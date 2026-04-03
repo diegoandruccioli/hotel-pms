@@ -69,14 +69,14 @@ class RoomTypeServiceImplTest {
     @Test
     void testCreateRoomTypeSuccess() {
         when(roomTypeMapper.toEntity(Objects.requireNonNull(request))).thenReturn(roomType);
-        when(roomTypeRepository.save(Objects.requireNonNull(roomType))).thenReturn(roomType);
+        when(roomTypeRepository.saveAndFlush(Objects.requireNonNull(roomType))).thenReturn(roomType);
         when(roomTypeMapper.toResponse(Objects.requireNonNull(roomType))).thenReturn(response);
 
         final RoomTypeResponse result = roomTypeService.createRoomType(request);
 
         assertNotNull(result);
         assertEquals(SINGLE, result.name());
-        verify(roomTypeRepository).save(Objects.requireNonNull(roomType));
+        verify(roomTypeRepository).saveAndFlush(Objects.requireNonNull(roomType));
     }
 
     @Test
@@ -120,13 +120,13 @@ class RoomTypeServiceImplTest {
                 new BigDecimal(PRICE_100), true, null, null);
 
         when(roomTypeRepository.findById(Objects.requireNonNull(id))).thenReturn(Optional.of(roomType));
-        when(roomTypeRepository.save(Objects.requireNonNull(roomType))).thenReturn(updatedRoomType);
+        when(roomTypeRepository.saveAndFlush(Objects.requireNonNull(roomType))).thenReturn(updatedRoomType);
         when(roomTypeMapper.toResponse(Objects.requireNonNull(updatedRoomType))).thenReturn(updateResponse);
 
         final RoomTypeResponse result = roomTypeService.updateRoomType(id, updateRequest);
 
         assertEquals(DOUBLE, result.name());
-        verify(roomTypeRepository).save(Objects.requireNonNull(roomType)); // The active roomType is updated
+        verify(roomTypeRepository).saveAndFlush(Objects.requireNonNull(roomType)); // The active roomType is updated
     }
 
     @Test

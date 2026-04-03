@@ -164,14 +164,14 @@ class RoomServiceImplTest {
 
         when(roomRepository.findById(Objects.requireNonNull(roomId))).thenReturn(Optional.of(room));
         when(roomTypeRepository.findById(Objects.requireNonNull(roomTypeId))).thenReturn(Optional.of(roomType));
-        when(roomRepository.save(Objects.requireNonNull(room))).thenReturn(updatedRoom);
+        when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(updatedRoom);
         when(roomMapper.toResponse(Objects.requireNonNull(updatedRoom))).thenReturn(updateResponse);
 
         final RoomResponse result = roomService.updateRoom(Objects.requireNonNull(roomId), updateRequest);
 
         assertEquals(ROOM_102, result.roomNumber());
         assertEquals(RoomStatus.DIRTY, result.status());
-        verify(roomRepository).save(Objects.requireNonNull(room));
+        verify(roomRepository).saveAndFlush(Objects.requireNonNull(room));
     }
 
     @Test
@@ -187,13 +187,13 @@ class RoomServiceImplTest {
                 null);
 
         when(roomRepository.findById(Objects.requireNonNull(roomId))).thenReturn(Optional.of(room));
-        when(roomRepository.save(Objects.requireNonNull(room))).thenReturn(dirtyRoom);
+        when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(dirtyRoom);
         when(roomMapper.toResponse(Objects.requireNonNull(dirtyRoom))).thenReturn(dirtyResponse);
 
         final RoomResponse result = roomService.updateRoomStatus(Objects.requireNonNull(roomId), RoomStatus.DIRTY);
 
         assertEquals(RoomStatus.DIRTY, result.status());
-        verify(roomRepository).save(Objects.requireNonNull(room));
+        verify(roomRepository).saveAndFlush(Objects.requireNonNull(room));
     }
 
     @Test
