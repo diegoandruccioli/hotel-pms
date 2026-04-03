@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hotel_stay
+    username: user
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: true
+
+
+# Internal HMAC security - injected by setup-hmac-secret script
+internal:
+  hmac:
+    secret: ${INTERNAL_HMAC_SECRET}
