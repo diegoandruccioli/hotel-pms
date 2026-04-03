@@ -1,0 +1,20 @@
+export const enSettingsModalTranslations = {
+  settings: "Settings",
+  settings_section_appearance: "Appearance",
+  settings_section_typography: "Text Size",
+  settings_section_accessibility: "Accessibility",
+  settings_section_language: "Language",
+  settings_theme_label: "Select colour theme",
+  settings_font_label: "Select text size",
+  settings_language_label: "Select language",
+  settings_high_contrast: "High Contrast",
+  settings_high_contrast_desc: "Maximises text/background contrast (WCAG AAA)",
+  font_small: "Small",
+  font_normal: "Normal",
+  font_large: "Large",
+  theme_light: "Light theme",
+  theme_dark: "Dark theme",
+  theme_system: "System theme",
+  lang_italian: "Italian",
+  lang_english: "English"
+};

@@ -1,0 +1,329 @@
+/* ═══════════════════════════════════════════════════════
+   M3 Design Tokens — Light & Dark
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Light Theme (default) ─────────────────────────── */
+:root {
+  --md-primary: #1A3A5C;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #D4E4F7;
+  --md-on-primary-container: #0A2540;
+
+  --md-secondary: #B8860B;
+  --md-on-secondary: #FFFFFF;
+  --md-secondary-container: #FFF3D6;
+  --md-on-secondary-container: #4A3500;
+
+  --md-tertiary: #2E7D6A;
+  --md-on-tertiary: #FFFFFF;
+  --md-tertiary-container: #D7F0EA;
+  --md-on-tertiary-container: #0B3229;
+
+  --md-error: #BA1A1A;
+  --md-on-error: #FFFFFF;
+  --md-error-container: #FFDAD6;
+  --md-on-error-container: #410002;
+
+  --md-surface: #FAFCFF;
+  --md-on-surface: #1A1C1E;
+  --md-surface-variant: #E0E3E8;
+  --md-on-surface-variant: #43474E;
+  --md-surface-dim: #D9DCE1;
+  --md-surface-bright: #FAFCFF;
+  --md-surface-container-lowest: #FFFFFF;
+  --md-surface-container-low: #F3F5FA;
+  --md-surface-container: #EDF0F5;
+  --md-surface-container-high: #E7EAEF;
+  --md-surface-container-highest: #E1E4E9;
+
+  --md-outline: #73777F;
+  --md-outline-variant: #C3C7CF;
+
+  --md-inverse-surface: #2F3033;
+  --md-inverse-on-surface: #F1F0F4;
+  --md-inverse-primary: #A6C8ED;
+
+  /* Elevation shadows — light */
+  --md-elevation-1: 0px 1px 3px 1px rgba(0,0,0,0.15), 0px 1px 2px 0px rgba(0,0,0,0.30);
+  --md-elevation-2: 0px 2px 6px 2px rgba(0,0,0,0.15), 0px 1px 2px 0px rgba(0,0,0,0.30);
+  --md-elevation-3: 0px 4px 8px 3px rgba(0,0,0,0.15), 0px 1px 3px 0px rgba(0,0,0,0.30);
+  --md-elevation-4: 0px 6px 10px 4px rgba(0,0,0,0.15), 0px 2px 3px 0px rgba(0,0,0,0.30);
+  --md-elevation-5: 0px 8px 12px 6px rgba(0,0,0,0.15), 0px 4px 4px 0px rgba(0,0,0,0.30);
+
+  /* Glass */
+  --md-glass-bg: rgba(255, 255, 255, 0.72);
+  --md-glass-border: rgba(255, 255, 255, 0.3);
+  --md-glass-bg-elevated: rgba(255, 255, 255, 0.82);
+  --md-glass-border-elevated: rgba(255, 255, 255, 0.4);
+
+  /* Scrollbar */
+  --md-scrollbar-thumb: #C3C7CF;
+  --md-scrollbar-thumb-hover: #73777F;
+}
+
+/* ── Dark Theme ────────────────────────────────────── */
+.dark {
+  --md-primary: #A6C8ED;
+  --md-on-primary: #0A2540;
+  --md-primary-container: #1A3A5C;
+  --md-on-primary-container: #D4E4F7;
+
+  --md-secondary: #F0D080;
+  --md-on-secondary: #4A3500;
+  --md-secondary-container: #6B5200;
+  --md-on-secondary-container: #FFF3D6;
+
+  --md-tertiary: #8BD4BF;
+  --md-on-tertiary: #0B3229;
+  --md-tertiary-container: #1A5C4A;
+  --md-on-tertiary-container: #D7F0EA;
+
+  --md-error: #FFB4AB;
+  --md-on-error: #690005;
+  --md-error-container: #93000A;
+  --md-on-error-container: #FFDAD6;
+
+  --md-surface: #121316;
+  --md-on-surface: #E3E2E6;
+  --md-surface-variant: #43474E;
+  --md-on-surface-variant: #C3C7CF;
+  --md-surface-dim: #121316;
+  --md-surface-bright: #38393D;
+  --md-surface-container-lowest: #0D0E11;
+  --md-surface-container-low: #1A1C1E;
+  --md-surface-container: #1E2023;
+  --md-surface-container-high: #282A2D;
+  --md-surface-container-highest: #333538;
+
+  --md-outline: #8D9199;
+  --md-outline-variant: #43474E;
+
+  --md-inverse-surface: #E3E2E6;
+  --md-inverse-on-surface: #2F3033;
+  --md-inverse-primary: #1A3A5C;
+
+  /* Elevation shadows — dark (softer, less contrast) */
+  --md-elevation-1: 0px 1px 3px 1px rgba(0,0,0,0.30), 0px 1px 2px 0px rgba(0,0,0,0.50);
+  --md-elevation-2: 0px 2px 6px 2px rgba(0,0,0,0.30), 0px 1px 2px 0px rgba(0,0,0,0.50);
+  --md-elevation-3: 0px 4px 8px 3px rgba(0,0,0,0.30), 0px 1px 3px 0px rgba(0,0,0,0.50);
+  --md-elevation-4: 0px 6px 10px 4px rgba(0,0,0,0.30), 0px 2px 3px 0px rgba(0,0,0,0.50);
+  --md-elevation-5: 0px 8px 12px 6px rgba(0,0,0,0.30), 0px 4px 4px 0px rgba(0,0,0,0.50);
+
+  /* Glass — dark */
+  --md-glass-bg: rgba(30, 32, 35, 0.75);
+  --md-glass-border: rgba(255, 255, 255, 0.08);
+  --md-glass-bg-elevated: rgba(40, 42, 45, 0.82);
+  --md-glass-border-elevated: rgba(255, 255, 255, 0.12);
+
+  /* Scrollbar — dark */
+  --md-scrollbar-thumb: #43474E;
+  --md-scrollbar-thumb-hover: #8D9199;
+}
+
+/* ── High Contrast Theme (WCAG AAA) ────────────────── */
+/*
+   Activated by adding the attribute data-contrast="high"
+   to the <html> element. These tokens override the M3
+   surface/text tokens for maximum readability.
+*/
+[data-contrast="high"] {
+  --md-primary: #003070;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #D4E4F7;
+  --md-on-primary-container: #000000;
+
+  --md-secondary: #6B4900;
+  --md-on-secondary: #FFFFFF;
+  --md-secondary-container: #FFF3D6;
+  --md-on-secondary-container: #000000;
+
+  --md-error: #930000;
+  --md-on-error: #FFFFFF;
+  --md-error-container: #FFDAD6;
+  --md-on-error-container: #000000;
+
+  --md-surface: #FFFFFF;
+  --md-on-surface: #000000;
+  --md-surface-variant: #E0E3E8;
+  --md-on-surface-variant: #000000;
+  --md-surface-dim: #C0C3C8;
+  --md-surface-bright: #FFFFFF;
+  --md-surface-container-lowest: #FFFFFF;
+  --md-surface-container-low: #F0F3F8;
+  --md-surface-container: #E8EBF0;
+  --md-surface-container-high: #D8DBE0;
+  --md-surface-container-highest: #C8CBD0;
+
+  --md-outline: #000000;
+  --md-outline-variant: #43474E;
+
+  --md-glass-bg: rgba(255, 255, 255, 0.95);
+  --md-glass-border: rgba(0, 0, 0, 0.5);
+  --md-glass-bg-elevated: rgba(255, 255, 255, 0.98);
+  --md-glass-border-elevated: rgba(0, 0, 0, 0.6);
+}
+
+.dark[data-contrast="high"] {
+  --md-primary: #C8DFFF;
+  --md-on-primary: #000000;
+  --md-primary-container: #004A99;
+  --md-on-primary-container: #FFFFFF;
+
+  --md-secondary: #FFE27A;
+  --md-on-secondary: #000000;
+  --md-secondary-container: #5C3E00;
+  --md-on-secondary-container: #FFFFFF;
+
+  --md-error: #FFB4AB;
+  --md-on-error: #000000;
+  --md-error-container: #7A0000;
+  --md-on-error-container: #FFFFFF;
+
+  --md-surface: #000000;
+  --md-on-surface: #FFFFFF;
+  --md-surface-variant: #2A2D34;
+  --md-on-surface-variant: #FFFFFF;
+  --md-surface-dim: #000000;
+  --md-surface-bright: #2A2C30;
+  --md-surface-container-lowest: #000000;
+  --md-surface-container-low: #101214;
+  --md-surface-container: #181A1C;
+  --md-surface-container-high: #222426;
+  --md-surface-container-highest: #2C2E30;
+
+  --md-outline: #FFFFFF;
+  --md-outline-variant: #C3C7CF;
+
+  --md-glass-bg: rgba(0, 0, 0, 0.95);
+  --md-glass-border: rgba(255, 255, 255, 0.5);
+  --md-glass-bg-elevated: rgba(10, 12, 15, 0.98);
+  --md-glass-border-elevated: rgba(255, 255, 255, 0.6);
+}
+
+/* ── Typography Scale ───────────────────────────────── */
+/*
+   Three scale options driven by a CSS variable on <html>.
+   Because Tailwind uses `rem`, scaling html font-size
+   proportionally scales the entire UI (padding, margins,
+   font sizes, icon sizes expressed as rem).
+   Default (Normale) = 16px (1rem = 16px)
+*/
+:root {
+  --md-font-scale: 16px; /* default: Normale */
+}
+
+html {
+  font-size: var(--md-font-scale);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Base Layer
+   ═══════════════════════════════════════════════════════ */
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  html,
+  body {
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: "Inter", system-ui, sans-serif;
+    color: var(--md-on-surface);
+    background-color: var(--md-surface);
+  }
+}
+
+/* ── Glassmorphism Utilities ───────────────────────── */
+
+@layer components {
+  .glass-surface {
+    background: var(--md-glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--md-glass-border);
+  }
+
+  .glass-surface-elevated {
+    background: var(--md-glass-bg-elevated);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--md-glass-border-elevated);
+  }
+}
+
+/* ── Scrollbar ─────────────────────────────────────── */
+
+@layer base {
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--md-scrollbar-thumb);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--md-scrollbar-thumb-hover);
+  }
+}
+
+/* ── Smooth Transitions ────────────────────────────── */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    transition-property: color, background-color, border-color, box-shadow,
+      opacity;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  [data-no-transition],
+  [data-no-transition] *,
+  .animate-spin,
+  .animate-pulse {
+    transition: none !important;
+  }
+}
+
+/* ── Material Symbols Configuration ────────────────── */
+
+@layer base {
+  .material-symbols-outlined {
+    font-variation-settings:
+      "FILL" 0,
+      "wght" 400,
+      "GRAD" 0,
+      "opsz" 24;
+    font-size: 24px;
+    line-height: 1;
+    vertical-align: middle;
+    user-select: none;
+  }
+
+  .material-symbols-outlined.filled {
+    font-variation-settings:
+      "FILL" 1,
+      "wght" 400,
+      "GRAD" 0,
+      "opsz" 24;
+  }
+}
