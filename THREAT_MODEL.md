@@ -164,12 +164,13 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 
 | Threat ID | Intervento | Servizio/File | Commit | OWASP | Stato |
 |-----------|------------|---------------|--------|-------|-------|
-| T-AUTH-01 | Messaggi errore login uniformi (no user enumeration) | auth-service | — | A07 | ⏳ |
-| T-AUTH-02 | Account lockout + rate limiting login | auth-service | — | A07 | ⏳ |
+| T-AUTH-01 | Messaggi errore login uniformi (no user enumeration) | auth-service/AuthServiceImpl.java | baseline (main) | A07 | ✅ |
+| T-AUTH-02 | Account lockout dopo 5 tentativi falliti, 15 min | auth-service/AuthServiceImpl.java | a90e462 | A07 | ✅ |
 | T-AUTH-03 | Verifica/upgrade hashing password (bcrypt cost factor) | auth-service | — | A02 | ⏳ |
 | T-AUTH-04 | Refresh token rotation + blacklist | auth-service | — | A07 | ⏳ |
 | T-AUTH-05 | Audit log autenticazione | auth-service | — | A09 | ⏳ |
-| T-GW-01 | Strip header X-Auth-* in ingresso dal client | api-gateway | — | A01 | ⏳ |
+| T-GW-01 | Verifica HMAC-SHA256 su X-Internal-Signature (InternalAuthFilter) | api-gateway + tutti i servizi | baseline (main) | A01 | ✅ |
+| T-FE-02 | Token JWT in httpOnly cookie (Secure + SameSite=Strict) | auth-service/AuthController.java | baseline (main) | A02 | ✅ |
 | T-GW-03 | Security headers HTTP (CSP, HSTS, X-Frame-Options) | api-gateway | — | A05 | ⏳ |
 | T-GW-04 | CORS origins whitelist restrittiva | api-gateway | — | A05 | ⏳ |
 | T-GW-05 | CSRF token per operazioni mutanti | api-gateway/frontend | — | A01 | ⏳ |

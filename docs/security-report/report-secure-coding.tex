@@ -372,11 +372,257 @@ riferimento al commit Git e alla entry corrispondente nel THREAT\_MODEL.md.]}
 %
 % \paragraph{Riferimento} Commit: \commitref{SHA}{messaggio commit}
 
-\subsection{User Enumeration \threat{T-AUTH-01}}
-\textit{[Da completare — step di hardening in corso]}
+% ── Nota sui threat già mitigati nella baseline ──────────────────────────────
+\begin{notebox}[title={Mitigazioni presenti nella baseline (branch \texttt{main})}]
+Le vulnerabilità \textbf{T-AUTH-01}, \textbf{T-GW-01} e \textbf{T-FE-02} risultano già
+mitigate nel codice del branch \texttt{main} (baseline). Tali protezioni sono state introdotte
+consapevolmente durante la fase di sviluppo iniziale, non come hardening successivo.
+Le sezioni seguenti documentano il pattern insicuro che è stato evitato, a dimostrazione
+della consapevolezza del rischio durante la progettazione.
+\end{notebox}
 
-\subsection{Protezione Brute Force \threat{T-AUTH-02}}
-\textit{[Da completare — step di hardening in corso]}
+\subsection{User Enumeration — Risposta Uniforme al Login \threat{T-AUTH-01}}
+
+\paragraph{Descrizione}
+Un endpoint di login che restituisce messaggi di errore differenziati (es.\
+\texttt{"USER\_NOT\_FOUND"} vs \texttt{"INVALID\_PASSWORD"}) consente a un attaccante
+di enumerare gli username validi tramite una scansione automatizzata.
+Classificato OWASP A07 --- Identification \& Authentication Failures.
+
+\begin{insecurebox}[title={Pattern Vulnerabile Evitato --- AuthServiceImpl.java}]
+\begin{lstlisting}[style=java]
+// INSICURO: messaggi diversi rivelano l'esistenza dell'account
+public AuthResponse login(LoginRequest request) {
+    UserAccount user = userRepository.findByUsername(request.username())
+        .orElseThrow(
+            () -> new BadCredentialsException("USER_NOT_FOUND")); // leak!
+
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        throw new BadCredentialsException("INVALID_PASSWORD"); // diverso -> enum
+    }
+    ...
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata (baseline)}
+\texttt{AuthServiceImpl.login()} utilizza lo stesso messaggio \texttt{"INVALID\_CREDENTIALS"}
+sia quando l'utente non esiste sia quando la password è errata, rendendo impossibile
+distinguere i due casi dall'esterno.
+
+\begin{securebox}[title={Codice Sicuro --- AuthServiceImpl.java (branch \texttt{main})}]
+\begin{lstlisting}[style=java]
+// SICURO: stesso messaggio in entrambi i casi
+public AuthResponse login(LoginRequest request) {
+    UserAccount user = userRepository.findByUsername(request.username())
+        .orElseThrow(
+            () -> new BadCredentialsException("INVALID_CREDENTIALS"));
+
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        throw new BadCredentialsException("INVALID_CREDENTIALS"); // identico
+    }
+    ...
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Riferimento} Presente nella baseline --- \texttt{auth-service/AuthServiceImpl.java}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Iniezione Header X-Auth via Client \threat{T-GW-01}}
+
+\paragraph{Descrizione}
+In un'architettura a microservizi, i servizi interni ricevono dal gateway gli header
+\texttt{X-Auth-User} e \texttt{X-Auth-Role} per identificare il chiamante senza
+ri-validare il JWT. Un servizio che accetti tali header senza verificarne l'origine
+è vulnerabile a impersonation: un client che raggiunga direttamente la porta interna
+del servizio può iniettare \texttt{X-Auth-Role: ADMIN} e ottenere privilegi massimi.
+Classificato OWASP A01 --- Broken Access Control.
+
+\begin{insecurebox}[title={Pattern Vulnerabile Evitato --- filtro servizi interni}]
+\begin{lstlisting}[style=java]
+// INSICURO: il servizio trust gli header senza verifica di origine
+String username = request.getHeader("X-Auth-User");
+String role    = request.getHeader("X-Auth-Role");
+// Chiunque raggiunga direttamente il servizio puo' iniettare ROLE_ADMIN
+SecurityContextHolder.getContext().setAuthentication(
+    new UsernamePasswordAuthenticationToken(
+        username, "", List.of(new SimpleGrantedAuthority("ROLE_" + role))));
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata (baseline)}
+Il gateway firma ogni richiesta con \texttt{HMAC-SHA256(secret, "username:role")} e
+inietta la firma in \texttt{X-Internal-Signature}. L'\texttt{InternalAuthFilter}
+presente in ogni microservizio ricalcola la firma e la confronta con
+\texttt{MessageDigest.isEqual} (confronto constant-time, immune a timing attack)
+prima di popolare il \texttt{SecurityContext}. Senza il segreto HMAC condiviso è
+impossibile forgiare una firma valida.
+
+\begin{securebox}[title={Codice Sicuro --- InternalAuthFilter.java (tutti i servizi)}]
+\begin{lstlisting}[style=java]
+// SICURO: verifica HMAC-SHA256 prima di fidarsi degli header
+private boolean isSignatureValid(String username, String role, String sig) {
+    String expected = computeHmac(username, role);
+    // Confronto constant-time: previene timing attack
+    return MessageDigest.isEqual(
+        expected.getBytes(StandardCharsets.UTF_8),
+        sig.getBytes(StandardCharsets.UTF_8));
+}
+
+// In doFilterInternal():
+if (!isSignatureValid(username, role, signature)) {
+    rejectRequest(response, "Invalid internal request signature"); // 401
+    return;
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Riferimento} Presente nella baseline --- \texttt{guest-service/.../InternalAuthFilter.java}
+(replicato in tutti i microservizi).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Token JWT in \texttt{localStorage} --- Esposizione a XSS \threat{T-FE-02}}
+
+\paragraph{Descrizione}
+Memorizzare il token di sessione in \texttt{localStorage} lo rende leggibile da qualsiasi
+script JavaScript eseguito nella pagina, incluso codice iniettato via XSS. Un attaccante
+può estrarlo con \texttt{localStorage.getItem('jwt')} ed eseguire richieste autenticate
+su server arbitrari. Classificato OWASP A02 --- Cryptographic Failures / A07.
+
+\begin{insecurebox}[title={Pattern Vulnerabile Evitato --- gestione token frontend}]
+\begin{lstlisting}[style=typescript]
+// INSICURO: token in localStorage, leggibile da XSS
+const response = await axios.post('/api/v1/auth/login', credentials);
+localStorage.setItem('jwt', response.data.token);  // esposto a JS
+axios.defaults.headers.common['Authorization'] =
+    `Bearer ${localStorage.getItem('jwt')}`;
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata (baseline)}
+Il server imposta il JWT in un cookie \texttt{httpOnly; Secure; SameSite=Strict}.
+Il flag \texttt{httpOnly} lo rende inaccessibile a JavaScript; \texttt{Secure}
+ne impedisce la trasmissione in chiaro; \texttt{SameSite=Strict} blocca l'invio
+cross-site. Il frontend React non gestisce mai il valore del token.
+
+\begin{securebox}[title={Codice Sicuro --- AuthController.java (branch \texttt{main})}]
+\begin{lstlisting}[style=java]
+// SICURO: cookie httpOnly, invisibile a JavaScript
+private ResponseCookie createCookie(String value, int maxAge) {
+    return ResponseCookie.from("jwt", value)
+        .httpOnly(true)       // inaccessibile a JavaScript
+        .secure(true)         // solo HTTPS
+        .sameSite("Strict")   // blocco invio cross-site
+        .path("/")
+        .maxAge(maxAge)
+        .build();
+}
+// Il frontend non tocca mai il token: il browser lo gestisce in automatico
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Riferimento} Presente nella baseline --- \texttt{auth-service/AuthController.java}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Brute Force sul Login --- Assenza di Account Lockout \threat{T-AUTH-02}}
+
+\paragraph{Descrizione}
+L'assenza di un meccanismo di account lockout consente attacchi a dizionario o brute
+force sull'endpoint di login senza limitazioni applicative. Il rate limiting del gateway
+(5 req/s per IP) è insufficiente contro attacchi distribuiti da IP multipli. Classificato
+OWASP A07 --- Identification \& Authentication Failures.
+
+La baseline non implementava alcun contatore di tentativi falliti:
+
+\begin{insecurebox}[title={Codice Vulnerabile --- AuthServiceImpl.java (baseline, branch \texttt{main})}]
+\begin{lstlisting}[style=java]
+@Transactional(readOnly = true)
+public AuthResponse login(LoginRequest request) {
+    UserAccount user = userRepository.findByUsername(request.username())
+        .orElseThrow(() -> new BadCredentialsException("INVALID_CREDENTIALS"));
+
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        throw new BadCredentialsException("INVALID_CREDENTIALS");
+        // Nessun contatore, nessun lockout:
+        // un attaccante puo' provare password illimitatamente
+    }
+
+    return new AuthResponse(
+        jwtService.generateToken(user.getUsername(), user.getRole()));
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Il metodo \texttt{login()} è stato esteso con una politica di lockout progressivo:
+\begin{itemize}
+  \item Dopo \textbf{5 tentativi falliti consecutivi} il campo \texttt{locked\_until}
+        viene impostato a \texttt{now + 15 minuti}.
+  \item Se l'account è bloccato, viene lanciata \texttt{AccountLockedException}
+        (HTTP 429 Too Many Requests) \emph{prima} del controllo password,
+        evitando timing leak sulla validità della password.
+  \item Un login riuscito resetta il contatore e cancella il lock.
+  \item I valori (soglia e durata) sono costanti named, senza magic numbers.
+\end{itemize}
+
+La Flyway migration \texttt{V2\_\_add\_login\_lockout.sql} aggiunge le colonne
+\texttt{failed\_attempts} e \texttt{locked\_until} alla tabella \texttt{user\_account}.
+
+\begin{securebox}[title={Codice Sicuro --- AuthServiceImpl.java (feature/secure-coding-hardening)}]
+\begin{lstlisting}[style=java]
+private static final int MAX_FAILED_ATTEMPTS = 5;
+private static final Duration LOCKOUT_DURATION = Duration.ofMinutes(15);
+
+@Transactional
+public AuthResponse login(LoginRequest request) {
+    UserAccount user = userRepository.findByUsername(request.username())
+        .orElseThrow(() -> new BadCredentialsException("INVALID_CREDENTIALS"));
+
+    // 1. Verifica lockout PRIMA del controllo password (no timing leak)
+    if (user.getLockedUntil() != null
+            && Instant.now().isBefore(user.getLockedUntil())) {
+        throw new AccountLockedException("ACCOUNT_TEMPORARILY_LOCKED"); // 429
+    }
+
+    // 2. Verifica password
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        int newAttempts = user.getFailedAttempts() + 1;
+        user.setFailedAttempts(newAttempts);
+        if (newAttempts >= MAX_FAILED_ATTEMPTS) {
+            user.setLockedUntil(Instant.now().plus(LOCKOUT_DURATION));
+        }
+        userRepository.save(user);
+        throw new BadCredentialsException("INVALID_CREDENTIALS");
+    }
+
+    // 3. Login riuscito: reset contatore e lock
+    if (user.getFailedAttempts() > 0) {
+        user.setFailedAttempts(0);
+        user.setLockedUntil(null);
+        userRepository.save(user);
+    }
+    return new AuthResponse(
+        jwtService.generateToken(user.getUsername(), user.getRole()));
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={V2\_\_add\_login\_lockout.sql --- Flyway migration}]
+\begin{lstlisting}[style=yaml]
+ALTER TABLE user_account
+    ADD COLUMN IF NOT EXISTS failed_attempts INTEGER     NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS locked_until   TIMESTAMPTZ;
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test} Aggiunti 4 test in \texttt{AuthServiceImplTest}:
+\texttt{loginThrowsWhenAccountIsLocked},
+\texttt{loginIncrementsFailedAttemptsOnWrongPassword},
+\texttt{loginLocksAccountAfterMaxFailedAttempts},
+\texttt{loginResetsCounterOnSuccess}.
+
+\paragraph{Riferimento} Commit: \commitref{a90e462}{security(auth): add account lockout for brute-force protection (T-AUTH-02)}
 
 \subsection{Sicurezza Hashing Password \threat{T-AUTH-03}}
 \textit{[Da completare — step di hardening in corso]}
@@ -399,7 +645,8 @@ riferimento al commit Git e alla entry corrispondente nel THREAT\_MODEL.md.]}
 % ─────────────────────────────────────────────────────────────────────────────
 
 \subsection{Strip Header X-Auth dal client \threat{T-GW-01}}
-\textit{[Da completare]}
+\textit{Mitigato nella baseline tramite HMAC-SHA256 (InternalAuthFilter). Documentato nella
+sezione \textbf{Autenticazione Sicura} sopra (T-AUTH-01/T-GW-01/T-FE-02).}
 
 \subsection{IDOR su risorse ospite/hotel \threat{T-GST-01, T-RES-02, T-BILL-01}}
 \textit{[Da completare]}
