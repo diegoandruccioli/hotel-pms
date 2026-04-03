@@ -1,0 +1,509 @@
+\documentclass[a4paper,12pt]{report}
+
+% ─── Codifica e lingua ───────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{float}
+
+% ─── Geometria e layout ──────────────────────────────────────────────────────
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{multicol}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+
+% ─── Colori ──────────────────────────────────────────────────────────────────
+\usepackage{xcolor}
+
+% Palette codice Java (come J-Pou)
+\definecolor{javared}{rgb}{0.6,0,0}
+\definecolor{javagreen}{rgb}{0.25,0.5,0.35}
+\definecolor{javapurple}{rgb}{0.5,0,0.35}
+\definecolor{javadocblue}{rgb}{0.25,0.35,0.75}
+
+% Palette codice TypeScript / YAML
+\definecolor{tsblue}{rgb}{0.0,0.2,0.6}
+\definecolor{tsorange}{rgb}{0.8,0.4,0.0}
+\definecolor{tsgray}{rgb}{0.5,0.5,0.5}
+
+% Palette ambienti sicurezza
+\definecolor{vulnred}{RGB}{220,50,47}
+\definecolor{fixgreen}{RGB}{42,161,152}
+\definecolor{warnyellow}{RGB}{181,137,0}
+\definecolor{infoblue}{RGB}{38,139,210}
+\definecolor{lightred}{RGB}{255,235,235}
+\definecolor{lightgreen}{RGB}{235,255,235}
+\definecolor{lightyellow}{RGB}{255,252,220}
+
+% ─── Listings ────────────────────────────────────────────────────────────────
+\usepackage{listings}
+
+% Stile Java (identico a J-Pou)
+\lstdefinestyle{java}{
+  language=Java,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{javapurple}\bfseries,
+  stringstyle=\color{javared},
+  commentstyle=\color{javagreen},
+  morecomment=[s][\color{javadocblue}]{/**}{*/},
+  tabsize=4,
+  showspaces=false,
+  showstringspaces=false,
+  frame=single,
+  breaklines=true,
+  postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+  numbers=left,
+  numberstyle=\tiny\color{tsgray},
+  numbersep=5pt,
+}
+
+% Stile TypeScript / JavaScript
+\lstdefinestyle{typescript}{
+  language=JavaScript,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{tsblue}\bfseries,
+  stringstyle=\color{javared},
+  commentstyle=\color{javagreen},
+  tabsize=2,
+  showspaces=false,
+  showstringspaces=false,
+  frame=single,
+  breaklines=true,
+  postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+  numbers=left,
+  numberstyle=\tiny\color{tsgray},
+  numbersep=5pt,
+}
+
+% Stile YAML / Properties
+\lstdefinestyle{yaml}{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{tsblue}\bfseries,
+  stringstyle=\color{javared},
+  commentstyle=\color{javagreen},
+  tabsize=2,
+  showspaces=false,
+  showstringspaces=false,
+  frame=single,
+  breaklines=true,
+  postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+  numbers=left,
+  numberstyle=\tiny\color{tsgray},
+  numbersep=5pt,
+}
+
+% Stile predefinito
+\lstset{style=java}
+
+% ─── Ambienti personalizzati ─────────────────────────────────────────────────
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+
+% Box codice INSICURO (sfondo rosso chiaro)
+\newtcolorbox{insecurebox}[1][]{
+  colback=lightred,
+  colframe=vulnred,
+  fonttitle=\bfseries\small,
+  title={\textcolor{vulnred}{Codice Vulnerabile} #1},
+  breakable,
+  #1
+}
+
+% Box codice SICURO (sfondo verde chiaro)
+\newtcolorbox{securebox}[1][]{
+  colback=lightgreen,
+  colframe=fixgreen,
+  fonttitle=\bfseries\small,
+  title={\textcolor{fixgreen}{Codice Sicuro} #1},
+  breakable,
+  #1
+}
+
+% Box nota/avviso
+\newtcolorbox{notebox}[1][]{
+  colback=lightyellow,
+  colframe=warnyellow,
+  fonttitle=\bfseries\small,
+  title={\textcolor{warnyellow}{Nota} #1},
+  breakable,
+}
+
+% ─── Hyperref ────────────────────────────────────────────────────────────────
+\usepackage{hyperref}
+\usepackage[all]{hypcap}
+\usepackage{url}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=magenta,
+    urlcolor=blue,
+    pdftitle={Progetto Secure Coding — Hotel PMS},
+    pdfauthor={Diego Andruccioli},
+}
+
+% ─── Comandi personalizzati ──────────────────────────────────────────────────
+
+% Intestazione vulnerabilità: \vuln{Nome Vuln}{OWASP A0X}{Threat ID}
+\newcommand{\vuln}[3]{%
+  \subsubsection{#1 \hfill \textcolor{vulnred}{\small [#2 — #3]}}%
+}
+
+% Badge OWASP colorato
+\newcommand{\owasp}[1]{\textcolor{white}{\colorbox{vulnred}{\textbf{\small #1}}}}
+
+% Riferimento commit Git
+\newcommand{\commitref}[2]{\texttt{\small \href{https://github.com/diegoandruccioli/hotel-pms/commit/#1}{#2}}}
+
+% Threat ID inline
+\newcommand{\threat}[1]{\texttt{\small\textcolor{vulnred}{[#1]}}}
+
+% ─── Metadati documento ──────────────────────────────────────────────────────
+\title{%
+  \textbf{Progetto di Secure Coding} \\[0.5em]
+  \large Analisi delle vulnerabilità e hardening di un \\
+  Property Management System per hotel \\[1em]
+  \normalsize Corso di Sicurezza — A.A. 2025/26
+}
+\author{Diego Andruccioli}
+\date{A.A. 2025/26}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+\maketitle
+
+% ─── Sommario ────────────────────────────────────────────────────────────────
+\chapter*{Sommario}
+
+Questa relazione documenta il processo di analisi della sicurezza e di \textit{hardening} applicato
+a \textbf{Hotel PMS}, un sistema gestionale per la gestione alberghiera sviluppato come progetto
+personale e utilizzato come base per questo elaborato del corso di Sicurezza.
+
+\par\medskip
+
+Il sistema è un'applicazione enterprise a microservizi composta da 9 servizi backend (Java 21,
+Spring Boot 3.4, Spring Cloud) e un frontend React 19, accessibili tramite un API Gateway centrale.
+La superficie di attacco è ampia e significativa: il sistema gestisce credenziali utente, sessioni
+JWT, dati personali di ospiti (PII), prenotazioni, fatture e report obbligatori per la Polizia di Stato.
+
+\par\medskip
+
+Il documento segue l'approccio richiesto dalla traccia d'esame: partendo dalla baseline del codice
+originale (branch \texttt{main}), identifica le vulnerabilità tramite analisi statica e threat
+modeling STRIDE, le mappa rispetto all'OWASP Top 10 2021, e descrive per ciascuna l'intervento
+di mitigazione applicato sul branch \texttt{feature/secure-coding-hardening}, mostrando i diff
+rilevanti del codice prima e dopo l'hardening.
+
+\par\medskip
+
+Ogni intervento è accompagnato dal riferimento al commit Git corrispondente e da un frammento
+della tabella di tracciamento del \texttt{THREAT\_MODEL.md}, che evolve iterativamente
+con lo sviluppo.
+
+\tableofcontents
+
+% ═════════════════════════════════════════════════════════════════════════════
+\chapter{Introduzione}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\section{Descrizione del dominio applicativo}
+
+\textbf{Hotel PMS} (Property Management System) è un gestionale enterprise per strutture
+ricettive che supporta l'intero ciclo operativo di un hotel: dalla registrazione degli ospiti
+alla gestione delle prenotazioni, dal check-in/check-out alla fatturazione, fino al servizio
+di Food \& Beverage del ristorante interno.
+
+Il sistema è progettato in ottica multi-hotel: un singolo deployment gestisce più strutture,
+garantendo l'isolamento dei dati tramite il campo \texttt{hotel\_id} propagato su tutti i servizi.
+
+\section{Architettura del sistema}
+
+Il backend è composto da 9 microservizi indipendenti, ciascuno con il proprio database PostgreSQL.
+Tutte le richieste client transitano attraverso l'\textbf{API Gateway} (:8080), che valida i token JWT
+e inietta gli header di autenticazione (\texttt{X-Auth-User}, \texttt{X-Auth-Role},
+\texttt{X-Internal-Signature}) prima di instradare verso il servizio competente.
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Servizio} & \textbf{Porta} & \textbf{Funzione} \\
+\midrule
+api-gateway & 8080 & Routing, JWT validation, rate limiting, CORS \\
+config-service & 8888 & Configurazione centralizzata (segreti) \\
+auth-service & 8087 & Autenticazione, JWT, gestione utenti \\
+guest-service & 8083 & Anagrafica ospiti (PII) \\
+inventory-service & 8081 & Gestione camere e disponibilità \\
+reservation-service & 8082 & Prenotazioni \\
+stay-service & 8084 & Check-in/check-out, report Alloggiati \\
+billing-service & 8085 & Fatture e pagamenti \\
+fb-service & 8086 & POS Food \& Beverage \\
+\bottomrule
+\end{tabularx}
+\caption{Microservizi del sistema Hotel PMS}
+\label{tab:services}
+\end{table}
+
+\section{Requisiti funzionali rilevanti per la sicurezza}
+
+L'applicazione soddisfa tutti i requisiti minimi obbligatori indicati dalla traccia d'esame:
+
+\begin{enumerate}
+  \item \textbf{Sistema di login e registrazione} — \texttt{auth-service}: form di autenticazione
+        con JWT in cookie httpOnly, gestione ruoli (ADMIN, MANAGER, RECEPTIONIST).
+  \item \textbf{Interazione persistente con database} — PostgreSQL per ogni microservizio,
+        ORM JPA/Hibernate con query parametrizzate tramite Spring Data JPA.
+  \item \textbf{Gestione dei ruoli (RBAC)} — tre ruoli distinti con endpoint amministrativi
+        riservati ad ADMIN, verificati lato server tramite Spring Security.
+  \item \textbf{Inserimento e visualizzazione dati utente} — campi testo libero su ospiti,
+        note prenotazione, descrizioni ordini F\&B.
+  \item \textbf{Risorse protette per proprietà} — ogni prenotazione/fattura/stay è legata a
+        un ospite e un hotel; accesso verificato server-side tramite \texttt{hotel\_id}.
+  \item \textbf{Gestione sessioni/stato} — JWT in cookie httpOnly con flag \texttt{Secure}
+        e \texttt{SameSite=Strict}.
+\end{enumerate}
+
+\textbf{Funzionalità avanzate (bonus)} presenti:
+\begin{itemize}
+  \item Integrazione API esterna: report Alloggiati via Web Service Polizia di Stato
+        (gestione sicura delle credenziali PS).
+  \item Servizi esterni mockati: config-service come secret manager centralizzato.
+\end{itemize}
+
+\section{Metodologia di analisi}
+
+L'analisi delle vulnerabilità segue la metodologia \textbf{STRIDE} di Microsoft, con mappatura
+rispetto all'\textbf{OWASP Top 10 2021}. Le vulnerabilità identificate sono documentate nel file
+\texttt{THREAT\_MODEL.md} del repository e tracciate nella tabella di mitigazione che evolve
+con ogni commit di hardening.
+
+Il branch \texttt{main} rappresenta la \textbf{baseline} (codice originale), mentre il branch
+\texttt{feature/secure-coding-hardening} contiene tutti gli interventi di messa in sicurezza.
+
+% ═════════════════════════════════════════════════════════════════════════════
+\chapter{Analisi della Baseline Insicura}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\textit{[Questo capitolo verrà completato iterativamente, con l'analisi dettagliata del codice
+vulnerabile originale per ogni area di sicurezza, accompagnata da snippet e mappatura OWASP.]}
+
+\section{Panoramica delle vulnerabilità identificate}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l l X l}
+\toprule
+\textbf{ID} & \textbf{OWASP} & \textbf{Descrizione} & \textbf{Impatto} \\
+\midrule
+T-AUTH-01 & A07 & User Enumeration al login & ALTO \\
+T-AUTH-02 & A07 & Brute Force senza protezione & CRITICO \\
+T-AUTH-03 & A02 & Gestione password (hashing) & CRITICO \\
+T-AUTH-04 & A07 & Refresh Token senza revoca & ALTO \\
+T-GW-01   & A01 & Header X-Auth iniettabili & CRITICO \\
+T-GW-03   & A05 & Assenza security headers HTTP & MEDIO \\
+T-GW-05   & A01 & Assenza protezione CSRF & ALTO \\
+T-GST-01  & A01 & IDOR su ospiti (hotel\_id) & CRITICO \\
+T-RES-01  & A04 & Double booking (no date lock) & CRITICO \\
+T-FB-02   & A04 & Prezzi non ricalcolati server-side & CRITICO \\
+T-CFG-01  & A05 & Actuator esposti & CRITICO \\
+T-CFG-02  & A02 & Segreti in chiaro & CRITICO \\
+T-FE-03   & A01 & Route guard solo lato client & MEDIO \\
+T-FE-04   & A05 & Assenza CSP & ALTO \\
+\bottomrule
+\end{tabularx}
+\caption{Riepilogo vulnerabilità identificate nella baseline}
+\label{tab:vulns}
+\end{table}
+
+\section{Autenticazione e Gestione Password}
+\textit{[Snippet e analisi — inseriti iterativamente ad ogni step di hardening]}
+
+\section{Validazione degli Input}
+\textit{[Snippet e analisi — inseriti iterativamente ad ogni step di hardening]}
+
+\section{Autorizzazione e Controllo degli Accessi}
+\textit{[Snippet e analisi — inseriti iterativamente ad ogni step di hardening]}
+
+\section{Gestione delle Sessioni}
+\textit{[Snippet e analisi — inseriti iterativamente ad ogni step di hardening]}
+
+\section{Configurazioni di Sicurezza}
+\textit{[Snippet e analisi — inseriti iterativamente ad ogni step di hardening]}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\chapter{Implementazione del Secure Coding}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\textit{[Questo capitolo verrà popolato iterativamente. Per ogni vulnerabilità corretta,
+verrà mostrato il codice originale (insicuro) affiancato al codice sicuro, con
+riferimento al commit Git e alla entry corrispondente nel THREAT\_MODEL.md.]}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Autenticazione Sicura}
+% ─────────────────────────────────────────────────────────────────────────────
+
+% TEMPLATE PER OGNI VULNERABILITÀ CORRETTA:
+%
+% \vuln{Nome Vulnerabilità}{OWASP AXX}{T-ID}
+%
+% \paragraph{Descrizione}
+% Testo della vulnerabilità originale.
+%
+% \begin{insecurebox}[title={Codice Vulnerabile — NomeFile.java}]
+% \begin{lstlisting}[style=java]
+% // codice insicuro
+% \end{lstlisting}
+% \end{insecurebox}
+%
+% \paragraph{Mitigazione applicata}
+% Testo della mitigazione.
+%
+% \begin{securebox}[title={Codice Sicuro — NomeFile.java}]
+% \begin{lstlisting}[style=java]
+% // codice sicuro
+% \end{lstlisting}
+% \end{securebox}
+%
+% \paragraph{Riferimento} Commit: \commitref{SHA}{messaggio commit}
+
+\subsection{User Enumeration \threat{T-AUTH-01}}
+\textit{[Da completare — step di hardening in corso]}
+
+\subsection{Protezione Brute Force \threat{T-AUTH-02}}
+\textit{[Da completare — step di hardening in corso]}
+
+\subsection{Sicurezza Hashing Password \threat{T-AUTH-03}}
+\textit{[Da completare — step di hardening in corso]}
+
+\subsection{Refresh Token Rotation \threat{T-AUTH-04}}
+\textit{[Da completare — step di hardening in corso]}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Validazione, Sanificazione ed Encoding}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Input Validation su dati ospite \threat{T-GST-02}}
+\textit{[Da completare]}
+
+\subsection{Server-side Price Validation \threat{T-FB-02}}
+\textit{[Da completare]}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Autorizzazione e Controllo degli Accessi}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Strip Header X-Auth dal client \threat{T-GW-01}}
+\textit{[Da completare]}
+
+\subsection{IDOR su risorse ospite/hotel \threat{T-GST-01, T-RES-02, T-BILL-01}}
+\textit{[Da completare]}
+
+\subsection{Double Booking Prevention \threat{T-RES-01}}
+\textit{[Da completare]}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Gestione Sicura delle Sessioni}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Cookie flags e JWT hardening \threat{T-AUTH-04}}
+\textit{[Da completare]}
+
+\subsection{Protezione CSRF \threat{T-GW-05}}
+\textit{[Da completare]}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Configurazioni di Sicurezza (Difesa in Profondità)}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Security Headers HTTP \threat{T-GW-03}}
+\textit{[Da completare]}
+
+\subsection{Content Security Policy \threat{T-FE-04}}
+\textit{[Da completare]}
+
+\subsection{Protezione Actuator Endpoints \threat{T-CFG-01}}
+\textit{[Da completare]}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Gestione Segreti}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Rimozione segreti in chiaro \threat{T-CFG-02}}
+\textit{[Da completare]}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\chapter{Gestione Autenticazione e Autorizzazione}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\textit{[Sezione dedicata a spiegare il ridisegno complessivo del sistema di identità e privilegi.
+Verrà completata al termine degli interventi sui servizi auth, gateway e frontend.]}
+
+\section{Ridisegno del flusso di autenticazione}
+
+\section{Modello RBAC}
+
+\section{Gestione del ciclo di vita del JWT}
+
+\section{Protezioni contro attacchi comuni all'autenticazione}
+
+% ═════════════════════════════════════════════════════════════════════════════
+% APPENDICI
+% ═════════════════════════════════════════════════════════════════════════════
+\appendix
+
+% ═════════════════════════════════════════════════════════════════════════════
+\chapter{Appendice IA — Log Prompt e Analisi Critica}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\section{Modalità di utilizzo dell'IA}
+
+Questo progetto utilizza \textbf{Claude Code} (Anthropic, modello \texttt{claude-sonnet-4-6})
+come strumento di sviluppo integrato, non come generatore passivo di codice.
+
+L'IA è stata impiegata nelle seguenti modalità:
+\begin{enumerate}
+  \item \textbf{Generazione del codice iniziale} (baseline): il sistema Hotel PMS è stato
+        sviluppato originariamente con il supporto di Claude Code per la stesura del codice
+        boilerplate di microservizi, controller, entità JPA e componenti React.
+  \item \textbf{Analisi critica delle vulnerabilità}: l'IA è stata interrogata per identificare
+        debolezze architetturali e di implementazione nel codice generato.
+  \item \textbf{Implementazione degli interventi di hardening}: l'IA ha assistito nella
+        scrittura del codice di mitigazione, con revisione critica delle proposte.
+\end{enumerate}
+
+\section{Log dei Prompt utilizzati}
+
+\textit{[Questa sezione verrà popolata iterativamente con i prompt specifici
+utilizzati per ogni step di hardening, evidenziando i "cattivi consigli" o i
+default insicuri prodotti dall'IA.]}
+
+% Template per ogni entry:
+%
+% \subsection{Step N — Nome intervento}
+%
+% \paragraph{Prompt utilizzato}
+% \begin{verbatim}
+% [testo del prompt]
+% \end{verbatim}
+%
+% \paragraph{Output IA (rilevante)}
+% \begin{verbatim}
+% [estratto della risposta]
+% \end{verbatim}
+%
+% \paragraph{Analisi critica}
+% [Commento: cosa era corretto, cosa era insicuro o "allucinato",
+%  cosa ho modificato manualmente e perché]
+
+\section{Valutazione complessiva dell'output IA}
+
+\textit{[Riflessione conclusiva sull'affidabilità dell'IA per la generazione di codice sicuro,
+con esempi concreti di default insicuri introdotti e come sono stati corretti.]}
+
+\end{document}
