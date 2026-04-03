@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: api-gateway
+  config:
+    import: "configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
+  cloud:
+    gateway:
+      default-filters:
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 10
+            redis-rate-limiter.burstCapacity: 20
+            redis-rate-limiter.requestedTokens: 1
+            key-resolver: "#{@remoteAddrKeyResolver}"
+
+eureka:
+  client:
+    enabled: false
+
+
+# Internal HMAC security - injected by setup-hmac-secret script
+internal:
+  hmac:
+    secret: ${INTERNAL_HMAC_SECRET}
