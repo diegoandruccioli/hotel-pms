@@ -23,6 +23,21 @@ public class GlobalExceptionHandler {
     private static final String TIMESTAMP = "timestamp";
 
     /**
+     * Handles AccountLockedException (HTTP 429 Too Many Requests).
+     *
+     * @param ex the exception
+     * @return the problem detail mapping
+     */
+    @ExceptionHandler(AccountLockedException.class)
+    public ProblemDetail handleAccountLockedException(final AccountLockedException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        problemDetail.setTitle("Account Temporarily Locked");
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/too-many-requests")));
+        problemDetail.setProperty(TIMESTAMP, Instant.now());
+        return problemDetail;
+    }
+
+    /**
      * Handles BadCredentialsException.
      *
      * @param ex the exception

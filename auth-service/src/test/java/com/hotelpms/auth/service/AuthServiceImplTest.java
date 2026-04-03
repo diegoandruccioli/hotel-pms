@@ -5,6 +5,7 @@ import com.hotelpms.auth.domain.UserAccount;
 import com.hotelpms.auth.dto.AuthResponse;
 import com.hotelpms.auth.dto.LoginRequest;
 import com.hotelpms.auth.dto.RegisterRequest;
+import com.hotelpms.auth.exception.AccountLockedException;
 import com.hotelpms.auth.exception.BadCredentialsException;
 import com.hotelpms.auth.exception.DuplicateResourceException;
 import com.hotelpms.auth.mapper.UserAccountMapper;
@@ -12,16 +13,20 @@ import com.hotelpms.auth.repository.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -37,6 +42,7 @@ class AuthServiceImplTest {
     private static final String RAW_PASSWORD = "rawpassword";
     private static final String HASHED_PASSWORD = "hashedpassword";
     private static final String MOCK_TOKEN = "mockJwtToken";
+    private static final int MAX_FAILED_ATTEMPTS = 5;
 
     @Mock
     private UserAccountRepository userRepository;
@@ -139,5 +145,92 @@ class AuthServiceImplTest {
 
         assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest),
                 "Should throw BadCredentialsException when password does not match");
+    }
+
+    @Test
+    void loginThrowsWhenAccountIsLocked() {
+        final UserAccount lockedUser = UserAccount.builder()
+                .username(TEST_USER)
+                .email(TEST_EMAIL)
+                .passwordHash(HASHED_PASSWORD)
+                .role(Role.GUEST)
+                .active(true)
+                .failedAttempts(MAX_FAILED_ATTEMPTS)
+                .lockedUntil(Instant.now().plus(Duration.ofMinutes(10)))
+                .build();
+
+        when(userRepository.findByUsername(TEST_USER)).thenReturn(Optional.of(lockedUser));
+
+        assertThrows(AccountLockedException.class, () -> authService.login(loginRequest),
+                "Should throw AccountLockedException when account is locked");
+
+        verifyNoMoreInteractions(passwordEncoder);
+    }
+
+    @Test
+    void loginIncrementsFailedAttemptsOnWrongPassword() {
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(false);
+
+        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
+
+        final ArgumentCaptor<UserAccount> captor = ArgumentCaptor.forClass(UserAccount.class);
+        verify(userRepository).save(captor.capture());
+        assertEquals(1, captor.getValue().getFailedAttempts(),
+                "Failed attempts counter should be incremented to 1");
+        assertNull(captor.getValue().getLockedUntil(),
+                "Account should not be locked after a single failure");
+    }
+
+    @Test
+    void loginLocksAccountAfterMaxFailedAttempts() {
+        final UserAccount nearLockUser = UserAccount.builder()
+                .username(TEST_USER)
+                .email(TEST_EMAIL)
+                .passwordHash(HASHED_PASSWORD)
+                .role(Role.GUEST)
+                .active(true)
+                .failedAttempts(4)
+                .build();
+
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(nearLockUser));
+        when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(false);
+
+        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
+
+        final ArgumentCaptor<UserAccount> captor = ArgumentCaptor.forClass(UserAccount.class);
+        verify(userRepository).save(captor.capture());
+        assertEquals(MAX_FAILED_ATTEMPTS, captor.getValue().getFailedAttempts(),
+                "Failed attempts counter should reach MAX_FAILED_ATTEMPTS");
+        assertNotNull(captor.getValue().getLockedUntil(),
+                "Account must be locked after reaching MAX_FAILED_ATTEMPTS");
+    }
+
+    @Test
+    void loginResetsCounterOnSuccess() {
+        final UserAccount userWithPriorFailures = UserAccount.builder()
+                .username(TEST_USER)
+                .email(TEST_EMAIL)
+                .passwordHash(HASHED_PASSWORD)
+                .role(Role.GUEST)
+                .active(true)
+                .failedAttempts(3)
+                .build();
+
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(userWithPriorFailures));
+        when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
+        when(jwtService.generateToken(TEST_USER, Role.GUEST)).thenReturn(MOCK_TOKEN);
+
+        final AuthResponse response = authService.login(loginRequest);
+
+        assertNotNull(response);
+        assertEquals(MOCK_TOKEN, response.token());
+
+        final ArgumentCaptor<UserAccount> captor = ArgumentCaptor.forClass(UserAccount.class);
+        verify(userRepository).save(captor.capture());
+        assertEquals(0, captor.getValue().getFailedAttempts(),
+                "Failed attempts counter must be reset to 0 on successful login");
+        assertNull(captor.getValue().getLockedUntil(),
+                "Locked-until must be cleared on successful login");
     }
 }
