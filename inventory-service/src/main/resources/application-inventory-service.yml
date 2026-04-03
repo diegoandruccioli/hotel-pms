@@ -1,0 +1,26 @@
+server:
+  port: 8081
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/hotel_inventory}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:password}
+  jpa:
+    hibernate:
+      # validate: Flyway owns DDL. Hibernate only validates the schema, never alters it.
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+  flyway:
+    enabled: true
+    # Flyway will locate migrations in classpath:db/migration by default.
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+# Internal HMAC security – injected by setup-hmac-secret script or K8s Secret
+internal:
+  hmac:
+    secret: ${INTERNAL_HMAC_SECRET}
