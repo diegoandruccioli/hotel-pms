@@ -1,0 +1,167 @@
+server:
+  port: 8080
+
+spring:
+  data:
+    redis:
+      host: "${GW_REDIS_HOST:redis}"
+      port: 6379
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "${GW_CORS_ALLOWED_ORIGINS:http://localhost:5173}"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+      routes:
+        - id: auth-service
+          uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
+          predicates:
+            - Path=/api/v1/auth/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@remoteAddrKeyResolver}"
+
+        - id: guest-service
+          uri: "${GW_GUEST_SERVICE_URI:http://guest-service:8083}"
+          predicates:
+            - Path=/api/v1/guests/**
+          filters:
+            - AuthenticationFilter
+
+        - id: inventory-service
+          uri: "${GW_INVENTORY_SERVICE_URI:http://inventory-service:8081}"
+          predicates:
+            - Path=/api/v1/rooms/**, /api/v1/room-types/**
+          filters:
+            - AuthenticationFilter
+
+        - id: reservation-service
+          uri: "${GW_RESERVATION_SERVICE_URI:http://reservation-service:8082}"
+          predicates:
+            - Path=/api/v1/reservations/**
+          filters:
+            - AuthenticationFilter
+
+        - id: stay-service
+          uri: "${GW_STAY_SERVICE_URI:http://stay-service:8084}"
+          predicates:
+            - Path=/api/v1/stays/**
+          filters:
+            - AuthenticationFilter
+
+        - id: billing-service
+          uri: "${GW_BILLING_SERVICE_URI:http://billing-service:8085}"
+          predicates:
+            - Path=/api/v1/invoices/**, /api/v1/reports/**
+          filters:
+            - AuthenticationFilter
+
+        - id: fb-service
+          uri: "${GW_FB_SERVICE_URI:http://fb-service:8086}"
+          predicates:
+            - Path=/api/v1/fb/**
+          filters:
+            - AuthenticationFilter
+
+        - id: auth-service-docs
+          uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
+          predicates:
+            - Path=/auth-service/v3/api-docs
+          filters:
+            - RewritePath=/auth-service/(?<remaining>.*), /${remaining}
+
+        - id: inventory-service-docs
+          uri: "${GW_INVENTORY_SERVICE_URI:http://inventory-service:8081}"
+          predicates:
+            - Path=/inventory-service/v3/api-docs
+          filters:
+            - RewritePath=/inventory-service/(?<remaining>.*), /${remaining}
+
+        - id: reservation-service-docs
+          uri: "${GW_RESERVATION_SERVICE_URI:http://reservation-service:8082}"
+          predicates:
+            - Path=/reservation-service/v3/api-docs
+          filters:
+            - RewritePath=/reservation-service/(?<remaining>.*), /${remaining}
+
+        - id: guest-service-docs
+          uri: "${GW_GUEST_SERVICE_URI:http://guest-service:8083}"
+          predicates:
+            - Path=/guest-service/v3/api-docs
+          filters:
+            - RewritePath=/guest-service/(?<remaining>.*), /${remaining}
+
+        - id: stay-service-docs
+          uri: "${GW_STAY_SERVICE_URI:http://stay-service:8084}"
+          predicates:
+            - Path=/stay-service/v3/api-docs
+          filters:
+            - RewritePath=/stay-service/(?<remaining>.*), /${remaining}
+
+        - id: billing-service-docs
+          uri: "${GW_BILLING_SERVICE_URI:http://billing-service:8085}"
+          predicates:
+            - Path=/billing-service/v3/api-docs
+          filters:
+            - RewritePath=/billing-service/(?<remaining>.*), /${remaining}
+
+        - id: fb-service-docs
+          uri: "${GW_FB_SERVICE_URI:http://fb-service:8086}"
+          predicates:
+            - Path=/fb-service/v3/api-docs
+          filters:
+            - RewritePath=/fb-service/(?<remaining>.*), /${remaining}
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    urls:
+      - name: auth-service
+        url: /auth-service/v3/api-docs
+      - name: inventory-service
+        url: /inventory-service/v3/api-docs
+      - name: reservation-service
+        url: /reservation-service/v3/api-docs
+      - name: guest-service
+        url: /guest-service/v3/api-docs
+      - name: stay-service
+        url: /stay-service/v3/api-docs
+      - name: billing-service
+        url: /billing-service/v3/api-docs
+      - name: fb-service
+        url: /fb-service/v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health,info"
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+
+internal:
+  hmac:
+    secret: ${INTERNAL_HMAC_SECRET}
