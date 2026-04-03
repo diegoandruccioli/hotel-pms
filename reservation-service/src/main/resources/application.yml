@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: reservation-service
+  config:
+    import: "configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
+
+eureka:
+  client:
+    enabled: false
+
+
+
+# Internal HMAC security - injected by setup-hmac-secret script
+internal:
+  hmac:
+    secret: ${INTERNAL_HMAC_SECRET}

@@ -1,0 +1,21 @@
+server:
+  port: 8082
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/reservation_db
+    username: postgres
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+
+# Internal HMAC security - injected by setup-hmac-secret script
+internal:
+  hmac:
+    secret: ${INTERNAL_HMAC_SECRET}
