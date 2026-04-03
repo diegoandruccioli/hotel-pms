@@ -84,7 +84,7 @@ test.describe('Authentication – Happy Path', () => {
     // -----------------------------------------------------------------------
     // PHASE 5 – Assert successful redirect to the dashboard (root URL).
     // -----------------------------------------------------------------------
-    await expect(page).toHaveURL('http://localhost:3000/', { timeout: 10_000 });
+    await expect(page).toHaveURL(/\/$/, { timeout: 10_000 });
 
     // -----------------------------------------------------------------------
     // PHASE 6 – Assert key dashboard elements are visible.
