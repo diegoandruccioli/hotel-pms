@@ -1,0 +1,14 @@
+server:
+  port: 8087
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hotel_auth
+    username: pms_user
+    password: pms_password
