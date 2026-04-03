@@ -1,0 +1,5 @@
+# Enforce LF line endings
+* text eol=lf
+
+# Ensure UTF-8 encoding
+* charset=utf-8

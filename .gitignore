@@ -1,0 +1,48 @@
+# ── Build & dependency artifacts ────────────────────────────────────────────
+/build/
+/.gradle/
+/bin/
+**/build/
+**/out/
+**/bin/
+**/.gradle/
+
+# Gradle wrapper JARs (keep gradlew scripts, ignore the jar)
+!gradle/wrapper/gradle-wrapper.jar
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+
+# ── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.DS_Store
+.project
+.classpath
+.settings/
+.nb-gradle/
+
+# ── Secrets & environment ────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ── Logs & temp ──────────────────────────────────────────────────────────────
+*.log
+*.tmp
+
+# ── Claude Code — personal files, do not commit ──────────────────────────────
+backup/
+.claude/settings.local.json
+
+# ── Local tools ──────────────────────────────────────────────────────────────
+.antigravity.json
