@@ -1,0 +1,511 @@
+# ============================================================
+# Hotel PMS – Production-grade docker-compose
+# ============================================================
+# Changes from previous version:
+#   • Added deploy.resources (limits + reservations) for every service
+#   • Added /actuator/health/liveness healthchecks for every Spring service
+#   • api-gateway depends_on all downstream services (service_healthy)
+#   • Removed stale EUREKA_CLIENT_ENABLED flags (Eureka is being removed)
+# ============================================================
+
+services:
+  # ----------------------------------------------------------
+  # PostgreSQL – shared database host
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: hotel_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./docker/postgres:/docker-entrypoint-initdb.d
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  # ----------------------------------------------------------
+  # Redis - for API Gateway Rate Limiting
+  # ----------------------------------------------------------
+  redis:
+    image: redis:alpine
+    container_name: hotel_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+
+  # ----------------------------------------------------------
+  # Zipkin - Distributed Tracing
+  # ----------------------------------------------------------
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: hotel_zipkin
+    ports:
+      - "9411:9411"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
+  # Prometheus - Metrics and Monitoring
+  # ----------------------------------------------------------
+  prometheus:
+    image: prom/prometheus
+    container_name: hotel_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      config-server:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
+  # Config Server
+  # ----------------------------------------------------------
+  config-server:
+    build:
+      context: .
+      dockerfile: config-service/Dockerfile
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - SPRING_PROFILES_ACTIVE=native
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8888/actuator/health/liveness || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
+  # API Gateway (Spring Cloud Gateway – WebFlux / reactive)
+  # ----------------------------------------------------------
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - CONFIG_SERVER_URL=http://config-server:8888
+      # Service URIs – override with K8s ClusterIP or external URLs
+      - GW_AUTH_SERVICE_URI=http://auth-service:8087
+      - GW_GUEST_SERVICE_URI=http://guest-service:8083
+      - GW_INVENTORY_SERVICE_URI=http://inventory-service:8081
+      - GW_RESERVATION_SERVICE_URI=http://reservation-service:8082
+      - GW_STAY_SERVICE_URI=http://stay-service:8084
+      - GW_BILLING_SERVICE_URI=http://billing-service:8085
+      - GW_FB_SERVICE_URI=http://fb-service:8086
+      # CORS – override for production frontend URL
+      - GW_CORS_ALLOWED_ORIGINS=http://localhost:5173
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      guest-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      reservation-service:
+        condition: service_healthy
+      stay-service:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
+      fb-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8080/actuator/health/liveness || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384M
+        reservations:
+          cpus: "0.10"
+          memory: 192M
+
+  # ----------------------------------------------------------
+  # Auth Service
+  # ----------------------------------------------------------
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: auth-service
+    ports:
+      - "8087:8087"
+    environment:
+      - SPRING_PROFILES_ACTIVE=auth-service
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_auth
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8087/actuator/health/liveness || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
+  # Guest Service
+  # ----------------------------------------------------------
+  guest-service:
+    build:
+      context: .
+      dockerfile: guest-service/Dockerfile
+    container_name: guest-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=guest-service
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_guest
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+      - APPLICATION_CONFIG_RESERVATION_SERVICE_URL=http://reservation-service:8082
+      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8083/actuator/health/liveness || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
+  # Stay Service
+  # ----------------------------------------------------------
+  stay-service:
+    build:
+      context: .
+      dockerfile: stay-service/Dockerfile
+    container_name: stay-service
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_PROFILES_ACTIVE=stay-service
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_stay
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8084/actuator/health/liveness || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
+  # Billing Service
+  # ----------------------------------------------------------
+  billing-service:
+    build:
+      context: .
+      dockerfile: billing-service/Dockerfile
+    container_name: billing-service
+    ports:
+      - "8085:8085"
+    environment:
+      - SPRING_PROFILES_ACTIVE=billing-service
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_billing
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8085/actuator/health/liveness || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
+  # F&B Service
+  # ----------------------------------------------------------
+  fb-service:
+    build:
+      context: .
+      dockerfile: fb-service/Dockerfile
+    container_name: fb-service
+    ports:
+      - "8086:8086"
+    environment:
+      - SPRING_PROFILES_ACTIVE=fb-service
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_fb
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+      - APPLICATION_CONFIG_STAY_SERVICE_URL=http://stay-service:8084
+      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8086/actuator/health/liveness || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
+  # Inventory Service
+  # ----------------------------------------------------------
+  inventory-service:
+    build:
+      context: .
+      dockerfile: inventory-service/Dockerfile
+    container_name: inventory-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=inventory-service
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_inventory
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8081/actuator/health/liveness || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
+  # Reservation Service
+  # ----------------------------------------------------------
+  reservation-service:
+    build:
+      context: .
+      dockerfile: reservation-service/Dockerfile
+    container_name: reservation-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=reservation-service
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_reservation
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+      - APPLICATION_CONFIG_GUEST_SERVICE_URL=http://guest-service:8083
+      - APPLICATION_CONFIG_INVENTORY_SERVICE_URL=http://inventory-service:8081
+      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8082/actuator/health/liveness || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 768M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
+  # Frontend (Nginx static build)
+  # ----------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "80:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+
+volumes:
+  postgres_data:
