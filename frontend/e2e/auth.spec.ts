@@ -70,8 +70,8 @@ test.describe('Authentication – Happy Path', () => {
     // PHASE 3 – Fill the login form using stable, i18n-agnostic selectors.
     //   The inputs already have id="username" and id="password" in the DOM.
     // -----------------------------------------------------------------------
-    await page.locator('#username').fill(LOGIN_CREDENTIALS.username);
-    await page.locator('#password').fill(LOGIN_CREDENTIALS.password);
+    await page.getByRole('textbox', { name: /username/i }).fill(LOGIN_CREDENTIALS.username);
+    await page.getByLabel(/password/i).fill(LOGIN_CREDENTIALS.password);
 
     // -----------------------------------------------------------------------
     // PHASE 4 – Submit the form and wait for the POST /login response.

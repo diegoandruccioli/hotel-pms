@@ -137,8 +137,8 @@ test.describe('Booking → Check-in Scenario', () => {
     await page.goto('/reservations');
     await expect(page).toHaveURL(/reservations/);
 
-    // Click "New Reservation"
-    await page.getByRole('link', { name: /new/i }).click();
+    // Click "New Reservation" — data-testid avoids locale-dependent text matching
+    await page.locator('[data-testid="new-reservation-btn"]').click();
     await expect(page).toHaveURL(/reservations\/new/);
 
     // =====================================================================
