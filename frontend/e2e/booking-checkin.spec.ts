@@ -194,7 +194,7 @@ test.describe('Booking → Check-in Scenario', () => {
     // =====================================================================
     // STEP 6: Fill check-in guest form
     // =====================================================================
-    await expect(page.getByText(/check-in/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /check-in/i })).toBeVisible({ timeout: 5000 });
 
     // Fill required guest fields
     const firstNameInput = page.getByLabel(/first name/i).first();
