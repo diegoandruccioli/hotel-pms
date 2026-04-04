@@ -85,8 +85,14 @@ test.describe('Booking → Check-in Scenario', () => {
     );
 
     // ----- MOCK: rooms -----
-    await page.route('**/api/v1/rooms', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_ROOMS) })
+    // Pattern must include ** suffix: getAllRooms() adds query params (?page=0&size=500&sort=...)
+    // Response must be a SpringPage, not a plain array.
+    await page.route('**/api/v1/rooms**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ content: MOCK_ROOMS, totalElements: MOCK_ROOMS.length, totalPages: 1, number: 0, size: 500 }),
+      })
     );
 
     // ----- MOCK: reservation creation -----
