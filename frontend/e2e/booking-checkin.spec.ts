@@ -96,7 +96,8 @@ test.describe('Booking → Check-in Scenario', () => {
     );
 
     // ----- MOCK: reservation creation -----
-    await page.route('**/api/v1/reservations', async (route) => {
+    // Pattern must include ** suffix: getAllReservations() adds ?size=500
+    await page.route('**/api/v1/reservations**', async (route) => {
       if (route.request().method() === 'POST') {
         await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(MOCK_RESERVATION) });
       } else {
