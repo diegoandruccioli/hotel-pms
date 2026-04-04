@@ -106,7 +106,7 @@ test.describe('Booking → Check-in Scenario', () => {
         await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(MOCK_RESERVATION) });
       } else {
         reservationsGetCount += 1;
-        const list = reservationsGetCount <= 1 ? [] : [MOCK_RESERVATION];
+        const list = reservationsGetCount <= 2 ? [] : [MOCK_RESERVATION];
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
