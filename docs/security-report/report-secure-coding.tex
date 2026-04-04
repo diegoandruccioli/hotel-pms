@@ -750,7 +750,7 @@ uno per ciascun header (verifica del valore esatto) e uno per la priorità del f
 Il test utilizza \texttt{MockServerWebExchange} per invocare la callback \texttt{beforeCommit}
 tramite \texttt{response.setComplete()}, senza avviare alcun contesto Spring.
 
-\paragraph{Riferimento} Commit: \commitref{TO\_FILL}{fix(security): T-GW-03 --- add SecurityHeadersFilter for HTTP security headers}
+\paragraph{Riferimento} Commit: \commitref{b901a9f}{fix(security): T-GW-03 + T-FE-04 --- security headers and CSP}
 
 % ─────────────────────────────────────────────────────────────────────────────
 
@@ -854,7 +854,7 @@ incompatibile con il meccanismo di purging di Tailwind. Il rischio residuo è ac
 poiché la CSP blocca comunque \texttt{script-src} all'origine stessa, neutralizzando
 il vettore XSS principale.
 
-\paragraph{Riferimento} Commit: \commitref{TO\_FILL}{fix(security): T-FE-04 --- add CSP via nginx.conf and make API base URL relative}
+\paragraph{Riferimento} Commit: \commitref{b901a9f}{fix(security): T-GW-03 + T-FE-04 --- security headers and CSP}
 
 \subsection{Protezione Actuator Endpoints \threat{T-CFG-01}}
 
