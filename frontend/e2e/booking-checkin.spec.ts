@@ -95,17 +95,22 @@ test.describe('Booking → Check-in Scenario', () => {
       })
     );
 
-    // ----- MOCK: reservation creation -----
+    // ----- MOCK: reservation list + creation -----
     // Pattern must include ** suffix: getAllReservations() adds ?size=500
+    // The GET is called twice:
+    //   1. ReservationForm.loadInitialData() — must return empty to avoid double-booking conflict
+    //   2. Reservations list page (after form redirect) — must return [MOCK_RESERVATION]
+    let reservationsGetCount = 0;
     await page.route('**/api/v1/reservations**', async (route) => {
       if (route.request().method() === 'POST') {
         await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(MOCK_RESERVATION) });
       } else {
-        // GET list
+        reservationsGetCount += 1;
+        const list = reservationsGetCount <= 1 ? [] : [MOCK_RESERVATION];
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ content: [MOCK_RESERVATION], totalElements: 1, totalPages: 1, number: 0, size: 20 }),
+          body: JSON.stringify({ content: list, totalElements: list.length, totalPages: 1, number: 0, size: 500 }),
         });
       }
     });
