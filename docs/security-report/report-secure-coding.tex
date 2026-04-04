@@ -675,7 +675,109 @@ sezione \textbf{Autenticazione Sicura} sopra (T-AUTH-01/T-GW-01/T-FE-02).}
 \textit{[Da completare]}
 
 \subsection{Protezione Actuator Endpoints \threat{T-CFG-01}}
-\textit{[Da completare]}
+
+\paragraph{Descrizione}
+Spring Boot Actuator espone endpoint di diagnostica e monitoraggio (\texttt{/actuator/health},
+\texttt{/actuator/prometheus}, \texttt{/actuator/info}) sulla stessa porta dell'API applicativa.
+Nella baseline, tutti e 9 i microservizi pubblicavano la propria porta applicativa
+(da \texttt{8080} a \texttt{8087} e \texttt{8888}) con questi endpoint liberamente accessibili.
+In particolare:
+
+\begin{itemize}
+  \item \texttt{/actuator/prometheus} espone metriche interne del processo JVM (thread pool,
+        connection pool del database, latenze HTTP, circuit breaker state) — informazioni
+        preziose per un attaccante in fase di reconnaissance.
+  \item \texttt{/actuator/health} con \texttt{show-details: always} rivela lo stato dei
+        sotto-sistemi (database UP/DOWN, Redis ping, Zipkin) e i dettagli delle loro
+        configurazioni di connessione.
+\end{itemize}
+
+Classificato OWASP A05 --- Security Misconfiguration.
+
+\begin{insecurebox}[title={Configurazione Vulnerabile --- auth-service.yml (baseline)}]
+\begin{lstlisting}[style=yaml]
+# INSICURO: actuator sulla stessa porta dell'API (8087), accessibile
+# a chiunque raggiunga la porta pubblicata nel docker-compose
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health,info"
+  endpoint:
+    health:
+      show-details: always   # dettagli DB/Redis esposti senza autenticazione
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{insecurebox}[title={docker-compose.yml (baseline) --- porta applicativa pubblicata}]
+\begin{lstlisting}[style=yaml]
+auth-service:
+  ports:
+    - "8087:8087"   # /actuator/prometheus raggiungibile da qualsiasi client
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+La mitigazione separa il piano di gestione dal piano applicativo tramite la proprietà
+\texttt{management.server.port: 8090}. Tutti e 9 i servizi (incluso il config-service)
+legano ora il management server sulla porta \texttt{8090}, che \textbf{non viene mai
+pubblicata} nel \texttt{docker-compose.yml}.
+
+Il risultato è il seguente modello di accesso:
+
+\begin{itemize}
+  \item \textbf{Internet / client esterno} → \texttt{:808x} (API) — nessuna rotta actuator.
+  \item \textbf{Prometheus / healthcheck Docker} → \texttt{:8090} (management) — raggiungibile
+        solo dall'interno della rete Docker \texttt{hotel\_network}.
+  \item \texttt{show-details} impostato a \texttt{when-authorized}: gli endpoint health
+        restituiscono solo \texttt{"status": "UP"} a chiamanti anonimi.
+\end{itemize}
+
+\begin{securebox}[title={Configurazione Sicura --- auth-service.yml (feature/secure-coding-hardening)}]
+\begin{lstlisting}[style=yaml]
+# SICURO: management server separato su porta interna non pubblicata
+management:
+  server:
+    port: 8090             # porta dedicata, non nel blocco "ports" del compose
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health,info"
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized  # dettagli visibili solo ad autenticati
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={docker-compose.yml (post-hardening) --- porta management non pubblicata}]
+\begin{lstlisting}[style=yaml]
+auth-service:
+  ports:
+    - "8087:8087"   # solo API esposta; porta 8090 non in "ports"
+  healthcheck:
+    test: ["CMD-SHELL",
+      "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1"]
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={docker/prometheus/prometheus.yml --- scraping su porta interna}]
+\begin{lstlisting}[style=yaml]
+scrape_configs:
+  - job_name: "auth-service"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["auth-service:8090"]  # rete Docker interna, non pubblica
+\end{lstlisting}
+\end{securebox}
+
+La stessa configurazione è applicata simmetricamente a tutti e 9 i servizi
+(\texttt{api-gateway}, \texttt{auth-service}, \texttt{guest-service},
+\texttt{inventory-service}, \texttt{reservation-service}, \texttt{stay-service},
+\texttt{billing-service}, \texttt{fb-service}, \texttt{config-service}).
+
+\paragraph{Riferimento} Commit: \commitref{b0cf898}{fix(security): T-CFG-01 --- move actuator to internal-only management port}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}
