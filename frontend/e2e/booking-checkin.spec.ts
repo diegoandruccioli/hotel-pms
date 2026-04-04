@@ -26,6 +26,7 @@ const MOCK_ROOMS = [
 const MOCK_RESERVATION = {
   id: 'res-001',
   guestId: MOCK_GUEST.id,
+  guestFullName: 'Mario Rossi',
   checkInDate: '2026-04-01',
   checkOutDate: '2026-04-05',
   status: 'CONFIRMED',
@@ -186,17 +187,9 @@ test.describe('Booking → Check-in Scenario', () => {
     // =====================================================================
     // STEP 5: Navigate to Check-in from the reservation
     // =====================================================================
-    // Click the reservation row/action to go to check-in
-    const checkInBtn = page.getByRole('link', { name: /check.?in/i }).first();
-    if (await checkInBtn.isVisible()) {
-      await checkInBtn.click();
-    } else {
-      // Try clicking the reservation row first
-      await page.getByText('Mario Rossi').first().click();
-      // Then find a check-in action
-      const checkInAction = page.getByRole('link', { name: /check.?in/i }).first();
-      await checkInAction.click();
-    }
+    // Click the Check-in button for the reservation row
+    // The button is rendered as <button> (not <a>) in ReservationRow when status === 'CONFIRMED'
+    await page.getByRole('button', { name: /check.?in/i }).first().click();
 
     // =====================================================================
     // STEP 6: Fill check-in guest form
