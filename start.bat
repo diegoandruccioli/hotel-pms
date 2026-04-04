@@ -178,7 +178,7 @@ set "COMPOSE_STARTED=1"
 call :LOG_OK "All containers are starting."
 
 :: ═══════════════════════════════════════════════════════════════════════════════
-::  STEP 4 — Config Server health check
+::  STEP 4 — Config Server health check (via docker inspect, management port is internal)
 :: ═══════════════════════════════════════════════════════════════════════════════
 call :LOG_STEP "4/7" "Waiting for Config Server"
 
@@ -189,8 +189,9 @@ if !ELAPSED_H! geq !TIMEOUT_H! (
     set "FATAL_MSG=Config Server did not become healthy within !TIMEOUT_H!s. Run: docker compose logs config-server"
     goto FATAL_WITH_CLEANUP
 )
-curl -sf http://localhost:8888/actuator/health/liveness >nul 2>&1
-if !ERRORLEVEL! equ 0 (
+set "HSTATUS="
+for /f "tokens=*" %%S in ('docker inspect --format={{.State.Health.Status}} config-server 2^>nul') do set "HSTATUS=%%S"
+if "!HSTATUS!"=="healthy" (
     echo.
     call :LOG_OK "Config Server is healthy!"
     goto CONFIG_READY
@@ -202,7 +203,7 @@ goto WAIT_CONFIG
 :CONFIG_READY
 
 :: ═══════════════════════════════════════════════════════════════════════════════
-::  STEP 5 — API Gateway health check
+::  STEP 5 — API Gateway health check (via docker inspect, management port is internal)
 :: ═══════════════════════════════════════════════════════════════════════════════
 call :LOG_STEP "5/7" "Waiting for API Gateway"
 
@@ -213,8 +214,9 @@ if !ELAPSED_H! geq !TIMEOUT_H! (
     set "FATAL_MSG=API Gateway did not become healthy within !TIMEOUT_H!s. Run: docker compose logs api-gateway"
     goto FATAL_WITH_CLEANUP
 )
-curl -sf http://localhost:8080/actuator/health/liveness >nul 2>&1
-if !ERRORLEVEL! equ 0 (
+set "HSTATUS="
+for /f "tokens=*" %%S in ('docker inspect --format={{.State.Health.Status}} api-gateway 2^>nul') do set "HSTATUS=%%S"
+if "!HSTATUS!"=="healthy" (
     echo.
     call :LOG_OK "API Gateway is healthy!"
     goto GW_READY

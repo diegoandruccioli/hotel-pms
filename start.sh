@@ -207,17 +207,19 @@ start_docker() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  HTTP HEALTH CHECK
+#  CONTAINER HEALTH CHECK (via docker inspect — management port is internal-only)
 # ═══════════════════════════════════════════════════════════════════════════════
-wait_for_healthy() {
+wait_for_container_healthy() {
     local name="$1"
-    local url="$2"
+    local container="$2"
     local timeout="${3:-120}"
     local elapsed=0
 
-    log_info "Polling $name at $url (timeout ${timeout}s)..."
+    log_info "Waiting for $name to become healthy (timeout ${timeout}s)..."
     while [[ "$elapsed" -lt "$timeout" ]]; do
-        if curl -sf "$url" >/dev/null 2>&1; then
+        local status
+        status=$(docker inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "unknown")
+        if [[ "$status" == "healthy" ]]; then
             echo ""
             log_ok "$name is healthy!"
             return 0
@@ -227,7 +229,7 @@ wait_for_healthy() {
         elapsed=$((elapsed + 3))
     done
     echo ""
-    die "$name did not become healthy within ${timeout}s. Check logs: docker compose logs $(echo "$name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')"
+    die "$name did not become healthy within ${timeout}s. Check logs: docker compose logs $container"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -291,11 +293,11 @@ log_ok "All containers are starting."
 
 # ── Step 4: Config Server health ──────────────────────────────────────────────
 log_step "4/7" "Waiting for Config Server"
-wait_for_healthy "Config Server" "http://localhost:8888/actuator/health/liveness" 120
+wait_for_container_healthy "Config Server" "config-server" 120
 
 # ── Step 5: API Gateway health ────────────────────────────────────────────────
 log_step "5/7" "Waiting for API Gateway"
-wait_for_healthy "API Gateway" "http://localhost:8080/actuator/health/liveness" 180
+wait_for_container_healthy "API Gateway" "api-gateway" 180
 
 # ── Step 6: Frontend dependencies ─────────────────────────────────────────────
 log_step "6/7" "Installing frontend dependencies"
