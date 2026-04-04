@@ -669,10 +669,192 @@ sezione \textbf{Autenticazione Sicura} sopra (T-AUTH-01/T-GW-01/T-FE-02).}
 % ─────────────────────────────────────────────────────────────────────────────
 
 \subsection{Security Headers HTTP \threat{T-GW-03}}
-\textit{[Da completare]}
+
+\paragraph{Descrizione}
+Nella baseline, l'API Gateway non iniettava alcun header HTTP di sicurezza nelle risposte.
+Un browser che riceva una risposta priva di questi header è esposto a una serie di vettori
+di attacco ben documentati:
+\begin{itemize}
+  \item Assenza di \texttt{Strict-Transport-Security} (HSTS): un attaccante on-path può
+        forzare il downgrade della connessione da HTTPS a HTTP.
+  \item Assenza di \texttt{X-Content-Type-Options}: il browser può effettuare
+        \emph{MIME sniffing}, eseguendo come script una risposta dichiarata come
+        \texttt{application/json}.
+  \item Assenza di \texttt{X-Frame-Options}: la pagina può essere incorporata in un
+        \texttt{<iframe>} per attacchi di clickjacking.
+  \item Assenza di \texttt{Referrer-Policy}: l'URL completo viene inviato come header
+        \texttt{Referer} a terze parti, potenzialmente esponendo path con token o ID.
+  \item Assenza di \texttt{Permissions-Policy}: le API del browser (fotocamera, microfono,
+        geolocalizzazione) rimangono accessibili a script di terze parti iniettati.
+\end{itemize}
+Classificato OWASP A05 --- Security Misconfiguration.
+
+\begin{insecurebox}[title={Baseline vulnerabile --- nessun header di sicurezza nelle risposte}]
+\begin{lstlisting}[style=java]
+// INSICURO: l'API Gateway non aggiunge alcun header di sicurezza.
+// HTTP Response example (baseline):
+//   HTTP/1.1 200 OK
+//   Content-Type: application/json
+//   Transfer-Encoding: chunked
+//   < nessun HSTS, X-Frame-Options, CSP, X-Content-Type-Options >
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+È stato aggiunto il componente \texttt{SecurityHeadersFilter}, un \texttt{GlobalFilter}
+Spring Cloud Gateway che si inserisce all'inizio della catena
+(\texttt{Ordered.HIGHEST\_PRECEDENCE + 1}) e registra una callback \texttt{beforeCommit}
+sulla risposta reattiva. La callback viene eseguita immediatamente prima che gli header HTTP
+vengano inviati sulla rete, garantendo la presenza degli header su ogni risposta del gateway,
+indipendentemente dalla rotta o dal microservizio downstream.
+
+\begin{securebox}[title={SecurityHeadersFilter.java --- GlobalFilter (api-gateway)}]
+\begin{lstlisting}[style=java]
+@Component
+public class SecurityHeadersFilter implements GlobalFilter, Ordered {
+
+    static final String VALUE_HSTS    = "max-age=31536000; includeSubDomains";
+    static final String VALUE_XCTO    = "nosniff";
+    static final String VALUE_XFO     = "DENY";
+    static final String VALUE_REFERRER = "no-referrer";
+    static final String VALUE_PERMISSIONS =
+        "camera=(), microphone=(), geolocation=()";
+    // API responses sono JSON: nessun contenuto da renderizzare
+    static final String VALUE_CSP =
+        "default-src 'none'; frame-ancestors 'none'";
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange,
+                             GatewayFilterChain chain) {
+        exchange.getResponse().beforeCommit(() -> {
+            HttpHeaders h = exchange.getResponse().getHeaders();
+            h.set(HEADER_HSTS,        VALUE_HSTS);
+            h.set(HEADER_XCTO,        VALUE_XCTO);
+            h.set(HEADER_XFO,         VALUE_XFO);
+            h.set(HEADER_REFERRER,    VALUE_REFERRER);
+            h.set(HEADER_PERMISSIONS, VALUE_PERMISSIONS);
+            h.set(HEADER_CSP,         VALUE_CSP);
+            return Mono.empty();
+        });
+        return chain.filter(exchange);
+    }
+
+    @Override
+    public int getOrder() { return Ordered.HIGHEST_PRECEDENCE + 1; }
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test} Aggiunti 7 test in \texttt{SecurityHeadersFilterTest}:
+uno per ciascun header (verifica del valore esatto) e uno per la priorità del filtro.
+Il test utilizza \texttt{MockServerWebExchange} per invocare la callback \texttt{beforeCommit}
+tramite \texttt{response.setComplete()}, senza avviare alcun contesto Spring.
+
+\paragraph{Riferimento} Commit: \commitref{TO\_FILL}{fix(security): T-GW-03 --- add SecurityHeadersFilter for HTTP security headers}
+
+% ─────────────────────────────────────────────────────────────────────────────
 
 \subsection{Content Security Policy \threat{T-FE-04}}
-\textit{[Da completare]}
+
+\paragraph{Descrizione}
+L'assenza di un header \texttt{Content-Security-Policy} nella risposta che serve il frontend
+React lascia il browser privo di istruzioni su quali sorgenti di contenuto siano legittime.
+In mancanza di una CSP, uno script iniettato via XSS può caricare risorse da origini
+arbitrarie, esfiltrare dati o eseguire operazioni autenticate per conto della vittima.
+Classificato OWASP A05 --- Security Misconfiguration.
+
+Problema secondario: la configurazione nginx baseline era definita come stringa \emph{inline}
+nel \texttt{Dockerfile}, rendendo impossibile aggiungere header di risposta senza ricostruire
+l'immagine con un'istruzione RUN lunga e non manutenibile. Il frontend effettuava inoltre
+chiamate API all'indirizzo assoluto \texttt{http://localhost:8080}, rendendo \texttt{connect-src
+'self'} inapplicabile (origini diverse per porta).
+
+\begin{insecurebox}[title={Dockerfile baseline --- nginx inline senza header di sicurezza}]
+\begin{lstlisting}[style=yaml]
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+RUN rm /etc/nginx/conf.d/default.conf
+# Config inline: nessun header di sicurezza, nessun proxy API
+RUN echo "server { listen 80; location / { root /usr/share/nginx/html; \
+    try_files $uri $uri/ /index.html; } }" \
+    > /etc/nginx/conf.d/default.conf
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{insecurebox}[title={api.ts baseline --- URL assoluto, incompatibile con CSP strict}]
+\begin{lstlisting}[style=typescript]
+// INSICURO per CSP: URL assoluto con porta diversa
+// -> connect-src 'self' non copre http://localhost:8080
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080',
+  withCredentials: true,
+});
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+L'intervento si articola in tre modifiche coordinate:
+
+\begin{enumerate}
+  \item \textbf{nginx.conf dedicato} con la CSP completa e tutti gli header di sicurezza,
+        copiato nel container via \texttt{COPY nginx.conf /etc/nginx/conf.d/default.conf}.
+  \item \textbf{Proxy nginx per \texttt{/api/}}: nginx inoltra tutte le richieste
+        \texttt{/api/*} all'API Gateway interno (\texttt{http://api-gateway:8080}),
+        rendendo le chiamate API same-origin dal punto di vista del browser e
+        consentendo \texttt{connect-src 'self'}.
+  \item \textbf{api.ts}: il \texttt{baseURL} è cambiato da \texttt{'http://localhost:8080'}
+        a stringa vuota (\texttt{''}), così Axios usa URL relativi che il browser risolve
+        sulla stessa origine --- compatibili sia con il proxy Vite in sviluppo sia con
+        il proxy nginx in produzione.
+\end{enumerate}
+
+\begin{securebox}[title={nginx.conf --- CSP + proxy API + security headers}]
+\begin{lstlisting}[style=yaml]
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+
+    add_header Content-Security-Policy
+      "default-src 'self'; script-src 'self';
+       style-src 'self' 'unsafe-inline'; img-src 'self' data:;
+       connect-src 'self'; frame-ancestors 'none';
+       form-action 'self'; base-uri 'self'" always;
+    add_header X-Content-Type-Options "nosniff"           always;
+    add_header X-Frame-Options        "DENY"              always;
+    add_header Referrer-Policy        "no-referrer"       always;
+
+    # Proxy API: same-origin per connect-src 'self'
+    location /api/ {
+        proxy_pass http://api-gateway:8080;
+        proxy_set_header X-Real-IP       $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location / { try_files $uri $uri/ /index.html; }
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={api.ts --- baseURL relativo, same-origin e CSP-compatibile}]
+\begin{lstlisting}[style=typescript]
+// SICURO: URL relativo -> stesso host/porta del frontend
+// Dev:  proxy Vite  /api/* -> localhost:8080
+// Prod: proxy nginx /api/* -> api-gateway:8080
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || '',
+  withCredentials: true,
+});
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Nota su \texttt{style-src 'unsafe-inline'}}
+TailwindCSS inietta classi di utilità come stili inline al runtime; rimuovere
+\texttt{'unsafe-inline'} richiederebbe la generazione di nonce o hash per ogni stile,
+incompatibile con il meccanismo di purging di Tailwind. Il rischio residuo è accettabile
+poiché la CSP blocca comunque \texttt{script-src} all'origine stessa, neutralizzando
+il vettore XSS principale.
+
+\paragraph{Riferimento} Commit: \commitref{TO\_FILL}{fix(security): T-FE-04 --- add CSP via nginx.conf and make API base URL relative}
 
 \subsection{Protezione Actuator Endpoints \threat{T-CFG-01}}
 

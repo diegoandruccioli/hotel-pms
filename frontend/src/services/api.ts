@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Base Axios instance
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080', // Replace with Gateway URL later
+  baseURL: import.meta.env.VITE_API_URL || '',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',

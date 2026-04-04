@@ -79,7 +79,7 @@
 |----|-----------------|--------|---------|-------------|-------|
 | T-GW-01 | Tampering | Header X-Auth-User/Role iniettabili dal client se non rimossi in ingresso | CRITICO | MEDIA | ✅ RISOLTO |
 | T-GW-02 | Denial of Service | Rate limiting insufficiente o bypassabile per certi endpoint | ALTO | MEDIA | 🟡 DA ANALIZZARE |
-| T-GW-03 | Information Disclosure | Assenza header sicurezza HTTP (CSP, HSTS, X-Frame-Options, X-Content-Type-Options) | MEDIO | ALTA | 🔴 APERTO |
+| T-GW-03 | Information Disclosure | Assenza header sicurezza HTTP (CSP, HSTS, X-Frame-Options, X-Content-Type-Options) | MEDIO | ALTA | ✅ RISOLTO |
 | T-GW-04 | Spoofing | CORS misconfiguration: origini non ristrette | ALTO | MEDIA | 🟡 DA ANALIZZARE |
 | T-GW-05 | Tampering | CSRF: mancanza protezione esplicita per operazioni mutanti via cookie | ALTO | MEDIA | 🔴 APERTO |
 
@@ -138,7 +138,7 @@
 | T-FE-01 | Tampering | XSS: output di dati utente non encoded in rendering dinamico | ALTO | MEDIA | 🟡 DA ANALIZZARE |
 | T-FE-02 | Information Disclosure | Token JWT eventualmente esposto in localStorage o state non protetto | CRITICO | BASSA | ✅ RISOLTO |
 | T-FE-03 | Elevation of Privilege | Broken Access Control frontend: route admin accessibili nascondendo solo elementi UI | MEDIO | ALTA | 🔴 APERTO |
-| T-FE-04 | Tampering | Assenza Content-Security-Policy: possibilità di inject di script esterni | ALTO | MEDIA | 🔴 APERTO |
+| T-FE-04 | Tampering | Assenza Content-Security-Policy: possibilità di inject di script esterni | ALTO | MEDIA | ✅ RISOLTO |
 
 ---
 
@@ -173,7 +173,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-AUTH-05 | Audit log autenticazione | auth-service | — | A09 | ⏳ |
 | T-GW-01 | Verifica HMAC-SHA256 su X-Internal-Signature (InternalAuthFilter) | api-gateway + tutti i servizi | baseline (main) | A01 | ✅ |
 | T-FE-02 | Token JWT in httpOnly cookie (Secure + SameSite=Strict) | auth-service/AuthController.java | baseline (main) | A02 | ✅ |
-| T-GW-03 | Security headers HTTP (CSP, HSTS, X-Frame-Options) | api-gateway | — | A05 | ⏳ |
+| T-GW-03 | SecurityHeadersFilter GlobalFilter: HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, CSP default-src 'none' su tutte le risposte del gateway | api-gateway/SecurityHeadersFilter.java | — | A05 | ✅ |
 | T-GW-04 | CORS origins whitelist restrittiva | api-gateway | — | A05 | ⏳ |
 | T-GW-05 | CSRF token per operazioni mutanti | api-gateway/frontend | — | A01 | ⏳ |
 | T-GST-01 | Verifica hotel_id ownership su ogni operazione | guest-service | — | A01 | ⏳ |
@@ -188,7 +188,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-CFG-02 | Segreti in variabili d'ambiente (no plaintext) | config-service | — | A02 | ⏳ |
 | T-FE-01 | Output encoding React (verifica dangerouslySetInnerHTML) | frontend | — | A03 | ⏳ |
 | T-FE-03 | Route guard server-side (non solo UI hiding) | frontend/gateway | — | A01 | ⏳ |
-| T-FE-04 | Content-Security-Policy header | api-gateway/frontend | — | A05 | ⏳ |
+| T-FE-04 | CSP SPA-level via nginx.conf: script-src 'self', style-src 'self' 'unsafe-inline', connect-src 'self', frame-ancestors 'none'; nginx proxy /api/ → api-gateway per same-origin; api.ts baseURL relativo | frontend/nginx.conf, frontend/Dockerfile, frontend/src/services/api.ts | — | A05 | ✅ |
 
 **Legenda stato**: ⏳ In attesa | 🔄 In corso | ✅ Completato
 
