@@ -366,7 +366,8 @@ class ReservationServiceImplTest {
                 .thenReturn(List.of());
         when(reservationMapper.toEntity(request)).thenReturn(entity);
         when(reservationRepository.save(entity))
-                .thenThrow(new ObjectOptimisticLockingFailureException(Reservation.class, UUID.randomUUID()));
+                .thenThrow(new ObjectOptimisticLockingFailureException(Reservation.class,
+                        Objects.requireNonNull(UUID.randomUUID())));
 
         // Act & Assert: the exception must propagate to the GlobalExceptionHandler
         assertThrows(ObjectOptimisticLockingFailureException.class,
