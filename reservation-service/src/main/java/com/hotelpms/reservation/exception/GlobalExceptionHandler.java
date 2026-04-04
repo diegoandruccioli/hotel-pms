@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -117,6 +118,41 @@ public class GlobalExceptionHandler {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problemDetail.setTitle("Bad Request");
         problemDetail.setType(Objects.requireNonNull(URI.create("https://hotelpms.com/errors/bad-request")));
+        problemDetail.setProperty(TIMESTAMP, Instant.now());
+        return problemDetail;
+    }
+
+    /**
+     * Handles ConflictException.
+     *
+     * @param ex the exception
+     * @return the problem detail response
+     */
+    @ExceptionHandler(ConflictException.class)
+    public final ProblemDetail handleConflictException(final ConflictException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problemDetail.setTitle("Conflict");
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotelpms.com/errors/conflict")));
+        problemDetail.setProperty(TIMESTAMP, Instant.now());
+        return problemDetail;
+    }
+
+    /**
+     * Handles ObjectOptimisticLockingFailureException thrown by JPA when a
+     * concurrent modification is detected via the {@code @Version} field.
+     *
+     * <p>Returns HTTP 409 Conflict so the client knows to retry the operation.
+     *
+     * @param ex the optimistic locking exception
+     * @return the problem detail response
+     */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public final ProblemDetail handleOptimisticLockingFailure(final ObjectOptimisticLockingFailureException ex) {
+        LOG.warn("[OptimisticLock] Concurrent modification detected: {}", ex.getMessage());
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "RESERVATION_CONCURRENT_MODIFICATION");
+        problemDetail.setTitle("Conflict");
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotelpms.com/errors/conflict")));
         problemDetail.setProperty(TIMESTAMP, Instant.now());
         return problemDetail;
     }

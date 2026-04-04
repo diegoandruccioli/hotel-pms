@@ -34,6 +34,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -297,9 +299,85 @@ class ReservationServiceImplTest {
         verify(reservationRepository, times(1)).delete(entity);
     }
 
+    @Test
+    void testCreateReservationOverlapThrowsBadRequest() {
+        // Arrange: overlap query returns a conflicting reservation
+        final RoomResponse mockRoomResponse = new RoomResponse(roomId, ROOM_NUMBER_101, null, ROOM_STATUS_AVAILABLE,
+                true, null, null);
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(inventoryClient.getRoomById(roomId)).thenReturn(Optional.of(mockRoomResponse));
+
+        final Reservation conflicting = new Reservation();
+        conflicting.setCheckInDate(LocalDate.now().plusDays(1));
+        conflicting.setCheckOutDate(LocalDate.now().plusDays(3));
+        when(reservationRepository.findOverlappingReservationsForNew(
+                List.of(roomId),
+                LocalDate.now().plusDays(1),
+                LocalDate.now().plusDays(3)))
+                .thenReturn(List.of(conflicting));
+
+        // Act & Assert
+        final BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> reservationService.createReservation(request));
+        assertEquals("ROOM_UNAVAILABLE_DATES", ex.getMessage());
+        verify(reservationRepository, never()).save(anyReservation());
+    }
+
+    @Test
+    void testUpdateReservationOverlapThrowsBadRequest() {
+        // Arrange
+        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(entity));
+        final RoomResponse mockRoomResponse = new RoomResponse(roomId, ROOM_NUMBER_101, null, ROOM_STATUS_AVAILABLE,
+                true, null, null);
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(inventoryClient.getRoomById(roomId)).thenReturn(Optional.of(mockRoomResponse));
+
+        final Reservation conflicting = new Reservation();
+        conflicting.setCheckInDate(LocalDate.now().plusDays(1));
+        conflicting.setCheckOutDate(LocalDate.now().plusDays(3));
+        when(reservationRepository.findOverlappingReservations(
+                List.of(roomId),
+                reservationId,
+                LocalDate.now().plusDays(1),
+                LocalDate.now().plusDays(3)))
+                .thenReturn(List.of(conflicting));
+
+        // Act & Assert
+        final BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> reservationService.updateReservation(reservationId, request));
+        assertEquals("ROOM_UNAVAILABLE_DATES", ex.getMessage());
+        verify(reservationRepository, never()).save(anyReservation());
+    }
+
+    @Test
+    void testSaveThrowsOptimisticLockingFailurePropagates() {
+        // Arrange: overlap check passes, but concurrent write causes optimistic lock failure
+        final RoomResponse mockRoomResponse = new RoomResponse(roomId, ROOM_NUMBER_101, null, ROOM_STATUS_AVAILABLE,
+                true, null, null);
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(inventoryClient.getRoomById(roomId)).thenReturn(Optional.of(mockRoomResponse));
+        when(reservationRepository.findOverlappingReservationsForNew(any(), any(), any()))
+                .thenReturn(List.of());
+        when(reservationMapper.toEntity(request)).thenReturn(entity);
+        when(reservationRepository.save(entity))
+                .thenThrow(new ObjectOptimisticLockingFailureException(Reservation.class, UUID.randomUUID()));
+
+        // Act & Assert: the exception must propagate to the GlobalExceptionHandler
+        assertThrows(ObjectOptimisticLockingFailureException.class,
+                () -> reservationService.createReservation(request));
+    }
+
     @NonNull
     private static Reservation anyReservation() {
-        any(Reservation.class); // registers the Mockito argument matcher
-        return Objects.requireNonNull(ANY_RESERVATION);
+        // any(Reservation.class) registers the Mockito argument matcher as a side-effect;
+        // its return value is null at runtime, so we fall back to the sentinel ANY_RESERVATION.
+        final Reservation matched = any(Reservation.class);
+        return matched != null ? matched : Objects.requireNonNull(ANY_RESERVATION);
     }
 }

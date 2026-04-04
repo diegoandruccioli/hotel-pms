@@ -652,7 +652,146 @@ sezione \textbf{Autenticazione Sicura} sopra (T-AUTH-01/T-GW-01/T-FE-02).}
 \textit{[Da completare]}
 
 \subsection{Double Booking Prevention \threat{T-RES-01}}
-\textit{[Da completare]}
+
+\paragraph{Descrizione}
+In un sistema di prenotazione alberghiera, il \emph{double booking} si verifica quando due
+richieste concorrenti riescono a prenotare la stessa camera per date sovrapposte.
+La condizione di gara (race condition) è del tipo \emph{Time-Of-Check/Time-Of-Use} (TOCTOU):
+entrambe le transazioni superano il controllo di disponibilità prima che l'altra abbia
+effettuato la scrittura. Classificato OWASP A04 --- Insecure Design.
+
+La baseline non implementava alcun meccanismo di locking:
+
+\begin{insecurebox}[title={Codice Vulnerabile --- Reservation.java (baseline)}]
+\begin{lstlisting}[style=java]
+@Entity
+@Table(name = "reservations")
+public class Reservation {
+    // Nessun @Version: aggiornamenti concorrenti alla stessa
+    // prenotazione sovrascrivono silenziosamente i dati altrui.
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+    // ...
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{insecurebox}[title={Codice Vulnerabile --- ReservationRepository.java (baseline)}]
+\begin{lstlisting}[style=java]
+// Nessun @Lock: il SELECT sul controllo overlap non acquisisce
+// alcun lock a livello DB. Due transazioni simultanee possono
+// entrambe passare il check e inserire due prenotazioni
+// per la stessa camera nelle stesse date.
+List<Reservation> findOverlappingReservationsForNew(
+    List<UUID> roomIds,
+    LocalDate checkIn,
+    LocalDate checkOut
+);
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+La mitigazione agisce su due livelli complementari:
+
+\begin{itemize}
+  \item \textbf{Optimistic locking JPA} (\texttt{@Version}): il campo \texttt{version} è
+        incrementato ad ogni \texttt{UPDATE}. Se due transazioni leggono la stessa versione
+        e tentano di aggiornare la stessa prenotazione, la seconda riceve
+        \texttt{ObjectOptimisticLockingFailureException} che viene tradotta in HTTP 409
+        Conflict dal \texttt{GlobalExceptionHandler}.
+
+  \item \textbf{Pessimistic write lock sul controllo overlap} (\texttt{@Lock(PESSIMISTIC\_WRITE)}):
+        la query \texttt{findOverlappingReservationsForNew} esegue un
+        \texttt{SELECT \ldots\ FOR UPDATE} sulle prenotazioni esistenti che si sovrappongono
+        alle date richieste. Questo serializza le richieste concorrenti per la stessa camera:
+        la seconda transazione viene messa in attesa finché la prima non fa commit, eliminando
+        la finestra TOCTOU.
+
+  \item \textbf{Formula date-overlap} già corretta: \texttt{checkInDate < :checkOut AND
+        checkOutDate > :checkIn}, che copre tutti i casi di sovrapposizione parziale e totale.
+
+  \item \textbf{Flyway migration V4}: aggiunge la colonna \texttt{version BIGINT NOT NULL
+        DEFAULT 0} alla tabella \texttt{reservations}.
+\end{itemize}
+
+\begin{securebox}[title={Codice Sicuro --- Reservation.java (feature/secure-coding-hardening)}]
+\begin{lstlisting}[style=java]
+@Entity
+@Table(name = "reservations")
+public class Reservation {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    // Optimistic locking: incrementato ad ogni UPDATE.
+    // Conflitto concorrente -> ObjectOptimisticLockingFailureException
+    // -> HTTP 409 Conflict.
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
+    // ...
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- ReservationRepository.java (feature/secure-coding-hardening)}]
+\begin{lstlisting}[style=java]
+// SELECT ... FOR UPDATE: serializza le richieste concorrenti
+// sulla stessa camera. La seconda transazione attende il commit
+// della prima, eliminando la race condition TOCTOU.
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("""
+    SELECT r FROM Reservation r
+    JOIN r.lineItems li
+    WHERE r.active = true
+    AND r.status NOT IN (CANCELLED, NO_SHOW)
+    AND li.roomId IN :roomIds
+    AND li.active = true
+    AND r.checkInDate < :checkOut
+    AND r.checkOutDate > :checkIn
+    """)
+List<Reservation> findOverlappingReservationsForNew(
+    @Param("roomIds") List<UUID> roomIds,
+    @Param("checkIn") LocalDate checkIn,
+    @Param("checkOut") LocalDate checkOut
+);
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={V4\_\_add\_version\_to\_reservations.sql --- Flyway migration}]
+\begin{lstlisting}[style=yaml]
+ALTER TABLE reservations
+    ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={GlobalExceptionHandler.java --- Handler HTTP 409}]
+\begin{lstlisting}[style=java]
+@ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+public ProblemDetail handleOptimisticLockingFailure(
+        ObjectOptimisticLockingFailureException ex) {
+    LOG.warn("[OptimisticLock] Concurrent modification: {}", ex.getMessage());
+    ProblemDetail pd = ProblemDetail.forStatusAndDetail(
+        HttpStatus.CONFLICT, "RESERVATION_CONCURRENT_MODIFICATION");
+    pd.setTitle("Conflict");
+    pd.setType(URI.create("https://hotelpms.com/errors/conflict"));
+    return pd;
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test} Aggiunti 3 test in \texttt{ReservationServiceImplTest}:
+\texttt{testCreateReservationOverlapThrowsBadRequest} (verifica che il check di overlap
+rifiuti la prenotazione con HTTP 400),
+\texttt{testUpdateReservationOverlapThrowsBadRequest} (stesso controllo sull'update),
+\texttt{testSaveThrowsOptimisticLockingFailurePropagates} (verifica che
+\texttt{ObjectOptimisticLockingFailureException} propaghi correttamente
+al GlobalExceptionHandler per la traduzione in HTTP 409).
+
+\paragraph{Riferimento} Commit: \commitref{PLACEHOLDER\_TRES01}{fix(security): T-RES-01 --- optimistic lock + pessimistic write on overlap check}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Sicura delle Sessioni}

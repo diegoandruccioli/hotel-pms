@@ -1,10 +1,12 @@
 package com.hotelpms.reservation.repository;
 
 import com.hotelpms.reservation.domain.Reservation;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -25,16 +27,17 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
      * @param checkOut  check-out date
      * @return list of overlapping reservations
      */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
-            SELECT r FROM Reservation r 
-            JOIN r.lineItems li 
-            WHERE r.id != :excludeId 
-            AND r.active = true 
+            SELECT r FROM Reservation r
+            JOIN r.lineItems li
+            WHERE r.id != :excludeId
+            AND r.active = true
             AND r.status NOT IN (com.hotelpms.reservation.domain.ReservationStatus.CANCELLED,
                                  com.hotelpms.reservation.domain.ReservationStatus.NO_SHOW)
-            AND li.roomId IN :roomIds 
+            AND li.roomId IN :roomIds
             AND li.active = true
-            AND r.checkInDate < :checkOut 
+            AND r.checkInDate < :checkOut
             AND r.checkOutDate > :checkIn
             """)
     List<Reservation> findOverlappingReservations(
@@ -52,15 +55,16 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
      * @param checkOut check-out date
      * @return list of overlapping reservations
      */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
-            SELECT r FROM Reservation r 
-            JOIN r.lineItems li 
-            WHERE r.active = true 
+            SELECT r FROM Reservation r
+            JOIN r.lineItems li
+            WHERE r.active = true
             AND r.status NOT IN (com.hotelpms.reservation.domain.ReservationStatus.CANCELLED,
                                  com.hotelpms.reservation.domain.ReservationStatus.NO_SHOW)
-            AND li.roomId IN :roomIds 
+            AND li.roomId IN :roomIds
             AND li.active = true
-            AND r.checkInDate < :checkOut 
+            AND r.checkInDate < :checkOut
             AND r.checkOutDate > :checkIn
             """)
     List<Reservation> findOverlappingReservationsForNew(

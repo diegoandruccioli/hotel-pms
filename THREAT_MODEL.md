@@ -96,7 +96,7 @@
 
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
-| T-RES-01 | Tampering | Double Booking (Overbooking): assenza di lock ottimistico sulle date | CRITICO | ALTA | 🔴 APERTO |
+| T-RES-01 | Tampering | Double Booking (Overbooking): assenza di lock ottimistico sulle date | CRITICO | ALTA | ✅ RISOLTO |
 | T-RES-02 | Elevation of Privilege | IDOR: accesso a prenotazioni di altri hotel senza verifica ownership | CRITICO | MEDIA | 🔴 APERTO |
 | T-RES-03 | Injection | Filtri di ricerca date non validati server-side | MEDIO | BASSA | 🟡 DA ANALIZZARE |
 
@@ -178,7 +178,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-GW-05 | CSRF token per operazioni mutanti | api-gateway/frontend | — | A01 | ⏳ |
 | T-GST-01 | Verifica hotel_id ownership su ogni operazione | guest-service | — | A01 | ⏳ |
 | T-GST-03 | Filtro hotel_id obbligatorio in tutte le query | guest-service | — | A01 | ⏳ |
-| T-RES-01 | Optimistic lock + date-overlap check atomico | reservation-service | — | A04 | ⏳ |
+| T-RES-01 | @Version optimistic lock + @Lock(PESSIMISTIC_WRITE) su overlap query + ConflictException HTTP 409 + Flyway V4 version column | reservation-service/Reservation.java, ReservationRepository.java, GlobalExceptionHandler.java, V4__add_version_to_reservations.sql | PLACEHOLDER_TRES01 | A04 | ✅ |
 | T-RES-02 | Verifica ownership hotel_id su prenotazioni | reservation-service | — | A01 | ⏳ |
 | T-STAY-01 | Validazione stato prenotazione prima check-in | stay-service | — | A04 | ⏳ |
 | T-STAY-02 | Audit trail check-in/check-out | stay-service | — | A09 | ⏳ |
