@@ -168,6 +168,7 @@ class AuthServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null") // captor.capture() is @Nullable by design; save() expects @NonNull
     void loginIncrementsFailedAttemptsOnWrongPassword() {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(false);
@@ -183,6 +184,7 @@ class AuthServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null") // captor.capture() is @Nullable by design; save() expects @NonNull
     void loginLocksAccountAfterMaxFailedAttempts() {
         final UserAccount nearLockUser = UserAccount.builder()
                 .username(TEST_USER)
@@ -207,6 +209,7 @@ class AuthServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("null") // captor.capture() is @Nullable by design; save() expects @NonNull
     void loginResetsCounterOnSuccess() {
         final UserAccount userWithPriorFailures = UserAccount.builder()
                 .username(TEST_USER)
