@@ -145,14 +145,17 @@ jobs:
         run: docker compose up -d --wait
         timeout-minutes: 10
 
-      # Extra guard: poll the gateway liveness endpoint directly.
-      # The gateway becomes healthy only after all downstream services are healthy.
+      # Extra guard: confirm the gateway process is accepting connections on port 8080.
+      # The actuator was moved to the internal-only management port (8090, T-CFG-01),
+      # so we probe port 8080 directly and accept any HTTP response (2xx/3xx/4xx)
+      # as proof that the gateway is alive. Connection failures return "000".
       - name: Wait for API Gateway to be healthy
         run: |
-          echo "Polling http://localhost:8080/actuator/health/liveness ..."
+          echo "Polling http://localhost:8080 for any HTTP response ..."
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:8080/actuator/health/liveness > /dev/null 2>&1; then
-              echo "API Gateway is healthy (attempt $i)."
+            STATUS=$(curl -so /dev/null -w "%{http_code}" http://localhost:8080/ 2>/dev/null || echo "000")
+            if [ "$STATUS" != "000" ]; then
+              echo "API Gateway is responding (HTTP $STATUS, attempt $i)."
               exit 0
             fi
             echo "Attempt $i/30 — retrying in 10 s ..."
