@@ -116,7 +116,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8888/actuator/health/liveness || exit 1",
+          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -179,7 +179,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8080/actuator/health/liveness || exit 1",
+          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -220,7 +220,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8087/actuator/health/liveness || exit 1",
+          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -262,7 +262,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8083/actuator/health/liveness || exit 1",
+          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -303,7 +303,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8084/actuator/health/liveness || exit 1",
+          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -344,7 +344,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8085/actuator/health/liveness || exit 1",
+          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -386,7 +386,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8086/actuator/health/liveness || exit 1",
+          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -427,7 +427,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8081/actuator/health/liveness || exit 1",
+          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -470,7 +470,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8082/actuator/health/liveness || exit 1",
+          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s

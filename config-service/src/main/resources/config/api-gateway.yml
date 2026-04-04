@@ -147,6 +147,8 @@ springdoc:
         url: /fb-service/v3/api-docs
 
 management:
+  server:
+    port: 8090
   endpoints:
     web:
       exposure:
@@ -155,6 +157,7 @@ management:
     health:
       probes:
         enabled: true
+      show-details: when-authorized
   tracing:
     sampling:
       probability: 1.0
