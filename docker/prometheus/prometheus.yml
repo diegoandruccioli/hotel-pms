@@ -6,44 +6,44 @@ scrape_configs:
   - job_name: "config-server"
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["config-server:8888"]
+      - targets: ["config-server:8090"]
 
   - job_name: "api-gateway"
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["api-gateway:8080"]
+      - targets: ["api-gateway:8090"]
 
   - job_name: "auth-service"
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["auth-service:8087"]
+      - targets: ["auth-service:8090"]
 
   - job_name: "guest-service"
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["guest-service:8083"]
+      - targets: ["guest-service:8090"]
 
   - job_name: "inventory-service"
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["inventory-service:8081"]
+      - targets: ["inventory-service:8090"]
 
   - job_name: "reservation-service"
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["reservation-service:8082"]
+      - targets: ["reservation-service:8090"]
 
   - job_name: "stay-service"
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["stay-service:8084"]
+      - targets: ["stay-service:8090"]
 
   - job_name: "billing-service"
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["billing-service:8085"]
+      - targets: ["billing-service:8090"]
 
   - job_name: "fb-service"
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["fb-service:8086"]
+      - targets: ["fb-service:8090"]

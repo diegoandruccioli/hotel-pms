@@ -2,7 +2,7 @@
 
 **Metodologia**: STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege)  
 **Branch di riferimento**: `feature/secure-coding-hardening`  
-**Data ultima revisione**: 2026-04-03  
+**Data ultima revisione**: 2026-04-04  
 **Autore**: Diego Andruccioli
 
 ---
@@ -61,12 +61,14 @@
 
 ## 4. Threat Enumeration per Servizio (STRIDE)
 
+**Legenda stato**: 🔴 APERTO | 🟡 DA ANALIZZARE | 🔄 IN CORSO | ✅ RISOLTO
+
 ### 4.1 auth-service
 
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
-| T-AUTH-01 | Information Disclosure | User Enumeration: messaggi di errore distinti per "utente non trovato" vs "password errata" | ALTO | ALTA | 🔴 APERTO |
-| T-AUTH-02 | Denial of Service | Brute Force: nessun rate limiting sul login a livello di servizio | CRITICO | ALTA | 🔴 APERTO |
+| T-AUTH-01 | Information Disclosure | User Enumeration: messaggi di errore distinti per "utente non trovato" vs "password errata" | ALTO | ALTA | ✅ RISOLTO |
+| T-AUTH-02 | Denial of Service | Brute Force: nessun rate limiting sul login a livello di servizio | CRITICO | ALTA | ✅ RISOLTO |
 | T-AUTH-03 | Spoofing | Password debole: algoritmo di hashing da verificare (bcrypt vs Argon2) | CRITICO | MEDIA | 🟡 DA ANALIZZARE |
 | T-AUTH-04 | Elevation of Privilege | Refresh Token: assenza di meccanismo di revoca (token rotation) | ALTO | MEDIA | 🔴 APERTO |
 | T-AUTH-05 | Repudiation | Assenza di audit log per eventi di autenticazione (login, logout, failed attempts) | MEDIO | ALTA | 🔴 APERTO |
@@ -75,7 +77,7 @@
 
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
-| T-GW-01 | Tampering | Header X-Auth-User/Role iniettabili dal client se non rimossi in ingresso | CRITICO | MEDIA | 🟡 DA ANALIZZARE |
+| T-GW-01 | Tampering | Header X-Auth-User/Role iniettabili dal client se non rimossi in ingresso | CRITICO | MEDIA | ✅ RISOLTO |
 | T-GW-02 | Denial of Service | Rate limiting insufficiente o bypassabile per certi endpoint | ALTO | MEDIA | 🟡 DA ANALIZZARE |
 | T-GW-03 | Information Disclosure | Assenza header sicurezza HTTP (CSP, HSTS, X-Frame-Options, X-Content-Type-Options) | MEDIO | ALTA | 🔴 APERTO |
 | T-GW-04 | Spoofing | CORS misconfiguration: origini non ristrette | ALTO | MEDIA | 🟡 DA ANALIZZARE |
@@ -134,7 +136,7 @@
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
 | T-FE-01 | Tampering | XSS: output di dati utente non encoded in rendering dinamico | ALTO | MEDIA | 🟡 DA ANALIZZARE |
-| T-FE-02 | Information Disclosure | Token JWT eventualmente esposto in localStorage o state non protetto | CRITICO | BASSA | 🟡 DA ANALIZZARE |
+| T-FE-02 | Information Disclosure | Token JWT eventualmente esposto in localStorage o state non protetto | CRITICO | BASSA | ✅ RISOLTO |
 | T-FE-03 | Elevation of Privilege | Broken Access Control frontend: route admin accessibili nascondendo solo elementi UI | MEDIO | ALTA | 🔴 APERTO |
 | T-FE-04 | Tampering | Assenza Content-Security-Policy: possibilità di inject di script esterni | ALTO | MEDIA | 🔴 APERTO |
 
@@ -182,7 +184,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-STAY-02 | Audit trail check-in/check-out | stay-service | — | A09 | ⏳ |
 | T-BILL-01 | Verifica ownership fatture | billing-service | — | A01 | ⏳ |
 | T-FB-02 | Ricalcolo prezzi server-side | fb-service | — | A04 | ⏳ |
-| T-CFG-01 | Protezione actuator endpoints | config-service/tutti | — | A05 | ⏳ |
+| T-CFG-01 | Porta management separata (:8090, non pubblicata) + show-details: when-authorized su tutti i servizi | config-service/resources/config/*.yml, docker-compose.yml, prometheus.yml | b0cf898 | A05 | ✅ |
 | T-CFG-02 | Segreti in variabili d'ambiente (no plaintext) | config-service | — | A02 | ⏳ |
 | T-FE-01 | Output encoding React (verifica dangerouslySetInnerHTML) | frontend | — | A03 | ⏳ |
 | T-FE-03 | Route guard server-side (non solo UI hiding) | frontend/gateway | — | A01 | ⏳ |
