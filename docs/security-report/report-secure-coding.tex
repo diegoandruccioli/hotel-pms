@@ -989,52 +989,99 @@ Verrà completata al termine degli interventi sui servizi auth, gateway e fronte
 \appendix
 
 % ═════════════════════════════════════════════════════════════════════════════
-\chapter{Appendice IA — Log Prompt e Analisi Critica}
+\chapter{Appendice IA --- Utilizzo e Metodologia}
 % ═════════════════════════════════════════════════════════════════════════════
 
 \section{Modalità di utilizzo dell'IA}
 
-Questo progetto utilizza \textbf{Claude Code} (Anthropic, modello \texttt{claude-sonnet-4-6})
-come strumento di sviluppo integrato, non come generatore passivo di codice.
+Nel contesto di questo progetto, \textbf{Claude Code} (Anthropic, modello
+\texttt{claude-sonnet-4-6}) è stato impiegato come strumento di supporto in tre
+fasi ben distinte del ciclo di sviluppo della sicurezza, descritte di seguito.
 
-L'IA è stata impiegata nelle seguenti modalità:
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Fase 1 — Analisi iniziale del software}
+
+Nella prima fase, l'IA ha effettuato un'analisi statica dell'intera codebase del
+sistema Hotel PMS, esaminando i nove microservizi backend (Java 21, Spring Boot 3.4),
+il frontend React e la configurazione dell'infrastruttura Docker.
+
+L'obiettivo era identificare le aree di debolezza rispetto alle principali categorie
+di rischio, senza ancora prescrivere soluzioni implementative. L'analisi ha prodotto
+un insieme strutturato di osservazioni relative a:
+
+\begin{itemize}
+  \item gestione delle credenziali e dei token di autenticazione;
+  \item esposizione di endpoint interni e di monitoraggio;
+  \item assenza di header HTTP di sicurezza nelle risposte;
+  \item mancanza di controlli di autorizzazione multi-tenant;
+  \item configurazioni di default insicure nei servizi Spring Boot.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Fase 2 — Costruzione del Threat Model}
+
+Sulla base dell'analisi prodotta nella fase precedente, è stato costruito il documento
+\texttt{THREAT\_MODEL.md}, che costituisce il piano operativo dell'intero processo
+di hardening. Il documento è organizzato secondo la metodologia \textbf{STRIDE}
+(Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service,
+Elevation of Privilege) e comprende:
+
+\begin{itemize}
+  \item la catalogazione di 22 threat distribuiti sui 9 microservizi e sul frontend;
+  \item la mappatura di ciascun threat sulla tassonomia \textbf{OWASP Top 10 (2021)};
+  \item una \emph{risk matrix} impatto/probabilità per stabilire le priorità di intervento;
+  \item una tabella di tracciamento delle mitigazioni, aggiornata al termine di ogni
+        implementazione con il riferimento al commit Git corrispondente.
+\end{itemize}
+
+Il \texttt{THREAT\_MODEL.md} funge da documento vivente: viene aggiornato
+iterativamente a ogni intervento completato e riflette in ogni momento lo stato
+corrente del processo di hardening.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Fase 3 — Verifica post-implementazione}
+
+Al termine di ciascun intervento di hardening, l'IA ha eseguito sistematicamente
+le seguenti operazioni di verifica prima di autorizzare il commit e il push sulla
+repository GitHub:
+
 \begin{enumerate}
-  \item \textbf{Generazione del codice iniziale} (baseline): il sistema Hotel PMS è stato
-        sviluppato originariamente con il supporto di Claude Code per la stesura del codice
-        boilerplate di microservizi, controller, entità JPA e componenti React.
-  \item \textbf{Analisi critica delle vulnerabilità}: l'IA è stata interrogata per identificare
-        debolezze architetturali e di implementazione nel codice generato.
-  \item \textbf{Implementazione degli interventi di hardening}: l'IA ha assistito nella
-        scrittura del codice di mitigazione, con revisione critica delle proposte.
+  \item \textbf{Analisi delle modifiche}: revisione di tutti i file coinvolti
+        nell'intervento, verifica della correttezza logica e dell'assenza di
+        regressioni rispetto al comportamento atteso.
+  \item \textbf{Build backend}: esecuzione di \texttt{./gradlew build} sul modulo
+        interessato, che include compilazione, analisi statica PMD (zero-warning
+        policy) e suite di test JUnit 5. Il build viene considerato superato solo
+        se tutti e tre i gate risultano verdi.
+  \item \textbf{Build e lint frontend}: esecuzione di \texttt{npm run lint} e
+        \texttt{npm run build} nella directory \texttt{frontend/}, con verifica
+        che ESLint non produca alcun avviso e che la compilazione TypeScript
+        termini senza errori.
+  \item \textbf{Aggiornamento della documentazione}: modifica della tabella
+        mitigazioni in \texttt{THREAT\_MODEL.md} (status \texttt{✅}, SHA del
+        commit) e produzione del frammento LaTeX corrispondente per questo report,
+        secondo il workflow iterativo codice\,+\,documentazione.
+  \item \textbf{Commit e push}: solo al superamento di tutti i controlli precedenti
+        viene effettuato il commit sul branch \texttt{feature/secure-coding-hardening}
+        con messaggio convenzionale, seguito dal merge su \texttt{main}.
 \end{enumerate}
 
-\section{Log dei Prompt utilizzati}
+Questo approccio garantisce che ogni commit presente nella repository rappresenti
+uno stato integro e verificabile del sistema, e che la storia Git rifletta
+fedelmente la progressione degli interventi di sicurezza.
 
-\textit{[Questa sezione verrà popolata iterativamente con i prompt specifici
-utilizzati per ogni step di hardening, evidenziando i "cattivi consigli" o i
-default insicuri prodotti dall'IA.]}
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Valutazione del processo}
 
-% Template per ogni entry:
-%
-% \subsection{Step N — Nome intervento}
-%
-% \paragraph{Prompt utilizzato}
-% \begin{verbatim}
-% [testo del prompt]
-% \end{verbatim}
-%
-% \paragraph{Output IA (rilevante)}
-% \begin{verbatim}
-% [estratto della risposta]
-% \end{verbatim}
-%
-% \paragraph{Analisi critica}
-% [Commento: cosa era corretto, cosa era insicuro o "allucinato",
-%  cosa ho modificato manualmente e perché]
+L'utilizzo dell'IA come strumento di analisi e verifica, piuttosto che come
+generatore passivo di codice, ha permesso di mantenere un controllo consapevole
+su ogni modifica introdotta. Ogni intervento è stato compreso, validato e integrato
+nel contesto architetturale del sistema prima di essere committato.
 
-\section{Valutazione complessiva dell'output IA}
-
-\textit{[Riflessione conclusiva sull'affidabilità dell'IA per la generazione di codice sicuro,
-con esempi concreti di default insicuri introdotti e come sono stati corretti.]}
+Il valore principale dello strumento si è manifestato nella capacità di correlare
+rapidamente le osservazioni di sicurezza con le specifiche del codice esistente e
+di produrre una documentazione strutturata e coerente (threat model, sezioni LaTeX,
+messaggi di commit) in parallelo allo sviluppo, senza lasciare debito documentativo
+a fine progetto.
 
 \end{document}
