@@ -198,7 +198,7 @@ class AuthServiceImplTest {
 
         assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
 
-        verify(userRepository).save(nearLockUser);
+        verify(userRepository).save(Objects.requireNonNull(nearLockUser));
         assertEquals(MAX_FAILED_ATTEMPTS, nearLockUser.getFailedAttempts(),
                 "Failed attempts counter should reach MAX_FAILED_ATTEMPTS");
         assertNotNull(nearLockUser.getLockedUntil(),
@@ -225,7 +225,7 @@ class AuthServiceImplTest {
         assertNotNull(response);
         assertEquals(MOCK_TOKEN, response.token());
 
-        verify(userRepository).save(userWithPriorFailures);
+        verify(userRepository).save(Objects.requireNonNull(userWithPriorFailures));
         assertEquals(0, userWithPriorFailures.getFailedAttempts(),
                 "Failed attempts counter must be reset to 0 on successful login");
         assertNull(userWithPriorFailures.getLockedUntil(),
