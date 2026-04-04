@@ -177,32 +177,31 @@ function Start-DockerDesktop {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  HTTP HEALTH CHECK
+#  CONTAINER HEALTH CHECK (via docker inspect — management port is internal-only)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-function Wait-ForHealthy {
+function Wait-ForContainerHealthy {
     param(
         [Parameter(Mandatory)][string]$ServiceName,
-        [Parameter(Mandatory)][string]$Url,
+        [Parameter(Mandatory)][string]$ContainerName,
         [int]$TimeoutSeconds = 120
     )
 
-    Write-Info "Polling $ServiceName at $Url (timeout ${TimeoutSeconds}s)..."
+    Write-Info "Waiting for $ServiceName to become healthy (timeout ${TimeoutSeconds}s)..."
     $elapsed = 0
     while ($elapsed -lt $TimeoutSeconds) {
-        try {
-            $resp = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
-            if ($resp.StatusCode -eq 200) {
-                Write-Success "$ServiceName is healthy!"
-                return
-            }
-        } catch { <# expected while service boots #> }
+        $status = (docker inspect --format='{{.State.Health.Status}}' $ContainerName 2>$null) -join ''
+        if ($status -eq 'healthy') {
+            Write-Host ''
+            Write-Success "$ServiceName is healthy!"
+            return
+        }
         Start-Sleep -Seconds 3
         $elapsed += 3
         Write-Host '.' -NoNewline -ForegroundColor DarkGray
     }
     Write-Host ''
-    Stop-WithError "$ServiceName did not become healthy within ${TimeoutSeconds}s. Check container logs with: docker compose logs $($ServiceName.ToLower() -replace ' ','-')"
+    Stop-WithError "$ServiceName did not become healthy within ${TimeoutSeconds}s. Check container logs with: docker compose logs $ContainerName"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -274,11 +273,11 @@ try {
 
     # ── Step 4: Config Server health ──────────────────────────────────────────
     Write-Step '4/7' 'Waiting for Config Server'
-    Wait-ForHealthy -ServiceName 'Config Server' -Url 'http://localhost:8888/actuator/health/liveness' -TimeoutSeconds 120
+    Wait-ForContainerHealthy -ServiceName 'Config Server' -ContainerName 'config-server' -TimeoutSeconds 120
 
     # ── Step 5: API Gateway health ────────────────────────────────────────────
     Write-Step '5/7' 'Waiting for API Gateway'
-    Wait-ForHealthy -ServiceName 'API Gateway' -Url 'http://localhost:8080/actuator/health/liveness' -TimeoutSeconds 180
+    Wait-ForContainerHealthy -ServiceName 'API Gateway' -ContainerName 'api-gateway' -TimeoutSeconds 180
 
     # ── Step 6: Frontend ──────────────────────────────────────────────────────
     Write-Step '6/7' 'Installing frontend dependencies'

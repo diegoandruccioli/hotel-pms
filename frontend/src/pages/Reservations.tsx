@@ -173,7 +173,7 @@ export const Reservations = () => {
           </h1>
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('reservations_subtitle')}</p>
         </div>
-        <M3Button icon="add" onClick={handleNewReservation}>
+        <M3Button data-testid="new-reservation-btn" icon="add" onClick={handleNewReservation}>
           {t('new_reservation')}
         </M3Button>
       </div>

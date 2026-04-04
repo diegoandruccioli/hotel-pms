@@ -26,6 +26,7 @@ const MOCK_ROOMS = [
 const MOCK_RESERVATION = {
   id: 'res-001',
   guestId: MOCK_GUEST.id,
+  guestFullName: 'Mario Rossi',
   checkInDate: '2026-04-01',
   checkOutDate: '2026-04-05',
   status: 'CONFIRMED',
@@ -85,20 +86,32 @@ test.describe('Booking → Check-in Scenario', () => {
     );
 
     // ----- MOCK: rooms -----
-    await page.route('**/api/v1/rooms', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_ROOMS) })
+    // Pattern must include ** suffix: getAllRooms() adds query params (?page=0&size=500&sort=...)
+    // Response must be a SpringPage, not a plain array.
+    await page.route('**/api/v1/rooms**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ content: MOCK_ROOMS, totalElements: MOCK_ROOMS.length, totalPages: 1, number: 0, size: 500 }),
+      })
     );
 
-    // ----- MOCK: reservation creation -----
-    await page.route('**/api/v1/reservations', async (route) => {
+    // ----- MOCK: reservation list + creation -----
+    // Pattern must include ** suffix: getAllReservations() adds ?size=500
+    // The GET is called twice:
+    //   1. ReservationForm.loadInitialData() — must return empty to avoid double-booking conflict
+    //   2. Reservations list page (after form redirect) — must return [MOCK_RESERVATION]
+    let reservationsGetCount = 0;
+    await page.route('**/api/v1/reservations**', async (route) => {
       if (route.request().method() === 'POST') {
         await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(MOCK_RESERVATION) });
       } else {
-        // GET list
+        reservationsGetCount += 1;
+        const list = reservationsGetCount <= 2 ? [] : [MOCK_RESERVATION];
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ content: [MOCK_RESERVATION], totalElements: 1, totalPages: 1, number: 0, size: 20 }),
+          body: JSON.stringify({ content: list, totalElements: list.length, totalPages: 1, number: 0, size: 500 }),
         });
       }
     });
@@ -137,8 +150,8 @@ test.describe('Booking → Check-in Scenario', () => {
     await page.goto('/reservations');
     await expect(page).toHaveURL(/reservations/);
 
-    // Click "New Reservation"
-    await page.getByRole('link', { name: /new/i }).click();
+    // Click "New Reservation" — data-testid avoids locale-dependent text matching
+    await page.locator('[data-testid="new-reservation-btn"]').click();
     await expect(page).toHaveURL(/reservations\/new/);
 
     // =====================================================================
@@ -174,22 +187,14 @@ test.describe('Booking → Check-in Scenario', () => {
     // =====================================================================
     // STEP 5: Navigate to Check-in from the reservation
     // =====================================================================
-    // Click the reservation row/action to go to check-in
-    const checkInBtn = page.getByRole('link', { name: /check.?in/i }).first();
-    if (await checkInBtn.isVisible()) {
-      await checkInBtn.click();
-    } else {
-      // Try clicking the reservation row first
-      await page.getByText('Mario Rossi').first().click();
-      // Then find a check-in action
-      const checkInAction = page.getByRole('link', { name: /check.?in/i }).first();
-      await checkInAction.click();
-    }
+    // Click the Check-in button for the reservation row
+    // The button is rendered as <button> (not <a>) in ReservationRow when status === 'CONFIRMED'
+    await page.getByRole('button', { name: /check.?in/i }).first().click();
 
     // =====================================================================
     // STEP 6: Fill check-in guest form
     // =====================================================================
-    await expect(page.getByText(/check-in/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /check-in/i })).toBeVisible({ timeout: 5000 });
 
     // Fill required guest fields
     const firstNameInput = page.getByLabel(/first name/i).first();

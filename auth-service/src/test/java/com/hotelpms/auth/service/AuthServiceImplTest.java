@@ -13,7 +13,6 @@ import com.hotelpms.auth.repository.UserAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -174,11 +173,12 @@ class AuthServiceImplTest {
 
         assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
 
-        final ArgumentCaptor<UserAccount> captor = ArgumentCaptor.forClass(UserAccount.class);
-        verify(userRepository).save(captor.capture());
-        assertEquals(1, captor.getValue().getFailedAttempts(),
+        // The service mutates the same UserAccount instance in-place before saving it,
+        // so assertions on testUser reflect the state persisted by save().
+        verify(userRepository).save(Objects.requireNonNull(testUser));
+        assertEquals(1, testUser.getFailedAttempts(),
                 "Failed attempts counter should be incremented to 1");
-        assertNull(captor.getValue().getLockedUntil(),
+        assertNull(testUser.getLockedUntil(),
                 "Account should not be locked after a single failure");
     }
 
@@ -190,7 +190,7 @@ class AuthServiceImplTest {
                 .passwordHash(HASHED_PASSWORD)
                 .role(Role.GUEST)
                 .active(true)
-                .failedAttempts(4)
+                .failedAttempts(MAX_FAILED_ATTEMPTS - 1)
                 .build();
 
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(nearLockUser));
@@ -198,11 +198,10 @@ class AuthServiceImplTest {
 
         assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
 
-        final ArgumentCaptor<UserAccount> captor = ArgumentCaptor.forClass(UserAccount.class);
-        verify(userRepository).save(captor.capture());
-        assertEquals(MAX_FAILED_ATTEMPTS, captor.getValue().getFailedAttempts(),
+        verify(userRepository).save(Objects.requireNonNull(nearLockUser));
+        assertEquals(MAX_FAILED_ATTEMPTS, nearLockUser.getFailedAttempts(),
                 "Failed attempts counter should reach MAX_FAILED_ATTEMPTS");
-        assertNotNull(captor.getValue().getLockedUntil(),
+        assertNotNull(nearLockUser.getLockedUntil(),
                 "Account must be locked after reaching MAX_FAILED_ATTEMPTS");
     }
 
@@ -226,11 +225,10 @@ class AuthServiceImplTest {
         assertNotNull(response);
         assertEquals(MOCK_TOKEN, response.token());
 
-        final ArgumentCaptor<UserAccount> captor = ArgumentCaptor.forClass(UserAccount.class);
-        verify(userRepository).save(captor.capture());
-        assertEquals(0, captor.getValue().getFailedAttempts(),
+        verify(userRepository).save(Objects.requireNonNull(userWithPriorFailures));
+        assertEquals(0, userWithPriorFailures.getFailedAttempts(),
                 "Failed attempts counter must be reset to 0 on successful login");
-        assertNull(captor.getValue().getLockedUntil(),
+        assertNull(userWithPriorFailures.getLockedUntil(),
                 "Locked-until must be cleared on successful login");
     }
 }

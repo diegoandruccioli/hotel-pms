@@ -1,0 +1,198 @@
+name: CI Quality Gate
+
+# ── Triggers ──────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches:
+      - main
+      - feature/secure-coding-hardening
+  pull_request:
+    branches:
+      - main
+
+# Cancel in-progress runs on the same branch to avoid wasted resources
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ══════════════════════════════════════════════════════════════════════════════
+jobs:
+
+  # ── Job 1: Backend ──────────────────────────────────────────────────────────
+  backend:
+    name: "Backend — Build · PMD · Checkstyle · JUnit"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Build all modules (PMD + Checkstyle + JUnit + JaCoCo)
+        run: ./gradlew build --no-daemon
+
+      - name: Upload test and quality reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-reports
+          path: |
+            **/build/reports/tests/
+            **/build/reports/pmd/
+            **/build/reports/checkstyle/
+            **/build/reports/jacoco/
+          retention-days: 14
+
+  # ── Job 2: Frontend ─────────────────────────────────────────────────────────
+  frontend:
+    name: "Frontend — ESLint · TypeScript · Vitest"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: ESLint — zero warnings policy
+        working-directory: frontend
+        run: npm run lint
+
+      - name: TypeScript check + production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Unit tests — Vitest
+        working-directory: frontend
+        run: npm run test
+
+  # ── Job 3: E2E ──────────────────────────────────────────────────────────────
+  # Runs only after both backend and frontend pass.
+  # Builds the full Docker stack, waits for every service to be healthy,
+  # then runs Playwright E2E tests against the containerised frontend (nginx:80).
+  #
+  # REQUIRED SECRET: INTERNAL_HMAC_SECRET must be set in the repository's
+  # Settings → Secrets and variables → Actions. Generate one with:
+  #   openssl rand -hex 32
+  # ─────────────────────────────────────────────────────────────────────────────
+  e2e:
+    name: "E2E — Docker Stack + Playwright"
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    timeout-minutes: 30
+    env:
+      INTERNAL_HMAC_SECRET: ${{ secrets.INTERNAL_HMAC_SECRET }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Fail early and clearly if the required secret is missing
+      - name: Validate INTERNAL_HMAC_SECRET
+        run: |
+          if [ -z "$INTERNAL_HMAC_SECRET" ]; then
+            echo "::error::INTERNAL_HMAC_SECRET is not configured."
+            echo "::error::Go to Settings → Secrets → Actions and add it (openssl rand -hex 32)."
+            exit 1
+          fi
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright + Chromium system dependencies
+        working-directory: frontend
+        run: npx playwright install chromium --with-deps
+
+      # Build all Docker images (Spring services build their own JARs via
+      # multi-stage Dockerfiles; tests are skipped with -x test)
+      - name: Build Docker images
+        run: docker compose build
+
+      # Start every service in detached mode and wait until all health checks
+      # pass (or until the step timeout fires after 10 minutes)
+      - name: Start full Docker stack
+        run: docker compose up -d --wait
+        timeout-minutes: 10
+
+      # Extra guard: poll the gateway liveness endpoint directly.
+      # The gateway becomes healthy only after all downstream services are healthy.
+      - name: Wait for API Gateway to be healthy
+        run: |
+          echo "Polling http://localhost:8080/actuator/health/liveness ..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/actuator/health/liveness > /dev/null 2>&1; then
+              echo "API Gateway is healthy (attempt $i)."
+              exit 0
+            fi
+            echo "Attempt $i/30 — retrying in 10 s ..."
+            sleep 10
+          done
+          echo "::error::API Gateway did not become healthy within 300 s."
+          exit 1
+
+      # Confirm the nginx frontend is actually serving the React SPA
+      - name: Verify frontend (nginx) is serving
+        run: |
+          HTTP_STATUS=$(curl -so /dev/null -w "%{http_code}" http://localhost:80)
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error::Frontend returned HTTP $HTTP_STATUS instead of 200."
+            exit 1
+          fi
+          echo "Frontend is serving (HTTP $HTTP_STATUS)."
+
+      # Run the full Playwright suite against the Docker-hosted frontend.
+      # PLAYWRIGHT_BASE_URL overrides the config default (Vite dev server)
+      # so every page.goto('/') resolves to http://localhost:80/.
+      - name: Run Playwright E2E tests
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:80
+        run: npm run test:e2e:ci
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 30
+
+      # Dump the last 200 lines of every container log to help diagnose failures
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose logs --tail=200
+
+      - name: Tear down Docker stack and volumes
+        if: always()
+        run: docker compose down -v

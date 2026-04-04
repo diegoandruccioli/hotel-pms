@@ -38,11 +38,14 @@ frontend/test-results/
 
 # ── Logs & temp ──────────────────────────────────────────────────────────────
 *.log
+*.txt
 *.tmp
 
-# ── Claude Code — personal files, do not commit ──────────────────────────────
+# ── AI tooling — never commit ────────────────────────────────────────────────
+.claude/
+CLAUDE.md
+.ai/
 backup/
-.claude/settings.local.json
 
 # ── Local tools ──────────────────────────────────────────────────────────────
 .antigravity.json
