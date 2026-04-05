@@ -183,7 +183,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-STAY-01 | Validazione stato prenotazione prima check-in | stay-service | — | A04 | ⏳ |
 | T-STAY-02 | Audit trail check-in/check-out | stay-service | — | A09 | ⏳ |
 | T-BILL-01 | Verifica ownership fatture | billing-service | — | A01 | ⏳ |
-| T-FB-02 | Catalogo MenuItem server-side (V2 Flyway); OrderItemRequest accetta menuItemId+quantity, no unitPrice; service risolve prezzi da DB con buildItemsFromCatalog(); totalAmount ricalcolato server-side | fb-service/MenuItem.java, MenuItemRepository.java, V2__add_menu_items.sql, OrderItemRequest.java, RestaurantOrderServiceImpl.java | TBD | A04 | ✅ |
+| T-FB-02 | Catalogo MenuItem server-side (V2 Flyway); OrderItemRequest accetta menuItemId+quantity, no unitPrice; service risolve prezzi da DB con buildItemsFromCatalog(); totalAmount ricalcolato server-side | fb-service/MenuItem.java, MenuItemRepository.java, V2__add_menu_items.sql, OrderItemRequest.java, RestaurantOrderServiceImpl.java | d7af61c | A04 | ✅ |
 | T-CFG-01 | Porta management separata (:8090, non pubblicata) + show-details: when-authorized su tutti i servizi | config-service/resources/config/*.yml, docker-compose.yml, prometheus.yml | b0cf898 | A05 | ✅ |
 | T-CFG-02 | Segreti in variabili d'ambiente (no plaintext) | config-service | — | A02 | ⏳ |
 | T-FE-01 | Output encoding React (verifica dangerouslySetInnerHTML) | frontend | — | A03 | ⏳ |
