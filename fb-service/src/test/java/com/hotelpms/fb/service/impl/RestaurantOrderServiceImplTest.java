@@ -29,7 +29,6 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -97,8 +96,8 @@ class RestaurantOrderServiceImplTest {
         // Arrange
         when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN));
         when(orderMapper.toEntity(request)).thenReturn(order);
-        when(menuItemRepository.findById(menuItemId)).thenReturn(Optional.of(menuItem));
-        when(orderRepository.save(any(RestaurantOrder.class))).thenReturn(order);
+        when(menuItemRepository.findById(Objects.requireNonNull(menuItemId))).thenReturn(Optional.of(menuItem));
+        when(orderRepository.save(Objects.requireNonNull(order))).thenReturn(order);
         when(orderMapper.toResponse(Objects.requireNonNull(order))).thenReturn(response);
 
         // Act
@@ -110,8 +109,8 @@ class RestaurantOrderServiceImplTest {
         assertEquals(OrderStatus.BILLED_TO_ROOM, result.status());
 
         verify(stayClient).getStayById(stayId);
-        verify(menuItemRepository).findById(menuItemId);
-        verify(orderRepository).save(any(RestaurantOrder.class));
+        verify(menuItemRepository).findById(Objects.requireNonNull(menuItemId));
+        verify(orderRepository).save(Objects.requireNonNull(order));
     }
 
     @Test
@@ -125,17 +124,17 @@ class RestaurantOrderServiceImplTest {
                 .name("Bistecca ai Ferri")
                 .price(new BigDecimal("22.00"))
                 .build();
-        when(menuItemRepository.findById(menuItemId)).thenReturn(Optional.of(expensiveItem));
-        when(orderRepository.save(any(RestaurantOrder.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(orderMapper.toResponse(any(RestaurantOrder.class))).thenReturn(response);
+        when(menuItemRepository.findById(Objects.requireNonNull(menuItemId))).thenReturn(Optional.of(expensiveItem));
+        when(orderRepository.save(Objects.requireNonNull(order))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderMapper.toResponse(Objects.requireNonNull(order))).thenReturn(response);
 
         // Act
         orderService.createOrder(request);
 
         // Assert: verify the item was built using catalog price (22.00), not any client value
-        verify(menuItemRepository).findById(menuItemId);
+        verify(menuItemRepository).findById(Objects.requireNonNull(menuItemId));
         // The order passed to save must contain items with server-side price 22.00
-        verify(orderRepository).save(any(RestaurantOrder.class));
+        verify(orderRepository).save(Objects.requireNonNull(order));
     }
 
     @Test
@@ -143,15 +142,15 @@ class RestaurantOrderServiceImplTest {
         // Arrange: menu item UUID does not exist in the catalog
         when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN));
         when(orderMapper.toEntity(request)).thenReturn(order);
-        when(menuItemRepository.findById(menuItemId)).thenReturn(Optional.empty());
+        when(menuItemRepository.findById(Objects.requireNonNull(menuItemId))).thenReturn(Optional.empty());
 
         // Act & Assert
         final OrderValidationException exception = assertThrows(OrderValidationException.class,
                 () -> orderService.createOrder(request));
 
         assertNotNull(exception.getMessage());
-        verify(menuItemRepository).findById(menuItemId);
-        verify(orderRepository, org.mockito.Mockito.never()).save(any());
+        verify(menuItemRepository).findById(Objects.requireNonNull(menuItemId));
+        verifyNoInteractions(orderRepository);
     }
 
     @Test

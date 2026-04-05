@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -125,7 +126,7 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
 
         final List<OrderItem> items = new ArrayList<>();
         for (final OrderItemRequest req : itemRequests) {
-            final MenuItem menuItem = menuItemRepository.findById(req.menuItemId())
+            final MenuItem menuItem = menuItemRepository.findById(Objects.requireNonNull(req.menuItemId()))
                     .orElseThrow(() -> new OrderValidationException(
                             "MENU_ITEM_NOT_FOUND: " + req.menuItemId()));
 
