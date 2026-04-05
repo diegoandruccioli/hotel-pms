@@ -19,6 +19,7 @@ public class FeignHeaderConfig {
 
     private static final String HEADER_USER = "X-Auth-User";
     private static final String HEADER_ROLE = "X-Auth-Role";
+    private static final String HEADER_HOTEL = "X-Auth-Hotel";
 
     /**
      * Registers a RequestInterceptor that extracts the gateway auth headers
@@ -42,6 +43,10 @@ public class FeignHeaderConfig {
             }
             if (StringUtils.hasText(role)) {
                 template.header(HEADER_ROLE, role);
+            }
+            final String hotel = request.getHeader(HEADER_HOTEL);
+            if (StringUtils.hasText(hotel)) {
+                template.header(HEADER_HOTEL, hotel);
             }
         };
     }

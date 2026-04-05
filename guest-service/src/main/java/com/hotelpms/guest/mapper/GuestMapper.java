@@ -40,6 +40,7 @@ public interface GuestMapper {
      * @param target  the entity to be mutated; must not be {@code null}
      */
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "hotelId", ignore = true)
     @Mapping(target = "identityDocuments", ignore = true)
     @Mapping(target = "active", ignore = true)
     @Mapping(target = "createdAt", ignore = true)

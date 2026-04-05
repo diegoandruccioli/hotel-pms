@@ -7,12 +7,20 @@ import com.hotelpms.guest.exception.NotFoundException;
 import com.hotelpms.guest.mapper.GuestMapper;
 import com.hotelpms.guest.model.Guest;
 import com.hotelpms.guest.repository.GuestRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -21,14 +29,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,13 +63,16 @@ class GuestServiceImplTest {
     private GuestRequest guestRequest;
     private GuestResponse guestResponse;
     private UUID guestId;
+    private UUID hotelId;
 
     @BeforeEach
     void setUp() {
         guestId = UUID.randomUUID();
+        hotelId = UUID.randomUUID();
 
         guest = Guest.builder()
                 .id(guestId)
+                .hotelId(hotelId)
                 .firstName(TEST_FIRST_NAME)
                 .lastName(TEST_LAST_NAME)
                 .email(TEST_EMAIL)
@@ -98,6 +105,18 @@ class GuestServiceImplTest {
                 Collections.emptyList(),
                 guest.getCreatedAt(),
                 guest.getUpdatedAt());
+
+        // Provide hotel context that InternalAuthFilter would normally inject
+        final Authentication auth = mock(Authentication.class);
+        when(auth.getDetails()).thenReturn(hotelId.toString());
+        final SecurityContext securityContext = mock(SecurityContext.class);
+        when(securityContext.getAuthentication()).thenReturn(auth);
+        SecurityContextHolder.setContext(securityContext);
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -123,7 +142,8 @@ class GuestServiceImplTest {
         final Guest nonNullGuest = Objects.requireNonNull(guest);
         final GuestResponse nonNullGuestResponse = Objects.requireNonNull(guestResponse);
 
-        when(guestRepository.findById(nonNullGuestId)).thenReturn(Optional.of(nonNullGuest));
+        when(guestRepository.findByIdAndHotelId(nonNullGuestId, hotelId))
+                .thenReturn(Optional.of(nonNullGuest));
         when(guestMapper.toResponse(nonNullGuest)).thenReturn(nonNullGuestResponse);
 
         final GuestResponse result = guestService.getGuestById(nonNullGuestId);
@@ -137,7 +157,22 @@ class GuestServiceImplTest {
     void shouldThrowNotFoundExceptionWhenGuestNotFound() {
         final UUID nonNullGuestId = Objects.requireNonNull(guestId);
 
-        when(guestRepository.findById(nonNullGuestId)).thenReturn(Optional.empty());
+        when(guestRepository.findByIdAndHotelId(nonNullGuestId, hotelId))
+                .thenReturn(Optional.empty());
+
+        final NotFoundException exception = assertThrows(NotFoundException.class,
+                () -> guestService.getGuestById(nonNullGuestId));
+
+        assertEquals("GUEST_NOT_FOUND", exception.getMessage());
+    }
+
+    @Test
+    void shouldReturnNotFoundForGuestBelongingToOtherHotel() {
+        final UUID nonNullGuestId = Objects.requireNonNull(guestId);
+
+        // findByIdAndHotelId returns empty when the guest belongs to a different hotel
+        when(guestRepository.findByIdAndHotelId(nonNullGuestId, hotelId))
+                .thenReturn(Optional.empty());
 
         final NotFoundException exception = assertThrows(NotFoundException.class,
                 () -> guestService.getGuestById(nonNullGuestId));
@@ -150,7 +185,8 @@ class GuestServiceImplTest {
         final UUID nonNullGuestId = Objects.requireNonNull(guestId);
         final Guest nonNullGuest = Objects.requireNonNull(guest);
 
-        when(guestRepository.findById(nonNullGuestId)).thenReturn(Optional.of(nonNullGuest));
+        when(guestRepository.findByIdAndHotelId(nonNullGuestId, hotelId))
+                .thenReturn(Optional.of(nonNullGuest));
         when(reservationClient.hasActiveReservations(nonNullGuestId)).thenReturn(false);
 
         guestService.deleteGuest(nonNullGuestId);
@@ -166,7 +202,7 @@ class GuestServiceImplTest {
         final GuestResponse nonNullGuestResponse = Objects.requireNonNull(guestResponse);
         final Page<Guest> guestPage = new PageImpl<>(Objects.requireNonNull(List.of(nonNullGuest)));
 
-        when(guestRepository.searchByKeyword(query, pageable)).thenReturn(guestPage);
+        when(guestRepository.searchByKeywordAndHotelId(query, hotelId, pageable)).thenReturn(guestPage);
         when(guestMapper.toResponse(nonNullGuest)).thenReturn(nonNullGuestResponse);
 
         final Page<GuestResponse> result = guestService.searchGuests(query, pageable);
@@ -184,7 +220,7 @@ class GuestServiceImplTest {
         final GuestResponse nonNullGuestResponse = Objects.requireNonNull(guestResponse);
         final Page<Guest> guestPage = new PageImpl<>(Objects.requireNonNull(List.of(nonNullGuest)));
 
-        when(guestRepository.findAll(pageable)).thenReturn(guestPage);
+        when(guestRepository.findAllByHotelId(hotelId, pageable)).thenReturn(guestPage);
         when(guestMapper.toResponse(nonNullGuest)).thenReturn(nonNullGuestResponse);
 
         final Page<GuestResponse> result = guestService.searchGuests(query, pageable);

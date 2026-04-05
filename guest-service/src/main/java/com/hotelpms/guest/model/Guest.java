@@ -93,6 +93,13 @@ public class Guest {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    /**
+     * Owning hotel UUID. Injected from the {@code X-Auth-Hotel} gateway header
+     * and used to enforce multi-tenant isolation on every query.
+     */
+    @Column(name = "hotel_id", nullable = false)
+    private UUID hotelId;
+
     @Builder.Default
     @Column(nullable = false)
     private boolean active = true;
