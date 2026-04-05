@@ -309,6 +309,7 @@ T-GW-01   & A01 & Header X-Auth iniettabili & CRITICO \\
 T-GW-03   & A05 & Assenza security headers HTTP & MEDIO \\
 T-GW-05   & A01 & Assenza protezione CSRF & ALTO \\
 T-GST-01  & A01 & IDOR su ospiti (hotel\_id) & CRITICO \\
+T-GST-03  & A01 & Multi-tenant leak PII ospiti & CRITICO \\
 T-RES-01  & A04 & Double booking (no date lock) & CRITICO \\
 T-FB-02   & A04 & Prezzi non ricalcolati server-side & CRITICO \\
 T-CFG-01  & A05 & Actuator esposti & CRITICO \\
@@ -1099,6 +1100,121 @@ La stessa configurazione è applicata simmetricamente a tutti e 9 i servizi
 \texttt{billing-service}, \texttt{fb-service}, \texttt{config-service}).
 
 \paragraph{Riferimento} Commit: \commitref{b0cf898}{fix(security): T-CFG-01 --- move actuator to internal-only management port}
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Broken Access Control --- Isolamento Multi-Tenant}
+% ═════════════════════════════════════════════════════════════════════════════
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{IDOR e Data Leak sul Guest Service \threat{T-GST-01} \threat{T-GST-03}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il sistema gestisce strutture ricettive multiple (multi-hotel). Ogni utente autenticato
+appartiene a un hotel specifico, identificato dal campo \texttt{hotel\_id} estratto dal JWT
+e iniettato dall'API Gateway come header \texttt{X-Auth-Hotel}.
+
+\textbf{T-GST-01 (IDOR):} il \texttt{GuestController} esponeva endpoint
+\texttt{GET /api/v1/guests/\{id\}} e \texttt{PUT /api/v1/guests/\{id\}} senza verificare
+l'ownership dell'hotel. Un receptionist dell'Hotel A, conoscendo o indovinando un UUID,
+poteva leggere e modificare profili ospite dell'Hotel B. Classificato OWASP A01 ---
+Broken Access Control.
+
+\textbf{T-GST-03 (Multi-tenant leak):} le query \texttt{findAll()} e \texttt{searchByKeyword()}
+non filtravano per \texttt{hotel\_id}, restituendo ospiti di tutti gli hotel alla prima
+chiamata paginata. I dati PII (nome, documento, data di nascita) risultavano accessibili
+cross-hotel. Classificato OWASP A01 --- Broken Access Control.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- GuestServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: lookup per solo UUID, nessun check ownership
+private Guest resolveGuest(UUID id) {
+    return guestRepository.findById(id)   // trova chiunque, qualsiasi hotel
+        .orElseThrow(() -> new NotFoundException("GUEST_NOT_FOUND"));
+}
+
+// INSICURO: lista tutti gli ospiti di tutti gli hotel
+public Page<GuestResponse> getAllGuests(Pageable pageable) {
+    return guestRepository.findAll(pageable)  // nessun filtro hotel_id
+        .map(guestMapper::toResponse);
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+L'intervento si articola in quattro livelli:
+
+\begin{enumerate}
+    \item \textbf{Schema DB} --- Flyway V2 aggiunge la colonna \texttt{hotel\_id UUID NOT NULL}
+          alla tabella \texttt{guests}, con indice parziale su \texttt{active = TRUE}.
+    \item \textbf{Extraction dal SecurityContext} --- \texttt{InternalAuthFilter} legge
+          \texttt{X-Auth-Hotel} e lo memorizza in \texttt{Authentication.details}. Il service
+          lo estrae con \texttt{extractHotelId()} senza dipendere dal controller.
+    \item \textbf{Query scoped} --- tutte le query del repository usano varianti
+          hotel-scoped (\texttt{findByIdAndHotelId}, \texttt{findAllByHotelId},
+          \texttt{searchByKeywordAndHotelId}, \texttt{findAllByIdInAndHotelId}).
+    \item \textbf{IDOR-safe 404} --- \texttt{resolveGuest(id, hotelId)} chiama
+          \texttt{findByIdAndHotelId}: se il guest esiste ma appartiene a un altro hotel
+          il metodo restituisce \texttt{Optional.empty()} e il service lancia
+          \texttt{NotFoundException} (HTTP 404), senza rivelare l'esistenza della risorsa.
+\end{enumerate}
+
+\begin{securebox}[title={Codice Sicuro --- GuestServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: lookup combinato id + hotel_id, IDOR-safe con 404
+private Guest resolveGuest(UUID id, UUID hotelId) {
+    return guestRepository.findByIdAndHotelId(id, hotelId)
+        .orElseThrow(() -> new NotFoundException("GUEST_NOT_FOUND"));
+    // 404 anche se il guest esiste ma appartiene ad altro hotel:
+    // l'attaccante non puo' distinguere "non esiste" da "non tuo"
+}
+
+// SICURO: elenco filtrato per hotel del caller
+public Page<GuestResponse> getAllGuests(Pageable pageable) {
+    UUID hotelId = extractHotelId();          // da Authentication.details
+    return guestRepository
+        .findAllByHotelId(hotelId, pageable)  // solo il proprio hotel
+        .map(guestMapper::toResponse);
+}
+
+// SICURO: hotelId estratto dal SecurityContext (non dal client)
+private UUID extractHotelId() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    Object details = auth.getDetails();       // iniettato da InternalAuthFilter
+    return UUID.fromString((String) details); // mai controllabile dal client
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={InternalAuthFilter.java --- estrazione X-Auth-Hotel}]
+\begin{lstlisting}[style=java]
+// Il gateway inietta X-Auth-Hotel dal JWT; il filter lo memorizza nei details
+String hotelId = request.getHeader("X-Auth-Hotel");
+// Richiesta rifiutata (401) se l'header e' assente
+if (!StringUtils.hasText(hotelId)) {
+    rejectRequest(response, "Missing required gateway authentication headers");
+    return;
+}
+UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+    username, "", List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+auth.setDetails(hotelId);   // tenant context propagato al service layer
+SecurityContextHolder.getContext().setAuthentication(auth);
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={V2\_\_add\_hotel\_id\_to\_guests.sql --- Flyway migration}]
+\begin{lstlisting}[style=sql]
+ALTER TABLE guests
+    ADD COLUMN hotel_id UUID NOT NULL
+    DEFAULT '00000000-0000-0000-0000-000000000000';
+ALTER TABLE guests ALTER COLUMN hotel_id DROP DEFAULT;
+
+CREATE INDEX IF NOT EXISTS idx_guests_hotel_id
+    ON guests (hotel_id) WHERE active = TRUE;
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Riferimento} Commit: \commitref{b483eac}{fix(security): T-GST-01 + T-GST-03 --- hotel\_id isolation on guest-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}

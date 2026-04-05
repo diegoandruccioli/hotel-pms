@@ -87,9 +87,9 @@
 
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
-| T-GST-01 | Elevation of Privilege | IDOR: un RECEPTIONIST potrebbe accedere a ospiti di altri hotel via UUID prevedibile | CRITICO | MEDIA | 🔴 APERTO |
+| T-GST-01 | Elevation of Privilege | IDOR: un RECEPTIONIST potrebbe accedere a ospiti di altri hotel via UUID prevedibile | CRITICO | MEDIA | ✅ RISOLTO |
 | T-GST-02 | Injection | Input validation: campi testo libero (nome, note) non sanitizzati | ALTO | MEDIA | 🟡 DA ANALIZZARE |
-| T-GST-03 | Information Disclosure | Esposizione PII senza controllo hotel_id (multi-tenant data leak) | CRITICO | ALTA | 🔴 APERTO |
+| T-GST-03 | Information Disclosure | Esposizione PII senza controllo hotel_id (multi-tenant data leak) | CRITICO | ALTA | ✅ RISOLTO |
 | T-GST-04 | Tampering | Mass Assignment: DTO potrebbe accettare campi non previsti tramite JSON | MEDIO | MEDIA | 🟡 DA ANALIZZARE |
 
 ### 4.4 reservation-service
@@ -176,8 +176,8 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-GW-03 | SecurityHeadersFilter GlobalFilter: HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, CSP default-src 'none' su tutte le risposte del gateway | api-gateway/SecurityHeadersFilter.java | b901a9f | A05 | ✅ |
 | T-GW-04 | CORS origins whitelist restrittiva | api-gateway | — | A05 | ⏳ |
 | T-GW-05 | CSRF token per operazioni mutanti | api-gateway/frontend | — | A01 | ⏳ |
-| T-GST-01 | Verifica hotel_id ownership su ogni operazione | guest-service | — | A01 | ⏳ |
-| T-GST-03 | Filtro hotel_id obbligatorio in tutte le query | guest-service | — | A01 | ⏳ |
+| T-GST-01 | IDOR fix: resolveGuest(id, hotelId) → findByIdAndHotelId, 404 anche per guest di altri hotel (no enumeration) | guest-service/GuestServiceImpl.java, GuestRepository.java | b483eac | A01 | ✅ |
+| T-GST-03 | hotel_id su tabella guests (Flyway V2) + tutte le query repository scoped per hotelId; X-Auth-Hotel letto da InternalAuthFilter e propagato via FeignHeaderConfig | guest-service/V2__add_hotel_id_to_guests.sql, GuestRepository.java, InternalAuthFilter.java, FeignHeaderConfig.java | b483eac | A01 | ✅ |
 | T-RES-01 | @Version optimistic lock + @Lock(PESSIMISTIC_WRITE) su overlap query + ConflictException HTTP 409 + Flyway V4 version column | reservation-service/Reservation.java, ReservationRepository.java, GlobalExceptionHandler.java, V4__add_version_to_reservations.sql | ca9bf92 | A04 | ✅ |
 | T-RES-02 | Verifica ownership hotel_id su prenotazioni | reservation-service | — | A01 | ⏳ |
 | T-STAY-01 | Validazione stato prenotazione prima check-in | stay-service | — | A04 | ⏳ |
