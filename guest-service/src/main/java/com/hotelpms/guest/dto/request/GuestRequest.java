@@ -3,6 +3,8 @@ package com.hotelpms.guest.dto.request;
 import com.hotelpms.guest.util.ValidationConstants;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
@@ -20,12 +22,26 @@ import java.time.LocalDate;
  * @param dateOfBirth The date of birth of the guest.
  */
 public record GuestRequest(
-        @NotBlank @Size(max = ValidationConstants.MAX_FIRST_NAME_LENGTH) String firstName,
-        @NotBlank @Size(max = ValidationConstants.MAX_LAST_NAME_LENGTH) String lastName,
+        @NotBlank
+        @Size(max = ValidationConstants.MAX_FIRST_NAME_LENGTH)
+        @Pattern(regexp = ValidationConstants.NAME_PATTERN)
+        String firstName,
+        @NotBlank
+        @Size(max = ValidationConstants.MAX_LAST_NAME_LENGTH)
+        @Pattern(regexp = ValidationConstants.NAME_PATTERN)
+        String lastName,
         @NotBlank @Email @Size(max = ValidationConstants.MAX_EMAIL_LENGTH) String email,
-        @Size(max = ValidationConstants.MAX_PHONE_LENGTH) String phone,
-        @Size(max = ValidationConstants.MAX_ADDRESS_LENGTH) String address,
-        @Size(max = ValidationConstants.MAX_LOCATION_LENGTH) String city,
-        @Size(max = ValidationConstants.MAX_LOCATION_LENGTH) String country,
-        LocalDate dateOfBirth) {
+        @Size(max = ValidationConstants.MAX_PHONE_LENGTH)
+        @Pattern(regexp = ValidationConstants.PHONE_PATTERN)
+        String phone,
+        @Size(max = ValidationConstants.MAX_ADDRESS_LENGTH)
+        @Pattern(regexp = ValidationConstants.TEXT_SAFE_PATTERN)
+        String address,
+        @Size(max = ValidationConstants.MAX_LOCATION_LENGTH)
+        @Pattern(regexp = ValidationConstants.LOCATION_PATTERN)
+        String city,
+        @Size(max = ValidationConstants.MAX_LOCATION_LENGTH)
+        @Pattern(regexp = ValidationConstants.LOCATION_PATTERN)
+        String country,
+        @Past LocalDate dateOfBirth) {
 }
