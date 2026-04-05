@@ -639,7 +639,119 @@ ALTER TABLE user_account
 \textit{[Da completare]}
 
 \subsection{Server-side Price Validation \threat{T-FB-02}}
-\textit{[Da completare]}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il \texttt{fb-service} gestisce gli ordini del Food \& Beverage (bar, ristorante)
+addebitati al conto camera. Prima della mitigazione, il DTO \texttt{OrderItemRequest}
+accettava il campo \texttt{unitPrice} inviato direttamente dal client. Il service
+usava quel valore senza alcuna verifica per calcolare il \texttt{totalAmount}
+dell'ordine. Un utente malintenzionato poteva manipolare il payload JSON
+(e.g.\ con un proxy interceptor come Burp Suite) e impostare prezzi arbitrari,
+inclusi valori prossimi allo zero, ottenendo beni e servizi a costo irrisorio
+senza essere rilevato. Classificato OWASP A04 --- Insecure Design.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- OrderItemRequest.java + service (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: il prezzo arriva dal client senza validazione
+public record OrderItemRequest(
+    @NotBlank String itemName,
+    @NotNull @Positive Integer quantity,
+    @NotNull @Positive BigDecimal unitPrice  // attaccante imposta 0.01
+) {}
+
+// INSICURO: totalAmount calcolato con il prezzo del client
+BigDecimal totalAmount = order.getItems().stream()
+    .map(item -> item.getUnitPrice()         // valore iniettato dal client
+                     .multiply(BigDecimal.valueOf(item.getQuantity())))
+    .reduce(BigDecimal.ZERO, BigDecimal::add);
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+L'intervento introduce un catalogo di voci di menu server-side e rimuove
+il prezzo dal perimetro di controllo del client:
+
+\begin{enumerate}
+    \item \textbf{Entita' MenuItem} --- nuova tabella \texttt{menu\_items}
+          (Flyway V2) con campi \texttt{name} e \texttt{price}. I prezzi
+          sono scritti solo da operatori autenticati con accesso DB;
+          il client non puo' mai influenzarli.
+    \item \textbf{Seed data} --- 10 voci tipiche di un hotel (espresso,
+          cappuccino, club sandwich, bistecca\ldots) con prezzi realistici.
+    \item \textbf{OrderItemRequest ridisegnato} --- il campo \texttt{unitPrice}
+          e \texttt{itemName} sono rimossi; il client invia solo
+          \texttt{menuItemId} (UUID) e \texttt{quantity}.
+    \item \textbf{buildItemsFromCatalog()} --- per ogni item richiesto, il service
+          cerca il \texttt{MenuItem} per UUID. Se l'ID non esiste lancia
+          \texttt{OrderValidationException} (HTTP 400). Il prezzo e' sempre
+          quello del catalogo.
+    \item \textbf{totalAmount ricalcolato server-side} --- dopo il lookup, il
+          totale e' la somma di \texttt{menuItem.getPrice() * quantity}.
+          Nessun valore del client partecipa al calcolo.
+\end{enumerate}
+
+\begin{securebox}[title={Codice Sicuro --- OrderItemRequest.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: nessun campo prezzo esposto al client
+public record OrderItemRequest(
+    @NotNull UUID menuItemId,   // riferimento al catalogo server-side
+    @NotNull @Positive Integer quantity
+) {}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- buildItemsFromCatalog() nel service}]
+\begin{lstlisting}[style=java]
+// SICURO: prezzo sempre letto dal catalogo DB, mai dal client
+private List<OrderItem> buildItemsFromCatalog(
+        List<OrderItemRequest> itemRequests, RestaurantOrder order) {
+
+    List<OrderItem> items = new ArrayList<>();
+    for (OrderItemRequest req : itemRequests) {
+        MenuItem menuItem = menuItemRepository.findById(req.menuItemId())
+            .orElseThrow(() -> new OrderValidationException(
+                "MENU_ITEM_NOT_FOUND: " + req.menuItemId()));
+
+        OrderItem item = OrderItem.builder()
+            .restaurantOrder(order)
+            .itemName(menuItem.getName())
+            .unitPrice(menuItem.getPrice())  // server-side — mai dal client
+            .quantity(req.quantity())
+            .build();
+        items.add(item);
+    }
+    return items;
+}
+
+// SICURO: totalAmount calcolato sui prezzi del catalogo
+BigDecimal totalAmount = items.stream()
+    .map(i -> i.getUnitPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
+    .reduce(BigDecimal.ZERO, BigDecimal::add);
+order.setTotalAmount(totalAmount);
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={V2\_\_add\_menu\_items.sql --- catalogo prezzi server-side}]
+\begin{lstlisting}[style=sql]
+CREATE TABLE IF NOT EXISTS menu_items (
+    id     UUID           NOT NULL DEFAULT gen_random_uuid(),
+    name   VARCHAR(255)   NOT NULL,
+    price  NUMERIC(10,2)  NOT NULL,
+    active BOOLEAN        NOT NULL DEFAULT TRUE,
+    ...
+    CONSTRAINT chk_menu_items_price CHECK (price >= 0)
+);
+
+-- Seed: prezzi autoritativi, non modificabili dal client
+INSERT INTO menu_items (id, name, price) VALUES
+    ('a1000000-...01', 'Espresso',          2.50),
+    ('a1000000-...06', 'Club Sandwich',    12.00),
+    ('a1000000-...09', 'Bistecca ai Ferri', 22.00);
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Riferimento} Commit: \commitref{TBD}{fix(security): T-FB-02 --- server-side price catalog on fb-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Autorizzazione e Controllo degli Accessi}
