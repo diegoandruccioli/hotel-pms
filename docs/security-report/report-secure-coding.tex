@@ -636,7 +636,165 @@ ALTER TABLE user_account
 % ─────────────────────────────────────────────────────────────────────────────
 
 \subsection{Input Validation su dati ospite \threat{T-GST-02}}
-\textit{[Da completare]}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il \texttt{guest-service} espone endpoint REST per la creazione e l'aggiornamento
+di profili ospite (\texttt{POST /api/v1/guests}, \texttt{PUT /api/v1/guests/\{id\}}).
+I DTO di richiesta --- \texttt{GuestRequest} e \texttt{IdentityDocumentRequestDTO} ---
+erano protetti solo con \texttt{@NotBlank} e \texttt{@Size}, ma \textbf{privi di
+vincoli di formato} sui campi testo libero. Un attaccante poteva inviare payload
+contenenti tag HTML o script nei campi nome, telefono, città e numero documento,
+oppure una data di nascita nel futuro. Classificato OWASP A03 --- Injection.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- GuestRequest.java (baseline)}]
+\begin{lstlisting}[style=java]
+public record GuestRequest(
+    @NotBlank @Size(max = 100) String firstName,  // nessun @Pattern
+    @NotBlank @Size(max = 100) String lastName,   // nessun @Pattern
+    @NotBlank @Email @Size(max = 150) String email,
+    @Size(max = 20) String phone,                 // nessun @Pattern
+    @Size(max = 255) String address,              // nessun @Pattern
+    @Size(max = 50) String city,                  // nessun @Pattern
+    @Size(max = 50) String country,               // nessun @Pattern
+    LocalDate dateOfBirth) {                      // nessun @Past
+}
+// Payload valido inviabile: firstName = "<script>alert(1)</script>"
+// oppure phone = "'; DROP TABLE guests;--"
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={Codice Sicuro --- GuestRequest.java + ValidationConstants.java}]
+\begin{lstlisting}[style=java]
+// ValidationConstants.java
+public static final String NAME_PATTERN     = "^[\\p{L} '\\-]+$";
+public static final String PHONE_PATTERN    = "^[+]?[0-9 ()\\-]+$";
+public static final String TEXT_SAFE_PATTERN = "^[^<>&\"]+$";
+public static final String LOCATION_PATTERN = "^[\\p{L}0-9 '\\-.]+$";
+public static final String DOCUMENT_NUMBER_PATTERN = "^[A-Za-z0-9\\-]+$";
+
+// GuestRequest.java
+public record GuestRequest(
+    @NotBlank @Size(max = MAX_FIRST_NAME_LENGTH)
+    @Pattern(regexp = NAME_PATTERN) String firstName,
+
+    @NotBlank @Size(max = MAX_LAST_NAME_LENGTH)
+    @Pattern(regexp = NAME_PATTERN) String lastName,
+
+    @NotBlank @Email @Size(max = MAX_EMAIL_LENGTH) String email,
+
+    @Size(max = MAX_PHONE_LENGTH)
+    @Pattern(regexp = PHONE_PATTERN) String phone,
+
+    @Size(max = MAX_ADDRESS_LENGTH)
+    @Pattern(regexp = TEXT_SAFE_PATTERN) String address,
+
+    @Size(max = MAX_LOCATION_LENGTH)
+    @Pattern(regexp = LOCATION_PATTERN) String city,
+
+    @Size(max = MAX_LOCATION_LENGTH)
+    @Pattern(regexp = LOCATION_PATTERN) String country,
+
+    @Past LocalDate dateOfBirth) {
+}
+
+// IdentityDocumentRequestDTO.java
+public record IdentityDocumentRequestDTO(
+    @NotNull DocumentType documentType,
+    @NotBlank @Size(max = MAX_DOCUMENT_NUMBER_LENGTH)
+    @Pattern(regexp = DOCUMENT_NUMBER_PATTERN) String documentNumber,
+    @NotNull @Past LocalDate issueDate,
+    @NotNull @FutureOrPresent LocalDate expiryDate,
+    @Size(max = MAX_COUNTRY_LENGTH)
+    @Pattern(regexp = LOCATION_PATTERN) String issuingCountry) {
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Effetto}
+Jakarta Bean Validation rifiuta automaticamente al layer controller qualsiasi
+richiesta che non rispetti i pattern dichiarati: la risposta è
+\texttt{400 Bad Request} prima che il dato raggiunga il service o il database.
+I pattern scelti coprono nomi internazionali (Unicode \texttt{\textbackslash p\{L\}}),
+numeri di telefono in formato internazionale, e bloccano esplicitamente i caratteri
+usati negli attacchi XSS e SQL Injection (\texttt{<}, \texttt{>}, \texttt{\&},
+\texttt{"}, \texttt{;}).
+
+\paragraph{Riferimento} Commit: \commitref{fb6fdff}{fix(security): T-GST-02 + T-GST-04 --- input validation patterns and explicit mass-assignment guards on guest-service}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Difesa contro Mass Assignment \threat{T-GST-04}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il \emph{mass assignment} è una vulnerabilità per cui un client può impostare
+campi sensibili dell'entità (chiave primaria, \texttt{hotel\_id}, flag
+\texttt{active}, timestamp di auditing) includendoli nel payload JSON della
+richiesta. In Java con Spring e MapStruct il rischio è mitigato dal tipo record
+(immutabile) e dalla policy \texttt{ReportingPolicy.IGNORE}, ma il metodo
+\texttt{GuestMapper\#toEntity()} non dichiarava esplicitamente quali target
+fossero esclusi dal mapping, rendendo la protezione implicita e non verificabile
+a ispezione statica del codice. Classificato OWASP A04 --- Insecure Design.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- GuestMapper.java (baseline)}]
+\begin{lstlisting}[style=java]
+@Mapper(componentModel = "spring",
+        unmappedTargetPolicy = ReportingPolicy.IGNORE,  // protezione implicita
+        uses = IdentityDocumentMapper.class)
+public interface GuestMapper {
+
+    // Nessun @Mapping(ignore=true): i campi id, hotelId, active,
+    // createdAt, updatedAt sono esclusi solo per comportamento di default
+    // di ReportingPolicy.IGNORE, non per dichiarazione esplicita.
+    Guest toEntity(GuestRequest request);
+
+    @Mapping(target = "id",                ignore = true)
+    @Mapping(target = "hotelId",           ignore = true)
+    @Mapping(target = "identityDocuments", ignore = true)
+    @Mapping(target = "active",            ignore = true)
+    @Mapping(target = "createdAt",         ignore = true)
+    @Mapping(target = "updatedAt",         ignore = true)
+    void updateEntityFromRequest(GuestRequest request, @MappingTarget Guest target);
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={Codice Sicuro --- GuestMapper.java}]
+\begin{lstlisting}[style=java]
+@Mapper(componentModel = "spring",
+        unmappedTargetPolicy = ReportingPolicy.IGNORE,
+        uses = IdentityDocumentMapper.class)
+public interface GuestMapper {
+
+    // Ignores espliciti: nessun dato client puo' influenzare questi campi,
+    // indipendentemente dalla policy del mapper o da future refactoring.
+    @Mapping(target = "id",                ignore = true)
+    @Mapping(target = "hotelId",           ignore = true)
+    @Mapping(target = "identityDocuments", ignore = true)
+    @Mapping(target = "active",            ignore = true)
+    @Mapping(target = "createdAt",         ignore = true)
+    @Mapping(target = "updatedAt",         ignore = true)
+    Guest toEntity(GuestRequest request);
+
+    @Mapping(target = "id",                ignore = true)
+    @Mapping(target = "hotelId",           ignore = true)
+    @Mapping(target = "identityDocuments", ignore = true)
+    @Mapping(target = "active",            ignore = true)
+    @Mapping(target = "createdAt",         ignore = true)
+    @Mapping(target = "updatedAt",         ignore = true)
+    void updateEntityFromRequest(GuestRequest request, @MappingTarget Guest target);
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Effetto}
+La dichiarazione esplicita degli ignore garantisce che qualunque refactoring
+futuro (rimozione di \texttt{ReportingPolicy.IGNORE}, cambio di libreria di
+mapping) non reintroduca accidentalmente la possibilità di impostare campi
+sensibili da input client. La protezione diventa \emph{fail-safe by design}
+anziché dipendente da un comportamento di default.
+
+\paragraph{Riferimento} Commit: \commitref{fb6fdff}{fix(security): T-GST-02 + T-GST-04 --- input validation patterns and explicit mass-assignment guards on guest-service}
 
 \subsection{Server-side Price Validation \threat{T-FB-02}}
 % ─────────────────────────────────────────────────────────────────────────────
