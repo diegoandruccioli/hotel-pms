@@ -97,7 +97,7 @@
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
 | T-RES-01 | Tampering | Double Booking (Overbooking): assenza di lock ottimistico sulle date | CRITICO | ALTA | ✅ RISOLTO |
-| T-RES-02 | Elevation of Privilege | IDOR: accesso a prenotazioni di altri hotel senza verifica ownership | CRITICO | MEDIA | 🔴 APERTO |
+| T-RES-02 | Elevation of Privilege | IDOR: accesso a prenotazioni di altri hotel senza verifica ownership | CRITICO | MEDIA | ✅ RISOLTO |
 | T-RES-03 | Injection | Filtri di ricerca date non validati server-side | MEDIO | BASSA | 🟡 DA ANALIZZARE |
 
 ### 4.5 stay-service
@@ -179,7 +179,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-GST-01 | IDOR fix: resolveGuest(id, hotelId) → findByIdAndHotelId, 404 anche per guest di altri hotel (no enumeration) | guest-service/GuestServiceImpl.java, GuestRepository.java | b483eac | A01 | ✅ |
 | T-GST-03 | hotel_id su tabella guests (Flyway V2) + tutte le query repository scoped per hotelId; X-Auth-Hotel letto da InternalAuthFilter e propagato via FeignHeaderConfig | guest-service/V2__add_hotel_id_to_guests.sql, GuestRepository.java, InternalAuthFilter.java, FeignHeaderConfig.java | b483eac | A01 | ✅ |
 | T-RES-01 | @Version optimistic lock + @Lock(PESSIMISTIC_WRITE) su overlap query + ConflictException HTTP 409 + Flyway V4 version column | reservation-service/Reservation.java, ReservationRepository.java, GlobalExceptionHandler.java, V4__add_version_to_reservations.sql | ca9bf92 | A04 | ✅ |
-| T-RES-02 | Verifica ownership hotel_id su prenotazioni | reservation-service | — | A01 | ⏳ |
+| T-RES-02 | hotel_id scope su tutte le query reservation (findByIdAndHotelId, findAllByHotelId); InternalAuthFilter propaga X-Auth-Hotel in auth.details; createReservation imposta hotelId dall'auth context | reservation-service/ReservationServiceImpl.java, ReservationRepository.java, InternalAuthFilter.java, FeignHeaderConfig.java | TBD | A01 | ✅ |
 | T-STAY-01 | Validazione stato prenotazione prima check-in | stay-service | — | A04 | ⏳ |
 | T-STAY-02 | Audit trail check-in/check-out | stay-service | — | A09 | ⏳ |
 | T-BILL-01 | Verifica ownership fatture | billing-service | — | A01 | ⏳ |

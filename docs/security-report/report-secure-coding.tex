@@ -1217,6 +1217,110 @@ CREATE INDEX IF NOT EXISTS idx_guests_hotel_id
 \paragraph{Riferimento} Commit: \commitref{b483eac}{fix(security): T-GST-01 + T-GST-03 --- hotel\_id isolation on guest-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{IDOR sul Reservation Service \threat{T-RES-02}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il \texttt{reservation-service} gestisce le prenotazioni di camera. Prima della
+mitigazione, l'endpoint \texttt{GET /api/v1/reservations/\{id\}} e le operazioni
+correlate (PUT, DELETE, PATCH) non verificavano che la prenotazione richiesta
+appartenesse all'hotel del caller. Un receptionist dell'Hotel A, conoscendo o
+indovinando un UUID valido, poteva leggere, modificare o cancellare prenotazioni
+dell'Hotel B. Classificato OWASP A01 --- Broken Access Control.
+
+Analogamente, \texttt{getAllReservations()} eseguiva \texttt{findAll()} senza
+alcun filtro su \texttt{hotel\_id}, esponendo l'intero dataset di prenotazioni a
+qualsiasi utente autenticato.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- ReservationServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: lookup per solo UUID, nessun controllo ownership hotel
+private Reservation findReservationByIdOrThrow(UUID id) {
+    return reservationRepository.findById(id)  // restituisce qualsiasi hotel
+        .orElseThrow(() -> new NotFoundException("RESERVATION_NOT_FOUND"));
+}
+
+// INSICURO: lista tutte le prenotazioni di tutti gli hotel
+public Page<ReservationResponse> getAllReservations(Pageable pageable) {
+    return reservationRepository.findAll(pageable)  // nessun filtro hotel_id
+        .map(...);
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+L'intervento replica il pattern gia' applicato al \texttt{guest-service} (T-GST-01/T-GST-03)
+e si articola in tre livelli:
+
+\begin{enumerate}
+    \item \textbf{InternalAuthFilter aggiornato} --- il filter legge l'header
+          \texttt{X-Auth-Hotel} iniettato dal gateway e lo salva in
+          \texttt{Authentication.details}. Richieste prive dell'header sono
+          rifiutate con HTTP 401.
+    \item \textbf{Query hotel-scoped} --- il repository espone due nuovi metodi:
+          \texttt{findByIdAndHotelId(id, hotelId)} e
+          \texttt{findAllByHotelId(hotelId, pageable)}. Il service usa
+          \texttt{findByIdAndHotelId} per tutte le operazioni su singola
+          risorsa (GET, PUT, DELETE, PATCH).
+    \item \textbf{IDOR-safe 404} --- se la prenotazione esiste ma appartiene a
+          un altro hotel, \texttt{findByIdAndHotelId} restituisce
+          \texttt{Optional.empty()} e il service lancia \texttt{NotFoundException}
+          (HTTP 404), senza rivelare l'esistenza della risorsa all'attaccante.
+    \item \textbf{hotelId impostato alla creazione} --- \texttt{createReservation}
+          recupera il \texttt{hotelId} dal SecurityContext tramite
+          \texttt{resolveHotelId()} e lo persiste sull'entità, garantendo che
+          ogni nuova prenotazione sia legata all'hotel del caller.
+\end{enumerate}
+
+\begin{securebox}[title={Codice Sicuro --- ReservationServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: lookup combinato id + hotel_id (IDOR-safe con 404)
+private Reservation findReservationByIdAndHotelOrThrow(UUID id, UUID hotelId) {
+    return reservationRepository.findByIdAndHotelId(id, hotelId)
+        .orElseThrow(() -> new NotFoundException("RESERVATION_NOT_FOUND"));
+    // 404 anche se esiste ma appartiene ad altro hotel
+}
+
+// SICURO: lista filtrata per hotel del caller
+public Page<ReservationResponse> getAllReservations(Pageable pageable) {
+    UUID hotelId = resolveHotelId();
+    return reservationRepository
+        .findAllByHotelId(hotelId, safePageable)
+        .map(...);
+}
+
+// SICURO: hotelId estratto dal SecurityContext, mai dal client
+private UUID resolveHotelId() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)) {
+        throw new IllegalStateException("Hotel ID cannot be null");
+    }
+    return UUID.fromString(hotelIdStr);
+}
+
+// SICURO: hotelId persistito sul record alla creazione
+public ReservationResponse createReservation(ReservationRequest request) {
+    UUID hotelId = resolveHotelId();
+    Reservation reservation = reservationMapper.toEntity(request);
+    reservation.setHotelId(hotelId);  // tenant-bound, non alterabile dal client
+    ...
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={ReservationRepository.java --- metodi hotel-scoped}]
+\begin{lstlisting}[style=java]
+// Lookup singola risorsa con check ownership (Spring Data query derivata)
+Optional<Reservation> findByIdAndHotelId(UUID id, UUID hotelId);
+
+// Lista paginata filtrata per hotel
+Page<Reservation> findAllByHotelId(UUID hotelId, Pageable pageable);
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Riferimento} Commit: \commitref{TBD}{fix(security): T-RES-02 --- hotel\_id isolation on reservation-service}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}
 % ─────────────────────────────────────────────────────────────────────────────
 

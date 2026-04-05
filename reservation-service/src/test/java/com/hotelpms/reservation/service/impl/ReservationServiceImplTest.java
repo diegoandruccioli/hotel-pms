@@ -25,6 +25,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import feign.FeignException;
 
 import org.springframework.lang.NonNull;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -53,6 +55,7 @@ class ReservationServiceImplTest {
     private static final String ROOM_NUMBER_101 = "101";
     private static final String ROOM_STATUS_AVAILABLE = "AVAILABLE";
     private static final UUID GUEST_ID = Objects.requireNonNull(UUID.randomUUID());
+    private static final UUID HOTEL_ID = Objects.requireNonNull(UUID.randomUUID());
     private static final int EXPECTED_GUESTS = 2;
     private static final Reservation ANY_RESERVATION = new Reservation();
     private static final UUID ANY_UUID = Objects.requireNonNull(UUID.randomUUID());
@@ -95,6 +98,11 @@ class ReservationServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                "testuser", "", List.of());
+        auth.setDetails(HOTEL_ID.toString());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
         final ReservationLineItemRequest lineItemRequest = new ReservationLineItemRequest(roomId,
                 BigDecimal.valueOf(100));
         request = new ReservationRequest(
@@ -238,7 +246,7 @@ class ReservationServiceImplTest {
     @Test
     void testGetReservationByIdSuccess() {
         // Arrange
-        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(entity));
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
@@ -249,23 +257,32 @@ class ReservationServiceImplTest {
 
         // Assert
         assertNotNull(result);
-        verify(reservationRepository, times(1)).findById(reservationId);
+        verify(reservationRepository, times(1)).findByIdAndHotelId(reservationId, HOTEL_ID);
     }
 
     @Test
     void testGetReservationByIdNotFoundThrowsException() {
         // Arrange
-        when(reservationRepository.findById(reservationId)).thenReturn(Optional.empty());
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.empty());
 
         // Act & Assert
         assertThrows(NotFoundException.class, () -> reservationService.getReservationById(reservationId));
-        verify(reservationRepository, times(1)).findById(reservationId);
+        verify(reservationRepository, times(1)).findByIdAndHotelId(reservationId, HOTEL_ID);
+    }
+
+    @Test
+    void testGetReservationByIdCrossHotelReturnsNotFound() {
+        // Arrange: reservation exists but belongs to a different hotel (IDOR check)
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(NotFoundException.class, () -> reservationService.getReservationById(reservationId));
     }
 
     @Test
     void testUpdateReservationSuccess() {
         // Arrange
-        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(entity));
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         final RoomResponse mockRoomResponse = new RoomResponse(roomId, ROOM_NUMBER_101, null, ROOM_STATUS_AVAILABLE,
                 true, null, null);
         final GuestResponse mockGuestResponse =
@@ -280,7 +297,7 @@ class ReservationServiceImplTest {
 
         // Assert
         assertNotNull(result);
-        verify(reservationRepository, times(1)).findById(reservationId);
+        verify(reservationRepository, times(1)).findByIdAndHotelId(reservationId, HOTEL_ID);
         verify(inventoryClient, times(1)).getRoomById(roomId);
         verify(reservationMapper, times(1)).updateEntityFromRequest(request, entity);
         verify(reservationRepository, times(1)).save(entity);
@@ -289,13 +306,13 @@ class ReservationServiceImplTest {
     @Test
     void testDeleteReservationSuccess() {
         // Arrange
-        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(entity));
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
 
         // Act
         reservationService.deleteReservation(reservationId);
 
         // Assert
-        verify(reservationRepository, times(1)).findById(reservationId);
+        verify(reservationRepository, times(1)).findByIdAndHotelId(reservationId, HOTEL_ID);
         verify(reservationRepository, times(1)).delete(entity);
     }
 
@@ -328,7 +345,7 @@ class ReservationServiceImplTest {
     @Test
     void testUpdateReservationOverlapThrowsBadRequest() {
         // Arrange
-        when(reservationRepository.findById(reservationId)).thenReturn(Optional.of(entity));
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         final RoomResponse mockRoomResponse = new RoomResponse(roomId, ROOM_NUMBER_101, null, ROOM_STATUS_AVAILABLE,
                 true, null, null);
         final GuestResponse mockGuestResponse =
