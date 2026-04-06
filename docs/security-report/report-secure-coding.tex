@@ -632,6 +632,107 @@ ALTER TABLE user_account
 \textit{[Da completare — step di hardening in corso]}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\section{Audit Log e Security Monitoring}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Audit log eventi di autenticazione \threat{T-AUTH-05}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+In assenza di logging strutturato, qualsiasi attività sospetta sul sistema di
+autenticazione --- tentativi di brute force, account bloccati, login anomali ---
+rimane invisibile agli operatori e non lascia traccia auditabile. La categoria
+OWASP A09 (Security Logging \& Monitoring Failures) identifica questa lacuna
+come vettore che amplifica tutti gli altri attacchi, poiché impedisce sia il
+rilevamento in tempo reale sia l'analisi forense post-incidente.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- AuthServiceImpl.java (baseline, nessun log)}]
+\begin{lstlisting}[style=java]
+// Tutti i rami di autenticazione erano silenti:
+// nessun log su login riuscito, fallimento password,
+// account bloccato o registrazione utente.
+
+public AuthResponse login(LoginRequest request) {
+    final UserAccount user = userRepository.findByUsername(request.username())
+            .orElseThrow(() -> new BadCredentialsException("INVALID_CREDENTIALS"));
+    // (nessun log su username non trovato)
+
+    if (user.getLockedUntil() != null && ...) {
+        throw new AccountLockedException("ACCOUNT_TEMPORARILY_LOCKED");
+        // (nessun log su tentativo su account bloccato)
+    }
+
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        // (nessun log su password errata / contatore tentativi)
+        throw new BadCredentialsException("INVALID_CREDENTIALS");
+    }
+    // (nessun log su login riuscito)
+    return new AuthResponse(jwtService.generateToken(...));
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={Codice Sicuro --- AuthServiceImpl.java + AuthController.java}]
+\begin{lstlisting}[style=java]
+// AuthServiceImpl.java — @Slf4j via Lombok
+
+// Registrazione utente
+log.info("[AUTH] REGISTER_SUCCESS | user={}", user.getUsername());
+
+// Username non trovato
+.orElseThrow(() -> {
+    log.warn("[AUTH] LOGIN_FAILED | user={} | reason=USER_NOT_FOUND",
+            request.username());
+    return new BadCredentialsException("INVALID_CREDENTIALS");
+});
+
+// Tentativo su account bloccato
+log.warn("[AUTH] LOGIN_BLOCKED | user={} | reason=ACCOUNT_LOCKED | until={}",
+        user.getUsername(), user.getLockedUntil());
+
+// Password errata
+log.warn("[AUTH] LOGIN_FAILED | user={} | reason=BAD_PASSWORD | attempts={}",
+        user.getUsername(), newAttempts);
+
+// Account raggiunge soglia lockout
+log.warn("[AUTH] ACCOUNT_LOCKED | user={} | attempts={} | until={}",
+        user.getUsername(), newAttempts, user.getLockedUntil());
+
+// Login riuscito
+log.info("[AUTH] LOGIN_SUCCESS | user={}", user.getUsername());
+
+// AuthController.java — logout con estrazione username da cookie JWT
+@PostMapping("/logout")
+public ResponseEntity<Void> logout(
+        @CookieValue(name = "jwt", required = false) String token) {
+    if (token != null) {
+        try {
+            log.info("[AUTH] LOGOUT | user={}", jwtService.extractUsername(token));
+        } catch (JwtException | IllegalArgumentException e) {
+            log.info("[AUTH] LOGOUT | user=unknown (invalid token)");
+        }
+    }
+    return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, createCookie("", 0).toString())
+            .build();
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Effetto}
+Ogni evento di sicurezza rilevante produce ora una riga di log strutturata con
+prefisso \texttt{[AUTH]}, livello \texttt{INFO} per i successi e \texttt{WARN}
+per i fallimenti. Il formato chiave/valore (pipe-separated) è direttamente
+consumabile da aggregatori di log (ELK, Loki, Splunk) per la creazione di alert
+su pattern anomali: picchi di \texttt{LOGIN\_FAILED}, eventi \texttt{ACCOUNT\_LOCKED}
+multipli, o accessi da orari inusuali. Il logout registra lo username estratto
+dal JWT prima che il cookie venga azzerato, garantendo la tracciabilità della
+sessione anche in uscita. Nessuna dipendenza aggiuntiva: implementazione basata
+su SLF4J + Lombok \texttt{@Slf4j}, già presente nel classpath.
+
+\paragraph{Riferimento} Commit: \commitref{ad441e9}{fix(security): T-AUTH-05 --- audit log for authentication events on auth-service}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Validazione, Sanificazione ed Encoding}
 % ─────────────────────────────────────────────────────────────────────────────
 

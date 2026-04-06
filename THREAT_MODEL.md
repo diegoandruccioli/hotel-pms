@@ -71,7 +71,7 @@
 | T-AUTH-02 | Denial of Service | Brute Force: nessun rate limiting sul login a livello di servizio | CRITICO | ALTA | ✅ RISOLTO |
 | T-AUTH-03 | Spoofing | Password debole: algoritmo di hashing da verificare (bcrypt vs Argon2) | CRITICO | MEDIA | 🟡 DA ANALIZZARE |
 | T-AUTH-04 | Elevation of Privilege | Refresh Token: assenza di meccanismo di revoca (token rotation) | ALTO | MEDIA | 🔴 APERTO |
-| T-AUTH-05 | Repudiation | Assenza di audit log per eventi di autenticazione (login, logout, failed attempts) | MEDIO | ALTA | 🔴 APERTO |
+| T-AUTH-05 | Repudiation | Assenza di audit log per eventi di autenticazione (login, logout, failed attempts) | MEDIO | ALTA | ✅ RISOLTO |
 
 ### 4.2 api-gateway
 
@@ -170,7 +170,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-AUTH-02 | Account lockout dopo 5 tentativi falliti, 15 min | auth-service/AuthServiceImpl.java | a90e462 | A07 | ✅ |
 | T-AUTH-03 | Verifica/upgrade hashing password (bcrypt cost factor) | auth-service | — | A02 | ⏳ |
 | T-AUTH-04 | Refresh token rotation + blacklist | auth-service | — | A07 | ⏳ |
-| T-AUTH-05 | Audit log autenticazione | auth-service | — | A09 | ⏳ |
+| T-AUTH-05 | Structured SLF4J audit log (@Slf4j) in AuthServiceImpl e AuthController: REGISTER_SUCCESS, LOGIN_SUCCESS, LOGIN_FAILED (USER_NOT_FOUND / BAD_PASSWORD + counter), ACCOUNT_LOCKED (con expiry), LOGIN_BLOCKED, LOGOUT (username da JWT cookie) | auth-service/AuthServiceImpl.java, AuthController.java | ad441e9 | A09 | ✅ |
 | T-GW-01 | Verifica HMAC-SHA256 su X-Internal-Signature (InternalAuthFilter) | api-gateway + tutti i servizi | baseline (main) | A01 | ✅ |
 | T-FE-02 | Token JWT in httpOnly cookie (Secure + SameSite=Strict) | auth-service/AuthController.java | baseline (main) | A02 | ✅ |
 | T-GW-03 | SecurityHeadersFilter GlobalFilter: HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, CSP default-src 'none' su tutte le risposte del gateway | api-gateway/SecurityHeadersFilter.java | b901a9f | A05 | ✅ |
