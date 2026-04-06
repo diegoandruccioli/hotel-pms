@@ -15,6 +15,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Opt into Node.js 24 for all JavaScript-based actions to silence
+# the Node.js 20 deprecation warning (removal scheduled Sep 2026).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 # ══════════════════════════════════════════════════════════════════════════════
 jobs:
 
