@@ -114,7 +114,7 @@
 |----|-----------------|--------|---------|-------------|-------|
 | T-BILL-01 | Elevation of Privilege | IDOR: accesso a fatture di altri ospiti/hotel | CRITICO | MEDIA | ✅ RISOLTO |
 | T-BILL-02 | Tampering | Importi non validati server-side (negative amounts, overflow) | ALTO | BASSA | 🟡 DA ANALIZZARE |
-| T-BILL-03 | Repudiation | Assenza di log immutabile delle transazioni di pagamento | ALTO | ALTA | 🔴 APERTO |
+| T-BILL-03 | Repudiation | Assenza di log immutabile delle transazioni di pagamento | ALTO | ALTA | ✅ RISOLTO |
 
 ### 4.7 fb-service
 
@@ -127,6 +127,7 @@
 
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
+| T-BILL-03 | Structured SLF4J audit log in PaymentServiceImpl: PAYMENT_REJECTED (reason=INVOICE_ALREADY_PAID/INVOICE_CANCELLED/PAYMENT_EXCEEDS_BALANCE con invoiceId+hotelId+amount+balanceDue), PAYMENT_ADDED (invoiceId+paymentId+amount+method+hotelId), INVOICE_PAID (invoiceId+totalAmount+hotelId); prefisso [BILLING], WARN per rifiuti, INFO per successi | billing-service/PaymentServiceImpl.java | 7e41838 | A09 | ✅ |
 | T-CFG-01 | Information Disclosure | Endpoint `/actuator` esposti senza autenticazione | CRITICO | ALTA | 🔴 APERTO |
 | T-CFG-02 | Information Disclosure | Segreti in chiaro nei file di configurazione (JWT secret, HMAC key, DB password) | CRITICO | ALTA | 🟡 DA ANALIZZARE |
 | T-CFG-03 | Spoofing | Nessuna autenticazione tra config-service e microservizi consumer | ALTO | MEDIA | 🟡 DA ANALIZZARE |
