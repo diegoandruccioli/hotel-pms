@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.lang.NonNull;
@@ -68,6 +70,8 @@ public class InvoiceServiceImpl implements InvoiceService {
         invoice.setIssueDate(LocalDateTime.now());
         invoice.setInvoiceNumber(
                 "INV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT));
+        // Bind invoice to the caller's hotel — never trust the client-supplied value.
+        invoice.setHotelId(resolveHotelId());
 
         final Invoice savedInvoice = invoiceRepository.save(invoice);
         log.info("Successfully created Invoice {}", savedInvoice.getInvoiceNumber());
@@ -80,7 +84,8 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional(readOnly = true)
     public InvoiceResponse getInvoice(@NonNull final UUID id) {
         log.info("Fetching invoice with id {}", id);
-        final Invoice invoice = invoiceRepository.findById(id)
+        final UUID hotelId = resolveHotelId();
+        final Invoice invoice = invoiceRepository.findByIdAndHotelId(id, hotelId)
                 .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND"));
         return invoiceMapper.toResponse(invoice);
     }
@@ -90,8 +95,9 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional(readOnly = true)
     public InvoiceResponse getLatestInvoiceByReservation(@NonNull final UUID reservationId) {
         log.info("Fetching latest invoice for reservation {}", reservationId);
+        final UUID hotelId = resolveHotelId();
         final Invoice invoice = invoiceRepository
-                .findFirstByReservationIdOrderByIssueDateDesc(reservationId)
+                .findFirstByReservationIdAndHotelIdOrderByIssueDateDesc(reservationId, hotelId)
                 .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND"));
         return invoiceMapper.toResponse(invoice);
     }
@@ -101,7 +107,24 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional(readOnly = true)
     public Page<InvoiceResponse> getAllInvoices(final Pageable pageable) {
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
-        return invoiceRepository.findAll(safePageable)
+        final UUID hotelId = resolveHotelId();
+        return invoiceRepository.findByHotelId(hotelId, safePageable)
                 .map(invoiceMapper::toResponse);
+    }
+
+    /**
+     * Extracts the hotel UUID from the current authentication context.
+     * The hotel ID is stored as {@code details} by {@link com.hotelpms.billing.security.InternalAuthFilter}
+     * after reading the {@code X-Auth-Hotel} header injected by the API Gateway.
+     *
+     * @return the hotel UUID of the authenticated caller
+     * @throws IllegalStateException if the security context is missing or malformed
+     */
+    private UUID resolveHotelId() {
+        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)) {
+            throw new IllegalStateException("MISSING_HOTEL_CONTEXT");
+        }
+        return UUID.fromString(hotelIdStr);
     }
 }

@@ -12,6 +12,7 @@ import com.hotelpms.billing.exception.BillingValidationException;
 import com.hotelpms.billing.exception.NotFoundException;
 import com.hotelpms.billing.mapper.InvoiceMapper;
 import com.hotelpms.billing.repository.InvoiceRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -61,13 +64,25 @@ class InvoiceServiceImplTest {
 
         private UUID reservationId;
         private UUID guestId;
+        private UUID hotelId;
         private InvoiceRequest request;
 
         @BeforeEach
         void setUp() {
                 reservationId = UUID.randomUUID();
                 guestId = UUID.randomUUID();
+                hotelId = UUID.randomUUID();
                 request = new InvoiceRequest(null, reservationId, guestId, TOTAL_AMOUNT, InvoiceStatus.ISSUED);
+
+                final UsernamePasswordAuthenticationToken auth =
+                        new UsernamePasswordAuthenticationToken("admin", "", List.of());
+                auth.setDetails(hotelId.toString());
+                SecurityContextHolder.getContext().setAuthentication(auth);
+        }
+
+        @AfterEach
+        void tearDown() {
+                SecurityContextHolder.clearContext();
         }
 
         @Test
@@ -84,8 +99,8 @@ class InvoiceServiceImplTest {
                 invoice.setId(UUID.randomUUID());
                 invoice.setTotalAmount(TOTAL_AMOUNT);
 
-                final InvoiceResponse expectedResponse = new InvoiceResponse(invoice.getId(), null, "INV-12345", null,
-                                TOTAL_AMOUNT, InvoiceStatus.ISSUED, reservationId, guestId, List.of());
+                final InvoiceResponse expectedResponse = new InvoiceResponse(invoice.getId(), hotelId, "INV-12345",
+                                null, TOTAL_AMOUNT, InvoiceStatus.ISSUED, reservationId, guestId, List.of());
 
                 when(guestClient.getGuestById(guestId)).thenReturn(guestResponse);
                 when(reservationClient.getReservationById(reservationId)).thenReturn(resResponse);
@@ -99,6 +114,7 @@ class InvoiceServiceImplTest {
                 // Assert
                 assertNotNull(result);
                 assertEquals(expectedResponse.id(), result.id());
+                assertEquals(hotelId, invoice.getHotelId());
                 verify(invoiceRepository).save(invoice);
         }
 
@@ -134,17 +150,17 @@ class InvoiceServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should successfully get existing invoice")
+        @DisplayName("Should successfully get existing invoice scoped to hotel")
         void shouldGetExistingInvoice() {
                 // Arrange
                 final UUID invoiceId = UUID.randomUUID();
                 final Invoice invoice = new Invoice();
                 invoice.setId(invoiceId);
-                final InvoiceResponse expectedResponse = new InvoiceResponse(invoiceId, null, "INV-123", null,
-                                BigDecimal.TEN,
-                                InvoiceStatus.ISSUED, reservationId, guestId, List.of());
+                final InvoiceResponse expectedResponse = new InvoiceResponse(invoiceId, hotelId, "INV-123", null,
+                                BigDecimal.TEN, InvoiceStatus.ISSUED, reservationId, guestId, List.of());
 
-                when(invoiceRepository.findById(Objects.requireNonNull(invoiceId))).thenReturn(Optional.of(invoice));
+                when(invoiceRepository.findByIdAndHotelId(Objects.requireNonNull(invoiceId), hotelId))
+                                .thenReturn(Optional.of(invoice));
                 when(invoiceMapper.toResponse(invoice)).thenReturn(expectedResponse);
 
                 // Act
@@ -156,11 +172,12 @@ class InvoiceServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should throw NotFoundException for non-existent invoice")
-        void shouldThrowWhenGettingNonExistentInvoice() {
+        @DisplayName("Should throw NotFoundException for invoice belonging to a different hotel (IDOR-safe)")
+        void shouldThrowWhenInvoiceBelongsToDifferentHotel() {
                 // Arrange
                 final UUID invoiceId = UUID.randomUUID();
-                when(invoiceRepository.findById(Objects.requireNonNull(invoiceId))).thenReturn(Optional.empty());
+                when(invoiceRepository.findByIdAndHotelId(Objects.requireNonNull(invoiceId), hotelId))
+                                .thenReturn(Optional.empty());
 
                 // Act & Assert
                 final Exception exception = assertThrows(NotFoundException.class,

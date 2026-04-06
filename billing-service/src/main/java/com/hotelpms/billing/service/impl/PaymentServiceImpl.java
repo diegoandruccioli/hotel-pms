@@ -13,6 +13,8 @@ import com.hotelpms.billing.repository.PaymentRepository;
 import com.hotelpms.billing.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.lang.NonNull;
@@ -39,7 +41,8 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentResponse addPayment(@NonNull final UUID invoiceId, @NonNull final PaymentRequest request) {
         log.info("Attempting to add payment of {} to invoice {}", request.amount(), invoiceId);
 
-        final Invoice invoice = invoiceRepository.findById(invoiceId)
+        final UUID hotelId = resolveHotelId();
+        final Invoice invoice = invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)
                 .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND"));
 
         if (invoice.getStatus() == InvoiceStatus.PAID) {
@@ -76,5 +79,21 @@ public class PaymentServiceImpl implements PaymentService {
         invoiceRepository.save(invoice); // Save cascaded payment addition and potential status change
 
         return paymentMapper.toResponse(savedPayment);
+    }
+
+    /**
+     * Extracts the hotel UUID from the current authentication context.
+     * The hotel ID is stored as {@code details} by {@link com.hotelpms.billing.security.InternalAuthFilter}
+     * after reading the {@code X-Auth-Hotel} header injected by the API Gateway.
+     *
+     * @return the hotel UUID of the authenticated caller
+     * @throws IllegalStateException if the security context is missing or malformed
+     */
+    private UUID resolveHotelId() {
+        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)) {
+            throw new IllegalStateException("MISSING_HOTEL_CONTEXT");
+        }
+        return UUID.fromString(hotelIdStr);
     }
 }
