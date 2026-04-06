@@ -39,17 +39,19 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public PaymentResponse addPayment(@NonNull final UUID invoiceId, @NonNull final PaymentRequest request) {
-        log.info("Attempting to add payment of {} to invoice {}", request.amount(), invoiceId);
-
         final UUID hotelId = resolveHotelId();
         final Invoice invoice = invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)
                 .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND"));
 
         if (invoice.getStatus() == InvoiceStatus.PAID) {
+            log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={} | reason=INVOICE_ALREADY_PAID",
+                    invoiceId, hotelId);
             throw new BillingValidationException("INVOICE_ALREADY_PAID");
         }
 
         if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
+            log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={} | reason=INVOICE_CANCELLED",
+                    invoiceId, hotelId);
             throw new BillingValidationException("INVOICE_CANCELLED");
         }
 
@@ -60,6 +62,9 @@ public class PaymentServiceImpl implements PaymentService {
         final BigDecimal balanceDue = invoice.getTotalAmount().subtract(currentTotalPaid);
 
         if (request.amount().compareTo(balanceDue) > 0) {
+            log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={} | reason=PAYMENT_EXCEEDS_BALANCE"
+                    + " | amount={} | balanceDue={}",
+                    invoiceId, hotelId, request.amount(), balanceDue);
             throw new BillingValidationException("PAYMENT_EXCEEDS_BALANCE");
         }
 
@@ -69,10 +74,14 @@ public class PaymentServiceImpl implements PaymentService {
         invoice.addPayment(payment);
         final Payment savedPayment = paymentRepository.save(payment);
 
+        log.info("[BILLING] PAYMENT_ADDED | invoiceId={} | paymentId={} | amount={} | method={} | hotelId={}",
+                invoiceId, savedPayment.getId(), request.amount(), request.paymentMethod(), hotelId);
+
         // Check if fully paid
         final BigDecimal newTotalPaid = currentTotalPaid.add(request.amount());
         if (newTotalPaid.compareTo(invoice.getTotalAmount()) == 0) {
-            log.info("Invoice {} is now fully paid. Updating status.", invoiceId);
+            log.info("[BILLING] INVOICE_PAID | invoiceId={} | totalAmount={} | hotelId={}",
+                    invoiceId, invoice.getTotalAmount(), hotelId);
             invoice.setStatus(InvoiceStatus.PAID);
         }
 
