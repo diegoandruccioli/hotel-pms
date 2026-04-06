@@ -733,6 +733,168 @@ su SLF4J + Lombok \texttt{@Slf4j}, già presente nel classpath.
 \paragraph{Riferimento} Commit: \commitref{ad441e9}{fix(security): T-AUTH-05 --- audit log for authentication events on auth-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Audit log check-in / check-out \threat{T-STAY-02}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Le operazioni di check-in e check-out rappresentano i momenti operativi più
+critici del ciclo di soggiorno: abilitano l'accesso fisico alla struttura,
+attivano addebiti e modificano lo stato di camere e prenotazioni. In assenza di
+un audit trail strutturato, qualsiasi anomalia --- check-out con fattura non
+saldata, tentativo su soggiorno in stato errato, indisponibilità di un servizio
+esterno durante il check-in --- rimane invisibile a fini forensi. OWASP A09
+(Security Logging \& Monitoring Failures) classifica questa lacuna come
+amplificatore di tutti gli altri rischi operativi.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- StayServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// checkIn: log generico, nessun evento strutturato
+log.info("Processing check-in for reservation: {}",
+        request.reservationId());
+// ...
+log.error("External validation failed during check-in: {}",
+        ex.getMessage());   // errore senza contesto audit
+// ...
+log.info("Check-in successful. Stay ID: {}", savedStay.getId());
+
+// checkOut: log generico, nessun dettaglio sulle eccezioni
+log.info("Processing check-out for stay ID: {}", stayId);
+// ...
+throw new IllegalStateException("INVALID_STAY_STATUS");   // silente
+// ...
+throw new BillingNotPaidException("BILLING_NOT_PAID");    // silente
+// ...
+log.info("Check-out successful for stay ID: {}", stayId);
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={Codice Sicuro --- StayServiceImpl.java}]
+\begin{lstlisting}[style=java]
+// CHECK_IN_FAILED: servizio esterno non raggiungibile
+log.warn("[STAY] CHECK_IN_FAILED | reservationId={} "
+       + "| reason=EXTERNAL_SERVICE_UNAVAILABLE | detail={}",
+        request.reservationId(), ex.getMessage());
+
+// CHECK_IN_SUCCESS: stayId + tutti gli identificatori chiave
+log.info("[STAY] CHECK_IN_SUCCESS | stayId={} | reservationId={}"
+       + " | guestId={} | roomId={}",
+        savedStay.getId(), savedStay.getReservationId(),
+        savedStay.getGuestId(), savedStay.getRoomId());
+
+// CHECK_OUT_FAILED: stato soggiorno non valido
+log.warn("[STAY] CHECK_OUT_FAILED | stayId={}"
+       + " | reason=INVALID_STATUS | currentStatus={}",
+        stayId, stay.getStatus());
+
+// CHECK_OUT_FAILED: fattura non saldata
+log.warn("[STAY] CHECK_OUT_FAILED | stayId={} | reservationId={}"
+       + " | reason=BILLING_NOT_PAID",
+        stayId, stay.getReservationId());
+
+// CHECK_OUT_SUCCESS: stayId + prenotazione + camera
+log.info("[STAY] CHECK_OUT_SUCCESS | stayId={} | reservationId={}"
+       + " | roomId={}",
+        stayId, stay.getReservationId(), stay.getRoomId());
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Aggiunti 3 test in \texttt{StayServiceImplTest} (copertura del flusso checkOut
+in precedenza assente): \texttt{shouldCheckOutSuccessfully},
+\texttt{shouldThrowWhenCheckOutBillingNotPaid},
+\texttt{shouldThrowWhenCheckOutStayNotCheckedIn}.
+
+\paragraph{Effetto}
+Ogni evento operativo critico produce una riga strutturata con prefisso
+\texttt{[STAY]}, livello \texttt{INFO} per i successi e \texttt{WARN} per i
+fallimenti, con tutti gli identificatori rilevanti (stayId, reservationId,
+guestId, roomId). Il formato è direttamente filtrabile via
+\texttt{grep "[STAY]"} o in aggregatori di log per alert su anomalie operative
+(es.\ picchi di \texttt{CHECK\_OUT\_FAILED~BILLING\_NOT\_PAID}).
+
+\paragraph{Riferimento} Commit: \commitref{f2cb417}{fix(security): T-STAY-02 --- audit log for check-in/check-out events on stay-service}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Audit log transazioni di pagamento \threat{T-BILL-03}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Le transazioni di pagamento costituiscono operazioni finanziariamente
+irreversibili: una volta che una fattura è contrassegnata come \texttt{PAID},
+il suo stato non può essere retrocesso. In assenza di un log immutabile delle
+transazioni, è impossibile ricostruire chi ha effettuato un pagamento, con quale
+metodo e in quale momento, né rilevare tentativi di pagamento rigettati
+(overpayment, fattura già saldata, fattura annullata). OWASP A09 (Security
+Logging \& Monitoring Failures) individua la mancanza di logging delle
+transazioni critiche come lacuna che rende impossibile sia l'audit finanziario
+sia il rilevamento di frodi.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- PaymentServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// Log generico senza struttura e senza contesto hotel
+log.info("Attempting to add payment of {} to invoice {}",
+        request.amount(), invoiceId);
+
+if (invoice.getStatus() == InvoiceStatus.PAID) {
+    throw new BillingValidationException("INVOICE_ALREADY_PAID");
+    // nessun log: chi ha tentato? quale hotel?
+}
+if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
+    throw new BillingValidationException("INVOICE_CANCELLED");
+    // silente
+}
+if (request.amount().compareTo(balanceDue) > 0) {
+    throw new BillingValidationException("PAYMENT_EXCEEDS_BALANCE");
+    // silente
+}
+
+// Pagamento aggiunto: nessun log strutturato
+// Fattura saldata: log generico senza hotelId
+log.info("Invoice {} is now fully paid. Updating status.", invoiceId);
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={Codice Sicuro --- PaymentServiceImpl.java}]
+\begin{lstlisting}[style=java]
+// Rifiuto: fattura gia' saldata
+log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={}"
+       + " | reason=INVOICE_ALREADY_PAID", invoiceId, hotelId);
+
+// Rifiuto: fattura annullata
+log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={}"
+       + " | reason=INVOICE_CANCELLED", invoiceId, hotelId);
+
+// Rifiuto: importo superiore al saldo residuo
+log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={}"
+       + " | reason=PAYMENT_EXCEEDS_BALANCE | amount={} | balanceDue={}",
+        invoiceId, hotelId, request.amount(), balanceDue);
+
+// Pagamento registrato con successo
+log.info("[BILLING] PAYMENT_ADDED | invoiceId={} | paymentId={}"
+       + " | amount={} | method={} | hotelId={}",
+        invoiceId, savedPayment.getId(),
+        request.amount(), request.paymentMethod(), hotelId);
+
+// Fattura interamente saldata
+log.info("[BILLING] INVOICE_PAID | invoiceId={} | totalAmount={}"
+       + " | hotelId={}",
+        invoiceId, invoice.getTotalAmount(), hotelId);
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Effetto}
+Ogni transazione di pagamento --- accettata o rifiutata --- produce una riga di
+log strutturata con prefisso \texttt{[BILLING]}, correlata a \texttt{invoiceId}
+e \texttt{hotelId}. I rifiuti (livello \texttt{WARN}) consentono il rilevamento
+di tentativi di pagamento su fatture già saldate o annullate; il completamento
+del pagamento (livello \texttt{INFO}) fornisce il trail auditabile richiesto da
+normative contabili. Il formato chiave/valore è filtrabile via aggregatori di
+log per audit finanziari e alert su anomalie (es.\ tentativi ripetuti di
+\texttt{PAYMENT\_EXCEEDS\_BALANCE}).
+
+\paragraph{Riferimento} Commit: \textit{[vedi commit successivo in questa sezione]}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Validazione, Sanificazione ed Encoding}
 % ─────────────────────────────────────────────────────────────────────────────
 
