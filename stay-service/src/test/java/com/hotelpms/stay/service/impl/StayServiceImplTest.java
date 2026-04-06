@@ -1,8 +1,11 @@
 package com.hotelpms.stay.service.impl;
 
+import com.hotelpms.stay.client.BillingClient;
 import com.hotelpms.stay.client.GuestClient;
 import com.hotelpms.stay.client.InventoryClient;
 import com.hotelpms.stay.client.ReservationClient;
+import com.hotelpms.stay.client.dto.InvoiceStatusResponse;
+import com.hotelpms.stay.exception.BillingNotPaidException;
 import com.hotelpms.stay.client.dto.GuestResponse;
 import com.hotelpms.stay.client.dto.ReservationResponse;
 import com.hotelpms.stay.client.dto.RoomResponse;
@@ -23,6 +26,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +58,9 @@ class StayServiceImplTest {
 
     @Mock
     private StayMapper stayMapper;
+
+    @Mock
+    private BillingClient billingClient;
 
     @Mock
     private GuestClient guestClient;
@@ -314,6 +321,66 @@ class StayServiceImplTest {
 
         // Act & Assert
         assertThrows(NotFoundException.class, () -> stayService.getStayById(id));
+    }
+
+    @Test
+    void shouldCheckOutSuccessfully() {
+        // Arrange
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay checkedInStay = Objects.requireNonNull(savedStay);
+        checkedInStay.setRoomId(roomId);
+        checkedInStay.setReservationId(reservationId);
+
+        final InvoiceStatusResponse paidInvoice = new InvoiceStatusResponse(
+                UUID.randomUUID(), reservationId, "PAID", BigDecimal.valueOf(200));
+
+        when(stayRepository.findById(id)).thenReturn(Optional.of(checkedInStay));
+        when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
+                .thenReturn(paidInvoice);
+        when(stayRepository.save(checkedInStay)).thenReturn(checkedInStay);
+        when(stayMapper.toDto(checkedInStay)).thenReturn(validResponse);
+
+        // Act
+        final StayResponse response = stayService.checkOut(id);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(StayStatus.CHECKED_OUT, checkedInStay.getStatus());
+        assertNotNull(checkedInStay.getActualCheckOutTime());
+        verify(inventoryClient, times(1)).updateRoomStatus(Objects.requireNonNull(roomId), "DIRTY");
+    }
+
+    @Test
+    void shouldThrowWhenCheckOutBillingNotPaid() {
+        // Arrange
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay checkedInStay = Objects.requireNonNull(savedStay);
+        checkedInStay.setReservationId(reservationId);
+
+        final InvoiceStatusResponse unpaidInvoice = new InvoiceStatusResponse(
+                UUID.randomUUID(), reservationId, "ISSUED", BigDecimal.valueOf(200));
+
+        when(stayRepository.findById(id)).thenReturn(Optional.of(checkedInStay));
+        when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
+                .thenReturn(unpaidInvoice);
+
+        // Act & Assert
+        assertThrows(BillingNotPaidException.class, () -> stayService.checkOut(id));
+    }
+
+    @Test
+    void shouldThrowWhenCheckOutStayNotCheckedIn() {
+        // Arrange
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay notCheckedInStay = Stay.builder()
+                .id(id)
+                .status(StayStatus.EXPECTED)
+                .build();
+
+        when(stayRepository.findById(id)).thenReturn(Optional.of(notCheckedInStay));
+
+        // Act & Assert
+        assertThrows(IllegalStateException.class, () -> stayService.checkOut(id));
     }
 
     /**

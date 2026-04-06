@@ -62,7 +62,8 @@ public class StayServiceImpl implements StayService {
             log.debug("Validating room ID: {}", request.roomId());
             inventoryClient.getRoomById(request.roomId());
         } catch (final feign.FeignException ex) {
-            log.error("External validation failed during check-in: {}", ex.getMessage());
+            log.warn("[STAY] CHECK_IN_FAILED | reservationId={} | reason=EXTERNAL_SERVICE_UNAVAILABLE | detail={}",
+                    request.reservationId(), ex.getMessage());
             throw new ExternalServiceException("EXTERNAL_SERVICE_UNAVAILABLE: " + ex.getMessage(), ex);
         }
 
@@ -81,7 +82,9 @@ public class StayServiceImpl implements StayService {
         }
 
         final Stay savedStay = stayRepository.save(newStay);
-        log.info("Check-in successful. Stay ID: {}", savedStay.getId());
+        log.info("[STAY] CHECK_IN_SUCCESS | stayId={} | reservationId={} | guestId={} | roomId={}",
+                savedStay.getId(), savedStay.getReservationId(),
+                savedStay.getGuestId(), savedStay.getRoomId());
 
         // Update reservation actualGuests (sum of all StayGuest entries for this
         // reservation)
@@ -100,6 +103,8 @@ public class StayServiceImpl implements StayService {
                 .orElseThrow(() -> new NotFoundException("STAY_NOT_FOUND"));
 
         if (stay.getStatus() != StayStatus.CHECKED_IN) {
+            log.warn("[STAY] CHECK_OUT_FAILED | stayId={} | reason=INVALID_STATUS | currentStatus={}",
+                    stayId, stay.getStatus());
             throw new IllegalStateException("INVALID_STAY_STATUS");
         }
 
@@ -107,6 +112,8 @@ public class StayServiceImpl implements StayService {
         log.debug("Verifying billing folio for reservation: {}", stay.getReservationId());
         final InvoiceStatusResponse invoice = billingClient.getLatestInvoiceByReservation(stay.getReservationId());
         if (invoice == null || !PAID_STATUS.equalsIgnoreCase(invoice.status())) {
+            log.warn("[STAY] CHECK_OUT_FAILED | stayId={} | reservationId={} | reason=BILLING_NOT_PAID",
+                    stayId, stay.getReservationId());
             throw new BillingNotPaidException("BILLING_NOT_PAID");
         }
 
@@ -119,7 +126,8 @@ public class StayServiceImpl implements StayService {
         stay.setActualCheckOutTime(LocalDateTime.now());
 
         final Stay updatedStay = stayRepository.save(stay);
-        log.info("Check-out successful for stay ID: {}", stayId);
+        log.info("[STAY] CHECK_OUT_SUCCESS | stayId={} | reservationId={} | roomId={}",
+                stayId, stay.getReservationId(), stay.getRoomId());
 
         return stayMapper.toDto(updatedStay);
     }
