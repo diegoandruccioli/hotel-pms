@@ -6,6 +6,7 @@ import com.hotelpms.auth.dto.RegisterRequest;
 import com.hotelpms.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +25,7 @@ import java.util.Map;
 /**
  * REST controller for authentication endpoints.
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -70,10 +72,20 @@ public class AuthController {
     /**
      * Endpoint for user logout.
      *
+     * @param token the current JWT cookie; may be absent if already expired
      * @return the empty response with cleared cookie
      */
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout() {
+    public ResponseEntity<Void> logout(
+            @CookieValue(name = COOKIE_NAME, required = false) final String token) {
+        if (token != null) {
+            try {
+                final String username = jwtService.extractUsername(token);
+                log.info("[AUTH] LOGOUT | user={}", username);
+            } catch (final JwtException | IllegalArgumentException e) {
+                log.info("[AUTH] LOGOUT | user=unknown (invalid token)");
+            }
+        }
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, createCookie("", 0).toString())
                 .build();

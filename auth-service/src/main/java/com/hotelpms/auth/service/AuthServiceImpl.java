@@ -10,6 +10,7 @@ import com.hotelpms.auth.exception.DuplicateResourceException;
 import com.hotelpms.auth.mapper.UserAccountMapper;
 import com.hotelpms.auth.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import java.time.Instant;
 /**
  * Implementation of {@link AuthService}.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
@@ -53,6 +55,7 @@ public class AuthServiceImpl implements AuthService {
 
         userRepository.save(user);
 
+        log.info("[AUTH] REGISTER_SUCCESS | user={}", user.getUsername());
         final String token = jwtService.generateToken(user.getUsername(), user.getRole());
         return new AuthResponse(token);
     }
@@ -71,9 +74,14 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public AuthResponse login(final LoginRequest request) {
         final UserAccount user = userRepository.findByUsername(request.username())
-                .orElseThrow(() -> new BadCredentialsException("INVALID_CREDENTIALS"));
+                .orElseThrow(() -> {
+                    log.warn("[AUTH] LOGIN_FAILED | user={} | reason=USER_NOT_FOUND", request.username());
+                    return new BadCredentialsException("INVALID_CREDENTIALS");
+                });
 
         if (user.getLockedUntil() != null && Instant.now().isBefore(user.getLockedUntil())) {
+            log.warn("[AUTH] LOGIN_BLOCKED | user={} | reason=ACCOUNT_LOCKED | until={}",
+                    user.getUsername(), user.getLockedUntil());
             throw new AccountLockedException("ACCOUNT_TEMPORARILY_LOCKED");
         }
 
@@ -82,6 +90,11 @@ public class AuthServiceImpl implements AuthService {
             user.setFailedAttempts(newAttempts);
             if (newAttempts >= MAX_FAILED_ATTEMPTS) {
                 user.setLockedUntil(Instant.now().plus(LOCKOUT_DURATION));
+                log.warn("[AUTH] ACCOUNT_LOCKED | user={} | attempts={} | until={}",
+                        user.getUsername(), newAttempts, user.getLockedUntil());
+            } else {
+                log.warn("[AUTH] LOGIN_FAILED | user={} | reason=BAD_PASSWORD | attempts={}",
+                        user.getUsername(), newAttempts);
             }
             userRepository.save(user);
             throw new BadCredentialsException("INVALID_CREDENTIALS");
@@ -93,6 +106,7 @@ public class AuthServiceImpl implements AuthService {
             userRepository.save(user);
         }
 
+        log.info("[AUTH] LOGIN_SUCCESS | user={}", user.getUsername());
         final String token = jwtService.generateToken(user.getUsername(), user.getRole());
         return new AuthResponse(token);
     }
