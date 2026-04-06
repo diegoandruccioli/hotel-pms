@@ -1021,7 +1021,11 @@ INSERT INTO menu_items (id, name, price) VALUES
 sezione \textbf{Autenticazione Sicura} sopra (T-AUTH-01/T-GW-01/T-FE-02).}
 
 \subsection{IDOR su risorse ospite/hotel \threat{T-GST-01, T-RES-02, T-BILL-01}}
-\textit{[Da completare]}
+Le vulnerabilità IDOR che consentivano l'accesso cross-tenant a ospiti (T-GST-01),
+prenotazioni (T-RES-02) e fatture (T-BILL-01) sono state risolte con lo stesso pattern
+architetturale applicato in cascata a tutti e tre i servizi.
+Il dettaglio di ciascun intervento è documentato nell'appendice storica
+(Capitolo~\ref{ch:storico}) alle sezioni dedicate ai rispettivi servizi.
 
 \subsection{Double Booking Prevention \threat{T-RES-01}}
 
@@ -1690,6 +1694,145 @@ Page<Reservation> findAllByHotelId(UUID hotelId, Pageable pageable);
 \end{securebox}
 
 \paragraph{Riferimento} Commit: \commitref{3e93f49}{fix(security): T-RES-02 --- hotel\_id isolation on reservation-service}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{IDOR sul Billing Service \threat{T-BILL-01}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il \texttt{billing-service} gestisce fatture e pagamenti. Prima della mitigazione,
+\texttt{InvoiceServiceImpl.getInvoice(id)} e \texttt{PaymentServiceImpl.addPayment(invoiceId, ...)}
+usavano \texttt{findById(id)}, che restituisce qualsiasi fattura indipendentemente dall'hotel
+di appartenenza. Un receptionist dell'Hotel A, indovinando un UUID valido, poteva:
+\begin{itemize}
+  \item leggere le fatture dell'Hotel B (\texttt{GET /api/v1/invoices/\{id\}});
+  \item registrare pagamenti su fatture di altri hotel (\texttt{POST /api/v1/invoices/\{invoiceId\}/payments});
+  \item ottenere la lista completa di tutte le fatture di tutti gli hotel via \texttt{getAllInvoices()}.
+\end{itemize}
+Classificato OWASP A01 --- Broken Access Control.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- InvoiceServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: lookup per solo UUID, nessun controllo ownership hotel
+public InvoiceResponse getInvoice(UUID id) {
+    Invoice invoice = invoiceRepository.findById(id)  // qualsiasi hotel
+        .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND"));
+    return invoiceMapper.toResponse(invoice);
+}
+
+// INSICURO: lista tutte le fatture di tutti gli hotel
+public Page<InvoiceResponse> getAllInvoices(Pageable pageable) {
+    return invoiceRepository.findAll(pageable)  // nessun filtro hotel_id
+        .map(invoiceMapper::toResponse);
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{insecurebox}[title={Codice Vulnerabile --- PaymentServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: addPayment carica la fattura senza verifica hotel
+public PaymentResponse addPayment(UUID invoiceId, PaymentRequest request) {
+    Invoice invoice = invoiceRepository.findById(invoiceId)
+        .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND"));
+    // ... aggiunge il pagamento indipendentemente dall'hotel
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+L'intervento replica il pattern consolidato di T-GST-01 e T-RES-02:
+
+\begin{enumerate}
+    \item \textbf{InternalAuthFilter aggiornato} --- il filter legge l'header
+          \texttt{X-Auth-Hotel} iniettato dal gateway e lo salva in
+          \texttt{Authentication.details}. Richieste prive dell'header sono
+          rifiutate con HTTP 401.
+    \item \textbf{Query hotel-scoped nel repository} --- aggiunti tre metodi:
+          \texttt{findByIdAndHotelId(id, hotelId)},
+          \texttt{findByHotelId(hotelId, pageable)} (paginata) e
+          \texttt{findFirstByReservationIdAndHotelIdOrderByIssueDateDesc(reservationId, hotelId)}.
+    \item \textbf{IDOR-safe 404} --- \texttt{findByIdAndHotelId} restituisce
+          \texttt{Optional.empty()} se la fattura esiste ma appartiene ad
+          un altro hotel; il service lancia \texttt{NotFoundException} (HTTP 404),
+          senza rivelare l'esistenza della risorsa all'attaccante.
+    \item \textbf{hotelId impostato alla creazione} --- \texttt{createInvoice} imposta
+          \texttt{invoice.setHotelId(resolveHotelId())}, ignorando qualsiasi valore
+          passato nel corpo della richiesta.
+    \item \textbf{FeignHeaderConfig aggiornato} --- propaga \texttt{X-Auth-Hotel} su
+          tutte le chiamate Feign verso \texttt{guest-service} e
+          \texttt{reservation-service}.
+\end{enumerate}
+
+\begin{securebox}[title={Codice Sicuro --- InvoiceServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: lookup combinato id + hotel_id (IDOR-safe con 404)
+public InvoiceResponse getInvoice(UUID id) {
+    UUID hotelId = resolveHotelId();
+    Invoice invoice = invoiceRepository.findByIdAndHotelId(id, hotelId)
+        .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND"));
+    return invoiceMapper.toResponse(invoice);
+}
+
+// SICURO: lista paginata filtrata per hotel del caller
+public Page<InvoiceResponse> getAllInvoices(Pageable pageable) {
+    UUID hotelId = resolveHotelId();
+    return invoiceRepository.findByHotelId(hotelId, safePageable)
+        .map(invoiceMapper::toResponse);
+}
+
+// SICURO: hotelId estratto dal SecurityContext, mai dal client
+public InvoiceResponse createInvoice(InvoiceRequest request) {
+    // ... validazioni guest e reservation ...
+    Invoice invoice = invoiceMapper.toEntity(request);
+    invoice.setHotelId(resolveHotelId());  // tenant-bound
+    return invoiceMapper.toResponse(invoiceRepository.save(invoice));
+}
+
+private UUID resolveHotelId() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)) {
+        throw new IllegalStateException("MISSING_HOTEL_CONTEXT");
+    }
+    return UUID.fromString(hotelIdStr);
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- PaymentServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: lookup combinato id + hotel_id (IDOR-safe con 404)
+public PaymentResponse addPayment(UUID invoiceId, PaymentRequest request) {
+    UUID hotelId = resolveHotelId();
+    Invoice invoice = invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)
+        .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND"));
+    // ... aggiunge il pagamento solo se la fattura appartiene al caller
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={InvoiceRepository.java --- metodi hotel-scoped}]
+\begin{lstlisting}[style=java]
+// Lookup singola fattura con check ownership (Spring Data query derivata)
+Optional<Invoice> findByIdAndHotelId(UUID id, UUID hotelId);
+
+// Lista paginata filtrata per hotel
+Page<Invoice> findByHotelId(UUID hotelId, Pageable pageable);
+
+// Ultima fattura per prenotazione, scoped per hotel
+Optional<Invoice> findFirstByReservationIdAndHotelIdOrderByIssueDateDesc(
+    UUID reservationId, UUID hotelId);
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Aggiunti/aggiornati test in \texttt{InvoiceServiceImplTest} e \texttt{PaymentServiceImplTest}:
+il \texttt{SecurityContextHolder} viene inizializzato in \texttt{setUp()} con un
+\texttt{UsernamePasswordAuthenticationToken} il cui \texttt{details} è il \texttt{hotelId} del
+caller, e ripulito in \texttt{tearDown()}. Aggiunto il caso
+\texttt{shouldThrowWhenInvoiceBelongsToDifferentHotel} che verifica il comportamento IDOR-safe
+(la query hotel-scoped restituisce \texttt{Optional.empty()} → HTTP 404).
+
+\paragraph{Riferimento} Commit: \commitref{4a44eea}{fix(security): T-BILL-01 --- IDOR fix on billing-service (hotel-scoped invoice/payment lookup)}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}

@@ -112,7 +112,7 @@
 
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
-| T-BILL-01 | Elevation of Privilege | IDOR: accesso a fatture di altri ospiti/hotel | CRITICO | MEDIA | 🔴 APERTO |
+| T-BILL-01 | Elevation of Privilege | IDOR: accesso a fatture di altri ospiti/hotel | CRITICO | MEDIA | ✅ RISOLTO |
 | T-BILL-02 | Tampering | Importi non validati server-side (negative amounts, overflow) | ALTO | BASSA | 🟡 DA ANALIZZARE |
 | T-BILL-03 | Repudiation | Assenza di log immutabile delle transazioni di pagamento | ALTO | ALTA | 🔴 APERTO |
 
@@ -184,7 +184,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-RES-02 | hotel_id scope su tutte le query reservation (findByIdAndHotelId, findAllByHotelId); InternalAuthFilter propaga X-Auth-Hotel in auth.details; createReservation imposta hotelId dall'auth context | reservation-service/ReservationServiceImpl.java, ReservationRepository.java, InternalAuthFilter.java, FeignHeaderConfig.java | 3e93f49 | A01 | ✅ |
 | T-STAY-01 | Validazione stato prenotazione prima check-in | stay-service | — | A04 | ⏳ |
 | T-STAY-02 | Audit trail check-in/check-out | stay-service | — | A09 | ⏳ |
-| T-BILL-01 | Verifica ownership fatture | billing-service | — | A01 | ⏳ |
+| T-BILL-01 | hotel_id scope su tutte le query invoice/payment (findByIdAndHotelId, findByHotelId con Pageable, findFirstByReservationIdAndHotelIdOrderByIssueDateDesc); InternalAuthFilter legge X-Auth-Hotel e lo memorizza in auth.details; createInvoice imposta hotelId dall'auth context (ignora valore client); FeignHeaderConfig propaga X-Auth-Hotel | billing-service/InvoiceRepository.java, InvoiceServiceImpl.java, PaymentServiceImpl.java, InternalAuthFilter.java, FeignHeaderConfig.java | 4a44eea | A01 | ✅ |
 | T-FB-02 | Catalogo MenuItem server-side (V2 Flyway); OrderItemRequest accetta menuItemId+quantity, no unitPrice; service risolve prezzi da DB con buildItemsFromCatalog(); totalAmount ricalcolato server-side | fb-service/MenuItem.java, MenuItemRepository.java, V2__add_menu_items.sql, OrderItemRequest.java, RestaurantOrderServiceImpl.java | d7af61c | A04 | ✅ |
 | T-CFG-01 | Porta management separata (:8090, non pubblicata) + show-details: when-authorized su tutti i servizi | config-service/resources/config/*.yml, docker-compose.yml, prometheus.yml | b0cf898 | A05 | ✅ |
 | T-CFG-02 | Segreti in variabili d'ambiente (no plaintext) | config-service | — | A02 | ⏳ |
