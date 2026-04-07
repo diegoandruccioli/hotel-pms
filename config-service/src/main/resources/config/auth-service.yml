@@ -2,7 +2,7 @@ server:
   port: 8087
 
 jwt:
-  secret: "${JWT_SECRET:bXktMzItYnl0ZS1zZWNyZXQta2V5LWZvci10ZXN0LWxvY2FsLWRldi0xMjM0NQ==}"
+  secret: "${JWT_SECRET}"
   expiration: "${JWT_EXPIRATION:86400000}"
 
 management:

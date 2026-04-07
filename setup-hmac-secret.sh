@@ -38,22 +38,45 @@ ok()    { echo -e "  ${GREEN}✔  $1${NC}"; }
 skip()  { echo -e "  ${GRAY}–  $1${NC}"; }
 warn()  { echo -e "  ${YELLOW}⚠  $1${NC}"; }
 
-# ── Step 1: Create .env with a cryptographically-random 64-char hex secret ────
+# ── Step 1: Create/update .env with all required secrets ─────────────────────
 step "Step 1 – .env file"
 
-if [ ! -f "$ENV_FILE" ]; then
-    # Generate 32 random bytes → 64 hex characters
-    # Tries /dev/urandom first (Linux/macOS), falls back to openssl
+_gen_hex() { # $1 = byte count
     if command -v openssl &>/dev/null; then
-        SECRET="$(openssl rand -hex 32)"
+        openssl rand -hex "$1"
     else
-        SECRET="$(xxd -l 32 -p /dev/urandom | tr -d '\n')"
+        xxd -l "$1" -p /dev/urandom | tr -d '\n'
     fi
+}
+_gen_b64() { # $1 = byte count
+    if command -v openssl &>/dev/null; then
+        openssl rand -base64 "$1" | tr -d '\n'
+    else
+        xxd -l "$1" -p /dev/urandom | tr -d '\n'
+    fi
+}
 
-    printf "INTERNAL_HMAC_SECRET=%s\n" "$SECRET" > "$ENV_FILE"
-    ok ".env created with a fresh 64-char hex secret."
+if [ ! -f "$ENV_FILE" ]; then
+    printf "INTERNAL_HMAC_SECRET=%s\n" "$(_gen_hex 32)" > "$ENV_FILE"
+    ok ".env created with a fresh HMAC secret."
 else
-    skip ".env already exists – skipping secret generation to avoid rotation."
+    skip ".env already exists – skipping HMAC secret generation to avoid rotation."
+fi
+
+# Append JWT_SECRET if not already present (idempotent)
+if ! grep -q "^JWT_SECRET=" "$ENV_FILE"; then
+    printf "JWT_SECRET=%s\n" "$(_gen_b64 48)" >> "$ENV_FILE"
+    ok "JWT_SECRET added to .env."
+else
+    skip "JWT_SECRET already in .env – skipping."
+fi
+
+# Append POSTGRES_PASSWORD if not already present (idempotent)
+if ! grep -q "^POSTGRES_PASSWORD=" "$ENV_FILE"; then
+    printf "POSTGRES_PASSWORD=%s\n" "$(_gen_hex 16)" >> "$ENV_FILE"
+    ok "POSTGRES_PASSWORD added to .env."
+else
+    skip "POSTGRES_PASSWORD already in .env – skipping."
 fi
 
 # ── Step 2: Ensure .env is in .gitignore ──────────────────────────────────────
