@@ -2,6 +2,7 @@ import { MaterialIcon } from './MaterialIcon';
 import { useToastStore } from '../store/toastStore';
 import type { Toast, ToastType } from '../store/toastStore';
 import { useCallback, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const iconByType: Record<ToastType, string> = {
   success: 'check_circle',
@@ -16,6 +17,7 @@ const toneByType: Record<ToastType, string> = {
 };
 
 const ToastItem = memo(({ toast }: { toast: Toast }) => {
+  const { t } = useTranslation('common');
   const removeToast = useToastStore((s) => s.removeToast);
 
   const handleRemove = useCallback(() => {
@@ -32,7 +34,7 @@ const ToastItem = memo(({ toast }: { toast: Toast }) => {
       <button
         onClick={handleRemove}
         className="opacity-60 hover:opacity-100 transition-opacity"
-        aria-label="Dismiss notification"
+        aria-label={t('dismiss_notification')}
       >
         <MaterialIcon name="close" size={16} />
       </button>

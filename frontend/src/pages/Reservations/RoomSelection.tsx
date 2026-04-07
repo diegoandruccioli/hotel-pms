@@ -12,6 +12,7 @@ interface RoomButtonProps {
 }
 
 const RoomButton = memo(({ room, isSelected, readOnly, onToggle }: RoomButtonProps) => {
+  const { t } = useTranslation('reservations');
   const handleClick = useCallback(() => {
     if (!readOnly) {
       onToggle(room.id);
@@ -30,7 +31,7 @@ const RoomButton = memo(({ room, isSelected, readOnly, onToggle }: RoomButtonPro
     >
       <div className="flex justify-between items-center w-full">
         <span className={`font-medium ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
-          Room {room.roomNumber}
+          {t('room_prefix')} {room.roomNumber}
         </span>
         {isSelected && <MaterialIcon name="check_circle" size={16} className="text-primary" />}
       </div>
@@ -68,7 +69,7 @@ export const RoomSelection = memo(({
   readOnly = false
 }: RoomSelectionProps) => {
 
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['reservations', 'common']);
 
   const handleCheckInChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     onCheckInChange(e.target.value);
@@ -116,7 +117,7 @@ export const RoomSelection = memo(({
       <div className="pt-4">
         <h3 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider mb-3">{t('select_rooms')}</h3>
         {availableRooms.length === 0 ? (
-          <p className="text-sm text-on-surface-variant">No available rooms loaded.</p>
+          <p className="text-sm text-on-surface-variant">{t('no_rooms_available')}</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {availableRooms.map(room => (

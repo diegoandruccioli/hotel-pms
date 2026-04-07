@@ -1,7 +1,5 @@
 import { useCallback, memo, type ReactElement } from 'react';
-import { useComponentTranslation } from '../hooks/useComponentTranslation';
-import { itSettingsModalTranslations } from './SettingsModal.it.i18n';
-import { enSettingsModalTranslations } from './SettingsModal.en.i18n';
+import { useTranslation } from 'react-i18next';
 
 import { M3Dialog } from './m3/M3Dialog';
 import { MaterialIcon } from './MaterialIcon';
@@ -72,7 +70,7 @@ const SegmentedButton = memo(function SegmentedButton<T extends string>({
   isLast: boolean;
   onChange: (v: T) => void;
 }) {
-  const { t } = useComponentTranslation('SettingsModal', itSettingsModalTranslations, enSettingsModalTranslations);
+  const { t } = useTranslation('settings');
   const handleClick = useCallback(() => onChange(opt.value), [onChange, opt.value]);
 
   return (
@@ -163,7 +161,7 @@ const LanguageButton = memo(function LanguageButton({
   isActive: boolean;
   onSelect: (v: string) => void;
 }) {
-  const { t } = useComponentTranslation('SettingsModal', itSettingsModalTranslations, enSettingsModalTranslations);
+  const { t } = useTranslation('settings');
   const handleClick = useCallback(() => onSelect(lang.value), [onSelect, lang.value]);
 
   return (
@@ -207,7 +205,7 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
-  const { t, i18n } = useComponentTranslation('SettingsModal', itSettingsModalTranslations, enSettingsModalTranslations);
+  const { t, i18n } = useTranslation('settings');
 
   const { theme, setTheme } = useThemeStore();
   const { contrast, fontScale, setContrast, setFontScale, setLanguage } = useSettingsStore();

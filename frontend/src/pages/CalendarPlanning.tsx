@@ -49,7 +49,7 @@ const CALENDAR_VIEWS: View[] = ['month'];
 const CALENDAR_STYLE = { height: 600 };
 
 export const CalendarPlanning = () => {
-  const { t, i18n } = useTranslation('common');
+  const { t, i18n } = useTranslation(['common', 'calendar']);
   const [reservations, setReservations] = useState<ReservationResponse[]>([]);
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,7 +206,7 @@ export const CalendarPlanning = () => {
           <button
             onClick={handlePrevMonth}
             className="p-1 rounded-full hover:bg-surface-container transition-colors text-primary"
-            aria-label="Previous month"
+            aria-label={t('calendar:prev_month')}
           >
             <MaterialIcon name="chevron_left" size={28} />
           </button>
@@ -223,7 +223,7 @@ export const CalendarPlanning = () => {
           <button
             onClick={handleNextMonth}
             className="p-1 rounded-full hover:bg-surface-container transition-colors text-primary"
-            aria-label="Next month"
+            aria-label={t('calendar:next_month')}
           >
             <MaterialIcon name="chevron_right" size={28} />
           </button>

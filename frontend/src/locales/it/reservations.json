@@ -1,0 +1,10 @@
+{
+  "search_guest_placeholder": "Cerca ospite per nome o email",
+  "btn_new_guest": "Nuovo Ospite",
+  "btn_change": "Cambia",
+  "heading_create_guest": "Crea Nuovo Ospite Principale",
+  "btn_save_guest": "Salva Ospite",
+  "no_guests_search": "Nessun ospite trovato. Prova a crearne uno nuovo.",
+  "room_prefix": "Camera",
+  "no_rooms_available": "Nessuna camera disponibile."
+}

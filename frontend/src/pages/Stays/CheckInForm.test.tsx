@@ -47,8 +47,8 @@ describe('CheckInForm', () => {
 
   it('renders correctly with initial expected guests', () => {
     renderComponent(2);
-    expect(screen.getByText('Check-in Alloggiati')).toBeInTheDocument();
-    
+    expect(screen.getByText('checkin_title')).toBeInTheDocument();
+
     // Should render 2 guest cards because expectedGuests is 2
     expect(screen.getByText(/Guest 1/i)).toBeInTheDocument();
     expect(screen.getByText(/Guest 2/i)).toBeInTheDocument();
@@ -63,13 +63,13 @@ describe('CheckInForm', () => {
     expect(screen.queryByText(/Guest 2/i)).not.toBeInTheDocument();
 
     // Add guest
-    await user.click(screen.getByRole('button', { name: /add guest/i }));
-    
+    await user.click(screen.getByRole('button', { name: /btn_add_guest/i }));
+
     expect(screen.getByText(/Guest 1/i)).toBeInTheDocument();
     expect(screen.getByText(/Guest 2/i)).toBeInTheDocument();
 
     // Remove guest 2
-    const removeBtns = screen.getAllByRole('button', { name: /remove/i });
+    const removeBtns = screen.getAllByRole('button', { name: /btn_remove/i });
     expect(removeBtns).toHaveLength(2); // Since there are 2 guests now, both might have remove button
     await user.click(removeBtns[1]);
 
@@ -82,9 +82,9 @@ describe('CheckInForm', () => {
     const user = userEvent.setup();
 
     // Fill in required fields for Guest 1
-    await user.type(screen.getAllByLabelText(/first name/i)[0], 'John');
-    await user.type(screen.getAllByLabelText(/last name/i)[0], 'Doe');
-    await user.type(screen.getAllByLabelText(/gender/i)[0], 'M');
+    await user.type(screen.getAllByLabelText(/label_first_name/i)[0], 'John');
+    await user.type(screen.getAllByLabelText(/label_last_name/i)[0], 'Doe');
+    await user.type(screen.getAllByLabelText(/label_gender/i)[0], 'M');
 
     // Date input — use fireEvent.change for date inputs
     const dobInput = document.querySelector('input[type="date"]');
@@ -92,31 +92,31 @@ describe('CheckInForm', () => {
       fireEvent.change(dobInput, { target: { value: '1990-01-01' } });
     }
 
-    await user.type(screen.getAllByLabelText(/place of birth/i)[0], 'Rome');
-    await user.type(screen.getAllByLabelText(/citizenship/i)[0], 'IT');
-    await user.type(screen.getAllByLabelText(/document type/i)[0], 'PASSPORT');
-    await user.type(screen.getAllByLabelText(/document number/i)[0], 'A1234567');
-    await user.type(screen.getAllByLabelText(/document place of issue/i)[0], 'Rome');
+    await user.type(screen.getAllByLabelText(/label_place_of_birth/i)[0], 'Rome');
+    await user.type(screen.getAllByLabelText(/label_citizenship/i)[0], 'IT');
+    await user.type(screen.getAllByLabelText(/label_doc_type/i)[0], 'PASSPORT');
+    await user.type(screen.getAllByLabelText(/label_doc_number/i)[0], 'A1234567');
+    await user.type(screen.getAllByLabelText(/label_doc_issue_place/i)[0], 'Rome');
 
-    // Select Traveller Type (Ospite Singolo is primary default in code, but let's select it explicitly for the test)
-    const travellerTypeSelect = screen.getAllByLabelText(/Tipo Alloggiato/i)[0];
+    // Select Traveller Type
+    const travellerTypeSelect = screen.getAllByLabelText(/label_guest_type/i)[0];
     await user.selectOptions(travellerTypeSelect, 'OSPITE_SINGOLO');
 
     // Guest 1 is primary by default. Let's uncheck it to test validation
-    const primaryCheckbox = screen.getByRole('checkbox', { name: /primary guest/i });
+    const primaryCheckbox = screen.getByRole('checkbox', { name: /label_primary_guest/i });
     await user.click(primaryCheckbox); // Uncheck
-    
+
     // Try to submit
-    const submitBtn = screen.getByRole('button', { name: /complete check-in/i });
+    const submitBtn = screen.getByRole('button', { name: /btn_complete_checkin/i });
     await user.click(submitBtn);
 
     // Should show error
-    expect(screen.getByText('error_primary_guest_required')).toBeInTheDocument();
+    expect(screen.getByText('err_primary_guest_required')).toBeInTheDocument();
     expect(stayService.createStay).not.toHaveBeenCalled();
 
     // Check it back
     await user.click(primaryCheckbox);
-    
+
     // Submit again
     await user.click(submitBtn);
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as FocusTrapModule from 'focus-trap-react';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../MaterialIcon';
 
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
@@ -29,6 +30,7 @@ export const M3Dialog = ({
   onClose,
   children,
 }: M3DialogProps) => {
+  const { t } = useTranslation('common');
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Move focus to close button when dialog opens
@@ -95,7 +97,7 @@ export const M3Dialog = ({
                 'focus-visible:ring-primary focus-visible:ring-offset-2',
                 'transition-colors',
               ].join(' ')}
-              aria-label="Chiudi"
+              aria-label={t('close')}
             >
               <MaterialIcon name="close" size={20} />
             </button>

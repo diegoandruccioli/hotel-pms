@@ -1,0 +1,16 @@
+{
+  "modal_title_edit": "Edit Guest",
+  "modal_title_add": "Add Guest",
+  "label_first_name": "First Name",
+  "label_last_name": "Last Name",
+  "label_country": "Country",
+  "label_email_hint": "Email (if no phone)",
+  "label_phone_hint": "Phone (if no email)",
+  "err_email_or_phone": "Email or phone is required",
+  "toast_guest_updated": "Guest updated successfully",
+  "toast_guest_saved": "Guest saved successfully",
+  "toast_guest_deleted": "Guest deleted successfully",
+  "toast_error": "Error",
+  "confirm_delete_guest": "Are you sure you want to delete this guest?",
+  "btn_confirm": "Confirm"
+}

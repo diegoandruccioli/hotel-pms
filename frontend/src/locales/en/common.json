@@ -13,7 +13,6 @@
   "role_receptionist": "Receptionist",
   "role_owner": "Owner",
   "my_profile": "My Profile",
-  "settings": "Settings",
   "loading": "Loading...",
   "loading_session": "Loading session...",
   "welcome_back": "Welcome back, {{name}}!",
@@ -138,13 +137,8 @@
   "no_invoices_period": "No invoices in this period.",
   "nav_menu": "Menu",
   "guest": "Guest",
-  "log_out": "Log out",
   "role_guest": "Guest",
   "name": "Name",
-  "theme_light": "Light theme",
-  "theme_dark": "Dark theme",
-  "theme_system": "System theme",
-  "theme_toggle": "Toggle theme",
   "nav_rooms": "Rooms",
   "rooms_title": "Inventory",
   "rooms_subtitle": "Manage physical rooms and room categories.",
@@ -186,5 +180,5 @@
   "room_move_overlap_error": "Cannot change room. The room is already occupied during these dates.",
   "reservation_overlap_error": "The selected dates overlap with another reservation for these rooms.",
 
-  "user_menu_label": "User menu for {{name}}"
+  "close": "Close"
 }

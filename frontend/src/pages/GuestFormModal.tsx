@@ -26,7 +26,7 @@ interface Props {
 }
 
 export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['guests', 'common']);
   const addToast = useToastStore((s) => s.addToast);
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -76,7 +76,7 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
     setLoading(true);
 
     if (!formData.email.trim() && !phoneNumber.trim()) {
-      addToast(t('email_or_phone_required', 'È necessario inserire Email oppure Telefono'), 'error');
+      addToast(t('err_email_or_phone'), 'error');
       setLoading(false);
       return;
     }
@@ -87,15 +87,15 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
     try {
       if (guest) {
         await guestService.updateGuest(guest.id, submitData);
-        addToast(t('item_updated', 'Ospite aggiornato con successo'), 'success');
+        addToast(t('toast_guest_updated'), 'success');
       } else {
         await guestService.createGuest(submitData);
-        addToast(t('saving', 'Salvato con successo'), 'success');
+        addToast(t('toast_guest_saved'), 'success');
       }
       onSaved();
     } catch (err: unknown) {
       const errorObj = err as {response?: {data?: {detail?: string}}, message?: string};
-      const errorMsg = errorObj.response?.data?.detail || errorObj.message || t('error', 'Errore');
+      const errorMsg = errorObj.response?.data?.detail || errorObj.message || t('toast_error');
       addToast(errorMsg, 'error');
     } finally {
       setLoading(false);
@@ -107,11 +107,11 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
     setLoading(true);
     try {
       await guestService.deleteGuest(guest.id);
-      addToast(t('item_deleted', 'Eliminato con successo'), 'success');
+      addToast(t('toast_guest_deleted'), 'success');
       onSaved();
     } catch (err: unknown) {
       const errorObj = err as {response?: {data?: {detail?: string}}, message?: string};
-      const errorMsg = errorObj.response?.data?.detail || errorObj.message || t('error', 'Errore');
+      const errorMsg = errorObj.response?.data?.detail || errorObj.message || t('toast_error');
       addToast(errorMsg, 'error');
     } finally {
       setLoading(false);
@@ -132,7 +132,7 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
           
           <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/30">
             <h3 className="text-xl font-display font-medium text-on-surface">
-              {guest ? t('edit_guest', 'Modifica Ospite') : t('add_guest', 'Aggiungi Ospite')}
+              {guest ? t('modal_title_edit') : t('modal_title_add')}
             </h3>
             <button
               onClick={onClose}
@@ -148,13 +148,13 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                    {t('first_name', 'Nome')} *
+                    {t('label_first_name')} *
                   </label>
                   <input required type="text" name="firstName" value={formData.firstName} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                    {t('last_name', 'Cognome')} *
+                    {t('label_last_name')} *
                   </label>
                   <input required type="text" name="lastName" value={formData.lastName} onChange={handleChange} className={inputClass} />
                 </div>
@@ -162,14 +162,14 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
 
               <div>
                 <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                  {t('email', 'Email')} * (se senza telefono)
+                  {t('label_email_hint')} *
                 </label>
                 <input type="email" name="email" value={formData.email} onChange={handleChange} className={inputClass} />
               </div>
 
               <div>
                 <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                  {t('phone', 'Telefono')} * (se senza email)
+                  {t('label_phone_hint')} *
                 </label>
                 <div className="flex gap-2">
                   <select 
@@ -192,13 +192,13 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                    {t('city', 'Città')}
+                    {t('common:city')}
                   </label>
                   <input type="text" name="city" value={formData.city} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                    {t('country', 'Nazione')}
+                    {t('label_country')}
                   </label>
                   <input type="text" name="country" value={formData.country} onChange={handleChange} className={inputClass} />
                 </div>
@@ -209,11 +209,11 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
           {showDeleteConfirm ? (
             <div className="flex flex-col sm:flex-row justify-between items-center gap-3 px-6 py-4 border-t border-error/20 bg-error-container/20 rounded-b-shape-lg">
               <span className="text-sm font-medium font-body text-error">
-                {t('confirm_delete', 'Sei sicuro di voler eliminare questo ospite?')}
+                {t('confirm_delete_guest')}
               </span>
               <div className="flex gap-2">
                 <M3Button variant="text" onClick={closeDeleteConfirm} disabled={loading}>{t('cancel')}</M3Button>
-                <M3Button onClick={handleDelete} loading={loading} disabled={loading} className="bg-error text-on-error hover:bg-error/90 border-transparent">{t('confirm', 'Conferma')}</M3Button>
+                <M3Button onClick={handleDelete} loading={loading} disabled={loading} className="bg-error text-on-error hover:bg-error/90 border-transparent">{t('btn_confirm')}</M3Button>
               </div>
             </div>
           ) : (

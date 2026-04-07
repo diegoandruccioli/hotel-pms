@@ -16,7 +16,7 @@ interface Props {
 }
 
 export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) => {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['rooms', 'common']);
   const addToast = useToastStore((s) => s.addToast);
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -61,11 +61,11 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
     setLoading(true);
     try {
       await inventoryService.deleteRoomType(roomType.id);
-      addToast(t('item_deleted', 'Eliminato con successo'), 'success');
+      addToast(t('toast_deleted'), 'success');
       onSaved();
     } catch (err: unknown) {
       const e = err as {response?: {data?: {detail?: string}}};
-      const errorMsg = e.response?.data?.detail || t('failed_delete_room', 'Errore durante l\'eliminazione');
+      const errorMsg = e.response?.data?.detail || t('toast_delete_error');
       addToast(errorMsg, 'error');
     } finally {
       setLoading(false);
@@ -163,11 +163,11 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
           {showDeleteConfirm ? (
             <div className="flex flex-col sm:flex-row justify-between items-center gap-3 px-6 py-4 border-t border-error/20 bg-error-container/20 rounded-b-shape-lg">
               <span className="text-sm font-medium font-body text-error">
-                {t('confirm_delete', 'Sei sicuro di voler eliminare questa tipologia?')}
+                {t('confirm_delete_room_type')}
               </span>
               <div className="flex gap-2">
                 <M3Button variant="text" onClick={closeDeleteConfirm} disabled={loading}>{t('cancel')}</M3Button>
-                <M3Button onClick={handleDelete} loading={loading} disabled={loading} className="bg-error text-on-error hover:bg-error/90 border-transparent">{t('confirm', 'Conferma')}</M3Button>
+                <M3Button onClick={handleDelete} loading={loading} disabled={loading} className="bg-error text-on-error hover:bg-error/90 border-transparent">{t('btn_confirm')}</M3Button>
               </div>
             </div>
           ) : (

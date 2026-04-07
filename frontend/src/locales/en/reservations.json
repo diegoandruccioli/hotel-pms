@@ -1,0 +1,10 @@
+{
+  "search_guest_placeholder": "Search guest by name or email",
+  "btn_new_guest": "New Guest",
+  "btn_change": "Change",
+  "heading_create_guest": "Create New Primary Guest",
+  "btn_save_guest": "Save Guest",
+  "no_guests_search": "No guests found. Try creating a new one.",
+  "room_prefix": "Room",
+  "no_rooms_available": "No available rooms loaded."
+}

@@ -1,8 +1,6 @@
 import { MaterialIcon } from './MaterialIcon';
 import { useThemeStore } from '../store/themeStore';
-import { useComponentTranslation } from '../hooks/useComponentTranslation';
-import { itThemeToggleTranslations } from './ThemeToggle.it.i18n';
-import { enThemeToggleTranslations } from './ThemeToggle.en.i18n';
+import { useTranslation } from 'react-i18next';
 import { useCallback } from 'react';
 
 const themeOptions = [
@@ -12,7 +10,7 @@ const themeOptions = [
 ] as const;
 
 export const ThemeToggle = () => {
-  const { t } = useComponentTranslation('ThemeToggle', itThemeToggleTranslations, enThemeToggleTranslations);
+  const { t } = useTranslation('settings');
   const { theme, setTheme } = useThemeStore();
 
   const currentIndex = themeOptions.findIndex((o) => o.value === theme);

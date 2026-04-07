@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, memo } from 'react';
-import { useComponentTranslation } from '../hooks/useComponentTranslation';
-import { itUserMenuTranslations } from './UserMenu.it.i18n';
-import { enUserMenuTranslations } from './UserMenu.en.i18n';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
 
 interface UserMenuProps {
@@ -67,7 +65,7 @@ export const UserMenu = ({
   onOpenSettings,
   onLogout,
 }: UserMenuProps) => {
-  const { t } = useComponentTranslation('UserMenu', itUserMenuTranslations, enUserMenuTranslations);
+  const { t } = useTranslation('settings');
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const userInitial = username.charAt(0).toUpperCase();
