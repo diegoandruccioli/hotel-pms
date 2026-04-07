@@ -128,7 +128,7 @@
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
 | T-BILL-03 | Structured SLF4J audit log in PaymentServiceImpl: PAYMENT_REJECTED (reason=INVOICE_ALREADY_PAID/INVOICE_CANCELLED/PAYMENT_EXCEEDS_BALANCE con invoiceId+hotelId+amount+balanceDue), PAYMENT_ADDED (invoiceId+paymentId+amount+method+hotelId), INVOICE_PAID (invoiceId+totalAmount+hotelId); prefisso [BILLING], WARN per rifiuti, INFO per successi | billing-service/PaymentServiceImpl.java | 7e41838 | A09 | ✅ |
-| T-CFG-01 | Information Disclosure | Endpoint `/actuator` esposti senza autenticazione | CRITICO | ALTA | 🔴 APERTO |
+| T-CFG-01 | Information Disclosure | Endpoint `/actuator` esposti senza autenticazione | CRITICO | ALTA | ✅ RISOLTO |
 | T-CFG-02 | Information Disclosure | Segreti in chiaro nei file di configurazione (JWT secret, HMAC key, DB password) | CRITICO | ALTA | ✅ RISOLTO |
 | T-CFG-03 | Spoofing | Nessuna autenticazione tra config-service e microservizi consumer | ALTO | MEDIA | 🟡 DA ANALIZZARE |
 
@@ -189,6 +189,12 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-FB-02 | Catalogo MenuItem server-side (V2 Flyway); OrderItemRequest accetta menuItemId+quantity, no unitPrice; service risolve prezzi da DB con buildItemsFromCatalog(); totalAmount ricalcolato server-side | fb-service/MenuItem.java, MenuItemRepository.java, V2__add_menu_items.sql, OrderItemRequest.java, RestaurantOrderServiceImpl.java | d7af61c | A04 | ✅ |
 | T-CFG-01 | Porta management separata (:8090, non pubblicata) + show-details: when-authorized su tutti i servizi | config-service/resources/config/*.yml, docker-compose.yml, prometheus.yml | b0cf898 | A05 | ✅ |
 | T-CFG-02 | Rimosso fallback JWT_SECRET hardcoded da auth-service.yml; POSTGRES_PASSWORD e JWT_SECRET parametrizzati come variabili d'ambiente nel docker-compose; setup script aggiornato per generare entrambi i segreti | config-service/config/auth-service.yml, docker-compose.yml, setup-hmac-secret.sh/.ps1 | 91d9484 | A02 | ✅ |
+| T-GW-02 | Analisi e raffinamento configurazione rate limiting Redis token-bucket su api-gateway | api-gateway | — | A05 | ⏳ |
+| T-RES-03 | Validazione server-side dei parametri di ricerca date (formato, coerenza checkIn < checkOut) | reservation-service | — | A03 | ⏳ |
+| T-STAY-03 | Verifica TLS e firma digitale nella trasmissione dati Alloggiati al portale PS | stay-service | — | A02 | ⏳ |
+| T-BILL-02 | Validazione server-side importi pagamento (no valori negativi, no overflow BigDecimal) | billing-service | — | A04 | ⏳ |
+| T-FB-01 | IDOR fix fb-service: ordini e menu item scoped per hotel_id, verifica ownership su ogni operazione | fb-service | — | A01 | ⏳ |
+| T-CFG-03 | Autenticazione tra config-service e microservizi consumer (basic auth o token) | config-service | — | A07 | ⏳ |
 | T-FE-01 | Output encoding React (verifica dangerouslySetInnerHTML) | frontend | — | A03 | ⏳ |
 | T-FE-03 | Route guard server-side (non solo UI hiding) | frontend/gateway | — | A01 | ⏳ |
 | T-FE-04 | CSP SPA-level via nginx.conf: script-src 'self', style-src 'self' 'unsafe-inline', connect-src 'self', frame-ancestors 'none'; nginx proxy /api/ → api-gateway per same-origin; api.ts baseURL relativo | frontend/nginx.conf, frontend/Dockerfile, frontend/src/services/api.ts | b901a9f | A05 | ✅ |
