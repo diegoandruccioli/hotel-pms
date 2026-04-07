@@ -626,7 +626,105 @@ ALTER TABLE user_account
 \paragraph{Riferimento} Commit: \commitref{a90e462}{security(auth): add account lockout for brute-force protection (T-AUTH-02)}
 
 \subsection{Sicurezza Hashing Password \threat{T-AUTH-03}}
-\textit{[Da completare — step di hardening in corso]}
+
+\paragraph{Descrizione}
+L'algoritmo BCrypt adotta un \textit{cost factor} (o \textit{strength}) che determina il numero
+di iterazioni dell'algoritmo: un valore troppo basso rende il calcolo dell'hash banalmente veloce
+su hardware moderno, abbattendo il tempo necessario per un attacco brute-force su hash rubati.
+La configurazione originale usava \texttt{new BCryptPasswordEncoder()} senza argomenti,
+che corrisponde al valore di default \textbf{10} (circa 100\,ms su hardware del 2013).
+L'OWASP Authentication Cheat Sheet raccomanda un cost factor minimo di \textbf{10} e
+preferibilmente \textbf{12} per hardware contemporaneo (\(\approx\)400\,ms per hash).
+Classificato OWASP A02 --- Cryptographic Failures.
+
+Un secondo problema correlato è l'\textbf{assenza di rehash progressivo}: anche dopo
+aver alzato il cost factor, gli hash esistenti nel database rimangono con il vecchio valore
+finché non vengono aggiornati esplicitamente. Senza un meccanismo di aggiornamento automatico,
+la protezione è retroattiva solo per i nuovi utenti.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- SecurityConfig.java (cost factor 10 implicito)}]
+\begin{lstlisting}[style=java]
+// INSICURO: BCryptPasswordEncoder() senza argomento usa strength=10,
+// valore di default del 2013, insufficiente su hardware moderno.
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder(); // strength=10 implicito
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{insecurebox}[title={Codice Vulnerabile --- AuthServiceImpl.java (nessun rehash progressivo)}]
+\begin{lstlisting}[style=java]
+// INSICURO: anche alzando il cost factor, gli hash esistenti
+// restano a strength=10 finche' l'utente non cambia password.
+// Nessun aggiornamento automatico al login.
+if (user.getFailedAttempts() > 0) {
+    user.setFailedAttempts(0);
+    user.setLockedUntil(null);
+    userRepository.save(user);
+}
+// Hash con cost=10 rimane in DB invariato
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Sono stati applicati due interventi distinti e complementari:
+
+\begin{enumerate}
+  \item \textbf{Upgrade cost factor a 12} in \texttt{SecurityConfig}: tutti i nuovi hash
+        (registrazione + rehash) vengono calcolati con strength 12, che corrisponde a circa
+        400\,ms su hardware contemporaneo, allineandosi alla raccomandazione OWASP.
+  \item \textbf{Lazy rehash on login}: ad ogni login riuscito, il metodo
+        \texttt{passwordEncoder.upgradeEncoding(storedHash)} verifica se l'hash corrente
+        è stato calcolato con un cost factor inferiore a quello configurato.
+        Se sì, la password in chiaro (disponibile solo in questo momento) viene ricalcolata
+        e persistita, migrando silenziosamente l'intero parco utenti senza downtime
+        né password reset forzati.
+\end{enumerate}
+
+L'evento di rehash è tracciato con log strutturato \texttt{[AUTH] PASSWORD\_REHASHED}
+per audit e monitoraggio della progressione della migrazione.
+
+\begin{securebox}[title={Codice Sicuro --- SecurityConfig.java (cost factor 12)}]
+\begin{lstlisting}[style=java]
+// SICURO: cost factor 12 (OWASP-raccomandato per hardware moderno,
+// ~400 ms per hash; valore di default era 10 = ~100 ms).
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder(12);
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- AuthServiceImpl.java (lazy rehash on login)}]
+\begin{lstlisting}[style=java]
+// SICURO: dopo un login riuscito, verifica se l'hash in DB usa
+// un cost factor inferiore a quello corrente (12). Se necessario,
+// ricalcola e persiste l'hash aggiornato (lazy migration).
+final boolean needsRehash =
+    passwordEncoder.upgradeEncoding(user.getPasswordHash());
+final boolean needsReset = user.getFailedAttempts() > 0;
+if (needsRehash) {
+    user.setPasswordHash(passwordEncoder.encode(request.password()));
+    log.info("[AUTH] PASSWORD_REHASHED | user={}", user.getUsername());
+}
+if (needsReset) {
+    user.setFailedAttempts(0);
+    user.setLockedUntil(null);
+}
+if (needsRehash || needsReset) {
+    userRepository.save(user); // unica save anche se entrambi true
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test} Aggiunti 2 test in \texttt{AuthServiceImplTest}:
+\texttt{loginRehashesPasswordWhenEncodingNeedsUpgrade} (verifica che il nuovo hash venga
+persistito quando \texttt{upgradeEncoding} restituisce \texttt{true}) e
+\texttt{loginSkipsRehashWhenEncodingIsUpToDate} (verifica che nessuna \texttt{save}
+venga eseguita quando l'hash è già aggiornato e i tentativi falliti sono zero).
+
+\paragraph{Riferimento} Commit: \commitref{4e1f1e9}{fix(security): T-AUTH-03 — BCrypt cost 12 + lazy rehash on login on auth-service}
 
 \subsection{Refresh Token Rotation \threat{T-AUTH-04}}
 \textit{[Da completare — step di hardening in corso]}
