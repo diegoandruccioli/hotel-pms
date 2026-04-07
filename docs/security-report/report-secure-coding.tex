@@ -2099,7 +2099,113 @@ caller, e ripulito in \texttt{tearDown()}. Aggiunto il caso
 % ─────────────────────────────────────────────────────────────────────────────
 
 \subsection{Rimozione segreti in chiaro \threat{T-CFG-02}}
-\textit{[Da completare]}
+
+\paragraph{Descrizione}
+Nella baseline il sistema presentava due categorie di segreti in chiaro nei file versionati:
+
+\begin{enumerate}
+  \item \textbf{JWT\_SECRET con fallback hardcoded} in
+        \texttt{config-service/src/main/resources/config/auth-service.yml}: il valore di default
+        \texttt{bXktMzItYnl0ZS1zZWNyZXQta2V5LWZvci10ZXN0LWxvY2FsLWRldi0xMjM0NQ==}
+        (base64 della stringa nota \texttt{my-32-byte-secret-key-for-test-local-dev-12345})
+        era committato nel repository. Se la variabile d'ambiente \texttt{JWT\_SECRET} non veniva
+        impostata, il servizio avviava silenziosamente con questo segreto debole e noto.
+        Un attaccante con accesso al repository --- o che ne conosce la struttura --- poteva
+        forgiare JWT validi per qualsiasi utente.
+
+  \item \textbf{POSTGRES\_PASSWORD hardcoded} a \texttt{password} nel \texttt{docker-compose.yml}
+        e in tutti e 7 i blocchi \texttt{SPRING\_DATASOURCE\_PASSWORD}: la password del database
+        era in chiaro in un file versionato, identica per tutti gli ambienti, senza possibilità
+        di rotazione senza modifica del codice sorgente.
+\end{enumerate}
+
+Classificato OWASP A02 --- Cryptographic Failures.
+
+\begin{insecurebox}[title={Configurazione Vulnerabile --- auth-service.yml (baseline)}]
+\begin{lstlisting}[style=yaml]
+# INSICURO: fallback hardcoded — se JWT_SECRET non e' impostata,
+# viene usato un segreto debole e noto committato nel repository
+jwt:
+  secret: "${JWT_SECRET:bXktMzItYnl0ZS1zZWNyZXQta2V5LWZvci10ZXN0LWxvY2FsLWRldi0xMjM0NQ==}"
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{insecurebox}[title={docker-compose.yml (baseline) --- segreti DB in chiaro}]
+\begin{lstlisting}[style=yaml]
+postgres:
+  environment:
+    POSTGRES_PASSWORD: password   # hardcoded, identico in tutti gli ambienti
+
+auth-service:
+  environment:
+    - SPRING_DATASOURCE_PASSWORD=password   # idem su tutti e 7 i servizi
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+L'intervento si articola in tre modifiche coordinate:
+
+\begin{enumerate}
+  \item \textbf{Rimozione del fallback} da \texttt{auth-service.yml}: il valore di default
+        è stato eliminato. La proprietà diventa \texttt{"\$\{JWT\_SECRET\}"} senza alternativa:
+        se la variabile d'ambiente non è presente, Spring Boot fallisce all'avvio con un errore
+        esplicito (\emph{fail-fast}), impedendo che il servizio parta con un segreto insicuro.
+
+  \item \textbf{Parametrizzazione di \texttt{POSTGRES\_PASSWORD}} nel \texttt{docker-compose.yml}:
+        la password del database è ora \texttt{"\$\{POSTGRES\_PASSWORD\}"} sia per il container
+        PostgreSQL sia per tutti e 7 i servizi applicativi. Il valore effettivo viene caricato
+        esclusivamente dal file \texttt{.env} (gitignored).
+
+  \item \textbf{Aggiornamento degli script di setup} (\texttt{setup-hmac-secret.sh} e
+        \texttt{setup-hmac-secret.ps1}): entrambi gli script generano ora, in modo idempotente,
+        anche \texttt{JWT\_SECRET} (48 byte random in Base64) e \texttt{POSTGRES\_PASSWORD}
+        (16 byte random in esadecimale) nel file \texttt{.env}, oltre al già gestito
+        \texttt{INTERNAL\_HMAC\_SECRET}.
+\end{enumerate}
+
+\begin{securebox}[title={Configurazione Sicura --- auth-service.yml (feature/secure-coding-hardening)}]
+\begin{lstlisting}[style=yaml]
+# SICURO: nessun fallback — il servizio fallisce all'avvio
+# se JWT_SECRET non e' impostata nell'ambiente (fail-fast)
+jwt:
+  secret: "${JWT_SECRET}"
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={docker-compose.yml (post-hardening) --- segreti da variabili d'ambiente}]
+\begin{lstlisting}[style=yaml]
+postgres:
+  environment:
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}   # da .env (gitignored)
+
+auth-service:
+  environment:
+    - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+    - JWT_SECRET=${JWT_SECRET}                # iniettato nel container, non nel repo
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={setup-hmac-secret.sh (estratto) --- generazione idempotente di tutti i segreti}]
+\begin{lstlisting}[style=bash]
+# Genera JWT_SECRET se non gia' presente in .env
+if ! grep -q "^JWT_SECRET=" "$ENV_FILE"; then
+    JWT_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
+    printf "JWT_SECRET=%s\n" "$JWT_SECRET" >> "$ENV_FILE"
+fi
+
+# Genera POSTGRES_PASSWORD se non gia' presente in .env
+if ! grep -q "^POSTGRES_PASSWORD=" "$ENV_FILE"; then
+    POSTGRES_PASSWORD="$(openssl rand -hex 16)"
+    printf "POSTGRES_PASSWORD=%s\n" "$POSTGRES_PASSWORD" >> "$ENV_FILE"
+fi
+\end{lstlisting}
+\end{securebox}
+
+Il file \texttt{.env} rimane gitignored e viene generato localmente da ogni sviluppatore
+tramite lo script di setup, oppure iniettato dal sistema di CI/CD come secret di ambiente.
+Nessun segreto transita più attraverso il repository.
+
+\paragraph{Riferimento} Commit: \commitref{91d9484}{fix(security): T-CFG-02 --- remove JWT\_SECRET fallback, parameterize POSTGRES\_PASSWORD in docker-compose}
 
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}

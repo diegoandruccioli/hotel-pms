@@ -129,7 +129,7 @@
 |----|-----------------|--------|---------|-------------|-------|
 | T-BILL-03 | Structured SLF4J audit log in PaymentServiceImpl: PAYMENT_REJECTED (reason=INVOICE_ALREADY_PAID/INVOICE_CANCELLED/PAYMENT_EXCEEDS_BALANCE con invoiceId+hotelId+amount+balanceDue), PAYMENT_ADDED (invoiceId+paymentId+amount+method+hotelId), INVOICE_PAID (invoiceId+totalAmount+hotelId); prefisso [BILLING], WARN per rifiuti, INFO per successi | billing-service/PaymentServiceImpl.java | 7e41838 | A09 | ✅ |
 | T-CFG-01 | Information Disclosure | Endpoint `/actuator` esposti senza autenticazione | CRITICO | ALTA | 🔴 APERTO |
-| T-CFG-02 | Information Disclosure | Segreti in chiaro nei file di configurazione (JWT secret, HMAC key, DB password) | CRITICO | ALTA | 🟡 DA ANALIZZARE |
+| T-CFG-02 | Information Disclosure | Segreti in chiaro nei file di configurazione (JWT secret, HMAC key, DB password) | CRITICO | ALTA | ✅ RISOLTO |
 | T-CFG-03 | Spoofing | Nessuna autenticazione tra config-service e microservizi consumer | ALTO | MEDIA | 🟡 DA ANALIZZARE |
 
 ### 4.9 Frontend (React)
@@ -188,7 +188,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-BILL-01 | hotel_id scope su tutte le query invoice/payment (findByIdAndHotelId, findByHotelId con Pageable, findFirstByReservationIdAndHotelIdOrderByIssueDateDesc); InternalAuthFilter legge X-Auth-Hotel e lo memorizza in auth.details; createInvoice imposta hotelId dall'auth context (ignora valore client); FeignHeaderConfig propaga X-Auth-Hotel | billing-service/InvoiceRepository.java, InvoiceServiceImpl.java, PaymentServiceImpl.java, InternalAuthFilter.java, FeignHeaderConfig.java | 4a44eea | A01 | ✅ |
 | T-FB-02 | Catalogo MenuItem server-side (V2 Flyway); OrderItemRequest accetta menuItemId+quantity, no unitPrice; service risolve prezzi da DB con buildItemsFromCatalog(); totalAmount ricalcolato server-side | fb-service/MenuItem.java, MenuItemRepository.java, V2__add_menu_items.sql, OrderItemRequest.java, RestaurantOrderServiceImpl.java | d7af61c | A04 | ✅ |
 | T-CFG-01 | Porta management separata (:8090, non pubblicata) + show-details: when-authorized su tutti i servizi | config-service/resources/config/*.yml, docker-compose.yml, prometheus.yml | b0cf898 | A05 | ✅ |
-| T-CFG-02 | Segreti in variabili d'ambiente (no plaintext) | config-service | — | A02 | ⏳ |
+| T-CFG-02 | Rimosso fallback JWT_SECRET hardcoded da auth-service.yml; POSTGRES_PASSWORD e JWT_SECRET parametrizzati come variabili d'ambiente nel docker-compose; setup script aggiornato per generare entrambi i segreti | config-service/config/auth-service.yml, docker-compose.yml, setup-hmac-secret.sh/.ps1 | 91d9484 | A02 | ✅ |
 | T-FE-01 | Output encoding React (verifica dangerouslySetInnerHTML) | frontend | — | A03 | ⏳ |
 | T-FE-03 | Route guard server-side (non solo UI hiding) | frontend/gateway | — | A01 | ⏳ |
 | T-FE-04 | CSP SPA-level via nginx.conf: script-src 'self', style-src 'self' 'unsafe-inline', connect-src 'self', frame-ancestors 'none'; nginx proxy /api/ → api-gateway per same-origin; api.ts baseURL relativo | frontend/nginx.conf, frontend/Dockerfile, frontend/src/services/api.ts | b901a9f | A05 | ✅ |
