@@ -110,6 +110,8 @@ jobs:
     timeout-minutes: 30
     env:
       INTERNAL_HMAC_SECRET: ${{ secrets.INTERNAL_HMAC_SECRET }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
 
     steps:
       - name: Checkout repository
