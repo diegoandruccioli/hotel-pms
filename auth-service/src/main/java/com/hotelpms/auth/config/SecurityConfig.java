@@ -20,6 +20,9 @@ public class SecurityConfig {
 
     private static final String AUTH_ENDPOINTS = "/api/v1/auth/**";
 
+    /** BCrypt cost factor — OWASP minimum 10, recommended 12 for modern hardware (T-AUTH-03). */
+    private static final int BCRYPT_STRENGTH = 12;
+
     /**
      * Configures the main Spring Security filter chain.
      *
@@ -53,6 +56,6 @@ public class SecurityConfig {
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
+        return new BCryptPasswordEncoder(BCRYPT_STRENGTH);
     }
 }
