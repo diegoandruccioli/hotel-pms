@@ -100,9 +100,18 @@ public class AuthServiceImpl implements AuthService {
             throw new BadCredentialsException("INVALID_CREDENTIALS");
         }
 
-        if (user.getFailedAttempts() > 0) {
+        // Lazy rehash: upgrade stored hash to current cost factor if needed (T-AUTH-03)
+        final boolean needsRehash = passwordEncoder.upgradeEncoding(user.getPasswordHash());
+        final boolean needsReset = user.getFailedAttempts() > 0;
+        if (needsRehash) {
+            user.setPasswordHash(passwordEncoder.encode(request.password()));
+            log.info("[AUTH] PASSWORD_REHASHED | user={}", user.getUsername());
+        }
+        if (needsReset) {
             user.setFailedAttempts(0);
             user.setLockedUntil(null);
+        }
+        if (needsRehash || needsReset) {
             userRepository.save(user);
         }
 

@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -203,6 +204,35 @@ class AuthServiceImplTest {
                 "Failed attempts counter should reach MAX_FAILED_ATTEMPTS");
         assertNotNull(nearLockUser.getLockedUntil(),
                 "Account must be locked after reaching MAX_FAILED_ATTEMPTS");
+    }
+
+    @Test
+    void loginRehashesPasswordWhenEncodingNeedsUpgrade() {
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
+        when(passwordEncoder.upgradeEncoding(HASHED_PASSWORD)).thenReturn(true);
+        when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn("rehashed_password");
+        when(jwtService.generateToken(testUser.getUsername(), testUser.getRole())).thenReturn(MOCK_TOKEN);
+
+        final AuthResponse response = authService.login(loginRequest);
+
+        assertNotNull(response);
+        assertEquals(MOCK_TOKEN, response.token());
+        assertEquals("rehashed_password", testUser.getPasswordHash(),
+                "Password hash must be upgraded to the current cost factor");
+        verify(userRepository).save(Objects.requireNonNull(testUser));
+    }
+
+    @Test
+    void loginSkipsRehashWhenEncodingIsUpToDate() {
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
+        when(passwordEncoder.upgradeEncoding(HASHED_PASSWORD)).thenReturn(false);
+        when(jwtService.generateToken(testUser.getUsername(), testUser.getRole())).thenReturn(MOCK_TOKEN);
+
+        authService.login(loginRequest);
+
+        verify(userRepository, never()).save(any());
     }
 
     @Test

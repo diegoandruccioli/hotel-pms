@@ -44,10 +44,15 @@ public class SecurityConfig {
     /**
      * Provides the password encoder bean.
      *
-     * @return a {@link BCryptPasswordEncoder} instance
+     * <p>Cost factor 12 satisfies the OWASP recommendation for BCrypt (minimum 10,
+     * recommended 12 for modern hardware).  The value is intentionally higher than
+     * the BCrypt default (10) to increase the work factor against brute-force
+     * attacks on stolen hashes (T-AUTH-03).
+     *
+     * @return a {@link BCryptPasswordEncoder} with strength 12
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BCryptPasswordEncoder(12);
     }
 }
