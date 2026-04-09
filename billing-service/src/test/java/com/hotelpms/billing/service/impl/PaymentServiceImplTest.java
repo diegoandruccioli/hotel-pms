@@ -180,4 +180,44 @@ class PaymentServiceImplTest {
         assertThrows(NotFoundException.class,
                 () -> paymentService.addPayment(Objects.requireNonNull(invoiceId), Objects.requireNonNull(request)));
     }
+
+    @Test
+    @DisplayName("Should throw BillingValidationException when invoice is already paid (T-BILL-02)")
+    void shouldThrowWhenInvoiceAlreadyPaid() {
+        // Arrange
+        invoice.setStatus(InvoiceStatus.PAID);
+        when(invoiceRepository.findByIdAndHotelId(Objects.requireNonNull(invoiceId), hotelId))
+                .thenReturn(Optional.of(invoice));
+
+        // Act & Assert
+        final Exception exception = assertThrows(BillingValidationException.class,
+                () -> paymentService.addPayment(Objects.requireNonNull(invoiceId), Objects.requireNonNull(request)));
+        assertEquals("INVOICE_ALREADY_PAID", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should normalize payment amount to 2 decimal places before storing (T-BILL-02)")
+    void shouldNormalizeAmountToTwoDecimalPlaces() {
+        // Arrange: amount with 3 decimal places (100.005 rounds to 100.01 with HALF_UP)
+        final BigDecimal rawAmount = new BigDecimal("100.005");
+        final BigDecimal expectedNormalized = new BigDecimal("100.01");
+        request = new PaymentRequest(rawAmount, PaymentMethod.CREDIT_CARD, TXN_ID);
+
+        final Payment payment = new Payment();
+        final PaymentResponse response = new PaymentResponse(UUID.randomUUID(), LocalDateTime.now(),
+                expectedNormalized, PaymentMethod.CREDIT_CARD, TXN_ID, invoiceId);
+
+        when(invoiceRepository.findByIdAndHotelId(Objects.requireNonNull(invoiceId), hotelId))
+                .thenReturn(Optional.of(invoice));
+        when(paymentMapper.toEntity(Objects.requireNonNull(request))).thenReturn(payment);
+        when(paymentRepository.save(Objects.requireNonNull(payment))).thenReturn(payment);
+        when(paymentMapper.toResponse(Objects.requireNonNull(payment))).thenReturn(response);
+
+        // Act
+        paymentService.addPayment(Objects.requireNonNull(invoiceId), Objects.requireNonNull(request));
+
+        // Assert: the payment entity amount is normalized to 2 decimal places
+        assertEquals(0, expectedNormalized.compareTo(Objects.requireNonNull(payment.getAmount())));
+        assertEquals(InvoiceStatus.ISSUED, invoice.getStatus()); // 100.01 < 500, not fully paid
+    }
 }

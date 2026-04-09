@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.lang.NonNull;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -43,6 +44,8 @@ public class PaymentServiceImpl implements PaymentService {
         final Invoice invoice = invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)
                 .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND"));
 
+        final BigDecimal paymentAmount = request.amount().setScale(2, RoundingMode.HALF_UP);
+
         if (invoice.getStatus() == InvoiceStatus.PAID) {
             log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={} | reason=INVOICE_ALREADY_PAID",
                     invoiceId, hotelId);
@@ -61,24 +64,25 @@ public class PaymentServiceImpl implements PaymentService {
 
         final BigDecimal balanceDue = invoice.getTotalAmount().subtract(currentTotalPaid);
 
-        if (request.amount().compareTo(balanceDue) > 0) {
+        if (paymentAmount.compareTo(balanceDue) > 0) {
             log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={} | reason=PAYMENT_EXCEEDS_BALANCE"
                     + " | amount={} | balanceDue={}",
-                    invoiceId, hotelId, request.amount(), balanceDue);
+                    invoiceId, hotelId, paymentAmount, balanceDue);
             throw new BillingValidationException("PAYMENT_EXCEEDS_BALANCE");
         }
 
         final Payment payment = paymentMapper.toEntity(request);
+        payment.setAmount(paymentAmount);
         payment.setPaymentDate(LocalDateTime.now());
 
         invoice.addPayment(payment);
         final Payment savedPayment = paymentRepository.save(payment);
 
         log.info("[BILLING] PAYMENT_ADDED | invoiceId={} | paymentId={} | amount={} | method={} | hotelId={}",
-                invoiceId, savedPayment.getId(), request.amount(), request.paymentMethod(), hotelId);
+                invoiceId, savedPayment.getId(), paymentAmount, request.paymentMethod(), hotelId);
 
         // Check if fully paid
-        final BigDecimal newTotalPaid = currentTotalPaid.add(request.amount());
+        final BigDecimal newTotalPaid = currentTotalPaid.add(paymentAmount);
         if (newTotalPaid.compareTo(invoice.getTotalAmount()) == 0) {
             log.info("[BILLING] INVOICE_PAID | invoiceId={} | totalAmount={} | hotelId={}",
                     invoiceId, invoice.getTotalAmount(), hotelId);
