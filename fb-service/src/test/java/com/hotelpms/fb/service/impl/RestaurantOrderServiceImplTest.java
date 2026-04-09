@@ -251,7 +251,8 @@ class RestaurantOrderServiceImplTest {
     void shouldReturnOnlyHotelOrdersOnPaginatedListing() {
         // Arrange: paginated hotel-scoped query (T-FB-01)
         final PageRequest pageable = PageRequest.of(0, 10);
-        final Page<RestaurantOrder> page = new PageImpl<>(List.of(Objects.requireNonNull(order)));
+        final List<RestaurantOrder> orderList = List.of(Objects.requireNonNull(order));
+        final Page<RestaurantOrder> page = new PageImpl<>(Objects.requireNonNull(orderList));
         when(orderRepository.findAllByHotelId(hotelId, pageable)).thenReturn(page);
         when(orderMapper.toResponse(order)).thenReturn(response);
 
