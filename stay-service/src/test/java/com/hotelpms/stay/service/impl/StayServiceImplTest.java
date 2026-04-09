@@ -50,6 +50,10 @@ class StayServiceImplTest {
     private static final String GUEST_LAST_NAME = "Doe";
     private static final String GUEST_EMAIL = "john@example.com";
     private static final String STATUS_CONFIRMED = "CONFIRMED";
+    private static final String STATUS_CANCELLED = "CANCELLED";
+    private static final String STATUS_CHECKED_OUT = "CHECKED_OUT";
+    private static final String STATUS_NO_SHOW = "NO_SHOW";
+    private static final String STATUS_PARTIALLY_CHECKED_IN = "PARTIALLY_CHECKED_IN";
     private static final String ROOM_NUMBER_101 = "101";
     private static final String ROOM_STATUS_AVAILABLE = "AVAILABLE";
 
@@ -381,6 +385,91 @@ class StayServiceImplTest {
 
         // Act & Assert
         assertThrows(IllegalStateException.class, () -> stayService.checkOut(id));
+    }
+
+    @Test
+    void shouldRejectCheckInWhenReservationIsCancelled() {
+        // Arrange
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationClient.getReservationById(reservation))
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CANCELLED, null));
+
+        // Act & Assert
+        assertThrows(IllegalStateException.class, () -> stayService.checkIn(request));
+        verify(stayRepository, times(0)).save(anyNonNull(Stay.class));
+    }
+
+    @Test
+    void shouldRejectCheckInWhenReservationIsCheckedOut() {
+        // Arrange
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationClient.getReservationById(reservation))
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CHECKED_OUT, null));
+
+        // Act & Assert
+        assertThrows(IllegalStateException.class, () -> stayService.checkIn(request));
+        verify(stayRepository, times(0)).save(anyNonNull(Stay.class));
+    }
+
+    @Test
+    void shouldRejectCheckInWhenReservationIsNoShow() {
+        // Arrange
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationClient.getReservationById(reservation))
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_NO_SHOW, null));
+
+        // Act & Assert
+        assertThrows(IllegalStateException.class, () -> stayService.checkIn(request));
+        verify(stayRepository, times(0)).save(anyNonNull(Stay.class));
+    }
+
+    @Test
+    void shouldAllowCheckInWhenReservationIsPartiallyCheckedIn() {
+        // Arrange
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+        final Stay saved = Objects.requireNonNull(savedStay);
+        final StayResponse expected = Objects.requireNonNull(validResponse);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationClient.getReservationById(reservation))
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_PARTIALLY_CHECKED_IN, null));
+        when(inventoryClient.getRoomById(room))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+
+        final Stay unmappedStay = new Stay();
+        when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(saved);
+        when(stayMapper.toDto(saved)).thenReturn(expected);
+
+        // Act
+        final StayResponse response = stayService.checkIn(request);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(StayStatus.CHECKED_IN, response.status());
+        verify(stayRepository, times(1)).save(Objects.requireNonNull(unmappedStay));
     }
 
     /**

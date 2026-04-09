@@ -5,6 +5,7 @@ import com.hotelpms.stay.client.GuestClient;
 import com.hotelpms.stay.client.InventoryClient;
 import com.hotelpms.stay.client.ReservationClient;
 import com.hotelpms.stay.client.dto.InvoiceStatusResponse;
+import com.hotelpms.stay.client.dto.ReservationResponse;
 import com.hotelpms.stay.client.dto.ReservationStatusUpdateRequest;
 import com.hotelpms.stay.domain.Stay;
 import com.hotelpms.stay.domain.StayStatus;
@@ -27,6 +28,7 @@ import org.springframework.lang.NonNull;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -38,6 +40,7 @@ import java.util.UUID;
 public class StayServiceImpl implements StayService {
 
     private static final String PAID_STATUS = "PAID";
+    private static final Set<String> CHECKIN_ALLOWED_STATUSES = Set.of("CONFIRMED", "PARTIALLY_CHECKED_IN");
 
     private final StayRepository stayRepository;
     private final StayMapper stayMapper;
@@ -57,7 +60,12 @@ public class StayServiceImpl implements StayService {
             guestClient.getGuestById(request.guestId());
 
             log.debug("Validating reservation ID: {}", request.reservationId());
-            reservationClient.getReservationById(request.reservationId());
+            final ReservationResponse reservation = reservationClient.getReservationById(request.reservationId());
+            if (!CHECKIN_ALLOWED_STATUSES.contains(reservation.status())) {
+                log.warn("[STAY] CHECK_IN_FAILED | reservationId={} | reason=INVALID_RESERVATION_STATUS | currentStatus={}",
+                        request.reservationId(), reservation.status());
+                throw new IllegalStateException("INVALID_RESERVATION_STATUS");
+            }
 
             log.debug("Validating room ID: {}", request.roomId());
             inventoryClient.getRoomById(request.roomId());
@@ -166,7 +174,7 @@ public class StayServiceImpl implements StayService {
         if (reservationId == null) {
             return;
         }
-        final com.hotelpms.stay.client.dto.ReservationResponse res =
+        final ReservationResponse res =
                 reservationClient.getReservationById(reservationId);
         final List<Stay> stays = stayRepository.findAllByReservationId(reservationId);
 

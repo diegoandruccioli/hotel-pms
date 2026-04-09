@@ -831,6 +831,75 @@ su SLF4J + Lombok \texttt{@Slf4j}, già presente nel classpath.
 \paragraph{Riferimento} Commit: \commitref{ad441e9}{fix(security): T-AUTH-05 --- audit log for authentication events on auth-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Validazione stato prenotazione al check-in \threat{T-STAY-01}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+L'operazione di check-in crea un soggiorno (\texttt{Stay}) a partire da un
+\texttt{reservationId} fornito dal client. Nel codice baseline, il servizio
+verificava soltanto che la prenotazione \emph{esistesse} (chiamata
+\texttt{ReservationClient.getReservationById}) senza esaminare il campo
+\texttt{status} restituito. Un operatore --- o un attaccante con accesso al token
+JWT --- poteva quindi effettuare il check-in su una prenotazione
+\texttt{CANCELLED}, \texttt{CHECKED\_OUT} o \texttt{NO\_SHOW}, bypassando la
+logica di stato del ciclo di vita e creando soggiorni fantasma nell'inventario.
+OWASP A04 (Insecure Design) inquadra questo difetto come assenza di un controllo
+di business logic server-side obbligatorio.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- StayServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// Il risultato di getReservationById viene ignorato:
+// nessuna verifica del campo "status"
+reservationClient.getReservationById(request.reservationId());
+// Esecuzione prosegue anche se status = CANCELLED o CHECKED_OUT
+inventoryClient.getRoomById(request.roomId());
+final Stay newStay = stayMapper.toEntity(request);
+// ...salvataggio incondizionato
+stayRepository.save(newStay);
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={Codice Sicuro --- StayServiceImpl.java}]
+\begin{lstlisting}[style=java]
+private static final Set<String> CHECKIN_ALLOWED_STATUSES =
+        Set.of("CONFIRMED", "PARTIALLY_CHECKED_IN");
+
+// Dentro il blocco di validazione:
+final ReservationResponse reservation =
+        reservationClient.getReservationById(request.reservationId());
+if (!CHECKIN_ALLOWED_STATUSES.contains(reservation.status())) {
+    log.warn("[STAY] CHECK_IN_FAILED | reservationId={} "
+           + "| reason=INVALID_RESERVATION_STATUS | currentStatus={}",
+            request.reservationId(), reservation.status());
+    throw new IllegalStateException("INVALID_RESERVATION_STATUS");
+}
+// Solo se status == CONFIRMED o PARTIALLY_CHECKED_IN si procede
+inventoryClient.getRoomById(request.roomId());
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Aggiunti 4 test in \texttt{StayServiceImplTest}:
+\texttt{shouldRejectCheckInWhenReservationIsCancelled},
+\texttt{shouldRejectCheckInWhenReservationIsCheckedOut},
+\texttt{shouldRejectCheckInWhenReservationIsNoShow} (tutti verificano che
+\texttt{IllegalStateException} venga lanciata e che \texttt{stayRepository.save}
+non venga mai invocato) e
+\texttt{shouldAllowCheckInWhenReservationIsPartiallyCheckedIn} (percorso positivo
+per prenotazioni multi-camera).
+
+\paragraph{Effetto}
+Solo prenotazioni in stato \texttt{CONFIRMED} o \texttt{PARTIALLY\_CHECKED\_IN}
+possono generare un soggiorno attivo. Il tentativo su qualsiasi altro stato
+(\texttt{CANCELLED}, \texttt{CHECKED\_OUT}, \texttt{NO\_SHOW}, \texttt{PENDING})
+produce HTTP 409 (già gestito da \texttt{GlobalExceptionHandler} per
+\texttt{IllegalStateException}) con \texttt{detail: INVALID\_RESERVATION\_STATUS},
+e il log WARN strutturato con prefisso \texttt{[STAY]} permette il monitoraggio
+di tentativi anomali in aggregatori di log.
+
+\paragraph{Riferimento} Commit: \commitref{TBD}{fix(security): T-STAY-01 --- reservation status validation before check-in}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \subsection{Audit log check-in / check-out \threat{T-STAY-02}}
 % ─────────────────────────────────────────────────────────────────────────────
 
