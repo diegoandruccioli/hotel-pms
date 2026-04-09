@@ -1342,6 +1342,114 @@ INSERT INTO menu_items (id, name, price) VALUES
 \paragraph{Riferimento} Commit: \commitref{d7af61c}{fix(security): T-FB-02 --- server-side price catalog on fb-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Validazione importi pagamento \threat{T-BILL-02}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il \texttt{billing-service} accettava importi di pagamento senza vincoli di
+precisione decimale. Il DTO \texttt{PaymentRequest} era vincolato solo con
+\texttt{@Positive} (no negativi, no zero), ma non limitava il numero di cifre
+decimali. Un attaccante poteva inviare importi con precisione arbitraria
+(es.\ \texttt{amount: 0.00000000001}) che: (1) bypassano \texttt{@Positive}
+superando il controllo di validazione, (2) inquinano i calcoli di bilancio
+per arrotondamento cumulativo, (3) possono causare errori di conversione
+quando il valore viene persistito in colonne \texttt{NUMERIC(10,2)} di PostgreSQL.
+Parallelamente, \texttt{transactionReference} non aveva un limite di lunghezza,
+aprendo a payload di decine di KB con caratteri arbitrari.
+Classificato OWASP A04 --- Insecure Design.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- PaymentRequest.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: nessun vincolo di precisione decimale
+public record PaymentRequest(
+    @NotNull @Positive BigDecimal amount,   // accetta 0.00000000001
+    @NotNull PaymentMethod paymentMethod,
+    @NotBlank String transactionReference)  // nessun @Size: payload illimitato
+{}
+
+// Il service usa request.amount() raw per tutte le comparazioni:
+final BigDecimal balanceDue = invoice.getTotalAmount().subtract(currentTotalPaid);
+if (request.amount().compareTo(balanceDue) > 0) { ... }
+final BigDecimal newTotalPaid = currentTotalPaid.add(request.amount());
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+L'intervento opera su tre livelli ortogonali:
+
+\begin{enumerate}
+    \item \textbf{Precisione decimale} --- aggiunto
+          \texttt{@Digits(integer = 10, fraction = 2)} su
+          \texttt{PaymentRequest.amount} e su \texttt{InvoiceRequest.totalAmount}.
+          Jakarta Bean Validation rifiuta con HTTP 400 qualsiasi importo con pi\`u
+          di 2 cifre decimali o pi\`u di 10 cifre intere, allineato allo standard
+          ISO 4217 per valute a centesimo.
+    \item \textbf{Lunghezza e formato del riferimento transazione} ---
+          aggiunto \texttt{@Size(max = 100)} e
+          \texttt{@Pattern(regexp = "\^{}[A-Za-z0-9\textbackslash-\textbackslash\_/\textbackslash.]+\$")}
+          su \texttt{transactionReference}: limita la lunghezza a 100 caratteri
+          e blocca caratteri di iniezione (\texttt{<}, \texttt{>},
+          \texttt{;}, \texttt{\&}, spazi).
+    \item \textbf{Normalizzazione nel service} --- difesa in profondit\`a:
+          \texttt{PaymentServiceImpl.addPayment()} normalizza l'importo a
+          2 decimali con \texttt{setScale(2, RoundingMode.HALF\_UP)} prima
+          di qualsiasi aritmetica e persiste il valore normalizzato
+          tramite \texttt{payment.setAmount(paymentAmount)}.
+\end{enumerate}
+
+\begin{securebox}[title={Codice Sicuro --- PaymentRequest.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: precisione monetaria imposta a livello DTO
+public record PaymentRequest(
+    @NotNull(message = "Amount is required")
+    @Positive(message = "Amount must be positive")
+    @Digits(integer = 10, fraction = 2,
+            message = "Amount must have at most 10 integer digits and 2 decimal places")
+    BigDecimal amount,
+
+    @NotNull(message = "Payment method is required")
+    PaymentMethod paymentMethod,
+
+    @NotBlank(message = "Transaction reference is required")
+    @Size(max = 100, message = "Transaction reference must not exceed 100 characters")
+    @Pattern(regexp = "^[A-Za-z0-9\\-_/\\.]+$",
+            message = "Transaction reference contains invalid characters")
+    String transactionReference) {}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- PaymentServiceImpl.java (normalizzazione defense-in-depth)}]
+\begin{lstlisting}[style=java]
+// SICURO: normalizzazione a 2 decimali prima di ogni aritmetica
+final BigDecimal paymentAmount = request.amount()
+        .setScale(2, RoundingMode.HALF_UP);   // defense-in-depth
+
+if (paymentAmount.compareTo(balanceDue) > 0) {
+    log.warn("[BILLING] PAYMENT_REJECTED | reason=PAYMENT_EXCEEDS_BALANCE"
+            + " | amount={} | balanceDue={}", paymentAmount, balanceDue);
+    throw new BillingValidationException("PAYMENT_EXCEEDS_BALANCE");
+}
+
+final Payment payment = paymentMapper.toEntity(request);
+payment.setAmount(paymentAmount);             // valore normalizzato persistito
+payment.setPaymentDate(LocalDateTime.now());
+// ...
+final BigDecimal newTotalPaid = currentTotalPaid.add(paymentAmount);
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Effetto}
+Un importo come \texttt{0.00000000001} viene ora rifiutato con HTTP 400 al
+livello controller prima di raggiungere il service; un eventuale bypass
+verrebbe comunque normalizzato a \texttt{0.00} dalla
+\texttt{setScale} difensiva. Il riferimento transazione non pu\`o superare
+100 caratteri n\'e contenere caratteri non whitelisted.
+Due nuovi test coprono il ramo \texttt{INVOICE\_ALREADY\_PAID} e la
+normalizzazione decimale (\texttt{100.005} $\rightarrow$ \texttt{100.01}).
+
+\paragraph{Riferimento} Commit: \commitref{d346fe8}{fix(security): T-BILL-02 --- server-side payment amount validation on billing-service}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Autorizzazione e Controllo degli Accessi}
 % ─────────────────────────────────────────────────────────────────────────────
 

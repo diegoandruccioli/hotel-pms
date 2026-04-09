@@ -113,7 +113,7 @@
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
 | T-BILL-01 | Elevation of Privilege | IDOR: accesso a fatture di altri ospiti/hotel | CRITICO | MEDIA | ✅ RISOLTO |
-| T-BILL-02 | Tampering | Importi non validati server-side (negative amounts, overflow) | ALTO | BASSA | 🟡 DA ANALIZZARE |
+| T-BILL-02 | Tampering | Importi non validati server-side (negative amounts, overflow) | ALTO | BASSA | ✅ RISOLTO |
 | T-BILL-03 | Repudiation | Assenza di log immutabile delle transazioni di pagamento | ALTO | ALTA | ✅ RISOLTO |
 
 ### 4.7 fb-service
@@ -192,7 +192,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-GW-02 | Analisi e raffinamento configurazione rate limiting Redis token-bucket su api-gateway | api-gateway | — | A05 | ⏳ |
 | T-RES-03 | Validazione server-side dei parametri di ricerca date (formato, coerenza checkIn < checkOut) | reservation-service | — | A03 | ⏳ |
 | T-STAY-03 | Verifica TLS e firma digitale nella trasmissione dati Alloggiati al portale PS | stay-service | — | A02 | ⏳ |
-| T-BILL-02 | Validazione server-side importi pagamento (no valori negativi, no overflow BigDecimal) | billing-service | — | A04 | ⏳ |
+| T-BILL-02 | @Digits(integer=10, fraction=2) su PaymentRequest.amount e InvoiceRequest.totalAmount; @Size(max=100)+@Pattern su transactionReference; PaymentServiceImpl.addPayment() normalizza l'importo con setScale(2, HALF_UP) prima di ogni aritmetica; payment.setAmount(paymentAmount) assicura valore normalizzato persistito; 2 nuovi test: shouldThrowWhenInvoiceAlreadyPaid + shouldNormalizeAmountToTwoDecimalPlaces | billing-service/PaymentRequest.java, InvoiceRequest.java, PaymentServiceImpl.java | d346fe8 | A04 | ✅ |
 | T-FB-01 | hotel_id scope su restaurant_orders (Flyway V3); InternalAuthFilter legge X-Auth-Hotel e lo memorizza in auth.details; createOrder imposta hotelId dall'auth context; getOrdersByStayId usa findByStayIdAndHotelId; getAllOrders usa findAllByHotelId(pageable) — nessun ordine cross-hotel mai restituito; FeignHeaderConfig propaga X-Auth-Hotel; Flyway V3 fix anche CHECK constraint status enum | fb-service/RestaurantOrder.java, RestaurantOrderRepository.java, RestaurantOrderServiceImpl.java, InternalAuthFilter.java, FeignHeaderConfig.java, V3__add_hotel_id_to_restaurant_orders.sql | 18a3768 | A01 | ✅ |
 | T-CFG-03 | Autenticazione tra config-service e microservizi consumer (basic auth o token) | config-service | — | A07 | ⏳ |
 | T-FE-01 | Output encoding React (verifica dangerouslySetInnerHTML) | frontend | — | A03 | ⏳ |
