@@ -120,7 +120,7 @@
 
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
-| T-FB-01 | Elevation of Privilege | IDOR: ordini F&B non legati a hotel_id, accessibili cross-hotel | ALTO | MEDIA | 🔴 APERTO |
+| T-FB-01 | Elevation of Privilege | IDOR: ordini F&B non legati a hotel_id, accessibili cross-hotel | ALTO | MEDIA | ✅ RISOLTO |
 | T-FB-02 | Tampering | Prezzi degli ordini non ricalcolati server-side (client-side price tampering) | CRITICO | ALTA | ✅ RISOLTO |
 
 ### 4.8 config-service
@@ -193,7 +193,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-RES-03 | Validazione server-side dei parametri di ricerca date (formato, coerenza checkIn < checkOut) | reservation-service | — | A03 | ⏳ |
 | T-STAY-03 | Verifica TLS e firma digitale nella trasmissione dati Alloggiati al portale PS | stay-service | — | A02 | ⏳ |
 | T-BILL-02 | Validazione server-side importi pagamento (no valori negativi, no overflow BigDecimal) | billing-service | — | A04 | ⏳ |
-| T-FB-01 | IDOR fix fb-service: ordini e menu item scoped per hotel_id, verifica ownership su ogni operazione | fb-service | — | A01 | ⏳ |
+| T-FB-01 | hotel_id scope su restaurant_orders (Flyway V3); InternalAuthFilter legge X-Auth-Hotel e lo memorizza in auth.details; createOrder imposta hotelId dall'auth context; getOrdersByStayId usa findByStayIdAndHotelId; getAllOrders usa findAllByHotelId(pageable) — nessun ordine cross-hotel mai restituito; FeignHeaderConfig propaga X-Auth-Hotel; Flyway V3 fix anche CHECK constraint status enum | fb-service/RestaurantOrder.java, RestaurantOrderRepository.java, RestaurantOrderServiceImpl.java, InternalAuthFilter.java, FeignHeaderConfig.java, V3__add_hotel_id_to_restaurant_orders.sql | TBD | A01 | ✅ |
 | T-CFG-03 | Autenticazione tra config-service e microservizi consumer (basic auth o token) | config-service | — | A07 | ⏳ |
 | T-FE-01 | Output encoding React (verifica dangerouslySetInnerHTML) | frontend | — | A03 | ⏳ |
 | T-FE-03 | Route guard server-side (non solo UI hiding) | frontend/gateway | — | A01 | ⏳ |

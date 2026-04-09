@@ -13,12 +13,18 @@ import com.hotelpms.fb.exception.StayNotFoundException;
 import com.hotelpms.fb.mapper.RestaurantOrderMapper;
 import com.hotelpms.fb.repository.MenuItemRepository;
 import com.hotelpms.fb.repository.RestaurantOrderRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -28,6 +34,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -55,6 +62,7 @@ class RestaurantOrderServiceImplTest {
 
     private UUID stayId;
     private UUID menuItemId;
+    private UUID hotelId;
     private RestaurantOrderRequest request;
     private RestaurantOrder order;
     private RestaurantOrderResponse response;
@@ -64,6 +72,13 @@ class RestaurantOrderServiceImplTest {
     void setUp() {
         stayId = UUID.randomUUID();
         menuItemId = UUID.randomUUID();
+        hotelId = UUID.randomUUID();
+
+        // T-FB-01: inject hotel ID into SecurityContext (simulates InternalAuthFilter)
+        final UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken("user", "", List.of());
+        auth.setDetails(hotelId.toString());
+        SecurityContextHolder.getContext().setAuthentication(auth);
 
         final OrderItemRequest itemRequest = new OrderItemRequest(menuItemId, 2);
         request = RestaurantOrderRequest.builder()
@@ -91,6 +106,11 @@ class RestaurantOrderServiceImplTest {
                 .build();
     }
 
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
     @Test
     void shouldCreateOrderSuccessfully() {
         // Arrange
@@ -111,6 +131,22 @@ class RestaurantOrderServiceImplTest {
         verify(stayClient).getStayById(stayId);
         verify(menuItemRepository).findById(Objects.requireNonNull(menuItemId));
         verify(orderRepository).save(Objects.requireNonNull(order));
+    }
+
+    @Test
+    void shouldSetHotelIdFromSecurityContextOnCreate() {
+        // Arrange: verify hotel_id is set server-side from SecurityContext (T-FB-01)
+        when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN));
+        when(orderMapper.toEntity(request)).thenReturn(order);
+        when(menuItemRepository.findById(Objects.requireNonNull(menuItemId))).thenReturn(Optional.of(menuItem));
+        when(orderRepository.save(Objects.requireNonNull(order))).thenReturn(order);
+        when(orderMapper.toResponse(Objects.requireNonNull(order))).thenReturn(response);
+
+        // Act
+        orderService.createOrder(request);
+
+        // Assert: hotelId on the entity must equal the one from SecurityContext
+        assertEquals(hotelId, order.getHotelId());
     }
 
     @Test
@@ -182,9 +218,9 @@ class RestaurantOrderServiceImplTest {
     }
 
     @Test
-    void testGetOrdersByStayId() {
-        // Arrange
-        when(orderRepository.findByStayId(stayId)).thenReturn(List.of(order));
+    void testGetOrdersByStayIdScopedToHotel() {
+        // Arrange: hotel-scoped query (T-FB-01)
+        when(orderRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(List.of(order));
         when(orderMapper.toResponse(order)).thenReturn(response);
 
         // Act
@@ -195,6 +231,35 @@ class RestaurantOrderServiceImplTest {
         assertEquals(1, results.size());
         assertEquals(response, results.get(0));
 
-        verify(orderRepository).findByStayId(stayId);
+        verify(orderRepository).findByStayIdAndHotelId(stayId, hotelId);
+    }
+
+    @Test
+    void shouldReturnEmptyListForWrongHotelOnStayLookup() {
+        // Arrange: IDOR scenario — stay exists but belongs to a different hotel
+        when(orderRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(List.of());
+
+        // Act
+        final List<RestaurantOrderResponse> results = orderService.getOrdersByStayId(stayId);
+
+        // Assert: no orders leaked — empty list, no exception
+        assertTrue(results.isEmpty());
+        verify(orderRepository).findByStayIdAndHotelId(stayId, hotelId);
+    }
+
+    @Test
+    void shouldReturnOnlyHotelOrdersOnPaginatedListing() {
+        // Arrange: paginated hotel-scoped query (T-FB-01)
+        final PageRequest pageable = PageRequest.of(0, 10);
+        final Page<RestaurantOrder> page = new PageImpl<>(List.of(order));
+        when(orderRepository.findAllByHotelId(hotelId, pageable)).thenReturn(page);
+        when(orderMapper.toResponse(order)).thenReturn(response);
+
+        // Act
+        final Page<RestaurantOrderResponse> result = orderService.getAllOrders(pageable);
+
+        // Assert: only orders for this hotel are returned
+        assertEquals(1, result.getTotalElements());
+        verify(orderRepository).findAllByHotelId(hotelId, pageable);
     }
 }

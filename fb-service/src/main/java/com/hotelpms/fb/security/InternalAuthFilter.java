@@ -54,6 +54,7 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
 
     private static final String HEADER_USER = "X-Auth-User";
     private static final String HEADER_ROLE = "X-Auth-Role";
+    private static final String HEADER_HOTEL = "X-Auth-Hotel";
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
 
@@ -87,10 +88,17 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
 
         final String username = request.getHeader(HEADER_USER);
         final String role = request.getHeader(HEADER_ROLE);
+        final String hotelId = request.getHeader(HEADER_HOTEL);
         final String signature = request.getHeader(HEADER_SIGNATURE);
 
         if (!StringUtils.hasText(username) || !StringUtils.hasText(role) || !StringUtils.hasText(signature)) {
             rejectRequest(response, "Missing required gateway authentication headers");
+            return;
+        }
+
+        if (!StringUtils.hasText(hotelId)) {
+            LOG.warn("[InternalAuthFilter] Missing X-Auth-Hotel header for user={}", username);
+            rejectRequest(response, "Missing X-Auth-Hotel header");
             return;
         }
 
@@ -102,6 +110,7 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
 
         final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 username, "", List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+        auth.setDetails(hotelId);
 
         SecurityContextHolder.getContext().setAuthentication(auth);
         filterChain.doFilter(request, response);

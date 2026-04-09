@@ -55,6 +55,14 @@ public class RestaurantOrder {
     @Column(name = "stay_id", nullable = false)
     private UUID stayId;
 
+    /**
+     * Hotel scope for multi-tenant isolation (T-FB-01).
+     * Set server-side from the {@code X-Auth-Hotel} JWT claim injected by the gateway;
+     * never accepted from the client.
+     */
+    @Column(name = "hotel_id", nullable = false)
+    private UUID hotelId;
+
     /** Date and time the order was placed. */
     @Column(name = "order_date", nullable = false)
     private LocalDateTime orderDate;

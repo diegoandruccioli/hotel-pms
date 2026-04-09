@@ -1287,6 +1287,156 @@ architetturale applicato in cascata a tutti e tre i servizi.
 Il dettaglio di ciascun intervento è documentato nell'appendice storica
 (Capitolo~\ref{ch:storico}) alle sezioni dedicate ai rispettivi servizi.
 
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{IDOR su ordini F\&B --- Accesso Cross-Hotel \threat{T-FB-01}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il \texttt{fb-service} gestisce gli ordini del ristorante addebitati al conto camera.
+Nella baseline, l'entità \texttt{RestaurantOrder} non possedeva il campo \texttt{hotel\_id}
+e tutti i metodi del repository operavano senza scoping multi-tenant:
+\texttt{findAll(pageable)} restituiva \emph{tutti} gli ordini di \emph{tutti} gli hotel,
+e \texttt{findByStayId(stayId)} restituiva gli ordini di qualsiasi hotel purché il
+\texttt{stayId} fosse noto all'attaccante.
+Un operatore autenticato su Hotel~A poteva quindi enumerare e leggere gli ordini F\&B
+dell'Hotel~B con una semplice richiesta \texttt{GET /api/v1/fb/orders}.
+Classificato \textbf{OWASP A01 --- Broken Access Control / IDOR}.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- RestaurantOrderRepository.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: nessun filtro hotel_id — tutti gli ordini di tutti gli hotel
+@Repository
+public interface RestaurantOrderRepository
+        extends JpaRepository<RestaurantOrder, UUID> {
+
+    // Restituisce gli ordini di QUALSIASI hotel che abbiano questo stayId
+    List<RestaurantOrder> findByStayId(UUID stayId);
+
+    // findAll(pageable) ereditato da JpaRepository: restituisce TUTTI gli ordini
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{insecurebox}[title={Codice Vulnerabile --- RestaurantOrderServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// getAllOrders: nessun filtro hotel
+public Page<RestaurantOrderResponse> getAllOrders(Pageable pageable) {
+    return orderRepository.findAll(pageable)   // cross-hotel leak
+            .map(orderMapper::toResponse);
+}
+
+// getOrdersByStayId: nessun check ownership
+public List<RestaurantOrderResponse> getOrdersByStayId(UUID stayId) {
+    return orderRepository.findByStayId(stayId)  // cross-hotel IDOR
+            .stream().map(orderMapper::toResponse).toList();
+}
+
+// createOrder: hotel_id non impostato sull'entita'
+public RestaurantOrderResponse createOrder(RestaurantOrderRequest request) {
+    RestaurantOrder order = orderMapper.toEntity(request);
+    // hotelId mai valorizzato: ordine non scoped a nessun hotel
+    order.setStatus(OrderStatus.BILLED_TO_ROOM);
+    ...
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+L'intervento segue il medesimo pattern già applicato a \texttt{guest-service},
+\texttt{reservation-service} e \texttt{billing-service}:
+
+\begin{enumerate}
+  \item \textbf{Flyway V3}: aggiunta colonna \texttt{hotel\_id UUID NOT NULL} alla tabella
+        \texttt{restaurant\_orders} con indici compositi \texttt{(hotel\_id)} e
+        \texttt{(hotel\_id, stay\_id)} per le query più frequenti.
+        La stessa migration corregge anche il CHECK constraint sullo stato
+        (\texttt{PENDING/PREPARED/DELIVERED/BILLED\_TO\_ROOM}), che nella baseline
+        elencava valori obsoleti (\texttt{OPEN/IN\_PROGRESS/SERVED/CANCELLED}).
+  \item \textbf{InternalAuthFilter}: lettura header \texttt{X-Auth-Hotel} iniettato
+        dall'API Gateway; rifiuto con \texttt{401} se assente; valore memorizzato in
+        \texttt{auth.setDetails(hotelId)} e disponibile in tutto il thread corrente.
+  \item \textbf{FeignHeaderConfig}: propagazione di \texttt{X-Auth-Hotel} su tutte le
+        chiamate Feign in uscita (es.\ verso \texttt{stay-service}).
+  \item \textbf{RestaurantOrderServiceImpl}: metodo \texttt{resolveHotelId()} estrae
+        \texttt{hotel\_id} dal \texttt{SecurityContext} (mai dal client); tutte le
+        operazioni usano query hotel-scoped; \texttt{ORDER\_CREATED} loggato con
+        \texttt{orderId+stayId+hotelId+total} (prefisso \texttt{[FB]}).
+  \item \textbf{RestaurantOrderRepository}: nuovi metodi
+        \texttt{findByStayIdAndHotelId} e \texttt{findAllByHotelId(Pageable)}
+        al posto delle query non scoped.
+\end{enumerate}
+
+\begin{securebox}[title={Codice Sicuro --- InternalAuthFilter.java (lettura X-Auth-Hotel)}]
+\begin{lstlisting}[style=java]
+// T-FB-01: legge X-Auth-Hotel e lo rifiuta se assente
+private static final String HEADER_HOTEL = "X-Auth-Hotel";
+
+final String hotelId = request.getHeader(HEADER_HOTEL);
+if (!StringUtils.hasText(hotelId)) {
+    LOG.warn("[InternalAuthFilter] Missing X-Auth-Hotel header for user={}",
+             username);
+    rejectRequest(response, "Missing X-Auth-Hotel header"); // 401
+    return;
+}
+
+UsernamePasswordAuthenticationToken auth =
+    new UsernamePasswordAuthenticationToken(
+        username, "", List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+auth.setDetails(hotelId);   // disponibile via auth.getDetails() nel service
+SecurityContextHolder.getContext().setAuthentication(auth);
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- RestaurantOrderServiceImpl.java (hotel-scoped)}]
+\begin{lstlisting}[style=java]
+// Estrae hotel_id dal SecurityContext; mai accettato dal client (T-FB-01)
+private UUID resolveHotelId() {
+    final Authentication auth =
+        SecurityContextHolder.getContext().getAuthentication();
+    final Object details = auth.getDetails();
+    if (!(details instanceof String hotelIdStr)
+            || !StringUtils.hasText(hotelIdStr)) {
+        throw new IllegalStateException("X-Auth-Hotel_MISSING");
+    }
+    return UUID.fromString(hotelIdStr);
+}
+
+// createOrder: hotel_id impostato server-side
+public RestaurantOrderResponse createOrder(RestaurantOrderRequest request) {
+    final UUID hotelId = resolveHotelId();
+    RestaurantOrder order = orderMapper.toEntity(request);
+    order.setHotelId(hotelId);   // mai dal client
+    ...
+    log.info("[FB] ORDER_CREATED | orderId={} | stayId={} | hotelId={} | total={}",
+             savedOrder.getId(), savedOrder.getStayId(), hotelId,
+             savedOrder.getTotalAmount());
+}
+
+// getAllOrders: solo ordini dell'hotel autenticato
+public Page<RestaurantOrderResponse> getAllOrders(Pageable pageable) {
+    final UUID hotelId = resolveHotelId();
+    return orderRepository.findAllByHotelId(hotelId, pageable)
+                          .map(orderMapper::toResponse);
+}
+
+// getOrdersByStayId: IDOR-safe — lista vuota se stayId di altro hotel
+public List<RestaurantOrderResponse> getOrdersByStayId(UUID stayId) {
+    final UUID hotelId = resolveHotelId();
+    return orderRepository.findByStayIdAndHotelId(stayId, hotelId)
+                          .stream().map(orderMapper::toResponse).toList();
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test} Aggiunti/aggiornati 8 test in \texttt{RestaurantOrderServiceImplTest}:
+mock del \texttt{SecurityContext} con \texttt{hotelId} in \texttt{@BeforeEach},
+\texttt{clearContext()} in \texttt{@AfterEach};
+\texttt{shouldSetHotelIdFromSecurityContextOnCreate} (verifica che \texttt{order.getHotelId()} == hotelId da SecurityContext),
+\texttt{shouldReturnEmptyListForWrongHotelOnStayLookup} (IDOR scenario --- lista vuota per stayId di altro hotel),
+\texttt{shouldReturnOnlyHotelOrdersOnPaginatedListing} (getAllOrders usa \texttt{findAllByHotelId}).
+
+\paragraph{Riferimento} Commit: \commitref{TBD}{fix(security): T-FB-01 --- IDOR fix, hotel\_id scope on fb-service orders}
+
 \subsection{Double Booking Prevention \threat{T-RES-01}}
 
 \paragraph{Descrizione}

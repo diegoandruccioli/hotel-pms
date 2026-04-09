@@ -19,8 +19,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -49,7 +52,8 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
     @Override
     @Transactional
     public RestaurantOrderResponse createOrder(final RestaurantOrderRequest request) {
-        log.info("Creating order for stay: {}", request.stayId());
+        final UUID hotelId = resolveHotelId();
+        log.info("Creating order for stay: {} hotel: {}", request.stayId(), hotelId);
 
         // Verify the stay is valid and active
         try {
@@ -64,6 +68,7 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
 
         // Build the order shell (no items yet)
         final RestaurantOrder order = orderMapper.toEntity(request);
+        order.setHotelId(hotelId);   // T-FB-01: set server-side, never from client
         order.setOrderDate(LocalDateTime.now());
         order.setStatus(OrderStatus.BILLED_TO_ROOM);
 
@@ -78,7 +83,8 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
         order.setTotalAmount(totalAmount);
 
         final RestaurantOrder savedOrder = orderRepository.save(order);
-        log.info("Order created successfully with ID: {}", savedOrder.getId());
+        log.info("[FB] ORDER_CREATED | orderId={} | stayId={} | hotelId={} | total={}",
+                savedOrder.getId(), savedOrder.getStayId(), hotelId, savedOrder.getTotalAmount());
 
         return orderMapper.toResponse(savedOrder);
     }
@@ -89,8 +95,10 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
     @Override
     @Transactional(readOnly = true)
     public List<RestaurantOrderResponse> getOrdersByStayId(final UUID stayId) {
-        log.info("Fetching orders for stay: {}", stayId);
-        final List<RestaurantOrder> orders = orderRepository.findByStayId(stayId);
+        final UUID hotelId = resolveHotelId();
+        log.info("Fetching orders for stay: {} hotel: {}", stayId, hotelId);
+        // T-FB-01: hotel-scoped — returns empty list for stayIds of other hotels (IDOR-safe)
+        final List<RestaurantOrder> orders = orderRepository.findByStayIdAndHotelId(stayId, hotelId);
         return orders.stream()
                 .map(orderMapper::toResponse)
                 .collect(Collectors.toList());
@@ -102,8 +110,31 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
     @Override
     @Transactional(readOnly = true)
     public Page<RestaurantOrderResponse> getAllOrders(final Pageable pageable) {
-        log.info("Fetching paginated restaurant orders, page: {}", pageable.getPageNumber());
-        return orderRepository.findAll(pageable).map(orderMapper::toResponse);
+        final UUID hotelId = resolveHotelId();
+        log.info("Fetching paginated restaurant orders, page: {}, hotel: {}",
+                pageable.getPageNumber(), hotelId);
+        // T-FB-01: hotel-scoped — never returns orders from other hotels
+        return orderRepository.findAllByHotelId(hotelId, pageable).map(orderMapper::toResponse);
+    }
+
+    /**
+     * Extracts the hotel identifier from the current security context.
+     *
+     * <p>The hotel ID is stored in {@link org.springframework.security.authentication
+     * .UsernamePasswordAuthenticationToken#getDetails()} by {@code InternalAuthFilter},
+     * which reads it from the {@code X-Auth-Hotel} header injected by the API Gateway
+     * after JWT validation. This prevents any client from supplying a forged hotel scope.
+     *
+     * @return the hotel UUID for the authenticated request
+     * @throws IllegalStateException if the security context does not contain a valid hotel ID
+     */
+    private UUID resolveHotelId() {
+        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        final Object details = auth.getDetails();
+        if (!(details instanceof String hotelIdStr) || !StringUtils.hasText(hotelIdStr)) {
+            throw new IllegalStateException("X-Auth-Hotel_MISSING");
+        }
+        return UUID.fromString(hotelIdStr);
     }
 
     /**

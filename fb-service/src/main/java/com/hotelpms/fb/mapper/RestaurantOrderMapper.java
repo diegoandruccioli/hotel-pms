@@ -25,6 +25,7 @@ public interface RestaurantOrderMapper {
      * @return the entity (without items populated)
      */
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "hotelId", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "orderDate", ignore = true)
     @Mapping(target = "totalAmount", ignore = true)
