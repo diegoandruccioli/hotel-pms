@@ -106,7 +106,7 @@
 |----|-----------------|--------|---------|-------------|-------|
 | T-STAY-01 | Elevation of Privilege | Check-in senza verifica stato prenotazione (es. CANCELLED) | ALTO | MEDIA | ✅ RISOLTO |
 | T-STAY-02 | Repudiation | Assenza di audit trail per operazioni check-in/check-out | ALTO | ALTA | ✅ RISOLTO |
-| T-STAY-03 | Information Disclosure | Report Alloggiati: trasmissione dati PS senza verifica firma/TLS | CRITICO | BASSA | 🟡 DA ANALIZZARE |
+| T-STAY-03 | Information Disclosure | Report Alloggiati: trasmissione dati PS senza verifica firma/TLS | CRITICO | BASSA | ✅ RISOLTO |
 
 ### 4.6 billing-service
 
@@ -191,7 +191,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-CFG-02 | Rimosso fallback JWT_SECRET hardcoded da auth-service.yml; POSTGRES_PASSWORD e JWT_SECRET parametrizzati come variabili d'ambiente nel docker-compose; setup script aggiornato per generare entrambi i segreti | config-service/config/auth-service.yml, docker-compose.yml, setup-hmac-secret.sh/.ps1 | 91d9484 | A02 | ✅ |
 | T-GW-02 | Analisi e raffinamento configurazione rate limiting Redis token-bucket su api-gateway | api-gateway | — | A05 | ⏳ |
 | T-RES-03 | Validazione server-side dei parametri di ricerca date (formato, coerenza checkIn < checkOut) | reservation-service | — | A03 | ⏳ |
-| T-STAY-03 | Verifica TLS e firma digitale nella trasmissione dati Alloggiati al portale PS | stay-service | — | A02 | ⏳ |
+| T-STAY-03 | AlloggiatiWebConfig: RestTemplate con JVM default SSL context (no TrustAllCerts, no hostname-verifier bypass); AlloggiatiWebSenderServiceImpl: credenziali lette da env vars (ALLOGGIATI_USERNAME, ALLOGGIATI_PASSWORD), mai hardcoded; Basic Auth header RFC 7617; 5 test con MockRestServiceServer (POST URL, Authorization header, Content-Type, 5xx → ExternalServiceException, empty report) | stay-service/AlloggiatiWebConfig.java, AlloggiatiWebSenderService.java, AlloggiatiWebSenderServiceImpl.java, config-service/stay-service.yml | f0be747 | A02 | ✅ |
 | T-BILL-02 | @Digits(integer=10, fraction=2) su PaymentRequest.amount e InvoiceRequest.totalAmount; @Size(max=100)+@Pattern su transactionReference; PaymentServiceImpl.addPayment() normalizza l'importo con setScale(2, HALF_UP) prima di ogni aritmetica; payment.setAmount(paymentAmount) assicura valore normalizzato persistito; 2 nuovi test: shouldThrowWhenInvoiceAlreadyPaid + shouldNormalizeAmountToTwoDecimalPlaces | billing-service/PaymentRequest.java, InvoiceRequest.java, PaymentServiceImpl.java | d346fe8 | A04 | ✅ |
 | T-FB-01 | hotel_id scope su restaurant_orders (Flyway V3); InternalAuthFilter legge X-Auth-Hotel e lo memorizza in auth.details; createOrder imposta hotelId dall'auth context; getOrdersByStayId usa findByStayIdAndHotelId; getAllOrders usa findAllByHotelId(pageable) — nessun ordine cross-hotel mai restituito; FeignHeaderConfig propaga X-Auth-Hotel; Flyway V3 fix anche CHECK constraint status enum | fb-service/RestaurantOrder.java, RestaurantOrderRepository.java, RestaurantOrderServiceImpl.java, InternalAuthFilter.java, FeignHeaderConfig.java, V3__add_hotel_id_to_restaurant_orders.sql | 18a3768 | A01 | ✅ |
 | T-CFG-03 | Autenticazione tra config-service e microservizi consumer (basic auth o token) | config-service | — | A07 | ⏳ |

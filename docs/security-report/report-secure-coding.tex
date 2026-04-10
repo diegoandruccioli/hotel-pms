@@ -1161,6 +1161,122 @@ guestId, roomId). Il formato è direttamente filtrabile via
 \paragraph{Riferimento} Commit: \commitref{f2cb417}{fix(security): T-STAY-02 --- audit log for check-in/check-out events on stay-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Trasmissione sicura report Alloggiati via TLS \threat{T-STAY-03}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il report Alloggiati contiene dati personali sensibili di ogni ospite ---
+nome, cognome, data di nascita, numero di documento, nazionalità --- ed è
+trasmesso al portale della Polizia di Stato (\texttt{alloggiatiweb.poliziadistato.it}).
+In assenza di verifica TLS, un attaccante in posizione Man-In-The-Middle (MITM)
+può intercettare il canale HTTPS e leggere o alterare il payload in transito.
+Il rischio si concretizza in tre scenari distinti: (1) intercettazione passiva
+dei PII trasmessi (Information Disclosure); (2) sostituzione del certificato
+server con uno self-signed non rilevata (MITM attivo); (3) invio delle
+credenziali di accesso al portale PS a un server impostato dall'attaccante.
+OWASP A02 (Cryptographic Failures) classifica esplicitamente l'assenza di
+verifica dei certificati TLS come vulnerabilità critica nella trasmissione
+di dati sensibili.
+
+\begin{insecurebox}[title={Scenario Vulnerabile --- RestTemplate senza verifica TLS}]
+\begin{lstlisting}[style=java]
+// Configurazione che disabilita la verifica del certificato TLS:
+// un attaccante puo' presentare qualsiasi certificato (anche scaduto
+// o self-signed) e il client lo accettera' senza eccezioni.
+SSLContext sslContext = SSLContextBuilder.create()
+    .loadTrustMaterial(null, (chain, authType) -> true)  // TrustAllCerts
+    .build();
+SSLConnectionSocketFactory csf =
+    new SSLConnectionSocketFactory(sslContext,
+        NoopHostnameVerifier.INSTANCE);           // hostname non verificato
+CloseableHttpClient httpClient =
+    HttpClients.custom().setSSLSocketFactory(csf).build();
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione}
+La soluzione adottata sfrutta il comportamento predefinito di \texttt{RestTemplate}
+(\texttt{new RestTemplate()}) che utilizza il \textbf{JVM default SSL context},
+il quale:
+\begin{itemize}
+  \item verifica la catena di certificati del server rispetto al truststore JVM
+        (\texttt{cacerts}), includendo le CA pubblicamente riconosciute;
+  \item verifica che l'hostname del server corrisponda al CN o al SAN del
+        certificato (hostname verification);
+  \item rifiuta certificati self-signed, scaduti o revocati con
+        \texttt{SSLHandshakeException}.
+\end{itemize}
+Nessun \texttt{TrustManager} personalizzato viene installato e nessun
+\texttt{HostnameVerifier} viene sovrascritta: il comportamento sicuro è
+quello di default. Le credenziali di accesso al portale PS vengono lette
+esclusivamente da variabili d'ambiente (\texttt{ALLOGGIATI\_USERNAME},
+\texttt{ALLOGGIATI\_PASSWORD}) e mai hardcoded nel codice o nei file
+di configurazione versionati.
+
+\begin{securebox}[title={Codice Sicuro --- AlloggiatiWebConfig.java}]
+\begin{lstlisting}[style=java]
+@Configuration
+public class AlloggiatiWebConfig {
+
+    /**
+     * RestTemplate con JVM default SSL context.
+     * Nessun TrustAllCerts manager, nessun bypass dell'hostname verifier:
+     * il certificato del portale PS viene verificato integralmente ad ogni
+     * chiamata.
+     */
+    @Bean("alloggiatiRestTemplate")
+    public RestTemplate alloggiatiRestTemplate() {
+        return new RestTemplate();
+    }
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- AlloggiatiWebSenderServiceImpl.java (estratto)}]
+\begin{lstlisting}[style=java]
+public AlloggiatiWebSenderServiceImpl(
+        final AlloggiatiReportService alloggiatiReportService,
+        @Qualifier("alloggiatiRestTemplate") final RestOperations restOperations,
+        @Value("${alloggiati.web.url}") final String portalUrl,
+        @Value("${alloggiati.web.username}") final String username,
+        @Value("${alloggiati.web.password}") final String password) {
+    this.alloggiatiReportService = alloggiatiReportService;
+    this.restOperations = restOperations;
+    this.portalUrl = portalUrl;
+    this.username = username;    // da ALLOGGIATI_USERNAME (env var)
+    this.password = password;    // da ALLOGGIATI_PASSWORD (env var)
+}
+
+private String buildBasicAuthHeader() {
+    // RFC 7617 Basic Authentication: credenziali mai in chiaro nel codice
+    final String credentials = username + ":" + password;
+    final String encoded = Base64.getEncoder()
+            .encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+    return "Basic " + encoded;
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Configurazione --- stay-service.yml (config-service)}]
+\begin{lstlisting}[style=yaml]
+# T-STAY-03: Credenziali portale PS da variabili d'ambiente.
+# Nessun default per le credenziali: fail-fast se le env var non sono impostate.
+alloggiati:
+  web:
+    url: ${ALLOGGIATI_WEB_URL:https://alloggiatiweb.poliziadistato.it/...}
+    username: ${ALLOGGIATI_USERNAME}
+    password: ${ALLOGGIATI_PASSWORD}
+\end{lstlisting}
+\end{securebox}
+
+I test verificano l'intero comportamento osservabile con \texttt{MockRestServiceServer}:
+il POST viene inviato all'URL corretto, l'header \texttt{Authorization: Basic ...}
+è presente, il \texttt{Content-Type} è \texttt{text/plain}, un errore HTTP 5xx
+genera \texttt{ExternalServiceException}, e un report vuoto non causa errori.
+
+\paragraph{Riferimento} Commit: \commitref{f0be747}{fix(security): T-STAY-03 --- secure TLS transmission of Alloggiati report to PS portal}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \subsection{Audit log transazioni di pagamento \threat{T-BILL-03}}
 % ─────────────────────────────────────────────────────────────────────────────
 
