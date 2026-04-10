@@ -1943,7 +1943,155 @@ al GlobalExceptionHandler per la traduzione in HTTP 409).
 \textit{[Da completare]}
 
 \subsection{Protezione CSRF \threat{T-GW-05}}
-\textit{[Da completare]}
+
+\paragraph{Descrizione}
+Il sistema utilizza cookie \texttt{httpOnly} con flag \texttt{SameSite=Strict} per trasportare
+il JWT di sessione. Il flag \texttt{SameSite=Strict} è una prima linea di difesa efficace,
+ma non sufficiente: browser datati, proxy aziendali e bug specifici di implementazione possono
+violarne il rispetto. In assenza di un meccanismo esplicito di verifica dell'origine della
+richiesta, un sito malevolo può indurre il browser autenticato dell'utente a inviare richieste
+mutanti (POST, PUT, PATCH, DELETE) verso il sistema --- l'attacco noto come
+\textbf{Cross-Site Request Forgery (CSRF)}.
+
+Nella baseline non era presente alcuna protezione CSRF esplicita: ogni richiesta con un cookie
+JWT valido veniva accettata dall'API Gateway indipendentemente dall'origine.
+Classificato OWASP A01 --- Broken Access Control.
+
+\begin{insecurebox}[title={Pattern Vulnerabile --- assenza CSRF token (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: il gateway accetta qualsiasi richiesta con cookie JWT valido,
+// indipendentemente dall'origine. Un sito malevolo puo' scatenare:
+//   POST https://hotel.example.com/api/v1/guests
+//   Cookie: jwt=<token valido> (inviato automaticamente dal browser)
+// senza che il sito possa leggere il token -- ma la richiesta viene eseguita.
+
+// api-gateway: nessun filtro CSRF nella baseline
+// -> tutte le richieste POST/PUT/PATCH/DELETE passano se il cookie JWT e' valido
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata --- Double Submit Cookie}
+L'intervento implementa il pattern \textbf{Double Submit Cookie} (OWASP CSRF Prevention Cheat
+Sheet), che è stateless e si integra naturalmente con l'architettura SPA + JWT:
+
+\begin{enumerate}
+  \item \textbf{Emissione del token CSRF} (\texttt{auth-service}): all'esito positivo di
+        \texttt{/login}, \texttt{/register} e \texttt{/refresh}, il controller emette un
+        cookie \texttt{csrf\_token} contenente un UUID casuale, con flag
+        \texttt{Secure; SameSite=Strict} ma senza \texttt{httpOnly}, in modo che il codice
+        JavaScript della SPA possa leggerlo tramite \texttt{document.cookie}.
+  \item \textbf{Invio dell'header} (frontend): un Axios request interceptor legge il cookie
+        \texttt{csrf\_token} e, per ogni richiesta mutante, lo inietta nell'header
+        \texttt{X-CSRF-Token}.
+  \item \textbf{Validazione} (\texttt{api-gateway/CsrfFilter}): un \texttt{GlobalFilter}
+        con ordine \texttt{HIGHEST\_PRECEDENCE + 2} confronta il valore dell'header con
+        quello del cookie. Se non corrispondono --- o se uno dei due è assente --- risponde
+        con HTTP 403. I percorsi pre-autenticazione (\texttt{/auth/login},
+        \texttt{/auth/register}) sono esclusi perché il token non è ancora stato emesso.
+\end{enumerate}
+
+\textbf{Perché è sicuro}: un sito malevolo può indurre il browser a inviare il cookie
+(questo è il CSRF stesso), ma la \emph{same-origin policy} del browser impedisce al
+JavaScript esterno di leggere il valore del cookie \texttt{csrf\_token}. Senza poter leggere
+il cookie, il sito malevolo non può costruire l'header \texttt{X-CSRF-Token} corrispondente,
+e la richiesta viene rifiutata dal gateway.
+
+\begin{securebox}[title={Codice Sicuro --- CsrfFilter.java (api-gateway)}]
+\begin{lstlisting}[style=java]
+@Component
+public class CsrfFilter implements GlobalFilter, Ordered {
+
+    static final String CSRF_COOKIE_NAME = "csrf_token";
+    static final String CSRF_HEADER_NAME = "X-CSRF-Token";
+
+    private static final Set<HttpMethod> SAFE_METHODS = Set.of(
+            HttpMethod.GET, HttpMethod.HEAD, HttpMethod.OPTIONS, HttpMethod.TRACE);
+
+    private static final Set<String> EXCLUDED_PATHS = Set.of(
+            "/api/v1/auth/login", "/api/v1/auth/register");
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        HttpMethod method = exchange.getRequest().getMethod();
+        if (method == null || SAFE_METHODS.contains(method)) {
+            return chain.filter(exchange); // metodi sicuri: nessun controllo
+        }
+        String path = exchange.getRequest().getPath().value();
+        if (EXCLUDED_PATHS.contains(path)) {
+            return chain.filter(exchange); // percorsi pre-auth: esclusi
+        }
+
+        HttpCookie csrfCookie = exchange.getRequest()
+                .getCookies().getFirst(CSRF_COOKIE_NAME);
+        String headerValue = exchange.getRequest()
+                .getHeaders().getFirst(CSRF_HEADER_NAME);
+
+        if (csrfCookie == null || csrfCookie.getValue().isBlank()
+                || headerValue == null || headerValue.isBlank()
+                || !csrfCookie.getValue().equals(headerValue)) {
+            // Cookie assente/blank o mismatch -> CSRF rilevato -> 403
+            exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
+            return exchange.getResponse().setComplete();
+        }
+        return chain.filter(exchange); // token valido: passa
+    }
+
+    @Override
+    public int getOrder() {
+        return Ordered.HIGHEST_PRECEDENCE + 2; // dopo SecurityHeadersFilter (+1)
+    }
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- AuthController.java (auth-service): emissione csrf\_token}]
+\begin{lstlisting}[style=java]
+// Emesso su login/register/refresh, cancellato al logout
+private static ResponseCookie createCsrfCookie(String value, int maxAge) {
+    return ResponseCookie.from("csrf_token", value)
+            .httpOnly(false)         // JS deve poterlo leggere
+            .secure(true)
+            .path("/")
+            .maxAge(maxAge)
+            .sameSite("Strict")
+            .build();
+}
+
+// Nel metodo login():
+return ResponseEntity.ok()
+    .header(SET_COOKIE, createCookie("jwt", ...).toString())
+    .header(SET_COOKIE, createCookie("refresh_token", ...).toString())
+    .header(SET_COOKIE,
+        createCsrfCookie(UUID.randomUUID().toString(), ACCESS_MAX_AGE).toString())
+    .build();
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- api.ts (frontend): Axios request interceptor}]
+\begin{lstlisting}[style=typescript]
+// Legge il cookie csrf_token (non-httpOnly) e lo inietta come header
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+api.interceptors.request.use((config) => {
+  const method = config.method?.toUpperCase();
+  if (method && ['POST','PUT','PATCH','DELETE'].includes(method)) {
+    const token = getCsrfToken();
+    if (token) config.headers['X-CSRF-Token'] = token;
+  }
+  return config;
+});
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test} Aggiunti 10 test in \texttt{CsrfFilterTest}:
+metodi sicuri (GET, HEAD, OPTIONS) passano senza token; percorsi esclusi (login, register) passano senza token;
+POST/PUT/PATCH/DELETE senza cookie → 403; senza header → 403; cookie blank → 403; header blank → 403;
+token mismatch → 403; token valido → 200 (POST, PUT, DELETE, PATCH).
+
+\paragraph{Riferimento} Commit: \commitref{PLACEHOLDER\_T\_GW\_05}{fix(security): T-GW-05 --- CSRF protection via Double Submit Cookie}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Configurazioni di Sicurezza (Difesa in Profondità)}

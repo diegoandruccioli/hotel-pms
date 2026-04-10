@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * REST controller for authentication endpoints.
@@ -36,6 +37,11 @@ public class AuthController {
 
     private static final String COOKIE_NAME = "jwt";
     private static final String REFRESH_COOKIE_NAME = "refresh_token";
+    /**
+     * Non-httpOnly cookie carrying the CSRF synchronization token (T-GW-05).
+     * JavaScript must be able to read this value to echo it in the X-CSRF-Token header.
+     */
+    private static final String CSRF_COOKIE_NAME = "csrf_token";
     private static final String COOKIE_PATH = "/";
     /** Refresh cookie is scoped to the auth path only (least-privilege exposure). */
     private static final String REFRESH_COOKIE_PATH = "/api/v1/auth";
@@ -64,6 +70,8 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE,
                         createCookie(REFRESH_COOKIE_NAME, response.refreshToken(),
                                 REFRESH_COOKIE_MAX_AGE, REFRESH_COOKIE_PATH).toString())
+                .header(HttpHeaders.SET_COOKIE,
+                        createCsrfCookie(UUID.randomUUID().toString(), ACCESS_COOKIE_MAX_AGE).toString())
                 .build();
     }
 
@@ -83,6 +91,8 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE,
                         createCookie(REFRESH_COOKIE_NAME, response.refreshToken(),
                                 REFRESH_COOKIE_MAX_AGE, REFRESH_COOKIE_PATH).toString())
+                .header(HttpHeaders.SET_COOKIE,
+                        createCsrfCookie(UUID.randomUUID().toString(), ACCESS_COOKIE_MAX_AGE).toString())
                 .build();
     }
 
@@ -110,6 +120,8 @@ public class AuthController {
                     .header(HttpHeaders.SET_COOKIE,
                             createCookie(REFRESH_COOKIE_NAME, response.refreshToken(),
                                     REFRESH_COOKIE_MAX_AGE, REFRESH_COOKIE_PATH).toString())
+                    .header(HttpHeaders.SET_COOKIE,
+                            createCsrfCookie(UUID.randomUUID().toString(), ACCESS_COOKIE_MAX_AGE).toString())
                     .build();
         } catch (final JwtException e) {
             log.warn("[AUTH] REFRESH_REJECTED | reason=INVALID_JWT | detail={}", e.getMessage());
@@ -150,6 +162,8 @@ public class AuthController {
                         createCookie(COOKIE_NAME, "", 0, COOKIE_PATH).toString())
                 .header(HttpHeaders.SET_COOKIE,
                         createCookie(REFRESH_COOKIE_NAME, "", 0, REFRESH_COOKIE_PATH).toString())
+                .header(HttpHeaders.SET_COOKIE,
+                        createCsrfCookie("", 0).toString())
                 .build();
     }
 
@@ -199,6 +213,33 @@ public class AuthController {
                 .httpOnly(true)
                 .secure(true)
                 .path(path)
+                .maxAge(maxAge)
+                .sameSite(SAME_SITE_STRICT)
+                .build();
+    }
+
+    /**
+     * Creates the CSRF synchronization cookie (T-GW-05 — Double Submit Cookie pattern).
+     *
+     * <p>Unlike the JWT and refresh cookies, this cookie is intentionally
+     * <em>not</em> httpOnly so that the SPA JavaScript can read its value and
+     * echo it in the {@code X-CSRF-Token} request header. The API Gateway
+     * ({@link com.hotelpms.gateway.filter.CsrfFilter}) then validates that the
+     * header matches the cookie, defeating cross-site request forgery: a foreign
+     * origin cannot read the cookie value (same-origin policy), therefore it
+     * cannot forge the matching header.
+     *
+     * @param value  the CSRF token (UUID); empty string to clear the cookie
+     * @param maxAge cookie lifetime in seconds; 0 to expire immediately
+     * @return the built {@link ResponseCookie}
+     */
+    private static ResponseCookie createCsrfCookie(final String value, final int maxAge) {
+        return ResponseCookie.from(
+                CSRF_COOKIE_NAME,
+                Objects.requireNonNull(value != null ? value : ""))
+                .httpOnly(false)
+                .secure(true)
+                .path(COOKIE_PATH)
                 .maxAge(maxAge)
                 .sameSite(SAME_SITE_STRICT)
                 .build();

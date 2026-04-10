@@ -12,6 +12,27 @@ const api = axios.create({
 import { useAuthStore } from '../store/authStore';
 import i18n from '../i18n';
 
+/**
+ * Reads the non-httpOnly csrf_token cookie set by auth-service on login/refresh.
+ * Returns null if the cookie is absent (pre-login state).
+ */
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+// Request interceptor: inject X-CSRF-Token header on mutating requests (T-GW-05)
+api.interceptors.request.use((config) => {
+  const method = config.method?.toUpperCase();
+  if (method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const token = getCsrfToken();
+    if (token) {
+      config.headers['X-CSRF-Token'] = token;
+    }
+  }
+  return config;
+});
+
 // Queue of callbacks waiting for a token refresh to complete
 let isRefreshing = false;
 const pendingQueue: Array<{
