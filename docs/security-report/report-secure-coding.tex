@@ -906,7 +906,7 @@ intercettarlo è inutile poiché è già blacklistato non appena viene usato dal
 titolare. Il logout revoca immediatamente il refresh token, chiudendo la sessione
 server-side senza dipendere dalla scadenza naturale del token.
 
-\paragraph{Riferimento} Commit: \commitref{placeholder}{fix(security): T-AUTH-04 --- refresh token rotation + Redis blacklist}
+\paragraph{Riferimento} Commit: \commitref{5ce3010}{fix(security): T-AUTH-04 --- refresh token rotation + Redis blacklist}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Audit Log e Security Monitoring}
@@ -2091,7 +2091,7 @@ metodi sicuri (GET, HEAD, OPTIONS) passano senza token; percorsi esclusi (login,
 POST/PUT/PATCH/DELETE senza cookie → 403; senza header → 403; cookie blank → 403; header blank → 403;
 token mismatch → 403; token valido → 200 (POST, PUT, DELETE, PATCH).
 
-\paragraph{Riferimento} Commit: \commitref{PLACEHOLDER\_T\_GW\_05}{fix(security): T-GW-05 --- CSRF protection via Double Submit Cookie}
+\paragraph{Riferimento} Commit: \commitref{e146b17}{fix(security): T-GW-05 --- CSRF protection via Double Submit Cookie}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Configurazioni di Sicurezza (Difesa in Profondità)}
