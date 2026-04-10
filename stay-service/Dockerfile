@@ -6,6 +6,7 @@ WORKDIR /app
 COPY gradlew .
 COPY gradle gradle
 COPY stay-service/build.gradle.kts stay-service/
+COPY stay-service/config stay-service/config
 COPY settings.gradle.kts .
 COPY stay-service/src stay-service/src
 
