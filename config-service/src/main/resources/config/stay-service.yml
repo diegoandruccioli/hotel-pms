@@ -5,6 +5,15 @@ internal:
   hmac:
     secret: ${INTERNAL_HMAC_SECRET}
 
+# T-STAY-03: Alloggiati Web portal credentials and URL.
+# All values MUST be provided as environment variables — no defaults for credentials.
+# The RestTemplate bean uses the JVM default SSL context, enforcing TLS validation.
+alloggiati:
+  web:
+    url: ${ALLOGGIATI_WEB_URL:https://alloggiatiweb.poliziadistato.it/PortaleAlloggiati/ScopeAut.aspx}
+    username: ${ALLOGGIATI_USERNAME}
+    password: ${ALLOGGIATI_PASSWORD}
+
 management:
   server:
     port: 8090

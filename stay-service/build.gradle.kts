@@ -82,3 +82,10 @@ tasks.withType<Test> {
     useJUnitPlatform()
     systemProperty("net.bytebuddy.experimental", "true")
 }
+
+// SpotBugs: project-specific exclusions (Spring DI beans — EI_EXPOSE_REP2 not applicable)
+tasks.withType<com.github.spotbugs.snom.SpotBugsTask>().configureEach {
+    extraArgs.addAll(
+        listOf("-exclude", "${project.projectDir}/config/spotbugs/exclude.xml")
+    )
+}

@@ -3,6 +3,7 @@ package com.hotelpms.stay.controller;
 import com.hotelpms.stay.dto.StayRequest;
 import com.hotelpms.stay.dto.StayResponse;
 import com.hotelpms.stay.service.AlloggiatiReportService;
+import com.hotelpms.stay.service.AlloggiatiWebSenderService;
 import com.hotelpms.stay.service.StayService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,7 @@ public class StayController {
 
     private final StayService stayService;
     private final AlloggiatiReportService alloggiatiReportService;
+    private final AlloggiatiWebSenderService alloggiatiWebSenderService;
 
     /**
      * Endpoint to check in a guest and create a stay.
@@ -124,5 +126,19 @@ public class StayController {
         headers.setContentLength(bytes.length);
 
         return ResponseEntity.ok().headers(headers).body(bytes);
+    }
+
+    /**
+     * Submits the Alloggiati Web report for the given date to the Polizia di Stato
+     * portal over a TLS-verified HTTPS channel (T-STAY-03).
+     *
+     * @param date the check-in date in YYYY-MM-DD format
+     * @return 200 OK on successful transmission
+     */
+    @PostMapping("/reports/alloggiati/submit")
+    public ResponseEntity<Void> submitAlloggiatiReport(
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
+        alloggiatiWebSenderService.submitReport(date);
+        return ResponseEntity.ok().build();
     }
 }
