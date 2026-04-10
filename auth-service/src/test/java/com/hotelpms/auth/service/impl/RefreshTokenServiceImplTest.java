@@ -13,8 +13,6 @@ import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.Objects;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -45,10 +43,7 @@ class RefreshTokenServiceImplTest {
 
         refreshTokenService.blacklist(TEST_JTI, futureExpiry);
 
-        verify(valueOps).set(
-                Objects.requireNonNull(eq(REDIS_KEY)),
-                Objects.requireNonNull(eq("1")),
-                Objects.requireNonNull(any(Duration.class)));
+        verify(valueOps).set(eq(REDIS_KEY), eq("1"), any(Duration.class));
     }
 
     @Test
@@ -58,10 +53,7 @@ class RefreshTokenServiceImplTest {
         refreshTokenService.blacklist(TEST_JTI, pastExpiry);
 
         verify(redisTemplate, never()).opsForValue();
-        verify(valueOps, never()).set(
-                Objects.requireNonNull(anyString()),
-                Objects.requireNonNull(anyString()),
-                Objects.requireNonNull(any(Duration.class)));
+        verify(valueOps, never()).set(anyString(), anyString(), any(Duration.class));
     }
 
     @Test
