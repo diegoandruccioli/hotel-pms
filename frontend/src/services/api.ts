@@ -12,12 +12,35 @@ const api = axios.create({
 import { useAuthStore } from '../store/authStore';
 import i18n from '../i18n';
 
-// Response interceptor for handling 401s (token expiration) globaly
+// Queue of callbacks waiting for a token refresh to complete
+let isRefreshing = false;
+const pendingQueue: Array<{
+  resolve: () => void;
+  reject: (err: unknown) => void;
+}> = [];
+
+function drainQueue(success: boolean, err: unknown): void {
+  for (const item of pendingQueue) {
+    if (success) {
+      item.resolve();
+    } else {
+      item.reject(err);
+    }
+  }
+  pendingQueue.length = 0;
+}
+
+function performLogout(): void {
+  useAuthStore.getState().logout();
+  window.location.href = '/login';
+}
+
+// Response interceptor: translate error codes and handle 401 with silent refresh (T-AUTH-04)
 api.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
+  async (error) => {
     // Translate UPPER_SNAKE_CASE error codes from backend
     if (error.response?.data?.detail && /^[A-Z_]+$/.test(error.response.data.detail)) {
       const code = error.response.data.detail;
@@ -28,18 +51,47 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
-      const url = error.config?.url;
-      // Do not trigger global logout/redirect if the 401 is from login or me endpoints
-      if (url && (url.includes('/login') || url.includes('/me'))) {
+      const url: string = error.config?.url ?? '';
+
+      // Never attempt refresh on auth endpoints themselves to prevent loops
+      if (url.includes('/login') || url.includes('/me')) {
         return Promise.reject(error);
       }
-      console.warn('Unauthorized access, logging out and redirecting to login');
-      // Trigger logout via Zustand which clears token
-      useAuthStore.getState().logout();
-      // Need a full page reload or router redirection; 
-      // simple window location works if we are not inside a router context
-      window.location.href = '/login';
+      if (url.includes('/refresh')) {
+        // Refresh endpoint returned 401 — session is truly expired
+        performLogout();
+        return Promise.reject(error);
+      }
+
+      const originalConfig = error.config;
+      if (!originalConfig) {
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        // Another refresh is already in progress — queue this request
+        return new Promise<void>((resolve, reject) => {
+          pendingQueue.push({ resolve, reject });
+        })
+          .then(() => api(originalConfig))
+          .catch(() => Promise.reject(error));
+      }
+
+      isRefreshing = true;
+
+      try {
+        await api.post('/api/v1/auth/refresh');
+        drainQueue(true, null);
+        return api(originalConfig);
+      } catch (refreshError) {
+        drainQueue(false, refreshError);
+        performLogout();
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
     }
+
     return Promise.reject(error);
   }
 );

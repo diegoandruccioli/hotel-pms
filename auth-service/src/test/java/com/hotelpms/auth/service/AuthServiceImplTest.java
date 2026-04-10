@@ -10,6 +10,7 @@ import com.hotelpms.auth.exception.BadCredentialsException;
 import com.hotelpms.auth.exception.DuplicateResourceException;
 import com.hotelpms.auth.mapper.UserAccountMapper;
 import com.hotelpms.auth.repository.UserAccountRepository;
+import io.jsonwebtoken.JwtException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,12 +24,15 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -41,7 +45,11 @@ class AuthServiceImplTest {
     private static final String RAW_PASSWORD = "rawpassword";
     private static final String HASHED_PASSWORD = "hashedpassword";
     private static final String MOCK_TOKEN = "mockJwtToken";
+    private static final String MOCK_REFRESH_TOKEN = "mockRefreshToken";
+    private static final String MOCK_NEW_REFRESH_TOKEN = "mockNewRefreshToken";
+    private static final String TEST_JTI = "test-jti-uuid";
     private static final int MAX_FAILED_ATTEMPTS = 5;
+    private static final long FUTURE_TTL_SECONDS = 3600L;
 
     @Mock
     private UserAccountRepository userRepository;
@@ -54,6 +62,9 @@ class AuthServiceImplTest {
 
     @Mock
     private JwtService jwtService;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -83,11 +94,13 @@ class AuthServiceImplTest {
         when(userMapper.toEntity(any(RegisterRequest.class))).thenReturn(testUser);
         when(passwordEncoder.encode(anyString())).thenReturn(HASHED_PASSWORD);
         when(jwtService.generateToken(anyString(), any(Role.class))).thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(anyString(), any(Role.class))).thenReturn(MOCK_REFRESH_TOKEN);
 
         final AuthResponse response = authService.register(registerRequest);
 
         assertNotNull(response, "Response should not be null");
         assertEquals(MOCK_TOKEN, response.token(), "Token should match the mocked one");
+        assertEquals(MOCK_REFRESH_TOKEN, response.refreshToken(), "Refresh token should match the mocked one");
 
         verify(userRepository).save(Objects.requireNonNull(testUser));
         verify(passwordEncoder).encode(RAW_PASSWORD);
@@ -122,11 +135,13 @@ class AuthServiceImplTest {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
         when(jwtService.generateToken(testUser.getUsername(), testUser.getRole())).thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(testUser.getUsername(), testUser.getRole())).thenReturn(MOCK_REFRESH_TOKEN);
 
         final AuthResponse response = authService.login(loginRequest);
 
         assertNotNull(response, "Response should not be null");
         assertEquals(MOCK_TOKEN, response.token(), "Token should match mocked one");
+        assertEquals(MOCK_REFRESH_TOKEN, response.refreshToken(), "Refresh token should match mocked one");
     }
 
     @Test
@@ -173,8 +188,6 @@ class AuthServiceImplTest {
 
         assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
 
-        // The service mutates the same UserAccount instance in-place before saving it,
-        // so assertions on testUser reflect the state persisted by save().
         verify(userRepository).save(Objects.requireNonNull(testUser));
         assertEquals(1, testUser.getFailedAttempts(),
                 "Failed attempts counter should be incremented to 1");
@@ -212,6 +225,7 @@ class AuthServiceImplTest {
         when(passwordEncoder.upgradeEncoding(HASHED_PASSWORD)).thenReturn(true);
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn("rehashed_password");
         when(jwtService.generateToken(testUser.getUsername(), testUser.getRole())).thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(testUser.getUsername(), testUser.getRole())).thenReturn(MOCK_REFRESH_TOKEN);
 
         final AuthResponse response = authService.login(loginRequest);
 
@@ -228,6 +242,7 @@ class AuthServiceImplTest {
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
         when(passwordEncoder.upgradeEncoding(HASHED_PASSWORD)).thenReturn(false);
         when(jwtService.generateToken(testUser.getUsername(), testUser.getRole())).thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(testUser.getUsername(), testUser.getRole())).thenReturn(MOCK_REFRESH_TOKEN);
 
         authService.login(loginRequest);
 
@@ -249,6 +264,7 @@ class AuthServiceImplTest {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(userWithPriorFailures));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
         when(jwtService.generateToken(TEST_USER, Role.GUEST)).thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(TEST_USER, Role.GUEST)).thenReturn(MOCK_REFRESH_TOKEN);
 
         final AuthResponse response = authService.login(loginRequest);
 
@@ -260,5 +276,81 @@ class AuthServiceImplTest {
                 "Failed attempts counter must be reset to 0 on successful login");
         assertNull(userWithPriorFailures.getLockedUntil(),
                 "Locked-until must be cleared on successful login");
+    }
+
+    // ─── T-AUTH-04: Refresh Token Rotation ───────────────────────────────────
+
+    @Test
+    void refreshSuccessIssuesNewTokenPair() {
+        when(jwtService.isRefreshToken(MOCK_REFRESH_TOKEN)).thenReturn(true);
+        when(jwtService.extractJti(MOCK_REFRESH_TOKEN)).thenReturn(TEST_JTI);
+        when(refreshTokenService.isBlacklisted(TEST_JTI)).thenReturn(false);
+        when(jwtService.extractUsername(MOCK_REFRESH_TOKEN)).thenReturn(TEST_USER);
+        when(userRepository.findByUsername(TEST_USER)).thenReturn(Optional.of(testUser));
+        when(jwtService.extractExpirationInstant(MOCK_REFRESH_TOKEN))
+                .thenReturn(Instant.now().plusSeconds(FUTURE_TTL_SECONDS));
+        when(jwtService.generateToken(TEST_USER, Role.GUEST)).thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(TEST_USER, Role.GUEST)).thenReturn(MOCK_NEW_REFRESH_TOKEN);
+
+        final AuthResponse response = authService.refresh(MOCK_REFRESH_TOKEN);
+
+        assertNotNull(response, "Response must not be null");
+        assertEquals(MOCK_TOKEN, response.token(), "New access token must be returned");
+        assertEquals(MOCK_NEW_REFRESH_TOKEN, response.refreshToken(), "New refresh token must be returned");
+        verify(refreshTokenService).blacklist(eq(TEST_JTI), any(Instant.class));
+    }
+
+    @Test
+    void refreshThrowsWhenTokenIsNotRefreshType() {
+        when(jwtService.isRefreshToken(MOCK_REFRESH_TOKEN)).thenReturn(false);
+
+        assertThrows(BadCredentialsException.class, () -> authService.refresh(MOCK_REFRESH_TOKEN),
+                "Should reject tokens that are not of typ=refresh");
+        verify(refreshTokenService, never()).blacklist(anyString(), any(Instant.class));
+    }
+
+    @Test
+    void refreshThrowsWhenJtiIsBlacklisted() {
+        when(jwtService.isRefreshToken(MOCK_REFRESH_TOKEN)).thenReturn(true);
+        when(jwtService.extractJti(MOCK_REFRESH_TOKEN)).thenReturn(TEST_JTI);
+        when(refreshTokenService.isBlacklisted(TEST_JTI)).thenReturn(true);
+
+        assertThrows(BadCredentialsException.class, () -> authService.refresh(MOCK_REFRESH_TOKEN),
+                "Should reject blacklisted refresh tokens");
+        verify(refreshTokenService, never()).blacklist(anyString(), any(Instant.class));
+    }
+
+    @Test
+    void refreshThrowsWhenUserNotFound() {
+        when(jwtService.isRefreshToken(MOCK_REFRESH_TOKEN)).thenReturn(true);
+        when(jwtService.extractJti(MOCK_REFRESH_TOKEN)).thenReturn(TEST_JTI);
+        when(refreshTokenService.isBlacklisted(TEST_JTI)).thenReturn(false);
+        when(jwtService.extractUsername(MOCK_REFRESH_TOKEN)).thenReturn(TEST_USER);
+        when(userRepository.findByUsername(TEST_USER)).thenReturn(Optional.empty());
+
+        assertThrows(BadCredentialsException.class, () -> authService.refresh(MOCK_REFRESH_TOKEN),
+                "Should reject refresh tokens for deleted/inactive users");
+        verify(refreshTokenService, never()).blacklist(anyString(), any(Instant.class));
+    }
+
+    @Test
+    void invalidateRefreshTokenBlacklistsValidToken() {
+        when(jwtService.extractJti(MOCK_REFRESH_TOKEN)).thenReturn(TEST_JTI);
+        when(jwtService.extractExpirationInstant(MOCK_REFRESH_TOKEN))
+                .thenReturn(Instant.now().plusSeconds(FUTURE_TTL_SECONDS));
+
+        authService.invalidateRefreshToken(MOCK_REFRESH_TOKEN);
+
+        verify(refreshTokenService).blacklist(eq(TEST_JTI), any(Instant.class));
+    }
+
+    @Test
+    void invalidateRefreshTokenSilentlyHandlesInvalidToken() {
+        when(jwtService.extractJti(MOCK_REFRESH_TOKEN))
+                .thenThrow(new JwtException("invalid token"));
+
+        assertDoesNotThrow(() -> authService.invalidateRefreshToken(MOCK_REFRESH_TOKEN),
+                "invalidateRefreshToken must not propagate JwtException");
+        verify(refreshTokenService, never()).blacklist(anyString(), any(Instant.class));
     }
 }

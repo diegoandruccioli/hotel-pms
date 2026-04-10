@@ -726,8 +726,187 @@ venga eseguita quando l'hash è già aggiornato e i tentativi falliti sono zero)
 
 \paragraph{Riferimento} Commit: \commitref{4e1f1e9}{fix(security): T-AUTH-03 — BCrypt cost 12 + lazy rehash on login on auth-service}
 
-\subsection{Refresh Token Rotation \threat{T-AUTH-04}}
-\textit{[Da completare — step di hardening in corso]}
+\subsection{Refresh Token Rotation e Blacklist \threat{T-AUTH-04}}
+
+\paragraph{Descrizione}
+La baseline emetteva un unico token JWT con scadenza di \textbf{24 ore} privo di un meccanismo di
+revoca. Un token intercettato (es.\ via XSS o man-in-the-middle su HTTP) rimaneva valido per
+l'intera finestra temporale, senza alcuna possibilità di invalidarlo lato server. L'assenza di
+\textit{token rotation} aggravava il problema: un refresh token mai revocato poteva essere riutilizzato
+a tempo indeterminato, anche dopo il logout esplicito dell'utente.
+Classificato OWASP A07 --- Identification \& Authentication Failures.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- JwtService.java + AuthController.java (baseline)}]
+\begin{lstlisting}[style=java]
+// Un solo token JWT con TTL 24 ore, nessun refresh token separato
+@Value("${jwt.expiration}")
+private long jwtExpiration; // 86_400_000 ms = 24 ore
+
+// AuthController: un unico cookie "jwt", nessun cookie "refresh_token"
+private static final int COOKIE_MAX_AGE = 86_400; // 24 ore
+
+// Login: emette un solo token
+return new AuthResponse(
+    jwtService.generateToken(user.getUsername(), user.getRole()));
+
+// Logout: azzera solo il cookie "jwt"
+// Il token non viene blacklistato: se qualcuno lo ha catturato,
+// rimane valido fino alla sua scadenza naturale (24 ore)
+ResponseEntity.ok()
+    .header(HttpHeaders.SET_COOKIE, createCookie("", 0).toString())
+    .build();
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Sono stati applicati quattro interventi coordinati:
+
+\begin{enumerate}
+  \item \textbf{Separazione access/refresh token}: il login emette ora due JWT distinti:
+        un \textit{access token} con TTL \textbf{15 minuti} e un \textit{refresh token} con
+        TTL \textbf{7 giorni}. Il refresh token porta una claim \texttt{jti} (UUID univoco) e
+        una claim \texttt{typ=refresh} che lo distingue dall'access token.
+  \item \textbf{Blacklist Redis}: al momento del refresh o del logout, il JTI del token consumato
+        viene scritto in Redis con chiave \texttt{rt:blacklist:<jti>} e TTL pari alla vita residua
+        del token. L'entry si auto-cancella alla scadenza naturale, senza job di pulizia.
+  \item \textbf{Token rotation}: \texttt{POST /api/v1/auth/refresh} valida il token ricevuto nel
+        cookie \texttt{refresh\_token}, ne blacklista il JTI, e risponde con un \textbf{nuovo}
+        token pair completo. Ogni refresh produce una coppia fresca --- un token intercettato
+        prima della rotation risulta immediatamente blacklistato.
+  \item \textbf{Frontend interceptor}: l'interceptor Axios intercetta i 401, tenta silenziosamente
+        il refresh e riprova la richiesta originale. Nessun logout visibile per sessioni attive
+        entro i 7 giorni; logout automatico se il refresh token è scaduto o revocato.
+\end{enumerate}
+
+\begin{securebox}[title={Codice Sicuro --- JwtService.java (generazione refresh token con jti)}]
+\begin{lstlisting}[style=java]
+// Refresh token: TTL 7 giorni, jti UUID, claim typ=refresh
+public String generateRefreshToken(String username, Role role) {
+    Map<String, Object> claims = new HashMap<>();
+    claims.put("role", role.name());
+    claims.put("typ", "refresh");  // distingue da access token
+    return buildRefreshToken(
+        claims, username, refreshExpiration,
+        UUID.randomUUID().toString()); // jti univoco
+}
+
+// Metodi di supporto per la blacklist
+public String extractJti(String token) {
+    return extractClaim(token, Claims::getId);
+}
+public Instant extractExpirationInstant(String token) {
+    return extractClaim(token, c -> c.getExpiration().toInstant());
+}
+public boolean isRefreshToken(String token) {
+    return "refresh".equals(
+        extractClaim(token, c -> c.get("typ", String.class)));
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- RefreshTokenServiceImpl.java (blacklist Redis)}]
+\begin{lstlisting}[style=java]
+// Redis key: "rt:blacklist:<jti>" con TTL = vita residua del token
+@Override
+public void blacklist(String jti, Instant expiresAt) {
+    long ttlSeconds = Duration.between(Instant.now(), expiresAt).getSeconds();
+    if (ttlSeconds > 0) {
+        // Scadenza automatica: nessun job di pulizia necessario
+        redisTemplate.opsForValue()
+            .set("rt:blacklist:" + jti, "1", Duration.ofSeconds(ttlSeconds));
+    }
+}
+
+@Override
+public boolean isBlacklisted(String jti) {
+    return Boolean.TRUE.equals(redisTemplate.hasKey("rt:blacklist:" + jti));
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- AuthServiceImpl.java (refresh con rotation)}]
+\begin{lstlisting}[style=java]
+@Override
+@Transactional(readOnly = true)
+public AuthResponse refresh(String refreshToken) {
+    // 1. Verifica che sia un refresh token
+    if (!jwtService.isRefreshToken(refreshToken)) {
+        log.warn("[AUTH] REFRESH_REJECTED | reason=NOT_REFRESH_TOKEN");
+        throw new BadCredentialsException("INVALID_REFRESH_TOKEN");
+    }
+    // 2. Verifica che il JTI non sia in blacklist
+    String jti = jwtService.extractJti(refreshToken);
+    if (jti == null || refreshTokenService.isBlacklisted(jti)) {
+        log.warn("[AUTH] REFRESH_REJECTED | reason=TOKEN_BLACKLISTED");
+        throw new BadCredentialsException("INVALID_REFRESH_TOKEN");
+    }
+    // 3. Verifica che l'utente esista ancora
+    String username = jwtService.extractUsername(refreshToken);
+    UserAccount user = userRepository.findByUsername(username)
+        .orElseThrow(() -> new BadCredentialsException("INVALID_REFRESH_TOKEN"));
+    // 4. Blacklista il token consumato (rotation)
+    refreshTokenService.blacklist(jti, jwtService.extractExpirationInstant(refreshToken));
+    // 5. Emette il nuovo token pair
+    log.info("[AUTH] REFRESH_SUCCESS | user={}", username);
+    return new AuthResponse(
+        jwtService.generateToken(username, user.getRole()),
+        jwtService.generateRefreshToken(username, user.getRole()));
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- api.ts (Axios interceptor con silent refresh)}]
+\begin{lstlisting}[style=typescript]
+// Interceptor: su 401, tenta refresh silenzioso prima di fare logout
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const url = error.config?.url ?? '';
+    if (error.response?.status === 401) {
+      if (url.includes('/refresh')) {
+        performLogout(); return Promise.reject(error); // refresh scaduto
+      }
+      if (!url.includes('/login') && !url.includes('/me')) {
+        if (isRefreshing) {
+          // Accoda la richiesta — verra' ritentata dopo il refresh
+          return new Promise((resolve, reject) => {
+            pendingQueue.push({ resolve, reject });
+          }).then(() => api(originalConfig));
+        }
+        isRefreshing = true;
+        try {
+          await api.post('/api/v1/auth/refresh'); // cookie gestito dal browser
+          drainQueue(true, null);
+          return api(originalConfig);            // riprova la richiesta originale
+        } catch (err) {
+          drainQueue(false, err); performLogout();
+        } finally { isRefreshing = false; }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test} Aggiunti 6 test in \texttt{AuthServiceImplTest}:
+\texttt{refreshSuccessIssuesNewTokenPair} (verifica rotation e blacklist del JTI consumato),
+\texttt{refreshThrowsWhenTokenIsNotRefreshType},
+\texttt{refreshThrowsWhenJtiIsBlacklisted},
+\texttt{refreshThrowsWhenUserNotFound},
+\texttt{invalidateRefreshTokenBlacklistsValidToken},
+\texttt{invalidateRefreshTokenSilentlyHandlesInvalidToken}.
+Aggiunti 5 test in \texttt{RefreshTokenServiceImplTest} che verificano il comportamento
+della blacklist Redis (store con TTL, skip su token già scaduto, lookup true/false/null).
+
+\paragraph{Effetto}
+La finestra di esposizione di un access token intercettato è ora di \textbf{15 minuti}
+invece di 24 ore. Il refresh token, con TTL 7 giorni, viene ruotato a ogni uso:
+intercettarlo è inutile poiché è già blacklistato non appena viene usato dal legittimo
+titolare. Il logout revoca immediatamente il refresh token, chiudendo la sessione
+server-side senza dipendere dalla scadenza naturale del token.
+
+\paragraph{Riferimento} Commit: \commitref{placeholder}{fix(security): T-AUTH-04 --- refresh token rotation + Redis blacklist}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Audit Log e Security Monitoring}

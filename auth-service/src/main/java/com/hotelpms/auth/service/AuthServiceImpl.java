@@ -9,6 +9,7 @@ import com.hotelpms.auth.exception.BadCredentialsException;
 import com.hotelpms.auth.exception.DuplicateResourceException;
 import com.hotelpms.auth.mapper.UserAccountMapper;
 import com.hotelpms.auth.repository.UserAccountRepository;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,17 +29,19 @@ public class AuthServiceImpl implements AuthService {
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final Duration LOCKOUT_DURATION = Duration.ofMinutes(15);
+    private static final String INVALID_REFRESH_TOKEN = "INVALID_REFRESH_TOKEN";
 
     private final UserAccountRepository userRepository;
     private final UserAccountMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
 
     /**
-     * Registers a new user.
+     * Registers a new user and issues a token pair.
      *
      * @param request the registration request
-     * @return the auth response
+     * @return the auth response containing access + refresh tokens
      */
     @Override
     @Transactional
@@ -56,8 +59,9 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
 
         log.info("[AUTH] REGISTER_SUCCESS | user={}", user.getUsername());
-        final String token = jwtService.generateToken(user.getUsername(), user.getRole());
-        return new AuthResponse(token);
+        final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole());
+        final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole());
+        return new AuthResponse(accessToken, refreshToken);
     }
 
     /**
@@ -68,7 +72,7 @@ public class AuthServiceImpl implements AuthService {
      * counter and clears the lock (T-AUTH-02).
      *
      * @param request the login request
-     * @return the auth response containing a fresh JWT
+     * @return the auth response containing a fresh access token and refresh token
      */
     @Override
     @Transactional
@@ -116,7 +120,67 @@ public class AuthServiceImpl implements AuthService {
         }
 
         log.info("[AUTH] LOGIN_SUCCESS | user={}", user.getUsername());
-        final String token = jwtService.generateToken(user.getUsername(), user.getRole());
-        return new AuthResponse(token);
+        final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole());
+        final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole());
+        return new AuthResponse(accessToken, refreshToken);
+    }
+
+    /**
+     * Validates the refresh token, blacklists its JTI, and issues a new token pair (T-AUTH-04).
+     *
+     * @param refreshToken the current refresh JWT
+     * @return a new {@link AuthResponse} with rotated tokens
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public AuthResponse refresh(final String refreshToken) {
+        if (!jwtService.isRefreshToken(refreshToken)) {
+            log.warn("[AUTH] REFRESH_REJECTED | reason=NOT_REFRESH_TOKEN");
+            throw new BadCredentialsException(INVALID_REFRESH_TOKEN);
+        }
+
+        final String jti = jwtService.extractJti(refreshToken);
+        if (jti == null || refreshTokenService.isBlacklisted(jti)) {
+            log.warn("[AUTH] REFRESH_REJECTED | reason=TOKEN_BLACKLISTED | jti={}", jti);
+            throw new BadCredentialsException(INVALID_REFRESH_TOKEN);
+        }
+
+        final String username = jwtService.extractUsername(refreshToken);
+        final UserAccount user = userRepository.findByUsername(username)
+                .orElseThrow(() -> {
+                    log.warn("[AUTH] REFRESH_REJECTED | reason=USER_NOT_FOUND | user={}", username);
+                    return new BadCredentialsException(INVALID_REFRESH_TOKEN);
+                });
+
+        // Blacklist the consumed token before issuing the new pair
+        final Instant expiresAt = jwtService.extractExpirationInstant(refreshToken);
+        refreshTokenService.blacklist(jti, expiresAt);
+
+        log.info("[AUTH] REFRESH_SUCCESS | user={}", username);
+        final String newAccessToken = jwtService.generateToken(username, user.getRole());
+        final String newRefreshToken = jwtService.generateRefreshToken(username, user.getRole());
+        return new AuthResponse(newAccessToken, newRefreshToken);
+    }
+
+    /**
+     * Blacklists the given refresh token on logout (T-AUTH-04).
+     *
+     * <p>If the token is already expired or has an invalid signature it is
+     * inherently unusable, so no action is taken.</p>
+     *
+     * @param refreshToken the refresh JWT value to invalidate
+     */
+    @Override
+    public void invalidateRefreshToken(final String refreshToken) {
+        try {
+            final String jti = jwtService.extractJti(refreshToken);
+            final Instant expiresAt = jwtService.extractExpirationInstant(refreshToken);
+            if (jti != null) {
+                refreshTokenService.blacklist(jti, expiresAt);
+                log.info("[AUTH] REFRESH_TOKEN_INVALIDATED | jti={}", jti);
+            }
+        } catch (final JwtException | IllegalArgumentException e) {
+            log.debug("[AUTH] REFRESH_TOKEN_INVALIDATION_SKIPPED | reason=INVALID_TOKEN");
+        }
     }
 }

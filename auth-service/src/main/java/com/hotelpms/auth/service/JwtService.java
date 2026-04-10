@@ -14,13 +14,24 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 /**
  * Service for JWT generation and validation.
+ *
+ * <p>Handles both short-lived access tokens and long-lived refresh tokens.
+ * Refresh tokens carry a unique {@code jti} claim that enables selective
+ * blacklisting on logout or rotation (T-AUTH-04).</p>
  */
 @Component
 public class JwtService {
+
+    /** Custom claim key that marks a token as a refresh token. */
+    private static final String CLAIM_TYPE = "typ";
+
+    /** Value of the {@code typ} claim in refresh tokens. */
+    private static final String TYPE_REFRESH = "refresh";
 
     @Value("${jwt.secret}")
     private String secretKey;
@@ -28,12 +39,15 @@ public class JwtService {
     @Value("${jwt.expiration}")
     private long jwtExpiration;
 
+    @Value("${jwt.refresh-expiration}")
+    private long refreshExpiration;
+
     /**
-     * Generates a JWT token for the given username and role.
+     * Generates a short-lived access JWT for the given username and role.
      *
      * @param username the user's username
      * @param role     the user's role
-     * @return the generated JWT token
+     * @return the generated access JWT
      */
     public String generateToken(final String username, final Role role) {
         final Map<String, Object> claims = new HashMap<>();
@@ -41,35 +55,44 @@ public class JwtService {
         return buildToken(claims, username, jwtExpiration);
     }
 
-    private String buildToken(final Map<String, Object> extraClaims, final String subject, final long expiration) {
-        final Instant now = Instant.now();
-        return Jwts.builder()
-                .setClaims(extraClaims)
-                .setSubject(subject)
-                .setIssuedAt(Date.from(now))
-                .setExpiration(Date.from(now.plusMillis(expiration)))
-                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
-                .compact();
+    /**
+     * Generates a long-lived refresh JWT for the given username and role.
+     *
+     * <p>The token includes a unique {@code jti} (JWT ID) and a
+     * {@code typ=refresh} marker to distinguish it from access tokens.
+     * The JTI can be blacklisted on logout or on rotation (T-AUTH-04).</p>
+     *
+     * @param username the user's username
+     * @param role     the user's role
+     * @return the generated refresh JWT
+     */
+    public String generateRefreshToken(final String username, final Role role) {
+        final Map<String, Object> claims = new HashMap<>();
+        claims.put("role", role.name());
+        claims.put(CLAIM_TYPE, TYPE_REFRESH);
+        return buildRefreshToken(claims, username, refreshExpiration, UUID.randomUUID().toString());
     }
 
     /**
-     * Validates a JWT token.
+     * Validates an access JWT token against the given username.
      *
      * @param token    the JWT token
      * @param username the username to validate against
-     * @return true if the token is valid, false otherwise
+     * @return {@code true} if the token is valid and not expired
      */
     public boolean isTokenValid(final String token, final String username) {
         final String tokenUsername = extractUsername(token);
         return tokenUsername.equals(username) && !isTokenExpired(token);
     }
 
-    private boolean isTokenExpired(final String token) {
-        return extractExpiration(token).before(Date.from(Instant.now()));
-    }
-
-    private Date extractExpiration(final String token) {
-        return extractClaim(token, Claims::getExpiration);
+    /**
+     * Returns {@code true} if the token carries a {@code typ=refresh} claim.
+     *
+     * @param token the JWT
+     * @return {@code true} if this is a refresh token
+     */
+    public boolean isRefreshToken(final String token) {
+        return TYPE_REFRESH.equals(extractClaim(token, c -> c.get(CLAIM_TYPE, String.class)));
     }
 
     /**
@@ -83,6 +106,26 @@ public class JwtService {
     }
 
     /**
+     * Extracts the JTI (JWT ID) claim from the given token.
+     *
+     * @param token the JWT
+     * @return the JTI value, or {@code null} if absent
+     */
+    public String extractJti(final String token) {
+        return extractClaim(token, Claims::getId);
+    }
+
+    /**
+     * Extracts the expiration as an {@link Instant} from the given token.
+     *
+     * @param token the JWT
+     * @return the expiration {@link Instant}
+     */
+    public Instant extractExpirationInstant(final String token) {
+        return extractClaim(token, c -> c.getExpiration().toInstant());
+    }
+
+    /**
      * Extracts a specific claim from the JWT token.
      *
      * @param token          the JWT token
@@ -93,6 +136,35 @@ public class JwtService {
     public <T> T extractClaim(final String token, final Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
+    }
+
+    private boolean isTokenExpired(final String token) {
+        return extractClaim(token, Claims::getExpiration).before(Date.from(Instant.now()));
+    }
+
+    private String buildToken(final Map<String, Object> extraClaims, final String subject,
+            final long expiration) {
+        final Instant now = Instant.now();
+        return Jwts.builder()
+                .setClaims(extraClaims)
+                .setSubject(subject)
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(now.plusMillis(expiration)))
+                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    private String buildRefreshToken(final Map<String, Object> extraClaims, final String subject,
+            final long expiration, final String jti) {
+        final Instant now = Instant.now();
+        return Jwts.builder()
+                .setClaims(extraClaims)
+                .setSubject(subject)
+                .setId(jti)
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(now.plusMillis(expiration)))
+                .signWith(getSignInKey(), SignatureAlgorithm.HS256)
+                .compact();
     }
 
     private Claims extractAllClaims(final String token) {

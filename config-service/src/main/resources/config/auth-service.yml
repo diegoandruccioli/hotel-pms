@@ -3,7 +3,14 @@ server:
 
 jwt:
   secret: "${JWT_SECRET}"
-  expiration: "${JWT_EXPIRATION:86400000}"
+  expiration: "${JWT_EXPIRATION:900000}"               # 15 minutes (T-AUTH-04)
+  refresh-expiration: "${JWT_REFRESH_EXPIRATION:604800000}"  # 7 days
+
+spring:
+  data:
+    redis:
+      host: "${AUTH_REDIS_HOST:redis}"
+      port: 6379
 
 management:
   server:
