@@ -4,18 +4,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.invocation.Invocation;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,7 +45,13 @@ class RefreshTokenServiceImplTest {
 
         refreshTokenService.blacklist(TEST_JTI, futureExpiry);
 
-        verify(valueOps).set(eq(REDIS_KEY), eq("1"), any(Duration.class));
+        final List<Invocation> invocations = new ArrayList<>(
+                Mockito.mockingDetails(valueOps).getInvocations());
+        assertEquals(1, invocations.size(), "set() must be called exactly once");
+        final Invocation setCall = invocations.get(0);
+        assertEquals(REDIS_KEY, setCall.<String>getArgument(0), "key must be the blacklist key");
+        assertEquals("1", setCall.<String>getArgument(1), "value must be '1'");
+        assertTrue(setCall.<Duration>getArgument(2).getSeconds() > 0L, "TTL must be positive");
     }
 
     @Test
@@ -53,7 +61,7 @@ class RefreshTokenServiceImplTest {
         refreshTokenService.blacklist(TEST_JTI, pastExpiry);
 
         verify(redisTemplate, never()).opsForValue();
-        verify(valueOps, never()).set(anyString(), anyString(), any(Duration.class));
+        Mockito.verifyNoInteractions(valueOps);
     }
 
     @Test
