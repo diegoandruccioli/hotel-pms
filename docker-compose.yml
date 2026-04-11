@@ -297,6 +297,9 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      # T-STAY-03: PS portal credentials — real values injected via .env in production
+      - ALLOGGIATI_USERNAME=${ALLOGGIATI_USERNAME:-ci_placeholder_user}
+      - ALLOGGIATI_PASSWORD=${ALLOGGIATI_PASSWORD:-ci_placeholder_password}
     depends_on:
       postgres:
         condition: service_healthy
