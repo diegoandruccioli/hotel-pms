@@ -59,6 +59,7 @@ class ReservationServiceImplTest {
     private static final int EXPECTED_GUESTS = 2;
     private static final Reservation ANY_RESERVATION = new Reservation();
     private static final UUID ANY_UUID = Objects.requireNonNull(UUID.randomUUID());
+    private static final String ERR_CHECKOUT_AFTER_CHECKIN = "CHECKOUT_MUST_BE_AFTER_CHECKIN";
 
     private static final String GUEST_FIRST_NAME = "Test";
     private static final String GUEST_LAST_NAME = "Guest";
@@ -389,6 +390,63 @@ class ReservationServiceImplTest {
         // Act & Assert: the exception must propagate to the GlobalExceptionHandler
         assertThrows(ObjectOptimisticLockingFailureException.class,
                 () -> reservationService.createReservation(request));
+    }
+
+    @Test
+    void shouldRejectCreateWhenCheckOutSameDayAsCheckIn() {
+        // Arrange: checkOut == checkIn → zero-night stay (T-RES-03)
+        final ReservationRequest sameDayRequest = new ReservationRequest(
+                GUEST_ID,
+                EXPECTED_GUESTS,
+                LocalDate.now().plusDays(1),
+                LocalDate.now().plusDays(1),
+                STATUS_CONFIRMED,
+                List.of(new ReservationLineItemRequest(roomId, BigDecimal.valueOf(100))));
+
+        // Act & Assert
+        final BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> reservationService.createReservation(sameDayRequest));
+        assertEquals(ERR_CHECKOUT_AFTER_CHECKIN, ex.getMessage());
+        verify(guestClient, never()).getGuestById(any());
+        verify(reservationRepository, never()).save(anyReservation());
+    }
+
+    @Test
+    void shouldRejectCreateWhenCheckOutBeforeCheckIn() {
+        // Arrange: checkOut < checkIn → inverted date range (T-RES-03)
+        final ReservationRequest invertedRequest = new ReservationRequest(
+                GUEST_ID,
+                EXPECTED_GUESTS,
+                LocalDate.now().plusDays(5),
+                LocalDate.now().plusDays(2),
+                STATUS_CONFIRMED,
+                List.of(new ReservationLineItemRequest(roomId, BigDecimal.valueOf(100))));
+
+        // Act & Assert
+        final BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> reservationService.createReservation(invertedRequest));
+        assertEquals(ERR_CHECKOUT_AFTER_CHECKIN, ex.getMessage());
+        verify(guestClient, never()).getGuestById(any());
+        verify(reservationRepository, never()).save(anyReservation());
+    }
+
+    @Test
+    void shouldRejectUpdateWhenCheckOutSameDayAsCheckIn() {
+        // Arrange: update with checkOut == checkIn (T-RES-03)
+        final ReservationRequest sameDayRequest = new ReservationRequest(
+                GUEST_ID,
+                EXPECTED_GUESTS,
+                LocalDate.now().plusDays(3),
+                LocalDate.now().plusDays(3),
+                STATUS_CONFIRMED,
+                List.of(new ReservationLineItemRequest(roomId, BigDecimal.valueOf(100))));
+
+        // Act & Assert
+        final BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> reservationService.updateReservation(reservationId, sameDayRequest));
+        assertEquals(ERR_CHECKOUT_AFTER_CHECKIN, ex.getMessage());
+        verify(reservationRepository, never()).findByIdAndHotelId(any(), any());
+        verify(reservationRepository, never()).save(anyReservation());
     }
 
     @NonNull

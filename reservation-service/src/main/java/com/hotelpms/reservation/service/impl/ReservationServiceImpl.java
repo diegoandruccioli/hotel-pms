@@ -47,6 +47,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional
     public ReservationResponse createReservation(final ReservationRequest request) {
+        verifyDateRange(request);
         final UUID hotelId = resolveHotelId();
         final GuestResponse guest = verifyGuestExists(request.guestId());
         verifyRoomsAvailability(request.lineItems());
@@ -107,6 +108,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional
     public ReservationResponse updateReservation(final UUID id, final ReservationRequest request) {
+        verifyDateRange(request);
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
         final UUID hotelId = resolveHotelId();
         final Reservation existingReservation = findReservationByIdAndHotelOrThrow(id, hotelId);
@@ -288,6 +290,26 @@ public class ReservationServiceImpl implements ReservationService {
             if (!room.active() || "UNAVAILABLE".equalsIgnoreCase(room.status())) {
                 throw new ExternalServiceException("ROOM_UNAVAILABLE");
             }
+        }
+    }
+
+    /**
+     * Defense-in-depth guard: rejects requests where {@code checkOutDate} is not
+     * strictly after {@code checkInDate}.
+     *
+     * <p>The primary enforcement is the {@code @ValidDateRange} class-level Bean
+     * Validation constraint on {@link ReservationRequest}. This method adds a
+     * second layer to protect programmatic callers that bypass controller validation.
+     *
+     * @param request the reservation request to validate
+     * @throws BadRequestException if {@code checkOutDate} is equal to or before
+     *         {@code checkInDate}
+     */
+    private static void verifyDateRange(final ReservationRequest request) {
+        if (request.checkInDate() != null
+                && request.checkOutDate() != null
+                && !request.checkOutDate().isAfter(request.checkInDate())) {
+            throw new BadRequestException("CHECKOUT_MUST_BE_AFTER_CHECKIN");
         }
     }
 
