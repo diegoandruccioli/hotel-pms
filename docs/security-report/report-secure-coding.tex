@@ -315,6 +315,7 @@ T-RES-01  & A04 & Double booking (no date lock) & CRITICO \\
 T-FB-02   & A04 & Prezzi non ricalcolati server-side & CRITICO \\
 T-CFG-01  & A05 & Actuator esposti & CRITICO \\
 T-CFG-02  & A02 & Segreti in chiaro & CRITICO \\
+T-FE-01   & A03 & Assenza guard statico XSS (dangerouslySetInnerHTML) & ALTO \\
 T-FE-03   & A01 & Route guard solo lato client & MEDIO \\
 T-FE-04   & A05 & Assenza CSP & ALTO \\
 \bottomrule
@@ -2512,6 +2513,131 @@ poiché la CSP blocca comunque \texttt{script-src} all'origine stessa, neutraliz
 il vettore XSS principale.
 
 \paragraph{Riferimento} Commit: \commitref{b901a9f}{fix(security): T-GW-03 + T-FE-04 --- security headers and CSP}
+
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Output Encoding e Protezione XSS \threat{T-FE-01}}
+
+\paragraph{Descrizione}
+Il frontend React espone dati recuperati dalle API direttamente nel DOM (nomi ospiti,
+email, descrizioni). Se un componente usasse \texttt{dangerouslySetInnerHTML} o
+manipolazioni DOM dirette (\texttt{innerHTML}/\texttt{outerHTML}), un payload XSS
+memorizzato nel database verrebbe interpretato come HTML dal browser, consentendo
+l'esecuzione di codice arbitrario nel contesto dell'applicazione.
+Classificato OWASP A03 --- Injection.
+
+L'audit del codebase ha confermato che nessun componente utilizza
+\texttt{dangerouslySetInnerHTML}: React JSX escapa automaticamente ogni espressione
+renderizzata come contenuto. Tuttavia, in assenza di un guard statico, non vi era
+nulla che impedisse l'introduzione futura del pattern vulnerabile.
+
+\begin{insecurebox}[title={Vettore XSS: dangerouslySetInnerHTML con dato da API}]
+\begin{lstlisting}[style=typescript]
+// INSICURO: interpreta HTML dal dato API come markup reale
+// Un payload "firstName": "<img src=x onerror=alert(document.cookie)>"
+// verrebbe eseguito dal browser invece di mostrato come testo
+
+function GuestName({ guest }: { guest: GuestResponseDTO }) {
+  return (
+    <td
+      dangerouslySetInnerHTML={{
+        __html: `${guest.firstName} ${guest.lastName}`,
+      }}
+    />
+  );
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{insecurebox}[title={Assenza di guard statico --- nessuna regola ESLint impediva il pattern}]
+\begin{lstlisting}[style=typescript]
+// eslint.config.js baseline: nessuna regola su dangerouslySetInnerHTML
+rules: {
+  ...reactPerf.configs.recommended.rules,
+  // (nessun vincolo XSS)
+},
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+L'intervento ha operato su due livelli complementari:
+
+\begin{enumerate}
+  \item \textbf{Enforcement statico via ESLint (\texttt{no-restricted-syntax})}:
+        tre selettori AST vietano i sink XSS primari in tutta la codebase;
+        la violazione causa un errore di build (non un warning) rendendo impossibile
+        introdurre il pattern senza interrompere la pipeline CI.
+  \item \textbf{Test di regressione XSS}: il componente \texttt{Guests} viene
+        renderizzato con un payload \texttt{<img src=x onerror=alert(1)>} nel campo
+        \texttt{firstName}. Il test verifica che (a) nessun elemento \texttt{<img>}
+        con attributo \texttt{onerror} sia presente nel DOM e (b) il payload compaia
+        come testo letterale --- comportamento garantito dal JSX escaping di React.
+\end{enumerate}
+
+\begin{securebox}[title={eslint.config.js --- no-restricted-syntax vieta i sink XSS}]
+\begin{lstlisting}[style=typescript]
+// T-FE-01: statically ban XSS sinks
+'no-restricted-syntax': [
+  'error',
+  {
+    selector:
+      'JSXAttribute[name.name="dangerouslySetInnerHTML"]',
+    message:
+      '[T-FE-01] dangerouslySetInnerHTML is forbidden ' +
+      '-- use React JSX expressions to prevent XSS.',
+  },
+  {
+    selector:
+      'AssignmentExpression[left.property.name="innerHTML"]',
+    message:
+      '[T-FE-01] Direct innerHTML assignment is forbidden ' +
+      '-- use React JSX expressions to prevent XSS.',
+  },
+  {
+    selector:
+      'AssignmentExpression[left.property.name="outerHTML"]',
+    message:
+      '[T-FE-01] Direct outerHTML assignment is forbidden ' +
+      '-- use React JSX expressions to prevent XSS.',
+  },
+],
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Guests.test.tsx --- test di regressione XSS (T-FE-01)}]
+\begin{lstlisting}[style=typescript]
+it('should escape XSS payload in guest fields (T-FE-01)', async () => {
+  const xssFirst = '<img src=x onerror=alert(1)>';
+  const xssEmail = '"><svg onload=alert(2)>';
+  vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([
+    { id: '1', firstName: xssFirst, lastName: 'XSS',
+      email: xssEmail, phone: '', city: '', country: '' },
+  ] as never);
+
+  const { container } = render(<Guests />);
+
+  await waitFor(() => {
+    // Nessun elemento iniettato: React non ha interpretato il payload come HTML
+    expect(container.querySelector('img[onerror]')).toBeNull();
+    expect(container.querySelector('svg[onload]')).toBeNull();
+    // Payload presente come testo letterale (HTML-escaped da JSX)
+    const cells = container.querySelectorAll('td');
+    expect(cells[0]?.textContent).toContain(xssFirst);
+  });
+});
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Rendering JSX e output encoding}
+React, per scelta architetturale, tratta ogni espressione JSX \texttt{\{valore\}}
+come testo puro: i caratteri \texttt{<}, \texttt{>} e \texttt{\&} vengono convertiti
+nelle corrispondenti entità HTML prima dell'inserimento nel DOM virtuale.
+L'unica eccezione esplicita è \texttt{dangerouslySetInnerHTML}, ora vietata
+staticamente. Di conseguenza, qualunque dato restituito dalle API --- anche un payload
+costruito ad arte --- viene visualizzato come stringa letterale senza possibilità di
+esecuzione.
+
+\paragraph{Riferimento} Commit: \commitref{3655906}{fix(security): T-FE-01 --- ESLint no-restricted-syntax bans dangerouslySetInnerHTML/innerHTML; XSS test on Guests}
 
 \subsection{Protezione Actuator Endpoints \threat{T-CFG-01}}
 
