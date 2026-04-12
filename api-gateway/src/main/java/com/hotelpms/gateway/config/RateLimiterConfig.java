@@ -3,6 +3,7 @@ package com.hotelpms.gateway.config;
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import reactor.core.publisher.Mono;
 
 import java.util.Objects;
@@ -41,9 +42,14 @@ public class RateLimiterConfig {
      * the leftmost — i.e. the original client — IP is used.  Without the header the
      * TCP-level remote address is used directly.
      *
+     * <p>Marked {@code @Primary} so that {@code RequestRateLimiterGatewayFilterFactory}
+     * can auto-wire a single default resolver without ambiguity. Routes that need
+     * per-user buckets reference {@code userKeyResolver} explicitly via SpEL.
+     *
      * @return a proxy-aware {@link KeyResolver} backed by client IP
      */
     @Bean
+    @Primary
     public KeyResolver remoteAddrKeyResolver() {
         return exchange -> {
             final String forwarded = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
