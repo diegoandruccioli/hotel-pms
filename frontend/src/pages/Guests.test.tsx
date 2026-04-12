@@ -59,4 +59,25 @@ describe('Guests', () => {
       expect(screen.getByText('nav_guests')).toBeInTheDocument();
     });
   });
+
+  // T-FE-01: React JSX output encoding — XSS payloads in API data must be escaped as text
+  it('should escape XSS payload in guest fields (T-FE-01)', async () => {
+    const xssFirst = '<img src=x onerror=alert(1)>';
+    const xssEmail = '"><svg onload=alert(2)>';
+    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([
+      { id: '1', firstName: xssFirst, lastName: 'XSS', email: xssEmail, phone: '', city: '', country: '' },
+    ] as never);
+
+    const { container } = render(<Guests />);
+
+    await waitFor(() => {
+      // No injected elements: React must not have interpreted the payload as HTML
+      expect(container.querySelector('img[onerror]')).toBeNull();
+      expect(container.querySelector('svg[onload]')).toBeNull();
+      // Payload is present as literal text content (HTML-escaped by React JSX)
+      const cells = container.querySelectorAll('td');
+      const nameCellText = cells[0]?.textContent ?? '';
+      expect(nameCellText).toContain(xssFirst);
+    });
+  });
 });
