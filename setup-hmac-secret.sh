@@ -79,6 +79,14 @@ else
     skip "POSTGRES_PASSWORD already in .env – skipping."
 fi
 
+# Append CONFIG_SERVER_PASSWORD if not already present (idempotent) — T-CFG-03
+if ! grep -q "^CONFIG_SERVER_PASSWORD=" "$ENV_FILE"; then
+    printf "CONFIG_SERVER_PASSWORD=%s\n" "$(_gen_hex 24)" >> "$ENV_FILE"
+    ok "CONFIG_SERVER_PASSWORD added to .env."
+else
+    skip "CONFIG_SERVER_PASSWORD already in .env – skipping."
+fi
+
 # ── Step 2: Ensure .env is in .gitignore ──────────────────────────────────────
 step "Step 2 – .gitignore"
 

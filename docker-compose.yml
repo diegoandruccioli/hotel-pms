@@ -112,6 +112,8 @@ services:
       - "8888:8888"
     environment:
       - SPRING_PROFILES_ACTIVE=native
+      # T-CFG-03: credentials required by consumer microservices
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
     healthcheck:
       test:
         [
@@ -144,6 +146,7 @@ services:
     environment:
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       # Service URIs – override with K8s ClusterIP or external URLs
       - GW_AUTH_SERVICE_URI=http://auth-service:8087
       - GW_GUEST_SERVICE_URI=http://guest-service:8083
@@ -207,6 +210,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=auth-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_auth
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
@@ -251,6 +255,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=guest-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_guest
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
@@ -293,6 +298,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=stay-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_stay
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
@@ -337,6 +343,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=billing-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_billing
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
@@ -378,6 +385,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=fb-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_fb
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
@@ -420,6 +428,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=inventory-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_inventory
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
@@ -461,6 +470,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=reservation-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_reservation
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}

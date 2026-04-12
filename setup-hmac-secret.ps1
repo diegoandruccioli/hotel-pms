@@ -85,6 +85,15 @@ if ($envContent -notmatch '(?m)^POSTGRES_PASSWORD=') {
     Write-Skip "POSTGRES_PASSWORD already in .env - skipping."
 }
 
+# Append CONFIG_SERVER_PASSWORD if not already present (idempotent) — T-CFG-03
+$envContent = Get-Content $ENV_FILE -Raw -Encoding UTF8
+if ($envContent -notmatch '(?m)^CONFIG_SERVER_PASSWORD=') {
+    Add-Content -Path $ENV_FILE -Value "CONFIG_SERVER_PASSWORD=$(New-RandomHex 24)" -Encoding UTF8
+    Write-Ok "CONFIG_SERVER_PASSWORD added to .env."
+} else {
+    Write-Skip "CONFIG_SERVER_PASSWORD already in .env - skipping."
+}
+
 # ── Step 2: Ensure .env is in .gitignore ──────────────────────────────────────
 Write-Step "Step 2 - .gitignore"
 
