@@ -2506,6 +2506,151 @@ La stessa configurazione è applicata simmetricamente a tutti e 9 i servizi
 
 \paragraph{Riferimento} Commit: \commitref{b0cf898}{fix(security): T-CFG-01 --- move actuator to internal-only management port}
 
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Rate Limiting — Estensione a Tutte le Route e Key Resolver Proxy-Aware \threat{T-GW-02}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il rate limiting baseline presentava due vulnerabilità distinte che lo rendevano aggirabile
+in produzione:
+
+\begin{enumerate}
+  \item \textbf{Copertura parziale}: il filtro \texttt{RequestRateLimiter} era configurato
+        \emph{unicamente} sulla route \texttt{auth-service} (\texttt{/api/v1/auth/**}).
+        Le sei route business (guest, inventory, reservation, stay, billing, fb) erano
+        completamente prive di rate limiting.
+        Un attaccante autenticato — o uno script che sfrutti un account compromesso —
+        poteva inondare qualsiasi endpoint business senza alcun limite, causando un
+        denial-of-service verso gli altri tenant del sistema multi-hotel.
+
+  \item \textbf{Key resolver non proxy-aware}: il \texttt{remoteAddrKeyResolver} baseline
+        leggeva il campo TCP \texttt{RemoteAddress} dell'exchange.
+        In un deployment con reverse proxy o load-balancer (nginx, AWS ALB), questo campo
+        contiene l'IP del proxy e \emph{non} quello del client originale: tutti i client
+        condividono quindi un unico bucket comune, rendendo il rate limiting di fatto
+        inutile (un singolo attaccante esaurisce il budget dell'intero sistema).
+\end{enumerate}
+
+Classificato OWASP A05 --- Security Misconfiguration.
+
+\begin{insecurebox}[title={Baseline vulnerabile — rate limiting solo su auth, key resolver non proxy-aware}]
+\begin{lstlisting}[style=yaml]
+# INSICURO 1: le route business non hanno RequestRateLimiter
+- id: guest-service
+  uri: "http://guest-service:8083"
+  predicates:
+    - Path=/api/v1/guests/**
+  filters:
+    - AuthenticationFilter   # nessun rate limiter -> flooding illimitato
+
+# INSICURO 2: key resolver usa TCP RemoteAddress; dietro un proxy
+# tutti i client condividono il medesimo bucket (IP del proxy)
+@Bean
+public KeyResolver remoteAddrKeyResolver() {
+    return exchange -> Mono.just(
+        Objects.requireNonNull(
+            exchange.getRequest().getRemoteAddress(),  // IP del proxy, non del client!
+            "Remote address must not be null")
+            .getAddress().getHostAddress());
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+
+\subparagraph{Key resolver proxy-aware}
+Il \texttt{remoteAddrKeyResolver} è stato aggiornato per leggere il header
+\texttt{X-Forwarded-For} quando presente, estraendo il primo IP della lista
+(il client originale secondo la specifica RFC 7239).  Solo in assenza del header
+si ricade sull'\texttt{RemoteAddress} TCP.
+
+È stato inoltre introdotto un secondo bean, \texttt{userKeyResolver}, dedicato alle
+route autenticate.  Poiché il filtro \texttt{AuthenticationFilter} è dichiarato
+\emph{prima} di \texttt{RequestRateLimiter} nella catena di ogni route, quando il rate
+limiter viene invocato l'header \texttt{X-Auth-User} è già stato iniettato nel request
+mutato.  Il resolver legge tale header e assegna a ciascun utente autenticato un bucket
+indipendente (chiave \texttt{"user:<username>"}), cadendo indietro sull'IP se l'header
+mancasse.  Il risultato è che:
+\begin{itemize}
+  \item un account compromesso non può esaurire il quota di altri account (isolamento
+        per-utente);
+  \item le richieste pre-autenticazione (es. endpoint non protetti o fallback) continuano
+        ad essere limitate per IP.
+\end{itemize}
+
+\subparagraph{Estensione a tutte le route}
+Il filtro \texttt{RequestRateLimiter} è stato aggiunto a tutte e sei le route business,
+con soglie calibrate sul carico atteso di un operatore alberghiero:
+\begin{itemize}
+  \item Route autenticate: \texttt{replenishRate: 20}, \texttt{burstCapacity: 50}
+        (per-user via \texttt{userKeyResolver}).
+  \item Route auth: \texttt{replenishRate: 5}, \texttt{burstCapacity: 10}
+        (per-IP via \texttt{remoteAddrKeyResolver}).
+\end{itemize}
+
+\begin{securebox}[title={RateLimiterConfig.java — key resolver proxy-aware e per-utente (api-gateway)}]
+\begin{lstlisting}[style=java]
+@Bean
+public KeyResolver remoteAddrKeyResolver() {
+    return exchange -> {
+        final String forwarded =
+            exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return Mono.just(forwarded.split(",")[0].trim()); // client originale
+        }
+        return Mono.just(
+            Objects.requireNonNull(
+                exchange.getRequest().getRemoteAddress(),
+                "Remote address must not be null").getAddress().getHostAddress());
+    };
+}
+
+@Bean
+public KeyResolver userKeyResolver() {
+    return exchange -> {
+        final String user =
+            exchange.getRequest().getHeaders().getFirst("X-Auth-User");
+        if (user != null && !user.isBlank()) {
+            return Mono.just("user:" + user);   // bucket per-utente
+        }
+        final String forwarded =
+            exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return Mono.just("ip:" + forwarded.split(",")[0].trim());
+        }
+        return Mono.just("ip:" + Objects.requireNonNull(
+            exchange.getRequest().getRemoteAddress(),
+            "Remote address must not be null").getAddress().getHostAddress());
+    };
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={api-gateway.yml — rate limiting su route business autenticate}]
+\begin{lstlisting}[style=yaml]
+- id: guest-service
+  uri: "${GW_GUEST_SERVICE_URI:http://guest-service:8083}"
+  predicates:
+    - Path=/api/v1/guests/**
+  filters:
+    - AuthenticationFilter         # 1. valida JWT, inietta X-Auth-User
+    - name: RequestRateLimiter     # 2. usa X-Auth-User per bucket per-utente
+      args:
+        redis-rate-limiter.replenishRate: 20
+        redis-rate-limiter.burstCapacity: 50
+        redis-rate-limiter.requestedTokens: 1
+        key-resolver: "#{@userKeyResolver}"
+# Identica configurazione applicata a: inventory, reservation,
+# stay, billing, fb-service
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test} Aggiunti 6 test in \texttt{RateLimiterConfigTest}:
+\texttt{remoteAddrKeyResolver} — XFF presente $\Rightarrow$ primo IP; XFF assente $\Rightarrow$ RemoteAddress; XFF blank $\Rightarrow$ RemoteAddress.
+\texttt{userKeyResolver} — \texttt{X-Auth-User} presente $\Rightarrow$ \texttt{"user:<username>"}; assente + XFF presente $\Rightarrow$ \texttt{"ip:<xff>"}; entrambi assenti $\Rightarrow$ \texttt{"ip:<remoteAddr>"}.
+
+\paragraph{Riferimento} Commit: \commitref{25c7b57}{fix(security): T-GW-02 --- rate limiting on all routes with proxy-aware key resolvers}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Broken Access Control --- Isolamento Multi-Tenant}
 % ═════════════════════════════════════════════════════════════════════════════
