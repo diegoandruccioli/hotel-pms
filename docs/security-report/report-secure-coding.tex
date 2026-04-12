@@ -307,6 +307,7 @@ T-AUTH-03 & A02 & Gestione password (hashing) & CRITICO \\
 T-AUTH-04 & A07 & Refresh Token senza revoca & ALTO \\
 T-GW-01   & A01 & Header X-Auth iniettabili & CRITICO \\
 T-GW-03   & A05 & Assenza security headers HTTP & MEDIO \\
+T-GW-04   & A05 & CORS misconfiguration: allowedHeaders wildcard & ALTO \\
 T-GW-05   & A01 & Assenza protezione CSRF & ALTO \\
 T-GST-01  & A01 & IDOR su ospiti (hotel\_id) & CRITICO \\
 T-GST-03  & A01 & Multi-tenant leak PII ospiti & CRITICO \\
@@ -2650,6 +2651,116 @@ public KeyResolver userKeyResolver() {
 \texttt{userKeyResolver} — \texttt{X-Auth-User} presente $\Rightarrow$ \texttt{"user:<username>"}; assente + XFF presente $\Rightarrow$ \texttt{"ip:<xff>"}; entrambi assenti $\Rightarrow$ \texttt{"ip:<remoteAddr>"}.
 
 \paragraph{Riferimento} Commit: \commitref{25c7b57}{fix(security): T-GW-02 --- rate limiting on all routes with proxy-aware key resolvers}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{CORS Misconfiguration --- Whitelist Header Esplicita \threat{T-GW-04}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+La politica CORS (Cross-Origin Resource Sharing) dell'API Gateway consente al browser
+di inviare richieste autenticate dall'applicazione React (porta 5173 in sviluppo) verso
+il gateway (porta 8080).  Poiché \texttt{allowCredentials: true} è obbligatorio (le
+richieste portano il cookie httpOnly JWT), qualsiasi permissività sugli header diventa
+rischiosa: un header non necessario accettato in preflight potrebbe essere sfruttato
+da uno script iniettato per inviare informazioni fuori banda verso l'API.
+
+Nella baseline la configurazione YAML dichiarava:
+
+\begin{lstlisting}[style=yaml]
+allowedHeaders: "*"
+\end{lstlisting}
+
+Il valore wildcard istruisce il gateway a riflettere \emph{qualsiasi} header nella
+risposta \texttt{Access-Control-Allow-Headers} della preflight OPTIONS, indipendentemente
+da ciò che il server abbia effettivamente bisogno di leggere.
+In abbinamento a \texttt{allowCredentials: true}, questo amplia la superficie di
+attacco: script di terze parti iniettati (XSS) possono includere header personalizzati
+arbitrari — ad esempio \texttt{X-Custom-Attack} — che il browser invierà con le credenziali.
+Classificato OWASP A05 --- Security Misconfiguration.
+
+Un secondo problema minore riguardava l'assenza di \texttt{maxAge}: senza questa
+proprietà, il browser non può mettere in cache le risposte alle preflight OPTIONS,
+generando una richiesta OPTIONS aggiuntiva prima di \emph{ogni} richiesta mutante.
+Nella pratica d'uso del gestionale (centinaia di operazioni per sessione) questo
+moltiplica inutilmente le richieste al gateway.
+
+\begin{insecurebox}[title={Configurazione Vulnerabile --- api-gateway.yml (baseline, cors globalcors)}]
+\begin{lstlisting}[style=yaml]
+spring:
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              "${GW_CORS_ALLOWED_ORIGINS:http://localhost:5173}"
+            allowedMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+            allowedHeaders: "*"   # wildcard: qualsiasi header e' riflesso
+            allowCredentials: true
+            # maxAge assente: nessuna cache delle preflight
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+La whitelist degli header accettati è stata sostituita con una lista esplicita e minimale:
+
+\begin{itemize}
+  \item \textbf{\texttt{Content-Type}}: necessario per il body JSON delle richieste
+        POST/PUT/PATCH.
+  \item \textbf{\texttt{X-CSRF-Token}}: necessario per il meccanismo di protezione
+        Double-Submit-Cookie introdotto in T-GW-05; senza questa voce, il browser
+        non otterrebbe l'approvazione della preflight per l'header e le richieste
+        mutanti fallirebbero in produzione.
+\end{itemize}
+
+L'header \texttt{Authorization} non è necessario: il token JWT transita nel cookie
+httpOnly, mai in un header esplicito.
+
+È stato aggiunto \texttt{maxAge: 3600} per istruire il browser a memorizzare
+in cache il risultato della preflight OPTIONS per un'ora, riducendo il numero
+di richieste ridondanti senza abbassare la sicurezza.
+
+L'origine consentita era già correttamente vincolata tramite la variabile
+d'ambiente \texttt{GW\_CORS\_ALLOWED\_ORIGINS} (default \texttt{http://localhost:5173}),
+senza l'uso di wildcard né pattern globbing. In produzione, nginx serve il frontend
+sulla stessa origine del proxy API, rendendo il CORS non necessario in quel contesto.
+
+\begin{securebox}[title={Configurazione Sicura --- api-gateway.yml (feature/secure-coding-hardening)}]
+\begin{lstlisting}[style=yaml]
+spring:
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              "${GW_CORS_ALLOWED_ORIGINS:http://localhost:5173}"
+            allowedMethods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+            allowedHeaders:      # whitelist minimale e dichiarativa
+              - Content-Type     # body JSON richieste mutanti
+              - X-CSRF-Token     # Double-Submit-Cookie (T-GW-05)
+            allowCredentials: true
+            maxAge: 3600         # cache preflight: 1 ora
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Effetto}
+Un client cross-origin può includere nei propri header \emph{solo} \texttt{Content-Type}
+e \texttt{X-CSRF-Token}; qualsiasi altro header personalizzato viene rifiutato già in
+fase di preflight dal browser, prima che la richiesta raggiunga il gateway.
+La combinazione con \texttt{allowedOrigins} esplicito e \texttt{allowCredentials: true}
+forma un contratto CORS minimale e corretto: accetta solo ciò che è strettamente
+necessario al funzionamento dell'applicazione.
+
+\paragraph{Nota sull'assenza di test unitari}
+La configurazione CORS è gestita interamente da Spring Cloud Gateway tramite il
+blocco YAML \texttt{globalcors}, senza alcun bean Java da testare in isolamento.
+Il comportamento corretto è verificato dall'integrazione end-to-end (Playwright E2E):
+il browser esegue le preflight verso \texttt{http://localhost:5173} e, se la risposta
+OPTIONS è errata, l'intera suite E2E fallisce a livello di \texttt{NetworkError}.
+
+\paragraph{Riferimento} Modifica: \texttt{config-service/src/main/resources/config/api-gateway.yml}
+--- branch \texttt{feature/secure-coding-hardening}.
 
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Broken Access Control --- Isolamento Multi-Tenant}

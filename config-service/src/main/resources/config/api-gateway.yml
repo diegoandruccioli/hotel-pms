@@ -19,8 +19,11 @@ spring:
               - PATCH
               - DELETE
               - OPTIONS
-            allowedHeaders: "*"
+            allowedHeaders:
+              - Content-Type
+              - X-CSRF-Token
             allowCredentials: true
+            maxAge: 3600
       routes:
         - id: auth-service
           uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
