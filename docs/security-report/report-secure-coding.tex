@@ -1746,6 +1746,117 @@ normalizzazione decimale (\texttt{100.005} $\rightarrow$ \texttt{100.01}).
 \paragraph{Riferimento} Commit: \commitref{d346fe8}{fix(security): T-BILL-02 --- server-side payment amount validation on billing-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Validazione date di prenotazione (range cross-field) \threat{T-RES-03}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il \texttt{ReservationRequest} DTO del \texttt{reservation-service} validava le date
+di check-in e check-out singolarmente tramite \texttt{@FutureOrPresent}, ma mancava
+di una validazione \emph{cross-field} che imponesse \texttt{checkOutDate > checkInDate}.
+
+Questa lacuna consentiva due classi di input anomali:
+
+\begin{enumerate}
+  \item \textbf{Zero-night stay}: \texttt{checkIn == checkOut} --- la camera appare
+        prenotata, ma la sovrapposizione non viene rilevata perché la condizione
+        \texttt{r.checkOutDate > :checkIn} nella query non produce mai un risultato
+        corretto.
+  \item \textbf{Date invertite}: \texttt{checkOut < checkIn} --- la query di
+        rilevamento overlap (\texttt{r.checkInDate < :checkOut AND r.checkOutDate > :checkIn})
+        fallisce silenziosamente, rendendo la stanza erroneamente disponibile.
+\end{enumerate}
+
+Entrambi i casi passano la validazione standard, raggiungono il layer persistenza e
+corrompono la logica di double-booking prevention introdotta con T-RES-01.
+La mappatura OWASP è \textbf{A03 --- Injection} (input non sanificato che altera il
+comportamento di una query parametrizzata).
+
+\paragraph{Mitigazione applicata}
+
+\textbf{Livello 1 --- Bean Validation (controller boundary)}
+
+È stata introdotta l'annotazione \texttt{@ValidDateRange}, un vincolo di classe
+(\texttt{@Target(ElementType.TYPE)}) implementato da \texttt{DateRangeValidator}:
+
+\begin{insecurebox}[title={Codice Vulnerabile --- ReservationRequest.java (prima)}]
+\begin{lstlisting}[style=java]
+// Nessuna validazione cross-field: entrambe le date passano
+// @FutureOrPresent anche se checkOut <= checkIn
+public record ReservationRequest(
+    @NotNull @FutureOrPresent LocalDate checkInDate,
+    @NotNull @FutureOrPresent LocalDate checkOutDate,
+    ...
+) { }
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={Codice Sicuro --- ReservationRequest.java (dopo)}]
+\begin{lstlisting}[style=java]
+@ValidDateRange   // class-level: checkOutDate > checkInDate
+public record ReservationRequest(
+    @NotNull @FutureOrPresent LocalDate checkInDate,
+    @NotNull @FutureOrPresent LocalDate checkOutDate,
+    ...
+) { }
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- DateRangeValidator.java}]
+\begin{lstlisting}[style=java]
+public class DateRangeValidator
+    implements ConstraintValidator<ValidDateRange, ReservationRequest> {
+
+  @Override
+  public boolean isValid(ReservationRequest request,
+                         ConstraintValidatorContext ctx) {
+    if (request == null
+        || request.checkInDate() == null
+        || request.checkOutDate() == null) {
+      return true;  // null-check delegato a @NotNull
+    }
+    return request.checkOutDate().isAfter(request.checkInDate());
+  }
+}
+\end{lstlisting}
+\end{securebox}
+
+Una violazione produce HTTP 400 con corpo RFC 7807 tramite il
+\texttt{MethodArgumentNotValidException} handler già presente nel
+\texttt{GlobalExceptionHandler}.
+
+\textbf{Livello 2 --- Guard nel service (difesa in profondità)}
+
+Per proteggere i chiamanti programmatici che bypassano la validazione del
+controller, è stato aggiunto un guard statico \texttt{verifyDateRange()} invocato
+come prima operazione in \texttt{createReservation()} e \texttt{updateReservation()},
+prima di qualsiasi accesso a servizi esterni o al DB:
+
+\begin{securebox}[title={Codice Sicuro --- ReservationServiceImpl.java (guard)}]
+\begin{lstlisting}[style=java]
+private static void verifyDateRange(ReservationRequest request) {
+    if (request.checkInDate() != null
+        && request.checkOutDate() != null
+        && !request.checkOutDate().isAfter(request.checkInDate())) {
+        throw new BadRequestException("CHECKOUT_MUST_BE_AFTER_CHECKIN");
+    }
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test introdotti}
+Sei nuovi test coprono la mitigazione:
+\begin{itemize}
+  \item \texttt{shouldRejectCreateWhenCheckOutSameDayAsCheckIn} --- zero-night stay su create
+  \item \texttt{shouldRejectCreateWhenCheckOutBeforeCheckIn} --- date invertite su create
+  \item \texttt{shouldRejectUpdateWhenCheckOutSameDayAsCheckIn} --- zero-night stay su update
+  \item \texttt{shouldPassWhenCheckOutIsAfterCheckIn} --- caso valido nel validator
+  \item \texttt{shouldFailWhenCheckOutSameDayAsCheckIn} --- validator diretto
+  \item \texttt{shouldFailWhenCheckOutBeforeCheckIn} --- validator diretto con range invertito
+\end{itemize}
+
+\paragraph{Riferimento} Commit: \commitref{43be320}{fix(security): T-RES-03 --- cross-field date range validation on reservation-service}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Autorizzazione e Controllo degli Accessi}
 % ─────────────────────────────────────────────────────────────────────────────
 
