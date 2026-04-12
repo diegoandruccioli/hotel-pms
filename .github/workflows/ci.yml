@@ -112,6 +112,7 @@ jobs:
       INTERNAL_HMAC_SECRET: ${{ secrets.INTERNAL_HMAC_SECRET }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      CONFIG_SERVER_PASSWORD: ${{ secrets.CONFIG_SERVER_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -124,6 +125,15 @@ jobs:
             echo "::error::INTERNAL_HMAC_SECRET is not configured."
             echo "::error::Go to Settings → Secrets → Actions and add it (openssl rand -hex 32)."
             exit 1
+          fi
+
+      # T-CFG-03: CONFIG_SERVER_PASSWORD is required by config-service (HTTP Basic Auth).
+      # If the repo secret is not set yet, generate a random one for this CI run so that
+      # config-service and all consumer services share the same ephemeral credential.
+      - name: Ensure CONFIG_SERVER_PASSWORD is set
+        run: |
+          if [ -z "$CONFIG_SERVER_PASSWORD" ]; then
+            echo "CONFIG_SERVER_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
           fi
 
       - name: Set up Node 24
