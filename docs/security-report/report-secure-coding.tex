@@ -3343,6 +3343,126 @@ Nessun segreto transita più attraverso il repository.
 
 \paragraph{Riferimento} Commit: \commitref{91d9484}{fix(security): T-CFG-02 --- remove JWT\_SECRET fallback, parameterize POSTGRES\_PASSWORD in docker-compose}
 
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Autenticazione del Config Server \threat{T-CFG-03}}
+
+\paragraph{Descrizione}
+Nella baseline il \texttt{config-service} (Spring Cloud Config Server sulla porta 8888) non
+richiedeva alcuna autenticazione: chiunque potesse raggiungere quella porta — all'interno
+della rete Docker o tramite il port binding esposto al host — era in grado di leggere
+\emph{qualsiasi} file di configurazione semplicemente con una richiesta GET.
+
+Poiché i file serviti dal config-service contengono \texttt{JWT\_SECRET}, \texttt{POSTGRES\_PASSWORD},
+\texttt{INTERNAL\_HMAC\_SECRET} e le credenziali del portale Alloggiati, un accesso non
+autenticato equivaleva a una completa violazione del modello di confidenzialità dei segreti.
+La minaccia è classificata come \emph{Spoofing} in STRIDE (un attaccante recupera segreti
+e può impersonare qualsiasi componente) e corrisponde a OWASP A07 --- Identification and
+Authentication Failures.
+
+\begin{insecurebox}[title={config-service (baseline) --- endpoint aperti senza autenticazione}]
+\begin{lstlisting}[style=yaml]
+# config-service/application.yml (baseline)
+# Spring Security non e' nel classpath: nessuna protezione
+server:
+  port: 8888
+
+spring:
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/config/
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{insecurebox}[title={Richiesta non autenticata restituiva i segreti in chiaro (baseline)}]
+\begin{lstlisting}[style=bash]
+# Chiunque poteva leggere JWT_SECRET e POSTGRES_PASSWORD senza credenziali:
+$ curl http://config-server:8888/auth-service/default
+{
+  "propertySources": [
+    { "name": "...", "source": { "jwt.secret": "...", ... } }
+  ]
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+L'intervento si articola in quattro componenti coordinate:
+
+\begin{enumerate}
+  \item \textbf{Dipendenza Spring Security} aggiunta a \texttt{config-service/build.gradle.kts}:
+        \texttt{spring-boot-starter-security} e Lombok (richiesto da \texttt{@SneakyThrows},
+        pattern uniforme al resto del progetto).
+
+  \item \textbf{SecurityConfig} nel \texttt{config-service}: un bean \texttt{SecurityFilterChain}
+        che configura HTTP Basic Auth su ogni richiesta, sessione \texttt{STATELESS} e CSRF
+        disabilitato (i client config non hanno sessione browser). Il management port
+        (:8090) è su un server embedded separato e non è influenzato da questa catena.
+
+  \item \textbf{Credenziali via variabili d'ambiente}: il config-service legge
+        \texttt{CONFIG\_SERVER\_USERNAME} (default \texttt{configuser}) e
+        \texttt{CONFIG\_SERVER\_PASSWORD} (senza default, fail-fast). Tutti e 8 i microservizi
+        consumer aggiungono \texttt{spring.cloud.config.username/password} nel proprio
+        \texttt{application.yml} con gli stessi env-var. Il \texttt{docker-compose.yml}
+        inietta \texttt{CONFIG\_SERVER\_PASSWORD=\$\{CONFIG\_SERVER\_PASSWORD\}} in ciascun
+        container.
+
+  \item \textbf{Script di setup aggiornati}: \texttt{setup-hmac-secret.sh} e
+        \texttt{setup-hmac-secret.ps1} generano \texttt{CONFIG\_SERVER\_PASSWORD} (24 byte
+        esadecimali) in modo idempotente nel file \texttt{.env} (gitignored), insieme
+        agli altri segreti già gestiti.
+\end{enumerate}
+
+\begin{securebox}[title={SecurityConfig --- HTTP Basic Auth su config-service (post-hardening)}]
+\begin{lstlisting}[style=java]
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    @SneakyThrows(Exception.class)
+    public SecurityFilterChain filterChain(final HttpSecurity http) {
+        http
+            .csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(sm ->
+                sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+            .httpBasic(withDefaults());
+        return http.build();
+    }
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={config-service/application.yml (post-hardening) --- credenziali da env var}]
+\begin{lstlisting}[style=yaml]
+spring:
+  security:
+    user:
+      name: ${CONFIG_SERVER_USERNAME:configuser}
+      password: ${CONFIG_SERVER_PASSWORD}   # fail-fast senza valore
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Consumer microservice/application.yml (post-hardening) --- es. auth-service}]
+\begin{lstlisting}[style=yaml]
+spring:
+  config:
+    import: "configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USERNAME:configuser}
+      password: ${CONFIG_SERVER_PASSWORD}
+\end{lstlisting}
+\end{securebox}
+
+I test di integrazione \texttt{ConfigSecurityTest} verificano che una richiesta senza
+credenziali riceva \texttt{401 Unauthorized} e che una richiesta con Basic Auth valida
+riceva \texttt{200 OK}.
+
+\paragraph{Riferimento} Commit: \commitref{c934f6e}{fix(security): T-CFG-03 --- HTTP Basic Auth on config-service, credentials injected to all consumers}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════
