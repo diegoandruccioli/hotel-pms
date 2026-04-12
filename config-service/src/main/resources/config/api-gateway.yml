@@ -40,6 +40,12 @@ spring:
             - Path=/api/v1/guests/**
           filters:
             - AuthenticationFilter
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 50
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
 
         - id: inventory-service
           uri: "${GW_INVENTORY_SERVICE_URI:http://inventory-service:8081}"
@@ -47,6 +53,12 @@ spring:
             - Path=/api/v1/rooms/**, /api/v1/room-types/**
           filters:
             - AuthenticationFilter
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 50
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
 
         - id: reservation-service
           uri: "${GW_RESERVATION_SERVICE_URI:http://reservation-service:8082}"
@@ -54,6 +66,12 @@ spring:
             - Path=/api/v1/reservations/**
           filters:
             - AuthenticationFilter
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 50
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
 
         - id: stay-service
           uri: "${GW_STAY_SERVICE_URI:http://stay-service:8084}"
@@ -61,6 +79,12 @@ spring:
             - Path=/api/v1/stays/**
           filters:
             - AuthenticationFilter
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 50
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
 
         - id: billing-service
           uri: "${GW_BILLING_SERVICE_URI:http://billing-service:8085}"
@@ -68,6 +92,12 @@ spring:
             - Path=/api/v1/invoices/**, /api/v1/reports/**
           filters:
             - AuthenticationFilter
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 50
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
 
         - id: fb-service
           uri: "${GW_FB_SERVICE_URI:http://fb-service:8086}"
@@ -75,6 +105,12 @@ spring:
             - Path=/api/v1/fb/**
           filters:
             - AuthenticationFilter
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 50
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
 
         - id: auth-service-docs
           uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
