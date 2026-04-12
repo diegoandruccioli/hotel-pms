@@ -2759,8 +2759,7 @@ Il comportamento corretto è verificato dall'integrazione end-to-end (Playwright
 il browser esegue le preflight verso \texttt{http://localhost:5173} e, se la risposta
 OPTIONS è errata, l'intera suite E2E fallisce a livello di \texttt{NetworkError}.
 
-\paragraph{Riferimento} Modifica: \texttt{config-service/src/main/resources/config/api-gateway.yml}
---- branch \texttt{feature/secure-coding-hardening}.
+\paragraph{Riferimento} Commit: \commitref{73e2788}{fix(security): T-GW-04 --- restrict CORS allowedHeaders whitelist and add preflight maxAge}
 
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Broken Access Control --- Isolamento Multi-Tenant}
