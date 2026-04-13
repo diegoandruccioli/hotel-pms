@@ -3572,6 +3572,68 @@ Nessun segreto transita più attraverso il repository.
 
 \paragraph{Riferimento} Commit: \commitref{91d9484}{fix(security): T-CFG-02 --- remove JWT\_SECRET fallback, parameterize POSTGRES\_PASSWORD in docker-compose}
 
+\paragraph{Gap residuo — fallback in JwtUtil dell'API Gateway}
+L'intervento descritto sopra rimuoveva il fallback soltanto da \texttt{auth-service.yml}.
+Un secondo segreto debole era rimasto nascosto in
+\texttt{api-gateway/src/main/java/com/hotelpms/gateway/util/JwtUtil.java}: l'annotazione
+\texttt{@Value} conteneva lo stesso default Base64 hardcoded, rendendo di fatto inefficace
+la protezione se l'API Gateway veniva avviato senza la variabile d'ambiente.
+
+\begin{insecurebox}[title={JwtUtil.java (api-gateway) --- fallback hardcoded residuo}]
+\begin{lstlisting}[style=java]
+// INSICURO: il gateway accetta JWT firmati con il segreto debole
+// se JWT_SECRET non e' presente nell'ambiente
+@Value("${jwt.secret:bXktMzItYnl0ZS1zZWNyZXQta2V5LWZvci10ZXN0LWxvY2FsLWRldi0xMjM0NQ==}")
+private String secret;
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{insecurebox}[title={api-gateway.yml (baseline) --- proprieta' jwt.secret assente}]
+\begin{lstlisting}[style=yaml]
+# jwt.secret non configurato: il gateway legge il fallback dalla
+# annotazione @Value nel codice sorgente (segreto debole e noto)
+internal:
+  hmac:
+    secret: ${INTERNAL_HMAC_SECRET}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Seconda mitigazione applicata}
+\begin{enumerate}
+  \item \textbf{Rimozione del default dall'annotazione} \texttt{@Value}: il parametro
+        \texttt{jwt.secret} non ha più valore alternativo. L'assenza della variabile d'ambiente
+        causa un fallimento esplicito all'avvio del gateway (\emph{fail-fast}), allineando il
+        comportamento a quello già in vigore per \texttt{auth-service}.
+
+  \item \textbf{Aggiunta di \texttt{jwt.secret} in \texttt{api-gateway.yml}}: la chiave viene
+        ora dichiarata esplicitamente nel file di configurazione centralizzata, con il binding
+        obbligatorio \texttt{\$\{JWT\_SECRET\}}. In questo modo il valore viene risolto
+        dall'ambiente (Docker secret o file \texttt{.env}) in modo coerente con tutti gli altri
+        segreti del sistema.
+\end{enumerate}
+
+\begin{securebox}[title={JwtUtil.java (post-hardening) --- fail-fast senza fallback}]
+\begin{lstlisting}[style=java]
+// SICURO: nessun default — il container non si avvia se JWT_SECRET
+// non e' definita; nessun segreto debole puo' essere usato silenziosamente
+@Value("${jwt.secret}")
+private String secret;
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={api-gateway.yml (post-hardening) --- jwt.secret esplicito da env}]
+\begin{lstlisting}[style=yaml]
+jwt:
+  secret: "${JWT_SECRET}"    # obbligatorio: fail-fast se assente
+
+internal:
+  hmac:
+    secret: ${INTERNAL_HMAC_SECRET}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Riferimento} Commit: \commitref{6dc6ea4}{fix(security): T-CFG-02 --- rimuovi fallback JWT\_SECRET hardcoded da api-gateway JwtUtil}
+
 % ─────────────────────────────────────────────────────────────────────────────
 \subsection{Autenticazione del Config Server \threat{T-CFG-03}}
 
