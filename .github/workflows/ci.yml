@@ -127,11 +127,23 @@ jobs:
             exit 1
           fi
 
-      # T-CFG-03: CONFIG_SERVER_PASSWORD is required by config-service (HTTP Basic Auth).
-      # If the repo secret is not set yet, generate a random one for this CI run so that
-      # config-service and all consumer services share the same ephemeral credential.
-      - name: Ensure CONFIG_SERVER_PASSWORD is set
+      # Ensure all required secrets are set before the Docker stack is built.
+      # If a GitHub repo secret is absent, the expression evaluates to "" and the
+      # stack would fail at runtime.  Generate ephemeral values so every CI run
+      # is self-contained even without secrets configured in the repository.
+      #
+      # JWT_SECRET      – auth-service fails fast with an empty value (T-CFG-02).
+      # POSTGRES_PASSWORD – shared by postgres + all Spring datasources.
+      # CONFIG_SERVER_PASSWORD – required by config-service HTTP Basic Auth (T-CFG-03).
+      # INTERNAL_HMAC_SECRET   – already validated above; no fallback needed.
+      - name: Ensure required CI secrets are set
         run: |
+          if [ -z "$JWT_SECRET" ]; then
+            echo "JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')" >> "$GITHUB_ENV"
+          fi
+          if [ -z "$POSTGRES_PASSWORD" ]; then
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+          fi
           if [ -z "$CONFIG_SERVER_PASSWORD" ]; then
             echo "CONFIG_SERVER_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
           fi
@@ -156,11 +168,14 @@ jobs:
       - name: Build Docker images
         run: docker compose build
 
-      # Start every service in detached mode and wait until all health checks
-      # pass (or until the step timeout fires after 10 minutes)
+      # Start every service in detached mode and wait until all health checks pass.
+      # The cascade (config-server → 7 consumer services → api-gateway → frontend)
+      # can take 10-12 minutes on a loaded GitHub runner, so the step timeout is
+      # set to 20 minutes to avoid spurious timeouts while still failing fast on
+      # genuine startup failures.
       - name: Start full Docker stack
         run: docker compose up -d --wait
-        timeout-minutes: 10
+        timeout-minutes: 20
 
       # Extra guard: confirm the gateway process is accepting connections on port 8080.
       # The actuator was moved to the internal-only management port (8090, T-CFG-01),
