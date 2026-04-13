@@ -204,6 +204,9 @@ management:
     tracing:
       endpoint: http://zipkin:9411/api/v2/spans
 
+jwt:
+  secret: "${JWT_SECRET}"
+
 internal:
   hmac:
     secret: ${INTERNAL_HMAC_SECRET}
