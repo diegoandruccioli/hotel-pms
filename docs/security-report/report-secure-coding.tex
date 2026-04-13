@@ -3693,6 +3693,167 @@ riceva \texttt{200 OK}.
 \paragraph{Riferimento} Commit: \commitref{c934f6e}{fix(security): T-CFG-03 --- HTTP Basic Auth on config-service, credentials injected to all consumers}
 
 % ═════════════════════════════════════════════════════════════════════════════
+\section{Analisi SAST con CodeQL e Supply Chain Security}
+% ═════════════════════════════════════════════════════════════════════════════
+
+Al termine del ciclo di hardening è stata eseguita un'analisi statica di sicurezza
+(SAST) tramite \textbf{GitHub CodeQL}, lo strumento di analisi semantica del codice
+integrato nativamente in GitHub Advanced Security. A differenza degli analizzatori
+basati su pattern testuali, CodeQL costruisce un grafo del flusso dati dell'intero
+programma e individua vulnerabilità per flusso di controllo e propagazione di
+valori non fidati.
+
+L'analisi ha prodotto \textbf{10 alert}, raggruppati in due categorie distinte,
+descritte nelle sottosezioni seguenti.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Permessi minimi nel workflow CI/CD}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione} CodeQL (regola \texttt{actions/missing-workflow-permissions})
+ha segnalato che i tre job del workflow \texttt{ci.yml} non dichiaravano un blocco
+\texttt{permissions} esplicito. In assenza di tale blocco, GitHub Actions assegna
+al \texttt{GITHUB\_TOKEN} i permessi di default, che includono l'accesso in scrittura
+a diverse risorse del repository (\texttt{contents: write}, \texttt{packages: write},
+ecc.). Questo viola il \textbf{principio del minimo privilegio}: un workflow che
+esegue solo build e test non ha mai bisogno di permessi di scrittura.
+
+\paragraph{Categoria OWASP} A05:2021 — Security Misconfiguration.
+
+\paragraph{Rischio} Se un job CI scarica una dipendenza malevola (supply chain
+attack), il codice iniettato dispone dei permessi del \texttt{GITHUB\_TOKEN}.
+Con permessi di default in scrittura, un attaccante potrebbe modificare il
+codice sorgente, pubblicare package o creare release non autorizzate dalla
+stessa pipeline CI.
+
+\begin{insecurebox}[title={ci.yml --- job senza dichiarazione di permessi}]
+jobs:
+  backend:
+    name: "Backend -- Build / PMD / JUnit"
+    runs-on: ubuntu-latest
+    # nessun blocco permissions: il token riceve i default
+    # (contents: write, packages: write, ...)
+    steps:
+      - uses: actions/checkout@v4
+      ...
+\end{insecurebox}
+
+\begin{securebox}[title={ci.yml --- permesso minimo per ciascun job (fix)}]
+jobs:
+  backend:
+    name: "Backend -- Build / PMD / JUnit"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read      # sola lettura per il checkout
+    steps:
+      - uses: actions/checkout@v4
+      ...
+
+  frontend:
+    name: "Frontend -- ESLint / TypeScript / Vitest"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps: ...
+
+  e2e:
+    name: "E2E -- Docker Stack + Playwright"
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    permissions:
+      contents: read
+    steps: ...
+\end{securebox}
+
+\paragraph{Motivazione della scelta} \texttt{contents: read} è il permesso strettamente
+necessario per eseguire \texttt{actions/checkout}. Nessuno dei tre job effettua push,
+commenta PR, pubblica package o interagisce con le API GitHub in scrittura: la policy
+\emph{deny-by-default} garantisce che eventuali dipendenze compromesse non possano
+sfruttare il token per alterare la repository.
+
+\paragraph{Riferimento} Commit: \commitref{PLACEHOLDER\_CODEQL\_CI}{fix(ci): add
+permissions: contents: read to all CI jobs --- CodeQL supply chain fix}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Falso positivo: CSRF disabilitato sui microservizi interni}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione} CodeQL (regola \texttt{java/disabled-spring-csrf-protection})
+ha segnalato come \emph{High} la presenza di \texttt{.csrf(AbstractHttpConfigurer::disable)}
+nelle \texttt{SecurityConfig.java} di sette microservizi: \texttt{auth-service},
+\texttt{guest-service}, \texttt{inventory-service}, \texttt{reservation-service},
+\texttt{stay-service}, \texttt{billing-service}, \texttt{fb-service}.
+
+\paragraph{Analisi dell'alert} Dopo revisione architetturale, gli alert sono stati
+classificati come \textbf{falsi positivi} e chiusi con motivazione \emph{not applicable}.
+La disabilitazione del CSRF protection a livello di singolo microservizio è
+\emph{corretta e intenzionale} per le seguenti ragioni:
+
+\begin{enumerate}
+  \item \textbf{I microservizi non sono esposti direttamente al browser.}
+        L'intera superficie HTTP pubblica è concentrata sull'\texttt{api-gateway}
+        (porta 8080). I servizi interni risiedono in una rete Docker isolata e non
+        sono raggiungibili dall'esterno.
+
+  \item \textbf{I microservizi non emettono né leggono cookie.}
+        La protezione CSRF è necessaria solo quando il browser invia automaticamente
+        credenziali tramite cookie verso un'origine autenticata. I microservizi
+        interni utilizzano esclusivamente header iniettati dall'API Gateway
+        (\texttt{X-Auth-User}, \texttt{X-Auth-Role}, \texttt{X-Auth-Hotel},
+        \texttt{X-Internal-Signature}): non esiste alcun cookie di sessione che
+        un attaccante possa sfruttare in un attacco CSRF.
+
+  \item \textbf{La protezione CSRF è già implementata a livello di gateway (T-GW-05).}
+        La mitigazione \texttt{T-GW-05} (commit \texttt{e146b17}) ha introdotto
+        un \texttt{CsrfFilter} globale sull'\texttt{api-gateway} con strategia
+        \emph{Double-Submit Cookie}: ogni richiesta mutante (POST/PUT/PATCH/DELETE)
+        proveniente dal browser deve includere l'header \texttt{X-CSRF-Token}
+        corrispondente al cookie \texttt{csrf\_token}. Il filtro opera prima di
+        qualsiasi inoltro verso i servizi interni, garantendo che nessuna richiesta
+        CSRF possa mai raggiungere il layer applicativo.
+
+  \item \textbf{Spring Security stessa raccomanda la disabilitazione per API REST stateless.}
+        La documentazione ufficiale di Spring Security afferma esplicitamente che
+        la protezione CSRF non deve essere abilitata per i servizi che utilizzano
+        autenticazione stateless (token-based), poiché non vi è alcun cookie di
+        sessione da proteggere.
+\end{enumerate}
+
+\begin{securebox}[title={SecurityConfig.java interna --- disabilitazione CSRF corretta per API stateless}]
+@Bean
+public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    return http
+        // CSRF disabilitato: servizio interno stateless, nessun cookie emesso.
+        // La protezione CSRF e' implementata a livello di API Gateway (T-GW-05).
+        .csrf(AbstractHttpConfigurer::disable)
+        .sessionManagement(sm ->
+            sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .addFilterBefore(internalAuthFilter, UsernamePasswordAuthenticationFilter.class)
+        ...
+        .build();
+}
+\end{securebox}
+
+\paragraph{Azione intrapresa} Gli alert \#4--\#10 su GitHub Code Scanning sono stati
+\textbf{chiusi come ``Not applicable''} con la seguente motivazione documentata:
+
+\begin{quote}
+\textit{``False positive. This is an internal microservice reachable only via the
+API Gateway's Docker network. It does not issue or read cookies and uses stateless
+JWT-based authentication via headers injected by the gateway. CSRF protection is
+implemented at the gateway layer (CsrfFilter, commit e146b17, T-GW-05) using the
+Double-Submit Cookie pattern. Disabling CSRF on stateless REST APIs is the
+recommended practice per Spring Security documentation.''}
+\end{quote}
+
+\paragraph{Nota metodologica} Questo caso illustra un aspetto rilevante
+dell'analisi SAST: gli strumenti automatici operano per pattern locali e non
+dispongono del contesto architetturale globale del sistema. La capacità di
+distinguere un vero positivo da un falso positivo motivato è parte integrante
+della competenza di sicurezza: un alert non va né ignorato né accettato
+acriticamente, ma analizzato rispetto all'architettura concreta del sistema.
+
+% ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════
 
