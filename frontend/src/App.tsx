@@ -22,6 +22,8 @@ const Housekeeping = lazy(() => import('./pages/Housekeeping').then((m) => ({ de
 const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard').then((m) => ({ default: m.OwnerDashboard })));
 const Rooms = lazy(() => import('./pages/Rooms').then((m) => ({ default: m.Rooms })));
 
+const OWNER_ADMIN_ROLES = ['OWNER', 'ADMIN'] as const;
+
 function App() {
   const { t } = useTranslation('common');
   const checkAuth = useAuthStore((state) => state.checkAuth);
@@ -80,7 +82,9 @@ function App() {
               <Route path="/calendar" element={<CalendarPlanning />} />
               <Route path="/housekeeping" element={<Housekeeping />} />
               <Route path="/rooms" element={<Rooms />} />
-              <Route path="/owner-dashboard" element={<OwnerDashboard />} />
+              <Route element={<ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />}>
+                <Route path="/owner-dashboard" element={<OwnerDashboard />} />
+              </Route>
             </Route>
           </Route>
 
