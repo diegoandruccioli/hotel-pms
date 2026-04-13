@@ -226,7 +226,15 @@ jobs:
       # Dump the last 200 lines of every container log to help diagnose failures
       - name: Dump container logs on failure
         if: failure()
-        run: docker compose logs --tail=200
+        run: docker compose logs --tail=200 > /tmp/docker-logs.txt 2>&1 || true
+
+      - name: Upload container logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-container-logs
+          path: /tmp/docker-logs.txt
+          retention-days: 3
 
       - name: Tear down Docker stack and volumes
         if: always()
