@@ -138,7 +138,7 @@
 |----|-----------------|--------|---------|-------------|-------|
 | T-FE-01 | Tampering | XSS: output di dati utente non encoded in rendering dinamico | ALTO | MEDIA | ✅ RISOLTO |
 | T-FE-02 | Information Disclosure | Token JWT eventualmente esposto in localStorage o state non protetto | CRITICO | BASSA | ✅ RISOLTO |
-| T-FE-03 | Elevation of Privilege | Broken Access Control frontend: route admin accessibili nascondendo solo elementi UI | MEDIO | ALTA | 🔴 APERTO |
+| T-FE-03 | Elevation of Privilege | Broken Access Control frontend: route admin accessibili nascondendo solo elementi UI | MEDIO | ALTA | ✅ RISOLTO |
 | T-FE-04 | Tampering | Assenza Content-Security-Policy: possibilità di inject di script esterni | ALTO | MEDIA | ✅ RISOLTO |
 
 ---
@@ -196,7 +196,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-FB-01 | hotel_id scope su restaurant_orders (Flyway V3); InternalAuthFilter legge X-Auth-Hotel e lo memorizza in auth.details; createOrder imposta hotelId dall'auth context; getOrdersByStayId usa findByStayIdAndHotelId; getAllOrders usa findAllByHotelId(pageable) — nessun ordine cross-hotel mai restituito; FeignHeaderConfig propaga X-Auth-Hotel; Flyway V3 fix anche CHECK constraint status enum | fb-service/RestaurantOrder.java, RestaurantOrderRepository.java, RestaurantOrderServiceImpl.java, InternalAuthFilter.java, FeignHeaderConfig.java, V3__add_hotel_id_to_restaurant_orders.sql | 18a3768 | A01 | ✅ |
 | T-CFG-03 | HTTP Basic Auth su config-service (SecurityConfig + spring.security.user); credenziali CONFIG_SERVER_USERNAME (default configuser) e CONFIG_SERVER_PASSWORD iniettate via env var; tutti gli 8 microservizi consumer aggiungono spring.cloud.config.username/password in application.yml; CONFIG_SERVER_PASSWORD generato da setup-hmac-secret.sh/.ps1 e iniettato nel docker-compose; 2 test di integrazione (401 senza credenziali, 200 con credenziali valide) | config-service/SecurityConfig.java, application.yml, tutti i microservizi/application.yml, docker-compose.yml, setup-hmac-secret.sh/.ps1 | c934f6e | A07 | ✅ |
 | T-FE-01 | Audit completo: nessun dangerouslySetInnerHTML trovato; React JSX escapa l'output per default. Enforcement statico: ESLint no-restricted-syntax vieta dangerouslySetInnerHTML, innerHTML e outerHTML diretti (errore di build). Test di regressione: Guests.test.tsx verifica che payload XSS (`<img src=x onerror=alert(1)>`) in dati API sia escaped come testo e non injettato come elemento DOM | frontend/eslint.config.js, frontend/src/pages/Guests.test.tsx | 3655906 | A03 | ✅ |
-| T-FE-03 | Route guard server-side (non solo UI hiding) | frontend/gateway | — | A01 | ⏳ |
+| T-FE-03 | ProtectedRoute con prop allowedRoles?: Role[]; se fornito, utenti con ruolo non in allowlist → redirect a /. App.tsx: /owner-dashboard annidato in <ProtectedRoute allowedRoles={['OWNER','ADMIN']}> dentro MainLayout. 4 nuovi test: ADMIN/OWNER ammessi, RECEPTIONIST → redirect /, user null → redirect /. 144/144 test verdi, lint zero warnings, tsc clean | frontend/src/components/ProtectedRoute.tsx, frontend/src/App.tsx, frontend/src/components/ProtectedRoute.test.tsx | ccfa431 | A01 | ✅ |
 | T-FE-04 | CSP SPA-level via nginx.conf: script-src 'self', style-src 'self' 'unsafe-inline', connect-src 'self', frame-ancestors 'none'; nginx proxy /api/ → api-gateway per same-origin; api.ts baseURL relativo | frontend/nginx.conf, frontend/Dockerfile, frontend/src/services/api.ts | b901a9f | A05 | ✅ |
 
 **Legenda stato**: ⏳ In attesa | 🔄 In corso | ✅ Completato

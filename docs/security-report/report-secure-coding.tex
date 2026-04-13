@@ -2639,6 +2639,109 @@ esecuzione.
 
 \paragraph{Riferimento} Commit: \commitref{3655906}{fix(security): T-FE-01 --- ESLint no-restricted-syntax bans dangerouslySetInnerHTML/innerHTML; XSS test on Guests}
 
+\subsection{Route Guard basato sul Ruolo \threat{T-FE-03}}
+
+\paragraph{Descrizione}
+In React, nascondere un link di navigazione nel layout non impedisce l'accesso alla route
+corrispondente: un utente malintenzionato può semplicemente digitare l'URL nel browser e
+raggiungere la pagina. Nella baseline, la route \texttt{/owner-dashboard} era protetta
+esclusivamente dalla condizione \texttt{isOwnerOrAdmin} nel \texttt{MainLayout} (UI hiding),
+che rendeva invisibile la voce di menu per i ruoli \texttt{RECEPTIONIST} e \texttt{MANAGER}.
+Il componente \texttt{ProtectedRoute} verificava unicamente lo stato di autenticazione,
+senza alcun controllo sul ruolo. Classificato OWASP A01 --- Broken Access Control.
+
+\begin{insecurebox}[title={ProtectedRoute.tsx --- baseline: solo verifica autenticazione}]
+\begin{lstlisting}[style=typescript]
+// INSICURO: nessun controllo sul ruolo utente
+export const ProtectedRoute = () => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;  // qualsiasi utente autenticato accede
+};
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{insecurebox}[title={App.tsx --- baseline: /owner-dashboard accessibile a tutti gli autenticati}]
+\begin{lstlisting}[style=typescript]
+// INSICURO: ProtectedRoute verifica solo l'autenticazione
+<Route element={<ProtectedRoute />}>
+  <Route element={<MainLayout />}>
+    {/* ... altre route ... */}
+    {/* Chiunque sia autenticato puo' digitare /owner-dashboard */}
+    <Route path="/owner-dashboard" element={<OwnerDashboard />} />
+  </Route>
+</Route>
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Intervento}
+\texttt{ProtectedRoute} è stato esteso con una prop opzionale \texttt{allowedRoles?: Role[]}.
+Se specificata, il componente verifica che \texttt{user.role} sia incluso nella allowlist;
+in caso contrario, redirige verso \texttt{/} (home). La route \texttt{/owner-dashboard}
+è ora annidata dentro un secondo \texttt{ProtectedRoute} con
+\texttt{allowedRoles=\{['OWNER', 'ADMIN']\}}, garantendo l'enforcement a livello di routing
+e non solo a livello di UI. L'array viene dichiarato come costante di modulo
+(\texttt{OWNER\_ADMIN\_ROLES}) per rispettare la regola ESLint
+\texttt{react-perf/jsx-no-new-array-as-prop}.
+
+\begin{securebox}[title={ProtectedRoute.tsx --- con prop allowedRoles (T-FE-03)}]
+\begin{lstlisting}[style=typescript]
+import type { Role } from '../types/auth.types';
+
+interface ProtectedRouteProps {
+  allowedRoles?: Role[];
+}
+
+export const ProtectedRoute = (
+  { allowedRoles }: ProtectedRouteProps = {}
+) => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles && (!user || !allowedRoles.includes(user.role))) {
+    return <Navigate to="/" replace />;  // ruolo non autorizzato
+  }
+
+  return <Outlet />;
+};
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={App.tsx --- /owner-dashboard con doppio guard (T-FE-03)}]
+\begin{lstlisting}[style=typescript]
+// Costante di modulo: evita new array ad ogni render
+const OWNER_ADMIN_ROLES = ['OWNER', 'ADMIN'] as const;
+
+// ...
+
+<Route element={<ProtectedRoute />}>        {/* guard: autenticazione */}
+  <Route element={<MainLayout />}>
+    {/* ... altre route (accessibili a tutti gli autenticati) ... */}
+    <Route element={
+      <ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />  {/* guard: ruolo */}
+    }>
+      <Route path="/owner-dashboard" element={<OwnerDashboard />} />
+    </Route>
+  </Route>
+</Route>
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test di verifica}
+Quattro nuovi casi in \texttt{ProtectedRoute.test.tsx}: ADMIN ammesso, OWNER ammesso,
+RECEPTIONIST rediretto a \texttt{/}, utente \texttt{null} con \texttt{allowedRoles} impostato
+rediretto a \texttt{/}. Tutti i 144 test rimangono verdi; lint zero warnings; TypeScript clean.
+
+\paragraph{Riferimento} Commit: \commitref{ccfa431}{fix(security): T-FE-03 --- role-based route guard on ProtectedRoute}
+
 \subsection{Protezione Actuator Endpoints \threat{T-CFG-01}}
 
 \paragraph{Descrizione}
