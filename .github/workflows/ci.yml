@@ -226,7 +226,7 @@ jobs:
       # Dump the last 200 lines of every container log to help diagnose failures
       - name: Dump container logs on failure
         if: failure()
-        run: docker compose logs --tail=200 > /tmp/docker-logs.txt 2>&1 || true
+        run: docker compose logs --tail=2000 > /tmp/docker-logs.txt 2>&1 || true
 
       - name: Upload container logs on failure
         if: failure()
