@@ -226,7 +226,27 @@ jobs:
       # Dump the last 200 lines of every container log to help diagnose failures
       - name: Dump container logs on failure
         if: failure()
-        run: docker compose logs --tail=2000 > /tmp/docker-logs.txt 2>&1 || true
+        run: |
+          {
+            echo "=== CONTAINER STATUS ==="
+            docker compose ps --all
+            echo ""
+            echo "=== HEALTH CHECK INSPECT ==="
+            for svc in config-server auth-service guest-service inventory-service reservation-service stay-service billing-service fb-service api-gateway; do
+              echo "--- $svc ---"
+              docker inspect "$svc" \
+                --format='State={{.State.Status}} Health={{if .State.Health}}{{.State.Health.Status}} Log={{range .State.Health.Log}}[exit={{.ExitCode}} out={{.Output}}]{{end}}{{else}}none{{end}}' \
+                2>/dev/null || echo "container not found"
+            done
+            echo ""
+            echo "=== MANUAL LIVENESS (config-server) ==="
+            docker exec config-server sh -c \
+              'wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness; echo "exit:$?"' \
+              2>&1 || echo "docker exec failed"
+            echo ""
+            echo "=== CONTAINER LOGS ==="
+            docker compose logs --tail=2000
+          } > /tmp/docker-logs.txt 2>&1 || true
 
       - name: Upload container logs on failure
         if: failure()
