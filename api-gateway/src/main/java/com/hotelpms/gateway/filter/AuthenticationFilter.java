@@ -48,6 +48,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
 
     private static final String HEADER_USER = "X-Auth-User";
     private static final String HEADER_ROLE = "X-Auth-Role";
+    private static final String HEADER_HOTEL = "X-Auth-Hotel";
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
 
@@ -98,6 +99,11 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
 
             final String username = claims.getSubject();
             final String role = claims.get("role", String.class);
+            final String hotelId = claims.get("hotelId", String.class);
+
+            if (hotelId == null || hotelId.isEmpty()) {
+                return this.onError(exchange, "JWT missing hotelId claim", HttpStatus.UNAUTHORIZED);
+            }
 
             final String signature = computeHmac(username, role);
 
@@ -107,6 +113,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                     .request(request.mutate()
                             .header(HEADER_USER, username)
                             .header(HEADER_ROLE, role)
+                            .header(HEADER_HOTEL, hotelId)
                             .header(HEADER_SIGNATURE, signature)
                             .build())
                     .build());

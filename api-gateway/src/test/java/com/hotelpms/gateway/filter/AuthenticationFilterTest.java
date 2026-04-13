@@ -62,6 +62,9 @@ class AuthenticationFilterTest {
         /** Fixed HMAC shared secret used for X-Internal-Signature in tests. */
         private static final String HMAC_SECRET = "test-internal-hmac-secret-for-unit-tests";
 
+        /** Hotel UUID used in test JWTs — matches the default admin seed. */
+        private static final String TEST_HOTEL_ID = "00000000-0000-0000-0000-000000000001";
+
         private static final long ONE_HOUR_MS = 3_600_000L;
 
         private AuthenticationFilter authenticationFilter;
@@ -94,6 +97,7 @@ class AuthenticationFilterTest {
                 return Jwts.builder()
                                 .setSubject(username)
                                 .claim("role", role)
+                                .claim("hotelId", TEST_HOTEL_ID)
                                 .setIssuedAt(now)
                                 .setExpiration(expiration)
                                 .signWith(key, SignatureAlgorithm.HS256)
@@ -163,6 +167,8 @@ class AuthenticationFilterTest {
                                         .isEqualTo("receptionist1");
                         assertThat(captured.get().getHeaders().getFirst("X-Auth-Role"))
                                         .isEqualTo("RECEPTIONIST");
+                        assertThat(captured.get().getHeaders().getFirst("X-Auth-Hotel"))
+                                        .isEqualTo(TEST_HOTEL_ID);
                         assertThat(captured.get().getHeaders().getFirst("X-Internal-Signature"))
                                         .isNotBlank();
                 }

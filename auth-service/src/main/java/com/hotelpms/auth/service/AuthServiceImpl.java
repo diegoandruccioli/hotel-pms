@@ -59,8 +59,8 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
 
         log.info("[AUTH] REGISTER_SUCCESS | user={}", user.getUsername());
-        final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole());
-        final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole());
+        final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole(), user.getHotelId());
+        final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole(), user.getHotelId());
         return new AuthResponse(accessToken, refreshToken);
     }
 
@@ -120,8 +120,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         log.info("[AUTH] LOGIN_SUCCESS | user={}", user.getUsername());
-        final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole());
-        final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole());
+        final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole(), user.getHotelId());
+        final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole(), user.getHotelId());
         return new AuthResponse(accessToken, refreshToken);
     }
 
@@ -157,8 +157,8 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenService.blacklist(jti, expiresAt);
 
         log.info("[AUTH] REFRESH_SUCCESS | user={}", username);
-        final String newAccessToken = jwtService.generateToken(username, user.getRole());
-        final String newRefreshToken = jwtService.generateRefreshToken(username, user.getRole());
+        final String newAccessToken = jwtService.generateToken(username, user.getRole(), user.getHotelId());
+        final String newRefreshToken = jwtService.generateRefreshToken(username, user.getRole(), user.getHotelId());
         return new AuthResponse(newAccessToken, newRefreshToken);
     }
 

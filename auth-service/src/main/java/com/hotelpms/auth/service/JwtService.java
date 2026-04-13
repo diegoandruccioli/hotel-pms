@@ -33,6 +33,9 @@ public class JwtService {
     /** Value of the {@code typ} claim in refresh tokens. */
     private static final String TYPE_REFRESH = "refresh";
 
+    /** Custom claim key for the tenant hotel identifier. */
+    private static final String CLAIM_HOTEL_ID = "hotelId";
+
     @Value("${jwt.secret}")
     private String secretKey;
 
@@ -43,20 +46,22 @@ public class JwtService {
     private long refreshExpiration;
 
     /**
-     * Generates a short-lived access JWT for the given username and role.
+     * Generates a short-lived access JWT for the given username, role, and hotel.
      *
      * @param username the user's username
      * @param role     the user's role
+     * @param hotelId  the tenant identifier for multi-hotel isolation
      * @return the generated access JWT
      */
-    public String generateToken(final String username, final Role role) {
+    public String generateToken(final String username, final Role role, final UUID hotelId) {
         final Map<String, Object> claims = new HashMap<>();
         claims.put("role", role.name());
+        claims.put(CLAIM_HOTEL_ID, hotelId.toString());
         return buildToken(claims, username, jwtExpiration);
     }
 
     /**
-     * Generates a long-lived refresh JWT for the given username and role.
+     * Generates a long-lived refresh JWT for the given username, role, and hotel.
      *
      * <p>The token includes a unique {@code jti} (JWT ID) and a
      * {@code typ=refresh} marker to distinguish it from access tokens.
@@ -64,11 +69,13 @@ public class JwtService {
      *
      * @param username the user's username
      * @param role     the user's role
+     * @param hotelId  the tenant identifier for multi-hotel isolation
      * @return the generated refresh JWT
      */
-    public String generateRefreshToken(final String username, final Role role) {
+    public String generateRefreshToken(final String username, final Role role, final UUID hotelId) {
         final Map<String, Object> claims = new HashMap<>();
         claims.put("role", role.name());
+        claims.put(CLAIM_HOTEL_ID, hotelId.toString());
         claims.put(CLAIM_TYPE, TYPE_REFRESH);
         return buildRefreshToken(claims, username, refreshExpiration, UUID.randomUUID().toString());
     }
@@ -113,6 +120,17 @@ public class JwtService {
      */
     public String extractJti(final String token) {
         return extractClaim(token, Claims::getId);
+    }
+
+    /**
+     * Extracts the {@code hotelId} claim from the given token.
+     *
+     * @param token the JWT
+     * @return the hotel UUID, or {@code null} if absent
+     */
+    public UUID extractHotelId(final String token) {
+        final String raw = extractClaim(token, c -> c.get(CLAIM_HOTEL_ID, String.class));
+        return raw != null ? UUID.fromString(raw) : null;
     }
 
     /**

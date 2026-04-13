@@ -57,6 +57,9 @@ public class UserAccount {
     @Column(nullable = false)
     private Role role;
 
+    @Column(nullable = false)
+    private UUID hotelId;
+
     @Builder.Default
     @Column(nullable = false)
     private boolean active = true;
