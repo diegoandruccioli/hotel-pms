@@ -290,8 +290,11 @@ Il branch \texttt{main} rappresenta la \textbf{baseline} (codice originale), men
 \chapter{Analisi della Baseline Insicura}
 % ═════════════════════════════════════════════════════════════════════════════
 
-\textit{[Questo capitolo verrà completato iterativamente, con l'analisi dettagliata del codice
-vulnerabile originale per ogni area di sicurezza, accompagnata da snippet e mappatura OWASP.]}
+Questo capitolo documenta le vulnerabilità rilevate nel codice del branch \texttt{main}
+(baseline), organizzate per area tematica. Per ciascuna categoria viene presentata
+un'analisi del pattern insicuro con i relativi snippet. I dettagli completi di ogni
+intervento di mitigazione --- con codice pre/post e riferimento al commit ---
+sono nel Capitolo~3 (Implementazione del Secure Coding).
 
 \section{Panoramica delle vulnerabilità identificate}
 
@@ -324,20 +327,330 @@ T-FE-04   & A05 & Assenza CSP & ALTO \\
 \label{tab:vulns}
 \end{table}
 
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Autenticazione e Gestione Password}
-\textit{[Snippet e analisi — inseriti iterativamente ad ogni step di hardening]}
+% ─────────────────────────────────────────────────────────────────────────────
 
+L'analisi della baseline ha rilevato tre vulnerabilità nell'area dell'autenticazione,
+classificabili OWASP A02 e A07, per un impatto complessivo da \textbf{alto} a
+\textbf{critico}.
+
+\paragraph{T-AUTH-02 — Assenza di protezione al Brute Force}
+Il metodo \texttt{login()} in \texttt{AuthServiceImpl} non manteneva alcun contatore
+di tentativi falliti né implementava alcun meccanismo di lockout applicativo.
+Un attaccante poteva eseguire un attacco a dizionario sull'endpoint \texttt{POST /api/v1/auth/login}
+senza limitazioni di sorta: il rate limiting del gateway (5~req/s per IP) costituiva l'unica
+difesa, facilmente aggirata distribuendo le richieste su più indirizzi IP (botnet, Tor).
+
+\begin{insecurebox}[title={AuthServiceImpl.java --- assenza di account lockout (baseline)}]
+\begin{lstlisting}[style=java]
+@Transactional(readOnly = true)
+public AuthResponse login(LoginRequest request) {
+    UserAccount user = userRepository.findByUsername(request.username())
+        .orElseThrow(() -> new BadCredentialsException("INVALID_CREDENTIALS"));
+
+    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        throw new BadCredentialsException("INVALID_CREDENTIALS");
+        // Nessun contatore, nessun lockout: tentativi illimitati
+    }
+    return buildAuthResponse(user);
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{T-AUTH-03 — Hashing password con cost factor insufficiente}
+La baseline istanziava \texttt{BCryptPasswordEncoder} senza argomenti, usando il valore
+di default \textbf{cost~10} (circa 100\,ms su hardware del~2013). Su GPU moderne questo
+valore permette di verificare centinaia di migliaia di hash al secondo, rendendo un attacco
+offline praticabile entro ore nel caso di furto del database.
+
+Un secondo problema correlato: anche alzando il parametro in seguito, gli hash esistenti
+sarebbero rimasti a \texttt{cost~10} per tutti gli utenti che non avessero effettuato il
+logout e un nuovo login --- senza un meccanismo di rehash progressivo, la protezione era
+retroattiva solo per i nuovi account.
+
+\begin{insecurebox}[title={SecurityConfig.java --- cost factor 10 implicito (baseline)}]
+\begin{lstlisting}[style=java]
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder(); // strength=10 implicito, sotto soglia OWASP
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{T-AUTH-04 — Assenza di revoca del token (Refresh Token)}
+La baseline emetteva un unico access token JWT con TTL configurabile ma senza alcun
+meccanismo di revoca anticipata. Non esisteva il concetto di \emph{refresh token}: una volta
+emesso, il JWT rimaneva valido fino alla scadenza naturale anche dopo il logout esplicito,
+dopo una compromissione rilevata o in seguito a un cambio di credenziali.
+L'unica azione di ``logout'' era cancellare il cookie lato client, ma il token continuava
+a essere accettato dal gateway per tutta la sua durata residua.
+Classificato OWASP A07 --- Identification \& Authentication Failures.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Validazione degli Input}
-\textit{[Snippet e analisi — inseriti iterativamente ad ogni step di hardening]}
+% ─────────────────────────────────────────────────────────────────────────────
 
+La baseline presentava quattro aree di mancata validazione server-side, classificabili
+OWASP A03 e A04, che aprivano la via a injection, manipolazione dei prezzi e
+corruzione dei dati di prenotazione.
+
+\paragraph{T-GST-02 — Assenza di vincoli di formato sui dati ospite}
+I DTO di richiesta del \texttt{guest-service} (\texttt{GuestRequest},
+\texttt{IdentityDocumentRequestDTO}) erano protetti solo con \texttt{@NotBlank} e
+\texttt{@Size}, ma privi di vincoli di formato sui campi testo libero.
+Un attaccante poteva inviare tag HTML o payload SQL nei campi \texttt{firstName},
+\texttt{phone}, \texttt{address}, oppure una data di nascita nel futuro.
+
+\begin{insecurebox}[title={GuestRequest.java --- nessun \texttt{@Pattern} (baseline)}]
+\begin{lstlisting}[style=java]
+public record GuestRequest(
+    @NotBlank @Size(max = 100) String firstName,  // nessun @Pattern
+    @NotBlank @Size(max = 100) String lastName,   // nessun @Pattern
+    @NotBlank @Email @Size(max = 150) String email,
+    @Size(max = 20) String phone,                 // nessun @Pattern
+    @Size(max = 255) String address,              // nessun @Pattern
+    @Size(max = 50) String city,                  // nessun @Pattern
+    @Size(max = 50) String country,               // nessun @Pattern
+    LocalDate dateOfBirth) {                      // nessun @Past
+}
+// Payload valido inviabile: firstName = "<script>alert(1)</script>"
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{T-GST-04 — Mass Assignment nel mapper ospite}
+\texttt{GuestMapper.toEntity()} non dichiarava esplicitamente i campi da ignorare durante
+il mapping da DTO a entità JPA. In assenza di \texttt{@Mapping(ignore=true)} su
+\texttt{id}, \texttt{hotelId}, \texttt{active}, \texttt{createdAt}, \texttt{updatedAt},
+MapStruct avrebbe tentato di copiare qualsiasi campo omonimo presente nel DTO, aprendo
+la strada a una sovrascrittura dei metadati di sistema da parte del client (mass assignment).
+
+\paragraph{T-RES-03 — Mancanza di validazione cross-field sulle date di prenotazione}
+\texttt{ReservationRequest} non verificava che \texttt{checkOutDate} fosse successiva a
+\texttt{checkInDate}. Un client poteva inviare una prenotazione con date invertite o con
+\texttt{checkIn == checkOut} (zero-night stay), producendo una query di overlap detection
+semanticamente errata che poteva ignorare conflitti reali.
+
+\paragraph{T-FB-02 — Prezzi degli ordini F\&B controllati dal client}
+\texttt{OrderItemRequest} accettava i campi \texttt{unitPrice} e \texttt{itemName}
+direttamente dalla richiesta HTTP. Il servizio si fidava del prezzo dichiarato dal client
+anziché consultare il catalogo server-side, consentendo a un utente di creare ordini con
+importi arbitrari (incluso zero o negativi) e di alterare il nome degli articoli.
+Classificato OWASP A04 --- Insecure Design.
+
+\paragraph{T-BILL-02 — Assenza di validazione degli importi pagamento}
+\texttt{PaymentRequest} non vincolava il campo \texttt{amount} con \texttt{@Digits} né
+\texttt{@Positive}, e \texttt{PaymentServiceImpl} non normalizzava l'importo prima di
+aggiungere il pagamento alla fattura. Importi negativi o con più di due decimali erano
+accettati, corrompendo il saldo e la logica di chiusura fattura.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Autorizzazione e Controllo degli Accessi}
-\textit{[Snippet e analisi — inseriti iterativamente ad ogni step di hardening]}
+% ─────────────────────────────────────────────────────────────────────────────
 
+Questa categoria rappresenta l'area di rischio più estesa della baseline: sette
+vulnerabilità IDOR distribuite su cinque microservizi, più una rottura strutturale
+del meccanismo di isolamento multi-tenant a livello di gateway.
+Tutte classificate OWASP A01 --- Broken Access Control.
+
+\paragraph{T-GST-01 / T-GST-03 / T-RES-02 / T-BILL-01 / T-FB-01 — IDOR su cinque servizi}
+I repository JPA di \texttt{guest-service}, \texttt{reservation-service},
+\texttt{billing-service} e \texttt{fb-service} operavano senza scoping per
+\texttt{hotel\_id}. Le query \texttt{findById()} e \texttt{findAll()} restituivano
+risorse di qualsiasi hotel, permettendo a un operatore dell'Hotel~A, conoscendo
+o indovinando un UUID, di leggere e modificare ospiti, prenotazioni, fatture e
+ordini F\&B dell'Hotel~B.
+
+\begin{insecurebox}[title={Pattern IDOR --- GuestServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: lookup per solo UUID, nessun check ownership hotel
+private Guest resolveGuest(UUID id) {
+    return guestRepository.findById(id)   // trova chiunque, qualsiasi hotel
+        .orElseThrow(() -> new NotFoundException("GUEST_NOT_FOUND"));
+}
+
+// INSICURO: lista tutti gli ospiti di tutti gli hotel
+public Page<GuestResponse> getAllGuests(Pageable pageable) {
+    return guestRepository.findAll(pageable)  // nessun filtro hotel_id
+        .map(guestMapper::toResponse);
+}
+\end{lstlisting}
+\end{insecurebox}
+
+Lo stesso pattern era replicato in \texttt{ReservationServiceImpl},
+\texttt{InvoiceServiceImpl} e \texttt{RestaurantOrderServiceImpl}: nessuno dei quattro
+servizi aveva \texttt{hotel\_id} nella propria entità JPA né nelle query del repository.
+
+\paragraph{T-GW-06 — Propagazione X-Auth-Hotel mancante end-to-end}
+Anche con i fix IDOR applicati ai singoli servizi, l'isolamento multi-tenant avrebbe
+comunque fallito in produzione per una ragione strutturale più profonda: l'entità
+\texttt{UserAccount} in \texttt{auth-service} non possedeva il campo \texttt{hotel\_id},
+quindi \texttt{JwtService.generateToken()} non includeva il claim \texttt{hotelId}
+nel JWT emesso. Di conseguenza \texttt{AuthenticationFilter} nell'API Gateway non
+poteva iniettare l'header \texttt{X-Auth-Hotel} --- perché il dato non era disponibile
+nel token --- e i servizi interni ricevevano sempre l'header vuoto, restituendo~401
+a ogni richiesta autenticata via gateway.
+
+\begin{insecurebox}[title={JwtService.java (auth-service) --- claim hotelId assente (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: il JWT non contiene il claim hotelId
+public String generateToken(UserAccount user) {
+    return Jwts.builder()
+        .setSubject(user.getUsername())
+        .claim("role", user.getRole().name())
+        // hotelId mai aggiunto: l'isolamento multi-tenant non funziona
+        .setIssuedAt(new Date())
+        .setExpiration(new Date(System.currentTimeMillis() + expiration))
+        .signWith(key, SignatureAlgorithm.HS256)
+        .compact();
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{T-FE-03 — Route guard solo lato client}
+Il frontend React proteggeva le route amministrative (\texttt{/owner-dashboard})
+nascondendo i link nella navigazione in base al ruolo memorizzato nello store Zustand.
+Tuttavia, \texttt{ProtectedRoute} non verificava il ruolo: un utente con ruolo
+\texttt{RECEPTIONIST} poteva accedere direttamente digitando l'URL nel browser,
+ricevendo dati o form riservati ad \texttt{ADMIN}/\texttt{OWNER}.
+Classificato OWASP A01 --- Broken Access Control (frontend enforcement only).
+
+\paragraph{T-RES-01 — Double Booking (assenza di lock concorrente)}
+\texttt{ReservationServiceImpl.createReservation()} eseguiva un controllo di overlap
+sulle date di prenotazione, ma senza \emph{pessimistic locking} sulla query.
+In condizioni di concorrenza (due richieste simultanee per la stessa camera e le
+stesse date) entrambe le transazioni potevano superare il controllo e inserire due
+prenotazioni in conflitto, violando il requisito di unicità operativa.
+Classificato OWASP A04 --- Insecure Design.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione delle Sessioni}
-\textit{[Snippet e analisi — inseriti iterativamente ad ogni step di hardening]}
+% ─────────────────────────────────────────────────────────────────────────────
 
+La baseline gestiva le sessioni tramite JWT in cookie \texttt{httpOnly} --- scelta
+corretta per prevenire l'accesso JavaScript al token --- ma presentava due lacune
+rilevanti nella gestione del ciclo di vita del token e nella protezione dalle
+richieste cross-site.
+
+\paragraph{T-AUTH-04 — Refresh token senza rotazione né blacklist Redis}
+Il sistema non implementava il meccanismo di \emph{refresh token}: il solo access token
+JWT, una volta emesso, era accettato dal gateway per tutta la sua durata (configurabile,
+default 15~min) anche dopo il logout. Non esisteva alcun identificatore univoco
+(\texttt{jti}) per tracciare il token, né una blacklist su Redis per invalidarlo
+anticipatamente. Di conseguenza:
+
+\begin{itemize}
+  \item Un logout non revocava effettivamente la sessione: il token rubato prima del
+        logout restava valido.
+  \item Un cambio di password o ruolo non invalidava i token emessi in precedenza.
+  \item Uno scenario di \emph{token theft} non aveva rimedio applicativo immediato.
+\end{itemize}
+
+\paragraph{T-GW-05 — Assenza di protezione CSRF}
+L'API Gateway non implementava alcun meccanismo esplicito di protezione CSRF.
+Il flag \texttt{SameSite=Strict} sul cookie JWT offre una prima difesa, ma non è
+sufficiente: browser datati, proxy aziendali o subdomain takeover possono violarne
+il rispetto. In assenza di un token CSRF verificato server-side, un sito malevolo
+poteva indurre il browser dell'utente autenticato a inviare richieste mutanti
+(\texttt{POST}, \texttt{PUT}, \texttt{DELETE}) verso il sistema, sfruttando
+l'invio automatico del cookie da parte del browser.
+
+\begin{insecurebox}[title={api-gateway (baseline) --- nessun filtro CSRF}]
+\begin{lstlisting}[style=java]
+// INSICURO: il gateway accetta qualsiasi richiesta con cookie JWT valido,
+// indipendentemente dall'origine della richiesta.
+// Non esiste alcun GlobalFilter che validi un CSRF token.
+// Un sito malevolo puo' scatenare:
+//   POST https://hotel.example.com/api/v1/reservations
+//   Cookie: jwt=<token valido> (inviato automaticamente dal browser)
+// La richiesta viene eseguita senza che il server verifichi l'origine.
+\end{lstlisting}
+\end{insecurebox}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Configurazioni di Sicurezza}
-\textit{[Snippet e analisi — inseriti iterativamente ad ogni step di hardening]}
+% ─────────────────────────────────────────────────────────────────────────────
+
+La baseline presentava sei categorie di misconfiguration, alcune con impatto critico
+(segreti in chiaro, actuator esposti), altre con impatto medio-alto (rate limiting
+parziale, assenza di header HTTP, CORS permissivo, mancanza di CSP).
+Classificate prevalentemente OWASP A05 --- Security Misconfiguration.
+
+\paragraph{T-CFG-01 — Endpoint \texttt{/actuator} esposti sulla porta applicativa}
+Tutti e 9 i microservizi pubblicavano gli endpoint Spring Boot Actuator
+(\texttt{/actuator/health}, \texttt{/actuator/prometheus}, \texttt{/actuator/info})
+sulla stessa porta dell'API (\texttt{8080}--\texttt{8087}, \texttt{8888}),
+a sua volta esposta nel \texttt{docker-compose.yml}.
+\texttt{/actuator/prometheus} rivelava metriche interne del processo JVM (thread pool,
+connection pool, circuit breaker state) preziose per un attaccante in fase di
+\emph{reconnaissance}. \texttt{/actuator/health} con \texttt{show-details: always}
+esponeva lo stato dei sottosistemi e i dettagli di connessione a database e Redis.
+
+\paragraph{T-CFG-02 — Segreti in chiaro nei file versionati}
+Due categorie di segreti erano presenti in chiaro nel repository:
+\begin{enumerate}
+  \item Il fallback hardcoded nella proprietà \texttt{jwt.secret} in
+        \texttt{auth-service.yml} e in \texttt{@Value} di \texttt{api-gateway/JwtUtil.java}:
+        entrambi contenevano la stringa Base64 nota
+        \texttt{bXktMzItYnl0ZS1zZWNyZXQta2V5LWZvci10ZXN0LWxvY2FsLWRldi0xMjM0NQ==}.
+        Se la variabile d'ambiente \texttt{JWT\_SECRET} non veniva impostata, il servizio
+        avviava silenziosamente con questo segreto debole, permettendo a chiunque
+        conosca il repository di forgiare JWT validi.
+  \item \texttt{POSTGRES\_PASSWORD} hardcoded a \texttt{password} nel
+        \texttt{docker-compose.yml}: password identica per tutti gli ambienti, senza
+        possibilità di rotazione senza modifica al codice sorgente.
+\end{enumerate}
+
+\begin{insecurebox}[title={auth-service.yml + JwtUtil.java --- fallback hardcoded (baseline)}]
+\begin{lstlisting}[style=yaml]
+# auth-service.yml: fallback noto, committato nel repository
+jwt:
+  secret: "${JWT_SECRET:bXktMzItYnl0ZS1zZWNyZXQta2V5LWZvci10ZXN0LWxvY2FsLWRldi0xMjM0NQ==}"
+\end{lstlisting}
+\begin{lstlisting}[style=java]
+// JwtUtil.java (api-gateway): stesso fallback anche nel gateway
+@Value("${jwt.secret:bXktMzItYnl0ZS1zZWNyZXQta2V5LWZvci10ZXN0LWxvY2FsLWRldi0xMjM0NQ==}")
+private String secret;
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{T-CFG-03 — Config Server senza autenticazione}
+Il \texttt{config-service} (Spring Cloud Config) distribuiva la configurazione centralizzata
+--- inclusi segreti, credenziali e chiavi --- senza alcuna protezione HTTP Basic.
+Qualsiasi processo raggiungibile sulla porta \texttt{8888} della rete Docker poteva
+ottenere la configurazione completa di ogni microservizio con una semplice richiesta GET.
+
+\paragraph{T-GW-02 — Rate limiting applicato solo alla route \texttt{/auth}}
+Nella baseline il \texttt{RequestRateLimiter} era configurato esclusivamente sulla
+route di autenticazione (\texttt{/api/v1/auth/**}). Le sei route di business
+(\texttt{/guests}, \texttt{/reservations}, \texttt{/stays}, \texttt{/invoices},
+\texttt{/fb}, \texttt{/rooms}) non avevano alcun limite di frequenza,
+esponendo i servizi interni ad attacchi di enumerazione e a scenari di denial-of-service
+applicativo. Inoltre, il \texttt{KeyResolver} leggeva l'indirizzo TCP remoto
+(\texttt{RemoteAddress}), risultando inutile per deployment dietro proxy/load balancer
+che presentano un unico IP al gateway.
+
+\paragraph{T-GW-03 / T-GW-04 — Assenza di security headers HTTP e CORS permissivo}
+Nessuno dei microservizi né il gateway aggiungeva gli header di sicurezza HTTP fondamentali:
+\texttt{Strict-Transport-Security}, \texttt{X-Content-Type-Options},
+\texttt{X-Frame-Options}, \texttt{Referrer-Policy} e \texttt{Permissions-Policy}
+erano assenti da tutte le risposte. La configurazione CORS usava
+\texttt{allowedHeaders: "*"} (wildcard), trasmettendo qualsiasi header client al backend
+senza whitelist esplicita.
+
+\paragraph{T-FE-04 — Assenza di Content Security Policy}
+La SPA React servita da Nginx non definiva alcuna \texttt{Content-Security-Policy}.
+In assenza di CSP, un XSS riuscito avrebbe potuto caricare script arbitrari da domini
+esterni, estrarre dati e contattare server C\&C senza restrizioni. Ugualmente assente
+era qualsiasi meccanismo di prevenzione statica del \texttt{dangerouslySetInnerHTML}
+lato frontend.
+
+\paragraph{T-AUTH-05 / T-STAY-02 / T-BILL-03 — Assenza di audit logging}
+Nella baseline nessun servizio emetteva log strutturati per gli eventi sensibili:
+tentativi di login (riusciti e falliti), check-in/check-out e transazioni di pagamento
+avvenivano senza traccia applicativa. In uno scenario di incidente o frode, l'assenza
+di audit trail avrebbe reso impossibile ricostruire la sequenza degli eventi.
+Classificato OWASP A09 --- Security Logging \& Monitoring Failures.
 
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Implementazione del Secure Coding}
