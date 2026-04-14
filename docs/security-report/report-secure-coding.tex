@@ -3773,6 +3773,141 @@ caller, e ripulito in \texttt{tearDown()}. Aggiunto il caso
 \paragraph{Riferimento} Commit: \commitref{4a44eea}{fix(security): T-BILL-01 --- IDOR fix on billing-service (hotel-scoped invoice/payment lookup)}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Propagazione X-Auth-Hotel End-to-End \threat{T-GW-06}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Tutte le mitigazioni IDOR sui singoli servizi si basavano su un presupposto fondamentale:
+che l'header \texttt{X-Auth-Hotel} venisse iniettato dall'\texttt{AuthenticationFilter}
+dell'API Gateway su ogni richiesta autenticata. Questo presupposto era \emph{falso}
+nella baseline: \texttt{UserAccount} in \texttt{auth-service} non possedeva il campo
+\texttt{hotel\_id}, quindi \texttt{JwtService.generateToken()} non poteva includere il
+claim \texttt{hotelId} nel JWT. Di conseguenza, l'\texttt{AuthenticationFilter} non aveva
+il dato per iniettare \texttt{X-Auth-Hotel} sulle richieste a valle.
+
+L'effetto pratico era che tutti i servizi che richiedevano l'header (guest, reservation,
+billing, fb) restituivano sistematicamente HTTP~401 a ogni richiesta autenticata passante
+per il gateway: l'isolamento multi-tenant era \emph{interamente non funzionante} in produzione.
+Classificato OWASP A01 --- Broken Access Control / IDOR.
+
+\begin{insecurebox}[title={UserAccount.java (auth-service) --- campo hotel\_id assente (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: UserAccount non ha hotel_id -> il JWT non puo' contenere hotelId
+@Entity
+@Table(name = "user_account")
+public class UserAccount {
+    @Id private UUID id;
+    private String username;
+    private String passwordHash;
+    @Enumerated(EnumType.STRING)
+    private Role role;
+    // hotel_id mai presente: nessun tenant binding per l'utente
+    private boolean active;
+    // ...
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{insecurebox}[title={JwtService.java (auth-service) --- claim hotelId assente (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: il JWT non contiene il claim hotelId
+public String generateToken(UserAccount user) {
+    return Jwts.builder()
+        .setSubject(user.getUsername())
+        .claim("role", user.getRole().name())
+        // hotelId mai aggiunto: X-Auth-Hotel non potra' mai essere iniettato
+        .setIssuedAt(new Date())
+        .setExpiration(new Date(System.currentTimeMillis() + expiration))
+        .signWith(key, SignatureAlgorithm.HS256)
+        .compact();
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+La correzione è stata end-to-end su quattro livelli:
+
+\begin{enumerate}
+  \item \textbf{Flyway V3 su auth-service} --- migrazione
+        \texttt{V3\_\_add\_hotel\_id\_to\_user\_account.sql}: aggiunge la colonna
+        \texttt{hotel\_id UUID NOT NULL} con backfill dell'UUID amministrativo di default
+        (\texttt{00000000-0000-0000-0000-000000000001}) per le righe esistenti;
+        crea un indice su \texttt{(hotel\_id) WHERE active = TRUE}.
+  \item \textbf{UserAccount aggiornato} --- aggiunto \texttt{private UUID hotelId} come
+        campo persistente.
+  \item \textbf{JwtService.generateToken/Refresh aggiornati} --- la firma ora richiede
+        il parametro \texttt{UUID hotelId} e lo inserisce nel JWT come claim
+        \texttt{hotelId} tramite la costante \texttt{CLAIM\_HOTEL\_ID}.
+  \item \textbf{AuthenticationFilter aggiornato} --- estrae \texttt{hotelId} dal JWT
+        e lo inietta come \texttt{X-Auth-Hotel} su ogni richiesta a valle; restituisce
+        HTTP~401 se il claim è assente, impedendo che token legacy privi del campo
+        superino il gateway.
+\end{enumerate}
+
+\begin{securebox}[title={Flyway V3 --- V3\_\_add\_hotel\_id\_to\_user\_account.sql}]
+\begin{lstlisting}[style=sql]
+-- Step 1: colonna nullable per evitare lock su righe esistenti
+ALTER TABLE user_account
+    ADD COLUMN IF NOT EXISTS hotel_id UUID;
+
+-- Step 2: backfill righe preesistenti con UUID admin di default
+UPDATE user_account
+   SET hotel_id = '00000000-0000-0000-0000-000000000001'
+ WHERE hotel_id IS NULL;
+
+-- Step 3: impone NOT NULL dopo che ogni riga ha un valore
+ALTER TABLE user_account
+    ALTER COLUMN hotel_id SET NOT NULL;
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={JwtService.java (auth-service) --- claim hotelId nel JWT (fix)}]
+\begin{lstlisting}[style=java]
+private static final String CLAIM_HOTEL_ID = "hotelId";
+
+// SICURO: il JWT ora contiene il claim hotelId per l'isolamento multi-tenant
+public String generateToken(final String username,
+                            final Role role,
+                            final UUID hotelId) {
+    final Map<String, Object> claims = new HashMap<>();
+    claims.put("role", role.name());
+    claims.put(CLAIM_HOTEL_ID, hotelId.toString());  // tenant binding
+    return buildToken(claims, username, jwtExpiration);
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={AuthenticationFilter.java (api-gateway) --- iniezione X-Auth-Hotel (fix)}]
+\begin{lstlisting}[style=java]
+private static final String HEADER_HOTEL = "X-Auth-Hotel";
+
+// SICURO: hotelId estratto dal JWT e iniettato come X-Auth-Hotel
+final String hotelId = claims.get("hotelId", String.class);
+if (hotelId == null || hotelId.isEmpty()) {
+    return this.onError(exchange,
+        "JWT missing hotelId claim", HttpStatus.UNAUTHORIZED); // 401
+}
+
+return chain.filter(exchange.mutate()
+    .request(request.mutate()
+        .header(HEADER_USER, username)
+        .header(HEADER_ROLE, role)
+        .header(HEADER_HOTEL, hotelId)   // X-Auth-Hotel ora sempre presente
+        .header(HEADER_SIGNATURE, signature)
+        .build())
+    .build());
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Aggiornati \texttt{AuthServiceImplTest} (costante \texttt{TEST\_HOTEL\_ID}, mock a tre
+argomenti per \texttt{generateToken/Refresh}) e \texttt{AuthenticationFilterTest}
+(\texttt{hotelId} inserito nel JWT di test via \texttt{buildJwt()}, asserzione che l'header
+\texttt{X-Auth-Hotel} sia presente nella richiesta a valle). Tutti i 144 test passano.
+
+\paragraph{Riferimento} Commit: \commitref{b469e21}{fix(security): T-IDOR-GW-01 --- X-Auth-Hotel propagation end-to-end}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}
 % ─────────────────────────────────────────────────────────────────────────────
 
