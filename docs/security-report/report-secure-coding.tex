@@ -3908,6 +3908,69 @@ argomenti per \texttt{generateToken/Refresh}) e \texttt{AuthenticationFilterTest
 \paragraph{Riferimento} Commit: \commitref{b469e21}{fix(security): T-IDOR-GW-01 --- X-Auth-Hotel propagation end-to-end}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{HMAC Signature estesa al Tenant Context \threat{T-GW-07}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+L'analisi post-implementazione di T-GW-06 ha rivelato un gap residuo nel meccanismo di firma
+interna: la funzione \texttt{computeHmac} firmava solo la coppia \texttt{"username:role"},
+lasciando l'header \texttt{X-Auth-Hotel} fuori dal payload autenticato.
+La garanzia crittografica copriva l'identità dell'utente (\emph{chi sei}) ma non il contesto
+di tenant (\emph{a quale hotel appartieni}).
+Un servizio interno compromesso avrebbe potuto ricevere una richiesta legittima dal gateway,
+modificare \texttt{X-Auth-Hotel} in transito e ri-inoltrarla a un altro servizio:
+la firma sarebbe rimasta valida, consentendo di accedere a dati di un hotel arbitrario pur
+avendo un JWT corretto.
+
+\paragraph{OWASP} A01:2021 --- Broken Access Control (header tampering sul tenant context).
+
+\begin{insecurebox}{Baseline --- HMAC su username:role soltanto}{java}
+// api-gateway/AuthenticationFilter.java  (baseline)
+private String computeHmac(String username, String role) {
+    Mac mac = Mac.getInstance("HmacSHA256");
+    mac.init(new SecretKeySpec(hmacSecret.getBytes(UTF_8), "HmacSHA256"));
+    byte[] digest = mac.doFinal(
+        (username + ":" + role).getBytes(UTF_8));  // hotelId ASSENTE
+    return HexFormat.of().formatHex(digest);
+}
+
+// InternalAuthFilter (tutti i servizi)  (baseline)
+private boolean isSignatureValid(String username, String role, String sig) {
+    String expected = computeHmac(username, role);  // hotelId non verificato
+    return MessageDigest.isEqual(
+        expected.getBytes(UTF_8), sig.getBytes(UTF_8));
+}
+\end{insecurebox}
+
+\begin{securebox}{Fix --- HMAC su username:role:hotelId}{java}
+// api-gateway/AuthenticationFilter.java  (fix)
+private String computeHmac(String username, String role, String hotelId) {
+    Mac mac = Mac.getInstance("HmacSHA256");
+    mac.init(new SecretKeySpec(hmacSecret.getBytes(UTF_8), "HmacSHA256"));
+    byte[] digest = mac.doFinal(
+        (username + ":" + role + ":" + hotelId).getBytes(UTF_8));
+    return HexFormat.of().formatHex(digest);
+}
+
+// InternalAuthFilter (tutti i servizi)  (fix)
+private boolean isSignatureValid(
+        String username, String role, String hotelId, String sig) {
+    String expected = computeHmac(username, role, hotelId);
+    return MessageDigest.isEqual(
+        expected.getBytes(UTF_8), sig.getBytes(UTF_8));
+}
+\end{securebox}
+
+\paragraph{Test}
+Aggiunto \texttt{shouldProduceDifferentSignatureForDifferentHotelId} in
+\texttt{AuthenticationFilterTest}: costruisce due JWT con \texttt{hotelId} distinti
+(\texttt{...001} e \texttt{...002}), esegue il filtro per entrambi e verifica che i valori
+di \texttt{X-Internal-Signature} siano diversi, dimostrando che la firma ora dipende dal
+tenant context.
+
+\paragraph{Riferimento} Commit: \commitref{TBD}{fix(security): T-GW-07 --- HMAC extended to include hotelId in signed payload}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}
 % ─────────────────────────────────────────────────────────────────────────────
 
