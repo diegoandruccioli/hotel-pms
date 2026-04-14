@@ -4619,6 +4619,166 @@ distinguere un vero positivo da un falso positivo motivato è parte integrante
 della competenza di sicurezza: un alert non va né ignorato né accettato
 acriticamente, ma analizzato rispetto all'architettura concreta del sistema.
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section{GAP-2 --- Test E2E Attack-Path (Zero Coverage di Sicurezza)}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+I test E2E \textbf{Playwright} esistenti coprono esclusivamente gli
+\emph{happy path} funzionali (login con successo, creazione prenotazione,
+check-in). Non esiste alcun test che verifichi il comportamento del sistema
+quando riceve risposte \emph{di sicurezza} dal backend: 401 Unauthorized, 403
+Forbidden, 404 Not Found per IDOR, 429 Too Many Requests per brute-force.
+Questa assenza lascia scoperti i meccanismi di hardening implementati nelle
+sezioni precedenti: un bug di regressione nel frontend (ad esempio, un modal
+che si chiude silenziosamente su 403) non sarebbe rilevato da alcuna suite
+automatizzata.
+
+\paragraph{Categoria OWASP}
+\begin{itemize}
+  \item \textbf{A01:2021} — Broken Access Control (IDOR, RBAC, accesso non autenticato)
+  \item \textbf{A07:2021} — Identification \& Authentication Failures (JWT scaduto, brute-force 429)
+  \item \textbf{A01:2021} — CSRF (403 su mutation)
+\end{itemize}
+
+\begin{insecurebox}[title={Baseline --- Suite E2E con zero copertura di percorsi di attacco}]
+\begin{lstlisting}[language=TypeScript]
+// e2e/auth.spec.ts  (baseline)
+// Solo happy path: login OK, redirect a dashboard, form visibile.
+// Nessun test per:
+//   - JWT assente/scaduto (401) -> redirect a /login
+//   - Refresh fallito -> performLogout()
+//   - 429 Too Many Requests -> errore generico (no detail account)
+//   - 403 CSRF -> toast error, modal aperto (no silent success)
+
+// e2e/booking-checkin.spec.ts  (baseline)
+// Solo happy path: prenotazione -> check-in.
+// Nessun test per:
+//   - IDOR cross-hotel: PUT /guests/{id} -> 404
+//   - URL manipulation: /reservations/edit/{cross-hotel-uuid} -> 404
+//   - RBAC: RECEPTIONIST -> /owner-dashboard -> redirect a /
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={Codice Sicuro --- 11 test E2E attack-path (3 suite)}]
+\begin{lstlisting}[language=TypeScript]
+// ── security-auth.spec.ts ─────────────────────────────────────────────────
+
+// T-AUTH-SEC-02: sessione scaduta durante la navigazione
+test('expired session (401 on data + failed refresh) -> /login', async ({page}) => {
+  // /me: call #1 -> 200, call #2+ -> 401
+  await page.route('**/api/v1/auth/me', async (route) => { /* counter */ });
+  // /refresh -> 401 (refresh token revocato o scaduto)
+  await page.route('**/api/v1/auth/refresh', route =>
+    route.fulfill({ status: 401, body: '{"error":"Unauthorized"}' }));
+  // GET /guests -> 401: scatena l'interceptor -> refresh -> logout
+  await page.route('**/api/v1/guests', route =>
+    route.fulfill({ status: 401, body: '{"error":"Unauthorized"}' }));
+  await page.goto('/guests');
+  // performLogout() -> window.location.href = '/login'
+  await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
+});
+
+// T-AUTH-SEC-03: brute-force rate limit (429) -> errore generico, no detail
+test('429 -> generic error, no account detail exposed', async ({ page }) => {
+  await page.route('**/api/v1/auth/login', route =>
+    route.fulfill({ status: 429, body: '{"detail":"Too Many Requests"}' }));
+  await page.goto('/login');
+  await page.getByRole('textbox', { name: /username/i }).fill('admin');
+  await page.getByLabel(/password/i).fill('wrongpassword');
+  await page.locator('[data-testid="login-submit"]').click();
+  const errorParagraph =
+    page.locator('[data-testid="login-form"] .bg-error-container p');
+  await expect(errorParagraph).toBeVisible({ timeout: 5_000 });
+  const msg = await errorParagraph.textContent();
+  // Nessun dettaglio su lock, ban, tentativi rimasti
+  expect(msg).not.toMatch(/lock|ban|remain|attempt/i);
+  // Submit ri-abilitato: no UI-level lockout permanente
+  await expect(page.locator('[data-testid="login-submit"]')).toBeEnabled();
+});
+
+// T-AUTH-SEC-04: CSRF rejection (403) -> toast error, no silent success
+test('403 CSRF rejection -> toast error, modal stays open', async ({ page }) => {
+  await page.route('**/api/v1/guests', async (route) => {
+    if (route.request().method() === 'GET')
+      await route.fulfill({ status: 200, body: '{"content":[],...}' });
+    else // POST senza X-CSRF-Token valido
+      await route.fulfill({ status: 403, body: '{"detail":"Forbidden"}' });
+  });
+  await page.goto('/guests');
+  await page.getByRole('button', { name: /add guest/i }).click();
+  await expect(page.locator('[role="dialog"]')).toBeVisible();
+  await page.locator('input[name="firstName"]').fill('Test');
+  await page.locator('input[name="lastName"]').fill('Guest');
+  await page.locator('input[name="email"]').fill('test@example.com');
+  await page.locator('button[form="guest-form"]').click();
+  // Toast error (role=alert da ToastContainer)
+  await expect(page.getByRole('alert')).toBeVisible({ timeout: 5_000 });
+  // Modal rimane aperto: nessun successo silenzioso
+  await expect(page.locator('[role="dialog"]')).toBeVisible();
+});
+
+// ── security-rbac.spec.ts ─────────────────────────────────────────────────
+
+// T-RBAC-SEC-01: RECEPTIONIST -> /owner-dashboard -> ProtectedRoute -> /
+test('RECEPTIONIST -> /owner-dashboard -> redirected to /', async ({ page }) => {
+  await page.route('**/api/v1/auth/me', route =>
+    route.fulfill({ status: 200,
+      body: JSON.stringify({ username: 'r', role: 'RECEPTIONIST' }) }));
+  await page.goto('/owner-dashboard');
+  await expect(page).toHaveURL(/\/$/, { timeout: 10_000 });
+  await expect(
+    page.getByRole('heading', { name: /owner dashboard/i })
+  ).not.toBeVisible();
+});
+
+// ── security-idor.spec.ts ─────────────────────────────────────────────────
+
+// T-IDOR-SEC-02: URL manipulation su prenotazione cross-hotel -> 404 -> error
+test('cross-hotel reservation edit via URL -> error state', async ({ page }) => {
+  const id = 'res-hotel-b-99999';
+  await page.route(`**/api/v1/reservations/${id}`, route =>
+    route.fulfill({ status: 404,
+      body: '{"detail":"RESERVATION_NOT_FOUND"}' }));
+  await page.goto(`/reservations/edit/${id}`);
+  // loadInitialData() cattura il 404 e chiama setError()
+  await expect(
+    page.locator('.bg-error-container').first()
+  ).toBeVisible({ timeout: 10_000 });
+  // Nessun dato di prenotazione popolato
+  const dateInputs = page.locator('input[type="date"]');
+  if (await dateInputs.count() > 0)
+    await expect(dateInputs.first()).toHaveValue('');
+});
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Copertura ottenuta}
+Le tre suite aggiungono \textbf{11 test E2E} che coprono i seguenti vettori:
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+\textbf{Suite} & \textbf{Test ID} & \textbf{Vettore di attacco} & \textbf{Assert chiave} \\
+\midrule
+security-auth  & T-AUTH-SEC-01 & Accesso non autenticato          & URL $=$ \texttt{/login} \\
+security-auth  & T-AUTH-SEC-02 & Sessione scaduta + refresh fail  & performLogout $\to$ \texttt{/login} \\
+security-auth  & T-AUTH-SEC-03 & Brute-force (429)                & Errore generico, no detail \\
+security-auth  & T-AUTH-SEC-04 & CSRF (403 su POST)               & Toast error, modal aperto \\
+security-rbac  & T-RBAC-SEC-01 & RECEPTIONIST $\to$ route ADMIN   & Redirect a \texttt{/} \\
+security-rbac  & T-RBAC-SEC-02 & ADMIN $\to$ route ADMIN/OWNER    & Accesso concesso \\
+security-rbac  & T-RBAC-SEC-03 & OWNER $\to$ route ADMIN/OWNER    & Accesso concesso \\
+security-rbac  & T-RBAC-SEC-04 & Non autenticato $\to$ route prot.& Redirect a \texttt{/login} \\
+security-idor  & T-IDOR-SEC-01 & Edit ospite cross-hotel (404)    & Toast error, modal aperto \\
+security-idor  & T-IDOR-SEC-02 & URL manipulation risorsa (404)   & Error state, no dati \\
+security-idor  & T-IDOR-SEC-03 & Lista ospiti hotel-scoped        & Solo ospiti hotel corrente \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Riferimento} Commit:
+\commitref{f2cbc7d}{fix: GAP-2 — 11 E2E security attack-path tests (auth/RBAC/IDOR)}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════
