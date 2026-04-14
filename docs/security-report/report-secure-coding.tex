@@ -4779,6 +4779,107 @@ security-idor  & T-IDOR-SEC-03 & Lista ospiti hotel-scoped        & Solo ospiti 
 \paragraph{Riferimento} Commit:
 \commitref{f2cbc7d}{fix: GAP-2 — 11 E2E security attack-path tests (auth/RBAC/IDOR)}
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section{GAP-3 --- fb-service InternalAuthFilter Struttura Inconsistente}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il filtro \texttt{InternalAuthFilter} del \textbf{fb-service} presentava una
+struttura del \emph{presence check} divergente rispetto agli altri cinque
+microservizi (guest, billing, reservation, stay, inventory).
+Mentre il pattern canonico adottato da tutti gli altri servizi verifica la
+presenza dei quattro header obbligatori in un \textbf{singolo} \texttt{if}
+combinato, il fb-service utilizzava \textbf{due} blocchi \texttt{if} separati:
+il primo controllava \texttt{X-Auth-User}, \texttt{X-Auth-Role} e
+\texttt{X-Internal-Signature} (escludendo \texttt{X-Auth-Hotel}); il secondo
+controllava \texttt{X-Auth-Hotel} in modo isolato, con un \texttt{LOG.warn}
+dedicato che rivelava il \texttt{username} già estratto prima della verifica
+d'integrità HMAC.
+
+\noindent
+L'impatto diretto sulla sicurezza è contenuto — la firma HMAC include
+\texttt{hotelId} nel payload firmato (\texttt{username:role:hotelId}),
+quindi un header mancante avrebbe comunque causato il fallimento del controllo
+HMAC. Tuttavia la struttura inconsistente:
+\begin{itemize}
+  \item Aumentava la \emph{superficie di manutenzione}: una futura modifica al
+        pattern di un solo servizio sarebbe passata inosservata.
+  \item Violava il principio di \textbf{uniformità difensiva}: filtri con
+        struttura diversa rendono il code review meno affidabile
+        (difficile identificare deviazioni dal pattern atteso).
+  \item Il \texttt{LOG.warn} nel secondo \texttt{if} emetteva il \texttt{username}
+        in chiaro anche prima della validazione della firma, benché in un contesto
+        interno non pubblico.
+\end{itemize}
+
+\paragraph{Classificazione OWASP}
+\textbf{A01 --- Broken Access Control} (pattern di controllo accessi
+non uniforme tra i servizi interni).
+
+\vspace{0.5em}
+\begin{insecurebox}{Codice vulnerabile --- fb-service InternalAuthFilter (presenza separata)}
+\begin{lstlisting}[language=Java]
+// fb-service (PRIMA): due if separati -- hotelId escluso dal primo check
+if (!StringUtils.hasText(username) || !StringUtils.hasText(role)
+        || !StringUtils.hasText(signature)) {           // hotelId assente!
+    rejectRequest(response, "Missing required gateway authentication headers");
+    return;
+}
+
+if (!StringUtils.hasText(hotelId)) {
+    // LOG emette username PRIMA della verifica HMAC
+    LOG.warn("[InternalAuthFilter] Missing X-Auth-Hotel header for user={}", username);
+    rejectRequest(response, "Missing X-Auth-Hotel header");
+    return;
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\vspace{0.5em}
+\begin{securebox}{Codice sicuro --- fb-service InternalAuthFilter (singolo if canonico)}
+\begin{lstlisting}[language=Java]
+// fb-service (DOPO): singolo if combinato -- identico agli altri 5 servizi
+if (!StringUtils.hasText(username) || !StringUtils.hasText(role)
+        || !StringUtils.hasText(hotelId) || !StringUtils.hasText(signature)) {
+    rejectRequest(response, "Missing required gateway authentication headers");
+    return;
+}
+
+// LOG.warn rimane solo per mismatch HMAC (dopo che tutti gli header sono presenti)
+if (!isSignatureValid(username, role, hotelId, signature)) {
+    LOG.warn("[InternalAuthFilter] HMAC signature mismatch for user={}", username);
+    rejectRequest(response, "Invalid internal request signature");
+    return;
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test di copertura}
+Sono stati aggiunti 8 test JUnit~5 in
+\texttt{fb-service/.../security/InternalAuthFilterTest.java}
+che coprono tutti i path del filtro:
+
+\begin{center}
+\small
+\begin{tabular}{llp{6cm}}
+\toprule
+\textbf{Nested class} & \textbf{Test} & \textbf{Assert chiave} \\
+\midrule
+PresenceCheck & shouldRejectWhenUsernameMissing    & HTTP 401 \\
+PresenceCheck & shouldRejectWhenRoleMissing        & HTTP 401 \\
+PresenceCheck & shouldRejectWhenHotelIdMissing     & HTTP 401 \\
+PresenceCheck & shouldRejectWhenSignatureMissing   & HTTP 401 \\
+HmacCheck     & shouldRejectWhenSignatureInvalid   & HTTP 401 \\
+HmacCheck     & shouldRejectWhenSignatureComputedForDifferentHotelId & HTTP 401 (tenant isolation) \\
+HmacCheck     & shouldAuthenticateWithValidHeaders & HTTP 200 + SecurityContext (name/details/authority) \\
+ActuatorBypass & shouldBypassFilterForActuatorEndpoint & HTTP 200 senza headers \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Riferimento} Commit:
+\commitref{TBD}{fix(security): GAP-3 --- fb-service InternalAuthFilter single combined presence check}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════

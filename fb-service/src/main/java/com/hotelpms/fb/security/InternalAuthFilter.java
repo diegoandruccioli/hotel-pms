@@ -31,10 +31,9 @@ import java.util.List;
  * <p>
  * The filter enforces a two-layer check:
  * <ol>
- * <li><b>Presence check</b> – rejects requests missing any of the three
- * required
- * headers: {@code X-Auth-User}, {@code X-Auth-Role}, or
- * {@code X-Internal-Signature}.</li>
+ * <li><b>Presence check</b> – rejects requests missing any of the four
+ * required headers: {@code X-Auth-User}, {@code X-Auth-Role},
+ * {@code X-Auth-Hotel}, or {@code X-Internal-Signature}.</li>
  * <li><b>HMAC-SHA256 integrity check</b> – recomputes
  * {@code HMAC-SHA256(sharedSecret, "username:role")} and compares it against
  * the received signature using constant-time {@link MessageDigest#isEqual} to
@@ -91,14 +90,9 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
         final String hotelId = request.getHeader(HEADER_HOTEL);
         final String signature = request.getHeader(HEADER_SIGNATURE);
 
-        if (!StringUtils.hasText(username) || !StringUtils.hasText(role) || !StringUtils.hasText(signature)) {
+        if (!StringUtils.hasText(username) || !StringUtils.hasText(role)
+                || !StringUtils.hasText(hotelId) || !StringUtils.hasText(signature)) {
             rejectRequest(response, "Missing required gateway authentication headers");
-            return;
-        }
-
-        if (!StringUtils.hasText(hotelId)) {
-            LOG.warn("[InternalAuthFilter] Missing X-Auth-Hotel header for user={}", username);
-            rejectRequest(response, "Missing X-Auth-Hotel header");
             return;
         }
 
