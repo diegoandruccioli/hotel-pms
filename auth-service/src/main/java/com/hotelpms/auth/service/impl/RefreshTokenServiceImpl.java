@@ -55,7 +55,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
      */
     @Override
     public void storeTokenVersion(final String username, final int version, final Duration ttl) {
-        redisTemplate.opsForValue().set(TV_PREFIX + username, String.valueOf(version),
+        redisTemplate.opsForValue().set(TV_PREFIX + username, Objects.requireNonNull(String.valueOf(version)),
                 Objects.requireNonNull(ttl));
     }
 

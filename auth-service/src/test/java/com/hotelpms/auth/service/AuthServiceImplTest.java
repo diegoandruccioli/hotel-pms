@@ -401,7 +401,7 @@ class AuthServiceImplTest {
                 "tokenVersion must be incremented to 1 after password change");
         assertEquals(newHash, testUser.getPasswordHash(),
                 "Password hash must be updated to the new value");
-        verify(userRepository).save(testUser);
+        verify(userRepository).save(Objects.requireNonNull(testUser));
         verify(refreshTokenService).storeTokenVersion(eq(TEST_USER), eq(1), any(Duration.class));
     }
 
@@ -414,7 +414,8 @@ class AuthServiceImplTest {
                 () -> authService.changePassword(TEST_USER,
                         new ChangePasswordRequest("wrongpassword", "newpassword")),
                 "Should reject password change when current password does not match");
-        verify(userRepository, never()).save(any());
+        verify(userRepository).findByUsername(TEST_USER);
+        verifyNoMoreInteractions(userRepository);
     }
 
     @Test
