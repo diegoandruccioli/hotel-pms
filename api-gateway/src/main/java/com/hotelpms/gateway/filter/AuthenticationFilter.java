@@ -105,7 +105,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                 return this.onError(exchange, "JWT missing hotelId claim", HttpStatus.UNAUTHORIZED);
             }
 
-            final String signature = computeHmac(username, role);
+            final String signature = computeHmac(username, role, hotelId);
 
             // Inline della variabile modifiedRequest per evitare declaration + immediate
             // return (code smell)
@@ -121,22 +121,29 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
     }
 
     /**
-     * Computes {@code HMAC-SHA256(secret, "username:role")} and returns the result
-     * as a lowercase hex string.
+     * Computes {@code HMAC-SHA256(secret, "username:role:hotelId")} and returns
+     * the result as a lowercase hex string.
+     *
+     * <p>Including {@code hotelId} in the signed payload ensures that downstream
+     * services can verify the integrity of the tenant-isolation header
+     * {@code X-Auth-Hotel} and not just the identity headers, closing a potential
+     * header-tampering vector on the internal network.
      *
      * @param username the authenticated username extracted from the JWT
      * @param role     the role extracted from the JWT
+     * @param hotelId  the hotel UUID extracted from the JWT {@code hotelId} claim
      * @return hex-encoded HMAC digest
      * @throws IllegalStateException if the JVM does not support HmacSHA256 (should
      *                               never happen)
      */
-    private String computeHmac(final String username, final String role) {
+    private String computeHmac(final String username, final String role, final String hotelId) {
         try {
             final Mac mac = Mac.getInstance(HMAC_ALGORITHM);
             final SecretKeySpec keySpec = new SecretKeySpec(
                     hmacSecret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM);
             mac.init(keySpec);
-            final byte[] digest = mac.doFinal((username + ":" + role).getBytes(StandardCharsets.UTF_8));
+            final byte[] digest = mac.doFinal(
+                    (username + ":" + role + ":" + hotelId).getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("HMAC_SIGNATURE_FAILED", e);

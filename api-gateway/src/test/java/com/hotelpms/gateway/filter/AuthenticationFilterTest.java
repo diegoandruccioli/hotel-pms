@@ -172,6 +172,48 @@ class AuthenticationFilterTest {
                         assertThat(captured.get().getHeaders().getFirst("X-Internal-Signature"))
                                         .isNotBlank();
                 }
+
+                @Test
+                @DisplayName("should produce a different X-Internal-Signature when hotelId differs")
+                void shouldProduceDifferentSignatureForDifferentHotelId() {
+                        final String hotelA = "00000000-0000-0000-0000-000000000001";
+                        final String hotelB = "00000000-0000-0000-0000-000000000002";
+
+                        final Key key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(JWT_SECRET_B64));
+                        final Date now = new Date();
+                        final Date exp = new Date(now.getTime() + ONE_HOUR_MS);
+
+                        final String tokenA = Jwts.builder()
+                                        .setSubject("admin").claim("role", "ADMIN")
+                                        .claim("hotelId", hotelA)
+                                        .setIssuedAt(now).setExpiration(exp)
+                                        .signWith(key, SignatureAlgorithm.HS256).compact();
+
+                        final String tokenB = Jwts.builder()
+                                        .setSubject("admin").claim("role", "ADMIN")
+                                        .claim("hotelId", hotelB)
+                                        .setIssuedAt(now).setExpiration(exp)
+                                        .signWith(key, SignatureAlgorithm.HS256).compact();
+
+                        final AtomicReference<String> sigA = new AtomicReference<>();
+                        final AtomicReference<String> sigB = new AtomicReference<>();
+
+                        authenticationFilter.apply(config).filter(
+                                MockServerWebExchange.from(MockServerHttpRequest.get("/api/v1/guests")
+                                        .cookie(new HttpCookie("jwt", tokenA)).build()),
+                                ex -> { sigA.set(ex.getRequest().getHeaders().getFirst("X-Internal-Signature")); return Mono.empty(); }
+                        ).block();
+
+                        authenticationFilter.apply(config).filter(
+                                MockServerWebExchange.from(MockServerHttpRequest.get("/api/v1/guests")
+                                        .cookie(new HttpCookie("jwt", tokenB)).build()),
+                                ex -> { sigB.set(ex.getRequest().getHeaders().getFirst("X-Internal-Signature")); return Mono.empty(); }
+                        ).block();
+
+                        assertThat(sigA.get()).isNotBlank();
+                        assertThat(sigB.get()).isNotBlank();
+                        assertThat(sigA.get()).isNotEqualTo(sigB.get());
+                }
         }
 
         @Nested
