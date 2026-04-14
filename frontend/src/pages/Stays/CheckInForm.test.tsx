@@ -79,7 +79,7 @@ describe('CheckInForm', () => {
   it('validates primary guest and submits', async () => {
     vi.mocked(stayService.createStay).mockResolvedValue(mockStayResponse());
     renderComponent(1);
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     // Fill in required fields for Guest 1
     await user.type(screen.getAllByLabelText(/first name/i)[0], 'John');
