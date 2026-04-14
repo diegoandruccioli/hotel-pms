@@ -1,5 +1,6 @@
 package com.hotelpms.auth.service;
 
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -29,4 +30,31 @@ public interface RefreshTokenService {
      * @return {@code true} if the JTI is in the blacklist, {@code false} otherwise
      */
     boolean isBlacklisted(String jti);
+
+    /**
+     * Stores the current token version for the given user in Redis (T-AUTH-04 residuo).
+     *
+     * <p>The key {@code user:tv:<username>} is written with the supplied TTL so
+     * that it expires once no valid token for the user can exist anymore. On
+     * password change the value is overwritten with the incremented version,
+     * causing subsequent {@link #getTokenVersion} calls to return the new value
+     * and triggering a mismatch rejection in {@code AuthServiceImpl.refresh()}.</p>
+     *
+     * @param username the username (Redis key suffix)
+     * @param version  the current {@code tokenVersion} of the user account
+     * @param ttl      how long the key should live (typically the refresh token lifetime)
+     */
+    void storeTokenVersion(String username, int version, Duration ttl);
+
+    /**
+     * Returns the token version stored in Redis for the given user.
+     *
+     * <p>Returns {@code -1} when the key does not exist (user has not logged in
+     * since the feature was deployed, or the key expired). The caller must treat
+     * {@code -1} as "version unknown" and skip the version check.</p>
+     *
+     * @param username the username (Redis key suffix)
+     * @return the stored token version, or {@code -1} if the key is absent
+     */
+    int getTokenVersion(String username);
 }

@@ -1,6 +1,7 @@
 package com.hotelpms.auth.controller;
 
 import com.hotelpms.auth.dto.AuthResponse;
+import com.hotelpms.auth.dto.ChangePasswordRequest;
 import com.hotelpms.auth.dto.LoginRequest;
 import com.hotelpms.auth.dto.RegisterRequest;
 import com.hotelpms.auth.exception.BadCredentialsException;
@@ -165,6 +166,50 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE,
                         createCsrfCookie("", 0).toString())
                 .build();
+    }
+
+    /**
+     * Endpoint for changing the authenticated user's password (T-AUTH-04 residuo).
+     *
+     * <p>Requires the current password as a second-factor check: an attacker who
+     * obtained a valid access token cannot silently replace the victim's credentials.
+     * On success, {@code tokenVersion} is incremented, all pre-existing sessions are
+     * invalidated, and fresh cookies are set so the requesting session remains active.</p>
+     *
+     * @param token   the access JWT cookie; {@code null} if absent
+     * @param request the change-password payload (current + new password)
+     * @return HTTP 200 with refreshed cookies on success,
+     *         HTTP 401 when the JWT cookie is missing, invalid, or expired
+     */
+    @PostMapping("/change-password")
+    public ResponseEntity<Void> changePassword(
+            @CookieValue(name = COOKIE_NAME, required = false) final String token,
+            @NonNull final @Valid @RequestBody ChangePasswordRequest request) {
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            final String username = jwtService.extractUsername(token);
+            if (!jwtService.isTokenValid(token, username)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            final AuthResponse response = authService.changePassword(username, request);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE,
+                            createCookie(COOKIE_NAME, response.token(),
+                                    ACCESS_COOKIE_MAX_AGE, COOKIE_PATH).toString())
+                    .header(HttpHeaders.SET_COOKIE,
+                            createCookie(REFRESH_COOKIE_NAME, response.refreshToken(),
+                                    REFRESH_COOKIE_MAX_AGE, REFRESH_COOKIE_PATH).toString())
+                    .header(HttpHeaders.SET_COOKIE,
+                            createCsrfCookie(UUID.randomUUID().toString(),
+                                    ACCESS_COOKIE_MAX_AGE).toString())
+                    .build();
+        } catch (final JwtException | IllegalArgumentException e) {
+            log.warn("[AUTH] CHANGE_PASSWORD_REJECTED | reason=INVALID_JWT | detail={}",
+                    e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
     }
 
     /**

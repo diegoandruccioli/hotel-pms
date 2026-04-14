@@ -36,6 +36,15 @@ public class JwtService {
     /** Custom claim key for the tenant hotel identifier. */
     private static final String CLAIM_HOTEL_ID = "hotelId";
 
+    /**
+     * Custom claim key for the token version counter (T-AUTH-04 residuo).
+     *
+     * <p>The value mirrors {@code UserAccount.tokenVersion}. When a password
+     * change increments that counter, any token carrying an older {@code tv}
+     * value is rejected at the refresh endpoint.</p>
+     */
+    private static final String CLAIM_TOKEN_VERSION = "tv";
+
     @Value("${jwt.secret}")
     private String secretKey;
 
@@ -46,37 +55,48 @@ public class JwtService {
     private long refreshExpiration;
 
     /**
-     * Generates a short-lived access JWT for the given username, role, and hotel.
+     * Generates a short-lived access JWT for the given username, role, hotel, and token version.
      *
-     * @param username the user's username
-     * @param role     the user's role
-     * @param hotelId  the tenant identifier for multi-hotel isolation
+     * <p>The {@code tv} (token version) claim mirrors {@code UserAccount.tokenVersion}.
+     * Incrementing that counter on password change makes all previously issued tokens
+     * distinguishable from the current generation (T-AUTH-04 residuo).</p>
+     *
+     * @param username     the user's username
+     * @param role         the user's role
+     * @param hotelId      the tenant identifier for multi-hotel isolation
+     * @param tokenVersion the current token version counter for the user
      * @return the generated access JWT
      */
-    public String generateToken(final String username, final Role role, final UUID hotelId) {
+    public String generateToken(final String username, final Role role, final UUID hotelId,
+            final int tokenVersion) {
         final Map<String, Object> claims = new HashMap<>();
         claims.put("role", role.name());
         claims.put(CLAIM_HOTEL_ID, hotelId.toString());
+        claims.put(CLAIM_TOKEN_VERSION, tokenVersion);
         return buildToken(claims, username, jwtExpiration);
     }
 
     /**
-     * Generates a long-lived refresh JWT for the given username, role, and hotel.
+     * Generates a long-lived refresh JWT for the given username, role, hotel, and token version.
      *
-     * <p>The token includes a unique {@code jti} (JWT ID) and a
-     * {@code typ=refresh} marker to distinguish it from access tokens.
-     * The JTI can be blacklisted on logout or on rotation (T-AUTH-04).</p>
+     * <p>The token includes a unique {@code jti} (JWT ID), a {@code typ=refresh} marker,
+     * and the {@code tv} (token version) counter. When a password change increments the
+     * counter, the refresh endpoint rejects tokens whose {@code tv} diverges from the
+     * Redis-cached value (T-AUTH-04 residuo).</p>
      *
-     * @param username the user's username
-     * @param role     the user's role
-     * @param hotelId  the tenant identifier for multi-hotel isolation
+     * @param username     the user's username
+     * @param role         the user's role
+     * @param hotelId      the tenant identifier for multi-hotel isolation
+     * @param tokenVersion the current token version counter for the user
      * @return the generated refresh JWT
      */
-    public String generateRefreshToken(final String username, final Role role, final UUID hotelId) {
+    public String generateRefreshToken(final String username, final Role role, final UUID hotelId,
+            final int tokenVersion) {
         final Map<String, Object> claims = new HashMap<>();
         claims.put("role", role.name());
         claims.put(CLAIM_HOTEL_ID, hotelId.toString());
         claims.put(CLAIM_TYPE, TYPE_REFRESH);
+        claims.put(CLAIM_TOKEN_VERSION, tokenVersion);
         return buildRefreshToken(claims, username, refreshExpiration, UUID.randomUUID().toString());
     }
 
@@ -120,6 +140,21 @@ public class JwtService {
      */
     public String extractJti(final String token) {
         return extractClaim(token, Claims::getId);
+    }
+
+    /**
+     * Extracts the {@code tv} (token version) claim from the given token.
+     *
+     * <p>Returns {@code -1} when the claim is absent, which happens for tokens
+     * issued before this feature was deployed. The caller must treat {@code -1}
+     * as "version unknown" and skip the version check to allow graceful migration.</p>
+     *
+     * @param token the JWT
+     * @return the token version, or {@code -1} if the claim is absent
+     */
+    public int extractTokenVersion(final String token) {
+        final Integer tv = extractClaim(token, c -> c.get(CLAIM_TOKEN_VERSION, Integer.class));
+        return tv != null ? tv : -1;
     }
 
     /**

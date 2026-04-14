@@ -23,6 +23,9 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     /** Key prefix for blacklisted refresh-token JTIs in Redis. */
     private static final String PREFIX = "rt:blacklist:";
 
+    /** Key prefix for per-user token version cache entries in Redis. */
+    private static final String TV_PREFIX = "user:tv:";
+
     private final StringRedisTemplate redisTemplate;
 
     /**
@@ -45,5 +48,34 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     public boolean isBlacklisted(final String jti) {
         return Boolean.TRUE.equals(redisTemplate.hasKey(PREFIX + jti));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void storeTokenVersion(final String username, final int version, final Duration ttl) {
+        redisTemplate.opsForValue().set(TV_PREFIX + username, String.valueOf(version),
+                Objects.requireNonNull(ttl));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Returns {@code -1} when the Redis key is absent (user has not yet logged in
+     * with the new code, or the key has expired). The value {@code -1} signals
+     * "unknown" to the caller so the version check can be safely skipped.</p>
+     */
+    @Override
+    public int getTokenVersion(final String username) {
+        final String raw = redisTemplate.opsForValue().get(TV_PREFIX + username);
+        if (raw == null) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(raw);
+        } catch (final NumberFormatException e) {
+            return -1;
+        }
     }
 }

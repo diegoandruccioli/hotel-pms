@@ -64,6 +64,18 @@ public class UserAccount {
     @Column(nullable = false)
     private boolean active = true;
 
+    /**
+     * Monotonically incrementing counter embedded in the JWT {@code tv} claim.
+     *
+     * <p>Incrementing this value (on password change) invalidates all previously
+     * issued tokens for this user. {@code AuthServiceImpl.refresh()} rejects
+     * any refresh token whose {@code tv} claim does not match the value cached
+     * in Redis under {@code user:tv:<username>} (T-AUTH-04 residuo).</p>
+     */
+    @Builder.Default
+    @Column(nullable = false)
+    private int tokenVersion = 0;
+
     @Column(nullable = false)
     private int failedAttempts;
 

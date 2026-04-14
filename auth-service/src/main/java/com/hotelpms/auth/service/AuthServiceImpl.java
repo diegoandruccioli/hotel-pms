@@ -2,6 +2,7 @@ package com.hotelpms.auth.service;
 
 import com.hotelpms.auth.domain.UserAccount;
 import com.hotelpms.auth.dto.AuthResponse;
+import com.hotelpms.auth.dto.ChangePasswordRequest;
 import com.hotelpms.auth.dto.LoginRequest;
 import com.hotelpms.auth.dto.RegisterRequest;
 import com.hotelpms.auth.exception.AccountLockedException;
@@ -31,6 +32,15 @@ public class AuthServiceImpl implements AuthService {
     private static final Duration LOCKOUT_DURATION = Duration.ofMinutes(15);
     private static final String INVALID_REFRESH_TOKEN = "INVALID_REFRESH_TOKEN";
 
+    /**
+     * TTL for the Redis token-version key {@code user:tv:<username>}.
+     *
+     * <p>Must be at least as long as the refresh token lifetime so that the version
+     * check remains effective for the entire window during which old tokens could
+     * be replayed. Kept in sync with {@code jwt.refresh-expiration} in config.</p>
+     */
+    private static final Duration REFRESH_TOKEN_TTL = Duration.ofDays(7);
+
     private final UserAccountRepository userRepository;
     private final UserAccountMapper userMapper;
     private final PasswordEncoder passwordEncoder;
@@ -58,9 +68,16 @@ public class AuthServiceImpl implements AuthService {
 
         userRepository.save(user);
 
+        // Cache the initial token version (0) so the tv check in refresh() is active
+        // from the very first token rotation.
+        refreshTokenService.storeTokenVersion(user.getUsername(), user.getTokenVersion(),
+                REFRESH_TOKEN_TTL);
+
         log.info("[AUTH] REGISTER_SUCCESS | user={}", user.getUsername());
-        final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole(), user.getHotelId());
-        final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole(), user.getHotelId());
+        final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole(),
+                user.getHotelId(), user.getTokenVersion());
+        final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole(),
+                user.getHotelId(), user.getTokenVersion());
         return new AuthResponse(accessToken, refreshToken);
     }
 
@@ -119,9 +136,16 @@ public class AuthServiceImpl implements AuthService {
             userRepository.save(user);
         }
 
+        // Refresh the Redis token-version cache on every successful login so that
+        // the key TTL is reset and the tv check remains active.
+        refreshTokenService.storeTokenVersion(user.getUsername(), user.getTokenVersion(),
+                REFRESH_TOKEN_TTL);
+
         log.info("[AUTH] LOGIN_SUCCESS | user={}", user.getUsername());
-        final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole(), user.getHotelId());
-        final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole(), user.getHotelId());
+        final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole(),
+                user.getHotelId(), user.getTokenVersion());
+        final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole(),
+                user.getHotelId(), user.getTokenVersion());
         return new AuthResponse(accessToken, refreshToken);
     }
 
@@ -152,14 +176,82 @@ public class AuthServiceImpl implements AuthService {
                     return new BadCredentialsException(INVALID_REFRESH_TOKEN);
                 });
 
+        // Token-version check (T-AUTH-04 residuo): reject tokens issued before a password change.
+        // storedTv = -1 means the Redis key is absent (user logged in before this feature was
+        // deployed) → skip the check for graceful migration.
+        // jwtTv = -1 means the token has no "tv" claim (old token without the claim) → mismatch
+        // against any positive storedTv → correctly rejected.
+        final int storedTv = refreshTokenService.getTokenVersion(username);
+        final int jwtTv = jwtService.extractTokenVersion(refreshToken);
+        if (storedTv >= 0 && jwtTv != storedTv) {
+            log.warn("[AUTH] REFRESH_REJECTED | reason=TOKEN_VERSION_MISMATCH | user={} | jwtTv={} | storedTv={}",
+                    username, jwtTv, storedTv);
+            throw new BadCredentialsException(INVALID_REFRESH_TOKEN);
+        }
+
         // Blacklist the consumed token before issuing the new pair
         final Instant expiresAt = jwtService.extractExpirationInstant(refreshToken);
         refreshTokenService.blacklist(jti, expiresAt);
 
         log.info("[AUTH] REFRESH_SUCCESS | user={}", username);
-        final String newAccessToken = jwtService.generateToken(username, user.getRole(), user.getHotelId());
-        final String newRefreshToken = jwtService.generateRefreshToken(username, user.getRole(), user.getHotelId());
+        final String newAccessToken = jwtService.generateToken(username, user.getRole(),
+                user.getHotelId(), user.getTokenVersion());
+        final String newRefreshToken = jwtService.generateRefreshToken(username, user.getRole(),
+                user.getHotelId(), user.getTokenVersion());
         return new AuthResponse(newAccessToken, newRefreshToken);
+    }
+
+    /**
+     * Changes the authenticated user's password and revokes all existing sessions
+     * by incrementing {@code tokenVersion} (T-AUTH-04 residuo).
+     *
+     * <p>Steps:
+     * <ol>
+     *   <li>Re-verify identity with {@code currentPassword} (second factor against
+     *       stolen-token attacks).</li>
+     *   <li>Hash and store the new password.</li>
+     *   <li>Increment {@code tokenVersion} in the database.</li>
+     *   <li>Update the Redis cache key {@code user:tv:<username>} with the new version,
+     *       so that any subsequent {@code refresh()} call carrying the old {@code tv}
+     *       claim is immediately rejected.</li>
+     *   <li>Issue a new token pair (with the updated {@code tv}) so the requesting
+     *       session stays active without forcing the owner to log in again.</li>
+     * </ol>
+     * </p>
+     *
+     * @param username the authenticated user's username
+     * @param request  the change-password request containing current and new passwords
+     * @return a fresh {@link AuthResponse} with new access and refresh tokens
+     */
+    @Override
+    @Transactional
+    public AuthResponse changePassword(final String username, final ChangePasswordRequest request) {
+        final UserAccount user = userRepository.findByUsername(username)
+                .orElseThrow(() -> {
+                    log.warn("[AUTH] CHANGE_PASSWORD_REJECTED | reason=USER_NOT_FOUND | user={}", username);
+                    return new BadCredentialsException("INVALID_CREDENTIALS");
+                });
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            log.warn("[AUTH] CHANGE_PASSWORD_REJECTED | reason=BAD_CURRENT_PASSWORD | user={}", username);
+            throw new BadCredentialsException("INVALID_CURRENT_PASSWORD");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        user.setTokenVersion(user.getTokenVersion() + 1);
+        userRepository.save(user);
+
+        // Overwrite Redis key with the new version to invalidate all previously issued tokens
+        refreshTokenService.storeTokenVersion(username, user.getTokenVersion(), REFRESH_TOKEN_TTL);
+
+        log.info("[AUTH] PASSWORD_CHANGED | user={} | newTokenVersion={}", username,
+                user.getTokenVersion());
+
+        final String accessToken = jwtService.generateToken(username, user.getRole(),
+                user.getHotelId(), user.getTokenVersion());
+        final String refreshToken = jwtService.generateRefreshToken(username, user.getRole(),
+                user.getHotelId(), user.getTokenVersion());
+        return new AuthResponse(accessToken, refreshToken);
     }
 
     /**

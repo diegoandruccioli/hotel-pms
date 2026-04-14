@@ -87,4 +87,52 @@ class RefreshTokenServiceImplTest {
         assertFalse(refreshTokenService.isBlacklisted(TEST_JTI),
                 "Should return false when Redis returns null (key absent)");
     }
+
+    // ─── Token Version (T-AUTH-04 residuo) ───────────────────────────────────
+
+    @Test
+    void storeTokenVersionWritesCorrectKeyAndValue() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        final Duration ttl = Duration.ofDays(7);
+
+        refreshTokenService.storeTokenVersion("alice", 3, ttl);
+
+        final List<Invocation> invocations = new ArrayList<>(
+                Mockito.mockingDetails(valueOps).getInvocations());
+        assertEquals(1, invocations.size(), "set() must be called exactly once");
+        final Invocation setCall = invocations.get(0);
+        assertEquals("user:tv:alice", setCall.<String>getArgument(0),
+                "Key must follow the user:tv:<username> pattern");
+        assertEquals("3", setCall.<String>getArgument(1),
+                "Value must be the string representation of the version");
+        assertEquals(ttl, setCall.<Duration>getArgument(2),
+                "TTL must match the supplied duration");
+    }
+
+    @Test
+    void getTokenVersionReturnsStoredValue() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get("user:tv:alice")).thenReturn("2");
+
+        assertEquals(2, refreshTokenService.getTokenVersion("alice"),
+                "Should return the integer value stored in Redis");
+    }
+
+    @Test
+    void getTokenVersionReturnsNegativeOneWhenKeyAbsent() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get("user:tv:bob")).thenReturn(null);
+
+        assertEquals(-1, refreshTokenService.getTokenVersion("bob"),
+                "Should return -1 when the Redis key does not exist");
+    }
+
+    @Test
+    void getTokenVersionReturnsNegativeOneWhenValueIsNotNumeric() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get("user:tv:corrupt")).thenReturn("not-a-number");
+
+        assertEquals(-1, refreshTokenService.getTokenVersion("corrupt"),
+                "Should return -1 and not throw when Redis value is non-numeric");
+    }
 }

@@ -1,6 +1,7 @@
 package com.hotelpms.auth.service;
 
 import com.hotelpms.auth.dto.AuthResponse;
+import com.hotelpms.auth.dto.ChangePasswordRequest;
 import com.hotelpms.auth.dto.LoginRequest;
 import com.hotelpms.auth.dto.RegisterRequest;
 
@@ -46,4 +47,23 @@ public interface AuthService {
      * @param refreshToken the refresh JWT value to invalidate
      */
     void invalidateRefreshToken(String refreshToken);
+
+    /**
+     * Changes the password for the authenticated user and invalidates all existing sessions
+     * (T-AUTH-04 residuo).
+     *
+     * <p>The caller must supply the current password as a second authentication factor,
+     * preventing an attacker with a stolen access token from silently replacing credentials.
+     * After a successful change, {@code UserAccount.tokenVersion} is incremented and the new
+     * value is cached in Redis. Any previously issued refresh token carries the old {@code tv}
+     * claim and will be rejected at the next rotation attempt.</p>
+     *
+     * <p>A fresh token pair (with the updated {@code tv}) is returned so the requesting
+     * session remains active without forcing the owner to log in again.</p>
+     *
+     * @param username the authenticated user's username (extracted from the access token)
+     * @param request  the change-password request containing current and new passwords
+     * @return a fresh {@link AuthResponse} with new access and refresh tokens
+     */
+    AuthResponse changePassword(String username, ChangePasswordRequest request);
 }
