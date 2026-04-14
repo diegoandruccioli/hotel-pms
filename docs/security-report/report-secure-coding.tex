@@ -1224,6 +1224,199 @@ server-side senza dipendere dalla scadenza naturale del token.
 \paragraph{Riferimento} Commit: \commitref{5ce3010}{fix(security): T-AUTH-04 --- refresh token rotation + Redis blacklist}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Cambio password non revoca le sessioni attive \threat{T-AUTH-04 residuo}}
+
+\paragraph{Descrizione}
+La rotation introdotta con \texttt{5ce3010} copre il caso in cui un token viene
+intercettato durante la trasmissione, ma lasciava aperta una finestra di attacco
+distinta: un utente che \textbf{cambia la propria password} non revocava i refresh
+token già emessi. Un attaccante in possesso di un refresh token (es.\ estratto da
+un dispositivo rubato o da un cookie leak) poteva continuare a ruotarlo per
+\textbf{7 giorni}, ottenendo nuovi access token validi anche dopo che la vittima
+aveva aggiornato la password. Il sistema non possedeva alcun meccanismo per
+correlare un token in volo con la ``generazione'' di credenziali corrente.
+Classificato OWASP A07 --- Identification \& Authentication Failures.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- AuthServiceImpl.java (refresh senza controllo versione)}]
+\begin{lstlisting}[style=java]
+// Prima del fix: refresh accetta qualsiasi token valido non blacklistato,
+// indipendentemente da quando e' stato emesso rispetto all'ultimo cambio password.
+@Override
+@Transactional(readOnly = true)
+public AuthResponse refresh(final String refreshToken) {
+    // ...
+    String username = jwtService.extractUsername(refreshToken);
+    UserAccount user = userRepository.findByUsername(username)
+        .orElseThrow(() -> new BadCredentialsException("INVALID_REFRESH_TOKEN"));
+    // MANCANZA: nessun confronto con la "generazione" corrente delle credenziali.
+    // Un token emesso 6 giorni fa (prima del cambio password) supera questo check.
+    refreshTokenService.blacklist(jti, jwtService.extractExpirationInstant(refreshToken));
+    return new AuthResponse(
+        jwtService.generateToken(username, user.getRole(), user.getHotelId()),
+        jwtService.generateRefreshToken(username, user.getRole(), user.getHotelId()));
+}
+
+// JwtService.generateToken / generateRefreshToken: nessun claim tv
+public String generateToken(String username, Role role, UUID hotelId) {
+    Map<String, Object> claims = new HashMap<>();
+    claims.put("role", role.name());
+    claims.put("hotelId", hotelId.toString());
+    // claim "tv" assente: il token non porta informazioni sulla generazione
+    return buildToken(claims, username, jwtExpiration);
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+L'approccio scelto è il \textbf{token versioning}: un contatore monotòno \texttt{tokenVersion}
+in \texttt{user\_account} viene embedded come claim \texttt{tv} in ogni JWT (access
+e refresh). Al cambio password il contatore viene incrementato e il nuovo valore
+sovrascrive la chiave Redis \texttt{user:tv:<username>}. Il metodo \texttt{refresh()}
+confronta il claim \texttt{tv} del token in ingresso con il valore in Redis: se
+divergono, il token appartiene a una generazione precedente e viene rifiutato con
+HTTP~401.
+
+\noindent Questo approccio è superiore alla blacklist JTI per il caso del cambio
+password perché:
+\begin{itemize}
+  \item Opera come \emph{blanket revocation}: un singolo write Redis revoca
+        \emph{tutti} i token precedenti, senza dover enumerare i JTI.
+  \item Non cresce con il numero di sessioni: la chiave è una sola per utente.
+  \item I token access (TTL 15 min) scadono naturalmente in pochi minuti;
+        la protezione immediata copre i refresh token (TTL 7 giorni).
+\end{itemize}
+
+\noindent\textbf{Migrazione graceful:} se la chiave Redis è assente
+(\texttt{storedTv = -1}), il check viene saltato. Questo permette agli utenti
+che avevano sessioni attive prima del deploy di continuare a usarle.
+La chiave viene scritta al primo login/register successivo al deploy.
+
+\begin{securebox}[title={Codice Sicuro --- Flyway V4 (migrazione schema)}]
+\begin{lstlisting}[style=sql]
+-- V4__add_token_version.sql
+ALTER TABLE user_account
+    ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 0;
+COMMENT ON COLUMN user_account.token_version IS
+    'Monotonically incrementing counter embedded in JWT "tv" claim. '
+    'Incrementing it (on password change) invalidates all previously issued tokens.';
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- JwtService.java (claim tv nei JWT)}]
+\begin{lstlisting}[style=java]
+private static final String CLAIM_TOKEN_VERSION = "tv";
+
+// generateToken e generateRefreshToken accettano ora tokenVersion come 4 argomento
+public String generateToken(String username, Role role, UUID hotelId, int tokenVersion) {
+    Map<String, Object> claims = new HashMap<>();
+    claims.put("role", role.name());
+    claims.put("hotelId", hotelId.toString());
+    claims.put(CLAIM_TOKEN_VERSION, tokenVersion); // nuovo claim
+    return buildToken(claims, username, jwtExpiration);
+}
+
+// Estrae il claim tv: -1 se assente (token pre-feature → check saltato)
+public int extractTokenVersion(String token) {
+    Integer tv = extractClaim(token, c -> c.get(CLAIM_TOKEN_VERSION, Integer.class));
+    return tv != null ? tv : -1;
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- RefreshTokenServiceImpl.java (Redis token version)}]
+\begin{lstlisting}[style=java]
+private static final String TV_PREFIX = "user:tv:";
+
+// Scrive "user:tv:<username>" = versione corrente con TTL = lifetime refresh token
+@Override
+public void storeTokenVersion(String username, int version, Duration ttl) {
+    redisTemplate.opsForValue()
+        .set(TV_PREFIX + username, String.valueOf(version), ttl);
+}
+
+// Restituisce -1 se la chiave non esiste (migrazione graceful)
+@Override
+public int getTokenVersion(String username) {
+    String raw = redisTemplate.opsForValue().get(TV_PREFIX + username);
+    if (raw == null) return -1;
+    try { return Integer.parseInt(raw); }
+    catch (NumberFormatException e) { return -1; }
+}
+\end{lstlisting}
+\end{securebox}
+
+\begin{securebox}[title={Codice Sicuro --- AuthServiceImpl.java (check tv in refresh + changePassword)}]
+\begin{lstlisting}[style=java]
+// In refresh(): check versione prima di ruotare il token
+final int storedTv = refreshTokenService.getTokenVersion(username);
+final int jwtTv = jwtService.extractTokenVersion(refreshToken);
+// storedTv >= 0: chiave presente -> check attivo
+// jwtTv = -1 (claim assente) != storedTv positivo -> rifiuto corretto
+if (storedTv >= 0 && jwtTv != storedTv) {
+    log.warn("[AUTH] REFRESH_REJECTED | reason=TOKEN_VERSION_MISMATCH"
+             + " | user={} | jwtTv={} | storedTv={}", username, jwtTv, storedTv);
+    throw new BadCredentialsException("INVALID_REFRESH_TOKEN");
+}
+
+// POST /api/v1/auth/change-password
+@Override
+@Transactional
+public AuthResponse changePassword(String username, ChangePasswordRequest request) {
+    UserAccount user = userRepository.findByUsername(username)
+        .orElseThrow(() -> new BadCredentialsException("INVALID_CREDENTIALS"));
+    // Secondo fattore: verifica password corrente
+    if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+        log.warn("[AUTH] CHANGE_PASSWORD_REJECTED | reason=BAD_CURRENT_PASSWORD");
+        throw new BadCredentialsException("INVALID_CURRENT_PASSWORD");
+    }
+    user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+    user.setTokenVersion(user.getTokenVersion() + 1); // invalida tutte le sessioni
+    userRepository.save(user);
+    // Sovrascrive Redis: tutti i token con tv=vecchio verranno rifiutati in refresh()
+    refreshTokenService.storeTokenVersion(username, user.getTokenVersion(), REFRESH_TOKEN_TTL);
+    log.info("[AUTH] PASSWORD_CHANGED | user={} | newTokenVersion={}", username,
+             user.getTokenVersion());
+    // Emette un nuovo token pair per mantenere attiva la sessione corrente
+    return new AuthResponse(
+        jwtService.generateToken(username, user.getRole(), user.getHotelId(),
+                                  user.getTokenVersion()),
+        jwtService.generateRefreshToken(username, user.getRole(), user.getHotelId(),
+                                         user.getTokenVersion()));
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Aggiunti 6 test tra \texttt{AuthServiceImplTest} e \texttt{RefreshTokenServiceImplTest}:
+\begin{itemize}
+  \item \texttt{refreshThrowsWhenTokenVersionMismatch}: verifica che il refresh
+        venga rifiutato quando il claim \texttt{tv} del JWT diverge dal valore Redis
+        (simula un token emesso prima del cambio password).
+  \item \texttt{refreshSkipsVersionCheckWhenRedisKeyAbsent}: verifica la migrazione
+        graceful (\texttt{storedTv = -1} $\Rightarrow$ check saltato).
+  \item \texttt{changePasswordSuccessIncreasesVersionAndIssuesNewTokenPair}: verifica
+        l'incremento di \texttt{tokenVersion}, il write Redis e l'emissione del nuovo
+        token pair.
+  \item \texttt{changePasswordThrowsWhenCurrentPasswordIsWrong}: verifica che la
+        password corrente errata blocchi il cambio.
+  \item \texttt{changePasswordThrowsWhenUserNotFound}: verifica la gestione di utenti
+        inesistenti.
+  \item \texttt{storeTokenVersionWritesCorrectKeyAndValue} e
+        \texttt{getTokenVersionReturnsStoredValue} in \texttt{RefreshTokenServiceImplTest}.
+\end{itemize}
+
+\paragraph{Effetto}
+Dopo il cambio password, qualsiasi tentativo di ruotare un refresh token
+``pre-cambio'' viene respinto con HTTP~401 non appena il token giunge al
+\texttt{POST /api/v1/auth/refresh}. La finestra di esposizione residua si riduce
+ai soli access token ancora in volo (massimo \textbf{15 minuti}), che scadono
+naturalmente. Il cambio password reimposta anche i cookie del browser della
+sessione corrente con il nuovo token pair, garantendo continuità di servizio
+al legittimo proprietario.
+
+\paragraph{Riferimento} Commit: \commitref{b473265}{fix(security): GAP-1 --- password change revokes existing sessions via tokenVersion}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Audit Log e Security Monitoring}
 % ─────────────────────────────────────────────────────────────────────────────
 
