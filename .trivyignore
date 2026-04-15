@@ -1,6 +1,14 @@
 # ============================================================
 # .trivyignore — Accepted CVE suppressions for Trivy
 # ============================================================
+# CVE-2026-22732 — Spring Security: security policy bypass and information
+# disclosure (spring-security-web). Fixed in Spring Security 6.5.9 / 7.0.4,
+# which require Spring Boot 3.5.x / 4.0.x respectively. The project is
+# currently pinned to Spring Boot 3.4.x (Spring Cloud 2024.0.0 compatibility).
+# Migration to Spring Boot 3.5.x is planned for the next major dependency
+# update cycle. Risk mitigated by network-layer controls (API gateway, no
+# direct external exposure of internal services).
+CVE-2026-22732
 # Format: one CVE-ID per line, with a comment explaining the
 # justification — mirrors the approach used in
 # config/dependency-check/suppressions.xml for OWASP DC.

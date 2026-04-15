@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.4.3"
+    id("org.springframework.boot") version "3.4.13"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -24,6 +24,7 @@ repositories {
 ext {
     set("springCloudVersion", "2024.0.0")
     set("jjwtVersion", "0.11.5")
+    set("tomcat.version", "10.1.54")
 }
 
 dependencies {
