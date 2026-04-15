@@ -5289,6 +5289,58 @@ Dopo il commit \texttt{14d29b9}:
 \end{securebox}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\section{Copertura OWASP Top 10 (2021) — Riepilogo}
+
+La tabella seguente mostra la copertura complessiva raggiunta al termine
+di tutte le sessioni di hardening, aggiornata alla revisione del
+2026-04-15.
+
+\begin{center}
+\small
+\begin{tabular}{clp{8cm}}
+\hline
+\textbf{Categoria} & \textbf{Nome} & \textbf{Interventi} \\
+\hline
+\owasp{A01} & Broken Access Control
+  & T-GST-01/03, T-RES-02, T-BILL-01, T-FB-01, T-FE-03,
+    T-GW-05/06/07, GAP-3 \\
+\owasp{A02} & Cryptographic Failures
+  & T-AUTH-03 (BCrypt cost 12), T-CFG-02 (segreti env), T-STAY-03 (TLS) \\
+\owasp{A03} & Injection
+  & T-GST-02 (Bean Validation pattern), T-RES-03 (date validation),
+    T-FE-01 (XSS ESLint rule) \\
+\owasp{A04} & Insecure Design
+  & T-RES-01 (optimistic lock), T-STAY-01 (state allowlist),
+    T-FB-02 (server-side pricing), T-BILL-02 (amount normalisation),
+    T-GST-04 (mass-assignment) \\
+\owasp{A05} & Security Misconfiguration
+  & T-GW-02 (rate limiting), T-GW-03 (security headers),
+    T-GW-04 (CORS whitelist), T-CFG-01 (actuator port),
+    T-CFG-03 (config-service Basic Auth), T-FE-04 (CSP nginx) \\
+\owasp{A06} & Vulnerable and Outdated Components
+  & DEP-CVE-01 (Netty 4.1.132, Gateway 4.2.6) \\
+\owasp{A07} & Identification \& Authentication Failures
+  & T-AUTH-01 (no enumeration), T-AUTH-02 (lockout),
+    T-AUTH-03 (BCrypt), T-AUTH-04 (token rotation + revocation),
+    T-FE-02 (httpOnly cookie) \\
+\owasp{A08} & Software and Data Integrity Failures
+  & \textit{n/a — Gradle dependency verification e signed artifacts
+    fuori scope esame} \\
+\owasp{A09} & Security Logging \& Monitoring Failures
+  & T-AUTH-05 (audit log auth), T-STAY-02 (audit log stay),
+    T-BILL-03 (audit log billing), GAP-4 (Loki SIEM aggregation) \\
+\owasp{A10} & Server-Side Request Forgery
+  & \textit{n/a — nessun endpoint accetta URL controllati dal client} \\
+\hline
+\end{tabular}
+\end{center}
+
+\medskip
+Su 10 categorie OWASP Top 10 (2021), \textbf{8 sono coperte} da almeno
+un intervento verificato e committato. A08 e A10 non si applicano
+all'architettura corrente del sistema.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Valutazione del processo}
 
 L'utilizzo dell'IA come strumento di analisi e verifica, piuttosto che come

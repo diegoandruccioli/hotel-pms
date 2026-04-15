@@ -2,7 +2,7 @@
 
 **Metodologia**: STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege)  
 **Branch di riferimento**: `feature/secure-coding-hardening`  
-**Data ultima revisione**: 2026-04-04  
+**Data ultima revisione**: 2026-04-15  
 **Autore**: Diego Andruccioli
 
 ---
@@ -216,10 +216,11 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 
 | OWASP | Nome | Threats mappati |
 |-------|------|----------------|
-| A01 | Broken Access Control | T-GST-01, T-GST-03, T-RES-02, T-BILL-01, T-FB-01, T-FE-03 |
-| A02 | Cryptographic Failures | T-AUTH-03, T-CFG-02 |
+| A01 | Broken Access Control | T-GST-01, T-GST-03, T-RES-02, T-BILL-01, T-FB-01, T-FE-03, T-GW-05, T-GW-06, T-GW-07, GAP-3 |
+| A02 | Cryptographic Failures | T-AUTH-03, T-CFG-02, T-STAY-03 |
 | A03 | Injection | T-GST-02, T-RES-03, T-FE-01 |
-| A04 | Insecure Design | T-RES-01, T-STAY-01, T-FB-02 |
-| A05 | Security Misconfiguration | T-GW-03, T-GW-04, T-CFG-01, T-FE-04 |
-| A07 | Identification & Authentication Failures | T-AUTH-01, T-AUTH-02, T-AUTH-04 |
-| A09 | Security Logging & Monitoring Failures | T-AUTH-05, T-STAY-02, T-BILL-03 |
+| A04 | Insecure Design | T-RES-01, T-STAY-01, T-FB-02, T-BILL-02, T-GST-04 |
+| A05 | Security Misconfiguration | T-GW-02, T-GW-03, T-GW-04, T-CFG-01, T-CFG-03, T-FE-04 |
+| A06 | Vulnerable and Outdated Components | DEP-CVE-01 |
+| A07 | Identification & Authentication Failures | T-AUTH-01, T-AUTH-02, T-AUTH-03, T-AUTH-04, T-AUTH-04-residuo, T-FE-02 |
+| A09 | Security Logging & Monitoring Failures | T-AUTH-05, T-STAY-02, T-BILL-03, GAP-4 |
