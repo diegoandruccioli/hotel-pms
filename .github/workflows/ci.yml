@@ -90,16 +90,30 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}-
 
-      # NVD database is ~200MB and takes 5+ minutes to download.
-      # Caching avoids re-downloading on every CI run.
+      # NVD database is ~200 MB and refreshes daily.
+      # Cache key uses the current date so every run on the same day hits the cache;
+      # the restore-key falls back to the most recent prior day if today's entry is
+      # absent (first run of the day re-downloads only the delta, not the full DB).
+      # NOTE: run_id was intentionally removed — it made the cache useless because
+      # run_id is unique per run and the saved entry was never restored.
+      - name: Get current date (for NVD cache key)
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
       - name: Cache NVD database
         uses: actions/cache@v4
         with:
           path: ~/.gradle/dependency-check-data
-          key: nvd-${{ runner.os }}-${{ github.run_id }}
+          key: nvd-${{ runner.os }}-${{ steps.date.outputs.date }}
           restore-keys: nvd-${{ runner.os }}-
 
       - name: Run OWASP Dependency Check
+        env:
+          # Optional: add NVD_API_KEY in Settings → Secrets → Actions.
+          # Without it: 1 req/6 s rate limit → slow first run.
+          # With it:   50 req/30 s → ~10× faster initial download.
+          # Register free at https://nvd.nist.gov/developers/request-an-api-key
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ./gradlew dependencyCheckAggregate --no-daemon
 
       - name: Upload Dependency Check reports

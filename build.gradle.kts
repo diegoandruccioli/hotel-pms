@@ -15,6 +15,14 @@ subprojects {
         // Suppress known false positives — add entries as needed
         suppressionFiles.addAll("${rootDir}/config/dependency-check/suppressions.xml")
 
+        // NVD API key speeds up the initial DB download ~10×
+        // (50 req/30 s vs 1 req/6 s without key).
+        // Set via env var NVD_API_KEY — absent value is silently ignored.
+        val nvdKey = System.getenv("NVD_API_KEY")
+        if (!nvdKey.isNullOrBlank()) {
+            nvdApiKey = nvdKey
+        }
+
         analyzers.apply {
             // Disable .NET assembly analyzer — not relevant to this Java project
             assemblyEnabled = false
