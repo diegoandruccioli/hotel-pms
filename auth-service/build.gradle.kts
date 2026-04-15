@@ -33,6 +33,9 @@ ext {
     set("mapStructVersion", "1.6.3")
     set("jjwtVersion", "0.11.5")
     set("tomcat.version", "10.1.54")
+    // CVE-2025-48976 (commons-fileupload 1.5→1.6.0) + CVE-2024-47554 (commons-io 2.11.0→2.14.0)
+    set("commons-fileupload.version", "1.6.0")
+    set("commons-io.version", "2.14.0")
 }
 
 dependencies {

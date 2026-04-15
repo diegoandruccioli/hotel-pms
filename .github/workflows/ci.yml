@@ -64,61 +64,7 @@ jobs:
             **/build/reports/jacoco/
           retention-days: 14
 
-  # ── Job 2: SCA (Software Composition Analysis) ──────────────────────────────
-  sca:
-    name: "SCA — OWASP Dependency Check (A06)"
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21 (Temurin)
-        uses: actions/setup-java@v4
-        with:
-          java-version: "21"
-          distribution: temurin
-
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
-          restore-keys: gradle-${{ runner.os }}-
-
-      # NVD database is ~200 MB and refreshes daily.
-      # Cache key uses the current date so every run on the same day hits the cache;
-      # the restore-key falls back to the most recent prior day if today's entry is
-      # absent (first run of the day re-downloads only the delta, not the full DB).
-      # NOTE: run_id was intentionally removed — it made the cache useless because
-      # run_id is unique per run and the saved entry was never restored.
-      - name: Get current date (for NVD cache key)
-        id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
-
-      - name: Cache NVD database
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle/dependency-check-data
-          key: nvd-${{ runner.os }}-${{ steps.date.outputs.date }}
-          restore-keys: nvd-${{ runner.os }}-
-
-      - name: Run OWASP Dependency Check
-        run: ./gradlew dependencyCheckAggregate --no-daemon
-
-      - name: Upload Dependency Check reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-check-report
-          path: build/reports/dependency-check*
-          retention-days: 14
-
-  # ── Job 3: Frontend ─────────────────────────────────────────────────────────
+  # ── Job 2: Frontend ─────────────────────────────────────────────────────────
   frontend:
     name: "Frontend — ESLint · TypeScript · Vitest"
     runs-on: ubuntu-latest
@@ -152,7 +98,7 @@ jobs:
         working-directory: frontend
         run: npm run test
 
-  # ── Job 4: Container Image Scan ──────────────────────────────────────────────
+  # ── Job 3: Container Image Scan ──────────────────────────────────────────────
   # Scans all 10 custom Docker images for OS/library CVEs (CRITICAL + HIGH).
   # Uses a matrix strategy to scan each image in parallel.
   # Uploads SARIF results to GitHub Security tab for centralised tracking.
@@ -266,7 +212,7 @@ jobs:
           exit-code: "0"
           severity: "CRITICAL,HIGH"
 
-  # ── Job 5: Third-party Image Scan ──────────────────────────────────────────
+  # ── Job 4: Third-party Image Scan ──────────────────────────────────────────
   # Warn-only scan of critical third-party images used in docker-compose.yml.
   # Non-blocking: we don't control upstream release cycles, but we want
   # visibility into CVEs in our infrastructure dependencies.
@@ -325,7 +271,7 @@ jobs:
           sarif_file: "trivy-thirdparty-${{ strategy.job-index }}.sarif"
           category: "trivy-thirdparty-${{ matrix.image }}"
 
-  # ── Job 6: E2E ──────────────────────────────────────────────────────────────
+  # ── Job 5: E2E ──────────────────────────────────────────────────────────────
   # Runs only after backend, frontend, and trivy pass.
   # Builds the full Docker stack, waits for every service to be healthy,
   # then runs Playwright E2E tests against the containerised frontend (nginx:80).

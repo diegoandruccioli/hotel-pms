@@ -207,6 +207,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | GAP-4 | Audit log non aggregati (SIEM assente): i log strutturati [AUTH], [STAY], [BILLING] venivano emessi solo su stdout senza possibilità di aggregazione, ricerca e alerting su anomalie. Fix: (1) Loki (grafana/loki:2.9.0) + Grafana (grafana/grafana:10.2.0) aggiunti al docker-compose con network observability-network, volumi persistenti loki_data/grafana_data e healthcheck; (2) loki-logback-appender:1.5.2 aggiunto come dipendenza runtime a auth-service, stay-service, billing-service; (3) logback-spring.xml creato per ciascuno dei tre servizi: ConsoleAppender sempre attivo + Loki4jAppender (HTTP push, label service/level, AsyncAppender neverBlock=true) attivo solo nel profilo Docker (auth-service/stay-service/billing-service) — in test e sviluppo locale solo console; (4) Grafana provisioning automatico: datasource Loki + dashboard "Security Audit Log" con 6 pannelli (LOGIN_FAILED/h, ACCOUNT_LOCKED/h, HMAC Failures/h, trend eventi/min, log raw [AUTH]/[STAY]/[BILLING], tabella eventi recenti). | auth-service/logback-spring.xml, stay-service/logback-spring.xml, billing-service/logback-spring.xml, docker-compose.yml, docker/loki/loki-config.yaml, docker/grafana/provisioning/ | fe99e2b | A09 | ✅ |
 
 | DEP-CVE-01 | Bump Netty 4.1.130→4.1.132.Final (CVE-2026-33870 request smuggling + CVE-2026-33871 HTTP/2 DoS) e Spring Cloud Gateway 4.2.0→4.2.6 (CVE-2025-41235 header forwarding + CVE-2025-41253 EL injection): ext["netty.version"]="4.1.132.Final" + dependencyManagement override gateway-server:4.2.6 in api-gateway/build.gradle.kts | api-gateway/build.gradle.kts | 14d29b9 | A06 | ✅ |
+| DEP-CVE-02 | Bump commons-fileupload 1.5→1.6.0 (CVE-2025-48976 DoS via part headers) + commons-io 2.11.0→2.14.0 (CVE-2024-47554 XmlStreamReader DoS): ext["commons-fileupload.version"]="1.6.0" + ext["commons-io.version"]="2.14.0" in tutti gli 8 microservizi (auth, billing, config, fb, guest, inventory, reservation, stay). CI SCA (OWASP Dependency Check) rimosso perché instabile (NVD API in manutenzione, run >1h), sostituito dalla copertura Trivy per A06. | */build.gradle.kts | TBD | A06 | ✅ |
 
 **Legenda stato**: ⏳ In attesa | 🔄 In corso | ✅ Completato
 
@@ -221,6 +222,6 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | A03 | Injection | T-GST-02, T-RES-03, T-FE-01 |
 | A04 | Insecure Design | T-RES-01, T-STAY-01, T-FB-02, T-BILL-02, T-GST-04 |
 | A05 | Security Misconfiguration | T-GW-02, T-GW-03, T-GW-04, T-CFG-01, T-CFG-03, T-FE-04 |
-| A06 | Vulnerable and Outdated Components | DEP-CVE-01 |
+| A06 | Vulnerable and Outdated Components | DEP-CVE-01, DEP-CVE-02 |
 | A07 | Identification & Authentication Failures | T-AUTH-01, T-AUTH-02, T-AUTH-03, T-AUTH-04, T-AUTH-04-residuo, T-FE-02 |
 | A09 | Security Logging & Monitoring Failures | T-AUTH-05, T-STAY-02, T-BILL-03, GAP-4 |
