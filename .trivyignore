@@ -1,0 +1,12 @@
+# ============================================================
+# .trivyignore — Accepted CVE suppressions for Trivy
+# ============================================================
+# Format: one CVE-ID per line, with a comment explaining the
+# justification — mirrors the approach used in
+# config/dependency-check/suppressions.xml for OWASP DC.
+#
+# Example:
+#   # CVE-2024-99999 — not exploitable: affected component (libfoo)
+#   # is not reachable in our container configuration.
+#   CVE-2024-99999
+# ============================================================

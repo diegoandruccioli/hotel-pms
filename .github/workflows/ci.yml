@@ -64,7 +64,53 @@ jobs:
             **/build/reports/jacoco/
           retention-days: 14
 
-  # ── Job 2: Frontend ─────────────────────────────────────────────────────────
+  # ── Job 2: SCA (Software Composition Analysis) ──────────────────────────────
+  sca:
+    name: "SCA — OWASP Dependency Check (A06)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      # NVD database is ~200MB and takes 5+ minutes to download.
+      # Caching avoids re-downloading on every CI run.
+      - name: Cache NVD database
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/dependency-check-data
+          key: nvd-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: nvd-${{ runner.os }}-
+
+      - name: Run OWASP Dependency Check
+        run: ./gradlew dependencyCheckAggregate --no-daemon
+
+      - name: Upload Dependency Check reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: build/reports/dependency-check*
+          retention-days: 14
+
+  # ── Job 3: Frontend ─────────────────────────────────────────────────────────
   frontend:
     name: "Frontend — ESLint · TypeScript · Vitest"
     runs-on: ubuntu-latest
@@ -98,8 +144,181 @@ jobs:
         working-directory: frontend
         run: npm run test
 
-  # ── Job 3: E2E ──────────────────────────────────────────────────────────────
-  # Runs only after both backend and frontend pass.
+  # ── Job 4: Container Image Scan ──────────────────────────────────────────────
+  # Scans all 10 custom Docker images for OS/library CVEs (CRITICAL + HIGH).
+  # Uses a matrix strategy to scan each image in parallel.
+  # Uploads SARIF results to GitHub Security tab for centralised tracking.
+  # Also runs a misconfig scan on each Dockerfile (warn-only).
+  # ─────────────────────────────────────────────────────────────────────────────
+  trivy:
+    name: "Trivy — ${{ matrix.service }}"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: config-service
+            dockerfile: config-service/Dockerfile
+            image: hotel-pms/config-service
+            context: "."
+          - service: api-gateway
+            dockerfile: api-gateway/Dockerfile
+            image: hotel-pms/api-gateway
+            context: "."
+          - service: auth-service
+            dockerfile: auth-service/Dockerfile
+            image: hotel-pms/auth-service
+            context: "."
+          - service: guest-service
+            dockerfile: guest-service/Dockerfile
+            image: hotel-pms/guest-service
+            context: "."
+          - service: inventory-service
+            dockerfile: inventory-service/Dockerfile
+            image: hotel-pms/inventory-service
+            context: "."
+          - service: reservation-service
+            dockerfile: reservation-service/Dockerfile
+            image: hotel-pms/reservation-service
+            context: "."
+          - service: stay-service
+            dockerfile: stay-service/Dockerfile
+            image: hotel-pms/stay-service
+            context: "."
+          - service: billing-service
+            dockerfile: billing-service/Dockerfile
+            image: hotel-pms/billing-service
+            context: "."
+          - service: fb-service
+            dockerfile: fb-service/Dockerfile
+            image: hotel-pms/fb-service
+            context: "."
+          - service: frontend
+            dockerfile: frontend/Dockerfile
+            image: hotel-pms/frontend
+            context: ./frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Trivy DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+
+      - name: Build Docker image — ${{ matrix.service }}
+        run: |
+          docker build \
+            -t ${{ matrix.image }}:ci \
+            -f ${{ matrix.dockerfile }} \
+            ${{ matrix.context }}
+
+      - name: Trivy vulnerability scan — ${{ matrix.service }}
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "${{ matrix.image }}:ci"
+          format: "table"
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          timeout: "10m0s"
+
+      - name: Trivy SARIF scan — ${{ matrix.service }}
+        if: always()
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "${{ matrix.image }}:ci"
+          format: "sarif"
+          output: "trivy-${{ matrix.service }}.sarif"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          timeout: "10m0s"
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-${{ matrix.service }}.sarif"
+          category: "trivy-${{ matrix.service }}"
+
+      - name: Trivy misconfig scan — ${{ matrix.service }}
+        if: always()
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: "config"
+          scan-ref: "${{ matrix.dockerfile }}"
+          format: "table"
+          exit-code: "0"
+          severity: "CRITICAL,HIGH"
+
+  # ── Job 5: Third-party Image Scan ──────────────────────────────────────────
+  # Warn-only scan of critical third-party images used in docker-compose.yml.
+  # Non-blocking: we don't control upstream release cycles, but we want
+  # visibility into CVEs in our infrastructure dependencies.
+  # ─────────────────────────────────────────────────────────────────────────────
+  trivy-thirdparty:
+    name: "Trivy 3rd-party — ${{ matrix.image }}"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - postgres:15-alpine
+          - redis:alpine
+          - grafana/grafana:10.2.0
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Trivy DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+
+      - name: Trivy scan — ${{ matrix.image }}
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "${{ matrix.image }}"
+          format: "table"
+          exit-code: "0"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          timeout: "10m0s"
+
+      - name: Trivy SARIF scan — ${{ matrix.image }}
+        if: always()
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "${{ matrix.image }}"
+          format: "sarif"
+          output: "trivy-thirdparty-${{ strategy.job-index }}.sarif"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          timeout: "10m0s"
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-thirdparty-${{ strategy.job-index }}.sarif"
+          category: "trivy-thirdparty-${{ matrix.image }}"
+
+  # ── Job 6: E2E ──────────────────────────────────────────────────────────────
+  # Runs only after backend, frontend, and trivy pass.
   # Builds the full Docker stack, waits for every service to be healthy,
   # then runs Playwright E2E tests against the containerised frontend (nginx:80).
   #
@@ -110,7 +329,7 @@ jobs:
   e2e:
     name: "E2E — Docker Stack + Playwright"
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    needs: [backend, frontend, trivy]
     timeout-minutes: 30
     permissions:
       contents: read

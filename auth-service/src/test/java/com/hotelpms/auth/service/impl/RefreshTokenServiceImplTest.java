@@ -110,7 +110,7 @@ class RefreshTokenServiceImplTest {
     }
 
     @Test
-    void getTokenVersionReturnsStoredValue() {
+    void tokenVersionReturnsStoredValue() {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         when(valueOps.get("user:tv:alice")).thenReturn("2");
 
@@ -119,7 +119,7 @@ class RefreshTokenServiceImplTest {
     }
 
     @Test
-    void getTokenVersionReturnsNegativeOneWhenKeyAbsent() {
+    void tokenVersionReturnsNegativeOneWhenKeyAbsent() {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         when(valueOps.get("user:tv:bob")).thenReturn(null);
 
@@ -128,7 +128,7 @@ class RefreshTokenServiceImplTest {
     }
 
     @Test
-    void getTokenVersionReturnsNegativeOneWhenValueIsNotNumeric() {
+    void tokenVersionReturnsNegativeOneWhenValueIsNotNumeric() {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         when(valueOps.get("user:tv:corrupt")).thenReturn("not-a-number");
 

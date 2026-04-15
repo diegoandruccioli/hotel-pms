@@ -72,9 +72,8 @@ public class UserAccount {
      * any refresh token whose {@code tv} claim does not match the value cached
      * in Redis under {@code user:tv:<username>} (T-AUTH-04 residuo).</p>
      */
-    @Builder.Default
     @Column(nullable = false)
-    private int tokenVersion = 0;
+    private int tokenVersion;
 
     @Column(nullable = false)
     private int failedAttempts;

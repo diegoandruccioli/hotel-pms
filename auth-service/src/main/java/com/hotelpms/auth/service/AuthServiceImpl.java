@@ -31,6 +31,7 @@ public class AuthServiceImpl implements AuthService {
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final Duration LOCKOUT_DURATION = Duration.ofMinutes(15);
     private static final String INVALID_REFRESH_TOKEN = "INVALID_REFRESH_TOKEN";
+    private static final String INVALID_CREDENTIALS = "INVALID_CREDENTIALS";
 
     /**
      * TTL for the Redis token-version key {@code user:tv:<username>}.
@@ -97,7 +98,7 @@ public class AuthServiceImpl implements AuthService {
         final UserAccount user = userRepository.findByUsername(request.username())
                 .orElseThrow(() -> {
                     log.warn("[AUTH] LOGIN_FAILED | user={} | reason=USER_NOT_FOUND", request.username());
-                    return new BadCredentialsException("INVALID_CREDENTIALS");
+                    return new BadCredentialsException(INVALID_CREDENTIALS);
                 });
 
         if (user.getLockedUntil() != null && Instant.now().isBefore(user.getLockedUntil())) {
@@ -118,7 +119,7 @@ public class AuthServiceImpl implements AuthService {
                         user.getUsername(), newAttempts);
             }
             userRepository.save(user);
-            throw new BadCredentialsException("INVALID_CREDENTIALS");
+            throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
 
         // Lazy rehash: upgrade stored hash to current cost factor if needed (T-AUTH-03)
@@ -229,7 +230,7 @@ public class AuthServiceImpl implements AuthService {
         final UserAccount user = userRepository.findByUsername(username)
                 .orElseThrow(() -> {
                     log.warn("[AUTH] CHANGE_PASSWORD_REJECTED | reason=USER_NOT_FOUND | user={}", username);
-                    return new BadCredentialsException("INVALID_CREDENTIALS");
+                    return new BadCredentialsException(INVALID_CREDENTIALS);
                 });
 
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {

@@ -4880,6 +4880,205 @@ ActuatorBypass & shouldBypassFilterForActuatorEndpoint & HTTP 200 senza headers 
 \paragraph{Riferimento} Commit:
 \commitref{9c299b1}{fix(security): GAP-3 --- fb-service InternalAuthFilter single combined presence check}
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section{GAP-4 --- Audit Log Non Aggregati (SIEM Assente)}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+I log strutturati emessi dai microservizi con prefissi \texttt{[AUTH]},
+\texttt{[STAY]} e \texttt{[BILLING]} venivano scritti esclusivamente su
+\texttt{stdout} del container Docker, senza alcun meccanismo di aggregazione,
+ricerca o alerting centralizzato.
+In assenza di un sistema di raccolta, risultava impossibile rispondere a
+domande operative di sicurezza quali:
+\begin{itemize}
+  \item \emph{«Quanti \texttt{LOGIN\_FAILED} ha prodotto l'utente X nelle
+        ultime 24 ore?»}
+  \item \emph{«Ci sono stati picchi anomali di \texttt{ACCOUNT\_LOCKED} in
+        una finestra temporale ristretta?»}
+  \item \emph{«Quali richieste hanno fallito la verifica HMAC nelle ultime
+        ore?»}
+\end{itemize}
+
+\noindent
+La mancanza di aggregazione log costituisce una violazione diretta di
+\textbf{OWASP A09 --- Security Logging and Monitoring Failures}: anche se i
+singoli eventi vengono emessi correttamente, la loro utilità è nulla se non
+possono essere consultati, correlati e alertati in modo centralizzato.
+
+\paragraph{Classificazione OWASP}
+\textbf{A09 --- Security Logging and Monitoring Failures} (log prodotti ma
+non aggregati, nessuna capacità di rilevamento anomalie o risposta a incidenti).
+
+\paragraph{Soluzione implementata}
+La soluzione è composta da tre livelli cooperanti:
+
+\begin{enumerate}
+  \item \textbf{Infrastruttura}: aggiunta di \textbf{Loki}
+        (\texttt{grafana/loki:2.9.0}) come aggregatore di log e
+        \textbf{Grafana} (\texttt{grafana/grafana:10.2.0}) come layer di
+        visualizzazione e alerting, entrambi nella rete Docker isolata
+        \texttt{observability-network} con volumi persistenti.
+  \item \textbf{Appender Logback}: integrazione della libreria
+        \texttt{loki-logback-appender:1.5.2} nei tre servizi con audit log
+        strutturati (auth-service, stay-service, billing-service).
+        Ogni servizio riceve un file \texttt{logback-spring.xml} dedicato.
+  \item \textbf{Dashboard Grafana}: provisioning automatico di una dashboard
+        \emph{Security Audit Log} con sei pannelli operativi: contatori
+        \texttt{LOGIN\_FAILED}, \texttt{ACCOUNT\_LOCKED} e \texttt{HMAC
+        Failures} nell'ultima ora, grafico di tendenza degli eventi
+        di sicurezza al minuto, e visualizzazione raw dei log per
+        ciascun prefisso di audit.
+\end{enumerate}
+
+\vspace{0.5em}
+\begin{insecurebox}{Situazione precedente --- log su stdout, nessuna aggregazione}
+\begin{lstlisting}[language=Java, caption={auth-service: audit event emesso su stdout senza destinazione SIEM}]
+// AuthServiceImpl.java (PRIMA) -- @Slf4j, log solo su stdout container
+LOG.warn("[AUTH] LOGIN_FAILED user={} reason=BAD_PASSWORD attempt={}/{}",
+         username, failedAttempts, lockoutThreshold);
+// Il log scompare nel buffer del container; nessun sistema lo raccoglie.
+// Impossibile aggregare, cercare, correlare o alertare su questi eventi.
+\end{lstlisting}
+\end{insecurebox}
+
+\vspace{0.5em}
+\begin{securebox}{Livello 1 --- Loki e Grafana in docker-compose (observability-network)}
+\begin{lstlisting}[language=bash, caption={docker-compose.yml: servizi Loki e Grafana aggiunti}]
+loki:
+  image: grafana/loki:2.9.0
+  command: -config.file=/etc/loki/config.yaml
+  volumes:
+    - ./docker/loki/loki-config.yaml:/etc/loki/config.yaml
+    - loki_data:/loki
+  networks: [observability-network]
+
+grafana:
+  image: grafana/grafana:10.2.0
+  environment:
+    - GF_SECURITY_ADMIN_PASSWORD=admin
+    - GF_USERS_ALLOW_SIGN_UP=false
+  volumes:
+    - ./docker/grafana/provisioning:/etc/grafana/provisioning
+    - grafana_data:/var/lib/grafana
+  depends_on:
+    loki: { condition: service_healthy }
+  networks: [observability-network]
+\end{lstlisting}
+\end{securebox}
+
+\vspace{0.5em}
+\begin{securebox}{Livello 2 --- logback-spring.xml con LokiAppender (auth-service)}
+\begin{lstlisting}[language=XML, caption={logback-spring.xml: Loki attivo solo nel profilo Docker; test usano solo console}]
+<configuration>
+  <include resource=
+    "org/springframework/boot/logging/logback/defaults.xml"/>
+  <springProperty scope="context" name="appName"
+    source="spring.application.name" defaultValue="auth-service"/>
+
+  <appender name="CONSOLE"
+            class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Attivo solo con SPRING_PROFILES_ACTIVE=auth-service (Docker) -->
+  <springProfile name="auth-service">
+    <appender name="LOKI"
+              class="com.github.loki4j.logback.Loki4jAppender">
+      <http>
+        <url>${LOKI_URL:-http://loki:3100}/loki/api/v1/push</url>
+      </http>
+      <format>
+        <label>
+          <pattern>service=${appName},level=%level</pattern>
+        </label>
+        <message>
+          <pattern>[%level] [%thread] %logger{36} | %msg%n%ex</pattern>
+        </message>
+        <sortByTime>true</sortByTime>
+      </format>
+    </appender>
+
+    <appender name="LOKI_ASYNC"
+              class="ch.qos.logback.classic.AsyncAppender">
+      <appender-ref ref="LOKI"/>
+      <queueSize>512</queueSize>
+      <discardingThreshold>0</discardingThreshold>
+      <!-- neverBlock: Loki irraggiungibile non blocca mai i thread app -->
+      <neverBlock>true</neverBlock>
+    </appender>
+
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+      <appender-ref ref="LOKI_ASYNC"/>
+    </root>
+  </springProfile>
+
+  <!-- Profilo default (test / sviluppo locale): solo console -->
+  <springProfile name="!auth-service">
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+    </root>
+  </springProfile>
+</configuration>
+\end{lstlisting}
+\end{securebox}
+
+\vspace{0.5em}
+\begin{securebox}{Livello 3 --- Query LogQL nella dashboard Grafana}
+\begin{lstlisting}[language=bash, caption={LogQL: pannelli dashboard "Security Audit Log"}]
+# LOGIN_FAILED nell'ultima ora (pannello stat con soglia rossa a 20)
+sum(count_over_time(
+  {service="auth-service"} |= "LOGIN_FAILED" [1h]
+))
+
+# ACCOUNT_LOCKED nell'ultima ora (soglia arancio a 1)
+sum(count_over_time(
+  {service="auth-service"} |= "ACCOUNT_LOCKED" [1h]
+))
+
+# HMAC Failures su qualsiasi servizio (soglia rossa a 1)
+sum(count_over_time(
+  {service=~".+", level="WARN"} |= "HMAC" [1h]
+))
+
+# Trend eventi/min — grafico time-series
+sum by (service) (rate(
+  {service=~"auth-service|stay-service|billing-service"}
+  |= "LOGIN_FAILED|CHECK_IN_FAILED|CHECK_OUT_FAILED" [5m]
+))
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Scelte progettuali rilevanti}
+
+\begin{itemize}
+  \item \textbf{Profilo Spring come guard}: il \texttt{<springProfile>} in
+        \texttt{logback-spring.xml} assicura che l'appender Loki sia attivo
+        esclusivamente quando il servizio viene avviato in Docker
+        (\texttt{SPRING\_PROFILES\_ACTIVE=auth-service}). In ambiente di test
+        JUnit non è presente alcun profilo attivo: solo il \texttt{ConsoleAppender}
+        è attivo, nessuna connessione a Loki viene tentata.
+  \item \textbf{AsyncAppender con \texttt{neverBlock=true}}: se Loki è
+        irraggiungibile (es. container non ancora avviato), i log vengono
+        scartati silenziosamente dalla coda senza mai bloccare i thread
+        dell'applicazione. La resilienza funzionale dell'applicazione non
+        dipende dalla disponibilità del sistema di logging.
+  \item \textbf{Label Loki \texttt{service/level}}: il pattern di label
+        \texttt{service=\$\{appName\},level=\%level} permette query LogQL
+        efficienti con filtro per servizio e livello di log, abilitando
+        l'aggregazione cross-service dei log di audit.
+  \item \textbf{Provisioning automatico Grafana}: datasource Loki e dashboard
+        vengono caricati automaticamente all'avvio tramite i file YAML in
+        \texttt{docker/grafana/provisioning/}, eliminando ogni configurazione
+        manuale post-deploy.
+\end{itemize}
+
+\paragraph{Riferimento} Commit:
+\commitref{TBD}{feat(security): GAP-4 --- Loki log aggregation SIEM for audit events}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════
