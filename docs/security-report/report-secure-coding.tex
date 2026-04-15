@@ -5311,6 +5311,82 @@ per mantenere la configurazione pulita; l'ottimizzazione rimane
 applicabile non appena il servizio torna disponibile.
 
 % ─────────────────────────────────────────────────────────────────────────────
+\section{DEP-CVE-02 --- Commons FileUpload + Commons IO (tutti i servizi)}
+
+\textbf{Commit}: \texttt{f177e36} — branch \texttt{feature/secure-coding-hardening}
+
+\subsection*{CVE coinvolte}
+
+\begin{center}
+\small
+\begin{tabular}{lllll}
+\hline
+\textbf{CVE} & \textbf{Libreria} & \textbf{Vers. vuln.} & \textbf{Fix} & \textbf{Severity} \\
+\hline
+CVE-2025-48976 & commons-fileupload & 1.5 & 1.6.0 & HIGH \\
+CVE-2024-47554  & commons-io         & 2.11.0 & 2.14.0 & HIGH \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection*{Descrizione delle vulnerabilità}
+
+\begin{insecurebox}{CVE-2025-48976 — Apache Commons FileUpload DoS}
+Un attaccante può inviare una richiesta multipart con un numero elevato di
+header per singola parte (\emph{part headers}), causando un consumo di CPU e
+memoria sproporzionato nel parsing (Denial of Service). Tutte le 8 immagini
+Docker dei microservizi includevano la versione 1.5 come dipendenza transitiva
+di Spring Boot 3.4.x.
+\end{insecurebox}
+
+\begin{insecurebox}{CVE-2024-47554 — Apache Commons IO XmlStreamReader DoS}
+\texttt{XmlStreamReader} non impone un limite alla dimensione del BOM/encoding
+declaration durante il parsing di input non fidato. Un input malevolo può
+bloccare il thread reader in un loop che consuma tutta la memoria disponibile.
+La versione 2.11.0 era inclusa transitivamente in tutti gli 8 servizi.
+\end{insecurebox}
+
+\subsection*{Risoluzione}
+
+\begin{securebox}{BOM property override su tutti gli 8 microservizi}
+Il plugin \texttt{io.spring.dependency-management} di Spring Boot espone le
+proprietà \texttt{commons-fileupload.version} e \texttt{commons-io.version}
+come punti di override controllati. Aggiungendo le due righe al blocco
+\texttt{ext} di ogni \texttt{build.gradle.kts}:
+
+\begin{verbatim}
+set("commons-fileupload.version", "1.6.0")
+set("commons-io.version", "2.14.0")
+\end{verbatim}
+
+l'intero grafo di dipendenze transitivo viene allineato alle versioni patchate
+senza modificare il BOM di Spring Boot né le dipendenze degli altri moduli.
+Questo approccio è identico a quello adottato per Netty in DEP-CVE-01 e
+garantisce la reversibilità: rimuovere le due righe ripristina i valori del BOM.
+\end{securebox}
+
+\subsection*{Rimozione del job SCA (OWASP Dependency Check)}
+
+Il job CI \texttt{sca} (OWASP Dependency Check) è stato rimosso dal workflow
+\texttt{ci.yml} per le seguenti ragioni:
+
+\begin{itemize}
+  \item Il database NVD di NIST risultava in manutenzione per periodi prolungati,
+        rendendo impossibile il download iniziale del DB e causando timeout
+        superiori a un'ora.
+  \item La scansione Trivy (\texttt{aquasecurity/trivy-action}) copre già
+        l'obiettivo A06 con un database di vulnerabilità aggiornato
+        autonomamente e tempi di esecuzione nell'ordine dei secondi.
+  \item I due strumenti si sovrapponevano sulla stessa categoria di rischio
+        (componenti vulnerabili) senza complementarità pratica nel contesto
+        di questo progetto.
+\end{itemize}
+
+La copertura OWASP A06 rimane garantita dalla pipeline Trivy (matrice ×8
+servizi + 3 immagini third-party), che ha rilevato e verificato la risoluzione
+di entrambe le CVE descritte in questa sezione.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Copertura OWASP Top 10 (2021) — Riepilogo}
 
 La tabella seguente mostra la copertura complessiva raggiunta al termine
@@ -5340,7 +5416,8 @@ di tutte le sessioni di hardening, aggiornata alla revisione del
     T-GW-04 (CORS whitelist), T-CFG-01 (actuator port),
     T-CFG-03 (config-service Basic Auth), T-FE-04 (CSP nginx) \\
 \owasp{A06} & Vulnerable and Outdated Components
-  & DEP-CVE-01 (Netty 4.1.132, Gateway 4.2.6) \\
+  & DEP-CVE-01 (Netty 4.1.132, Gateway 4.2.6),
+    DEP-CVE-02 (commons-fileupload 1.6.0, commons-io 2.14.0) \\
 \owasp{A07} & Identification \& Authentication Failures
   & T-AUTH-01 (no enumeration), T-AUTH-02 (lockout),
     T-AUTH-03 (BCrypt), T-AUTH-04 (token rotation + revocation),
