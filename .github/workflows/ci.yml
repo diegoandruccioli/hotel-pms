@@ -221,7 +221,7 @@ jobs:
             ${{ matrix.context }}
 
       - name: Trivy vulnerability scan — ${{ matrix.service }}
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: "${{ matrix.image }}:ci"
           format: "table"
@@ -232,7 +232,7 @@ jobs:
 
       - name: Trivy SARIF scan — ${{ matrix.service }}
         if: always()
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: "${{ matrix.image }}:ci"
           format: "sarif"
@@ -250,7 +250,7 @@ jobs:
 
       - name: Trivy misconfig scan — ${{ matrix.service }}
         if: always()
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: "config"
           scan-ref: "${{ matrix.dockerfile }}"
@@ -290,7 +290,7 @@ jobs:
           restore-keys: trivy-db-
 
       - name: Trivy scan — ${{ matrix.image }}
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: "${{ matrix.image }}"
           format: "table"
@@ -301,7 +301,7 @@ jobs:
 
       - name: Trivy SARIF scan — ${{ matrix.image }}
         if: always()
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: "${{ matrix.image }}"
           format: "sarif"
