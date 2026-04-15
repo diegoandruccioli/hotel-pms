@@ -5182,6 +5182,113 @@ uno stato integro e verificabile del sistema, e che la storia Git rifletta
 fedelmente la progressione degli interventi di sicurezza.
 
 % ─────────────────────────────────────────────────────────────────────────────
+\section{DEP-CVE-01 --- Dipendenze vulnerabili (Netty + Spring Cloud Gateway)}
+
+\subsection*{Contesto}
+
+Il pipeline CI esegue \textbf{Trivy} su ogni immagine Docker costruita in fase di
+\texttt{build}. Nella sessione del 2026-04-15, la scansione dell'immagine
+\texttt{hotel-pms/api-gateway:ci} ha riportato \textbf{4 CVE HIGH} tutte con
+patch disponibile (\texttt{status: fixed}):
+
+\begin{center}
+\small
+\begin{tabular}{lllll}
+\hline
+\textbf{CVE} & \textbf{Libreria} & \textbf{Versione installata} & \textbf{Fix} & \textbf{Tipo} \\
+\hline
+CVE-2026-33870 & \texttt{netty-codec-http}         & 4.1.130.Final & 4.1.132.Final & Request smuggling \\
+CVE-2026-33871 & \texttt{netty-codec-http2}        & 4.1.130.Final & 4.1.132.Final & HTTP/2 DoS \\
+CVE-2025-41235 & \texttt{spring-cloud-gateway-server} & 4.2.0      & 4.2.3         & Header forwarding \\
+CVE-2025-41253 & \texttt{spring-cloud-gateway-server} & 4.2.0      & 4.2.6         & EL injection \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection*{Analisi delle vulnerabilità}
+
+\begin{insecurebox}{Netty 4.1.130 — request smuggling e HTTP/2 DoS (gateway ingress)}
+\textbf{CVE-2026-33870} (\texttt{netty-codec-http}): parsing scorretto del
+\emph{chunked transfer encoding} di HTTP/1.1 consente a un attaccante di
+iniettare richieste aggiuntive nella stessa connessione TCP (\emph{HTTP request
+smuggling}), potenzialmente bypassando la logica di routing e autenticazione del
+gateway.
+
+\medskip
+\textbf{CVE-2026-33871} (\texttt{netty-codec-http2}): un \emph{CONTINUATION frame
+flood} nel protocollo HTTP/2 consuma memoria illimitata sul lato server, producendo
+un Denial of Service. Il gateway è il punto di ingresso unico di tutto il traffico
+esterno: un DoS qui rende irraggiungibili tutti i microservizi del PMS.
+\end{insecurebox}
+
+\begin{insecurebox}{Spring Cloud Gateway 4.2.0 --- header forwarding e EL injection}
+\textbf{CVE-2025-41235}: il gateway inoltra header \texttt{X-Forwarded-*} ricevuti
+da proxy non fidati senza validazione. Nel sistema PMS questo potrebbe permettere
+a un attaccante di sovrascrivere \texttt{X-Auth-User} / \texttt{X-Auth-Hotel} —
+gli stessi header che i microservizi interni usano per il controllo degli accessi
+multi-tenant.
+
+\medskip
+\textbf{CVE-2025-41253}: un input non sanificato nelle configurazioni di routing
+di Spring Cloud Gateway WebFlux può essere interpretato come \emph{Spring
+Expression Language}, portando a Remote Code Execution sul gateway o all'esfiltrazione
+di segreti dall'application context (chiave JWT, HMAC secret, credenziali Redis).
+\end{insecurebox}
+
+\subsection*{Intervento}
+
+\begin{securebox}{Netty 4.1.132.Final via Spring Boot BOM property override}
+La proprietà \texttt{netty.version} esposta dal plugin
+\texttt{io.spring.dependency-management} è stata sovrascritta nel blocco
+\texttt{ext} di \texttt{api-gateway/build.gradle.kts}:
+
+\begin{verbatim}
+set("netty.version", "4.1.132.Final")
+\end{verbatim}
+
+Questa tecnica forza l'intero grafo delle dipendenze Netty (codec-http,
+codec-http2, buffer, common, transport, \ldots) alla versione patchata,
+senza alterare il BOM Spring Cloud né le dipendenze degli altri moduli.
+\end{securebox}
+
+\begin{securebox}{Spring Cloud Gateway 4.2.6 via dependencyManagement override}
+Le coordinate \texttt{spring-cloud-gateway-server} e
+\texttt{spring-cloud-starter-gateway} sono state fissate a \texttt{4.2.6}
+tramite il blocco \texttt{dependencies} \{\ \} all'interno di
+\texttt{dependencyManagement}:
+
+\begin{verbatim}
+dependencyManagement {
+    imports { mavenBom("...spring-cloud-dependencies:2024.0.0") }
+    dependencies {
+        dependency("...spring-cloud-gateway-server:4.2.6")
+        dependency("...spring-cloud-starter-gateway:4.2.6")
+    }
+}
+\end{verbatim}
+
+Questo override ha priorità sul BOM importato, aggiornando il gateway al
+rilascio che corregge entrambe le CVE (\texttt{4.2.3} per CVE-2025-41235,
+\texttt{4.2.6} per CVE-2025-41253) senza toccare il resto del train
+\texttt{2024.0.0}.
+\end{securebox}
+
+\begin{securebox}{Impatto sulla postura di sicurezza}
+Dopo il commit \texttt{14d29b9}:
+\begin{itemize}
+  \item La scansione Trivy non rileva più CVE HIGH/CRITICAL nell'immagine
+        \texttt{api-gateway:ci} (tutte e 4 le segnalazioni risolte per fix
+        di versione, non per soppressione).
+  \item L'unica CVE precedentemente soppressa (\texttt{CVE-2026-22732},
+        Spring Security) rimane in \texttt{.trivyignore} con giustificazione
+        documentata in attesa di Spring Boot 3.5.x.
+  \item Il meccanismo di override BOM è verificabile e reversibile:
+        rimuovere le due righe nel \texttt{build.gradle.kts} ripristina il
+        comportamento del BOM originale.
+\end{itemize}
+\end{securebox}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Valutazione del processo}
 
 L'utilizzo dell'IA come strumento di analisi e verifica, piuttosto che come
