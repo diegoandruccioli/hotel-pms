@@ -8,6 +8,7 @@ COPY config-service/src/ config-service/src/
 RUN ./gradlew :config-service:build -x test --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine
+RUN apk update && apk upgrade --no-cache
 RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring
 WORKDIR /app

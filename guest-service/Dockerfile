@@ -14,6 +14,7 @@ RUN ./gradlew clean build -x test --no-daemon
 
 # Create lightweight production image
 FROM eclipse-temurin:21-jre-alpine
+RUN apk update && apk upgrade --no-cache
 WORKDIR /app
 
 # Add a non-root group and user securely
