@@ -108,12 +108,6 @@ jobs:
           restore-keys: nvd-${{ runner.os }}-
 
       - name: Run OWASP Dependency Check
-        env:
-          # Optional: add NVD_API_KEY in Settings → Secrets → Actions.
-          # Without it: 1 req/6 s rate limit → slow first run.
-          # With it:   50 req/30 s → ~10× faster initial download.
-          # Register free at https://nvd.nist.gov/developers/request-an-api-key
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: ./gradlew dependencyCheckAggregate --no-daemon
 
       - name: Upload Dependency Check reports

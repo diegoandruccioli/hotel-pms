@@ -5288,6 +5288,28 @@ Dopo il commit \texttt{14d29b9}:
 \end{itemize}
 \end{securebox}
 
+\subsection*{Nota — CI SCA: cache NVD e chiave API}
+
+In parallelo alla risoluzione delle CVE, è stato corretto un problema di
+performance nel job CI \texttt{sca} (OWASP Dependency Check): la chiave
+di cache per il database NVD utilizzava \texttt{run\_id}, unico per ogni
+esecuzione, rendendo di fatto inutile la cache e causando il ri-scaricamento
+dell'intero database (~200 MB) a ogni run, con tempi superiori a un'ora.
+La chiave è stata corretta in formato \texttt{nvd-<os>-<YYYY-MM-DD>},
+condivisa tra tutte le esecuzioni dello stesso giorno (commit \texttt{d1a7cdc}).
+
+Era stato inoltre previsto di registrare una \textbf{NVD API Key} gratuita
+(portale NIST) per aumentare il rate limit delle chiamate NVD da
+1\,req/6\,s a 50\,req/30\,s, riducendo il tempo di prima esecuzione da
+circa 15 minuti a circa 3 minuti. L'implementazione è stata progettata
+e il codice predisposto (lettura da env var \texttt{NVD\_API\_KEY} →
+property \texttt{nvdApiKey} del plugin Gradle), ma \textbf{non è stato
+possibile completare la registrazione}: al momento dell'accesso, il
+portale NVD di NIST risultava in manutenzione e non accettava nuove
+richieste di chiave. Il codice di integrazione è stato quindi rimosso
+per mantenere la configurazione pulita; l'ottimizzazione rimane
+applicabile non appena il servizio torna disponibile.
+
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Copertura OWASP Top 10 (2021) — Riepilogo}
 
