@@ -183,6 +183,8 @@ services:
       - SPRING_PROFILES_ACTIVE=native
       # T-CFG-03: credentials required by consumer microservices
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     healthcheck:
       test:
