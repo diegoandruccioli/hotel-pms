@@ -79,7 +79,6 @@ class AuthenticationFilterTest {
         void setUp() throws Exception {
                 final JwtUtil jwtUtil = new JwtUtil();
                 setPrivateField(jwtUtil, "secret", JWT_SECRET_B64);
-                jwtUtil.init();
 
                 authenticationFilter = new AuthenticationFilter(jwtUtil, HMAC_SECRET);
                 config = new AuthenticationFilter.Config();
