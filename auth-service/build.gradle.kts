@@ -33,9 +33,6 @@ ext {
     set("mapStructVersion", "1.6.3")
     set("jjwtVersion", "0.11.5")
     set("tomcat.version", "10.1.54")
-    // CVE-2025-48976 (commons-fileupload 1.5→1.6.0) + CVE-2024-47554 (commons-io 2.11.0→2.14.0)
-    set("commons-fileupload.version", "1.6.0")
-    set("commons-io.version", "2.14.0")
 }
 
 dependencies {
@@ -89,6 +86,13 @@ dependencies {
 dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
+    }
+    dependencies {
+        // CVE-2025-48976 (commons-fileupload 1.5→1.6.0) + CVE-2024-47554 (commons-io 2.11.0→2.14.0)
+        // commons-fileupload is not managed by Spring Boot 3.4.x BOM (removed with CommonsMultipartResolver
+        // in Spring 6.1); dependencyManagement.dependencies forces the version regardless of BOM properties.
+        dependency("commons-fileupload:commons-fileupload:1.6.0")
+        dependency("commons-io:commons-io:2.14.0")
     }
 }
 
