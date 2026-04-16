@@ -354,18 +354,22 @@ jobs:
           reservation-service stay-service billing-service fb-service
           api-gateway frontend
 
-      # Start only the application services in detached mode and wait until all
-      # health checks pass.  The cascade (config-server → 7 consumer services →
-      # api-gateway → frontend) can take 10-12 minutes on a loaded GitHub runner,
-      # so the step timeout is set to 20 minutes.
-      - name: Start application stack (monitoring excluded)
+      # Start backend services and wait for their health checks.  Frontend is
+      # started separately because its nginx healthcheck is unreliable under
+      # the resource pressure of a 7 GB GitHub runner; readiness is verified
+      # by the polling step below instead.
+      - name: Start backend stack (wait for healthy)
         run: >
           docker compose up -d --wait
           postgres redis config-server
           auth-service guest-service inventory-service
           reservation-service stay-service billing-service fb-service
-          api-gateway frontend
+          api-gateway
         timeout-minutes: 20
+
+      # Start frontend without --wait; readiness is checked in a later step.
+      - name: Start frontend container
+        run: docker compose up -d frontend
 
       # Extra guard: confirm the gateway process is accepting connections on port 8080.
       # The actuator was moved to the internal-only management port (8090, T-CFG-01),
@@ -386,15 +390,22 @@ jobs:
           echo "::error::API Gateway did not become healthy within 300 s."
           exit 1
 
-      # Confirm the nginx frontend is actually serving the React SPA
-      - name: Verify frontend (nginx) is serving
+      # Poll the nginx frontend until it serves the React SPA (HTTP 200).
+      # This replaces the unreliable Docker healthcheck with an explicit retry loop.
+      - name: Wait for frontend (nginx) to be serving
         run: |
-          HTTP_STATUS=$(curl -so /dev/null -w "%{http_code}" http://localhost:80)
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "::error::Frontend returned HTTP $HTTP_STATUS instead of 200."
-            exit 1
-          fi
-          echo "Frontend is serving (HTTP $HTTP_STATUS)."
+          echo "Polling http://localhost:80 for HTTP 200 ..."
+          for i in $(seq 1 30); do
+            STATUS=$(curl -so /dev/null -w "%{http_code}" http://localhost:80 2>/dev/null || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "Frontend is serving (HTTP 200, attempt $i)."
+              exit 0
+            fi
+            echo "Attempt $i/30 — got HTTP $STATUS, retrying in 5 s ..."
+            sleep 5
+          done
+          echo "::error::Frontend did not return HTTP 200 within 150 s."
+          exit 1
 
       # Run the full Playwright suite against the Docker-hosted frontend.
       # PLAYWRIGHT_BASE_URL overrides the config default (Vite dev server)
