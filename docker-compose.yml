@@ -132,6 +132,12 @@ services:
     container_name: hotel_zipkin
     ports:
       - "9411:9411"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -T5 -q -O /dev/null http://localhost:9411/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     networks:
       - observability-network
       - backend-network
@@ -632,6 +638,12 @@ services:
     depends_on:
       api-gateway:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -T2 -q -O /dev/null http://localhost:80/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     networks:
       - dmz-network
     deploy:
