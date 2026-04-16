@@ -342,18 +342,29 @@ jobs:
         working-directory: frontend
         run: npx playwright install chromium --with-deps
 
-      # Build all Docker images (Spring services build their own JARs via
-      # multi-stage Dockerfiles; tests are skipped with -x test)
+      # Build only the services needed for E2E tests (Spring services build
+      # their own JARs via multi-stage Dockerfiles; tests are skipped with -x test).
+      # Monitoring services (loki, grafana, prometheus, zipkin) are excluded to
+      # stay within the GitHub runner's 7 GB RAM budget.
       - name: Build Docker images
-        run: docker compose build
+        run: >
+          docker compose build
+          postgres redis config-server
+          auth-service guest-service inventory-service
+          reservation-service stay-service billing-service fb-service
+          api-gateway frontend
 
-      # Start every service in detached mode and wait until all health checks pass.
-      # The cascade (config-server → 7 consumer services → api-gateway → frontend)
-      # can take 10-12 minutes on a loaded GitHub runner, so the step timeout is
-      # set to 20 minutes to avoid spurious timeouts while still failing fast on
-      # genuine startup failures.
-      - name: Start full Docker stack
-        run: docker compose up -d --wait
+      # Start only the application services in detached mode and wait until all
+      # health checks pass.  The cascade (config-server → 7 consumer services →
+      # api-gateway → frontend) can take 10-12 minutes on a loaded GitHub runner,
+      # so the step timeout is set to 20 minutes.
+      - name: Start application stack (monitoring excluded)
+        run: >
+          docker compose up -d --wait
+          postgres redis config-server
+          auth-service guest-service inventory-service
+          reservation-service stay-service billing-service fb-service
+          api-gateway frontend
         timeout-minutes: 20
 
       # Extra guard: confirm the gateway process is accepting connections on port 8080.
