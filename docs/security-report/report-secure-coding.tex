@@ -5313,7 +5313,7 @@ applicabile non appena il servizio torna disponibile.
 % ─────────────────────────────────────────────────────────────────────────────
 \section{DEP-CVE-02 --- Commons FileUpload + Commons IO (tutti i servizi)}
 
-\textbf{Commit}: \texttt{f177e36} — branch \texttt{feature/secure-coding-hardening}
+\textbf{Commit}: \texttt{(questo commit)} — branch \texttt{feature/secure-coding-hardening}
 
 \subsection*{CVE coinvolte}
 
@@ -5348,21 +5348,33 @@ La versione 2.11.0 era inclusa transitivamente in tutti gli 8 servizi.
 
 \subsection*{Risoluzione}
 
-\begin{securebox}{BOM property override su tutti gli 8 microservizi}
-Il plugin \texttt{io.spring.dependency-management} di Spring Boot espone le
-proprietà \texttt{commons-fileupload.version} e \texttt{commons-io.version}
-come punti di override controllati. Aggiungendo le due righe al blocco
-\texttt{ext} di ogni \texttt{build.gradle.kts}:
+\begin{securebox}{dependencyManagement.dependencies su tutti gli 8 microservizi}
+\texttt{commons-fileupload} e \texttt{commons-io} \emph{non} sono gestiti
+dal BOM di Spring Boot 3.4.x: \texttt{CommonsMultipartResolver} è stato
+rimosso in Spring Framework 6.1, portando all'eliminazione di queste librerie
+dalla BOM di gestione. Di conseguenza, la tecnica
+\texttt{ext\{set("commons-fileupload.version", "1.6.0")\}} non ha effetto sul
+grafo delle dipendenze transitorie.
+
+La risoluzione corretta utilizza il blocco
+\texttt{dependencyManagement \{ dependencies \{ ... \} \}} del plugin
+\texttt{io.spring.dependency-management}, che forza la versione
+indipendentemente dalla provenienza del transitive pull:
 
 \begin{verbatim}
-set("commons-fileupload.version", "1.6.0")
-set("commons-io.version", "2.14.0")
+dependencyManagement {
+    imports { mavenBom(...) }
+    dependencies {
+        dependency("commons-fileupload:commons-fileupload:1.6.0")
+        dependency("commons-io:commons-io:2.14.0")
+    }
+}
 \end{verbatim}
 
-l'intero grafo di dipendenze transitivo viene allineato alle versioni patchate
-senza modificare il BOM di Spring Boot né le dipendenze degli altri moduli.
-Questo approccio è identico a quello adottato per Netty in DEP-CVE-01 e
-garantisce la reversibilità: rimuovere le due righe ripristina i valori del BOM.
+Questo è lo stesso meccanismo usato in \texttt{api-gateway} per forzare
+\texttt{spring-cloud-gateway-server:4.2.6} (DEP-CVE-01). Applicato a tutti
+gli 8 microservizi (auth, billing, config, fb, guest, inventory, reservation,
+stay).
 \end{securebox}
 
 \subsection*{Rimozione del job SCA (OWASP Dependency Check)}
@@ -5385,6 +5397,61 @@ Il job CI \texttt{sca} (OWASP Dependency Check) è stato rimosso dal workflow
 La copertura OWASP A06 rimane garantita dalla pipeline Trivy (matrice ×8
 servizi + 3 immagini third-party), che ha rilevato e verificato la risoluzione
 di entrambe le CVE descritte in questa sezione.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{DEP-CVE-03 --- Spring Cloud Config Server (CVE-2026-22739)}
+
+\textbf{Commit}: \texttt{(questo commit)} — branch \texttt{feature/secure-coding-hardening}
+
+\subsection*{CVE coinvolte}
+
+\begin{center}
+\small
+\begin{tabular}{lllll}
+\hline
+\textbf{CVE} & \textbf{Libreria} & \textbf{Vers. vuln.} & \textbf{Fix} & \textbf{Severity} \\
+\hline
+CVE-2026-22739 & spring-cloud-config-server & 4.2.0 & 4.3.2 / 5.0.2 & HIGH \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection*{Descrizione della vulnerabilità}
+
+\begin{insecurebox}{CVE-2026-22739 — Path Traversal via Profile Parameter}
+Un attaccante con accesso all'endpoint HTTP del Config Server può fornire un
+valore artigianale per il parametro \texttt{profile} che contiene sequenze di
+path traversal (\texttt{../}). Il server non sanifica sufficientemente il
+parametro prima di costruire il percorso del file di configurazione, permettendo
+la lettura di file arbitrari dal filesystem del container
+(\emph{Arbitrary File Read}).
+\end{insecurebox}
+
+\subsection*{Rischio residuale e mitigazione compensativa}
+
+La versione corretta (4.3.2) appartiene alla release train Spring Cloud
+2025.0.x, incompatibile con Spring Boot 3.4.x (utilizzato per garantire la
+compatibilità con Spring Cloud 2024.0.x). Non è possibile aggiornare solo
+\texttt{spring-cloud-config-server} senza rischiare incompatibilità nel grafo
+BOM.
+
+\begin{securebox}{Mitigazioni compensative}
+\begin{itemize}
+  \item \textbf{Isolamento di rete}: il config-service (porta 8888) non è
+        instradato attraverso l'API Gateway e non è accessibile dall'esterno.
+        Solo i microservizi interni con la corretta configurazione Spring Cloud
+        Config Client possono effettuare richieste.
+  \item \textbf{Nessun file sensibile nel container}: il filesystem del
+        container non contiene credenziali o file di sistema rilevanti oltre
+        ai config YAML già serviti.
+  \item \textbf{Soppressione documentata}: la CVE è stata aggiunta a
+        \texttt{.trivyignore} con giustificazione completa, in modo che la
+        pipeline CI rimanga verde e il rischio resti tracciato nel
+        \texttt{THREAT\_MODEL.md}.
+  \item \textbf{Piano di migrazione}: la CVE sarà risolta con il prossimo
+        aggiornamento a Spring Boot 3.5.x + Spring Cloud 2025.0.x.
+\end{itemize}
+\end{securebox}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Copertura OWASP Top 10 (2021) — Riepilogo}
@@ -5417,7 +5484,8 @@ di tutte le sessioni di hardening, aggiornata alla revisione del
     T-CFG-03 (config-service Basic Auth), T-FE-04 (CSP nginx) \\
 \owasp{A06} & Vulnerable and Outdated Components
   & DEP-CVE-01 (Netty 4.1.132, Gateway 4.2.6),
-    DEP-CVE-02 (commons-fileupload 1.6.0, commons-io 2.14.0) \\
+    DEP-CVE-02 (commons-fileupload 1.6.0, commons-io 2.14.0),
+    DEP-CVE-03 (config-server 4.2.0 CVE-2026-22739, rischio residuale mitigato) \\
 \owasp{A07} & Identification \& Authentication Failures
   & T-AUTH-01 (no enumeration), T-AUTH-02 (lockout),
     T-AUTH-03 (BCrypt), T-AUTH-04 (token rotation + revocation),
