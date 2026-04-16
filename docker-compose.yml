@@ -218,6 +218,7 @@ services:
       - "8080:8080"
     environment:
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
       - CONFIG_SERVER_URL=http://config-server:8888
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
@@ -271,10 +272,10 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 384M
+          memory: 768M
         reservations:
           cpus: "0.10"
-          memory: 192M
+          memory: 256M
 
   # ----------------------------------------------------------
   # Auth Service
