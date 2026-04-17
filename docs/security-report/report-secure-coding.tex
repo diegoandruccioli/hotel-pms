@@ -2674,8 +2674,72 @@ al GlobalExceptionHandler per la traduzione in HTTP 409).
 \section{Gestione Sicura delle Sessioni}
 % ─────────────────────────────────────────────────────────────────────────────
 
-\subsection{Cookie flags e JWT hardening \threat{T-AUTH-04}}
-\textit{[Da completare]}
+\subsection{Cookie flags e JWT hardening \threat{T-FE-02} / \threat{T-AUTH-04}}
+
+\paragraph{Descrizione}
+Il trasporto del token JWT in un cookie con flag di sicurezza appropriati
+costituisce la prima barriera contro le due categorie di furto di token più
+comuni: XSS (lettura del token da JavaScript) e intercettazione passiva su canali
+non cifrati.
+Parallelamente, la gestione del ciclo di vita del JWT — scadenza breve,
+rotazione del refresh token, revoca immediata al logout e al cambio password —
+determina la finestra di esposizione residua in caso di furto riuscito.
+
+\paragraph{Cookie httpOnly (T-FE-02 — baseline)}
+Fin dalla baseline il server imposta il JWT in un cookie con i tre flag
+fondamentali:
+
+\begin{securebox}[title={Cookie JWT --- AuthController.java (branch \texttt{main})}]
+\begin{lstlisting}[style=java]
+// httpOnly:  JavaScript non puo' leggere il token (difesa XSS)
+// Secure:    il cookie e' trasmesso solo su HTTPS
+// SameSite=Strict: il browser non invia il cookie in richieste cross-site
+private ResponseCookie createCookie(String value, int maxAge) {
+    return ResponseCookie.from("jwt", value)
+        .httpOnly(true)
+        .secure(true)
+        .sameSite("Strict")
+        .path("/")
+        .maxAge(maxAge)
+        .build();
+}
+\end{lstlisting}
+\end{securebox}
+
+Il flag \texttt{httpOnly} elimina la classe di attacchi in cui uno script
+XSS (anche iniettato via dipendenza npm compromessa) cerca di estrarre il
+token con \texttt{document.cookie} o \texttt{localStorage.getItem}.
+Il flag \texttt{Secure} protegge da intercettazione passiva su reti non
+cifrate. \texttt{SameSite=Strict} impedisce l'invio automatico del cookie su
+richieste che originano da siti terzi, costituendo la prima linea di difesa
+CSRF prima ancora del Double-Submit-Cookie di T-GW-05.
+
+\paragraph{Ciclo di vita del token (T-AUTH-04)}
+Il ridisegno completo del ciclo di vita JWT --- access token da 15 minuti,
+refresh token da 7 giorni con rotazione e blacklist Redis, revoca immediata
+al logout, e token versioning che invalida tutte le sessioni al cambio password
+--- è documentato in dettaglio nelle sottosezioni precedenti:
+
+\begin{itemize}
+  \item \textbf{\S~Refresh Token Rotation e Blacklist} (T-AUTH-04): la separazione
+        access/refresh token riduce la finestra di esposizione da 24 ore a
+        \textbf{15 minuti}; il logout revoca il refresh token server-side tramite
+        blacklist Redis, chiudendo la sessione indipendentemente dalla scadenza
+        naturale.
+  \item \textbf{\S~Cambio password non revoca le sessioni attive} (T-AUTH-04 residuo):
+        il meccanismo di token versioning (\texttt{tv} claim + Redis key
+        \texttt{user:tv:<username>}) garantisce che un token emesso prima del
+        cambio password venga rifiutato in fase di refresh, riducendo la finestra
+        di esposizione residua ai soli access token in volo (max 15 minuti).
+\end{itemize}
+
+\paragraph{Effetto complessivo}
+La combinazione dei tre livelli di protezione --- cookie httpOnly, access token
+a breve scadenza, revoca server-side --- rende il furto di token una minaccia
+gestibile: anche intercettando un access token, un attaccante dispone di una
+finestra massima di 15 minuti prima che il token scada. Un refresh token
+intercettato è inutile se il legittimo titolare ne fa uso prima (rotation) o se
+viene revocato esplicitamente (logout, cambio password).
 
 \subsection{Protezione CSRF \threat{T-GW-05}}
 
@@ -5083,16 +5147,208 @@ sum by (service) (rate(
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════
 
-\textit{[Sezione dedicata a spiegare il ridisegno complessivo del sistema di identità e privilegi.
-Verrà completata al termine degli interventi sui servizi auth, gateway e frontend.]}
+Questo capitolo presenta una visione sintetica e trasversale del sistema
+di identità e controllo degli accessi risultante dall'intero ciclo di hardening.
+I dettagli implementativi di ciascun intervento sono documentati nel
+Capitolo~3; qui l'obiettivo è offrire una lettura architetturale complessiva
+che mostri come i singoli interventi si raccordino in un modello coerente
+di difesa in profondità.
 
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Ridisegno del flusso di autenticazione}
+% ─────────────────────────────────────────────────────────────────────────────
 
+Il flusso di autenticazione nella baseline era un unico JWT con scadenza di
+24 ore, privo di revoca e senza binding al tenant dell'utente.
+Il ridisegno, completato in cinque iterazioni successive (commit
+\commitref{a90e462}{T-AUTH-02}, \commitref{4e1f1e9}{T-AUTH-03},
+\commitref{5ce3010}{T-AUTH-04}, \commitref{b469e21}{T-GW-06},
+\commitref{b473265}{T-AUTH-04 residuo}), produce il seguente flusso
+di autenticazione:
+
+\begin{enumerate}
+  \item \textbf{Login} (\texttt{POST /api/v1/auth/login}):
+    verifica lockout → verifica password (BCrypt cost~12) → genera
+    \emph{access token} (TTL 15 min, claim \texttt{role}, \texttt{hotelId},
+    \texttt{tv}) + \emph{refresh token} (TTL 7 giorni, \texttt{jti} UUID,
+    \texttt{typ=refresh}) → emette tre cookie:
+    \texttt{jwt}, \texttt{refresh\_token} (entrambi httpOnly/Secure/SameSite=Strict)
+    e \texttt{csrf\_token} (non-httpOnly, per il Double-Submit-Cookie).
+    Scrive la chiave Redis \texttt{user:tv:<username>} con il token version corrente.
+
+  \item \textbf{Richiesta autenticata}:
+    il browser invia automaticamente il cookie JWT.
+    L'\texttt{AuthenticationFilter} del gateway valida la firma HMAC-SHA256
+    del JWT, estrae \texttt{username}, \texttt{role}, \texttt{hotelId},
+    inietta \texttt{X-Auth-User}, \texttt{X-Auth-Role}, \texttt{X-Auth-Hotel}
+    e \texttt{X-Internal-Signature} sulla richiesta verso il microservizio.
+    Il \texttt{CsrfFilter} (ordine \texttt{HIGHEST\_PRECEDENCE+2}) verifica
+    che l'header \texttt{X-CSRF-Token} corrisponda al cookie \texttt{csrf\_token}
+    per ogni metodo mutante.
+
+  \item \textbf{Refresh} (\texttt{POST /api/v1/auth/refresh}):
+    valida il refresh token (firma, scadenza, tipo, JTI non blacklistato,
+    token version Redis) → blacklista il JTI consumato → emette nuovo
+    token pair con token version aggiornata.
+
+  \item \textbf{Cambio password} (\texttt{POST /api/v1/auth/change-password}):
+    verifica la password corrente → incrementa \texttt{tokenVersion} in DB
+    → sovrascrive Redis \texttt{user:tv:<username>} → emette nuovo token pair
+    (sessione corrente mantenuta) → ogni refresh token precedente viene rifiutato
+    alla prossima rotazione (TV mismatch → 401).
+
+  \item \textbf{Logout} (\texttt{POST /api/v1/auth/logout}):
+    blacklista il JTI del refresh token → azzera i tre cookie
+    (\texttt{jwt}, \texttt{refresh\_token}, \texttt{csrf\_token}).
+    Il log \texttt{[AUTH] LOGOUT | user=...} garantisce tracciabilità.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Modello RBAC}
+% ─────────────────────────────────────────────────────────────────────────────
 
+Il sistema adotta un modello \textbf{Role-Based Access Control} a tre ruoli,
+con enforcement a tre livelli:
+
+\begin{center}
+\small
+\begin{tabular}{llp{7cm}}
+\toprule
+\textbf{Ruolo} & \textbf{Accesso} & \textbf{Perimetro operativo} \\
+\midrule
+\texttt{ADMIN}       & Totale & Tutte le funzionalità, tutte le risorse dell'hotel \\
+\texttt{OWNER}       & Totale & Identico ad ADMIN + dashboard reportistica \\
+\texttt{RECEPTIONIST}& Limitato & Ospiti, prenotazioni, check-in/out, F\&B;
+                                  nessun accesso a fatture e dashboard finanziaria \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Enforcement a tre livelli}
+
+\begin{enumerate}
+  \item \textbf{Gateway (stateless)}: l'\texttt{AuthenticationFilter} valida il JWT
+        e inietta \texttt{X-Auth-Role}; le route del gateway non filtrano per ruolo
+        (delegato al layer applicativo), ma rifiutano qualsiasi richiesta priva di JWT
+        valido con HTTP 401.
+
+  \item \textbf{Microservizi (Spring Security)}: ciascun microservizio
+        popola il \texttt{SecurityContext} tramite \texttt{InternalAuthFilter}
+        con un \texttt{SimpleGrantedAuthority("ROLE\_" + role)} derivato dall'header
+        \texttt{X-Auth-Role}. I metodi di servizio e i controller usano
+        \texttt{@PreAuthorize} o \texttt{hasRole()} di Spring Security per
+        verificare il ruolo sul thread corrente.
+
+  \item \textbf{Frontend (React)}: il componente \texttt{ProtectedRoute}
+        con prop \texttt{allowedRoles} redirige a \texttt{/} gli utenti
+        non autorizzati prima di renderizzare la pagina (T-FE-03). Questo
+        terzo livello è una misura \emph{UX}; la garanzia di sicurezza
+        effettiva è fornita dai livelli 1 e 2.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione del ciclo di vita del JWT}
+% ─────────────────────────────────────────────────────────────────────────────
 
+Il JWT in produzione porta le seguenti claim obbligatorie:
+
+\begin{center}
+\small
+\begin{tabular}{llp{6.5cm}}
+\toprule
+\textbf{Claim} & \textbf{Tipo} & \textbf{Scopo} \\
+\midrule
+\texttt{sub}     & \texttt{String} & Username dell'utente autenticato \\
+\texttt{role}    & \texttt{String} & Ruolo (\texttt{ADMIN}, \texttt{OWNER}, \texttt{RECEPTIONIST}) \\
+\texttt{hotelId} & \texttt{String} (UUID) & Tenant binding: iniettato come \texttt{X-Auth-Hotel} \\
+\texttt{tv}      & \texttt{int}    & Token version: invalidazione bulk al cambio password \\
+\texttt{iat}     & \texttt{long}   & Issued at (standard JWT) \\
+\texttt{exp}     & \texttt{long}   & Expiration: 15 min (access), 7 giorni (refresh) \\
+\texttt{jti}     & \texttt{String} (UUID) & Solo refresh token: identificatore per blacklist Redis \\
+\texttt{typ}     & \texttt{String} & Solo refresh token: valore fisso \texttt{"refresh"} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Stato della revoca}
+Il sistema gestisce due categorie di revoca:
+
+\begin{itemize}
+  \item \textbf{Individuale} (logout, furto rilevato): il JTI del refresh token
+        viene scritto in Redis con chiave \texttt{rt:blacklist:<jti>} e TTL
+        pari alla vita residua del token. Scadenza automatica, nessun job di
+        manutenzione.
+  \item \textbf{Bulk} (cambio password): la chiave Redis
+        \texttt{user:tv:<username>} viene sovrascritta con il nuovo valore
+        di \texttt{tokenVersion}. Qualsiasi refresh token con \texttt{tv} inferiore
+        viene rifiutato in fase di rotation, senza enumerare i JTI.
+\end{itemize}
+
+\paragraph{Firma HMAC inter-service}
+Oltre alla firma JWT (HS256), ogni richiesta interna è autenticata da una firma
+HMAC-SHA256 calcolata su \texttt{"username:role:hotelId"} e trasmessa nell'header
+\texttt{X-Internal-Signature}. L'\texttt{InternalAuthFilter} di ogni microservizio
+verifica la firma con confronto \texttt{MessageDigest.isEqual} (constant-time)
+prima di popolare il \texttt{SecurityContext}, rendendo impossibile sia
+l'impersonation sia il tampering del tenant context (T-GW-01, T-GW-07).
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Protezioni contro attacchi comuni all'autenticazione}
+% ─────────────────────────────────────────────────────────────────────────────
+
+La tabella seguente sintetizza le protezioni attive contro i principali vettori
+di attacco sull'autenticazione, con riferimento alla categoria OWASP e al commit
+di implementazione.
+
+\begin{center}
+\small
+\begin{tabular}{p{3.2cm} p{4cm} l l}
+\toprule
+\textbf{Vettore} & \textbf{Protezione} & \textbf{OWASP} & \textbf{Commit} \\
+\midrule
+Brute force credenziali
+  & Lockout 5 tentativi / 15 min; rate limit gateway 5~req/s per IP
+  & A07 & \texttt{a90e462} \\
+User enumeration
+  & Messaggio uniforme \texttt{INVALID\_CREDENTIALS}
+  & A07 & baseline \\
+Password debole in DB
+  & BCrypt cost~12 + lazy rehash on login
+  & A02 & \texttt{4e1f1e9} \\
+Token theft (access)
+  & TTL 15 min; cookie httpOnly/Secure/SameSite
+  & A02/A07 & \texttt{5ce3010} \\
+Token theft (refresh)
+  & Rotation + blacklist JTI Redis; bulk revoca TV
+  & A07 & \texttt{5ce3010}, \texttt{b473265} \\
+Session hijacking CSRF
+  & Double-Submit Cookie (header \texttt{X-CSRF-Token} == cookie)
+  & A01 & \texttt{e146b17} \\
+JWT forging
+  & HS256 con segreto 48 byte random; fail-fast senza \texttt{JWT\_SECRET}
+  & A02 & \texttt{91d9484}, \texttt{6dc6ea4} \\
+Header injection inter-service
+  & HMAC-SHA256 su \texttt{username:role:hotelId} (constant-time compare)
+  & A01 & baseline, \texttt{5bdc594} \\
+Tenant hopping (IDOR)
+  & \texttt{hotelId} nel JWT; X-Auth-Hotel iniettato; query hotel-scoped; 404 IDOR-safe
+  & A01 & \texttt{b469e21} + T-GST/RES/BILL/FB \\
+XSS → token exfiltration
+  & httpOnly cookie; ESLint ban \texttt{dangerouslySetInnerHTML}; CSP nginx
+  & A03 & \texttt{3655906}, \texttt{b901a9f} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Postura complessiva}
+Al termine del ciclo di hardening, il sistema implementa tutti i controlli
+minimi raccomandati dall'OWASP Authentication Cheat Sheet e dalla NIST SP 800-63B
+per applicazioni aziendali: password hashing con funzione lenta, lockout
+progressivo, revoca dei token, binding crittografico del tenant context, e
+audit logging di ogni evento di autenticazione verso un aggregatore centralizzato
+(Loki + Grafana). La superficie di attacco residua si riduce al CVE-2026-22739
+del config-service (path traversal, soppresso con mitigazioni compensative documentate)
+e all'upgrade pianificato a Spring Boot 3.5.x.
 
 % ═════════════════════════════════════════════════════════════════════════════
 % APPENDICI
