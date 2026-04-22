@@ -100,3 +100,17 @@ tasks.withType<Test> {
     useJUnitPlatform()
     systemProperty("net.bytebuddy.experimental", "true")
 }
+
+// SpotBugs false-positive in JUnit tests: @BeforeEach-initialized fields are not seen
+// by SpotBugs as constructor-initialized, triggering NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR.
+tasks.named("populateDefaultSpotBugsExcludes") {
+    doLast {
+        val f = file("${layout.buildDirectory.get()}/javaqa/spotbugs-excludes.xml")
+        f.writeText(
+            f.readText().replace(
+                "</FindBugsFilter>",
+                "    <Match>\n        <Bug pattern=\"NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR\"/>\n    </Match>\n</FindBugsFilter>"
+            )
+        )
+    }
+}

@@ -66,7 +66,7 @@ public class Guest {
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
-    @Column(nullable = false, unique = true, length = MAX_EMAIL_LENGTH)
+    @Column(nullable = true, unique = true, length = MAX_EMAIL_LENGTH)
     private String email;
 
     @Column(length = MAX_PHONE_LENGTH)

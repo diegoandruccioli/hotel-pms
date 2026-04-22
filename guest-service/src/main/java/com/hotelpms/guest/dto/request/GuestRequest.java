@@ -1,6 +1,7 @@
 package com.hotelpms.guest.dto.request;
 
 import com.hotelpms.guest.util.ValidationConstants;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Past;
@@ -14,8 +15,8 @@ import java.time.LocalDate;
  *
  * @param firstName   The first name of the guest.
  * @param lastName    The last name of the guest.
- * @param email       The email address of the guest.
- * @param phone       The phone number of the guest.
+ * @param email       The email address of the guest (required if phone absent).
+ * @param phone       The phone number of the guest (required if email absent).
  * @param address     The street address of the guest.
  * @param city        The city of the guest.
  * @param country     The country of the guest.
@@ -30,7 +31,7 @@ public record GuestRequest(
         @Size(max = ValidationConstants.MAX_LAST_NAME_LENGTH)
         @Pattern(regexp = ValidationConstants.NAME_PATTERN)
         String lastName,
-        @NotBlank @Email @Size(max = ValidationConstants.MAX_EMAIL_LENGTH) String email,
+        @Email @Size(max = ValidationConstants.MAX_EMAIL_LENGTH) String email,
         @Size(max = ValidationConstants.MAX_PHONE_LENGTH)
         @Pattern(regexp = ValidationConstants.PHONE_PATTERN)
         String phone,
@@ -44,4 +45,16 @@ public record GuestRequest(
         @Pattern(regexp = ValidationConstants.LOCATION_PATTERN)
         String country,
         @Past LocalDate dateOfBirth) {
+
+    /**
+     * Validates that at least one of email or phone is provided.
+     *
+     * @return true if email or phone is present and non-blank
+     */
+    @AssertTrue(message = "At least one of email or phone must be provided")
+    public boolean isEmailOrPhoneProvided() {
+        final boolean hasEmail = email != null && !email.isBlank();
+        final boolean hasPhone = phone != null && !phone.isBlank();
+        return hasEmail || hasPhone;
+    }
 }

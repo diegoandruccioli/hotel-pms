@@ -1,12 +1,6 @@
 server:
   port: 8081
 
-spring:
-  data:
-    redis:
-      host: "${REDIS_HOST:redis}"
-      port: 6379
-
 internal:
   hmac:
     secret: ${INTERNAL_HMAC_SECRET}

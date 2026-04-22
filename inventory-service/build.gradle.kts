@@ -52,12 +52,9 @@ dependencies {
 
     // --- Caching ---
     // spring-boot-starter-cache provides the @EnableCaching / @Cacheable / @CacheEvict
-    // abstraction layer. The actual store is Redis, provided by spring-boot-starter-data-redis
-    // (uses the Lettuce driver by default, no extra driver dependency needed).
-    // When spring.cache.type is not set in application.yml, Spring Boot auto-detects Redis
-    // on the classpath and configures RedisCacheManager automatically.
+    // abstraction layer. Spring Boot uses ConcurrentMapCacheManager by default (in-memory),
+    // which is sufficient for RoomType data that changes infrequently.
     implementation("org.springframework.boot:spring-boot-starter-cache")
-    implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
     // --- Observability ---
     implementation("org.springframework.boot:spring-boot-starter-actuator")

@@ -92,6 +92,11 @@ public class ReservationServiceImpl implements ReservationService {
                 .map(Reservation::getGuestId)
                 .distinct()
                 .toList();
+
+        if (guestIds.isEmpty()) {
+            return reservationPage.map(reservationMapper::toResponse);
+        }
+
         final java.util.Map<UUID, String> guestNameMap = guestClient.getGuestsBatch(guestIds).stream()
                 .collect(java.util.stream.Collectors.toMap(
                         GuestResponse::id,
