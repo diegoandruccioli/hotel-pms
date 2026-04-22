@@ -14,7 +14,7 @@ interface RoomButtonProps {
 }
 
 const RoomButton = memo(({ room, isSelected, isOccupied, readOnly, onToggle }: RoomButtonProps) => {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['reservations', 'common']);
 
   const handleClick = useCallback(() => {
     if (!readOnly && !isOccupied) {
@@ -27,7 +27,7 @@ const RoomButton = memo(({ room, isSelected, isOccupied, readOnly, onToggle }: R
       type="button"
       onClick={handleClick}
       disabled={isOccupied}
-      aria-label={isOccupied ? `${t('room', 'Room')} ${room.roomNumber} — ${t('room_occupied', 'occupata')}` : undefined}
+      aria-label={isOccupied ? `${t('common:room_number', { number: room.roomNumber })} — ${t('common:room_occupied')}` : undefined}
       className={`p-3 rounded-shape-sm border text-left transition-colors flex flex-col gap-1 ${
         isOccupied
           ? 'opacity-40 cursor-not-allowed bg-surface-variant border-outline-variant'
@@ -38,7 +38,7 @@ const RoomButton = memo(({ room, isSelected, isOccupied, readOnly, onToggle }: R
     >
       <div className="flex justify-between items-center w-full">
         <span className={`font-medium ${isOccupied ? 'text-on-surface-variant' : isSelected ? 'text-primary' : 'text-on-surface'}`}>
-          Room {room.roomNumber}
+          {t('common:room_number', { number: room.roomNumber })}
         </span>
         {isOccupied
           ? <MaterialIcon name="block" size={16} className="text-on-surface-variant" />
@@ -50,7 +50,7 @@ const RoomButton = memo(({ room, isSelected, isOccupied, readOnly, onToggle }: R
         €{room.pricePerNight ?? room.roomType?.basePrice}
       </span>
       {isOccupied && (
-        <span className="text-xs text-on-surface-variant italic">{t('room_occupied', 'Occupata')}</span>
+        <span className="text-xs text-on-surface-variant italic">{t('common:room_occupied')}</span>
       )}
     </button>
   );
@@ -88,7 +88,7 @@ export const RoomSelection = memo(({
   readOnly = false
 }: RoomSelectionProps) => {
 
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['reservations', 'common']);
 
   const occupiedRoomIds = useMemo<Set<string>>(() => {
     if (!checkInDate || !checkOutDate) return new Set();
@@ -155,7 +155,7 @@ export const RoomSelection = memo(({
       <div className="pt-4">
         <h3 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider mb-3">{t('select_rooms')}</h3>
         {availableRooms.length === 0 ? (
-          <p className="text-sm text-on-surface-variant">No available rooms loaded.</p>
+          <p className="text-sm text-on-surface-variant">{t('no_rooms_available')}</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {availableRooms.map(room => (

@@ -83,20 +83,20 @@ const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, t 
             className="text-primary hover:text-primary/80 font-medium text-sm mr-4"
             onClick={handleCheckInClick}
           >
-            {t('check_in', 'Check-in')}
+            {t('check_in')}
           </button>
         )}
         <button 
           className="text-primary hover:text-primary/80 font-medium text-sm mr-4"
           onClick={handleViewClick}
         >
-          {t('view', 'Visualizza')}
+          {t('view')}
         </button>
-        <button 
+        <button
           className="text-primary hover:text-primary/80 font-medium text-sm"
           onClick={handleEditClick}
         >
-          {t('edit', 'Modifica')}
+          {t('edit')}
         </button>
       </M3TableCell>
     </M3TableRow>

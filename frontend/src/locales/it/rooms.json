@@ -1,0 +1,7 @@
+{
+  "select_placeholder": "-- Seleziona --",
+  "toast_deleted": "Eliminato con successo",
+  "toast_delete_error": "Errore durante l'eliminazione",
+  "confirm_delete_room_type": "Sei sicuro di voler eliminare questa tipologia?",
+  "btn_confirm": "Conferma"
+}

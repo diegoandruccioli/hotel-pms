@@ -1,0 +1,7 @@
+{
+  "select_placeholder": "-- Select --",
+  "toast_deleted": "Deleted successfully",
+  "toast_delete_error": "Error during deletion",
+  "confirm_delete_room_type": "Are you sure you want to delete this category?",
+  "btn_confirm": "Confirm"
+}

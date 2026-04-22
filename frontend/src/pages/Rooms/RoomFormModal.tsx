@@ -17,7 +17,7 @@ interface Props {
 }
 
 export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props) => {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['rooms', 'common']);
   const addToast = useToastStore((s) => s.addToast);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<RoomRequest>({
@@ -123,7 +123,7 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
                   onChange={handleChange}
                   className={inputClass}
                 >
-                  <option value="" disabled>-- Seleziona --</option>
+                  <option value="" disabled>{t('select_placeholder')}</option>
                   {roomTypes.map(rt => (
                     <option key={rt.id} value={rt.id}>
                       {rt.name} (Max {rt.maxOccupancy} pax)
