@@ -10,6 +10,11 @@ import guestsEn from './locales/en/guests.json';
 import staysEn from './locales/en/stays.json';
 import roomsEn from './locales/en/rooms.json';
 import reservationsEn from './locales/en/reservations.json';
+import calendarEn from './locales/en/calendar.json';
+import billingEn from './locales/en/billing.json';
+import restaurantEn from './locales/en/restaurant.json';
+import housekeepingEn from './locales/en/housekeeping.json';
+import dashboardEn from './locales/en/dashboard.json';
 
 import commonIt from './locales/it/common.json';
 import authIt from './locales/it/auth.json';
@@ -19,6 +24,11 @@ import guestsIt from './locales/it/guests.json';
 import staysIt from './locales/it/stays.json';
 import roomsIt from './locales/it/rooms.json';
 import reservationsIt from './locales/it/reservations.json';
+import calendarIt from './locales/it/calendar.json';
+import billingIt from './locales/it/billing.json';
+import restaurantIt from './locales/it/restaurant.json';
+import housekeepingIt from './locales/it/housekeeping.json';
+import dashboardIt from './locales/it/dashboard.json';
 
 const resources = {
   en: {
@@ -30,6 +40,11 @@ const resources = {
     stays: staysEn,
     rooms: roomsEn,
     reservations: reservationsEn,
+    calendar: calendarEn,
+    billing: billingEn,
+    restaurant: restaurantEn,
+    housekeeping: housekeepingEn,
+    dashboard: dashboardEn,
   },
   it: {
     common: commonIt,
@@ -40,6 +55,11 @@ const resources = {
     stays: staysIt,
     rooms: roomsIt,
     reservations: reservationsIt,
+    calendar: calendarIt,
+    billing: billingIt,
+    restaurant: restaurantIt,
+    housekeeping: housekeepingIt,
+    dashboard: dashboardIt,
   },
 };
 
