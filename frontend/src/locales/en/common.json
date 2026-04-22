@@ -152,6 +152,8 @@
   "description": "Description",
   "save": "Save",
   "cancel": "Cancel",
+  "confirm": "Confirm",
+  "close": "Close",
   "edit_room": "Edit Room",
   "edit_room_type": "Edit Category",
   "error_loading_room_types": "Error loading room categories",

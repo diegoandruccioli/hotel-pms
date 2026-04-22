@@ -152,6 +152,8 @@
   "description": "Descrizione",
   "save": "Salva",
   "cancel": "Annulla",
+  "confirm": "Conferma",
+  "close": "Chiudi",
   "edit_room": "Modifica Camera",
   "edit_room_type": "Modifica Tipologia",
   "error_loading_room_types": "Errore caricamento tipologie",

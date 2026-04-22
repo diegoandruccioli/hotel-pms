@@ -1,0 +1,22 @@
+{
+  "edit_guest": "Modifica Ospite",
+  "label_first_name": "Nome",
+  "label_last_name": "Cognome",
+  "label_country": "Nazione",
+  "label_email_hint": "Email (se senza telefono)",
+  "label_phone_hint": "Telefono (se senza email)",
+  "label_phone_number": "Numero di telefono",
+  "err_email_or_phone": "È necessario inserire Email oppure Telefono",
+  "toast_guest_updated": "Ospite aggiornato con successo",
+  "toast_guest_saved": "Salvato con successo",
+  "toast_guest_deleted": "Eliminato con successo",
+  "toast_error": "Errore",
+  "confirm_delete_guest": "Sei sicuro di voler eliminare questo ospite?",
+  "btn_confirm": "Conferma",
+  "search_guest_placeholder": "Cerca ospite per nome o email",
+  "btn_new_guest": "Nuovo Ospite",
+  "btn_change": "Cambia",
+  "heading_create_guest": "Crea Nuovo Ospite Principale",
+  "btn_save_guest": "Salva Ospite",
+  "no_guests_search": "Nessun ospite trovato. Prova a crearne uno nuovo."
+}

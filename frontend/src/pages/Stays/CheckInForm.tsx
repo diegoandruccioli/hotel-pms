@@ -37,11 +37,11 @@ const emptyGuest = (isPrimary: boolean): IdentifiableGuest => ({
   travelPurpose: '',
 });
 
-const GuestFieldSection = memo(({ 
-  guest, 
-  index, 
-  canRemove, 
-  onRemove, 
+const GuestFieldSection = memo(({
+  guest,
+  index,
+  canRemove,
+  onRemove,
   onChange,
 }: {
   guest: IdentifiableGuest;
@@ -50,6 +50,7 @@ const GuestFieldSection = memo(({
   onRemove: (idx: number) => void;
   onChange: (idx: number, field: keyof StayGuestRequest, value: string | boolean) => void;
 }) => {
+  const { t } = useTranslation('stays');
   const handleFieldChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
@@ -63,39 +64,39 @@ const GuestFieldSection = memo(({
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-display font-medium text-on-surface flex items-center">
           <MaterialIcon name="person" className="mr-2 text-primary" />
-          Guest {index + 1} {guest.isPrimaryGuest && <span className="ml-2 text-xs bg-primary text-on-primary px-2 py-0.5 rounded-full">Primary</span>}
+          {t('guest_number', { number: index + 1 })} {guest.isPrimaryGuest && <span className="ml-2 text-xs bg-primary text-on-primary px-2 py-0.5 rounded-full">{t('guest_badge_primary')}</span>}
         </h2>
         {canRemove && (
           <M3Button variant="text" icon="close" onClick={handleRemove} type="button">
-            Remove
+            {t('btn_remove')}
           </M3Button>
         )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <M3TextField
-          label="First Name"
+          label={t('label_first_name')}
           name="firstName"
           value={guest.firstName}
           onChange={handleFieldChange}
           required
         />
         <M3TextField
-          label="Last Name"
+          label={t('label_last_name')}
           name="lastName"
           value={guest.lastName}
           onChange={handleFieldChange}
           required
         />
         <M3TextField
-          label="Gender (M/F)"
+          label={t('label_gender')}
           name="gender"
           value={guest.gender}
           onChange={handleFieldChange}
           required
         />
         <M3TextField
-          label="Date of Birth"
+          label={t('label_date_of_birth')}
           name="dateOfBirth"
           type="date"
           value={guest.dateOfBirth}
@@ -103,35 +104,35 @@ const GuestFieldSection = memo(({
           required
         />
         <M3TextField
-          label="Place of Birth"
+          label={t('label_place_of_birth')}
           name="placeOfBirth"
           value={guest.placeOfBirth}
           onChange={handleFieldChange}
           required
         />
         <M3TextField
-          label="Citizenship (e.g., IT)"
+          label={t('label_citizenship')}
           name="citizenship"
           value={guest.citizenship}
           onChange={handleFieldChange}
           required
         />
         <M3TextField
-          label="Document Type (e.g., PASSPORT)"
+          label={t('label_doc_type')}
           name="documentType"
           value={guest.documentType}
           onChange={handleFieldChange}
           required
         />
         <M3TextField
-          label="Document Number"
+          label={t('label_doc_number')}
           name="documentNumber"
           value={guest.documentNumber}
           onChange={handleFieldChange}
           required
         />
         <M3TextField
-          label="Document Place of Issue"
+          label={t('label_doc_issue_place')}
           name="documentPlaceOfIssue"
           value={guest.documentPlaceOfIssue}
           onChange={handleFieldChange}
@@ -148,15 +149,15 @@ const GuestFieldSection = memo(({
               required
             >
               <option value="" disabled hidden></option>
-              <option value="OSPITE_SINGOLO">Ospite Singolo</option>
-              <option value="CAPOFAMIGLIA">Capofamiglia</option>
-              <option value="CAPOGRUPPO">Capogruppo</option>
+              <option value="OSPITE_SINGOLO">{t('guest_type_single')}</option>
+              <option value="CAPOFAMIGLIA">{t('guest_type_family_head')}</option>
+              <option value="CAPOGRUPPO">{t('guest_type_group_head')}</option>
             </select>
-            <label 
+            <label
               htmlFor={`traveller-type-${index}`}
               className="absolute transition-all duration-150 pointer-events-none font-body left-4 top-1 text-xs text-on-surface-variant"
             >
-              Tipo Alloggiato
+              {t('label_guest_type')}
             </label>
             <span 
               className="material-symbols-outlined absolute right-3 pointer-events-none text-on-surface-variant z-10" 
@@ -167,7 +168,7 @@ const GuestFieldSection = memo(({
           </div>
         </div>
         <M3TextField
-          label="Motivo Soggiorno (es. Turismo)"
+          label={t('label_stay_reason')}
           name="travelPurpose"
           value={guest.travelPurpose}
           onChange={handleFieldChange}
@@ -181,7 +182,7 @@ const GuestFieldSection = memo(({
               onChange={handleFieldChange}
               className="w-5 h-5 text-primary rounded focus:ring-primary"
             />
-            <span className="text-sm font-body text-on-surface">Primary Guest</span>
+            <span className="text-sm font-body text-on-surface">{t('label_primary_guest')}</span>
           </label>
         </div>
       </div>
@@ -192,7 +193,7 @@ const GuestFieldSection = memo(({
 GuestFieldSection.displayName = 'GuestFieldSection';
 
 export const CheckInForm = memo(() => {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['stays', 'common']);
   const navigate = useNavigate();
   const { reservationId } = useParams<{ reservationId: string }>();
   const location = useLocation();
@@ -235,13 +236,13 @@ export const CheckInForm = memo(() => {
     setError(null);
 
     if (!reservationId || !state?.roomId || !state?.guestId) {
-      setError('Missing reservation context data (reservationId, roomId, guestId)');
+      setError(t('err_missing_context'));
       return;
     }
 
     // Validate at least one primary guest
     if (!guests.some(g => g.isPrimaryGuest)) {
-      setError(t('error_primary_guest_required') || 'At least one primary guest is required');
+      setError(t('err_primary_guest_required'));
       return;
     }
 
@@ -275,7 +276,7 @@ export const CheckInForm = memo(() => {
       navigate('/stays', { replace: true });
     } catch (err: unknown) {
       const e = err as {response?: {data?: {detail?: string}}, message?: string};
-      setError(e.response?.data?.detail || e.message || 'Failed to complete check-in');
+      setError(e.response?.data?.detail || e.message || t('err_checkin_failed'));
     } finally {
       setLoading(false);
     }
@@ -287,7 +288,7 @@ export const CheckInForm = memo(() => {
         <M3Button variant="text" icon="arrow_back" onClick={handleBack}>
           {t('back')}
         </M3Button>
-        <h1 className="text-2xl font-display font-bold text-on-surface">Check-in Alloggiati</h1>
+        <h1 className="text-2xl font-display font-bold text-on-surface">{t('checkin_title')}</h1>
       </div>
 
       {error && (
@@ -311,15 +312,15 @@ export const CheckInForm = memo(() => {
 
         <div className="flex gap-4 items-center justify-between border-t border-outline-variant pt-6">
           <M3Button variant="outlined" icon="person_add" onClick={addGuest} type="button">
-            Add Guest
+            {t('btn_add_guest')}
           </M3Button>
-          <M3Button 
-            variant="filled" 
-            icon="how_to_reg" 
-            type="submit" 
+          <M3Button
+            variant="filled"
+            icon="how_to_reg"
+            type="submit"
             disabled={loading}
           >
-            {loading ? 'Processing...' : 'Complete Check-in'}
+            {loading ? t('btn_processing') : t('btn_complete_checkin')}
           </M3Button>
         </div>
       </form>

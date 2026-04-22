@@ -8,9 +8,20 @@ import { stayService } from '../../services/stayService';
 import userEvent from '@testing-library/user-event';
 import type { StayResponse } from '../../types/stay.types';
 
-// Mock translations
+// Mock translations (interpolation-aware)
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (opts && typeof opts === 'object') {
+        return Object.entries(opts).reduce(
+          (s, [k, v]) => s.replace(`{{${k}}}`, String(v)),
+          key
+        );
+      }
+      return key;
+    },
+    i18n: { language: 'en' },
+  }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
@@ -48,11 +59,10 @@ describe('CheckInForm', () => {
 
   it('renders correctly with initial expected guests', () => {
     renderComponent(2);
-    expect(screen.getByText('Check-in Alloggiati')).toBeInTheDocument();
-    
+    expect(screen.getByText('checkin_title')).toBeInTheDocument();
+
     // Should render 2 guest cards because expectedGuests is 2
-    expect(screen.getByText(/Guest 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/Guest 2/i)).toBeInTheDocument();
+    expect(screen.getAllByText('guest_number')).toHaveLength(2);
   });
 
   it('adds and removes guest cards dynamically', async () => {
@@ -60,26 +70,24 @@ describe('CheckInForm', () => {
     const user = userEvent.setup();
 
     // Only 1 guest initially
-    expect(screen.getByText(/Guest 1/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Guest 2/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText('guest_number')).toHaveLength(1);
 
     // Add guest
-    await user.click(screen.getByRole('button', { name: /add guest/i }));
-    
-    expect(screen.getByText(/Guest 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/Guest 2/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'btn_add_guest' }));
+
+    expect(screen.getAllByText('guest_number')).toHaveLength(2);
 
     // Remove guest 2
-    const removeBtns = screen.getAllByRole('button', { name: /remove/i });
-    expect(removeBtns).toHaveLength(2); // Since there are 2 guests now, both might have remove button
+    const removeBtns = screen.getAllByRole('button', { name: 'btn_remove' });
+    expect(removeBtns).toHaveLength(2);
     await user.click(removeBtns[1]);
 
-    expect(screen.queryByText(/Guest 2/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText('guest_number')).toHaveLength(1);
   });
 
   it('should have no accessibility violations', async () => {
     const { container } = renderComponent(1);
-    await waitFor(() => expect(screen.getByText('Check-in Alloggiati')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('checkin_title')).toBeInTheDocument());
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
@@ -90,9 +98,9 @@ describe('CheckInForm', () => {
     const user = userEvent.setup({ delay: null });
 
     // Fill in required fields for Guest 1
-    await user.type(screen.getAllByLabelText(/first name/i)[0], 'John');
-    await user.type(screen.getAllByLabelText(/last name/i)[0], 'Doe');
-    await user.type(screen.getAllByLabelText(/gender/i)[0], 'M');
+    await user.type(screen.getAllByLabelText('label_first_name')[0], 'John');
+    await user.type(screen.getAllByLabelText('label_last_name')[0], 'Doe');
+    await user.type(screen.getAllByLabelText('label_gender')[0], 'M');
 
     // Date input — use fireEvent.change for date inputs
     const dobInput = document.querySelector('input[type="date"]');
@@ -100,26 +108,26 @@ describe('CheckInForm', () => {
       fireEvent.change(dobInput, { target: { value: '1990-01-01' } });
     }
 
-    await user.type(screen.getAllByLabelText(/place of birth/i)[0], 'Rome');
-    await user.type(screen.getAllByLabelText(/citizenship/i)[0], 'IT');
-    await user.type(screen.getAllByLabelText(/document type/i)[0], 'PASSPORT');
-    await user.type(screen.getAllByLabelText(/document number/i)[0], 'A1234567');
-    await user.type(screen.getAllByLabelText(/document place of issue/i)[0], 'Rome');
+    await user.type(screen.getAllByLabelText('label_place_of_birth')[0], 'Rome');
+    await user.type(screen.getAllByLabelText('label_citizenship')[0], 'IT');
+    await user.type(screen.getAllByLabelText('label_doc_type')[0], 'PASSPORT');
+    await user.type(screen.getAllByLabelText('label_doc_number')[0], 'A1234567');
+    await user.type(screen.getAllByLabelText('label_doc_issue_place')[0], 'Rome');
 
-    // Select Traveller Type (Ospite Singolo is primary default in code, but let's select it explicitly for the test)
-    const travellerTypeSelect = screen.getAllByLabelText(/Tipo Alloggiato/i)[0];
+    // Select Traveller Type
+    const travellerTypeSelect = screen.getAllByLabelText('label_guest_type')[0];
     await user.selectOptions(travellerTypeSelect, 'OSPITE_SINGOLO');
 
     // Guest 1 is primary by default. Let's uncheck it to test validation
-    const primaryCheckbox = screen.getByRole('checkbox', { name: /primary guest/i });
+    const primaryCheckbox = screen.getByRole('checkbox', { name: 'label_primary_guest' });
     await user.click(primaryCheckbox); // Uncheck
-    
+
     // Try to submit
-    const submitBtn = screen.getByRole('button', { name: /complete check-in/i });
+    const submitBtn = screen.getByRole('button', { name: 'btn_complete_checkin' });
     await user.click(submitBtn);
 
     // Should show error
-    expect(screen.getByText('error_primary_guest_required')).toBeInTheDocument();
+    expect(screen.getByText('err_primary_guest_required')).toBeInTheDocument();
     expect(stayService.createStay).not.toHaveBeenCalled();
 
     // Check it back

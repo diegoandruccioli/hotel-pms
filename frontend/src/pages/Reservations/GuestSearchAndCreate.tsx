@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3TextField } from '../../components/m3/M3TextField';
@@ -47,6 +48,7 @@ export const GuestSearchAndCreate = memo(({
   onClearGuest,
   readOnly = false
 }: GuestSearchAndCreateProps) => {
+  const { t } = useTranslation(['guests', 'common']);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<GuestResponseDTO[]>([]);
   const [isCreatingGuest, setIsCreatingGuest] = useState(false);
@@ -122,7 +124,7 @@ export const GuestSearchAndCreate = memo(({
             {selectedGuest.email} {selectedGuest.phone ? `• ${selectedGuest.phone}` : ''}
           </p>
         </div>
-        {!readOnly && <M3Button variant="text" icon="edit" onClick={onClearGuest}>Change</M3Button>}
+        {!readOnly && <M3Button variant="text" icon="edit" onClick={onClearGuest}>{t('btn_change')}</M3Button>}
       </div>
     );
   }
@@ -130,19 +132,19 @@ export const GuestSearchAndCreate = memo(({
   if (isCreatingGuest) {
     return (
       <div className="space-y-4 border border-outline-variant p-4 rounded-shape-md">
-        <h3 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider mb-2">Create New Primary Guest</h3>
+        <h3 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider mb-2">{t('heading_create_guest')}</h3>
         {error && <p className="text-error text-sm">{error}</p>}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <M3TextField label="First Name" name="firstName" value={newGuest.firstName} onChange={handleInputChange} required />
-          <M3TextField label="Last Name" name="lastName" value={newGuest.lastName} onChange={handleInputChange} required />
-          <M3TextField label="Email" name="email" type="email" value={newGuest.email} onChange={handleInputChange} required />
-          <M3TextField label="Phone" name="phone" value={newGuest.phone || ''} onChange={handleInputChange} />
-          <M3TextField label="City" name="city" value={newGuest.city || ''} onChange={handleInputChange} />
-          <M3TextField label="Country" name="country" value={newGuest.country || ''} onChange={handleInputChange} />
+          <M3TextField label={t('label_first_name')} name="firstName" value={newGuest.firstName} onChange={handleInputChange} required />
+          <M3TextField label={t('label_last_name')} name="lastName" value={newGuest.lastName} onChange={handleInputChange} required />
+          <M3TextField label={t('email')} name="email" type="email" value={newGuest.email} onChange={handleInputChange} required />
+          <M3TextField label={t('phone')} name="phone" value={newGuest.phone || ''} onChange={handleInputChange} />
+          <M3TextField label={t('city')} name="city" value={newGuest.city || ''} onChange={handleInputChange} />
+          <M3TextField label={t('label_country')} name="country" value={newGuest.country || ''} onChange={handleInputChange} />
         </div>
         <div className="flex gap-2 justify-end pt-2">
-          <M3Button variant="text" onClick={handleCancelCreation}>Cancel</M3Button>
-          <M3Button onClick={handleCreateGuest} loading={loading}>Save Guest</M3Button>
+          <M3Button variant="text" onClick={handleCancelCreation}>{t('cancel')}</M3Button>
+          <M3Button onClick={handleCreateGuest} loading={loading}>{t('btn_save_guest')}</M3Button>
         </div>
       </div>
     );
@@ -151,15 +153,15 @@ export const GuestSearchAndCreate = memo(({
   return (
     <div className="space-y-4">
       <div className="flex gap-2 items-center">
-        <M3TextField 
-          label="Search guest by name or email" 
+        <M3TextField
+          label={t('search_guest_placeholder')}
           leadingIcon="search"
           value={searchQuery}
           onChange={handleSearchChange}
           className="flex-1"
           readOnly={readOnly}
         />
-        {!readOnly && <M3Button variant="tonal" icon="person_add" onClick={handleStartCreation}>New Guest</M3Button>}
+        {!readOnly && <M3Button variant="tonal" icon="person_add" onClick={handleStartCreation}>{t('btn_new_guest')}</M3Button>}
       </div>
       
       {searchQuery && (
@@ -175,7 +177,7 @@ export const GuestSearchAndCreate = memo(({
               ))}
             </ul>
           ) : (
-            <p className="p-4 text-center text-sm text-on-surface-variant">No guests found. Try creating a new one.</p>
+            <p className="p-4 text-center text-sm text-on-surface-variant">{t('no_guests_search')}</p>
           )}
         </div>
       )}

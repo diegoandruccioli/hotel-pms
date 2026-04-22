@@ -6,11 +6,15 @@ import commonEn from './locales/en/common.json';
 import authEn from './locales/en/auth.json';
 import errorsEn from './locales/en/errors.json';
 import settingsEn from './locales/en/settings.json';
+import guestsEn from './locales/en/guests.json';
+import staysEn from './locales/en/stays.json';
 
 import commonIt from './locales/it/common.json';
 import authIt from './locales/it/auth.json';
 import errorsIt from './locales/it/errors.json';
 import settingsIt from './locales/it/settings.json';
+import guestsIt from './locales/it/guests.json';
+import staysIt from './locales/it/stays.json';
 
 const resources = {
   en: {
@@ -18,12 +22,16 @@ const resources = {
     auth: authEn,
     errors: errorsEn,
     settings: settingsEn,
+    guests: guestsEn,
+    stays: staysEn,
   },
   it: {
     common: commonIt,
     auth: authIt,
     errors: errorsIt,
     settings: settingsIt,
+    guests: guestsIt,
+    stays: staysIt,
   },
 };
 
