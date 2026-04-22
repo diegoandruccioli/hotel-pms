@@ -5,21 +5,25 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 import commonEn from './locales/en/common.json';
 import authEn from './locales/en/auth.json';
 import errorsEn from './locales/en/errors.json';
+import settingsEn from './locales/en/settings.json';
 
 import commonIt from './locales/it/common.json';
 import authIt from './locales/it/auth.json';
 import errorsIt from './locales/it/errors.json';
+import settingsIt from './locales/it/settings.json';
 
 const resources = {
   en: {
     common: commonEn,
     auth: authEn,
     errors: errorsEn,
+    settings: settingsEn,
   },
   it: {
     common: commonIt,
     auth: authIt,
     errors: errorsIt,
+    settings: settingsIt,
   },
 };
 

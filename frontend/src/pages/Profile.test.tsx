@@ -28,7 +28,7 @@ vi.mock('../store/toastStore', () => ({
 }));
 
 const logoutMock = vi.fn();
-const mockUser: UserPayload = { username: 'admin', role: 'ADMIN', hotelId: 'h1' };
+const mockUser: UserPayload = { sub: 'admin', username: 'admin', role: 'ADMIN' };
 
 vi.mock('../store/authStore', () => ({
   useAuthStore: () => ({ user: mockUser, logout: logoutMock }),

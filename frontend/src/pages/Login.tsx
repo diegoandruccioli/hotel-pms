@@ -33,7 +33,7 @@ export const Login = memo(() => {
       if (e.response?.status === 401) {
         setError(t('invalid_credentials'));
       } else {
-        setError(t('login_error_generic'));
+        setError(t('login_failed'));
       }
     } finally {
       setIsLoading(false);
