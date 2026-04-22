@@ -57,17 +57,18 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
 
   return (
     <FocusTrap>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0" role="dialog" aria-modal="true">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0" role="dialog" aria-modal="true" aria-labelledby="room-modal-title">
         <div className="fixed inset-0 bg-scrim/40 transition-opacity" onClick={onClose} aria-hidden="true" />
         <div className="relative bg-surface rounded-shape-lg shadow-elevation-3 w-full max-w-md max-h-[90vh] flex flex-col animate-scale-in">
-          
+
           <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/30">
-            <h3 className="text-xl font-display font-medium text-on-surface">
+            <h3 id="room-modal-title" className="text-xl font-display font-medium text-on-surface">
               {room ? t('edit_room') : t('add_room')}
             </h3>
             <button
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+              type="button"
+              className="w-10 h-10 flex items-center justify-center rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none"
             >
               <MaterialIcon name="close" size={20} />
             </button>
@@ -78,12 +79,13 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                  <label htmlFor="roomNumber" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                     {t('room_number')} *
                   </label>
                   <input
                     required
                     type="text"
+                    id="roomNumber"
                     name="roomNumber"
                     value={formData.roomNumber}
                     onChange={handleChange}
@@ -92,10 +94,11 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                  <label htmlFor="roomStatus" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                     {t('status')} *
                   </label>
                   <select
+                    id="roomStatus"
                     name="status"
                     value={formData.status}
                     onChange={handleChange}
@@ -109,11 +112,12 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
               </div>
 
               <div>
-                <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                <label htmlFor="roomTypeId" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                   {t('room_type')} *
                 </label>
                 <select
                   required
+                  id="roomTypeId"
                   name="roomTypeId"
                   value={formData.roomTypeId}
                   onChange={handleChange}

@@ -1,6 +1,7 @@
 /* eslint-disable react-perf/jsx-no-new-array-as-prop */
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import { useAuthStore } from '../store/authStore';
@@ -129,5 +130,21 @@ describe('ProtectedRoute', () => {
 
     expect(screen.getByText('Home')).toBeInTheDocument();
     expect(screen.queryByText('Owner Dashboard')).not.toBeInTheDocument();
+  });
+
+  it('should have no accessibility violations when authenticated', async () => {
+    mockStore({ isAuthenticated: true, user: adminUser });
+    const { container } = render(
+      <MemoryRouter initialEntries={['/protected']}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/protected" element={<main><h1>Protected Content</h1></main>} />
+          </Route>
+          <Route path="/login" element={<div>Login</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

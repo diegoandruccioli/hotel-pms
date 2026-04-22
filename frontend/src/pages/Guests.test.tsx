@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { Guests } from './Guests';
 import { guestService } from '../services/guestService';
 
@@ -79,5 +80,13 @@ describe('Guests', () => {
       const nameCellText = cells[0]?.textContent ?? '';
       expect(nameCellText).toContain(xssFirst);
     });
+  });
+
+  it('should have no accessibility violations', async () => {
+    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([]);
+    const { container } = render(<Guests />);
+    await waitFor(() => expect(screen.getByText('no_guests_found')).toBeInTheDocument());
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

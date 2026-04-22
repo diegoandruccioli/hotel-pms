@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { MemoryRouter } from 'react-router-dom';
 import { Reservations } from './Reservations';
 import { reservationService } from '../services/reservationService';
@@ -74,5 +75,17 @@ describe('Reservations', () => {
     await waitFor(() => {
       expect(screen.getByText('error_loading_reservations')).toBeInTheDocument();
     });
+  });
+
+  it('should have no accessibility violations', async () => {
+    vi.mocked(reservationService.getAllReservations).mockResolvedValueOnce([]);
+    const { container } = render(
+      <MemoryRouter>
+        <Reservations />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByText('no_reservations_found')).toBeInTheDocument());
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

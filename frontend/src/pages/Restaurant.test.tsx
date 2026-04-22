@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { Restaurant } from './Restaurant';
 import { fbService } from '../services/fbService';
 
@@ -49,5 +50,13 @@ describe('Restaurant', () => {
     await waitFor(() => {
       expect(screen.getByText('error_loading_orders')).toBeInTheDocument();
     });
+  });
+
+  it('should have no accessibility violations', async () => {
+    vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+    const { container } = render(<Restaurant />);
+    await waitFor(() => expect(screen.getByText('no_orders')).toBeInTheDocument());
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

@@ -10,12 +10,12 @@ interface M3ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   filled:
-    'bg-primary text-on-primary hover:shadow-elevation-1 active:shadow-elevation-0',
+    'bg-primary text-on-primary hover:shadow-elevation-1 active:shadow-elevation-0 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
   tonal:
-    'bg-secondary-container text-on-secondary-container hover:shadow-elevation-1 active:shadow-elevation-0',
+    'bg-secondary-container text-on-secondary-container hover:shadow-elevation-1 active:shadow-elevation-0 focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2',
   outlined:
-    'border border-outline text-primary bg-transparent hover:bg-primary/[0.08]',
-  text: 'text-primary bg-transparent hover:bg-primary/[0.08]',
+    'border border-outline text-primary bg-transparent hover:bg-primary/[0.08] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+  text: 'text-primary bg-transparent hover:bg-primary/[0.08] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
 };
 
 export const M3Button = ({

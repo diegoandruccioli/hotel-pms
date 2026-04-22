@@ -39,7 +39,7 @@ type StatusTone = 'info' | 'warning' | 'success' | 'neutral' | 'error';
 
 const statusLegend: { labelKey: string; color: string; tone: StatusTone }[] = [
   { labelKey: 'status_confirmed', color: '#1A3A5C', tone: 'info' },
-  { labelKey: 'status_pending', color: '#B8860B', tone: 'warning' },
+  { labelKey: 'status_pending', color: '#5C4300', tone: 'warning' },
   { labelKey: 'status_checked_in', color: '#2E7D6A', tone: 'success' },
   { labelKey: 'status_checked_out', color: '#73777F', tone: 'neutral' },
   { labelKey: 'status_cancelled', color: '#BA1A1A', tone: 'error' },
@@ -175,7 +175,7 @@ export const CalendarPlanning = () => {
     const status = event.resource.status;
     const colorMap: Record<string, string> = {
       CONFIRMED: '#1A3A5C',
-      PENDING: '#B8860B',
+      PENDING: '#5C4300',
       CANCELLED: '#BA1A1A',
       CHECKED_IN: '#2E7D6A',
       CHECKED_OUT: '#73777F',

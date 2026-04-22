@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { ThemeToggle } from './ThemeToggle';
 
 vi.mock('react-i18next', () => ({
@@ -30,5 +31,11 @@ describe('ThemeToggle', () => {
     render(<ThemeToggle />);
     const button = screen.getByRole('button');
     expect(() => fireEvent.click(button)).not.toThrow();
+  });
+
+  it('should have no accessibility violations', async () => {
+    const { container } = render(<ThemeToggle />);
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

@@ -31,7 +31,7 @@ const ToastItem = memo(({ toast }: { toast: Toast }) => {
       <p className="text-sm font-body flex-1">{toast.message}</p>
       <button
         onClick={handleRemove}
-        className="opacity-60 hover:opacity-100 transition-opacity"
+        className="opacity-60 hover:opacity-100 transition-opacity rounded focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-1 focus-visible:outline-none"
         aria-label="Dismiss notification"
       >
         <MaterialIcon name="close" size={16} />

@@ -203,6 +203,7 @@ export const ReservationForm = () => {
           type="button"
           onClick={handleBackToReservations}
           className="p-2 rounded-full hover:bg-surface-variant transition-colors text-on-surface-variant"
+          aria-label={t('back', 'Back')}
         >
           <MaterialIcon name="arrow_back" />
         </button>
@@ -239,12 +240,14 @@ export const ReservationForm = () => {
           <MaterialIcon name="event_seat" className="text-primary" />
           <h2 className="text-lg font-medium text-on-surface">{t('step_reservation_details')}</h2>
         </div>
-        <RoomSelection 
+        <RoomSelection
           checkInDate={checkInDate}
           checkOutDate={checkOutDate}
           expectedGuests={expectedGuests}
           availableRooms={rooms}
           selectedRoomIds={selectedRoomIds}
+          allReservations={allReservations}
+          currentReservationId={id}
           onCheckInChange={setCheckInDate}
           onCheckOutChange={setCheckOutDate}
           onExpectedGuestsChange={setExpectedGuests}

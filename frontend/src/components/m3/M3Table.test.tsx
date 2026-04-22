@@ -1,6 +1,7 @@
 /* eslint-disable react-perf/jsx-no-new-array-as-prop */
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { M3Table, M3TableRow, M3TableCell } from './M3Table';
 
 describe('M3Table', () => {
@@ -52,5 +53,18 @@ describe('M3Table', () => {
 
     const container = screen.getByText('H').closest('div.overflow-x-auto')?.parentElement;
     expect(container?.className).toContain('mt-4');
+  });
+
+  it('should have no accessibility violations', async () => {
+    const { container } = render(
+      <M3Table headers={['Name', 'Status']}>
+        <M3TableRow>
+          <M3TableCell>John</M3TableCell>
+          <M3TableCell>Active</M3TableCell>
+        </M3TableRow>
+      </M3Table>
+    );
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

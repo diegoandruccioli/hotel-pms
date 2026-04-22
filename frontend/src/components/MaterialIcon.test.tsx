@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { MaterialIcon } from './MaterialIcon';
 
 describe('MaterialIcon', () => {
@@ -44,5 +45,11 @@ describe('MaterialIcon', () => {
     render(<MaterialIcon name="info" className="text-primary" />);
     const el = screen.getByText('info');
     expect(el.className).toContain('text-primary');
+  });
+
+  it('should have no accessibility violations', async () => {
+    const { container } = render(<MaterialIcon name="dashboard" label="Dashboard" />);
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

@@ -40,7 +40,10 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
       const match = COUNTRY_CODES.find(c => initialPhone.startsWith(c.code));
       if (match) {
         prefix = match.code;
-        number = initialPhone.slice(match.code.length).trim();
+        const raw = initialPhone.slice(match.code.length).trim().replace(/\D/g, '');
+        if (raw.length <= 3) number = raw;
+        else if (raw.length <= 6) number = `${raw.slice(0, 3)} ${raw.slice(3)}`;
+        else number = `${raw.slice(0, 3)} ${raw.slice(3, 6)} ${raw.slice(6)}`;
       }
     }
     return { initPrefix: prefix, initNumber: number };
@@ -67,22 +70,30 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
     setPhonePrefix(e.target.value);
   }, []);
 
-  const handlePhoneNumberChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setPhoneNumber(e.target.value);
+  const formatPhoneDisplay = useCallback((raw: string): string => {
+    const d = raw.replace(/\D/g, '');
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
+    return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;
   }, []);
+
+  const handlePhoneNumberChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhoneNumber(formatPhoneDisplay(e.target.value));
+  }, [formatPhoneDisplay]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    if (!formData.email.trim() && !phoneNumber.trim()) {
+    if (!(formData.email ?? '').trim() && !phoneNumber.trim()) {
       addToast(t('email_or_phone_required', 'È necessario inserire Email oppure Telefono'), 'error');
       setLoading(false);
       return;
     }
 
-    const finalPhone = phoneNumber.trim() ? `${phonePrefix} ${phoneNumber.trim()}` : '';
-    const submitData = { ...formData, phone: finalPhone };
+    const finalPhone = phoneNumber.trim() ? `${phonePrefix} ${phoneNumber.trim()}` : undefined;
+    const finalEmail = (formData.email ?? '').trim() || undefined;
+    const submitData = { ...formData, email: finalEmail, phone: finalPhone };
 
     try {
       if (guest) {
@@ -123,21 +134,23 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
   const closeDeleteConfirm = useCallback(() => setShowDeleteConfirm(false), []);
 
   const inputClass = "block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
+  const selectClass = "shrink-0 w-24 rounded-shape-xs border border-outline px-2 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
 
   return (
     <FocusTrap>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0" role="dialog" aria-modal="true">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0" role="dialog" aria-modal="true" aria-labelledby="guest-modal-title">
         <div className="fixed inset-0 bg-scrim/40 transition-opacity" onClick={onClose} aria-hidden="true" />
         <div className="relative bg-surface rounded-shape-lg shadow-elevation-3 w-full max-w-md max-h-[90vh] flex flex-col animate-scale-in">
-          
+
           <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/30">
-            <h3 className="text-xl font-display font-medium text-on-surface">
+            <h3 id="guest-modal-title" className="text-xl font-display font-medium text-on-surface">
               {guest ? t('edit_guest', 'Modifica Ospite') : t('add_guest', 'Aggiungi Ospite')}
             </h3>
             <button
               onClick={onClose}
               type="button"
-              className="w-8 h-8 flex items-center justify-center rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+              aria-label={t('close', 'Close')}
+              className="w-10 h-10 flex items-center justify-center rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none"
             >
               <MaterialIcon name="close" size={20} />
             </button>
@@ -147,43 +160,46 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
             <form id="guest-form" onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                  <label htmlFor="firstName" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                     {t('first_name', 'Nome')} *
                   </label>
-                  <input required type="text" name="firstName" value={formData.firstName} onChange={handleChange} className={inputClass} />
+                  <input required type="text" id="firstName" name="firstName" value={formData.firstName} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                  <label htmlFor="lastName" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                     {t('last_name', 'Cognome')} *
                   </label>
-                  <input required type="text" name="lastName" value={formData.lastName} onChange={handleChange} className={inputClass} />
+                  <input required type="text" id="lastName" name="lastName" value={formData.lastName} onChange={handleChange} className={inputClass} />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                <label htmlFor="email" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                   {t('email', 'Email')} * (se senza telefono)
                 </label>
-                <input type="email" name="email" value={formData.email} onChange={handleChange} className={inputClass} />
+                <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} className={inputClass} />
               </div>
 
               <div>
-                <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                <label htmlFor="phonePrefix" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                   {t('phone', 'Telefono')} * (se senza email)
                 </label>
                 <div className="flex gap-2">
-                  <select 
-                    value={phonePrefix} 
+                  <select
+                    id="phonePrefix"
+                    value={phonePrefix}
                     onChange={handlePhonePrefixChange}
-                    className={`${inputClass} w-[100px] px-2`}
+                    className={selectClass}
                   >
                     {COUNTRY_CODES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
                   </select>
-                  <input 
-                    type="text" 
-                    value={phoneNumber} 
-                    onChange={handlePhoneNumberChange} 
-                    className={`${inputClass} flex-1`} 
+                  <input
+                    type="text"
+                    id="phoneNumber"
+                    aria-label={t('phone_number', 'Phone number')}
+                    value={phoneNumber}
+                    onChange={handlePhoneNumberChange}
+                    className={`${inputClass} flex-1`}
                     placeholder="Es. 333 1234567"
                   />
                 </div>
@@ -191,16 +207,16 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                  <label htmlFor="city" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                     {t('city', 'Città')}
                   </label>
-                  <input type="text" name="city" value={formData.city} onChange={handleChange} className={inputClass} />
+                  <input type="text" id="city" name="city" value={formData.city} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                  <label htmlFor="country" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                     {t('country', 'Nazione')}
                   </label>
-                  <input type="text" name="country" value={formData.country} onChange={handleChange} className={inputClass} />
+                  <input type="text" id="country" name="country" value={formData.country} onChange={handleChange} className={inputClass} />
                 </div>
               </div>
             </form>

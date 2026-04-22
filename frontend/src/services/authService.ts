@@ -17,5 +17,9 @@ export const authService = {
   fetchMe: async (): Promise<UserPayload> => {
     const response = await api.get<UserPayload>('/api/v1/auth/me');
     return response.data;
-  }
+  },
+
+  changePassword: async (data: { currentPassword: string; newPassword: string }): Promise<void> => {
+    await api.post('/api/v1/auth/change-password', data);
+  },
 };

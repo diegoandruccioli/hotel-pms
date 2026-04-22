@@ -177,6 +177,7 @@
   "confirm_reservation": "Conferma Prenotazione",
   "back": "Indietro",
   "select_rooms": "Seleziona Camere",
+  "room_occupied": "Occupata",
   "label_checkin_date": "Data di Check-in",
   "label_checkout_date": "Data di Check-out",
   "label_expected_guests": "Ospiti Previsti",
@@ -186,5 +187,18 @@
   "room_move_overlap_error": "Impossibile spostare. La camera è già occupata in queste date.",
   "reservation_overlap_error": "Le date selezionate si sovrappongono con un'altra prenotazione per queste camere.",
 
-  "user_menu_label": "Menu utente di {{name}}"
+  "user_menu_label": "Menu utente di {{name}}",
+  "skip_to_main": "Vai al contenuto principale",
+
+  "profile_subtitle": "Gestisci il tuo account e le impostazioni di sicurezza.",
+  "section_account_info": "Informazioni Account",
+  "section_change_password": "Cambia Password",
+  "current_password": "Password attuale",
+  "new_password": "Nuova password",
+  "confirm_new_password": "Conferma nuova password",
+  "passwords_dont_match": "Le password non coincidono.",
+  "password_too_short": "La nuova password deve avere almeno 8 caratteri.",
+  "password_changed_success": "Password cambiata. Effettua nuovamente l'accesso.",
+  "password_change_failed": "Cambio password fallito. Verifica la password attuale e riprova.",
+  "change_password": "Cambia Password"
 }

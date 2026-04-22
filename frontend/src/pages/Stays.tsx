@@ -64,7 +64,7 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
             disabled={checkingOut === stay.id}
             onClick={handleCheckOut}
             id={`checkout-btn-${stay.id}`}
-            className="text-xs h-8 px-3"
+            className="text-xs h-10 px-3"
           >
             {t('action_checkout')}
           </M3Button>
@@ -205,7 +205,7 @@ export const Stays = memo(() => {
       <M3Card variant="outlined" className="p-5">
         <div className="flex items-center gap-2 mb-3">
           <MaterialIcon name="verified_user" size={20} className="text-primary" />
-          <h3 className="text-sm font-display font-semibold text-on-surface">{t('police_report_title')}</h3>
+          <h2 className="text-sm font-display font-semibold text-on-surface">{t('police_report_title')}</h2>
         </div>
         <p className="text-xs font-body text-on-surface-variant mb-4">{t('police_report_desc')}</p>
         <div className="flex flex-col sm:flex-row items-end gap-3">

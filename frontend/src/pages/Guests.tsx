@@ -23,8 +23,8 @@ const GuestRow = memo(({ guest, onEdit, t }: {
       <M3TableCell className="text-on-surface-variant">{guest.phone || '-'}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{guest.city || '-'} ({guest.country || '-'})</M3TableCell>
       <M3TableCell className="text-right">
-        <button 
-          className="text-primary hover:text-primary/80 font-medium text-sm"
+        <button
+          className="text-primary hover:text-primary/80 font-medium text-sm rounded focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-none"
           onClick={handleEdit}
         >
           {t('edit')}

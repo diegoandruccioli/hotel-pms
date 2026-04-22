@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { M3StatusChip } from './M3StatusChip';
 
 describe('M3StatusChip', () => {
@@ -35,5 +36,11 @@ describe('M3StatusChip', () => {
     const { container } = render(<M3StatusChip label="Plain" />);
     const iconSpans = container.querySelectorAll('.material-symbols-outlined');
     expect(iconSpans).toHaveLength(0);
+  });
+
+  it('should have no accessibility violations', async () => {
+    const { container } = render(<M3StatusChip label="Paid" tone="success" />);
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

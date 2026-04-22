@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 /* eslint-disable react-perf/jsx-no-new-array-as-prop */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { axe } from 'vitest-axe';
 import { ReservationForm } from './ReservationForm';
 import { inventoryService } from '../../services/inventoryService';
 import { reservationService } from '../../services/reservationService';
@@ -163,5 +164,18 @@ describe('ReservationForm', () => {
     });
 
     expect(screen.getByRole('button', { name: /update_reservation/i })).toBeInTheDocument();
+  });
+
+  it('should have no accessibility violations', async () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={['/reservations/new']}>
+        <Routes>
+          <Route path="/reservations/new" element={<ReservationForm />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByText('new_reservation')).toBeInTheDocument());
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

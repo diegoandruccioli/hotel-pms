@@ -22,7 +22,7 @@ export const M3TextField = ({
   const id = useId();
   const [focused, setFocused] = useState(false);
   const hasValue = !!rest.value && String(rest.value).length > 0;
-  const isFloating = focused || hasValue;
+  const isFloating = focused || hasValue || rest.type === 'date';
   const hasError = !!errorText;
 
   const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
@@ -39,11 +39,11 @@ export const M3TextField = ({
     <div className={`relative ${className}`}>
       {/* Input Container */}
       <div
-        className={`relative flex items-center rounded-shape-xs border transition-colors
+        className={`relative flex items-center rounded-shape-xs border transition-all
           ${hasError
-            ? 'border-error'
+            ? 'border-error ring-2 ring-error ring-offset-1'
             : focused
-              ? 'border-primary border-2'
+              ? 'border-primary border-2 ring-2 ring-primary ring-offset-1'
               : 'border-outline hover:border-on-surface'
           }
         `}

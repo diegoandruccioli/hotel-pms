@@ -2,6 +2,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 /* eslint-disable react-perf/jsx-no-new-array-as-prop */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { axe } from 'vitest-axe';
 import { CheckInForm } from './CheckInForm';
 import { stayService } from '../../services/stayService';
 import userEvent from '@testing-library/user-event';
@@ -74,6 +75,13 @@ describe('CheckInForm', () => {
     await user.click(removeBtns[1]);
 
     expect(screen.queryByText(/Guest 2/i)).not.toBeInTheDocument();
+  });
+
+  it('should have no accessibility violations', async () => {
+    const { container } = renderComponent(1);
+    await waitFor(() => expect(screen.getByText('Check-in Alloggiati')).toBeInTheDocument());
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 
   it('validates primary guest and submits', async () => {

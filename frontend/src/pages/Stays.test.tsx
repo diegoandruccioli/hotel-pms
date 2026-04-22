@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { Stays } from './Stays';
 import { stayService } from '../services/stayService';
 
@@ -67,5 +68,13 @@ describe('Stays', () => {
     await waitFor(() => {
       expect(screen.getByText('nav_stays')).toBeInTheDocument();
     });
+  });
+
+  it('should have no accessibility violations', async () => {
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([]);
+    const { container } = render(<Stays />);
+    await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });
