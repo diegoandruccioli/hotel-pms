@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -244,7 +245,7 @@ class InvoiceServiceImplTest {
                                 List.of(), List.of());
 
                 when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
-                when(invoiceRepository.save(any(Invoice.class))).thenReturn(savedInvoice);
+                when(invoiceRepository.save(notNull())).thenReturn(savedInvoice);
                 when(invoiceMapper.toResponse(savedInvoice)).thenReturn(expectedResponse);
 
                 // Act
@@ -254,7 +255,7 @@ class InvoiceServiceImplTest {
                 assertNotNull(result);
                 assertEquals(stayId, result.stayId());
                 assertEquals(0, BigDecimal.ZERO.compareTo(result.totalAmount()));
-                verify(invoiceRepository).save(any(Invoice.class));
+                verify(invoiceRepository).save(notNull());
         }
 
         @Test
@@ -308,7 +309,7 @@ class InvoiceServiceImplTest {
                 when(invoiceChargeMapper.toResponse(any(InvoiceCharge.class))).thenReturn(expectedCharge);
 
                 // Act
-                final ChargeResponse result = invoiceService.addCharge(stayId, chargeRequest);
+                final ChargeResponse result = invoiceService.addCharge(Objects.requireNonNull(stayId), chargeRequest);
 
                 // Assert
                 assertNotNull(result);
@@ -329,7 +330,7 @@ class InvoiceServiceImplTest {
 
                 // Act & Assert
                 final Exception exception = assertThrows(NotFoundException.class,
-                                () -> invoiceService.addCharge(stayId, chargeRequest));
+                                () -> invoiceService.addCharge(Objects.requireNonNull(stayId), chargeRequest));
                 assertEquals("INVOICE_NOT_FOUND_FOR_STAY", exception.getMessage());
         }
 
@@ -350,7 +351,7 @@ class InvoiceServiceImplTest {
 
                 // Act & Assert
                 final Exception exception = assertThrows(InvoiceConflictException.class,
-                                () -> invoiceService.addCharge(stayId, chargeRequest));
+                                () -> invoiceService.addCharge(Objects.requireNonNull(stayId), chargeRequest));
                 assertEquals("INVOICE_NOT_OPEN", exception.getMessage());
         }
 
@@ -367,6 +368,6 @@ class InvoiceServiceImplTest {
 
                 // Act & Assert
                 assertThrows(NotFoundException.class,
-                                () -> invoiceService.addCharge(foreignStayId, chargeRequest));
+                                () -> invoiceService.addCharge(Objects.requireNonNull(foreignStayId), chargeRequest));
         }
 }

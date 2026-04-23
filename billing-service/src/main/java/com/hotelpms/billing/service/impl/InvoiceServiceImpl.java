@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -77,7 +78,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         invoice.setInvoiceNumber(generateInvoiceNumber());
         invoice.setHotelId(resolveHotelId());
 
-        final Invoice savedInvoice = invoiceRepository.save(invoice);
+        final Invoice savedInvoice = invoiceRepository.save(Objects.requireNonNull(invoice));
         log.info("Successfully created Invoice {}", savedInvoice.getInvoiceNumber());
 
         return invoiceMapper.toResponse(savedInvoice);
@@ -107,7 +108,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .invoiceNumber(generateInvoiceNumber())
                 .build();
 
-        final Invoice savedInvoice = invoiceRepository.save(invoice);
+        final Invoice savedInvoice = invoiceRepository.save(Objects.requireNonNull(invoice));
         log.info("Created invoice {} for stay {}", savedInvoice.getInvoiceNumber(), request.stayId());
 
         return invoiceMapper.toResponse(savedInvoice);
@@ -136,7 +137,7 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         invoice.addCharge(charge);
         invoice.setTotalAmount(invoice.getTotalAmount().add(request.amount()));
-        invoiceRepository.save(invoice);
+        invoiceRepository.save(Objects.requireNonNull(invoice));
 
         log.info("Added {} charge of {} to invoice {} (new total: {})",
                 request.type(), request.amount(), invoice.getInvoiceNumber(), invoice.getTotalAmount());

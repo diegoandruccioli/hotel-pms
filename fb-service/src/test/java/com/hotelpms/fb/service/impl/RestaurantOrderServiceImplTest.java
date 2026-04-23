@@ -294,7 +294,7 @@ class RestaurantOrderServiceImplTest {
                 .build();
 
         when(orderRepository.findByIdAndHotelId(orderId, hotelId)).thenReturn(Optional.of(pendingOrder));
-        when(orderRepository.save(pendingOrder)).thenReturn(pendingOrder);
+        when(orderRepository.save(Objects.requireNonNull(pendingOrder))).thenReturn(pendingOrder);
         when(billingClient.addCharge(any(UUID.class), any(ChargeRequest.class)))
                 .thenReturn(new ChargeResponse(UUID.randomUUID()));
         when(orderMapper.toResponse(pendingOrder)).thenReturn(confirmedResponse);
@@ -306,7 +306,7 @@ class RestaurantOrderServiceImplTest {
         assertNotNull(result);
         assertEquals(OrderStatus.BILLED_TO_ROOM, result.status());
         assertEquals(OrderStatus.BILLED_TO_ROOM, pendingOrder.getStatus());
-        verify(orderRepository).save(pendingOrder);
+        verify(orderRepository).save(Objects.requireNonNull(pendingOrder));
         verify(billingClient).addCharge(any(UUID.class), any(ChargeRequest.class));
     }
 
@@ -329,7 +329,7 @@ class RestaurantOrderServiceImplTest {
                 .build();
 
         when(orderRepository.findByIdAndHotelId(orderId, hotelId)).thenReturn(Optional.of(preparedOrder));
-        when(orderRepository.save(preparedOrder)).thenReturn(preparedOrder);
+        when(orderRepository.save(Objects.requireNonNull(preparedOrder))).thenReturn(preparedOrder);
         when(billingClient.addCharge(any(UUID.class), any(ChargeRequest.class)))
                 .thenReturn(new ChargeResponse(UUID.randomUUID()));
         when(orderMapper.toResponse(preparedOrder)).thenReturn(confirmedResponse);
@@ -394,7 +394,7 @@ class RestaurantOrderServiceImplTest {
                 .build();
 
         when(orderRepository.findByIdAndHotelId(orderId, hotelId)).thenReturn(Optional.of(pendingOrder));
-        when(orderRepository.save(pendingOrder)).thenReturn(pendingOrder);
+        when(orderRepository.save(Objects.requireNonNull(pendingOrder))).thenReturn(pendingOrder);
         when(billingClient.addCharge(any(UUID.class), any(ChargeRequest.class))).thenReturn(null);
         when(orderMapper.toResponse(pendingOrder)).thenReturn(confirmedResponse);
 
