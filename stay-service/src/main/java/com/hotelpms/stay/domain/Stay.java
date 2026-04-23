@@ -118,6 +118,13 @@ public class Stay {
     private boolean active = true;
 
     /**
+     * Reference to the billing invoice folio opened at check-in (cross-service, no DB FK).
+     * Null for stays created before the F&amp;B billing feature or when billing-service was unavailable.
+     */
+    @Column(name = "invoice_id")
+    private UUID invoiceId;
+
+    /**
      * The list of guests staying in this room.
      */
     @OneToMany(mappedBy = "stay", cascade = CascadeType.ALL, orphanRemoval = true)

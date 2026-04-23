@@ -1,7 +1,10 @@
 package com.hotelpms.billing.controller;
 
+import com.hotelpms.billing.dto.ChargeRequest;
+import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.InvoiceRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
+import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.service.InvoiceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,12 +15,12 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -89,5 +92,38 @@ public class InvoiceController {
         log.info("REST request to get latest invoice for reservation {}", reservationId);
         final InvoiceResponse response = invoiceService.getLatestInvoiceByReservation(reservationId);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Creates an invoice for a hotel stay. Called by stay-service at check-in.
+     * Returns 409 if an open invoice already exists for the stay.
+     *
+     * @param request the stay invoice creation request
+     * @return the created invoice response with HTTP 201
+     */
+    @PostMapping("/stay")
+    public ResponseEntity<InvoiceResponse> createInvoiceForStay(
+            @NonNull @Valid @RequestBody final StayInvoiceRequest request) {
+        log.info("REST request to create invoice for stay {}", request.stayId());
+        final InvoiceResponse response = invoiceService.createInvoiceForStay(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Adds a charge to the open invoice for a stay. Called by fb-service after order confirmation.
+     * Returns 404 if no open invoice exists for the stay in the caller's hotel.
+     * Returns 409 if the invoice is not in ISSUED status.
+     *
+     * @param stayId  the stay UUID
+     * @param request the charge details
+     * @return the created charge response with HTTP 201
+     */
+    @PostMapping("/stay/{stayId}/charges")
+    public ResponseEntity<ChargeResponse> addCharge(
+            @NonNull @PathVariable final UUID stayId,
+            @NonNull @Valid @RequestBody final ChargeRequest request) {
+        log.info("REST request to add {} charge to stay {}", request.type(), stayId);
+        final ChargeResponse response = invoiceService.addCharge(stayId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

@@ -4,7 +4,9 @@ import com.hotelpms.stay.client.BillingClient;
 import com.hotelpms.stay.client.GuestClient;
 import com.hotelpms.stay.client.InventoryClient;
 import com.hotelpms.stay.client.ReservationClient;
+import com.hotelpms.stay.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.stay.client.dto.InvoiceStatusResponse;
+import com.hotelpms.stay.client.dto.StayInvoiceRequest;
 import com.hotelpms.stay.exception.BillingNotPaidException;
 import com.hotelpms.stay.client.dto.GuestResponse;
 import com.hotelpms.stay.client.dto.ReservationResponse;
@@ -109,7 +111,7 @@ class StayServiceImplTest {
 
         validResponse = new StayResponse(stayId, null, reservationId, guestId, roomId,
                 StayStatus.CHECKED_IN, savedStay.getActualCheckInTime(), null,
-                LocalDateTime.now(), LocalDateTime.now(), new ArrayList<>());
+                LocalDateTime.now(), LocalDateTime.now(), null, new ArrayList<>());
     }
 
     @Test
@@ -470,6 +472,40 @@ class StayServiceImplTest {
         assertNotNull(response);
         assertEquals(StayStatus.CHECKED_IN, response.status());
         verify(stayRepository, times(1)).save(Objects.requireNonNull(unmappedStay));
+    }
+
+    @Test
+    void shouldOpenInvoiceInBillingServiceOnCheckIn() {
+        // Arrange
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+        final Stay saved = Objects.requireNonNull(savedStay);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationClient.getReservationById(reservation))
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+        when(inventoryClient.getRoomById(room))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+
+        final Stay unmappedStay = new Stay();
+        when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(saved);
+
+        final UUID invoiceId = UUID.randomUUID();
+        when(billingClient.createInvoiceForStay(anyNonNull(StayInvoiceRequest.class)))
+                .thenReturn(new InvoiceCreatedResponse(invoiceId));
+        when(stayMapper.toDto(saved)).thenReturn(Objects.requireNonNull(validResponse));
+
+        // Act
+        stayService.checkIn(request);
+
+        // Assert
+        verify(billingClient, times(1)).createInvoiceForStay(anyNonNull(StayInvoiceRequest.class));
+        assertEquals(invoiceId, saved.getInvoiceId());
+        verify(stayRepository, times(2)).save(anyNonNull(Stay.class));
     }
 
     /**

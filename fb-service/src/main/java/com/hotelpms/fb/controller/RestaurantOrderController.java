@@ -78,4 +78,18 @@ public class RestaurantOrderController {
         log.info("REST request to get all paginated restaurant orders");
         return ResponseEntity.ok(orderService.getAllOrders(pageable));
     }
+
+    /**
+     * Confirms a restaurant order: transitions it to BILLED_TO_ROOM and charges
+     * the amount to the guest's open billing invoice.
+     *
+     * @param id the order UUID to confirm
+     * @return the updated order
+     */
+    @PostMapping("/{id}/confirm")
+    public ResponseEntity<RestaurantOrderResponse> confirmOrder(@NonNull @PathVariable final UUID id) {
+        log.info("REST request to confirm restaurant order: {}", id);
+        final RestaurantOrderResponse response = orderService.confirmOrder(id);
+        return ResponseEntity.ok(response);
+    }
 }

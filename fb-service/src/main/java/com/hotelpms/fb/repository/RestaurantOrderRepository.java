@@ -36,4 +36,13 @@ public interface RestaurantOrderRepository extends JpaRepository<RestaurantOrder
      * @return hotel-scoped page of orders
      */
     Page<RestaurantOrder> findAllByHotelId(UUID hotelId, Pageable pageable);
+
+    /**
+     * Finds an active order by its ID scoped to the caller's hotel (IDOR-safe).
+     *
+     * @param id      the order UUID
+     * @param hotelId the hotel scope extracted from the authenticated request
+     * @return the order, or empty when not found or belonging to a different hotel
+     */
+    java.util.Optional<RestaurantOrder> findByIdAndHotelId(UUID id, UUID hotelId);
 }

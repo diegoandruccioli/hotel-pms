@@ -72,4 +72,15 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
      * @return list of matching invoices
      */
     List<Invoice> findByIssueDateBetween(LocalDateTime start, LocalDateTime end);
+
+    /**
+     * Finds the active invoice for a stay, scoped to a hotel (IDOR-safe lookup).
+     * Returns empty if no invoice exists for the given stay and hotel combination.
+     * Used to detect duplicates before creating and to look up the invoice for charge additions.
+     *
+     * @param stayId  the stay UUID
+     * @param hotelId the hotel UUID from the authenticated request
+     * @return the invoice for the given stay if it belongs to the given hotel
+     */
+    Optional<Invoice> findByStayIdAndHotelId(UUID stayId, UUID hotelId);
 }

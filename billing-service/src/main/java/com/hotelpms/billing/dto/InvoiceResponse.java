@@ -14,11 +14,13 @@ import java.util.UUID;
  * @param hotelId       the hotel identifier
  * @param invoiceNumber the auto-generated invoice number
  * @param issueDate     the date the invoice was issued
- * @param totalAmount   the total amount of the invoice
+ * @param totalAmount   the current total amount (sum of all charges)
  * @param status        the current status of the invoice
  * @param reservationId the associated reservation UUID
  * @param guestId       the associated guest UUID
+ * @param stayId        the associated stay UUID (null for manually created invoices)
  * @param payments      the list of payments made against this invoice
+ * @param charges       the list of line-item charges on this invoice
  */
 public record InvoiceResponse(
         UUID id,
@@ -29,22 +31,27 @@ public record InvoiceResponse(
         InvoiceStatus status,
         UUID reservationId,
         UUID guestId,
-        List<PaymentResponse> payments) {
+        UUID stayId,
+        List<PaymentResponse> payments,
+        List<ChargeResponse> charges) {
 
     /**
-     * Compact constructor to ensure defensive copying of mutable lists.
+     * Compact constructor ensuring defensive copying of mutable lists.
      *
      * @param id            the invoice UUID
      * @param hotelId       the hotel identifier
      * @param invoiceNumber the auto-generated invoice number
      * @param issueDate     the date the invoice was issued
-     * @param totalAmount   the total amount of the invoice
+     * @param totalAmount   the current total amount
      * @param status        the current status of the invoice
      * @param reservationId the associated reservation UUID
      * @param guestId       the associated guest UUID
+     * @param stayId        the associated stay UUID
      * @param payments      the list of payments made against this invoice
+     * @param charges       the list of line-item charges on this invoice
      */
     public InvoiceResponse {
         payments = payments == null ? List.of() : List.copyOf(payments);
+        charges = charges == null ? List.of() : List.copyOf(charges);
     }
 }

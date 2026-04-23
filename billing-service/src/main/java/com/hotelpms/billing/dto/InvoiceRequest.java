@@ -11,11 +11,12 @@ import java.util.UUID;
 /**
  * Data Transfer Object for creating or updating an Invoice.
  *
- * @param hotelId       the hotel identifier for multi-tenancy
+ * @param hotelId       the hotel identifier for multi-tenancy (ignored — resolved server-side)
  * @param reservationId the associated reservation UUID
  * @param guestId       the associated guest UUID
  * @param totalAmount   the total amount of the invoice
  * @param status        the status of the invoice
+ * @param stayId        optional stay UUID; present when the invoice is linked to a hotel stay
  */
 public record InvoiceRequest(
         UUID hotelId,
@@ -30,5 +31,7 @@ public record InvoiceRequest(
                 message = "Amount must have at most 10 integer digits and 2 decimal places")
         BigDecimal totalAmount,
 
-        @NotNull(message = "Status is required") InvoiceStatus status) {
+        @NotNull(message = "Status is required") InvoiceStatus status,
+
+        UUID stayId) {
 }

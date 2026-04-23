@@ -153,6 +153,8 @@
   "save": "Salva",
   "cancel": "Annulla",
   "confirm": "Conferma",
+  "confirm_order": "Conferma ordine",
+  "confirm_order_failed": "Impossibile confermare l'ordine. Riprova.",
   "close": "Chiudi",
   "edit_room": "Modifica Camera",
   "edit_room_type": "Modifica Tipologia",

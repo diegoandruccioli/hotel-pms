@@ -499,6 +499,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - APPLICATION_CONFIG_STAY_SERVICE_URL=http://stay-service:8084
+      - APPLICATION_CONFIG_BILLING_SERVICE_URL=http://billing-service:8085
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:

@@ -1,6 +1,9 @@
 package com.hotelpms.fb.service.impl;
 
+import com.hotelpms.fb.client.BillingClient;
 import com.hotelpms.fb.client.StayClient;
+import com.hotelpms.fb.client.dto.ChargeRequest;
+import com.hotelpms.fb.client.dto.ChargeResponse;
 import com.hotelpms.fb.client.dto.StayResponse;
 import com.hotelpms.fb.domain.MenuItem;
 import com.hotelpms.fb.domain.OrderItem;
@@ -9,6 +12,7 @@ import com.hotelpms.fb.domain.RestaurantOrder;
 import com.hotelpms.fb.dto.OrderItemRequest;
 import com.hotelpms.fb.dto.RestaurantOrderRequest;
 import com.hotelpms.fb.dto.RestaurantOrderResponse;
+import com.hotelpms.fb.exception.OrderNotFoundException;
 import com.hotelpms.fb.exception.OrderValidationException;
 import com.hotelpms.fb.exception.StayNotFoundException;
 import com.hotelpms.fb.mapper.RestaurantOrderMapper;
@@ -30,6 +34,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -41,10 +46,14 @@ import java.util.stream.Collectors;
 @Slf4j
 public class RestaurantOrderServiceImpl implements RestaurantOrderService {
 
+    private static final String CHARGE_TYPE_FB_ORDER = "FB_ORDER";
+    private static final Set<OrderStatus> CONFIRMABLE_STATUSES = Set.of(OrderStatus.PENDING, OrderStatus.PREPARED);
+
     private final RestaurantOrderRepository orderRepository;
     private final RestaurantOrderMapper orderMapper;
     private final StayClient stayClient;
     private final MenuItemRepository menuItemRepository;
+    private final BillingClient billingClient;
 
     /**
      * {@inheritDoc}
@@ -70,7 +79,7 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
         final RestaurantOrder order = orderMapper.toEntity(request);
         order.setHotelId(hotelId);   // T-FB-01: set server-side, never from client
         order.setOrderDate(LocalDateTime.now());
-        order.setStatus(OrderStatus.BILLED_TO_ROOM);
+        order.setStatus(OrderStatus.PENDING);
 
         // Resolve items with server-side prices from the catalog (T-FB-02 mitigation)
         final List<OrderItem> items = buildItemsFromCatalog(request.items(), order);
@@ -115,6 +124,44 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
                 pageable.getPageNumber(), hotelId);
         // T-FB-01: hotel-scoped — never returns orders from other hotels
         return orderRepository.findAllByHotelId(hotelId, pageable).map(orderMapper::toResponse);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    @Transactional
+    public RestaurantOrderResponse confirmOrder(final UUID orderId) {
+        final UUID hotelId = resolveHotelId();
+        log.info("Confirming order: {} hotel: {}", orderId, hotelId);
+
+        final RestaurantOrder order = orderRepository.findByIdAndHotelId(
+                Objects.requireNonNull(orderId), hotelId)
+                .orElseThrow(() -> new OrderNotFoundException("ORDER_NOT_FOUND"));
+
+        if (!CONFIRMABLE_STATUSES.contains(order.getStatus())) {
+            log.warn("[FB] CONFIRM_FAILED | orderId={} | reason=INVALID_ORDER_STATUS | currentStatus={}",
+                    orderId, order.getStatus());
+            throw new OrderValidationException("INVALID_ORDER_STATUS");
+        }
+
+        order.setStatus(OrderStatus.BILLED_TO_ROOM);
+        final RestaurantOrder savedOrder = orderRepository.save(order);
+
+        final ChargeRequest chargeReq = new ChargeRequest(
+                CHARGE_TYPE_FB_ORDER,
+                "F&B " + orderId,
+                savedOrder.getTotalAmount(),
+                orderId);
+        final ChargeResponse chargeResp = billingClient.addCharge(savedOrder.getStayId(), chargeReq);
+        if (chargeResp == null) {
+            log.warn("[FB] CHARGE_FAILED | orderId={} | stayId={} | reason=BILLING_SERVICE_UNAVAILABLE",
+                    orderId, savedOrder.getStayId());
+        } else {
+            log.info("[FB] CHARGE_ADDED | orderId={} | chargeId={}", orderId, chargeResp.id());
+        }
+
+        return orderMapper.toResponse(savedOrder);
     }
 
     /**

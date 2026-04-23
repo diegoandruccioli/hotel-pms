@@ -4,9 +4,11 @@ import com.hotelpms.stay.client.BillingClient;
 import com.hotelpms.stay.client.GuestClient;
 import com.hotelpms.stay.client.InventoryClient;
 import com.hotelpms.stay.client.ReservationClient;
+import com.hotelpms.stay.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.stay.client.dto.InvoiceStatusResponse;
 import com.hotelpms.stay.client.dto.ReservationResponse;
 import com.hotelpms.stay.client.dto.ReservationStatusUpdateRequest;
+import com.hotelpms.stay.client.dto.StayInvoiceRequest;
 import com.hotelpms.stay.domain.Stay;
 import com.hotelpms.stay.domain.StayStatus;
 import com.hotelpms.stay.dto.StayRequest;
@@ -94,6 +96,8 @@ public class StayServiceImpl implements StayService {
                 savedStay.getId(), savedStay.getReservationId(),
                 savedStay.getGuestId(), savedStay.getRoomId());
 
+        openInvoiceForStay(savedStay);
+
         // Update reservation actualGuests (sum of all StayGuest entries for this
         // reservation)
         updateReservationGuests(savedStay.getReservationId());
@@ -168,6 +172,20 @@ public class StayServiceImpl implements StayService {
                 .map(stayMapper::toDto)
                 .toList();
         return new PageImpl<>(content, pageable == null ? Pageable.unpaged() : pageable, content.size());
+    }
+
+    private void openInvoiceForStay(final Stay stay) {
+        final StayInvoiceRequest invoiceReq = new StayInvoiceRequest(
+                stay.getId(), stay.getGuestId(), stay.getReservationId());
+        final InvoiceCreatedResponse invoiceResp = billingClient.createInvoiceForStay(invoiceReq);
+        if (invoiceResp != null && invoiceResp.id() != null) {
+            stay.setInvoiceId(invoiceResp.id());
+            stayRepository.save(stay);
+            log.info("[STAY] INVOICE_CREATED | stayId={} | invoiceId={}", stay.getId(), invoiceResp.id());
+        } else {
+            log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason=BILLING_SERVICE_UNAVAILABLE",
+                    stay.getId());
+        }
     }
 
     private void updateReservationGuests(final UUID reservationId) {

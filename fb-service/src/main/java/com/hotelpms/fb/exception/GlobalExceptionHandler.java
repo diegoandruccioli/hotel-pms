@@ -38,6 +38,21 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles OrderNotFoundException.
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 404 status
+     */
+    @ExceptionHandler(OrderNotFoundException.class)
+    public ProblemDetail handleOrderNotFoundException(final OrderNotFoundException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problemDetail.setTitle("Order Not Found");
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/not-found")));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
+
+    /**
      * Handles OrderValidationException.
      *
      * @param ex the exception

@@ -32,6 +32,7 @@ public interface StayMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "active", ignore = true)
+    @Mapping(target = "invoiceId", ignore = true)
     Stay toEntity(StayRequest request);
 
     /**
@@ -44,5 +45,6 @@ public interface StayMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "active", ignore = true)
+    @Mapping(target = "invoiceId", ignore = true)
     void updateEntityFromDto(StayRequest request, @MappingTarget Stay stay);
 }
