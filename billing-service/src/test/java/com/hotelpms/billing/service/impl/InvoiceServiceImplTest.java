@@ -221,6 +221,7 @@ class InvoiceServiceImplTest {
         // ---------------------------------------------------------------
 
         @Test
+        @SuppressWarnings("null")
         @DisplayName("Should create invoice for stay with totalAmount=0 and status=ISSUED")
         void shouldCreateInvoiceForStaySuccessfully() {
                 // Arrange
