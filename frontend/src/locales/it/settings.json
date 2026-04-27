@@ -19,5 +19,9 @@
   "lang_italian": "Italiano",
   "lang_english": "Inglese",
   "user_menu_label": "Menu utente di {{name}}",
-  "log_out": "Esci"
+  "log_out": "Esci",
+
+  "settings_section_system": "Sistema",
+  "alloggiati_auto_send_label": "Invio automatico alloggiati",
+  "alloggiati_auto_send_desc": "Invia automaticamente il report alloggiati al portale della Polizia di Stato ad ogni check-in"
 }

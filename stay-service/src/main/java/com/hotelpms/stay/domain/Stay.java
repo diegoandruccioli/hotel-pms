@@ -125,6 +125,13 @@ public class Stay {
     private UUID invoiceId;
 
     /**
+     * Whether the Alloggiati Web report for this stay has been successfully submitted
+     * to the Polizia di Stato portal (either automatically at check-in or manually).
+     */
+    @Column(name = "alloggiati_sent", nullable = false)
+    private boolean alloggiatiSent;
+
+    /**
      * The list of guests staying in this room.
      */
     @OneToMany(mappedBy = "stay", cascade = CascadeType.ALL, orphanRemoval = true)

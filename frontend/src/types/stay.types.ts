@@ -50,5 +50,15 @@ export interface StayResponse {
   actualCheckOutTime?: string;
   createdAt: string;
   updatedAt: string;
+  alloggiatiSent: boolean;
   guests?: StayGuestResponse[];
+}
+
+export interface HotelSettingsRequest {
+  alloggiatiAutoSend: boolean;
+}
+
+export interface HotelSettingsResponse {
+  hotelId: string;
+  alloggiatiAutoSend: boolean;
 }

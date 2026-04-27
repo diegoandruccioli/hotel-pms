@@ -11,6 +11,7 @@ import com.hotelpms.stay.client.dto.ReservationStatusUpdateRequest;
 import com.hotelpms.stay.client.dto.StayInvoiceRequest;
 import com.hotelpms.stay.domain.Stay;
 import com.hotelpms.stay.domain.StayStatus;
+import com.hotelpms.stay.dto.HotelSettingsResponse;
 import com.hotelpms.stay.dto.StayRequest;
 import com.hotelpms.stay.dto.StayResponse;
 import com.hotelpms.stay.exception.BillingNotPaidException;
@@ -18,6 +19,8 @@ import com.hotelpms.stay.exception.ExternalServiceException;
 import com.hotelpms.stay.exception.NotFoundException;
 import com.hotelpms.stay.mapper.StayMapper;
 import com.hotelpms.stay.repository.StayRepository;
+import com.hotelpms.stay.service.AlloggiatiWebSenderService;
+import com.hotelpms.stay.service.HotelSettingsService;
 import com.hotelpms.stay.service.StayService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.lang.NonNull;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -50,6 +54,8 @@ public class StayServiceImpl implements StayService {
     private final ReservationClient reservationClient;
     private final InventoryClient inventoryClient;
     private final BillingClient billingClient;
+    private final AlloggiatiWebSenderService alloggiatiWebSenderService;
+    private final HotelSettingsService hotelSettingsService;
 
     /** {@inheritDoc} */
     @Override
@@ -97,6 +103,7 @@ public class StayServiceImpl implements StayService {
                 savedStay.getGuestId(), savedStay.getRoomId());
 
         openInvoiceForStay(savedStay);
+        sendAlloggiatiIfEnabled(savedStay);
 
         // Update reservation actualGuests (sum of all StayGuest entries for this
         // reservation)
@@ -172,6 +179,26 @@ public class StayServiceImpl implements StayService {
                 .map(stayMapper::toDto)
                 .toList();
         return new PageImpl<>(content, pageable == null ? Pageable.unpaged() : pageable, content.size());
+    }
+
+    private void sendAlloggiatiIfEnabled(final Stay stay) {
+        if (stay.getHotelId() == null) {
+            return;
+        }
+        final HotelSettingsResponse settings = hotelSettingsService.getOrCreate(stay.getHotelId());
+        if (!settings.alloggiatiAutoSend()) {
+            return;
+        }
+        final LocalDate checkInDate = stay.getActualCheckInTime().toLocalDate();
+        try {
+            alloggiatiWebSenderService.submitReport(checkInDate);
+            stay.setAlloggiatiSent(true);
+            stayRepository.save(stay);
+            log.info("[STAY] ALLOGGIATI_SENT | stayId={} | date={}", stay.getId(), checkInDate);
+        } catch (final ExternalServiceException ex) {
+            log.error("[STAY] ALLOGGIATI_SEND_FAILED | stayId={} | date={} | reason={}",
+                    stay.getId(), checkInDate, ex.getMessage());
+        }
     }
 
     private void openInvoiceForStay(final Stay stay) {

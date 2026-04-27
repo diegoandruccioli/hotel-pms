@@ -20,6 +20,7 @@ import java.util.UUID;
  * @param createdAt          the creation timestamp
  * @param updatedAt          the last update timestamp
  * @param invoiceId          the billing invoice folio UUID opened at check-in (may be null)
+ * @param alloggiatiSent     whether the Alloggiati report was submitted to the PS portal
  * @param guests             the list of guests
  */
 public record StayResponse(
@@ -34,6 +35,7 @@ public record StayResponse(
                 LocalDateTime createdAt,
                 LocalDateTime updatedAt,
                 UUID invoiceId,
+                boolean alloggiatiSent,
                 List<StayGuestResponse> guests) {
     /**
      * Compact constructor to ensure defensive copying of the guests list.

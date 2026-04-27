@@ -55,6 +55,12 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
       <M3TableCell>
         <M3StatusChip label={stay.status.replace('_', ' ')} tone={getStatusTone(stay.status)} />
       </M3TableCell>
+      <M3TableCell>
+        <M3StatusChip
+          label={stay.alloggiatiSent ? t('alloggiati_sent') : t('alloggiati_not_sent')}
+          tone={stay.alloggiatiSent ? 'success' : 'neutral'}
+        />
+      </M3TableCell>
       <M3TableCell className="text-right">
         {stay.status === 'CHECKED_IN' && (
           <M3Button
@@ -142,12 +148,13 @@ export const Stays = memo(() => {
   }, [i18n.language]);
 
   const headers = useMemo(() => [
-    t('room_id'), 
-    t('guest_id'), 
-    t('check_in'), 
-    t('check_out'), 
-    t('guests', 'Guests'), 
-    t('status'), 
+    t('room_id'),
+    t('guest_id'),
+    t('check_in'),
+    t('check_out'),
+    t('guests', 'Guests'),
+    t('status'),
+    t('alloggiati_column'),
     <span key="sr" className="sr-only">{t('actions')}</span>
   ], [t]);
 
@@ -184,7 +191,7 @@ export const Stays = memo(() => {
       ) : (
         <M3Table headers={headers}>
           {stays.length === 0 ? (
-            <tr><td colSpan={7} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_active_stays')}</td></tr>
+            <tr><td colSpan={8} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_active_stays')}</td></tr>
           ) : (
             stays.map((stay) => (
               <StayRow 

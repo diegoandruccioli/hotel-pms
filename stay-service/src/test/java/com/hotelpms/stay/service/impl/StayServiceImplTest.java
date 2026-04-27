@@ -15,12 +15,15 @@ import com.hotelpms.stay.client.dto.ReservationLineItemResponse;
 import com.hotelpms.stay.domain.Stay;
 import com.hotelpms.stay.domain.StayGuest;
 import com.hotelpms.stay.domain.StayStatus;
+import com.hotelpms.stay.dto.HotelSettingsResponse;
 import com.hotelpms.stay.dto.StayRequest;
 import com.hotelpms.stay.dto.StayResponse;
 import com.hotelpms.stay.exception.ExternalServiceException;
 import com.hotelpms.stay.exception.NotFoundException;
 import com.hotelpms.stay.mapper.StayMapper;
 import com.hotelpms.stay.repository.StayRepository;
+import com.hotelpms.stay.service.AlloggiatiWebSenderService;
+import com.hotelpms.stay.service.HotelSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +32,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,12 +41,16 @@ import java.util.UUID;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.mockito.ArgumentMatchers;
 import org.springframework.lang.NonNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -76,6 +84,12 @@ class StayServiceImplTest {
 
     @Mock
     private InventoryClient inventoryClient;
+
+    @Mock
+    private AlloggiatiWebSenderService alloggiatiWebSenderService;
+
+    @Mock
+    private HotelSettingsService hotelSettingsService;
 
     @InjectMocks
     private StayServiceImpl stayService;
@@ -111,7 +125,7 @@ class StayServiceImplTest {
 
         validResponse = new StayResponse(stayId, null, reservationId, guestId, roomId,
                 StayStatus.CHECKED_IN, savedStay.getActualCheckInTime(), null,
-                LocalDateTime.now(), LocalDateTime.now(), null, new ArrayList<>());
+                LocalDateTime.now(), LocalDateTime.now(), null, false, new ArrayList<>());
     }
 
     @Test
@@ -506,6 +520,118 @@ class StayServiceImplTest {
         verify(billingClient, times(1)).createInvoiceForStay(anyNonNull(StayInvoiceRequest.class));
         assertEquals(invoiceId, saved.getInvoiceId());
         verify(stayRepository, times(2)).save(anyNonNull(Stay.class));
+    }
+
+    @Test
+    void shouldSendAlloggiatiAutomaticallyWhenAutoSendEnabled() {
+        final UUID hotelId = UUID.randomUUID();
+        final Stay stayWithHotel = Stay.builder()
+                .id(stayId)
+                .hotelId(hotelId)
+                .reservationId(reservationId)
+                .guestId(guestId)
+                .roomId(roomId)
+                .status(StayStatus.CHECKED_IN)
+                .actualCheckInTime(LocalDateTime.now())
+                .build();
+
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationClient.getReservationById(reservation))
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+        when(inventoryClient.getRoomById(room))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+        when(stayMapper.toEntity(request)).thenReturn(new Stay());
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(stayWithHotel);
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, true));
+        when(stayMapper.toDto(stayWithHotel)).thenReturn(Objects.requireNonNull(validResponse));
+
+        stayService.checkIn(request);
+
+        final LocalDate expectedDate = stayWithHotel.getActualCheckInTime().toLocalDate();
+        verify(alloggiatiWebSenderService, times(1)).submitReport(expectedDate);
+        assertTrue(stayWithHotel.isAlloggiatiSent());
+    }
+
+    @Test
+    void shouldSkipAlloggiatiWhenAutoSendDisabled() {
+        final UUID hotelId = UUID.randomUUID();
+        final Stay stayWithHotel = Stay.builder()
+                .id(stayId)
+                .hotelId(hotelId)
+                .reservationId(reservationId)
+                .guestId(guestId)
+                .roomId(roomId)
+                .status(StayStatus.CHECKED_IN)
+                .actualCheckInTime(LocalDateTime.now())
+                .build();
+
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationClient.getReservationById(reservation))
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+        when(inventoryClient.getRoomById(room))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+        when(stayMapper.toEntity(request)).thenReturn(new Stay());
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(stayWithHotel);
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false));
+        when(stayMapper.toDto(stayWithHotel)).thenReturn(Objects.requireNonNull(validResponse));
+
+        stayService.checkIn(request);
+
+        verifyNoInteractions(alloggiatiWebSenderService);
+        assertFalse(stayWithHotel.isAlloggiatiSent());
+    }
+
+    @Test
+    void shouldNotBlockCheckInWhenAlloggiatiSendFails() {
+        final UUID hotelId = UUID.randomUUID();
+        final Stay stayWithHotel = Stay.builder()
+                .id(stayId)
+                .hotelId(hotelId)
+                .reservationId(reservationId)
+                .guestId(guestId)
+                .roomId(roomId)
+                .status(StayStatus.CHECKED_IN)
+                .actualCheckInTime(LocalDateTime.now())
+                .build();
+
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationClient.getReservationById(reservation))
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+        when(inventoryClient.getRoomById(room))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+        when(stayMapper.toEntity(request)).thenReturn(new Stay());
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(stayWithHotel);
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, true));
+        doThrow(new ExternalServiceException("PS portal down", null))
+                .when(alloggiatiWebSenderService)
+                .submitReport(ArgumentMatchers.any(LocalDate.class));
+        when(stayMapper.toDto(stayWithHotel)).thenReturn(Objects.requireNonNull(validResponse));
+
+        final StayResponse response = stayService.checkIn(request);
+
+        assertNotNull(response);
+        assertFalse(stayWithHotel.isAlloggiatiSent());
     }
 
     /**

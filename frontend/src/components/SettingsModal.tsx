@@ -1,10 +1,13 @@
-import { useCallback, memo, type ReactElement } from 'react';
+import { useCallback, useEffect, useState, memo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { M3Dialog } from './m3/M3Dialog';
 import { MaterialIcon } from './MaterialIcon';
 import { useThemeStore } from '../store/themeStore';
 import { useSettingsStore, type FontScale } from '../store/settingsStore';
+import { useAuthStore } from '../store/authStore';
+import { stayService } from '../services/stayService';
+import type { HotelSettingsResponse } from '../types/stay.types';
 
 /* ── Types ──────────────────────────────────────────── */
 
@@ -209,6 +212,18 @@ export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
 
   const { theme, setTheme } = useThemeStore();
   const { contrast, fontScale, setContrast, setFontScale, setLanguage } = useSettingsStore();
+  const user = useAuthStore((s) => s.user);
+
+  const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
+
+  const [hotelSettings, setHotelSettings] = useState<HotelSettingsResponse | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  useEffect(() => {
+    if (open && isAdminOrOwner) {
+      stayService.getHotelSettings().then(setHotelSettings).catch(() => undefined);
+    }
+  }, [open, isAdminOrOwner]);
 
   const handleThemeChange = useCallback(
     (v: ThemeValue) => setTheme(v),
@@ -228,6 +243,18 @@ export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
     (lang: string) => setLanguage(lang),
     [setLanguage]
   );
+
+  const handleAlloggiatiToggle = useCallback(async () => {
+    if (!hotelSettings) return;
+    const newValue = !hotelSettings.alloggiatiAutoSend;
+    setSavingSettings(true);
+    try {
+      const updated = await stayService.updateHotelSettings({ alloggiatiAutoSend: newValue });
+      setHotelSettings(updated);
+    } finally {
+      setSavingSettings(false);
+    }
+  }, [hotelSettings]);
 
   return (
     <M3Dialog
@@ -329,6 +356,65 @@ export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
           ))}
         </div>
       </SettingsSection>
+
+      {/* ── System (admin/owner only) ────────────── */}
+      {isAdminOrOwner && (
+        <SettingsSection title={t('settings_section_system')}>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={hotelSettings?.alloggiatiAutoSend ?? false}
+            onClick={handleAlloggiatiToggle}
+            disabled={savingSettings || hotelSettings === null}
+            className={[
+              'flex items-center justify-between w-full',
+              'px-4 py-3 rounded-[12px]',
+              'border border-outline-variant',
+              'hover:bg-surface-container-highest',
+              'focus-visible:outline-none focus-visible:ring-2',
+              'focus-visible:ring-primary focus-visible:ring-offset-2',
+              'transition-colors disabled:opacity-50',
+            ].join(' ')}
+          >
+            <div className="flex items-center gap-3">
+              <MaterialIcon
+                name="verified_user"
+                size={20}
+                className="text-on-surface-variant"
+              />
+              <div className="text-left">
+                <p className="text-sm font-medium text-on-surface">
+                  {t('alloggiati_auto_send_label')}
+                </p>
+                <p className="text-xs text-on-surface-variant">
+                  {t('alloggiati_auto_send_desc')}
+                </p>
+              </div>
+            </div>
+
+            {/* M3 Switch visual */}
+            <div
+              aria-hidden="true"
+              className={[
+                'relative w-12 h-7 rounded-shape-full border-2 transition-colors',
+                hotelSettings?.alloggiatiAutoSend
+                  ? 'bg-primary border-primary'
+                  : 'bg-surface-container-highest border-outline',
+              ].join(' ')}
+            >
+              <span
+                className={[
+                  'absolute top-0.5 block w-5 h-5 rounded-shape-full',
+                  'shadow-elevation-1 transition-all duration-200',
+                  hotelSettings?.alloggiatiAutoSend
+                    ? 'translate-x-[22px] bg-on-primary'
+                    : 'translate-x-0.5 bg-outline',
+                ].join(' ')}
+              />
+            </div>
+          </button>
+        </SettingsSection>
+      )}
     </M3Dialog>
   );
 };

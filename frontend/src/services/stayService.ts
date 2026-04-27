@@ -1,5 +1,5 @@
 import api from './api';
-import type { StayRequest, StayResponse } from '../types/stay.types';
+import type { HotelSettingsRequest, HotelSettingsResponse, StayRequest, StayResponse } from '../types/stay.types';
 import type { SpringPage } from '../types/page.types';
 
 const BASE_PATH = '/api/v1/stays';
@@ -32,6 +32,16 @@ export const stayService = {
 
   checkOut: async (id: string): Promise<StayResponse> => {
     const response = await api.put<StayResponse>(`${BASE_PATH}/${id}/check-out`, {});
+    return response.data;
+  },
+
+  getHotelSettings: async (): Promise<HotelSettingsResponse> => {
+    const response = await api.get<HotelSettingsResponse>(`${BASE_PATH}/settings`);
+    return response.data;
+  },
+
+  updateHotelSettings: async (data: HotelSettingsRequest): Promise<HotelSettingsResponse> => {
+    const response = await api.put<HotelSettingsResponse>(`${BASE_PATH}/settings`, data);
     return response.data;
   },
 

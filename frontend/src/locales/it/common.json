@@ -197,5 +197,9 @@
   "password_too_short": "La nuova password deve avere almeno 8 caratteri.",
   "password_changed_success": "Password cambiata. Effettua nuovamente l'accesso.",
   "password_change_failed": "Cambio password fallito. Verifica la password attuale e riprova.",
-  "change_password": "Cambia Password"
+  "change_password": "Cambia Password",
+
+  "alloggiati_column": "Portale PS",
+  "alloggiati_sent": "Inviato alla PS",
+  "alloggiati_not_sent": "Non inviato"
 }

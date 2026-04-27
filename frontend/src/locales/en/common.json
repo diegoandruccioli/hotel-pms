@@ -197,5 +197,9 @@
   "password_too_short": "New password must be at least 8 characters.",
   "password_changed_success": "Password changed successfully. Please log in again.",
   "password_change_failed": "Failed to change password. Check your current password and try again.",
-  "change_password": "Change Password"
+  "change_password": "Change Password",
+
+  "alloggiati_column": "PS Portal",
+  "alloggiati_sent": "Sent to PS",
+  "alloggiati_not_sent": "Not sent"
 }
