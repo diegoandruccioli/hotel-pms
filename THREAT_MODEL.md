@@ -93,6 +93,7 @@
 | T-GST-02 | Injection | Input validation: campi testo libero (nome, note) non sanitizzati | ALTO | MEDIA | ✅ RISOLTO |
 | T-GST-03 | Information Disclosure | Esposizione PII senza controllo hotel_id (multi-tenant data leak) | CRITICO | ALTA | ✅ RISOLTO |
 | T-GST-04 | Tampering | Mass Assignment: DTO potrebbe accettare campi non previsti tramite JSON | MEDIO | MEDIA | ✅ RISOLTO |
+| T-GST-05 | Information Disclosure | GDPR Data Retention: PII ospite (nome, data nascita, documento, numero documento) conservata a tempo indeterminato senza retention policy; soft-delete non soddisfa diritto all'oblio (Art. 17 GDPR); nessun campo consenso su entità Guest | ALTO | MEDIA | 🔴 APERTO |
 
 ### 4.4 reservation-service
 
@@ -152,6 +153,7 @@ IMPATTO
   │  CRITICO  │ T-AUTH-02 │ T-GW-01  │ T-GST-01  │ T-RES-01  │ T-CFG-01  │
   │  ALTO     │ T-AUTH-01 │ T-GW-03  │ T-GST-02  │ T-STAY-01 │ T-BILL-01 │
   │  MEDIO    │ T-AUTH-05 │ T-GW-05  │ T-GST-04  │           │           │
+  │  ALTO     │           │          │ T-GST-05  │           │           │
   │  BASSO    │           │          │           │           │           │
   │           ├───────────┴──────────┴───────────┴───────────┴───────────
   │                BASSA        MEDIA          ALTA
@@ -185,6 +187,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-GST-03 | hotel_id su tabella guests (Flyway V2) + tutte le query repository scoped per hotelId; X-Auth-Hotel letto da InternalAuthFilter e propagato via FeignHeaderConfig | guest-service/V2__add_hotel_id_to_guests.sql, GuestRepository.java, InternalAuthFilter.java, FeignHeaderConfig.java | b483eac | A01 | ✅ |
 | T-GST-02 | @Pattern su firstName/lastName (NAME_PATTERN), phone (PHONE_PATTERN), address (TEXT_SAFE_PATTERN), city/country (LOCATION_PATTERN); @Past su dateOfBirth; @Pattern(DOCUMENT_NUMBER_PATTERN) + @Past/@FutureOrPresent su IdentityDocumentRequestDTO | guest-service/GuestRequest.java, IdentityDocumentRequestDTO.java, ValidationConstants.java | fb6fdff | A03 | ✅ |
 | T-GST-04 | GuestMapper.toEntity() con @Mapping(ignore=true) espliciti su id, hotelId, identityDocuments, active, createdAt, updatedAt — protezione mass-assignment dichiarativa | guest-service/GuestMapper.java | fb6fdff | A04 | ✅ |
+| T-GST-05 | [Pianificato] (1) Retention job notturno: anonimizzazione profili con ultimo soggiorno > N anni (default 5, configurabile); (2) Hard-delete con guardia legale: endpoint DELETE /guests/{id} che verifica obblighi fiscali/PS prima di cancellare fisicamente PII e documenti; (3) Consenso GDPR: campo gdprConsentDate su Guest entity; (4) IdentityDocument già entità separata: base idonea per retention differenziata | guest-service/Guest.java, IdentityDocument.java, GuestServiceImpl.java, GuestRepository.java | — | A04 | 🔴 |
 | T-RES-01 | @Version optimistic lock + @Lock(PESSIMISTIC_WRITE) su overlap query + ConflictException HTTP 409 + Flyway V4 version column | reservation-service/Reservation.java, ReservationRepository.java, GlobalExceptionHandler.java, V4__add_version_to_reservations.sql | ca9bf92 | A04 | ✅ |
 | T-RES-02 | hotel_id scope su tutte le query reservation (findByIdAndHotelId, findAllByHotelId); InternalAuthFilter propaga X-Auth-Hotel in auth.details; createReservation imposta hotelId dall'auth context | reservation-service/ReservationServiceImpl.java, ReservationRepository.java, InternalAuthFilter.java, FeignHeaderConfig.java | 3e93f49 | A01 | ✅ |
 | T-STAY-01 | Set.of("CONFIRMED","PARTIALLY_CHECKED_IN") come allowlist; checkIn() lancia IllegalStateException("INVALID_RESERVATION_STATUS") se stato non ammesso; log WARN [STAY] CHECK_IN_FAILED reason=INVALID_RESERVATION_STATUS; 4 test: shouldRejectCheckInWhenReservationIsCancelled/IsCheckedOut/IsNoShow + shouldAllowCheckInWhenPartiallyCheckedIn | stay-service/StayServiceImpl.java | 250edd0 | A04 | ✅ |
@@ -221,7 +224,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | A01 | Broken Access Control | T-GST-01, T-GST-03, T-RES-02, T-BILL-01, T-FB-01, T-FE-03, T-GW-05, T-GW-06, T-GW-07, GAP-3 |
 | A02 | Cryptographic Failures | T-AUTH-03, T-CFG-02, T-STAY-03 |
 | A03 | Injection | T-GST-02, T-RES-03, T-FE-01 |
-| A04 | Insecure Design | T-RES-01, T-STAY-01, T-FB-02, T-BILL-02, T-GST-04 |
+| A04 | Insecure Design | T-RES-01, T-STAY-01, T-FB-02, T-BILL-02, T-GST-04, T-GST-05 |
 | A05 | Security Misconfiguration | T-GW-02, T-GW-03, T-GW-04, T-CFG-01, T-CFG-03, T-FE-04 |
 | A06 | Vulnerable and Outdated Components | DEP-CVE-01, DEP-CVE-02, DEP-CVE-03 |
 | A07 | Identification & Authentication Failures | T-AUTH-01, T-AUTH-02, T-AUTH-03, T-AUTH-04, T-AUTH-04-residuo, T-FE-02 |

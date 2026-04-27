@@ -5203,6 +5203,121 @@ sum by (service) (rate(
 \commitref{fe99e2b}{feat(security): GAP-4 --- Loki log aggregation SIEM for audit events}
 
 % ═════════════════════════════════════════════════════════════════════════════
+\section{GAP-5 \textbar{} T-GST-05 --- GDPR Data Retention: Assenza di Policy sul Ciclo di Vita dei PII Ospite}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Il \texttt{guest-service} persiste in modo permanente i dati personali degli
+ospiti — nome, cognome, data di nascita, indirizzo, email, numero di telefono
+e, attraverso l'entità \texttt{IdentityDocument}, tipo documento, numero,
+date di emissione e scadenza, paese di rilascio.
+Queste informazioni vengono create al momento della prima prenotazione e
+rimangono nel database a tempo indeterminato: non esiste alcun meccanismo
+automatico di cancellazione, anonimizzazione o scadenza.
+
+L'unica operazione di rimozione attualmente disponibile è il \emph{soft-delete}
+(\texttt{active = false} via \texttt{@SQLDelete}), che nasconde il record dalle
+query applicative ma lascia i dati fisicamente presenti nel database.
+Questo comportamento è incompatibile con l'articolo~17 del GDPR
+(\emph{diritto alla cancellazione}): un interessato che eserciti tale diritto
+non ottiene la cancellazione effettiva dei propri dati, bensì la loro semplice
+invisibilità a livello applicativo.
+
+Inoltre non esiste alcun campo di consenso sull'entità \texttt{Guest}
+(\texttt{gdprConsentDate}, \texttt{consentPurpose}), rendendo impossibile
+dimostrare la base giuridica del trattamento in caso di ispezione da parte
+del Garante Privacy.
+
+\paragraph{Classificazione OWASP}
+\textbf{A04 --- Insecure Design}: la mancanza di una policy di ritenzione è
+un difetto di progettazione del modello dei dati, non una vulnerabilità
+puntuale. Il rischio non dipende da un bug nel codice ma dall'assenza di un
+controllo progettato fin dall'inizio.
+
+\paragraph{Contesto normativo italiano}
+La situazione è resa più complessa dalla coesistenza di obblighi di legge
+che \emph{impongono} la conservazione per periodi minimi e del diritto GDPR
+che ne chiede la cancellazione su richiesta:
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+\textbf{Obbligo} & \textbf{Dato} & \textbf{Durata minima} & \textbf{Prevalenza} \\
+\midrule
+Circ.\ PS / D.Lgs.\ 196/2003 & Dati alloggiati & 5 anni & Su richiesta GDPR \\
+Codice Civile art.\ 2220 & Fatture / pagamenti & 10 anni & Su richiesta GDPR \\
+GDPR art.\ 17 par.\ 3 lett.\ b & — & Deroga per obblighi legali & Prevale sulla richiesta \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+In pratica: la richiesta di cancellazione di un ospite che abbia soggiornato
+negli ultimi 5 anni deve essere \emph{rifiutata motivandola per legge}, non
+eseguita. Trascorso il periodo obbligatorio, i dati devono invece essere
+cancellati o anonimizzati.
+
+\paragraph{Confronto con PMS professionali}
+I sistemi PMS commerciali (Opera, Mews, Cloudbeds, Protel) adottano
+uniformemente il seguente modello:
+
+\begin{enumerate}
+  \item \textbf{Retention period configurabile per hotel}: l'operatore imposta
+        il periodo di conservazione (tipicamente 5--7 anni dall'ultimo
+        soggiorno). Un job notturno identifica i profili scaduti e li
+        \emph{anonimizza}: il nome viene sostituito con un identificativo
+        pseudonimo, tutti i campi PII vengono azzerati e i documenti di
+        identità vengono cancellati fisicamente. Lo storico contabile e gli
+        stay associati vengono mantenuti per la rendicontazione fiscale.
+  \item \textbf{Hard-delete con guardia legale}: l'endpoint di cancellazione
+        su richiesta dell'interessato verifica preventivamente l'esistenza di
+        obblighi legali prevalenti (fatture nel periodo fiscale, dati alloggiati
+        nel periodo PS). Se il blocco esiste, la richiesta viene rifiutata con
+        un messaggio che indica la data a partire dalla quale la cancellazione
+        sarà possibile. Altrimenti, PII e documenti vengono cancellati
+        fisicamente e il profilo viene anonimizzato.
+  \item \textbf{Separazione fisica PII / dati operativi}: i dati di identità
+        (entità \texttt{IdentityDocument}) sono mantenuti in una tabella
+        separata dal profilo operativo (preferenze, storico soggiorni),
+        consentendo retention differenziata: i dati di identità scadono prima,
+        il profilo operativo (senza PII) può essere conservato più a lungo per
+        analisi storiche e CRM.
+\end{enumerate}
+
+\noindent
+L'architettura attuale del sistema presenta già una base favorevole:
+\texttt{IdentityDocument} è un'entità separata da \texttt{Guest} con
+\texttt{CascadeType.ALL}, il che rende tecnicamente semplice implementare una
+retention differenziata.
+
+\paragraph{Piano di mitigazione raccomandato}
+
+\begin{enumerate}
+  \item \textbf{Campo consenso}: aggiungere \texttt{gdprConsentDate LocalDate}
+        e \texttt{gdprConsentIp String} a \texttt{Guest.java} (nuova migration
+        Flyway); valorizzare al momento della creazione del profilo.
+  \item \textbf{Retention job}: scheduled task notturno
+        (\texttt{@Scheduled(cron = "0 2 * * *")}) che interroga tutti i
+        \texttt{Guest} con \texttt{lastStayDate < now() - retentionYears}
+        e li anonimizza: pseudo-nome, campi PII a \texttt{null}, cascade
+        delete fisica degli \texttt{IdentityDocument}.
+  \item \textbf{Hard-delete endpoint}: \texttt{DELETE /api/v1/guests/\{id\}}
+        che verifica la presenza di vincoli legali attivi prima di procedere;
+        in caso di blocco restituisce \texttt{HTTP 451 Unavailable For Legal
+        Reasons} con payload che indica la data di sblocco.
+  \item \textbf{Configurabilità per hotel}: periodo di retention come
+        parametro in \texttt{hotel\_settings} (default 5 anni), gestibile
+        dall'admin dalla stessa \texttt{SettingsModal} già implementata.
+\end{enumerate}
+
+\paragraph{Stato}
+\textbf{\textcolor{vulnred}{🔴 APERTO --- non implementato.}}
+La minaccia è identificata e classificata; il piano di mitigazione è definito
+ma non ancora realizzato. La struttura dati attuale (\texttt{IdentityDocument}
+separato, \texttt{hotel\_settings} disponibile) è già predisposta per
+l'implementazione futura senza modifiche architetturali significative.
+
+% ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════
 
@@ -5792,7 +5907,7 @@ di tutte le sessioni di hardening, aggiornata alla revisione del
 \owasp{A04} & Insecure Design
   & T-RES-01 (optimistic lock), T-STAY-01 (state allowlist),
     T-FB-02 (server-side pricing), T-BILL-02 (amount normalisation),
-    T-GST-04 (mass-assignment) \\
+    T-GST-04 (mass-assignment), T-GST-05 (GDPR retention \textcolor{vulnred}{$\bullet$ aperto}) \\
 \owasp{A05} & Security Misconfiguration
   & T-GW-02 (rate limiting), T-GW-03 (security headers),
     T-GW-04 (CORS whitelist), T-CFG-01 (actuator port),
