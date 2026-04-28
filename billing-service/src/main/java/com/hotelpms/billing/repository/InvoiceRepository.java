@@ -72,4 +72,17 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
      * @return list of matching invoices
      */
     List<Invoice> findByIssueDateBetween(LocalDateTime start, LocalDateTime end);
+
+    /**
+     * Finds the most recent invoice for a guest within a hotel, ordered by
+     * issue date descending.
+     * Used by the guest-service GDPR legal-hold guard (T-GST-05) to verify
+     * whether the Codice Civile art. 2220 ten-year fiscal retention obligation
+     * has expired before anonymising a guest profile.
+     *
+     * @param guestId the guest UUID
+     * @param hotelId the hotel UUID (tenant isolation)
+     * @return the most recent invoice if present
+     */
+    Optional<Invoice> findTopByGuestIdAndHotelIdOrderByIssueDateDesc(UUID guestId, UUID hotelId);
 }

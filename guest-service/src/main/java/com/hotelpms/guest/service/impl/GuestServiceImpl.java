@@ -1,19 +1,28 @@
 package com.hotelpms.guest.service.impl;
 
+import com.hotelpms.guest.client.BillingServiceClient;
 import com.hotelpms.guest.client.ReservationClient;
+import com.hotelpms.guest.client.StayServiceClient;
+import com.hotelpms.guest.client.dto.GuestInvoiceClientResponse;
+import com.hotelpms.guest.client.dto.GuestLastStayClientResponse;
 import com.hotelpms.guest.dto.request.GuestRequest;
 import com.hotelpms.guest.dto.request.IdentityDocumentRequestDTO;
 import com.hotelpms.guest.dto.response.GuestResponse;
 import com.hotelpms.guest.dto.response.IdentityDocumentResponseDTO;
+import com.hotelpms.guest.exception.GdprLegalHoldException;
+import com.hotelpms.guest.exception.GdprLegalHoldException.LegalBasis;
 import com.hotelpms.guest.exception.NotFoundException;
 import com.hotelpms.guest.mapper.GuestMapper;
 import com.hotelpms.guest.mapper.IdentityDocumentMapper;
 import com.hotelpms.guest.model.Guest;
+import com.hotelpms.guest.model.GuestPrivacySettings;
 import com.hotelpms.guest.model.IdentityDocument;
 import com.hotelpms.guest.repository.GuestRepository;
 import com.hotelpms.guest.repository.IdentityDocumentRepository;
+import com.hotelpms.guest.service.GuestPrivacySettingsService;
 import com.hotelpms.guest.service.GuestService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -21,6 +30,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -39,16 +49,22 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @SuppressWarnings("checkstyle:DesignForExtension")
 public class GuestServiceImpl implements GuestService {
 
     private static final String GUEST_NOT_FOUND_MSG = "GUEST_NOT_FOUND";
+    private static final String ANON_FIRST = "GDPR";
+    private static final String ANON_LAST_PREFIX = "ERASED_";
 
     private final GuestRepository guestRepository;
     private final IdentityDocumentRepository identityDocumentRepository;
     private final GuestMapper guestMapper;
     private final IdentityDocumentMapper identityDocumentMapper;
     private final ReservationClient reservationClient;
+    private final StayServiceClient stayServiceClient;
+    private final BillingServiceClient billingServiceClient;
+    private final GuestPrivacySettingsService privacySettingsService;
 
     /**
      * Creates and persists a new guest profile, stamping the caller's hotel ID.
@@ -63,6 +79,7 @@ public class GuestServiceImpl implements GuestService {
         final Guest entity = guestMapper.toEntity(request);
         entity.setActive(true);
         entity.setHotelId(hotelId);
+        entity.setGdprConsentDate(LocalDate.now());
         final Guest saved = guestRepository.save(entity);
         return guestMapper.toResponse(saved);
     }
@@ -114,22 +131,107 @@ public class GuestServiceImpl implements GuestService {
     }
 
     /**
-     * Soft-deletes a guest profile after verifying hotel ownership and the absence
-     * of active reservations.
+     * Hard-deletes (anonymises) a guest profile after verifying hotel ownership,
+     * the absence of active reservations, and the expiry of all legal holds
+     * (T-GST-05).
+     *
+     * <p>Anonymisation strategy (preserves referential integrity):
+     * <ul>
+     *   <li>Name replaced with {@code GDPR / ERASED_<id-prefix>}</li>
+     *   <li>All PII fields set to {@code null}</li>
+     *   <li>Identity documents hard-deleted (orphanRemoval)</li>
+     *   <li>{@code active} set to {@code false} (hides from all queries)</li>
+     * </ul>
      *
      * @param id the guest UUID; must not be {@code null}
-     * @throws IllegalStateException if the guest has active reservations
-     * @throws NotFoundException     if no guest with the given ID exists in this hotel
+     * @throws IllegalStateException    if the guest has active reservations
+     * @throws GdprLegalHoldException   if a TULPS or fiscal legal hold is active
+     *                                  (HTTP 451)
+     * @throws NotFoundException        if no guest with the given ID exists in this hotel
      */
     @Override
     @Transactional
     public void deleteGuest(final UUID id) {
         final UUID hotelId = extractHotelId();
         final Guest guest = resolveGuest(id, hotelId);
+
         if (reservationClient.hasActiveReservations(id)) {
             throw new IllegalStateException("GUEST_HAS_ACTIVE_RESERVATIONS");
         }
-        guestRepository.delete(Objects.requireNonNull(guest));
+
+        verifyLegalHolds(id, hotelId);
+
+        log.info("[GDPR] GUEST_ANONYMISE_START | guestId={} | hotelId={}", id, hotelId);
+        guest.setFirstName(ANON_FIRST);
+        guest.setLastName(ANON_LAST_PREFIX + id.toString().substring(0, 8));
+        guest.setEmail(null);
+        guest.setPhone(null);
+        guest.setAddress(null);
+        guest.setCity(null);
+        guest.setCountry(null);
+        guest.setDateOfBirth(null);
+        guest.getIdentityDocuments().clear();
+        guest.setActive(false);
+        guestRepository.save(Objects.requireNonNull(guest));
+        log.info("[GDPR] GUEST_ANONYMISED | guestId={}", id);
+    }
+
+    /**
+     * Checks TULPS and fiscal legal holds for the given guest.
+     * Throws {@link GdprLegalHoldException} (HTTP 451) if either is active.
+     *
+     * @param guestId the guest UUID
+     * @param hotelId the hotel UUID
+     */
+    private void verifyLegalHolds(final UUID guestId, final UUID hotelId) {
+        final GuestPrivacySettings settings =
+                privacySettingsService.getOrCreateEntity(hotelId);
+        final int retentionYears = Math.max(settings.getGuestRetentionYears(),
+                GuestPrivacySettings.TULPS_MIN_YEARS);
+
+        final GuestLastStayClientResponse stayInfo =
+                stayServiceClient.getLastStayDate(guestId);
+        final LocalDate tulpsExpiry = computeTulpsExpiry(stayInfo, retentionYears);
+
+        final GuestInvoiceClientResponse invoiceInfo =
+                billingServiceClient.getLastInvoiceDate(guestId);
+        final LocalDate fiscalExpiry = computeFiscalExpiry(invoiceInfo);
+
+        final boolean tulpsBlocked  = tulpsExpiry  != null && !LocalDate.now().isAfter(tulpsExpiry);
+        final boolean fiscalBlocked = fiscalExpiry != null && !LocalDate.now().isAfter(fiscalExpiry);
+
+        if (tulpsBlocked && fiscalBlocked) {
+            final LocalDate unlocksAt = tulpsExpiry.isAfter(fiscalExpiry)
+                    ? tulpsExpiry : fiscalExpiry;
+            throw new GdprLegalHoldException(
+                    "LEGAL_HOLD_ACTIVE: TULPS and fiscal obligations pending",
+                    unlocksAt, LegalBasis.TULPS_AND_FISCAL);
+        }
+        if (tulpsBlocked) {
+            throw new GdprLegalHoldException(
+                    "LEGAL_HOLD_ACTIVE: TULPS obligation pending until " + tulpsExpiry,
+                    tulpsExpiry, LegalBasis.TULPS);
+        }
+        if (fiscalBlocked) {
+            throw new GdprLegalHoldException(
+                    "LEGAL_HOLD_ACTIVE: fiscal obligation pending until " + fiscalExpiry,
+                    fiscalExpiry, LegalBasis.FISCAL);
+        }
+    }
+
+    private static LocalDate computeTulpsExpiry(
+            final GuestLastStayClientResponse info, final int retentionYears) {
+        if (!info.hasStays() || info.lastStayDate() == null) {
+            return null;
+        }
+        return info.lastStayDate().plusYears(retentionYears);
+    }
+
+    private static LocalDate computeFiscalExpiry(final GuestInvoiceClientResponse info) {
+        if (!info.hasInvoices() || info.lastInvoiceDate() == null) {
+            return null;
+        }
+        return info.lastInvoiceDate().plusYears(GuestPrivacySettings.FISCAL_MIN_YEARS);
     }
 
     /**

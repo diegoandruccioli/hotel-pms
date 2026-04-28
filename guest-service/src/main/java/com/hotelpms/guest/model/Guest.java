@@ -100,6 +100,14 @@ public class Guest {
     @Column(name = "hotel_id", nullable = false)
     private UUID hotelId;
 
+    /**
+     * Date on which the guest provided GDPR consent (or the profile creation
+     * date used as a legally defensible proxy). Used by the retention job and
+     * the hard-delete legal-hold guard (T-GST-05).
+     */
+    @Column(name = "gdpr_consent_date", nullable = false)
+    private LocalDate gdprConsentDate;
+
     @Builder.Default
     @Column(nullable = false)
     private boolean active = true;

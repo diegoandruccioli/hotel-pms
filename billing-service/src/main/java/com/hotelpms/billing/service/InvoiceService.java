@@ -1,5 +1,6 @@
 package com.hotelpms.billing.service;
 
+import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import org.springframework.data.domain.Page;
@@ -45,4 +46,16 @@ public interface InvoiceService {
      * @return the latest invoice response
      */
     InvoiceResponse getLatestInvoiceByReservation(@NonNull UUID reservationId);
+
+    /**
+     * Returns the most recent invoice date for a guest within a hotel.
+     * Used internally by the guest-service GDPR legal-hold guard (T-GST-05)
+     * to verify whether the Codice Civile art. 2220 ten-year fiscal retention
+     * obligation has expired before anonymising a guest profile.
+     *
+     * @param guestId the guest UUID; must not be {@code null}
+     * @param hotelId the hotel UUID; must not be {@code null}
+     * @return response containing whether invoices exist and the most recent date
+     */
+    GuestInvoiceCheckResponse getLastInvoiceDateForGuest(@NonNull UUID guestId, @NonNull UUID hotelId);
 }

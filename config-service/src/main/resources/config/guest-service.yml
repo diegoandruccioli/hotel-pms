@@ -1,6 +1,11 @@
 server:
   port: 8083
 
+application:
+  config:
+    stay-service-url: http://stay-service:8084
+    billing-service-url: http://billing-service:8085
+
 internal:
   hmac:
     secret: ${INTERNAL_HMAC_SECRET}

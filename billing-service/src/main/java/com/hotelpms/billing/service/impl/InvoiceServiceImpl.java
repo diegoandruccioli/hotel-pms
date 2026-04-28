@@ -5,6 +5,7 @@ import com.hotelpms.billing.client.ReservationClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.client.dto.ReservationResponse;
 import com.hotelpms.billing.domain.Invoice;
+import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.exception.BillingValidationException;
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.lang.NonNull;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -120,6 +122,20 @@ public class InvoiceServiceImpl implements InvoiceService {
      * @return the hotel UUID of the authenticated caller
      * @throws IllegalStateException if the security context is missing or malformed
      */
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public GuestInvoiceCheckResponse getLastInvoiceDateForGuest(
+            @NonNull final UUID guestId, @NonNull final UUID hotelId) {
+        final Optional<Invoice> latest = invoiceRepository
+                .findTopByGuestIdAndHotelIdOrderByIssueDateDesc(guestId, hotelId);
+        if (latest.isEmpty() || latest.get().getIssueDate() == null) {
+            return new GuestInvoiceCheckResponse(false, null);
+        }
+        return new GuestInvoiceCheckResponse(true,
+                latest.get().getIssueDate().toLocalDate());
+    }
+
     private UUID resolveHotelId() {
         final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)) {

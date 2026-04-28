@@ -1,5 +1,6 @@
 package com.hotelpms.billing.controller;
 
+import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.service.InvoiceService;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.RestController;
@@ -89,5 +92,28 @@ public class InvoiceController {
         log.info("REST request to get latest invoice for reservation {}", reservationId);
         final InvoiceResponse response = invoiceService.getLatestInvoiceByReservation(reservationId);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Returns the most recent invoice date for a guest within the caller's hotel.
+     * Called internally by the guest-service GDPR legal-hold guard (T-GST-05).
+     *
+     * @param guestId the guest UUID
+     * @return 200 OK with last invoice date info
+     */
+    @GetMapping("/guest/{guestId}/last-invoice-date")
+    public ResponseEntity<GuestInvoiceCheckResponse> getLastInvoiceDateForGuest(
+            @NonNull @PathVariable final UUID guestId) {
+        final UUID hotelId = extractHotelId();
+        log.info("REST request for last invoice date — guest={} hotel={}", guestId, hotelId);
+        return ResponseEntity.ok(invoiceService.getLastInvoiceDateForGuest(guestId, hotelId));
+    }
+
+    private UUID extractHotelId() {
+        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr) || hotelIdStr.isBlank()) {
+            throw new IllegalStateException("HOTEL_ID_NOT_AVAILABLE");
+        }
+        return UUID.fromString(hotelIdStr);
     }
 }

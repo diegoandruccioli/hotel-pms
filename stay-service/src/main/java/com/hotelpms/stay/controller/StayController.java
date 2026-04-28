@@ -1,5 +1,6 @@
 package com.hotelpms.stay.controller;
 
+import com.hotelpms.stay.dto.GuestLastStayResponse;
 import com.hotelpms.stay.dto.StayRequest;
 import com.hotelpms.stay.dto.StayResponse;
 import com.hotelpms.stay.service.AlloggiatiReportService;
@@ -23,6 +24,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.lang.NonNull;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -140,5 +143,28 @@ public class StayController {
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
         alloggiatiWebSenderService.submitReport(date);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Returns the most recent check-in date for a specific guest within the
+     * caller's hotel. Used internally by the guest-service GDPR legal-hold guard
+     * (T-GST-05) before anonymising a guest profile.
+     *
+     * @param guestId the guest UUID
+     * @return 200 OK with last stay date info
+     */
+    @GetMapping("/guest/{guestId}/last-stay-date")
+    public ResponseEntity<GuestLastStayResponse> getLastStayDateForGuest(
+            @NonNull @PathVariable final UUID guestId) {
+        final UUID hotelId = extractHotelId();
+        return ResponseEntity.ok(stayService.getLastStayDateForGuest(guestId, hotelId));
+    }
+
+    private UUID extractHotelId() {
+        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr) || hotelIdStr.isBlank()) {
+            throw new IllegalStateException("HOTEL_ID_NOT_AVAILABLE");
+        }
+        return UUID.fromString(hotelIdStr);
     }
 }

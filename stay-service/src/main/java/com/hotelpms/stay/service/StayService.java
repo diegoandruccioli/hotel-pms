@@ -1,12 +1,13 @@
 package com.hotelpms.stay.service;
 
+import com.hotelpms.stay.dto.GuestLastStayResponse;
 import com.hotelpms.stay.dto.StayRequest;
 import com.hotelpms.stay.dto.StayResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.NonNull;
 
 import java.util.UUID;
-import org.springframework.lang.NonNull;
 
 /**
  * Service interface for Stay operations.
@@ -56,4 +57,16 @@ public interface StayService {
      * @return list of stay responses
      */
     Page<StayResponse> getStaysByReservationId(@NonNull UUID reservationId, Pageable pageable);
+
+    /**
+     * Returns the most recent check-in date for a guest within a hotel.
+     * Called by the guest-service GDPR legal-hold guard (T-GST-05) to verify
+     * whether the TULPS five-year retention obligation has expired before
+     * anonymising a guest profile.
+     *
+     * @param guestId the guest UUID; must not be {@code null}
+     * @param hotelId the hotel UUID; must not be {@code null}
+     * @return a response containing whether stays exist and the most recent date
+     */
+    GuestLastStayResponse getLastStayDateForGuest(@NonNull UUID guestId, @NonNull UUID hotelId);
 }

@@ -9,6 +9,7 @@ import com.hotelpms.stay.client.dto.ReservationResponse;
 import com.hotelpms.stay.client.dto.ReservationStatusUpdateRequest;
 import com.hotelpms.stay.domain.Stay;
 import com.hotelpms.stay.domain.StayStatus;
+import com.hotelpms.stay.dto.GuestLastStayResponse;
 import com.hotelpms.stay.dto.StayRequest;
 import com.hotelpms.stay.dto.StayResponse;
 import com.hotelpms.stay.exception.BillingNotPaidException;
@@ -28,6 +29,7 @@ import org.springframework.lang.NonNull;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -195,5 +197,19 @@ public class StayServiceImpl implements StayService {
 
         reservationClient.updateStatusAndGuests(reservationId,
                 new ReservationStatusUpdateRequest(status, actualGuests));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public GuestLastStayResponse getLastStayDateForGuest(
+            @NonNull final UUID guestId, @NonNull final UUID hotelId) {
+        final Optional<Stay> latest = stayRepository
+                .findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(guestId, hotelId);
+        if (latest.isEmpty() || latest.get().getActualCheckInTime() == null) {
+            return new GuestLastStayResponse(false, null);
+        }
+        return new GuestLastStayResponse(true,
+                latest.get().getActualCheckInTime().toLocalDate());
     }
 }

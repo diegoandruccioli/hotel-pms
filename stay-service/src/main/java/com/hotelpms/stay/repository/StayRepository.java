@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.lang.NonNull;
 
 /**
  * Repository interface for managing Stay entities.
@@ -48,4 +49,17 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      * @return list of matching stays
      */
     List<Stay> findByActualCheckInTimeBetween(LocalDateTime start, LocalDateTime end);
+
+    /**
+     * Finds the most recent stay for a guest within a hotel, ordered by
+     * actual check-in time descending.
+     * Used by the guest-service GDPR legal-hold guard (T-GST-05) to verify
+     * whether the TULPS five-year retention obligation has expired.
+     *
+     * @param guestId the guest UUID; must not be {@code null}
+     * @param hotelId the hotel UUID; must not be {@code null} (tenant isolation)
+     * @return the most recent stay if present
+     */
+    Optional<Stay> findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(
+            @NonNull UUID guestId, @NonNull UUID hotelId);
 }
