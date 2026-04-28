@@ -5290,32 +5290,97 @@ L'architettura attuale del sistema presenta già una base favorevole:
 \texttt{CascadeType.ALL}, il che rende tecnicamente semplice implementare una
 retention differenziata.
 
-\paragraph{Piano di mitigazione raccomandato}
+\paragraph{Soluzione implementata}
+
+I quattro step del piano sono stati realizzati integralmente nel
+commit \texttt{56109eb}.
 
 \begin{enumerate}
-  \item \textbf{Campo consenso}: aggiungere \texttt{gdprConsentDate LocalDate}
-        e \texttt{gdprConsentIp String} a \texttt{Guest.java} (nuova migration
-        Flyway); valorizzare al momento della creazione del profilo.
-  \item \textbf{Retention job}: scheduled task notturno
-        (\texttt{@Scheduled(cron = "0 2 * * *")}) che interroga tutti i
-        \texttt{Guest} con \texttt{lastStayDate < now() - retentionYears}
-        e li anonimizza: pseudo-nome, campi PII a \texttt{null}, cascade
-        delete fisica degli \texttt{IdentityDocument}.
-  \item \textbf{Hard-delete endpoint}: \texttt{DELETE /api/v1/guests/\{id\}}
-        che verifica la presenza di vincoli legali attivi prima di procedere;
-        in caso di blocco restituisce \texttt{HTTP 451 Unavailable For Legal
-        Reasons} con payload che indica la data di sblocco.
-  \item \textbf{Configurabilità per hotel}: periodo di retention come
-        parametro in \texttt{hotel\_settings} (default 5 anni), gestibile
-        dall'admin dalla stessa \texttt{SettingsModal} già implementata.
+  \item \textbf{Campo consenso --- Flyway V4}: la migration
+        \texttt{V4\_\_add\_gdpr\_consent\_date.sql} aggiunge la colonna
+        \texttt{gdpr\_consent\_date DATE NOT NULL} alla tabella \texttt{guests},
+        con backfill automatico da \texttt{created\_at} per i record esistenti
+        (proxy legalmente difendibile del momento di registrazione in hotel).
+        \texttt{GuestServiceImpl.createGuest()} stampa \texttt{LocalDate.now()}
+        su ogni nuovo profilo.
+
+  \item \textbf{Retention job notturno}:
+        \texttt{GuestRetentionJobServiceImpl} è annotato
+        \texttt{@Scheduled(cron = "0 0 2 * * *")} e gira ogni notte alle 02:00.
+        Usa il pre-filtro conservativo \texttt{FISCAL\_MIN\_YEARS = 10} anni
+        per identificare i candidati senza Feign call: solo i profili la cui
+        \texttt{gdprConsentDate} risale a più di 10 anni fa entrano nella
+        pipeline. Per ciascun candidato verifica le due hold indipendenti tramite
+        \texttt{StayServiceClient} e \texttt{BillingServiceClient}; in caso di
+        indisponibilità del servizio il circuit-breaker ritorna
+        \texttt{hasStays = true} (fail-closed: nessun ospite viene mai
+        anonimizzato per errore). L'anonimizzazione imposta
+        \texttt{firstName = "GDPR"}, \texttt{lastName = "ERASED\_<id-prefix>"},
+        azzera tutti i campi PII, svuota \texttt{identityDocuments}
+        (cascade hard-delete) e pone \texttt{active = false}.
+
+  \item \textbf{Hard-delete con guardia legale duale}:
+        \texttt{GuestServiceImpl.deleteGuest()} esegue due check in sequenza:
+        \begin{itemize}
+          \item \textbf{TULPS} --- chiama \texttt{GET /api/v1/stays/guest/\{id\}/last-stay-date}
+                (stay-service) e verifica che \texttt{lastStayDate + max(retentionYears, 5)} sia
+                già trascorso.
+          \item \textbf{Fiscale} --- chiama \texttt{GET /api/v1/invoices/guest/\{id\}/last-invoice-date}
+                (billing-service) e verifica che \texttt{lastInvoiceDate + 10 anni} sia
+                già trascorso.
+        \end{itemize}
+        Se almeno un vincolo è attivo, l'operazione è rifiutata con
+        \texttt{HTTP 451 Unavailable For Legal Reasons} (RFC 7725) e un corpo
+        \texttt{GdprLegalHoldResponse} contenente il campo \texttt{unlocksAt}
+        (la data di sblocco più lontana) e \texttt{legalBasis}
+        (\texttt{TULPS}, \texttt{FISCAL} o \texttt{TULPS\_AND\_FISCAL}).
+        Il \texttt{GlobalExceptionHandler} intercetta
+        \texttt{GdprLegalHoldException} e produce la risposta 451.
+
+  \item \textbf{Configurabilità per hotel --- Flyway V5}:
+        la migration \texttt{V5\_\_add\_guest\_privacy\_settings.sql} crea la
+        tabella \texttt{guest\_privacy\_settings} (una riga per hotel).
+        \texttt{GuestPrivacySettingsController} espone
+        \texttt{GET/PUT /api/v1/guests/settings} con Jakarta Bean Validation
+        (\texttt{@Min(5)}) che impedisce di scendere sotto il minimo TULPS.
+        Il periodo di retention configurato viene rispettato sia dalla guardia
+        legale hard-delete sia dal retention job.
 \end{enumerate}
 
+\paragraph{Fix collaterale: FeignHeaderConfig mancante}
+La \texttt{FeignHeaderConfig} del guest-service non calcolava la firma
+HMAC-SHA256 (\texttt{X-Internal-Signature}), a differenza di tutti gli altri
+servizi del progetto. Di conseguenza ogni chiamata Feign in uscita dal
+guest-service veniva rifiutata con HTTP 401 dagli \texttt{InternalAuthFilter}
+dei servizi downstream, e il circuit-breaker si attivava silenziosamente.
+Il file è stato allineato al pattern canonico (identico a stay-service)
+con l'aggiunta della dipendenza da \texttt{\$\{internal.hmac.secret\}} e del
+calcolo HMAC \texttt{username:role:hotelId} (T-GW-07).
+
+\paragraph{Test}
+Sono stati scritti 17 test suddivisi in tre classi, con copertura
+dei boundary value imposti dalla legge italiana:
+
+\begin{itemize}
+  \item \texttt{GuestServiceImplDeleteGuardTest} (7 test): verifica i casi limite
+        temporali — soggiorno a 4 anni e 364 giorni (bloccato), esattamente
+        5 anni (bloccato), 5 anni e 1 giorno (liberato); fattura a esattamente
+        10 anni (bloccata), 10 anni e 1 giorno (liberata); entrambi i vincoli
+        attivi con \texttt{unlocksAt} corretto; retention configurabile
+        per hotel a 7 anni.
+  \item \texttt{GuestPrivacySettingsServiceImplTest} (5 test): get-or-create,
+        default creation, update, update-when-none-exists, no-save-on-existing.
+  \item \texttt{GuestRetentionJobServiceImplTest} (5 test): anonimizzazione
+        completa, skip per TULPS hold, skip per fiscal hold, ospite senza
+        storico, nessun candidato.
+\end{itemize}
+
 \paragraph{Stato}
-\textbf{\textcolor{vulnred}{🔴 APERTO --- non implementato.}}
-La minaccia è identificata e classificata; il piano di mitigazione è definito
-ma non ancora realizzato. La struttura dati attuale (\texttt{IdentityDocument}
-separato, \texttt{hotel\_settings} disponibile) è già predisposta per
-l'implementazione futura senza modifiche architetturali significative.
+\textbf{\textcolor{securegreen}{✅ RISOLTO}} --- commit \texttt{56109eb},
+fix warning \texttt{066f611}.
+Tutti e quattro gli step del piano di mitigazione sono implementati;
+la copertura del test include i boundary value temporali critici richiesti
+dalla normativa italiana.
 
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
@@ -5907,7 +5972,7 @@ di tutte le sessioni di hardening, aggiornata alla revisione del
 \owasp{A04} & Insecure Design
   & T-RES-01 (optimistic lock), T-STAY-01 (state allowlist),
     T-FB-02 (server-side pricing), T-BILL-02 (amount normalisation),
-    T-GST-04 (mass-assignment), T-GST-05 (GDPR retention \textcolor{vulnred}{$\bullet$ aperto}) \\
+    T-GST-04 (mass-assignment), T-GST-05 (GDPR retention) \\
 \owasp{A05} & Security Misconfiguration
   & T-GW-02 (rate limiting), T-GW-03 (security headers),
     T-GW-04 (CORS whitelist), T-CFG-01 (actuator port),
