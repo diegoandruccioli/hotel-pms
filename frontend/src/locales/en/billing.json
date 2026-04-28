@@ -1,1 +1,24 @@
-{}
+{
+  "register_payment_title": "Register Payment",
+  "payment_amount": "Amount",
+  "payment_method": "Payment Method",
+  "transaction_reference": "Reference (optional)",
+  "reference_supporting": "e.g. last 4 card digits, transfer ID",
+  "confirm_payment": "Confirm Payment",
+  "payment_registered": "Payment registered successfully",
+  "payment_failed": "Failed to register payment. Please try again.",
+  "error_invalid_amount": "Please enter a valid amount greater than 0",
+  "payment_method_cash": "Cash",
+  "payment_method_credit_card": "Credit Card",
+  "payment_method_debit_card": "Debit Card",
+  "payment_method_bank_transfer": "Bank Transfer",
+  "payment_method_check": "Check",
+  "invoice_detail_title": "Invoice Details",
+  "payments_history": "Payment History",
+  "no_payments_yet": "No payments recorded",
+  "total_paid": "Total Paid",
+  "charges": "Charges",
+  "charge_type_fb_order": "F&B Order",
+  "charge_type_room_service": "Room Service",
+  "charge_type_other": "Other Charge"
+}

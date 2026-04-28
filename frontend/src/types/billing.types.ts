@@ -1,19 +1,34 @@
 export type InvoiceStatus = 'ISSUED' | 'PAID' | 'CANCELLED';
 
-export type PaymentMethod = 'CREDIT_CARD' | 'CASH' | 'TRANSFER';
+export type PaymentMethod =
+  | 'CASH'
+  | 'CREDIT_CARD'
+  | 'DEBIT_CARD'
+  | 'BANK_TRANSFER'
+  | 'CHECK';
+
+export type ChargeType = 'FB_ORDER' | 'ROOM_SERVICE' | 'OTHER';
+
+export interface ChargeResponse {
+  id: string;
+  type: ChargeType;
+  description?: string;
+  amount: number;
+  referenceId?: string;
+}
 
 export interface PaymentRequest {
   amount: number;
   paymentMethod: PaymentMethod;
-  transactionReference: string;
+  transactionReference?: string;
 }
 
 export interface PaymentResponse {
-  id: string; // UUID
-  paymentDate: string; // ISO DateTime
+  id: string;
+  paymentDate: string;
   amount: number;
   paymentMethod: PaymentMethod;
-  transactionReference: string;
+  transactionReference?: string;
   invoiceId: string;
 }
 
@@ -25,12 +40,14 @@ export interface InvoiceRequest {
 }
 
 export interface InvoiceResponse {
-  id: string; // UUID
+  id: string;
   invoiceNumber: string;
-  issueDate: string; // ISO DateTime
+  issueDate: string;
   totalAmount: number;
   status: InvoiceStatus;
   reservationId: string;
   guestId: string;
+  stayId?: string;
   payments: PaymentResponse[];
+  charges?: ChargeResponse[];
 }
