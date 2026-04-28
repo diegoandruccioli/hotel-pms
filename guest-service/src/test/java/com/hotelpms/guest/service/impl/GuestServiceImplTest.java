@@ -103,6 +103,7 @@ class GuestServiceImplTest {
                 TEST_COUNTRY,
                 null,
                 Collections.emptyList(),
+                null,
                 guest.getCreatedAt(),
                 guest.getUpdatedAt());
 

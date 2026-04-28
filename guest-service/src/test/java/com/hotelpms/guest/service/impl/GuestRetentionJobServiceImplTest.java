@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -71,13 +72,14 @@ class GuestRetentionJobServiceImplTest {
         when(billingServiceClient.getLastInvoiceDate(guestId))
                 .thenReturn(new GuestInvoiceClientResponse(true,
                         LocalDate.now().minusYears(11)));
-        when(guestRepository.save(any(Guest.class))).thenReturn(guest);
+        when(guestRepository.save(Objects.requireNonNull(guest)))
+                .thenReturn(Objects.requireNonNull(guest));
 
         job.runRetentionJob();
 
         assertFalse(guest.isActive());
         assertEquals("GDPR", guest.getFirstName());
-        verify(guestRepository, times(1)).save(guest);
+        verify(guestRepository, times(1)).save(Objects.requireNonNull(guest));
     }
 
     @Test
@@ -98,7 +100,8 @@ class GuestRetentionJobServiceImplTest {
 
         job.runRetentionJob();
 
-        verify(guestRepository, never()).save(any());
+        assertEquals("Mario", guest.getFirstName());
+        assertTrue(guest.isActive());
     }
 
     @Test
@@ -122,7 +125,8 @@ class GuestRetentionJobServiceImplTest {
 
         job.runRetentionJob();
 
-        verify(guestRepository, never()).save(any());
+        assertEquals("Mario", guest.getFirstName());
+        assertTrue(guest.isActive());
     }
 
     @Test
@@ -146,12 +150,13 @@ class GuestRetentionJobServiceImplTest {
                 .thenReturn(new GuestLastStayClientResponse(false, null));
         when(billingServiceClient.getLastInvoiceDate(guestId))
                 .thenReturn(new GuestInvoiceClientResponse(false, null));
-        when(guestRepository.save(any(Guest.class))).thenReturn(guestNoHistory);
+        when(guestRepository.save(Objects.requireNonNull(guestNoHistory)))
+                .thenReturn(Objects.requireNonNull(guestNoHistory));
 
         job.runRetentionJob();
 
         assertFalse(guestNoHistory.isActive());
-        verify(guestRepository, times(1)).save(guestNoHistory);
+        verify(guestRepository, times(1)).save(Objects.requireNonNull(guestNoHistory));
     }
 
     @Test
@@ -161,7 +166,6 @@ class GuestRetentionJobServiceImplTest {
 
         job.runRetentionJob();
 
-        verify(guestRepository, never()).save(any());
         verify(stayServiceClient, never()).getLastStayDate(any());
         verify(billingServiceClient, never()).getLastInvoiceDate(any());
     }

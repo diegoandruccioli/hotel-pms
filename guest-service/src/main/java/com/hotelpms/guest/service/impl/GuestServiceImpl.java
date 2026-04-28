@@ -201,7 +201,8 @@ public class GuestServiceImpl implements GuestService {
         final boolean fiscalBlocked = fiscalExpiry != null && !LocalDate.now().isAfter(fiscalExpiry);
 
         if (tulpsBlocked && fiscalBlocked) {
-            final LocalDate unlocksAt = tulpsExpiry.isAfter(fiscalExpiry)
+            final LocalDate unlocksAt = Objects.requireNonNull(tulpsExpiry)
+                    .isAfter(Objects.requireNonNull(fiscalExpiry))
                     ? tulpsExpiry : fiscalExpiry;
             throw new GdprLegalHoldException(
                     "LEGAL_HOLD_ACTIVE: TULPS and fiscal obligations pending",

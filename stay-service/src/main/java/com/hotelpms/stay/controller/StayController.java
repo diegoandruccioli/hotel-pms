@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -157,7 +158,8 @@ public class StayController {
     public ResponseEntity<GuestLastStayResponse> getLastStayDateForGuest(
             @NonNull @PathVariable final UUID guestId) {
         final UUID hotelId = extractHotelId();
-        return ResponseEntity.ok(stayService.getLastStayDateForGuest(guestId, hotelId));
+        return ResponseEntity.ok(
+                stayService.getLastStayDateForGuest(guestId, Objects.requireNonNull(hotelId)));
     }
 
     private UUID extractHotelId() {

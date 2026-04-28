@@ -16,8 +16,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -84,14 +82,15 @@ class GuestPrivacySettingsServiceImplTest {
 
         when(repository.findById(Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(existing));
-        when(repository.save(existing)).thenReturn(existing);
+        when(repository.save(Objects.requireNonNull(existing)))
+                .thenReturn(Objects.requireNonNull(existing));
 
         final GuestPrivacySettingsResponse result =
                 service.update(hotelId, new GuestPrivacySettingsRequest(7));
 
         assertNotNull(result);
         assertEquals(7, result.guestRetentionYears());
-        verify(repository, times(1)).save(existing);
+        verify(repository, times(1)).save(Objects.requireNonNull(existing));
     }
 
     @Test
@@ -109,12 +108,15 @@ class GuestPrivacySettingsServiceImplTest {
         when(repository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
         when(repository.save(Objects.requireNonNull(toSave)))
                 .thenReturn(Objects.requireNonNull(saved));
+        when(repository.save(Objects.requireNonNull(saved)))
+                .thenReturn(Objects.requireNonNull(saved));
 
         final GuestPrivacySettingsResponse result =
                 service.update(hotelId, new GuestPrivacySettingsRequest(6));
 
         assertNotNull(result);
-        verify(repository, times(2)).save(any(GuestPrivacySettings.class));
+        verify(repository).save(Objects.requireNonNull(toSave));
+        verify(repository).save(Objects.requireNonNull(saved));
     }
 
     @Test
@@ -128,6 +130,7 @@ class GuestPrivacySettingsServiceImplTest {
 
         service.getOrCreate(hotelId);
 
-        verify(repository, never()).save(any());
+        verify(repository, times(1)).findById(Objects.requireNonNull(hotelId));
+        verifyNoMoreInteractions(repository);
     }
 }

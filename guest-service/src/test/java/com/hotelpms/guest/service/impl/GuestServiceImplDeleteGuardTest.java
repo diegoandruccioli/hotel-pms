@@ -100,7 +100,8 @@ class GuestServiceImplDeleteGuardTest {
                 .thenReturn(new GuestLastStayClientResponse(false, null));
         when(billingServiceClient.getLastInvoiceDate(guestId))
                 .thenReturn(new GuestInvoiceClientResponse(false, null));
-        when(guestRepository.save(guest)).thenReturn(guest);
+        when(guestRepository.save(Objects.requireNonNull(guest)))
+                .thenReturn(Objects.requireNonNull(guest));
 
         service.deleteGuest(guestId);
 
@@ -159,7 +160,8 @@ class GuestServiceImplDeleteGuardTest {
                 .thenReturn(new GuestLastStayClientResponse(true, lastStay));
         when(billingServiceClient.getLastInvoiceDate(guestId))
                 .thenReturn(new GuestInvoiceClientResponse(false, null));
-        when(guestRepository.save(guest)).thenReturn(guest);
+        when(guestRepository.save(Objects.requireNonNull(guest)))
+                .thenReturn(Objects.requireNonNull(guest));
 
         service.deleteGuest(guestId);
 
@@ -201,7 +203,8 @@ class GuestServiceImplDeleteGuardTest {
                 .thenReturn(new GuestLastStayClientResponse(true, lastStay));
         when(billingServiceClient.getLastInvoiceDate(guestId))
                 .thenReturn(new GuestInvoiceClientResponse(true, lastInvoice));
-        when(guestRepository.save(guest)).thenReturn(guest);
+        when(guestRepository.save(Objects.requireNonNull(guest)))
+                .thenReturn(Objects.requireNonNull(guest));
 
         service.deleteGuest(guestId);
 

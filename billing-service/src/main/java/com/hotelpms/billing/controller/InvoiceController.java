@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -106,7 +107,8 @@ public class InvoiceController {
             @NonNull @PathVariable final UUID guestId) {
         final UUID hotelId = extractHotelId();
         log.info("REST request for last invoice date — guest={} hotel={}", guestId, hotelId);
-        return ResponseEntity.ok(invoiceService.getLastInvoiceDateForGuest(guestId, hotelId));
+        return ResponseEntity.ok(
+                invoiceService.getLastInvoiceDateForGuest(guestId, Objects.requireNonNull(hotelId)));
     }
 
     private UUID extractHotelId() {
