@@ -197,6 +197,28 @@ class RoomServiceImplTest {
     }
 
     @Test
+    void testUpdateRoomStatusToOccupied() {
+        final Room occupiedRoom = Room.builder()
+                .id(roomId)
+                .roomNumber(ROOM_101)
+                .roomType(roomType)
+                .status(RoomStatus.OCCUPIED)
+                .active(true)
+                .build();
+        final RoomResponse occupiedResponse = new RoomResponse(
+                roomId, null, ROOM_101, null, RoomStatus.OCCUPIED, true, null, null);
+
+        when(roomRepository.findById(Objects.requireNonNull(roomId))).thenReturn(Optional.of(room));
+        when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(occupiedRoom);
+        when(roomMapper.toResponse(Objects.requireNonNull(occupiedRoom))).thenReturn(occupiedResponse);
+
+        final RoomResponse result = roomService.updateRoomStatus(Objects.requireNonNull(roomId), RoomStatus.OCCUPIED);
+
+        assertEquals(RoomStatus.OCCUPIED, result.status());
+        verify(roomRepository).saveAndFlush(Objects.requireNonNull(room));
+    }
+
+    @Test
     void testUpdateRoomStatusNotFound() {
         when(roomRepository.findById(Objects.requireNonNull(roomId))).thenReturn(Optional.empty());
 

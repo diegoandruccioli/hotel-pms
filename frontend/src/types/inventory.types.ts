@@ -1,5 +1,5 @@
 
-export type RoomStatus = 'CLEAN' | 'DIRTY' | 'MAINTENANCE';
+export type RoomStatus = 'CLEAN' | 'DIRTY' | 'MAINTENANCE' | 'OCCUPIED';
 
 export interface RoomTypeResponse {
   id: string;

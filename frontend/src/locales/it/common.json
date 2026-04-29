@@ -86,6 +86,7 @@
   "room_status_clean": "Pulita",
   "room_status_dirty": "Sporca",
   "room_status_maintenance": "Manutenzione",
+  "room_status_occupied": "Occupata",
   "room_number": "Camera {{number}}",
   "night": "notte",
   "saving": "Salvataggio…",

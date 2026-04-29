@@ -11,26 +11,30 @@ const STATUS_KEYS: Record<RoomStatus, string> = {
   CLEAN: 'room_status_clean',
   DIRTY: 'room_status_dirty',
   MAINTENANCE: 'room_status_maintenance',
+  OCCUPIED: 'room_status_occupied',
 };
 
-type StatusTone = 'success' | 'error' | 'warning';
+type StatusTone = 'success' | 'error' | 'warning' | 'info' | 'neutral';
 
 const STATUS_CARD_STYLES: Record<RoomStatus, string> = {
   CLEAN: 'bg-tertiary-container/30 border-tertiary',
   DIRTY: 'bg-error-container/30 border-error',
   MAINTENANCE: 'bg-secondary-container/30 border-secondary',
+  OCCUPIED: 'bg-primary-container/30 border-primary',
 };
 
 const STATUS_TONES: Record<RoomStatus, StatusTone> = {
   CLEAN: 'success',
   DIRTY: 'error',
   MAINTENANCE: 'warning',
+  OCCUPIED: 'info',
 };
 
 const STATUS_BUTTON_STYLES: Record<RoomStatus, string> = {
   CLEAN: 'border-tertiary text-tertiary hover:bg-tertiary-container',
   DIRTY: 'border-error text-error hover:bg-error-container',
   MAINTENANCE: 'border-secondary text-secondary hover:bg-secondary-container',
+  OCCUPIED: 'border-outline text-on-surface-variant hover:bg-surface-container',
 };
 
 const ALL_STATUSES: RoomStatus[] = ['CLEAN', 'DIRTY', 'MAINTENANCE'];
@@ -72,17 +76,19 @@ const RoomCard = memo(({
 
       <p className="text-sm font-body text-on-surface-variant">{formatCurrency(room.roomType?.basePrice)} / {t('night')}</p>
 
-      <div className="flex gap-2 flex-wrap mt-1">
-        {ALL_STATUSES.filter((s) => s !== room.status).map((newStatus) => (
-          <StatusButton 
-            key={newStatus} 
-            newStatus={newStatus} 
-            updating={updating} 
-            onClick={handleStatusButton} 
-            t={t} 
-          />
-        ))}
-      </div>
+      {room.status !== 'OCCUPIED' && (
+        <div className="flex gap-2 flex-wrap mt-1">
+          {ALL_STATUSES.filter((s) => s !== room.status).map((newStatus) => (
+            <StatusButton
+              key={newStatus}
+              newStatus={newStatus}
+              updating={updating}
+              onClick={handleStatusButton}
+              t={t}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 });

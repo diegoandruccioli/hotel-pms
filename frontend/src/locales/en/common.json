@@ -86,6 +86,7 @@
   "room_status_clean": "Clean",
   "room_status_dirty": "Dirty",
   "room_status_maintenance": "Maintenance",
+  "room_status_occupied": "Occupied",
   "room_number": "Room {{number}}",
   "night": "night",
   "saving": "Saving…",

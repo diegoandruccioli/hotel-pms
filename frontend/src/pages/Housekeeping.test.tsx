@@ -69,6 +69,22 @@ describe('Housekeeping', () => {
     });
   });
 
+  it('should render OCCUPIED room without action buttons', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
+      content: [
+        { id: '2', roomNumber: '102', type: 'Standard', status: 'OCCUPIED', pricePerNight: 100 },
+      ],
+      totalElements: 1,
+    } as never);
+
+    render(<Housekeeping />);
+
+    await waitFor(() => {
+      expect(screen.getByText('room_status_occupied')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/→/)).not.toBeInTheDocument();
+  });
+
   it('should have no accessibility violations', async () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({ content: [], totalElements: 0 } as never);
     const { container } = render(<Housekeeping />);
