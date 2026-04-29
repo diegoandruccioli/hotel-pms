@@ -34,6 +34,7 @@ import org.springframework.lang.NonNull;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -188,6 +189,26 @@ public class StayServiceImpl implements StayService {
                 .map(stayMapper::toDto)
                 .toList();
         return new PageImpl<>(content, pageable == null ? Pageable.unpaged() : pageable, content.size());
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<StayResponse> getLastCompletedStayForGuest(@NonNull final UUID guestId) {
+        log.debug("Pre-fill check: verifying guest profile active for guestId={}", guestId);
+        final com.hotelpms.stay.client.dto.GuestResponse guest = guestClient.getGuestById(guestId);
+
+        // GuestClient fallback returns UNKNOWN_VALUE when guest-service is unreachable or
+        // the guest profile no longer exists (anonymised). Fail-safe: return empty.
+        if (GuestClient.UNKNOWN_VALUE.equals(guest.firstName())) {
+            log.warn("[STAY] PRE_FILL_SKIPPED | guestId={} | reason=GUEST_PROFILE_INACTIVE_OR_UNREACHABLE", guestId);
+            return Optional.empty();
+        }
+
+        log.debug("Pre-fill check: guest profile active, fetching last completed stay for guestId={}", guestId);
+        return stayRepository
+                .findTopByGuestIdAndStatusOrderByActualCheckInTimeDesc(guestId, StayStatus.CHECKED_OUT)
+                .map(stayMapper::toDto);
     }
 
     private void sendAlloggiatiIfEnabled(final Stay stay) {

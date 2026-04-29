@@ -59,6 +59,13 @@ export const stayService = {
     URL.revokeObjectURL(url);
   },
 
+  getLastCompletedStayForGuest: async (guestId: string): Promise<StayResponse | null> => {
+    const response = await api.get<StayResponse>(`${BASE_PATH}/guest/${guestId}/latest`, {
+      validateStatus: (s) => s === 200 || s === 204,
+    });
+    return response.status === 204 ? null : response.data;
+  },
+
   downloadAlloggiatiJson: async (date: string): Promise<void> => {
     const response = await api.get(`${BASE_PATH}/reports/alloggiati/json`, {
       params: { date },

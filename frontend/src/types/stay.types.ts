@@ -12,6 +12,8 @@ export interface StayGuestResponse {
   documentNumber: string;
   documentPlaceOfIssue: string;
   isPrimaryGuest: boolean;
+  travellerType?: string;
+  travelPurpose?: string;
 }
 
 export interface StayGuestRequest {

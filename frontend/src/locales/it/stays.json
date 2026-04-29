@@ -23,5 +23,17 @@
   "btn_complete_checkin": "Completa Check-in",
   "err_missing_context": "Dati contesto prenotazione mancanti",
   "err_primary_guest_required": "È richiesto almeno un ospite principale",
-  "err_checkin_failed": "Check-in non completato"
+  "err_checkin_failed": "Check-in non completato",
+  "prefill_banner_stay": "Ospite di ritorno — pre-compilato dal soggiorno precedente: {{fields}}. Verificare e completare se necessario.",
+  "prefill_banner_profile": "Pre-compilato dal profilo ospite: {{fields}}. Completare i campi rimanenti.",
+  "prefill_field_firstName": "Nome",
+  "prefill_field_lastName": "Cognome",
+  "prefill_field_gender": "Sesso",
+  "prefill_field_dateOfBirth": "Data di nascita",
+  "prefill_field_placeOfBirth": "Luogo di nascita",
+  "prefill_field_citizenship": "Cittadinanza",
+  "prefill_field_documentType": "Tipo documento",
+  "prefill_field_documentNumber": "Numero documento",
+  "prefill_field_documentPlaceOfIssue": "Luogo rilascio documento",
+  "prefill_field_travellerType": "Tipo alloggiato"
 }

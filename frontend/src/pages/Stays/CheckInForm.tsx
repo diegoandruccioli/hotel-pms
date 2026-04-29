@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, memo, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +7,18 @@ import { M3Button } from '../../components/m3/M3Button';
 import { M3Card } from '../../components/m3/M3Card';
 import { M3TextField } from '../../components/m3/M3TextField';
 import { stayService } from '../../services/stayService';
+import { guestService } from '../../services/guestService';
 import type { StayRequest, StayGuestRequest } from '../../types/stay.types';
+import type { DocumentType } from '../../types/guest.types';
+
+const mapDocType = (dt: DocumentType): string => {
+  switch (dt) {
+    case 'PASSPORT': return 'PASSAPORTO';
+    case 'ID_CARD': return "CARTA IDENTITA";
+    case 'DRIVERS_LICENSE': return 'PATENTE';
+    default: return 'ALTRO';
+  }
+};
 
 const ICON_SIZE_20 = { fontSize: 20 };
 
@@ -201,12 +212,60 @@ export const CheckInForm = memo(() => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [prefillFields, setPrefillFields] = useState<string[]>([]);
+  const [prefillSource, setPrefillSource] = useState<'stay' | 'profile' | null>(null);
 
   // Initialize guests based on expectedGuests, at least 1 primary guest
   const initialGuestsCount = state?.expectedGuests && state.expectedGuests > 0 ? state.expectedGuests : 1;
   const [guests, setGuests] = useState<IdentifiableGuest[]>(
     Array.from({ length: initialGuestsCount }, (_, i) => emptyGuest(i === 0))
   );
+
+  const guestId = state?.guestId;
+  useEffect(() => {
+    if (!guestId) return;
+
+    Promise.allSettled([
+      stayService.getLastCompletedStayForGuest(guestId),
+      guestService.getGuestById(guestId),
+    ]).then(([stayResult, profileResult]) => {
+      const updates: Partial<StayGuestRequest> = {};
+      const filled: string[] = [];
+
+      // Source 1 — previous stay: all Alloggiati fields, highest priority
+      const lastStay = stayResult.status === 'fulfilled' ? stayResult.value : null;
+      const lastPrimary = lastStay?.guests?.find(g => g.isPrimaryGuest) ?? lastStay?.guests?.[0] ?? null;
+      if (lastPrimary) {
+        if (lastPrimary.firstName)            { updates.firstName            = lastPrimary.firstName;            filled.push('firstName'); }
+        if (lastPrimary.lastName)             { updates.lastName             = lastPrimary.lastName;             filled.push('lastName'); }
+        if (lastPrimary.gender)               { updates.gender               = lastPrimary.gender;               filled.push('gender'); }
+        if (lastPrimary.dateOfBirth)          { updates.dateOfBirth          = lastPrimary.dateOfBirth;          filled.push('dateOfBirth'); }
+        if (lastPrimary.placeOfBirth)         { updates.placeOfBirth         = lastPrimary.placeOfBirth;         filled.push('placeOfBirth'); }
+        if (lastPrimary.citizenship)          { updates.citizenship          = lastPrimary.citizenship;          filled.push('citizenship'); }
+        if (lastPrimary.documentType)         { updates.documentType         = lastPrimary.documentType;         filled.push('documentType'); }
+        if (lastPrimary.documentNumber)       { updates.documentNumber       = lastPrimary.documentNumber;       filled.push('documentNumber'); }
+        if (lastPrimary.documentPlaceOfIssue) { updates.documentPlaceOfIssue = lastPrimary.documentPlaceOfIssue; filled.push('documentPlaceOfIssue'); }
+        if (lastPrimary.travellerType)        { updates.travellerType        = lastPrimary.travellerType;        filled.push('travellerType'); }
+      }
+
+      // Source 2 — guest profile: fills any gap not covered by the previous stay
+      const profile = profileResult.status === 'fulfilled' ? profileResult.value : null;
+      if (profile) {
+        const doc = profile.identityDocuments?.[0];
+        if (!updates.firstName    && profile.firstName) { updates.firstName    = profile.firstName;           filled.push('firstName'); }
+        if (!updates.lastName     && profile.lastName)  { updates.lastName     = profile.lastName;            filled.push('lastName'); }
+        if (!updates.citizenship  && profile.country)   { updates.citizenship  = profile.country;             filled.push('citizenship'); }
+        if (!updates.documentType    && doc?.documentType)   { updates.documentType    = mapDocType(doc.documentType); filled.push('documentType'); }
+        if (!updates.documentNumber  && doc?.documentNumber) { updates.documentNumber  = doc.documentNumber;           filled.push('documentNumber'); }
+      }
+
+      if (Object.keys(updates).length === 0) return;
+
+      setGuests(prev => [{ ...prev[0], ...updates }, ...prev.slice(1)]);
+      setPrefillFields(filled);
+      setPrefillSource(lastPrimary ? 'stay' : 'profile');
+    });
+  }, [guestId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGuestChange = useCallback((index: number, field: keyof StayGuestRequest, value: string | boolean) => {
     setGuests(prev => {
@@ -290,6 +349,17 @@ export const CheckInForm = memo(() => {
         </M3Button>
         <h1 className="text-2xl font-display font-bold text-on-surface">{t('checkin_title')}</h1>
       </div>
+
+      {prefillFields.length > 0 && (
+        <div className="bg-secondary-container text-on-secondary-container p-4 rounded-shape-sm flex items-start gap-3">
+          <MaterialIcon name="auto_fix_high" className="mt-0.5 flex-shrink-0" />
+          <p className="font-body text-sm">
+            {prefillSource === 'stay'
+              ? t('prefill_banner_stay', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })
+              : t('prefill_banner_profile', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })}
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="bg-error-container text-on-error-container p-4 rounded-shape-sm flex items-start gap-3">

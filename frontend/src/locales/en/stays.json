@@ -23,5 +23,17 @@
   "btn_complete_checkin": "Complete Check-in",
   "err_missing_context": "Missing reservation context data",
   "err_primary_guest_required": "At least one primary guest is required",
-  "err_checkin_failed": "Failed to complete check-in"
+  "err_checkin_failed": "Failed to complete check-in",
+  "prefill_banner_stay": "Returning guest — pre-filled from previous stay: {{fields}}. Verify and complete if needed.",
+  "prefill_banner_profile": "Pre-filled from guest profile: {{fields}}. Please complete the remaining required fields.",
+  "prefill_field_firstName": "First Name",
+  "prefill_field_lastName": "Last Name",
+  "prefill_field_gender": "Gender",
+  "prefill_field_dateOfBirth": "Date of Birth",
+  "prefill_field_placeOfBirth": "Place of Birth",
+  "prefill_field_citizenship": "Citizenship",
+  "prefill_field_documentType": "Document Type",
+  "prefill_field_documentNumber": "Document Number",
+  "prefill_field_documentPlaceOfIssue": "Document Place of Issue",
+  "prefill_field_travellerType": "Traveller Type"
 }

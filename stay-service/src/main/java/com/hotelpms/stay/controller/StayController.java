@@ -106,6 +106,23 @@ public class StayController {
     }
 
     /**
+     * Returns the most recent completed stay for a guest, used to pre-fill the check-in form.
+     * Verifies that the guest profile is still active before returning any data (Option-B
+     * GDPR safeguard). Returns 204 No Content when the guest has no previous stays, the
+     * profile was anonymised, or guest-service is unreachable (fail-safe).
+     *
+     * @param guestId the guest UUID
+     * @return 200 with the last completed stay, or 204 No Content
+     */
+    @GetMapping("/guest/{guestId}/latest")
+    public ResponseEntity<StayResponse> getLastCompletedStayForGuest(
+            @NonNull @PathVariable("guestId") final UUID guestId) {
+        return stayService.getLastCompletedStayForGuest(guestId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.noContent().build());
+    }
+
+    /**
      * Generates and downloads the Italian Alloggiati Web police report for all
      * guests who checked in on the given date.
      *

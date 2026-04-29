@@ -1,6 +1,7 @@
 package com.hotelpms.stay.repository;
 
 import com.hotelpms.stay.domain.Stay;
+import com.hotelpms.stay.domain.StayStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -48,4 +49,16 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      * @return list of matching stays
      */
     List<Stay> findByActualCheckInTimeBetween(LocalDateTime start, LocalDateTime end);
+
+    /**
+     * Finds the most recent stay for a guest with the given status,
+     * ordered by actual check-in time descending.
+     * Used to pre-fill the check-in form for returning guests, after the
+     * caller has verified that the guest profile is still active in guest-service.
+     *
+     * @param guestId the guest UUID
+     * @param status  the stay status to filter by
+     * @return an Optional containing the most recent matching stay
+     */
+    Optional<Stay> findTopByGuestIdAndStatusOrderByActualCheckInTimeDesc(UUID guestId, StayStatus status);
 }
