@@ -1,6 +1,7 @@
 package com.hotelpms.stay.client;
 
 import com.hotelpms.stay.client.dto.RoomResponse;
+import com.hotelpms.stay.exception.ExternalServiceException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,13 +54,16 @@ public interface InventoryClient {
 
     /**
      * Fallback method for updateRoomStatus.
+     * Always throws so callers can detect the failure and execute compensating transactions.
      *
      * @param id        the room ID
-     * @param status    the status
-     * @param throwable the throwable
-     * @return throws exception
+     * @param status    the new status that could not be applied
+     * @param throwable the underlying cause
+     * @return never — this method always throws
+     * @throws ExternalServiceException always, to signal the update did not occur
      */
     default RoomResponse updateRoomStatusFallback(final UUID id, final String status, final Throwable throwable) {
-        return new RoomResponse(id, UNKNOWN_VALUE, status);
+        throw new ExternalServiceException(
+                "Inventory service unavailable — room status not updated: " + throwable.getMessage(), throwable);
     }
 }

@@ -46,8 +46,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.mockito.ArgumentMatchers;
+import org.mockito.InOrder;
 import org.springframework.lang.NonNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -66,6 +68,7 @@ class StayServiceImplTest {
     private static final String STATUS_PARTIALLY_CHECKED_IN = "PARTIALLY_CHECKED_IN";
     private static final String ROOM_NUMBER_101 = "101";
     private static final String ROOM_STATUS_AVAILABLE = "AVAILABLE";
+    private static final String ROOM_STATUS_OCCUPIED = "OCCUPIED";
 
     @Mock
     private StayRepository stayRepository;
@@ -144,6 +147,8 @@ class StayServiceImplTest {
                 .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+        when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_OCCUPIED));
 
         final Stay unmappedStay = new Stay();
         when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
@@ -159,6 +164,7 @@ class StayServiceImplTest {
         verify(guestClient, times(1)).getGuestById(guest);
         verify(reservationClient, times(2)).getReservationById(reservation);
         verify(inventoryClient, times(1)).getRoomById(room);
+        verify(inventoryClient, times(1)).updateRoomStatus(room, ROOM_STATUS_OCCUPIED);
         verify(stayRepository, times(1)).save(Objects.requireNonNull(unmappedStay));
         assertEquals(StayStatus.CHECKED_IN, unmappedStay.getStatus());
         assertNotNull(unmappedStay.getActualCheckInTime());
@@ -205,6 +211,8 @@ class StayServiceImplTest {
                 .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+        when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_OCCUPIED));
 
         final Stay unmappedStay = new Stay();
         final List<StayGuest> guests = new ArrayList<>();
@@ -245,6 +253,8 @@ class StayServiceImplTest {
                 .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, lineItems));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+        when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_OCCUPIED));
 
         final Stay unmappedStay = new Stay();
         when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
@@ -290,6 +300,8 @@ class StayServiceImplTest {
                 .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, lineItems));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+        when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_OCCUPIED));
 
         final Stay unmappedStay = new Stay();
         when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
@@ -473,6 +485,8 @@ class StayServiceImplTest {
                 .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_PARTIALLY_CHECKED_IN, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+        when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_OCCUPIED));
 
         final Stay unmappedStay = new Stay();
         when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
@@ -503,6 +517,8 @@ class StayServiceImplTest {
                 .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+        when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_OCCUPIED));
 
         final Stay unmappedStay = new Stay();
         when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
@@ -632,6 +648,103 @@ class StayServiceImplTest {
 
         assertNotNull(response);
         assertFalse(stayWithHotel.isAlloggiatiSent());
+    }
+
+    @Test
+    void shouldMarkRoomOccupiedOnCheckIn() {
+        // Arrange
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+        final Stay saved = Objects.requireNonNull(savedStay);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationClient.getReservationById(reservation))
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+        when(inventoryClient.getRoomById(room))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+        when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_OCCUPIED));
+
+        final Stay unmappedStay = new Stay();
+        when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(saved);
+        when(stayMapper.toDto(saved)).thenReturn(Objects.requireNonNull(validResponse));
+
+        // Act
+        stayService.checkIn(request);
+
+        // Assert — OCCUPIED must be confirmed before invoice is opened (no orphan invoices)
+        final InOrder sagaOrder = inOrder(inventoryClient, billingClient);
+        sagaOrder.verify(inventoryClient).updateRoomStatus(room, ROOM_STATUS_OCCUPIED);
+        sagaOrder.verify(billingClient).createInvoiceForStay(anyNonNull(StayInvoiceRequest.class));
+    }
+
+    @Test
+    void shouldRollbackStayWhenRoomOccupiedFails() {
+        // Arrange
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+        final Stay saved = Objects.requireNonNull(savedStay);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationClient.getReservationById(reservation))
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+        when(inventoryClient.getRoomById(room))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+        when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
+                .thenThrow(new ExternalServiceException("Inventory service unavailable"));
+
+        final Stay unmappedStay = new Stay();
+        when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(saved);
+
+        // Act & Assert — exception propagates; @Transactional rolls back the Stay save in production
+        assertThrows(ExternalServiceException.class, () -> stayService.checkIn(request));
+        verifyNoInteractions(billingClient);
+    }
+
+    @Test
+    void shouldContinueCheckInWhenReservationUpdateFails() {
+        // Arrange
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+        final Stay saved = Objects.requireNonNull(savedStay);
+        final StayResponse expected = Objects.requireNonNull(validResponse);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationClient.getReservationById(reservation))
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+        when(inventoryClient.getRoomById(room))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
+        when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
+                .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_OCCUPIED));
+
+        final Stay unmappedStay = new Stay();
+        when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(saved);
+        when(stayMapper.toDto(saved)).thenReturn(expected);
+
+        final feign.FeignException feignEx = org.mockito.Mockito.mock(feign.FeignException.class);
+        when(feignEx.getMessage()).thenReturn("Reservation service unavailable");
+        doThrow(feignEx).when(reservationClient)
+                .updateStatusAndGuests(ArgumentMatchers.eq(reservation), ArgumentMatchers.any());
+
+        // Act — Stay and room remain consistent even if reservation update fails
+        final StayResponse response = stayService.checkIn(request);
+
+        // Assert
+        assertNotNull(response);
+        verify(inventoryClient, times(1)).updateRoomStatus(room, ROOM_STATUS_OCCUPIED);
+        verify(stayRepository, times(1)).save(Objects.requireNonNull(unmappedStay));
     }
 
     /**

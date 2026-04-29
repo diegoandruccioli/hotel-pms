@@ -46,6 +46,7 @@ import java.util.UUID;
 public class StayServiceImpl implements StayService {
 
     private static final String PAID_STATUS = "PAID";
+    private static final String ROOM_STATUS_OCCUPIED = "OCCUPIED";
     private static final Set<String> CHECKIN_ALLOWED_STATUSES = Set.of("CONFIRMED", "PARTIALLY_CHECKED_IN");
 
     private final StayRepository stayRepository;
@@ -102,12 +103,20 @@ public class StayServiceImpl implements StayService {
                 savedStay.getId(), savedStay.getReservationId(),
                 savedStay.getGuestId(), savedStay.getRoomId());
 
+        // SAGA STEP 3: mark room OCCUPIED — failure triggers @Transactional rollback of the save
+        markRoomOccupied(savedStay);
+
+        // Non-blocking steps: execute only after OCCUPIED is confirmed
         openInvoiceForStay(savedStay);
         sendAlloggiatiIfEnabled(savedStay);
 
-        // Update reservation actualGuests (sum of all StayGuest entries for this
-        // reservation)
-        updateReservationGuests(savedStay.getReservationId());
+        // Non-blocking: Stay and room are consistent regardless of reservation update outcome
+        try {
+            updateReservationGuests(savedStay.getReservationId());
+        } catch (final feign.FeignException ex) {
+            log.warn("[STAY] RESERVATION_UPDATE_FAILED | stayId={} | reason={}",
+                    savedStay.getId(), ex.getMessage());
+        }
 
         return stayMapper.toDto(savedStay);
     }
@@ -198,6 +207,18 @@ public class StayServiceImpl implements StayService {
         } catch (final ExternalServiceException ex) {
             log.error("[STAY] ALLOGGIATI_SEND_FAILED | stayId={} | date={} | reason={}",
                     stay.getId(), checkInDate, ex.getMessage());
+        }
+    }
+
+    private void markRoomOccupied(final Stay stay) {
+        try {
+            inventoryClient.updateRoomStatus(stay.getRoomId(), ROOM_STATUS_OCCUPIED);
+            log.info("[STAY] SAGA_ROOM_OCCUPIED | stayId={} | roomId={}",
+                    stay.getId(), stay.getRoomId());
+        } catch (final ExternalServiceException ex) {
+            log.error("[STAY] SAGA_COMPENSATED | stayId={} | roomId={} | reason=ROOM_OCCUPIED_FAILED | detail={}",
+                    stay.getId(), stay.getRoomId(), ex.getMessage());
+            throw ex;
         }
     }
 
