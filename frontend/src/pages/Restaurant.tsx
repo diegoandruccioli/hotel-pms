@@ -6,6 +6,8 @@ import { M3Button } from '../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { useTranslation } from 'react-i18next';
+import { OrderFormModal } from './Restaurant/OrderFormModal';
+import { OrderDetailModal } from './Restaurant/OrderDetailModal';
 
 const CONFIRMABLE_STATUSES = new Set<string>(['PENDING', 'PREPARED']);
 
@@ -26,15 +28,17 @@ interface OrderRowProps {
   order: RestaurantOrderResponse;
   confirmingId: string | null;
   onConfirm: (id: string) => void;
+  onView: (order: RestaurantOrderResponse) => void;
   formatCurrency: (amount: number) => string;
   formatDate: (dateStr?: string) => string;
   t: (key: string) => string;
 }
 
-const OrderRow = memo(({ order, confirmingId, onConfirm, formatCurrency, formatDate, t }: OrderRowProps) => {
+const OrderRow = memo(({ order, confirmingId, onConfirm, onView, formatCurrency, formatDate, t }: OrderRowProps) => {
   const isConfirmable = CONFIRMABLE_STATUSES.has(order.status);
   const isConfirming = confirmingId === order.id;
   const handleConfirmClick = useCallback(() => onConfirm(order.id), [onConfirm, order.id]);
+  const handleViewClick = useCallback(() => onView(order), [onView, order]);
 
   return (
     <M3TableRow key={order.id}>
@@ -64,7 +68,14 @@ const OrderRow = memo(({ order, confirmingId, onConfirm, formatCurrency, formatD
                 : t('confirm')}
             </button>
           )}
-          <button type="button" className="text-primary hover:text-primary/80 font-medium text-sm">{t('view')}</button>
+          <button
+            type="button"
+            onClick={handleViewClick}
+            aria-label={`${t('view')} ${order.id}`}
+            className="text-primary hover:text-primary/80 font-medium text-sm"
+          >
+            {t('view')}
+          </button>
         </div>
       </M3TableCell>
     </M3TableRow>
@@ -77,6 +88,8 @@ export const Restaurant = memo(() => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<RestaurantOrderResponse | null>(null);
 
   const loadOrders = useCallback(async () => {
     try {
@@ -109,8 +122,15 @@ export const Restaurant = memo(() => {
     }
   }, [loadOrders, t]);
 
+  const handleOrderCreated = useCallback(async () => { await loadOrders(); }, [loadOrders]);
+
+  const handleOpenOrderModal = useCallback(() => setIsOrderModalOpen(true), []);
+  const handleCloseOrderModal = useCallback(() => setIsOrderModalOpen(false), []);
+  const handleViewOrder = useCallback((order: RestaurantOrderResponse) => setSelectedOrder(order), []);
+  const handleCloseDetail = useCallback(() => setSelectedOrder(null), []);
+
   const formatCurrency = useCallback((amount: number) => {
-    return new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'USD' }).format(amount);
+    return new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(amount);
   }, [i18n.language]);
 
   const formatDate = useCallback((dateStr?: string) => {
@@ -137,7 +157,7 @@ export const Restaurant = memo(() => {
           </h1>
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('restaurant_subtitle')}</p>
         </div>
-        <M3Button icon="add">{t('new_order')}</M3Button>
+        <M3Button icon="add" onClick={handleOpenOrderModal}>{t('new_order')}</M3Button>
       </div>
 
       {loading ? (
@@ -166,6 +186,7 @@ export const Restaurant = memo(() => {
                 order={order}
                 confirmingId={confirmingId}
                 onConfirm={handleConfirm}
+                onView={handleViewOrder}
                 formatCurrency={formatCurrency}
                 formatDate={formatDate}
                 t={t}
@@ -173,6 +194,14 @@ export const Restaurant = memo(() => {
             ))
           )}
         </M3Table>
+      )}
+
+      {isOrderModalOpen && (
+        <OrderFormModal onClose={handleCloseOrderModal} onCreated={handleOrderCreated} />
+      )}
+
+      {selectedOrder && (
+        <OrderDetailModal order={selectedOrder} onClose={handleCloseDetail} />
       )}
     </div>
   );

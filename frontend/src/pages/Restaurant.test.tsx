@@ -13,7 +13,23 @@ vi.mock('react-i18next', () => {
 });
 
 vi.mock('../services/fbService', () => ({
-  fbService: { getAllOrders: vi.fn(), confirmOrder: vi.fn() },
+  fbService: { getAllOrders: vi.fn(), confirmOrder: vi.fn(), getMenuItems: vi.fn() },
+}));
+
+vi.mock('./Restaurant/OrderFormModal', () => ({
+  OrderFormModal: ({ onClose }: { onClose: () => void }) => (
+    <div role="dialog" aria-label="order-form">
+      <button type="button" onClick={onClose}>close-modal</button>
+    </div>
+  ),
+}));
+
+vi.mock('./Restaurant/OrderDetailModal', () => ({
+  OrderDetailModal: ({ onClose }: { onClose: () => void }) => (
+    <div role="dialog" aria-label="order-detail">
+      <button type="button" onClick={onClose}>close-detail</button>
+    </div>
+  ),
 }));
 
 const PENDING_ORDER = {
@@ -122,6 +138,54 @@ describe('Restaurant', () => {
     await waitFor(() => {
       expect(screen.getByText('error_loading_orders')).toBeInTheDocument();
     });
+  });
+
+  it('should open order detail modal when view button is clicked', async () => {
+    vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([PENDING_ORDER]);
+    render(<Restaurant />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /view order-1/ })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /view order-1/ }));
+
+    expect(screen.getByRole('dialog', { name: 'order-detail' })).toBeInTheDocument();
+  });
+
+  it('should close order detail modal when modal requests close', async () => {
+    vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([PENDING_ORDER]);
+    render(<Restaurant />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /view order-1/ })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /view order-1/ }));
+    expect(screen.getByRole('dialog', { name: 'order-detail' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'close-detail' }));
+    expect(screen.queryByRole('dialog', { name: 'order-detail' })).not.toBeInTheDocument();
+  });
+
+  it('should open order form modal when new order button is clicked', async () => {
+    vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+    render(<Restaurant />);
+
+    await waitFor(() => expect(screen.getByText('no_orders')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /new_order/ }));
+
+    expect(screen.getByRole('dialog', { name: 'order-form' })).toBeInTheDocument();
+  });
+
+  it('should close order form modal when modal requests close', async () => {
+    vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+    render(<Restaurant />);
+
+    await waitFor(() => expect(screen.getByText('no_orders')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /new_order/ }));
+    expect(screen.getByRole('dialog', { name: 'order-form' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'close-modal' }));
+    expect(screen.queryByRole('dialog', { name: 'order-form' })).not.toBeInTheDocument();
   });
 
   it('should have no accessibility violations', async () => {

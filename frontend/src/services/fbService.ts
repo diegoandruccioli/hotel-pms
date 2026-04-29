@@ -1,8 +1,9 @@
 import api from './api';
-import type { RestaurantOrderRequest, RestaurantOrderResponse } from '../types/fb.types';
+import type { MenuItemResponse, RestaurantOrderRequest, RestaurantOrderResponse } from '../types/fb.types';
 import type { SpringPage } from '../types/page.types';
 
 const BASE_PATH = '/api/v1/fb/orders';
+const MENU_ITEMS_PATH = '/api/v1/fb/menu-items';
 
 export const fbService = {
   createOrder: async (data: RestaurantOrderRequest): Promise<RestaurantOrderResponse> => {
@@ -23,5 +24,10 @@ export const fbService = {
   confirmOrder: async (id: string): Promise<RestaurantOrderResponse> => {
     const response = await api.post<RestaurantOrderResponse>(`${BASE_PATH}/${id}/confirm`);
     return response.data;
-  }
+  },
+
+  getMenuItems: async (): Promise<MenuItemResponse[]> => {
+    const response = await api.get<MenuItemResponse[]>(MENU_ITEMS_PATH);
+    return response.data;
+  },
 };

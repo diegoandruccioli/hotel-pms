@@ -1,9 +1,14 @@
 export type OrderStatus = 'PENDING' | 'PREPARING' | 'PREPARED' | 'READY' | 'DELIVERED' | 'CANCELLED' | 'BILLED_TO_ROOM';
 
+export interface MenuItemResponse {
+  id: string;
+  name: string;
+  price: number;
+}
+
 export interface OrderItemRequest {
-  itemName: string;
+  menuItemId: string;
   quantity: number;
-  unitPrice: number;
 }
 
 export interface OrderItemResponse {

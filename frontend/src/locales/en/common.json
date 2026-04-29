@@ -201,5 +201,36 @@
 
   "alloggiati_column": "PS Portal",
   "alloggiati_sent": "Sent to PS",
-  "alloggiati_not_sent": "Not sent"
+  "alloggiati_not_sent": "Not sent",
+  "download_json_export": "Download JSON Export",
+  "alloggiati_json_downloaded": "JSON export for {{date}} downloaded.",
+
+  "order_form_title": "New Restaurant Order",
+  "stay_id_label": "Stay ID",
+  "select_menu_items": "Select Menu Items",
+  "order_total_preview": "Estimated Total",
+  "order_created_success": "Order created successfully.",
+  "order_creation_failed": "Failed to create order. Please try again.",
+  "no_items_selected": "Please select at least one item.",
+  "no_menu_available": "No menu items available.",
+  "decrease_quantity": "Decrease quantity of",
+  "increase_quantity": "Increase quantity of",
+  "err_stay_id_required": "Stay ID is required.",
+  "create_order": "Create Order",
+  "quantity": "Quantity",
+
+  "order_detail_title": "Order Details",
+  "item_name": "Item",
+  "unit_price": "Unit Price",
+  "subtotal": "Subtotal",
+
+  "delete_guest_confirm": "Are you sure you want to delete this guest? This action cannot be undone.",
+  "delete_guest_gdpr_hold": "Cannot delete: guest has stays or invoices that must be retained for legal compliance.",
+  "delete_guest_failed": "Failed to delete guest. Please try again.",
+  "guest_deleted_success": "Guest deleted successfully.",
+
+  "cancel_reservation": "Cancel",
+  "cancel_reservation_confirm": "Are you sure you want to cancel this reservation? This action cannot be undone.",
+  "reservation_cancelled_success": "Reservation cancelled successfully.",
+  "cancel_reservation_failed": "Failed to cancel reservation. Please try again."
 }
