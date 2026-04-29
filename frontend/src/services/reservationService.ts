@@ -24,4 +24,9 @@ export const reservationService = {
     const response = await api.put<ReservationResponse>(`${BASE_PATH}/${id}`, data);
     return response.data;
   },
+
+  cancelReservation: async (id: string): Promise<ReservationResponse> => {
+    const response = await api.put<ReservationResponse>(`${BASE_PATH}/${id}`, { status: 'CANCELLED' });
+    return response.data;
+  },
 };
