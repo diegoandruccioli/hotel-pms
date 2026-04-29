@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { stayService } from '../services/stayService';
+import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import type { StayResponse, StayStatus } from '../types/stay.types';
 import { MaterialIcon } from '../components/MaterialIcon';
@@ -89,7 +90,10 @@ export const Stays = memo(() => {
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
   const [alloggiatiDate, setAlloggiatiDate] = useState(getTodayString());
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [downloadingJson, setDownloadingJson] = useState(false);
   const addToast = useToastStore((s) => s.addToast);
+  const role = useAuthStore((s) => s.user?.role);
+  const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
 
   const loadStays = useCallback(async () => {
     try {
@@ -133,6 +137,19 @@ export const Stays = memo(() => {
       addToast(message, 'error');
     } finally {
       setDownloadingReport(false);
+    }
+  }, [alloggiatiDate, addToast, t]);
+
+  const handleAlloggiatiJsonDownload = useCallback(async () => {
+    setDownloadingJson(true);
+    try {
+      await stayService.downloadAlloggiatiJson(alloggiatiDate);
+      addToast(t('alloggiati_json_downloaded', { date: alloggiatiDate }), 'success');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('failed_generate_report');
+      addToast(message, 'error');
+    } finally {
+      setDownloadingJson(false);
     }
   }, [alloggiatiDate, addToast, t]);
 
@@ -237,6 +254,18 @@ export const Stays = memo(() => {
           >
             {t('generate_and_download')}
           </M3Button>
+          {isAdminOrOwner && (
+            <M3Button
+              id="download-alloggiati-json-btn"
+              variant="outlined"
+              icon={downloadingJson ? 'progress_activity' : 'data_object'}
+              loading={downloadingJson}
+              disabled={downloadingJson}
+              onClick={handleAlloggiatiJsonDownload}
+            >
+              {t('download_json_export')}
+            </M3Button>
+          )}
         </div>
       </M3Card>
     </div>

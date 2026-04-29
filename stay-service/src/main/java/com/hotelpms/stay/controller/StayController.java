@@ -1,5 +1,6 @@
 package com.hotelpms.stay.controller;
 
+import com.hotelpms.stay.dto.AlloggiatiRowDto;
 import com.hotelpms.stay.dto.StayRequest;
 import com.hotelpms.stay.dto.StayResponse;
 import com.hotelpms.stay.service.AlloggiatiReportService;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -126,6 +128,26 @@ public class StayController {
         headers.setContentLength(bytes.length);
 
         return ResponseEntity.ok().headers(headers).body(bytes);
+    }
+
+    /**
+     * Generates and downloads the Alloggiati data as a structured JSON export
+     * for integration with channel managers, accounting software, and BI tools.
+     *
+     * @param date the check-in date in YYYY-MM-DD format
+     * @return the downloadable JSON array of guest arrival records
+     */
+    @GetMapping("/reports/alloggiati/json")
+    @SuppressWarnings("PMD.LooseCoupling")
+    public ResponseEntity<List<AlloggiatiRowDto>> downloadAlloggiatiJson(
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
+        final List<AlloggiatiRowDto> rows = alloggiatiReportService.generateJsonReport(date);
+        final HttpHeaders headers = new HttpHeaders();
+        headers.setContentDisposition(
+                ContentDisposition.attachment()
+                        .filename("alloggiati-" + date + ".json")
+                        .build());
+        return ResponseEntity.ok().headers(headers).body(rows);
     }
 
     /**

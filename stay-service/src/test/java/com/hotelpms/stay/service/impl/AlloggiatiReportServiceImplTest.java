@@ -4,6 +4,7 @@ import com.hotelpms.stay.client.GuestClient;
 import com.hotelpms.stay.client.dto.AlloggiatiGuestResponse;
 import com.hotelpms.stay.domain.Stay;
 import com.hotelpms.stay.domain.StayStatus;
+import com.hotelpms.stay.dto.AlloggiatiRowDto;
 import com.hotelpms.stay.repository.StayRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,6 +29,11 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AlloggiatiReportServiceImplTest {
 
+        private static final String NA_VALUE = "N/A";
+        private static final String GUEST_ONE_FIRST_NAME = "Rossi";
+        private static final String GUEST_ONE_LAST_NAME = "Mario";
+        private static final String DOC_TYPE_PASSPORT = "PASSPORT";
+        private static final String DOC_NUMBER_ONE = "AA123456";
         private static final int YEAR = 2026;
         private static final int MONTH_MAR = 3;
         private static final int DAY_MAR_2 = 2;
@@ -76,9 +83,10 @@ class AlloggiatiReportServiceImplTest {
                                 .build();
 
                 guestOne = new AlloggiatiGuestResponse(
-                                guestOneId, "Rossi", "Mario", LocalDate.of(YEAR_DOB, MONTH_DOB, DAY_DOB),
-                                List.of(new AlloggiatiGuestResponse.AlloggiatiDocumentResponse("PASSPORT",
-                                                "AA123456")));
+                                guestOneId, GUEST_ONE_FIRST_NAME, GUEST_ONE_LAST_NAME,
+                                LocalDate.of(YEAR_DOB, MONTH_DOB, DAY_DOB),
+                                List.of(new AlloggiatiGuestResponse.AlloggiatiDocumentResponse(
+                                                DOC_TYPE_PASSPORT, DOC_NUMBER_ONE)));
 
                 guestTwo = new AlloggiatiGuestResponse(
                                 guestTwoId, "Bianchi", "Lucia", null,
@@ -98,18 +106,76 @@ class AlloggiatiReportServiceImplTest {
 
                 // Assert
                 assertNotNull(report);
-                assertTrue(report.contains("Rossi"), "Report should contain guest one's last name");
-                assertTrue(report.contains("Mario"), "Report should contain guest one's first name");
+                assertTrue(report.contains(GUEST_ONE_FIRST_NAME), "Report should contain guest one's first name");
+                assertTrue(report.contains(GUEST_ONE_LAST_NAME), "Report should contain guest one's last name");
                 assertTrue(report.contains("20/05/1985"), "Report should contain guest one's formatted DOB");
-                assertTrue(report.contains("PASSPORT"), "Report should contain document type");
-                assertTrue(report.contains("AA123456"), "Report should contain document number");
+                assertTrue(report.contains(DOC_TYPE_PASSPORT), "Report should contain document type");
+                assertTrue(report.contains(DOC_NUMBER_ONE), "Report should contain document number");
                 assertTrue(report.contains("02/03/2026"), "Report should contain arrival date");
                 assertTrue(report.contains("Bianchi"), "Report should contain guest two's last name");
-                assertTrue(report.contains("N/A"), "Report should contain N/A for missing DOB");
+                assertTrue(report.contains(NA_VALUE), "Report should contain N/A for missing DOB");
 
                 verify(stayRepository, times(1)).findByActualCheckInTimeBetween(any(), any());
                 verify(guestClient, times(1)).getGuestDetailsById(stayOne.getGuestId());
                 verify(guestClient, times(1)).getGuestDetailsById(stayTwo.getGuestId());
+        }
+
+        @Test
+        void shouldGenerateJsonReportWithTwoRows() {
+                // Arrange
+                when(stayRepository.findByActualCheckInTimeBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
+                                .thenReturn(List.of(stayOne, stayTwo));
+                when(guestClient.getGuestDetailsById(stayOne.getGuestId())).thenReturn(guestOne);
+                when(guestClient.getGuestDetailsById(stayTwo.getGuestId())).thenReturn(guestTwo);
+
+                // Act
+                final List<AlloggiatiRowDto> rows = alloggiatiReportService.generateJsonReport(reportDate);
+
+                // Assert
+                assertNotNull(rows);
+                assertEquals(2, rows.size());
+                // AlloggiatiGuestResponse(id, firstName, lastName, ...) → buildRow maps guest.lastName() first
+                assertEquals(GUEST_ONE_LAST_NAME, rows.get(0).lastName());
+                assertEquals(GUEST_ONE_FIRST_NAME, rows.get(0).firstName());
+                assertEquals("20/05/1985", rows.get(0).dateOfBirth());
+                assertEquals(DOC_TYPE_PASSPORT, rows.get(0).documentType());
+                assertEquals(DOC_NUMBER_ONE, rows.get(0).documentNumber());
+                assertEquals("02/03/2026", rows.get(0).arrivalDate());
+                assertEquals("Lucia", rows.get(1).lastName());
+                assertEquals(NA_VALUE, rows.get(1).dateOfBirth());
+        }
+
+        @Test
+        void shouldGenerateEmptyJsonReportWhenNoCheckIns() {
+                // Arrange
+                when(stayRepository.findByActualCheckInTimeBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
+                                .thenReturn(List.of());
+
+                // Act
+                final List<AlloggiatiRowDto> rows = alloggiatiReportService.generateJsonReport(reportDate);
+
+                // Assert
+                assertNotNull(rows);
+                assertTrue(rows.isEmpty());
+                verify(guestClient, times(0)).getGuestDetailsById(any());
+        }
+
+        @Test
+        void shouldGenerateJsonReportWithMissingDocument() {
+                // Arrange
+                when(stayRepository.findByActualCheckInTimeBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
+                                .thenReturn(List.of(stayTwo));
+                when(guestClient.getGuestDetailsById(stayTwo.getGuestId())).thenReturn(guestTwo);
+
+                // Act
+                final List<AlloggiatiRowDto> rows = alloggiatiReportService.generateJsonReport(reportDate);
+
+                // Assert
+                assertNotNull(rows);
+                assertEquals(1, rows.size());
+                assertEquals(NA_VALUE, rows.get(0).documentType());
+                assertEquals(NA_VALUE, rows.get(0).documentNumber());
+                assertEquals(NA_VALUE, rows.get(0).dateOfBirth());
         }
 
         @Test

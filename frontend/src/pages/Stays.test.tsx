@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { Stays } from './Stays';
 import { stayService } from '../services/stayService';
+import { useAuthStore } from '../store/authStore';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
@@ -10,7 +11,11 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../services/stayService', () => ({
-  stayService: { getAllStays: vi.fn() },
+  stayService: { getAllStays: vi.fn(), downloadAlloggiatiJson: vi.fn(), downloadAlloggiatiReport: vi.fn() },
+}));
+
+vi.mock('../store/authStore', () => ({
+  useAuthStore: vi.fn(),
 }));
 
 vi.mock('../store/toastStore', () => ({
@@ -23,7 +28,12 @@ vi.mock('react-router-dom', () => ({
 }));
 
 describe('Stays', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useAuthStore).mockImplementation((selector: unknown) =>
+      (selector as (s: { user: null }) => unknown)({ user: null })
+    );
+  });
 
   it('should show loading spinner initially', () => {
     vi.mocked(stayService.getAllStays).mockReturnValue(new Promise(() => {}));
@@ -76,5 +86,35 @@ describe('Stays', () => {
     await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+
+  it('should not render JSON export button for RECEPTIONIST', async () => {
+    vi.mocked(useAuthStore).mockImplementation((selector: unknown) =>
+      (selector as (s: { user: { role: string } }) => unknown)({ user: { role: 'RECEPTIONIST' } })
+    );
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([]);
+    render(<Stays />);
+    await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
+    expect(screen.queryByText('download_json_export')).not.toBeInTheDocument();
+  });
+
+  it('should render JSON export button for ADMIN', async () => {
+    vi.mocked(useAuthStore).mockImplementation((selector: unknown) =>
+      (selector as (s: { user: { role: string } }) => unknown)({ user: { role: 'ADMIN' } })
+    );
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([]);
+    render(<Stays />);
+    await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
+    expect(screen.getByText('download_json_export')).toBeInTheDocument();
+  });
+
+  it('should render JSON export button for OWNER', async () => {
+    vi.mocked(useAuthStore).mockImplementation((selector: unknown) =>
+      (selector as (s: { user: { role: string } }) => unknown)({ user: { role: 'OWNER' } })
+    );
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([]);
+    render(<Stays />);
+    await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
+    expect(screen.getByText('download_json_export')).toBeInTheDocument();
   });
 });

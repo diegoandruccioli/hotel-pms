@@ -1,11 +1,12 @@
 package com.hotelpms.stay.service;
 
+import com.hotelpms.stay.dto.AlloggiatiRowDto;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
- * Service for generating Italian Alloggiati Web police reports.
+ * Service for generating Italian Alloggiati Web police reports and structured exports.
  */
-@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface AlloggiatiReportService {
 
     /**
@@ -16,4 +17,14 @@ public interface AlloggiatiReportService {
      * @return pipe-delimited report content as a UTF-8 string
      */
     String generateReport(LocalDate date);
+
+    /**
+     * Generates a structured list of Alloggiati rows for the given date,
+     * suitable for JSON export and integration with channel managers,
+     * accounting software, and BI tools.
+     *
+     * @param date the check-in date to generate the export for
+     * @return list of guest arrival records
+     */
+    List<AlloggiatiRowDto> generateJsonReport(LocalDate date);
 }

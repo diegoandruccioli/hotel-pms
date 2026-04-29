@@ -55,6 +55,20 @@ public class AlloggiatiReportServiceImpl implements AlloggiatiReportService {
         return report.toString();
     }
 
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<AlloggiatiRowDto> generateJsonReport(final LocalDate date) {
+        log.info("Generating Alloggiati JSON export for date: {}", date);
+        final LocalDateTime start = date.atStartOfDay();
+        final LocalDateTime end = date.plusDays(1).atStartOfDay();
+        final List<Stay> checkIns = stayRepository.findByActualCheckInTimeBetween(start, end);
+        log.info("Found {} check-ins for JSON export on {}", checkIns.size(), date);
+        return checkIns.stream()
+                .map(stay -> buildRow(stay, date))
+                .toList();
+    }
+
     private AlloggiatiRowDto buildRow(final Stay stay, final LocalDate arrivalDate) {
         final AlloggiatiGuestResponse guest = guestClient.getGuestDetailsById(stay.getGuestId());
 

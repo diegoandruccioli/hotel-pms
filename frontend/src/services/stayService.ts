@@ -58,4 +58,18 @@ export const stayService = {
     link.click();
     URL.revokeObjectURL(url);
   },
+
+  downloadAlloggiatiJson: async (date: string): Promise<void> => {
+    const response = await api.get(`${BASE_PATH}/reports/alloggiati/json`, {
+      params: { date },
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data as BlobPart], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `alloggiati-${date}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  },
 };
