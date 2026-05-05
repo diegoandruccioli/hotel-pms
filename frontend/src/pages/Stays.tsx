@@ -154,6 +154,7 @@ export const Stays = memo(() => {
   }, [alloggiatiDate, addToast, t]);
 
   const handleNewCheckIn = useCallback(() => navigate('/reservations'), [navigate]);
+  const handleWalkIn = useCallback(() => navigate('/stays/walk-in'), [navigate]);
   
   const handleAlloggiatiDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setAlloggiatiDate(e.target.value);
@@ -185,9 +186,14 @@ export const Stays = memo(() => {
           </h1>
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('stays_subtitle')}</p>
         </div>
-        <M3Button icon="add" onClick={handleNewCheckIn}>
-          {t('new_checkin', 'New Check-in')}
-        </M3Button>
+        <div className="flex gap-2">
+          <M3Button icon="add" onClick={handleNewCheckIn}>
+            {t('new_checkin', 'New Check-in')}
+          </M3Button>
+          <M3Button icon="person_add" variant="outlined" onClick={handleWalkIn}>
+            {t('walkin_title', 'Walk-in')}
+          </M3Button>
+        </div>
       </div>
 
       {loading ? (

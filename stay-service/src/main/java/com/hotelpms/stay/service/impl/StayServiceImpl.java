@@ -63,10 +63,13 @@ public class StayServiceImpl implements StayService {
     @Override
     @Transactional
     public StayResponse checkIn(final StayRequest request) {
-        log.info("Processing check-in for reservation: {}", request.reservationId());
+        log.info("Processing check-in | reservationId={} | walkIn={}",
+                request.reservationId(), request.reservationId() == null);
 
-        final LocalDate expectedCheckOutDate = validateAndGetCheckOutDate(
-                request.reservationId(), request.guestId(), request.roomId());
+        final LocalDate expectedCheckOutDate = request.reservationId() == null
+                ? validateWalkInAndGetCheckOutDate(request.guestId(), request.roomId(),
+                        request.expectedCheckOutDate())
+                : validateAndGetCheckOutDate(request.reservationId(), request.guestId(), request.roomId());
 
         final Stay newStay = stayMapper.toEntity(request);
         newStay.setExpectedCheckOutDate(expectedCheckOutDate);
@@ -95,12 +98,14 @@ public class StayServiceImpl implements StayService {
         openInvoiceForStay(savedStay);
         sendAlloggiatiIfEnabled(savedStay);
 
-        // Non-blocking: Stay and room are consistent regardless of reservation update outcome
-        try {
-            updateReservationGuests(savedStay.getReservationId());
-        } catch (final feign.FeignException ex) {
-            log.warn("[STAY] RESERVATION_UPDATE_FAILED | stayId={} | reason={}",
-                    savedStay.getId(), ex.getMessage());
+        // Non-blocking: only update reservation if this is a reservation-based check-in
+        if (savedStay.getReservationId() != null) {
+            try {
+                updateReservationGuests(savedStay.getReservationId());
+            } catch (final feign.FeignException ex) {
+                log.warn("[STAY] RESERVATION_UPDATE_FAILED | stayId={} | reason={}",
+                        savedStay.getId(), ex.getMessage());
+            }
         }
 
         return stayMapper.toDto(savedStay);
@@ -228,6 +233,29 @@ public class StayServiceImpl implements StayService {
                     reservationId, ex.getMessage());
             throw new ExternalServiceException("EXTERNAL_SERVICE_UNAVAILABLE: " + ex.getMessage(), ex);
         }
+    }
+
+    /**
+     * Validates a walk-in check-in (no reservation) by confirming guest and room exist,
+     * then returns the provided expected check-out date.
+     *
+     * @param guestId              the guest to validate
+     * @param roomId               the room to validate
+     * @param expectedCheckOutDate the check-out date supplied by the operator; may be null
+     * @return the expected check-out date (may be null)
+     */
+    private LocalDate validateWalkInAndGetCheckOutDate(
+            final UUID guestId, final UUID roomId, final LocalDate expectedCheckOutDate) {
+        try {
+            log.debug("[STAY] WALK_IN validating guest={}", guestId);
+            guestClient.getGuestById(guestId);
+            log.debug("[STAY] WALK_IN validating room={}", roomId);
+            inventoryClient.getRoomById(roomId);
+        } catch (final feign.FeignException ex) {
+            log.warn("[STAY] WALK_IN_FAILED | reason=EXTERNAL_SERVICE_UNAVAILABLE | detail={}", ex.getMessage());
+            throw new ExternalServiceException("EXTERNAL_SERVICE_UNAVAILABLE: " + ex.getMessage(), ex);
+        }
+        return expectedCheckOutDate;
     }
 
     private void sendAlloggiatiIfEnabled(final Stay stay) {

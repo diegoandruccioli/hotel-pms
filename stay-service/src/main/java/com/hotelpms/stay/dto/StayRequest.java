@@ -3,6 +3,7 @@ package com.hotelpms.stay.dto;
 import com.hotelpms.stay.domain.StayStatus;
 import jakarta.validation.constraints.NotNull;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -10,25 +11,32 @@ import java.util.UUID;
 /**
  * Data Transfer Object for creating or updating a Stay.
  *
- * @param hotelId            the hotel identifier for multi-tenancy
- * @param reservationId      the associated reservation ID
- * @param guestId            the associated guest ID
- * @param roomId             the associated room ID
- * @param status             the stay status
- * @param actualCheckInTime  the actual check-in time
- * @param actualCheckOutTime the actual check-out time
- * @param guests             the list of guests
+ * <p>When {@code reservationId} is {@code null} the check-in is treated as a
+ * <em>walk-in</em>: no reservation is validated, and {@code expectedCheckOutDate}
+ * is used directly instead of being fetched from the reservation service.
+ *
+ * @param hotelId              the hotel identifier for multi-tenancy
+ * @param reservationId        the associated reservation ID; {@code null} for walk-in
+ * @param guestId              the primary guest ID
+ * @param roomId               the assigned room ID
+ * @param status               the stay status
+ * @param expectedCheckOutDate the expected check-out date; required for walk-in
+ * @param actualCheckInTime    the actual check-in time
+ * @param actualCheckOutTime   the actual check-out time
+ * @param guests               the list of guests with Alloggiati fields
  */
 public record StayRequest(
                 UUID hotelId,
 
-                @NotNull(message = "Reservation ID is required") UUID reservationId,
+                UUID reservationId,
 
                 @NotNull(message = "Guest ID is required") UUID guestId,
 
                 @NotNull(message = "Room ID is required") UUID roomId,
 
                 @NotNull(message = "Stay status is required") StayStatus status,
+
+                LocalDate expectedCheckOutDate,
 
                 LocalDateTime actualCheckInTime,
                 LocalDateTime actualCheckOutTime,

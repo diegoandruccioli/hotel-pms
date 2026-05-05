@@ -14,6 +14,8 @@ const Guests = lazy(() => import('./pages/Guests').then((m) => ({ default: m.Gue
 const Reservations = lazy(() => import('./pages/Reservations').then((m) => ({ default: m.Reservations })));
 const ReservationForm = lazy(() => import('./pages/Reservations/ReservationForm').then((m) => ({ default: m.ReservationForm })));
 const CheckInForm = lazy(() => import('./pages/Stays/CheckInForm').then((m) => ({ default: m.CheckInForm })));
+const WalkInCheckInForm = lazy(() => import('./pages/Stays/WalkInCheckInForm').then((m) => ({ default: m.WalkInCheckInForm })));
+const AdminUsers = lazy(() => import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })));
 const Stays = lazy(() => import('./pages/Stays').then((m) => ({ default: m.Stays })));
 const Billing = lazy(() => import('./pages/Billing').then((m) => ({ default: m.Billing })));
 const Restaurant = lazy(() => import('./pages/Restaurant').then((m) => ({ default: m.Restaurant })));
@@ -78,6 +80,7 @@ function App() {
               <Route path="/reservations/edit/:id" element={<ReservationForm />} />
               <Route path="/stays" element={<Stays />} />
               <Route path="/stays/check-in/:reservationId" element={<CheckInForm />} />
+              <Route path="/stays/walk-in" element={<WalkInCheckInForm />} />
               <Route path="/billing" element={<Billing />} />
               <Route path="/restaurant" element={<Restaurant />} />
               <Route path="/calendar" element={<CalendarPlanning />} />
@@ -86,6 +89,7 @@ function App() {
               <Route path="/profile" element={<Profile />} />
               <Route element={<ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />}>
                 <Route path="/owner-dashboard" element={<OwnerDashboard />} />
+                <Route path="/admin/users" element={<AdminUsers />} />
               </Route>
             </Route>
           </Route>

@@ -47,5 +47,18 @@
   "prefill_field_documentType": "Tipo documento",
   "prefill_field_documentNumber": "Numero documento",
   "prefill_field_documentPlaceOfIssue": "Luogo rilascio documento",
-  "prefill_field_travellerType": "Tipo alloggiato"
+  "prefill_field_travellerType": "Tipo alloggiato",
+  "walkin_title": "Check-in Walk-in",
+  "walkin_subtitle": "Ospite senza prenotazione",
+  "walkin_label_room": "Camera",
+  "walkin_label_checkout_date": "Data prevista di check-out",
+  "walkin_placeholder_room": "Seleziona una camera disponibile...",
+  "walkin_placeholder_guest": "Cerca ospite per nome...",
+  "walkin_label_guest": "Ospite principale",
+  "walkin_no_rooms": "Nessuna camera disponibile al momento",
+  "walkin_err_room_required": "Selezionare una camera",
+  "walkin_err_guest_required": "Selezionare l'ospite principale",
+  "walkin_err_checkout_required": "Inserire la data prevista di check-out",
+  "walkin_btn_checkin": "Completa Walk-in",
+  "walkin_success": "Check-in walk-in completato"
 }

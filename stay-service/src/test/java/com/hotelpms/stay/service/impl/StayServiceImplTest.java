@@ -103,7 +103,7 @@ class StayServiceImplTest {
     private UUID roomId = UUID.randomUUID();
 
     private StayRequest validRequest = new StayRequest(null, reservationId, guestId, roomId,
-            StayStatus.EXPECTED, null, null, new ArrayList<>());
+            StayStatus.EXPECTED, null, null, null, new ArrayList<>());
     private Stay savedStay = new Stay();
     private StayResponse validResponse;
 
@@ -115,7 +115,7 @@ class StayServiceImplTest {
         roomId = UUID.randomUUID();
 
         validRequest = new StayRequest(null, reservationId, guestId, roomId,
-                StayStatus.EXPECTED, null, null, new ArrayList<>());
+                StayStatus.EXPECTED, null, null, null, new ArrayList<>());
 
         savedStay = Stay.builder()
                 .id(stayId)

@@ -3,6 +3,7 @@ import type {
   AlloggiatiComune,
   AlloggiatiStato,
   AlloggiatiTipdoc,
+  AvailableRoom,
   HotelSettingsRequest,
   HotelSettingsResponse,
   StayRequest,
@@ -103,5 +104,12 @@ export const stayService = {
   getLookupTipdoc: async (): Promise<AlloggiatiTipdoc[]> => {
     const response = await api.get<AlloggiatiTipdoc[]>(`${BASE_PATH}/lookup/tipdoc`);
     return response.data;
+  },
+
+  getAvailableRooms: async (): Promise<AvailableRoom[]> => {
+    const response = await api.get<{ content: AvailableRoom[] }>('/api/v1/rooms', {
+      params: { size: 200 },
+    });
+    return (response.data.content ?? []).filter((r) => r.status === 'AVAILABLE');
   },
 };

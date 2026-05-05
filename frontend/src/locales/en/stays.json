@@ -47,5 +47,18 @@
   "prefill_field_documentType": "Document Type",
   "prefill_field_documentNumber": "Document Number",
   "prefill_field_documentPlaceOfIssue": "Document Place of Issue",
-  "prefill_field_travellerType": "Traveller Type"
+  "prefill_field_travellerType": "Traveller Type",
+  "walkin_title": "Walk-in Check-in",
+  "walkin_subtitle": "Guest arriving without a reservation",
+  "walkin_label_room": "Room",
+  "walkin_label_checkout_date": "Expected Check-out Date",
+  "walkin_placeholder_room": "Select an available room...",
+  "walkin_placeholder_guest": "Search guest by name...",
+  "walkin_label_guest": "Primary Guest",
+  "walkin_no_rooms": "No available rooms at the moment",
+  "walkin_err_room_required": "Please select a room",
+  "walkin_err_guest_required": "Please select a primary guest",
+  "walkin_err_checkout_required": "Please enter the expected check-out date",
+  "walkin_btn_checkin": "Complete Walk-in",
+  "walkin_success": "Walk-in check-in completed"
 }

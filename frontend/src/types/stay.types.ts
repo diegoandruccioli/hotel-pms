@@ -1,5 +1,12 @@
 export type StayStatus = 'EXPECTED' | 'CHECKED_IN' | 'CHECKED_OUT';
 
+export interface AvailableRoom {
+  id: string;
+  roomNumber: string;
+  status: string;
+  roomType?: { name: string; basePrice?: number } | null;
+}
+
 export type TravellerType =
   | 'OSPITE_SINGOLO'
   | 'CAPOFAMIGLIA'
@@ -68,10 +75,13 @@ export interface StayGuestRequest {
 
 export interface StayRequest {
   hotelId?: string;
-  reservationId: string;
+  /** Null for walk-in check-ins (no reservation). */
+  reservationId?: string;
   guestId: string;
   roomId: string;
   status: StayStatus;
+  /** Required for walk-in check-ins (ISO date string YYYY-MM-DD). */
+  expectedCheckOutDate?: string;
   actualCheckInTime?: string;
   actualCheckOutTime?: string;
   guests: StayGuestRequest[];
