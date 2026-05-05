@@ -1,33 +1,68 @@
 export type StayStatus = 'EXPECTED' | 'CHECKED_IN' | 'CHECKED_OUT';
 
+export type TravellerType =
+  | 'OSPITE_SINGOLO'
+  | 'CAPOFAMIGLIA'
+  | 'CAPOGRUPPO'
+  | 'FAMILIARE'
+  | 'MEMBRO_GRUPPO';
+
+export interface AlloggiatiStato {
+  codice: string;
+  descrizione: string;
+  dataFineVal?: string | null;
+}
+
+export interface AlloggiatiComune {
+  codice: string;
+  descrizione: string;
+  provincia: string;
+  dataFineVal?: string | null;
+}
+
+export interface AlloggiatiTipdoc {
+  codice: string;
+  descrizione: string;
+}
+
 export interface StayGuestResponse {
   id: string;
   firstName: string;
   lastName: string;
+  /** "1" = Maschio, "2" = Femmina */
   gender: string;
   dateOfBirth: string;
+  /** 9-char comune code (Italian-born) or 9-char stato code (foreign-born) */
   placeOfBirth: string;
+  /** 9-char stato code from the Portale Alloggiati Web lookup */
   citizenship: string;
-  documentType: string;
-  documentNumber: string;
-  documentPlaceOfIssue: string;
+  /** 5-char tipdoc code — null for FAMILIARE/MEMBRO_GRUPPO */
+  documentType?: string | null;
+  documentNumber?: string | null;
+  /** 9-char comune or stato code — null for FAMILIARE/MEMBRO_GRUPPO */
+  documentPlaceOfIssue?: string | null;
   isPrimaryGuest: boolean;
-  travellerType?: string;
+  travellerType?: TravellerType;
   travelPurpose?: string;
 }
 
 export interface StayGuestRequest {
   firstName: string;
   lastName: string;
+  /** "1" = Maschio, "2" = Femmina */
   gender: string;
   dateOfBirth: string;
+  /** 9-char comune code (Italian-born) or 9-char stato code (foreign-born) */
   placeOfBirth: string;
+  /** 9-char stato code */
   citizenship: string;
-  documentType: string;
-  documentNumber: string;
-  documentPlaceOfIssue: string;
+  /** 5-char tipdoc code — omit for FAMILIARE/MEMBRO_GRUPPO */
+  documentType?: string;
+  documentNumber?: string;
+  /** 9-char comune or stato code — omit for FAMILIARE/MEMBRO_GRUPPO */
+  documentPlaceOfIssue?: string;
   isPrimaryGuest: boolean;
-  travellerType?: string;
+  travellerType?: TravellerType;
   travelPurpose?: string;
 }
 

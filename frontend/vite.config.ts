@@ -26,10 +26,6 @@ export default defineConfig({
         target: 'http://localhost:8087',
         changeOrigin: true
       },
-      '/api/v1/fb': {
-        target: 'http://localhost:8086',
-        changeOrigin: true
-      },
       // Fallback for an API Gateway or default port
       '/api': {
         target: 'http://localhost:8080',

@@ -1,5 +1,13 @@
 import api from './api';
-import type { HotelSettingsRequest, HotelSettingsResponse, StayRequest, StayResponse } from '../types/stay.types';
+import type {
+  AlloggiatiComune,
+  AlloggiatiStato,
+  AlloggiatiTipdoc,
+  HotelSettingsRequest,
+  HotelSettingsResponse,
+  StayRequest,
+  StayResponse,
+} from '../types/stay.types';
 import type { SpringPage } from '../types/page.types';
 
 const BASE_PATH = '/api/v1/stays';
@@ -78,5 +86,22 @@ export const stayService = {
     link.download = `alloggiati-${date}.json`;
     link.click();
     URL.revokeObjectURL(url);
+  },
+
+  getLookupStati: async (): Promise<AlloggiatiStato[]> => {
+    const response = await api.get<AlloggiatiStato[]>(`${BASE_PATH}/lookup/stati`);
+    return response.data;
+  },
+
+  searchLookupComuni: async (q: string, provincia?: string): Promise<AlloggiatiComune[]> => {
+    const response = await api.get<AlloggiatiComune[]>(`${BASE_PATH}/lookup/comuni`, {
+      params: { q, provincia },
+    });
+    return response.data;
+  },
+
+  getLookupTipdoc: async (): Promise<AlloggiatiTipdoc[]> => {
+    const response = await api.get<AlloggiatiTipdoc[]>(`${BASE_PATH}/lookup/tipdoc`);
+    return response.data;
   },
 };
