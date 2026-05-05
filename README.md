@@ -2,7 +2,6 @@
 
 An enterprise-grade, microservices-based **Hotel Property Management System**.  
 This platform orchestrates hotel operations — from reservations and guest management to food & beverage point-of-sale, billing, and housekeeping — powered by a modern React frontend and a highly scalable Spring Boot backend ecosystem.
-
 ---
 
 ## Tech Stack
