@@ -68,6 +68,15 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
 
+    // --- CSV parsing for Alloggiati Web lookup table downloads ---
+    // 1.9.0 is the last release that requires only commons-io < 2.15
+    // (avoids UnsynchronizedBufferedReader which is absent from forced commons-io:2.14.0)
+    implementation("org.apache.commons:commons-csv:1.9.0")
+
+    // --- In-memory caching (Caffeine, version managed by Spring Boot BOM) ---
+    implementation("org.springframework.boot:spring-boot-starter-cache")
+    implementation("com.github.ben-manes.caffeine:caffeine")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("net.bytebuddy:byte-buddy:1.15.11")
     testImplementation("net.bytebuddy:byte-buddy-agent:1.15.11")
