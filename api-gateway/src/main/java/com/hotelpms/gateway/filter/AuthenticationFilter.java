@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -20,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Set;
 
 /**
  * Reactive Authentication Filter for validating JWTs and applying headers.
@@ -51,6 +53,44 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
     private static final String HEADER_HOTEL = "X-Auth-Hotel";
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
+
+    // -----------------------------------------------------------------------
+    // RBAC configuration
+    // -----------------------------------------------------------------------
+
+    /** Roles allowed to perform any authenticated operation. */
+    private static final Set<String> OPERATIONAL_ROLES = Set.of("ADMIN", "OWNER", "RECEPTIONIST");
+
+    /** Roles allowed to perform administrative write operations. */
+    private static final Set<String> ADMIN_OWNER_ROLES = Set.of("ADMIN", "OWNER");
+
+    /**
+     * Path prefixes whose write operations (POST/PUT/PATCH/DELETE) are restricted to
+     * ADMIN and OWNER. GET is permitted for RECEPTIONIST (e.g. room selection
+     * during check-in).
+     */
+    private static final Set<String> WRITE_RESTRICTED_PREFIXES = Set.of(
+            "/api/v1/room-types"
+    );
+
+    /**
+     * Path prefixes fully restricted to ADMIN/OWNER for ALL HTTP methods.
+     * RECEPTIONIST cannot access these paths even with GET.
+     */
+    private static final Set<String> FULLY_RESTRICTED_PREFIXES = Set.of(
+            "/api/v1/reports"
+    );
+
+    /**
+     * Full paths restricted to ADMIN/OWNER regardless of HTTP method (room
+     * structural management; PUT on rooms replaces the full room definition).
+     */
+    private static final Set<HttpMethod> ROOM_ADMIN_METHODS = Set.of(
+            HttpMethod.POST, HttpMethod.PUT, HttpMethod.DELETE
+    );
+
+    /** Path prefix for user management — always restricted to ADMIN/OWNER. */
+    private static final String USERS_PATH_PREFIX = "/api/v1/auth/users";
 
     private final JwtUtil jwtUtil;
     private final String hmacSecret;
@@ -105,10 +145,13 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                 return this.onError(exchange, "JWT missing hotelId claim", HttpStatus.UNAUTHORIZED);
             }
 
+            // RBAC enforcement — runs before the request is forwarded
+            if (!isAccessAllowed(role, request.getPath().value(), request.getMethod())) {
+                return this.onError(exchange, "ACCESS_DENIED", HttpStatus.FORBIDDEN);
+            }
+
             final String signature = computeHmac(username, role, hotelId);
 
-            // Inline della variabile modifiedRequest per evitare declaration + immediate
-            // return (code smell)
             return chain.filter(exchange.mutate()
                     .request(request.mutate()
                             .header(HEADER_USER, username)
@@ -159,6 +202,49 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
         } catch (final JwtException | IllegalArgumentException e) {
             return null;
         }
+    }
+
+    /**
+     * Enforces the RBAC policy for the given role, request path, and HTTP method.
+     *
+     * <p>Rules:
+     * <ul>
+     *   <li>GUEST — no access to any authenticated API.</li>
+     *   <li>RECEPTIONIST — cannot perform write operations on room-types or financial
+     *       reports, cannot create/delete rooms, cannot access user management.</li>
+     *   <li>ADMIN / OWNER — full access.</li>
+     * </ul>
+     *
+     * @param role   the authenticated user's role (from JWT)
+     * @param path   the request URI path
+     * @param method the HTTP method
+     * @return {@code true} if the request is permitted, {@code false} otherwise
+     */
+    private static boolean isAccessAllowed(final String role, final String path, final HttpMethod method) {
+        if (role == null || !OPERATIONAL_ROLES.contains(role)) {
+            return false;
+        }
+        if (ADMIN_OWNER_ROLES.contains(role)) {
+            return true;
+        }
+        // RECEPTIONIST checks
+        if (path.startsWith(USERS_PATH_PREFIX)) {
+            return false;
+        }
+        if (path.startsWith("/api/v1/rooms") && ROOM_ADMIN_METHODS.contains(method)) {
+            return false;
+        }
+        for (final String prefix : FULLY_RESTRICTED_PREFIXES) {
+            if (path.startsWith(prefix)) {
+                return false;
+            }
+        }
+        for (final String prefix : WRITE_RESTRICTED_PREFIXES) {
+            if (path.startsWith(prefix) && method != HttpMethod.GET) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private Mono<Void> onError(final ServerWebExchange exchange, final String err, final HttpStatus httpStatus) {
