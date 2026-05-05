@@ -65,27 +65,11 @@ public class StayServiceImpl implements StayService {
     public StayResponse checkIn(final StayRequest request) {
         log.info("Processing check-in for reservation: {}", request.reservationId());
 
-        try {
-            log.debug("Validating guest ID: {}", request.guestId());
-            guestClient.getGuestById(request.guestId());
-
-            log.debug("Validating reservation ID: {}", request.reservationId());
-            final ReservationResponse reservation = reservationClient.getReservationById(request.reservationId());
-            if (!CHECKIN_ALLOWED_STATUSES.contains(reservation.status())) {
-                log.warn("[STAY] CHECK_IN_FAILED | reservationId={} | reason=INVALID_RESERVATION_STATUS | currentStatus={}",
-                        request.reservationId(), reservation.status());
-                throw new IllegalStateException("INVALID_RESERVATION_STATUS");
-            }
-
-            log.debug("Validating room ID: {}", request.roomId());
-            inventoryClient.getRoomById(request.roomId());
-        } catch (final feign.FeignException ex) {
-            log.warn("[STAY] CHECK_IN_FAILED | reservationId={} | reason=EXTERNAL_SERVICE_UNAVAILABLE | detail={}",
-                    request.reservationId(), ex.getMessage());
-            throw new ExternalServiceException("EXTERNAL_SERVICE_UNAVAILABLE: " + ex.getMessage(), ex);
-        }
+        final LocalDate expectedCheckOutDate = validateAndGetCheckOutDate(
+                request.reservationId(), request.guestId(), request.roomId());
 
         final Stay newStay = stayMapper.toEntity(request);
+        newStay.setExpectedCheckOutDate(expectedCheckOutDate);
 
         if (newStay.getGuests() != null) {
             newStay.getGuests().forEach(guest -> guest.setStay(newStay));
@@ -209,6 +193,41 @@ public class StayServiceImpl implements StayService {
         return stayRepository
                 .findTopByGuestIdAndStatusOrderByActualCheckInTimeDesc(guestId, StayStatus.CHECKED_OUT)
                 .map(stayMapper::toDto);
+    }
+
+    /**
+     * Validates the guest, reservation (status must be in {@code CHECKIN_ALLOWED_STATUSES}),
+     * and room via external services, then returns the reservation's expected check-out date.
+     * Wraps any {@link feign.FeignException} in an {@link ExternalServiceException}.
+     *
+     * @param reservationId the reservation to validate
+     * @param guestId       the guest to validate
+     * @param roomId        the room to validate
+     * @return the reservation's check-out date (may be {@code null} if not set)
+     */
+    private LocalDate validateAndGetCheckOutDate(
+            final UUID reservationId, final UUID guestId, final UUID roomId) {
+        try {
+            log.debug("Validating guest ID: {}", guestId);
+            guestClient.getGuestById(guestId);
+
+            log.debug("Validating reservation ID: {}", reservationId);
+            final ReservationResponse reservation = reservationClient.getReservationById(reservationId);
+            if (!CHECKIN_ALLOWED_STATUSES.contains(reservation.status())) {
+                log.warn("[STAY] CHECK_IN_FAILED | reservationId={} | reason=INVALID_RESERVATION_STATUS | currentStatus={}",
+                        reservationId, reservation.status());
+                throw new IllegalStateException("INVALID_RESERVATION_STATUS");
+            }
+
+            log.debug("Validating room ID: {}", roomId);
+            inventoryClient.getRoomById(roomId);
+
+            return reservation.checkOutDate();
+        } catch (final feign.FeignException ex) {
+            log.warn("[STAY] CHECK_IN_FAILED | reservationId={} | reason=EXTERNAL_SERVICE_UNAVAILABLE | detail={}",
+                    reservationId, ex.getMessage());
+            throw new ExternalServiceException("EXTERNAL_SERVICE_UNAVAILABLE: " + ex.getMessage(), ex);
+        }
     }
 
     private void sendAlloggiatiIfEnabled(final Stay stay) {
