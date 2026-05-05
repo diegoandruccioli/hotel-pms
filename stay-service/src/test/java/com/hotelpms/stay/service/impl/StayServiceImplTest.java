@@ -144,7 +144,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
         when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
@@ -181,7 +181,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null, null));
         final feign.FeignException feignEx = org.mockito.Mockito.mock(feign.FeignException.class);
         when(feignEx.getMessage()).thenReturn("Inventory Service is unavailable.");
         when(inventoryClient.getRoomById(room)).thenThrow(feignEx);
@@ -208,7 +208,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
         when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
@@ -250,7 +250,7 @@ class StayServiceImplTest {
         final List<ReservationLineItemResponse> lineItems = List.of(lineItem1, lineItem2);
 
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, lineItems));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, lineItems, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
         when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
@@ -297,7 +297,7 @@ class StayServiceImplTest {
         final List<ReservationLineItemResponse> lineItems = List.of(lineItem1);
 
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, lineItems));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, lineItems, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
         when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
@@ -426,7 +426,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CANCELLED, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CANCELLED, null, null));
 
         // Act & Assert
         assertThrows(IllegalStateException.class, () -> stayService.checkIn(request));
@@ -444,7 +444,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CHECKED_OUT, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CHECKED_OUT, null, null));
 
         // Act & Assert
         assertThrows(IllegalStateException.class, () -> stayService.checkIn(request));
@@ -462,7 +462,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_NO_SHOW, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_NO_SHOW, null, null));
 
         // Act & Assert
         assertThrows(IllegalStateException.class, () -> stayService.checkIn(request));
@@ -482,7 +482,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_PARTIALLY_CHECKED_IN, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_PARTIALLY_CHECKED_IN, null, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
         when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
@@ -514,7 +514,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
         when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
@@ -559,7 +559,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
         when(stayMapper.toEntity(request)).thenReturn(new Stay());
@@ -596,7 +596,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
         when(stayMapper.toEntity(request)).thenReturn(new Stay());
@@ -632,7 +632,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
         when(stayMapper.toEntity(request)).thenReturn(new Stay());
@@ -662,7 +662,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
         when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
@@ -694,7 +694,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
         when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
@@ -722,7 +722,7 @@ class StayServiceImplTest {
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(reservationClient.getReservationById(reservation))
-                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null));
+                .thenReturn(new ReservationResponse(reservation, guest, room, STATUS_CONFIRMED, null, null));
         when(inventoryClient.getRoomById(room))
                 .thenReturn(new RoomResponse(room, ROOM_NUMBER_101, ROOM_STATUS_AVAILABLE));
         when(inventoryClient.updateRoomStatus(room, ROOM_STATUS_OCCUPIED))
