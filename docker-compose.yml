@@ -403,8 +403,11 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       # T-STAY-03: PS portal credentials — real values injected via .env in production
+      # Obtain WsKey from: portal login -> account icon -> "Chiave Web Service"
       - ALLOGGIATI_USERNAME=${ALLOGGIATI_USERNAME:-ci_placeholder_user}
       - ALLOGGIATI_PASSWORD=${ALLOGGIATI_PASSWORD:-ci_placeholder_password}
+      - ALLOGGIATI_WS_KEY=${ALLOGGIATI_WS_KEY:-ci_placeholder_wskey}
+      - ALLOGGIATI_DRY_RUN=${ALLOGGIATI_DRY_RUN:-true}
       - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
