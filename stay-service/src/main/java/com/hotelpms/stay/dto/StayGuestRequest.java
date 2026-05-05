@@ -28,9 +28,9 @@ public record StayGuestRequest(
         @NotNull(message = "Date of birth is required") LocalDate dateOfBirth,
         @NotBlank(message = "Place of birth is required") String placeOfBirth,
         @NotBlank(message = "Citizenship is required") String citizenship,
-        @NotBlank(message = "Document type is required") String documentType,
-        @NotBlank(message = "Document number is required") String documentNumber,
-        @NotBlank(message = "Document place of issue is required") String documentPlaceOfIssue,
+        String documentType,
+        String documentNumber,
+        String documentPlaceOfIssue,
         boolean isPrimaryGuest,
         TravellerType travellerType,
         String travelPurpose

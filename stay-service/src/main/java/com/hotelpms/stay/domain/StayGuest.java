@@ -66,13 +66,16 @@ public class StayGuest {
     @Column(name = "citizenship", nullable = false)
     private String citizenship;
 
-    @Column(name = "document_type", nullable = false)
+    /** Nullable for FAMILIARE/MEMBRO_GRUPPO (TIPALLOG 19/20) per tracciato rules. */
+    @Column(name = "document_type")
     private String documentType;
 
-    @Column(name = "document_number", nullable = false)
+    /** Nullable for FAMILIARE/MEMBRO_GRUPPO (TIPALLOG 19/20) per tracciato rules. */
+    @Column(name = "document_number")
     private String documentNumber;
 
-    @Column(name = "document_place_of_issue", nullable = false)
+    /** Nullable for FAMILIARE/MEMBRO_GRUPPO (TIPALLOG 19/20) per tracciato rules. */
+    @Column(name = "document_place_of_issue")
     private String documentPlaceOfIssue;
 
     @Column(name = "is_primary_guest", nullable = false)

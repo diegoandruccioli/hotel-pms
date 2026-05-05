@@ -19,6 +19,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -130,6 +131,14 @@ public class Stay {
      */
     @Column(name = "alloggiati_sent", nullable = false)
     private boolean alloggiatiSent;
+
+    /**
+     * Expected check-out date sourced from the reservation at check-in time.
+     * Used to calculate the {@code permanenza} (number of nights) in the Alloggiati tracciato.
+     * May be {@code null} for stays created before this feature was introduced.
+     */
+    @Column(name = "expected_check_out_date")
+    private LocalDate expectedCheckOutDate;
 
     /**
      * The list of guests staying in this room.
