@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -54,6 +55,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtService jwtService;
+    private final com.hotelpms.auth.repository.UserAccountRepository userRepository;
 
     /**
      * Endpoint for user registration.
@@ -78,13 +80,18 @@ public class AuthController {
 
     /**
      * Endpoint for user login.
+     * Returns a body with {@code mustChangePassword} so the SPA can immediately
+     * redirect to the change-password page when the flag is set.
      *
      * @param request the login request
-     * @return HTTP 200 with access and refresh cookies
+     * @return HTTP 200 with access and refresh cookies and a JSON body
      */
     @PostMapping("/login")
-    public ResponseEntity<Void> login(@NonNull final @Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<Map<String, Object>> login(@NonNull final @Valid @RequestBody LoginRequest request) {
         final AuthResponse response = authService.login(request);
+
+        final Map<String, Object> body = new LinkedHashMap<>();
+        body.put("mustChangePassword", response.mustChangePassword());
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE,
@@ -94,7 +101,7 @@ public class AuthController {
                                 REFRESH_COOKIE_MAX_AGE, REFRESH_COOKIE_PATH).toString())
                 .header(HttpHeaders.SET_COOKIE,
                         createCsrfCookie(UUID.randomUUID().toString(), ACCESS_COOKIE_MAX_AGE).toString())
-                .build();
+                .body(body);
     }
 
     /**
@@ -219,7 +226,7 @@ public class AuthController {
      * @return the user payload, or HTTP 401 if the token is absent or invalid
      */
     @GetMapping("/me")
-    public ResponseEntity<Map<String, String>> getMe(
+    public ResponseEntity<Map<String, Object>> getMe(
             @CookieValue(name = "jwt", required = false) final String token) {
         if (token == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -232,10 +239,15 @@ public class AuthController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
 
-            return ResponseEntity.ok(Map.of(
-                    "sub", username,
-                    "username", username,
-                    "role", role));
+            final boolean mustChange = userRepository.findByUsername(username)
+                    .map(com.hotelpms.auth.domain.UserAccount::isMustChangePassword)
+                    .orElse(false);
+            final Map<String, Object> meBody = new LinkedHashMap<>();
+            meBody.put("sub", username);
+            meBody.put("username", username);
+            meBody.put("role", role);
+            meBody.put("mustChangePassword", mustChange);
+            return ResponseEntity.ok(meBody);
         } catch (final JwtException | IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }

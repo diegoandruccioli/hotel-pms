@@ -46,7 +46,7 @@ describe('Login Component', () => {
   });
 
   it('handles successful login', async () => {
-    vi.mocked(authService.login).mockResolvedValueOnce(undefined);
+    vi.mocked(authService.login).mockResolvedValueOnce({ mustChangePassword: false });
     vi.mocked(authService.fetchMe).mockResolvedValueOnce({
       sub: 'user',
       username: 'testuser',

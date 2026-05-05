@@ -79,7 +79,7 @@ public class AuthServiceImpl implements AuthService {
                 user.getHotelId(), user.getTokenVersion());
         final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole(),
                 user.getHotelId(), user.getTokenVersion());
-        return new AuthResponse(accessToken, refreshToken);
+        return new AuthResponse(accessToken, refreshToken, user.isMustChangePassword());
     }
 
     /**
@@ -142,12 +142,13 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenService.storeTokenVersion(user.getUsername(), user.getTokenVersion(),
                 REFRESH_TOKEN_TTL);
 
-        log.info("[AUTH] LOGIN_SUCCESS | user={}", user.getUsername());
+        log.info("[AUTH] LOGIN_SUCCESS | user={} | mustChangePassword={}", user.getUsername(),
+                user.isMustChangePassword());
         final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole(),
                 user.getHotelId(), user.getTokenVersion());
         final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole(),
                 user.getHotelId(), user.getTokenVersion());
-        return new AuthResponse(accessToken, refreshToken);
+        return new AuthResponse(accessToken, refreshToken, user.isMustChangePassword());
     }
 
     /**
@@ -199,7 +200,7 @@ public class AuthServiceImpl implements AuthService {
                 user.getHotelId(), user.getTokenVersion());
         final String newRefreshToken = jwtService.generateRefreshToken(username, user.getRole(),
                 user.getHotelId(), user.getTokenVersion());
-        return new AuthResponse(newAccessToken, newRefreshToken);
+        return new AuthResponse(newAccessToken, newRefreshToken, user.isMustChangePassword());
     }
 
     /**
@@ -240,6 +241,7 @@ public class AuthServiceImpl implements AuthService {
 
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         user.setTokenVersion(user.getTokenVersion() + 1);
+        user.setMustChangePassword(false);
         userRepository.save(user);
 
         // Overwrite Redis key with the new version to invalidate all previously issued tokens
@@ -252,7 +254,7 @@ public class AuthServiceImpl implements AuthService {
                 user.getHotelId(), user.getTokenVersion());
         final String refreshToken = jwtService.generateRefreshToken(username, user.getRole(),
                 user.getHotelId(), user.getTokenVersion());
-        return new AuthResponse(accessToken, refreshToken);
+        return new AuthResponse(accessToken, refreshToken, false);
     }
 
     /**

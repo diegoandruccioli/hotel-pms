@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
@@ -12,6 +12,8 @@ import { MaterialIcon } from '../components/MaterialIcon';
 export const Profile = () => {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
+  const location = useLocation();
+  const mustChangePassword = (location.state as { mustChangePassword?: boolean } | null)?.mustChangePassword === true;
   const { user, logout } = useAuthStore();
   const { addToast } = useToastStore();
 
@@ -102,6 +104,14 @@ export const Profile = () => {
           </div>
         </div>
       </M3Card>
+
+      {/* Must-change-password banner */}
+      {mustChangePassword && (
+        <div role="alert" className="flex items-start gap-3 rounded-2xl bg-warning-container text-on-warning-container px-4 py-3 text-sm font-medium">
+          <MaterialIcon name="warning" size={18} className="mt-0.5 flex-shrink-0" />
+          {t('must_change_password_banner', 'You must change your password before continuing.')}
+        </div>
+      )}
 
       {/* Change Password */}
       <M3Card className="p-6">

@@ -65,6 +65,14 @@ public class UserAccount {
     private boolean active = true;
 
     /**
+     * When {@code true} the user must change their password before using the system.
+     * Set automatically for admin-created accounts and for the default seeded ADMIN.
+     * Default is {@code false}: users who self-register are not forced to change.
+     */
+    @Column(nullable = false)
+    private boolean mustChangePassword;
+
+    /**
      * Monotonically incrementing counter embedded in the JWT {@code tv} claim.
      *
      * <p>Incrementing this value (on password change) invalidates all previously
