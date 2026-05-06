@@ -81,7 +81,7 @@ class HotelSettingsServiceImplTest {
         when(hotelSettingsRepository.save(existing)).thenReturn(existing);
 
         final HotelSettingsResponse result =
-                hotelSettingsService.update(hotelId, new HotelSettingsRequest(true));
+                hotelSettingsService.update(hotelId, new HotelSettingsRequest(true, null, null, null, null, null));
 
         assertNotNull(result);
         assertTrue(Objects.requireNonNull(result).alloggiatiAutoSend());
@@ -103,7 +103,7 @@ class HotelSettingsServiceImplTest {
         when(hotelSettingsRepository.save(Objects.requireNonNull(expectedArg))).thenReturn(Objects.requireNonNull(created));
 
         final HotelSettingsResponse result =
-                hotelSettingsService.update(hotelId, new HotelSettingsRequest(true));
+                hotelSettingsService.update(hotelId, new HotelSettingsRequest(true, null, null, null, null, null));
 
         assertNotNull(result);
         assertTrue(result.alloggiatiAutoSend());

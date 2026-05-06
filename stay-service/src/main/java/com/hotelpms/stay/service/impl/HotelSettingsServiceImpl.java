@@ -26,7 +26,7 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
     @Transactional
     public HotelSettingsResponse getOrCreate(final UUID hotelId) {
         return hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))
-                .map(this::toResponse)
+                .map(HotelSettingsServiceImpl::toResponse)
                 .orElseGet(() -> toResponse(createDefault(hotelId)));
     }
 
@@ -37,6 +37,11 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
         final HotelSettings settings = hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))
                 .orElseGet(() -> buildDefault(hotelId));
         settings.setAlloggiatiAutoSend(request.alloggiatiAutoSend());
+        settings.setHotelName(request.hotelName());
+        settings.setAddress(request.address());
+        settings.setVatNumber(request.vatNumber());
+        settings.setFiscalCode(request.fiscalCode());
+        settings.setLogoUrl(request.logoUrl());
         return toResponse(hotelSettingsRepository.save(settings));
     }
 
@@ -50,7 +55,14 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
         return defaults;
     }
 
-    private HotelSettingsResponse toResponse(final HotelSettings entity) {
-        return new HotelSettingsResponse(entity.getHotelId(), entity.isAlloggiatiAutoSend());
+    private static HotelSettingsResponse toResponse(final HotelSettings entity) {
+        return new HotelSettingsResponse(
+                entity.getHotelId(),
+                entity.isAlloggiatiAutoSend(),
+                entity.getHotelName(),
+                entity.getAddress(),
+                entity.getVatNumber(),
+                entity.getFiscalCode(),
+                entity.getLogoUrl());
     }
 }

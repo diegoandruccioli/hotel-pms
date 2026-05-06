@@ -16,6 +16,7 @@ const ReservationForm = lazy(() => import('./pages/Reservations/ReservationForm'
 const CheckInForm = lazy(() => import('./pages/Stays/CheckInForm').then((m) => ({ default: m.CheckInForm })));
 const WalkInCheckInForm = lazy(() => import('./pages/Stays/WalkInCheckInForm').then((m) => ({ default: m.WalkInCheckInForm })));
 const AdminUsers = lazy(() => import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })));
+const HotelProfile = lazy(() => import('./pages/HotelProfile').then((m) => ({ default: m.HotelProfile })));
 const Stays = lazy(() => import('./pages/Stays').then((m) => ({ default: m.Stays })));
 const Billing = lazy(() => import('./pages/Billing').then((m) => ({ default: m.Billing })));
 const Restaurant = lazy(() => import('./pages/Restaurant').then((m) => ({ default: m.Restaurant })));
@@ -90,6 +91,7 @@ function App() {
               <Route element={<ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />}>
                 <Route path="/owner-dashboard" element={<OwnerDashboard />} />
                 <Route path="/admin/users" element={<AdminUsers />} />
+                <Route path="/profile/hotel" element={<HotelProfile />} />
               </Route>
             </Route>
           </Route>

@@ -28,6 +28,11 @@ import java.util.UUID;
 @EntityListeners(AuditingEntityListener.class)
 public class HotelSettings {
 
+    private static final int LEN_HOTEL_NAME = 150;
+    private static final int LEN_ADDRESS = 200;
+    private static final int LEN_FISCAL = 20;
+    private static final int LEN_LOGO_URL = 500;
+
     /** The hotel this settings row belongs to (primary key). */
     @Id
     @Column(name = "hotel_id")
@@ -39,6 +44,26 @@ public class HotelSettings {
      */
     @Column(name = "alloggiati_auto_send", nullable = false)
     private boolean alloggiatiAutoSend;
+
+    /** Display name of the hotel property (e.g. "Hotel Bella Vista"). */
+    @Column(name = "hotel_name", length = LEN_HOTEL_NAME)
+    private String hotelName;
+
+    /** Street address including civic number (e.g. "Via Roma 12"). */
+    @Column(name = "address", length = LEN_ADDRESS)
+    private String address;
+
+    /** Partita IVA — Italian VAT number (11 digits). */
+    @Column(name = "vat_number", length = LEN_FISCAL)
+    private String vatNumber;
+
+    /** Codice Fiscale — Italian fiscal code. */
+    @Column(name = "fiscal_code", length = LEN_FISCAL)
+    private String fiscalCode;
+
+    /** Optional URL of the hotel logo image. */
+    @Column(name = "logo_url", length = LEN_LOGO_URL)
+    private String logoUrl;
 
     /** The timestamp when the record was created. */
     @CreatedDate

@@ -103,9 +103,19 @@ export interface StayResponse {
 
 export interface HotelSettingsRequest {
   alloggiatiAutoSend: boolean;
+  hotelName?: string;
+  address?: string;
+  vatNumber?: string;
+  fiscalCode?: string;
+  logoUrl?: string;
 }
 
 export interface HotelSettingsResponse {
   hotelId: string;
   alloggiatiAutoSend: boolean;
+  hotelName?: string | null;
+  address?: string | null;
+  vatNumber?: string | null;
+  fiscalCode?: string | null;
+  logoUrl?: string | null;
 }

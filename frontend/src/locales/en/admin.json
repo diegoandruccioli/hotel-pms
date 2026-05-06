@@ -31,5 +31,20 @@
   "err_load_failed": "Failed to load users",
   "err_create_failed": "Failed to create user",
   "err_toggle_failed": "Operation failed",
-  "err_all_fields_required": "All fields are required"
+  "err_all_fields_required": "All fields are required",
+  "hotel_profile_title": "Hotel Profile",
+  "hotel_profile_subtitle": "Name, address and fiscal information shown on invoices",
+  "label_hotel_name": "Hotel Name",
+  "label_hotel_address": "Address",
+  "label_vat_number": "VAT Number (P.IVA)",
+  "label_fiscal_code": "Fiscal Code (C.F.)",
+  "label_logo_url": "Logo URL (optional)",
+  "placeholder_hotel_name": "e.g. Hotel Bella Vista",
+  "placeholder_address": "e.g. Via Roma 12, 00100 Roma RM",
+  "placeholder_vat_number": "11 digits",
+  "placeholder_fiscal_code": "16 alphanumeric characters",
+  "placeholder_logo_url": "https://...",
+  "btn_save_profile": "Save Profile",
+  "toast_profile_saved": "Hotel profile saved",
+  "err_profile_save": "Failed to save hotel profile"
 }
