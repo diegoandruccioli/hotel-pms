@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <!--
   GAP-4: Audit-log aggregation — Loki appender attivo solo nel profilo Docker
   (SPRING_PROFILES_ACTIVE=stay-service).  In test e sviluppo locale resta solo
@@ -17,7 +17,7 @@
   <!-- ── ConsoleAppender (sempre attivo) ──────────────────────────────────── -->
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
-      <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n</pattern>
       <charset>UTF-8</charset>
     </encoder>
   </appender>

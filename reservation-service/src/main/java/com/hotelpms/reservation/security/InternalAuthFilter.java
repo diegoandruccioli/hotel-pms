@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.slf4j.MDC;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -59,6 +60,7 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
     private static final String HEADER_HOTEL = "X-Auth-Hotel";
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
 
     private final String hmacSecret;
 
@@ -112,7 +114,15 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
         auth.setDetails(hotelId);
 
         SecurityContextHolder.getContext().setAuthentication(auth);
-        filterChain.doFilter(request, response);
+        final String correlationId = request.getHeader(CORRELATION_ID_HEADER);
+        if (correlationId != null) {
+            MDC.put("correlationId", correlationId);
+        }
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            MDC.remove("correlationId");
+        }
     }
 
     /**

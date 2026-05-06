@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -35,6 +36,7 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
     private static final String HEADER_HOTEL = "X-Auth-Hotel";
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
 
     private final String hmacSecret;
 
@@ -69,8 +71,15 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
                 username, "", List.of(new SimpleGrantedAuthority("ROLE_" + role)));
         auth.setDetails(hotelId);
         SecurityContextHolder.getContext().setAuthentication(auth);
-
-        chain.doFilter(request, response);
+        final String correlationId = request.getHeader(CORRELATION_ID_HEADER);
+        if (correlationId != null) {
+            MDC.put("correlationId", correlationId);
+        }
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            MDC.remove("correlationId");
+        }
     }
 
     private String computeHmac(final String username, final String role, final String hotelId) {
