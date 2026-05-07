@@ -91,6 +91,7 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
             <button
               onClick={onClose}
               type="button"
+              aria-label={t('close')}
               className="w-10 h-10 flex items-center justify-center rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none"
             >
               <MaterialIcon name="close" size={20} />
