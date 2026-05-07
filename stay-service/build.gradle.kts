@@ -69,8 +69,18 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql")
 
     // --- CSV parsing for Alloggiati Web lookup table downloads ---
-    // 1.9.0 is the last release that requires only commons-io < 2.15
-    // (avoids UnsynchronizedBufferedReader which is absent from forced commons-io:2.14.0)
+    // PINNED at 1.9.0 — DO NOT upgrade to 1.10.0+ without verifying commons-io compatibility.
+    //
+    // Root cause: commons-csv 1.10.0 introduced a dependency on commons-io >= 2.15.0, which
+    // added UnsynchronizedBufferedReader. This project forces commons-io at 2.14.0 across all
+    // services (see dependencyManagement below) to address CVE-2024-47554. Upgrading commons-csv
+    // while commons-io remains at 2.14.0 causes a NoClassDefFoundError at runtime inside
+    // AlloggiatiCsvParser when parsing the PS lookup tables (stati, comuni, tipdoc).
+    //
+    // To safely upgrade: first confirm that the Spring Boot BOM has absorbed commons-io >= 2.15
+    // (check the BOM release notes for the Spring Boot version in use), then update both
+    // commons-csv and the forced commons-io version together in all dependencyManagement blocks.
+    // Dependabot is configured to ignore commons-csv >= 1.10 (.github/dependabot.yml).
     implementation("org.apache.commons:commons-csv:1.9.0")
 
     // --- In-memory caching (Caffeine, version managed by Spring Boot BOM) ---
