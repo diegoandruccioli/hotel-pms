@@ -50,7 +50,7 @@ public class Room {
     @Setter(AccessLevel.NONE)
     private UUID id;
 
-    @Column(name = "hotel_id")
+    @Column(name = "hotel_id", nullable = false)
     private UUID hotelId;
 
     @Column(nullable = false, unique = true, length = MAX_ROOM_NUMBER_LENGTH)

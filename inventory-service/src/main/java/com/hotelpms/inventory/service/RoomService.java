@@ -22,12 +22,13 @@ public interface RoomService {
     RoomResponse createRoom(RoomRequest request);
 
     /**
-     * Gets a room by id.
+     * Gets a room by id scoped to the authenticated hotel.
      *
-     * @param id the id
+     * @param id      the room UUID
+     * @param hotelId the hotel UUID (from the authenticated user's JWT)
      * @return the response
      */
-    RoomResponse getRoomById(UUID id);
+    RoomResponse getRoomById(UUID id, UUID hotelId);
 
     /**
      * Gets a paginated list of all active rooms.
@@ -38,27 +39,30 @@ public interface RoomService {
     Page<RoomResponse> getAllRooms(Pageable pageable);
 
     /**
-     * Updates a room.
+     * Updates a room scoped to the authenticated hotel.
      *
-     * @param id      the id
-     * @param request the request
+     * @param id      the room UUID
+     * @param hotelId the hotel UUID (from the authenticated user's JWT)
+     * @param request the update request
      * @return the response
      */
-    RoomResponse updateRoom(UUID id, RoomRequest request);
+    RoomResponse updateRoom(UUID id, UUID hotelId, RoomRequest request);
 
     /**
-     * Updates only the housekeeping status of a room.
+     * Updates only the housekeeping status of a room scoped to the authenticated hotel.
      *
-     * @param id     the room id
-     * @param status the new room status
+     * @param id      the room UUID
+     * @param hotelId the hotel UUID (from the authenticated user's JWT)
+     * @param status  the new room status
      * @return the updated room response
      */
-    RoomResponse updateRoomStatus(UUID id, RoomStatus status);
+    RoomResponse updateRoomStatus(UUID id, UUID hotelId, RoomStatus status);
 
     /**
-     * Deletes a room.
+     * Deletes a room scoped to the authenticated hotel.
      *
-     * @param id the id
+     * @param id      the room UUID
+     * @param hotelId the hotel UUID (from the authenticated user's JWT)
      */
-    void deleteRoom(UUID id);
+    void deleteRoom(UUID id, UUID hotelId);
 }
