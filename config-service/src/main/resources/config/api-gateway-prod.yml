@@ -1,0 +1,10 @@
+# Production overrides for api-gateway
+# Swagger/OpenAPI is disabled in production to prevent exposing
+# the full API surface to unauthenticated users.
+# Activate with: SPRING_PROFILES_ACTIVE=prod
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
