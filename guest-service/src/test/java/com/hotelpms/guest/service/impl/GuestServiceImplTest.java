@@ -2,11 +2,17 @@ package com.hotelpms.guest.service.impl;
 
 import com.hotelpms.guest.client.ReservationClient;
 import com.hotelpms.guest.dto.request.GuestRequest;
+import com.hotelpms.guest.dto.request.IdentityDocumentRequestDTO;
 import com.hotelpms.guest.dto.response.GuestResponse;
+import com.hotelpms.guest.dto.response.IdentityDocumentResponseDTO;
 import com.hotelpms.guest.exception.NotFoundException;
 import com.hotelpms.guest.mapper.GuestMapper;
+import com.hotelpms.guest.mapper.IdentityDocumentMapper;
 import com.hotelpms.guest.model.Guest;
+import com.hotelpms.guest.model.IdentityDocument;
+import com.hotelpms.guest.model.enums.DocumentType;
 import com.hotelpms.guest.repository.GuestRepository;
+import com.hotelpms.guest.repository.IdentityDocumentRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +28,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -32,7 +39,10 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,12 +56,19 @@ class GuestServiceImplTest {
     private static final String TEST_ADDRESS = "123 Main St";
     private static final String TEST_CITY = "Anytown";
     private static final String TEST_COUNTRY = "Country";
+    private static final String DOC_NUMBER = "AB123456";
 
     @Mock
     private GuestRepository guestRepository;
 
     @Mock
+    private IdentityDocumentRepository identityDocumentRepository;
+
+    @Mock
     private GuestMapper guestMapper;
+
+    @Mock
+    private IdentityDocumentMapper identityDocumentMapper;
 
     @Mock
     private ReservationClient reservationClient;
@@ -106,11 +123,10 @@ class GuestServiceImplTest {
                 guest.getCreatedAt(),
                 guest.getUpdatedAt());
 
-        // Provide hotel context that InternalAuthFilter would normally inject
         final Authentication auth = mock(Authentication.class);
-        when(auth.getDetails()).thenReturn(hotelId.toString());
+        lenient().when(auth.getDetails()).thenReturn(hotelId.toString());
         final SecurityContext securityContext = mock(SecurityContext.class);
-        when(securityContext.getAuthentication()).thenReturn(auth);
+        lenient().when(securityContext.getAuthentication()).thenReturn(auth);
         SecurityContextHolder.setContext(securityContext);
     }
 
@@ -170,7 +186,6 @@ class GuestServiceImplTest {
     void shouldReturnNotFoundForGuestBelongingToOtherHotel() {
         final UUID nonNullGuestId = Objects.requireNonNull(guestId);
 
-        // findByIdAndHotelId returns empty when the guest belongs to a different hotel
         when(guestRepository.findByIdAndHotelId(nonNullGuestId, hotelId))
                 .thenReturn(Optional.empty());
 
@@ -178,6 +193,47 @@ class GuestServiceImplTest {
                 () -> guestService.getGuestById(nonNullGuestId));
 
         assertEquals("GUEST_NOT_FOUND", exception.getMessage());
+    }
+
+    @Test
+    void shouldUpdateGuestSuccessfully() {
+        final Guest nonNullGuest = Objects.requireNonNull(guest);
+        final GuestResponse nonNullGuestResponse = Objects.requireNonNull(guestResponse);
+
+        when(guestRepository.findByIdAndHotelId(Objects.requireNonNull(guestId), hotelId))
+                .thenReturn(Optional.of(nonNullGuest));
+        when(guestRepository.save(nonNullGuest)).thenReturn(nonNullGuest);
+        when(guestMapper.toResponse(nonNullGuest)).thenReturn(nonNullGuestResponse);
+
+        final GuestResponse result = guestService.updateGuest(guestId, guestRequest);
+
+        assertNotNull(result);
+        assertEquals(guestId, result.id());
+        verify(guestMapper).updateEntityFromRequest(guestRequest, nonNullGuest);
+        verify(guestRepository).save(nonNullGuest);
+    }
+
+    @Test
+    void shouldThrowNotFoundWhenUpdatingNonExistentGuest() {
+        when(guestRepository.findByIdAndHotelId(Objects.requireNonNull(guestId), hotelId))
+                .thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> guestService.updateGuest(guestId, guestRequest));
+    }
+
+    @Test
+    void shouldReturnAllGuestsPagedSuccessfully() {
+        final Pageable pageable = PageRequest.of(0, 10);
+        final Page<Guest> guestPage = new PageImpl<>(List.of(Objects.requireNonNull(guest)));
+
+        when(guestRepository.findAllByHotelId(hotelId, pageable)).thenReturn(guestPage);
+        when(guestMapper.toResponse(Objects.requireNonNull(guest))).thenReturn(guestResponse);
+
+        final Page<GuestResponse> result = guestService.getAllGuests(pageable);
+
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals(TEST_FIRST_NAME, result.getContent().get(0).firstName());
     }
 
     @Test
@@ -192,6 +248,16 @@ class GuestServiceImplTest {
         guestService.deleteGuest(nonNullGuestId);
 
         verify(guestRepository).delete(nonNullGuest);
+    }
+
+    @Test
+    void shouldThrowWhenGuestHasActiveReservations() {
+        when(guestRepository.findByIdAndHotelId(Objects.requireNonNull(guestId), hotelId))
+                .thenReturn(Optional.of(Objects.requireNonNull(guest)));
+        when(reservationClient.hasActiveReservations(guestId)).thenReturn(true);
+
+        assertThrows(IllegalStateException.class, () -> guestService.deleteGuest(guestId));
+        verify(guestRepository, never()).delete(any());
     }
 
     @Test
@@ -228,5 +294,124 @@ class GuestServiceImplTest {
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
         assertEquals(TEST_FIRST_NAME, result.getContent().get(0).firstName());
+    }
+
+    @Test
+    void shouldReturnGuestsByIds() {
+        final List<UUID> ids = List.of(Objects.requireNonNull(guestId));
+
+        when(guestRepository.findAllByIdInAndHotelId(ids, hotelId))
+                .thenReturn(List.of(Objects.requireNonNull(guest)));
+        when(guestMapper.toResponse(Objects.requireNonNull(guest))).thenReturn(guestResponse);
+
+        final List<GuestResponse> result = guestService.getGuestsByIds(ids);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(TEST_FIRST_NAME, result.get(0).firstName());
+    }
+
+    @Test
+    void shouldReturnEmptyListWhenIdsAreEmpty() {
+        final List<GuestResponse> result = guestService.getGuestsByIds(Collections.emptyList());
+
+        assertNotNull(result);
+        assertEquals(0, result.size());
+        verify(guestRepository, never()).findAllByIdInAndHotelId(any(), any());
+    }
+
+    @Test
+    void shouldAddIdentityDocumentSuccessfully() {
+        final UUID docId = UUID.randomUUID();
+        final IdentityDocumentRequestDTO docRequest = new IdentityDocumentRequestDTO(
+                DocumentType.PASSPORT,
+                DOC_NUMBER,
+                LocalDate.now().minusYears(5),
+                LocalDate.now().plusYears(5),
+                "Italy");
+        final IdentityDocument document = IdentityDocument.builder()
+                .id(docId)
+                .guest(guest)
+                .documentType(DocumentType.PASSPORT)
+                .documentNumber(DOC_NUMBER)
+                .active(true)
+                .build();
+        final IdentityDocumentResponseDTO docResponse = new IdentityDocumentResponseDTO(
+                docId, DocumentType.PASSPORT, DOC_NUMBER,
+                LocalDate.now().minusYears(5), LocalDate.now().plusYears(5),
+                "Italy", null, null);
+
+        when(guestRepository.findByIdAndHotelId(Objects.requireNonNull(guestId), hotelId))
+                .thenReturn(Optional.of(Objects.requireNonNull(guest)));
+        when(identityDocumentMapper.toEntity(docRequest)).thenReturn(document);
+        when(identityDocumentRepository.save(document)).thenReturn(document);
+        when(identityDocumentMapper.toResponse(document)).thenReturn(docResponse);
+
+        final IdentityDocumentResponseDTO result = guestService.addIdentityDocument(guestId, docRequest);
+
+        assertNotNull(result);
+        assertEquals(DOC_NUMBER, result.documentNumber());
+        verify(identityDocumentRepository).save(document);
+    }
+
+    @Test
+    void shouldRemoveIdentityDocumentSuccessfully() {
+        final UUID docId = UUID.randomUUID();
+        final IdentityDocument document = IdentityDocument.builder()
+                .id(docId)
+                .guest(guest)
+                .documentType(DocumentType.PASSPORT)
+                .documentNumber(DOC_NUMBER)
+                .active(true)
+                .build();
+        Objects.requireNonNull(guest).getIdentityDocuments().add(document);
+
+        when(guestRepository.findByIdAndHotelId(Objects.requireNonNull(guestId), hotelId))
+                .thenReturn(Optional.of(Objects.requireNonNull(guest)));
+        when(identityDocumentRepository.findById(docId)).thenReturn(Optional.of(document));
+
+        guestService.removeIdentityDocument(guestId, docId);
+
+        verify(identityDocumentRepository).delete(document);
+        verify(guestRepository).save(Objects.requireNonNull(guest));
+    }
+
+    @Test
+    void shouldThrowNotFoundWhenRemovingNonExistentDocument() {
+        final UUID docId = UUID.randomUUID();
+
+        when(guestRepository.findByIdAndHotelId(Objects.requireNonNull(guestId), hotelId))
+                .thenReturn(Optional.of(Objects.requireNonNull(guest)));
+        when(identityDocumentRepository.findById(docId)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> guestService.removeIdentityDocument(guestId, docId));
+    }
+
+    @Test
+    void shouldThrowIllegalArgumentWhenDocumentBelongsToOtherGuest() {
+        final UUID docId = UUID.randomUUID();
+        final UUID otherGuestId = UUID.randomUUID();
+        final Guest otherGuest = Guest.builder()
+                .id(otherGuestId)
+                .hotelId(hotelId)
+                .firstName("Jane")
+                .lastName("Smith")
+                .email("jane@example.com")
+                .active(true)
+                .build();
+        final IdentityDocument document = IdentityDocument.builder()
+                .id(docId)
+                .guest(otherGuest)
+                .documentType(DocumentType.PASSPORT)
+                .documentNumber("XY999999")
+                .active(true)
+                .build();
+
+        when(guestRepository.findByIdAndHotelId(Objects.requireNonNull(guestId), hotelId))
+                .thenReturn(Optional.of(Objects.requireNonNull(guest)));
+        when(identityDocumentRepository.findById(docId)).thenReturn(Optional.of(document));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> guestService.removeIdentityDocument(guestId, docId));
     }
 }

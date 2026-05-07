@@ -24,6 +24,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import feign.FeignException;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -135,7 +139,6 @@ class ReservationServiceImplTest {
 
     @Test
     void testCreateReservationSuccess() {
-        // Arrange
         final RoomResponse mockRoomResponse = new RoomResponse(roomId, ROOM_NUMBER_101, null, ROOM_STATUS_AVAILABLE,
                 true, null, null);
         final GuestResponse mockGuestResponse =
@@ -146,10 +149,8 @@ class ReservationServiceImplTest {
         when(reservationRepository.save(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
 
-        // Act
         final ReservationResponse result = reservationService.createReservation(request);
 
-        // Assert
         assertNotNull(result);
         assertEquals(GUEST_ID, result.guestId());
         verify(guestClient, times(1)).getGuestById(GUEST_ID);
@@ -159,7 +160,6 @@ class ReservationServiceImplTest {
 
     @Test
     void testCreateReservationSetsDefaultStatusAndActualGuests() {
-        // Arrange
         final ReservationRequest requestWithNullStatus = new ReservationRequest(
                 GUEST_ID,
                 EXPECTED_GUESTS,
@@ -182,21 +182,17 @@ class ReservationServiceImplTest {
                 .thenReturn(entityWithNullStatus);
         when(reservationMapper.toResponse(entityWithNullStatus)).thenReturn(response);
 
-        // Act
         reservationService.createReservation(requestWithNullStatus);
 
-        // Assert
         assertEquals(ReservationStatus.CONFIRMED, entityWithNullStatus.getStatus());
         assertEquals(0, entityWithNullStatus.getActualGuests());
     }
 
     @Test
     void testCreateReservationGuestNotFoundThrowsException() {
-        // Arrange
         final FeignException.NotFound notFoundEx = mock(FeignException.NotFound.class);
         when(guestClient.getGuestById(GUEST_ID)).thenThrow(notFoundEx);
 
-        // Act & Assert
         final BadRequestException ex = assertThrows(
                 BadRequestException.class,
                 () -> reservationService.createReservation(request));
@@ -209,7 +205,6 @@ class ReservationServiceImplTest {
 
     @Test
     void testCreateReservationRoomUnavailableThrowsException() {
-        // Arrange
         final RoomResponse mockRoomResponse = new RoomResponse(roomId, ROOM_NUMBER_101, null, "UNAVAILABLE",
                 true, null, null);
         when(inventoryClient.getRoomById(roomId)).thenReturn(Optional.of(mockRoomResponse));
@@ -217,7 +212,6 @@ class ReservationServiceImplTest {
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
 
-        // Act & Assert
         final ExternalServiceException ex = assertThrows(ExternalServiceException.class,
                 () -> reservationService.createReservation(request));
         assertEquals("ROOM_UNAVAILABLE", ex.getMessage());
@@ -228,14 +222,11 @@ class ReservationServiceImplTest {
 
     @Test
     void testCreateReservationInventoryClientUnavailableThrowsException() {
-        // Arrange: simulate the Resilience4j fallback returning Optional.empty()
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
         when(inventoryClient.getRoomById(roomId)).thenReturn(Optional.empty());
 
-        // Act & Assert: empty Optional → NotFoundException (room not retrievable from
-        // inventory)
         final NotFoundException ex = assertThrows(NotFoundException.class,
                 () -> reservationService.createReservation(request));
         assertEquals("ROOM_NOT_FOUND", ex.getMessage());
@@ -246,43 +237,65 @@ class ReservationServiceImplTest {
 
     @Test
     void testGetReservationByIdSuccess() {
-        // Arrange
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
 
-        // Act
         final ReservationResponse result = reservationService.getReservationById(reservationId);
 
-        // Assert
         assertNotNull(result);
         verify(reservationRepository, times(1)).findByIdAndHotelId(reservationId, HOTEL_ID);
     }
 
     @Test
     void testGetReservationByIdNotFoundThrowsException() {
-        // Arrange
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.empty());
 
-        // Act & Assert
         assertThrows(NotFoundException.class, () -> reservationService.getReservationById(reservationId));
         verify(reservationRepository, times(1)).findByIdAndHotelId(reservationId, HOTEL_ID);
     }
 
     @Test
     void testGetReservationByIdCrossHotelReturnsNotFound() {
-        // Arrange: reservation exists but belongs to a different hotel (IDOR check)
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.empty());
 
-        // Act & Assert
         assertThrows(NotFoundException.class, () -> reservationService.getReservationById(reservationId));
     }
 
     @Test
+    void testGetAllReservationsSuccess() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        final Page<Reservation> reservationPage = new PageImpl<>(List.of(entity), pageable, 1L);
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+
+        when(reservationRepository.findAllByHotelId(HOTEL_ID, pageable)).thenReturn(reservationPage);
+        when(guestClient.getGuestsBatch(List.of(GUEST_ID))).thenReturn(List.of(mockGuestResponse));
+        when(reservationMapper.toResponse(entity)).thenReturn(response);
+
+        final Page<ReservationResponse> result = reservationService.getAllReservations(pageable);
+
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+    }
+
+    @Test
+    void testGetAllReservationsEmpty() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        final Page<Reservation> emptyPage = Page.empty(pageable);
+
+        when(reservationRepository.findAllByHotelId(HOTEL_ID, pageable)).thenReturn(emptyPage);
+
+        final Page<ReservationResponse> result = reservationService.getAllReservations(pageable);
+
+        assertNotNull(result);
+        assertEquals(0, result.getTotalElements());
+    }
+
+    @Test
     void testUpdateReservationSuccess() {
-        // Arrange
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         final RoomResponse mockRoomResponse = new RoomResponse(roomId, ROOM_NUMBER_101, null, ROOM_STATUS_AVAILABLE,
                 true, null, null);
@@ -293,10 +306,8 @@ class ReservationServiceImplTest {
         when(reservationRepository.save(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
 
-        // Act
         final ReservationResponse result = reservationService.updateReservation(reservationId, request);
 
-        // Assert
         assertNotNull(result);
         verify(reservationRepository, times(1)).findByIdAndHotelId(reservationId, HOTEL_ID);
         verify(inventoryClient, times(1)).getRoomById(roomId);
@@ -306,20 +317,68 @@ class ReservationServiceImplTest {
 
     @Test
     void testDeleteReservationSuccess() {
-        // Arrange
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
 
-        // Act
         reservationService.deleteReservation(reservationId);
 
-        // Assert
         verify(reservationRepository, times(1)).findByIdAndHotelId(reservationId, HOTEL_ID);
         verify(reservationRepository, times(1)).delete(entity);
     }
 
     @Test
+    void testUpdateStatusAndGuestsSuccess() {
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        final ReservationResponse checkedInResponse = new ReservationResponse(
+                reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 2,
+                LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
+                ReservationStatus.CHECKED_IN, null, true, null, null);
+
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(reservationMapper.toResponse(entity)).thenReturn(checkedInResponse);
+
+        final ReservationResponse result = reservationService.updateStatusAndGuests(
+                reservationId, ReservationStatus.CHECKED_IN, 2);
+
+        assertNotNull(result);
+        assertEquals(ReservationStatus.CHECKED_IN, entity.getStatus());
+        assertEquals(2, entity.getActualGuests());
+        verify(reservationRepository).save(entity);
+    }
+
+    @Test
+    void testUpdateStatusOnlyNullActualGuests() {
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        final ReservationResponse cancelledResponse = new ReservationResponse(
+                reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 0,
+                LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
+                ReservationStatus.CANCELLED, null, true, null, null);
+
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(reservationMapper.toResponse(entity)).thenReturn(cancelledResponse);
+
+        reservationService.updateStatusAndGuests(reservationId, ReservationStatus.CANCELLED, null);
+
+        assertEquals(ReservationStatus.CANCELLED, entity.getStatus());
+        verify(reservationRepository).save(entity);
+    }
+
+    @Test
+    void testUpdateStatusAndGuestsNotFound() {
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> reservationService.updateStatusAndGuests(
+                        reservationId, ReservationStatus.CHECKED_IN, 1));
+    }
+
+    @Test
     void testCreateReservationOverlapThrowsBadRequest() {
-        // Arrange: overlap query returns a conflicting reservation
         final RoomResponse mockRoomResponse = new RoomResponse(roomId, ROOM_NUMBER_101, null, ROOM_STATUS_AVAILABLE,
                 true, null, null);
         final GuestResponse mockGuestResponse =
@@ -336,7 +395,6 @@ class ReservationServiceImplTest {
                 LocalDate.now().plusDays(3)))
                 .thenReturn(List.of(conflicting));
 
-        // Act & Assert
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.createReservation(request));
         assertEquals("ROOM_UNAVAILABLE_DATES", ex.getMessage());
@@ -345,7 +403,6 @@ class ReservationServiceImplTest {
 
     @Test
     void testUpdateReservationOverlapThrowsBadRequest() {
-        // Arrange
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         final RoomResponse mockRoomResponse = new RoomResponse(roomId, ROOM_NUMBER_101, null, ROOM_STATUS_AVAILABLE,
                 true, null, null);
@@ -364,7 +421,6 @@ class ReservationServiceImplTest {
                 LocalDate.now().plusDays(3)))
                 .thenReturn(List.of(conflicting));
 
-        // Act & Assert
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.updateReservation(reservationId, request));
         assertEquals("ROOM_UNAVAILABLE_DATES", ex.getMessage());
@@ -373,7 +429,6 @@ class ReservationServiceImplTest {
 
     @Test
     void testSaveThrowsOptimisticLockingFailurePropagates() {
-        // Arrange: overlap check passes, but concurrent write causes optimistic lock failure
         final RoomResponse mockRoomResponse = new RoomResponse(roomId, ROOM_NUMBER_101, null, ROOM_STATUS_AVAILABLE,
                 true, null, null);
         final GuestResponse mockGuestResponse =
@@ -387,14 +442,12 @@ class ReservationServiceImplTest {
                 .thenThrow(new ObjectOptimisticLockingFailureException(Reservation.class,
                         Objects.requireNonNull(UUID.randomUUID())));
 
-        // Act & Assert: the exception must propagate to the GlobalExceptionHandler
         assertThrows(ObjectOptimisticLockingFailureException.class,
                 () -> reservationService.createReservation(request));
     }
 
     @Test
     void shouldRejectCreateWhenCheckOutSameDayAsCheckIn() {
-        // Arrange: checkOut == checkIn → zero-night stay (T-RES-03)
         final ReservationRequest sameDayRequest = new ReservationRequest(
                 GUEST_ID,
                 EXPECTED_GUESTS,
@@ -403,7 +456,6 @@ class ReservationServiceImplTest {
                 STATUS_CONFIRMED,
                 List.of(new ReservationLineItemRequest(roomId, BigDecimal.valueOf(100))));
 
-        // Act & Assert
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.createReservation(sameDayRequest));
         assertEquals(ERR_CHECKOUT_AFTER_CHECKIN, ex.getMessage());
@@ -413,7 +465,6 @@ class ReservationServiceImplTest {
 
     @Test
     void shouldRejectCreateWhenCheckOutBeforeCheckIn() {
-        // Arrange: checkOut < checkIn → inverted date range (T-RES-03)
         final ReservationRequest invertedRequest = new ReservationRequest(
                 GUEST_ID,
                 EXPECTED_GUESTS,
@@ -422,7 +473,6 @@ class ReservationServiceImplTest {
                 STATUS_CONFIRMED,
                 List.of(new ReservationLineItemRequest(roomId, BigDecimal.valueOf(100))));
 
-        // Act & Assert
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.createReservation(invertedRequest));
         assertEquals(ERR_CHECKOUT_AFTER_CHECKIN, ex.getMessage());
@@ -432,7 +482,6 @@ class ReservationServiceImplTest {
 
     @Test
     void shouldRejectUpdateWhenCheckOutSameDayAsCheckIn() {
-        // Arrange: update with checkOut == checkIn (T-RES-03)
         final ReservationRequest sameDayRequest = new ReservationRequest(
                 GUEST_ID,
                 EXPECTED_GUESTS,
@@ -441,7 +490,6 @@ class ReservationServiceImplTest {
                 STATUS_CONFIRMED,
                 List.of(new ReservationLineItemRequest(roomId, BigDecimal.valueOf(100))));
 
-        // Act & Assert
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.updateReservation(reservationId, sameDayRequest));
         assertEquals(ERR_CHECKOUT_AFTER_CHECKIN, ex.getMessage());
@@ -451,8 +499,6 @@ class ReservationServiceImplTest {
 
     @NonNull
     private static Reservation anyReservation() {
-        // any(Reservation.class) registers the Mockito argument matcher as a side-effect;
-        // its return value is null at runtime, so we fall back to the sentinel ANY_RESERVATION.
         final Reservation matched = any(Reservation.class);
         return matched != null ? matched : Objects.requireNonNull(ANY_RESERVATION);
     }
