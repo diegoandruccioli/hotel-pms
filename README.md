@@ -156,7 +156,7 @@ hotel-pms/
 ├── stay-service/          # Check-in / check-out / Alloggiati reports
 ├── frontend/              # React SPA (Vite + TypeScript + Tailwind)
 ├── docker/                # Docker init scripts (PostgreSQL multi-DB setup)
-├── docs/                  # Postman collection & seed data
+├── docs/                  # Technical documentation (architecture, security, user manual, audit)
 ├── docker-compose.yml     # Full production-grade compose file
 ├── start.sh               # One-click startup (Linux/macOS)
 ├── start.bat              # One-click startup (Windows CMD)
@@ -185,6 +185,20 @@ npm run test
 cd frontend
 npm run test:e2e
 ```
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [`docs/INTERACTION_FLOWS.md`](docs/INTERACTION_FLOWS.md) | End-to-end service call chains for all major flows |
+| [`docs/SECURITY_AND_PRIVACY.md`](docs/SECURITY_AND_PRIVACY.md) | Security model, GDPR/TULPS compliance, threat mitigations |
+| [`docs/USER_MANUAL.md`](docs/USER_MANUAL.md) | Step-by-step procedures for all user roles |
+| [`docs/I18N.md`](docs/I18N.md) | i18n architecture, namespace conventions, contribution guide |
+| [`docs/ALLOGGIATI_README.md`](docs/ALLOGGIATI_README.md) | Polizia di Stato SOAP integration and configuration |
+| [`docs/PILOT_READINESS_AUDIT.md`](docs/PILOT_READINESS_AUDIT.md) | Pilot readiness assessment (all critical blockers resolved) |
+| [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) | **Production-readiness & university-grade audit** — evidence-based, includes open gaps and roadmap |
 
 ---
 
