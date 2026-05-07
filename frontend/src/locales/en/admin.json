@@ -46,5 +46,7 @@
   "placeholder_logo_url": "https://...",
   "btn_save_profile": "Save Profile",
   "toast_profile_saved": "Hotel profile saved",
-  "err_profile_save": "Failed to save hotel profile"
+  "err_profile_save": "Failed to save hotel profile",
+  "label_alloggiati_auto_send": "Auto-send to PS Portal",
+  "hint_alloggiati_auto_send": "Automatically send the Alloggiati report at each check-in"
 }

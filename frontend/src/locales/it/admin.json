@@ -46,5 +46,7 @@
   "placeholder_logo_url": "https://...",
   "btn_save_profile": "Salva profilo",
   "toast_profile_saved": "Profilo hotel salvato",
-  "err_profile_save": "Salvataggio profilo non riuscito"
+  "err_profile_save": "Salvataggio profilo non riuscito",
+  "label_alloggiati_auto_send": "Invio automatico al Portale PS",
+  "hint_alloggiati_auto_send": "Invia automaticamente la comunicazione alloggiati ad ogni check-in"
 }

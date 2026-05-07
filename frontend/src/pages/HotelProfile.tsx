@@ -84,6 +84,12 @@ export function HotelProfile() {
     [],
   );
 
+  const handleToggle = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((prev) => ({ ...prev, alloggiatiAutoSend: e.target.checked })),
+    [],
+  );
+
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
@@ -168,6 +174,22 @@ export function HotelProfile() {
           placeholder={t('placeholder_logo_url')}
           onChange={handleChange('logoUrl')}
         />
+
+        <div className="flex items-start gap-3 pt-2 border-t border-outline-variant">
+          <input
+            id="profile-alloggiati-auto-send"
+            type="checkbox"
+            checked={form.alloggiatiAutoSend}
+            onChange={handleToggle}
+            className="mt-0.5 h-4 w-4 rounded border-outline text-primary focus:ring-2 focus:ring-primary"
+          />
+          <div>
+            <label htmlFor="profile-alloggiati-auto-send" className="text-sm font-medium text-on-surface">
+              {t('label_alloggiati_auto_send')}
+            </label>
+            <p className="text-xs text-on-surface-variant mt-0.5">{t('hint_alloggiati_auto_send')}</p>
+          </div>
+        </div>
       </M3Card>
 
       <div className="flex justify-end">
