@@ -152,8 +152,8 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 - [x] **D13** Aggiungere test per `CalendarPlanning.tsx` e `Rooms/index.tsx`
 - [x] **D14** Creare pagina `/profile/hotel` (nome, indirizzo, PIVA, logo)
 - [ ] **D15** Vista occupazione del giorno nel dashboard receptionist (status camere) ⏳
-- [ ] **D16** Attivare Dependabot auto-PR sul repository GitHub ⏳
-- [ ] **D17** Documentare vincolo `commons-csv:1.9.0` nel `build.gradle.kts` ⏳
+- [x] **D16** Attivare Dependabot auto-PR sul repository GitHub
+- [x] **D17** Documentare vincolo `commons-csv:1.9.0` nel `build.gradle.kts`
 
 ### Priorità 3 — Post-pilot
 
@@ -164,3 +164,93 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 - [ ] **D22** Wizard onboarding al primo avvio (hotel setup, prima camera, primo utente)
 - [ ] **D23** Notifiche in-app per eventi operativi (check-in atteso, camera sporca)
 - [ ] **D24** Multi-hotel UI per ADMIN di catena alberghiera
+
+---
+
+## 8. Analisi tecnica dei flussi critici
+
+Questa sezione documenta i flussi che hanno richiesto attenzione specifica durante lo sviluppo: il rischio originale, l'impatto concreto per il cliente, la soluzione implementata e lo stato residuale. Utile per il cliente come audit trail e per i developer come riferimento delle decisioni prese.
+
+---
+
+### 8.1 Check-in Walk-in
+
+**Rischio originale (critico):** Il modello iniziale del sistema richiedeva che ogni check-in fosse associato a una prenotazione esistente (`StayRequest.reservationId @NotNull`). Gli hotel fanno il 15–40% dei check-in come walk-in — ospiti che si presentano fisicamente senza prenotazione. Con il vincolo `@NotNull`, questi ospiti non potevano essere registrati in nessun modo: il sistema rifiutava la richiesta con errore 400. Un hotel che avesse ricevuto un ospite walk-in avrebbe dovuto gestirlo su carta, senza tracciamento, senza fattura, senza report PS — un rischio sia operativo che di conformità TULPS.
+
+**Impatto business:** blocco operativo totale per il 15–40% dei check-in reali. Impossibilità di emettere fattura per walk-in. Mancata comunicazione PS per questi ospiti (violazione art. 109 TULPS, sanzione amministrativa + possibile sospensione licenza).
+
+**Soluzione implementata:** `reservationId` reso nullable in `StayRequest` e `Stay`. Il backend gestisce correttamente entrambi i percorsi: con prenotazione (verifica disponibilità e stato CONFIRMED), senza prenotazione (verifica solo la camera). Il frontend ha una route dedicata `/stays/walk-in` con `WalkInCheckInForm.tsx` che raccoglie ospite, camera, data checkout e tutti i campi Alloggiati PS. Il payload `guests[]` viene compilato correttamente (il bug originale inviava un array vuoto).
+
+**Stato attuale:** ✅ Completamente operativo. La fattura viene aperta automaticamente al check-in walk-in come per i check-in normali. Il report PS viene generato e (se abilitato) inviato automaticamente.
+
+---
+
+### 8.2 Invio Alloggiati alla Polizia di Stato (art. 109 TULPS)
+
+**Rischio originale (alto):** L'obbligo di legge richiede la comunicazione telematica delle generalità degli ospiti alla Questura entro 24 ore dal check-in. Il sistema inizialmente supportava solo l'export del file `.txt` per upload manuale — un'operazione che il receptionist doveva ricordarsi di fare ogni giorno, per ogni data. Dimenticarla significa inadempienza automatica, indipendentemente da quanto il resto del sistema funzioni bene.
+
+**Impatto compliance:** inadempienza TULPS art. 109 = sanzione amministrativa + possibile sospensione della licenza di pubblica sicurezza dell'hotel. Il cliente non può difendersi sostenendo un "errore del software": la responsabilità è dell'esercente.
+
+**Soluzione implementata:** integrazione SOAP two-step con il portale `alloggiatiweb.poliziadistato.it` (GenerateToken → Send/Test), con flag `ALLOGGIATI_DRY_RUN` (default `true`) per proteggere ambienti di sviluppo e staging. L'invio automatico è attivabile per hotel tramite il toggle `alloggiatiAutoSend` nel profilo hotel. Al check-in, `StayServiceImpl` chiama `AlloggiatiWebSenderService` in modo non bloccante: se il portale PS non risponde, il check-in viene completato e il badge `alloggiatiSent=false` nella lista soggiorni segnala che il report deve essere inviato manualmente.
+
+**Stato residuale:** il collaudo reale con credenziali PS autentiche non è ancora stato eseguito (richiede accesso VPN alla Questura). Il codice SOAP è conforme alla specifica tecnica del portale (verificata tramite WSDL). Il piano di collaudo dettagliato è in `docs/ALLOGGIATI_COLLAUDO_REALE.md`.
+
+---
+
+### 8.3 Toggle alloggiatiAutoSend e separazione di responsabilità
+
+**Rischio originale (medio):** Il sistema aveva la funzionalità di invio automatico Alloggiati implementata nel backend (`HotelSettings.alloggiatiAutoSend`) ma senza UI per attivarla o disattivarla. Un ADMIN non poteva cambiare questa impostazione dall'interfaccia — doveva farlo via API con un client HTTP. Un albergatore non tecnico non avrebbe mai saputo come configurarlo.
+
+**Impatto operativo:** un hotel con `alloggiatiAutoSend=false` (default sicuro) non riceveva mai l'invio automatico anche dopo aver configurato correttamente le credenziali PS. Un hotel con `alloggiatiAutoSend=true` per errore in un ambiente di test avrebbe inviato dati reali al portale PS.
+
+**Soluzione implementata:** checkbox nel form `/profile/hotel` con label e hint text i18n (`label_alloggiati_auto_send`, `hint_alloggiati_auto_send`). La UI mostra chiaramente cosa fa il toggle. Il backend ha già la gestione `DRY_RUN` per l'ambiente, separata dalla preferenza hotel (`alloggiatiAutoSend`): è possibile avere `alloggiatiAutoSend=true` in staging con `DRY_RUN=true` senza rischi.
+
+**Stato attuale:** ✅ Toggle visibile e funzionante nel profilo hotel. Le due modalità (manuale e automatica) sono documentate in `docs/USER_MANUAL.md` e `docs/ALLOGGIATI_README.md`.
+
+---
+
+### 8.4 Validazione input e sicurezza API
+
+**Rischio originale (medio):** Diversi endpoint accettavano payload con campi critici non validati a livello applicativo. Nello specifico: `ReservationStatusUpdateRequest.status` poteva essere `null` (causando NullPointerException nel service layer invece di un 400 chiaro), `GuestController /batch` accettava array vuoti (query SELECT IN () invalida in PostgreSQL), `RoomController PATCH /status` accettava il tipo camera come stringa raw senza DTO validato.
+
+**Impatto:** errori 500 inaspettati su input malformati, invece di 400 con descrizione chiara. In un contesto multi-tenant, un input malformato che causa un errore 500 non gestito può esporre stack traces con informazioni di sistema.
+
+**Soluzione implementata:** `@NotNull` su `ReservationStatusUpdateRequest.status`, `@Min(1)` su `actualGuests`, `@Validated` + `@NotEmpty` su `GuestController /batch`, nuovo DTO `RoomStatusRequest` con `@NotNull` su `status`. Il `GlobalExceptionHandler` presente in ogni servizio intercetta le `ConstraintViolationException` e `MethodArgumentNotValidException` restituendo risposte RFC 7807 con campo `detail` che indica il campo fallito.
+
+**Stato attuale:** ✅ Tutti gli endpoint validano il loro input al boundary. Il cliente riceve 400 con messaggio comprensibile invece di 500 generico.
+
+---
+
+### 8.5 Isolamento multi-tenant (hotel_id)
+
+**Rischio originale (critico per la privacy):** Il campo `hotel_id` era presente su molte entità ma non era `NOT NULL` e non veniva sempre usato come filtro nelle query. Specificamente, `Room.hotelId` era nullable — una query senza filtro `hotel_id` avrebbe restituito camere di hotel diversi nello stesso risultato, permettendo a un receptionist dell'hotel A di vedere (e potenzialmente modificare) le camere dell'hotel B.
+
+**Impatto GDPR:** data leakage tra hotel = violazione art. 5(1)(f) GDPR (integrità e riservatezza). In un deployment multi-hotel su una stessa istanza, questo tipo di bug è classificato come data breach e deve essere notificato all'Autorità Garante entro 72 ore (art. 33 GDPR). La sanzione può arrivare a €20M o 4% del fatturato annuo globale.
+
+**Soluzione implementata:** `Room.hotelId` marcato `nullable=false` con migration Flyway V3 (backfill + ALTER COLUMN + indice). `RoomRepository` usa `findByIdAndActiveTrueAndHotelId` — impossibile recuperare una camera senza il `hotelId` corretto. `RoomController` estrae `hotelId` da `SecurityContextHolder` (iniettato dal gateway via JWT) — l'utente non può passare un `hotelId` diverso dal suo. Email unicità ospiti cambiata da globale a `UNIQUE (email, hotel_id) WHERE email IS NOT NULL`.
+
+**Stato attuale:** ✅ Isolamento corretto verificato a livello repository per tutte le entità rilevanti. Test di isolamento inclusi in `RoomServiceImplTest` (test con `hotelId` errato verifica che la query ritorni empty).
+
+---
+
+### 8.6 Copertura test sui controller
+
+**Rischio originale (medio):** 5 controller non avevano nessun test (AuthController, StayController, HotelSettingsController, OwnerReportController, MenuItemController). I test di servizio coprivano la logica di business ma non verificavano: routing HTTP corretto, status code attesi, serializzazione/deserializzazione JSON, validazione degli header, gestione degli errori a livello controller.
+
+**Impatto:** un bug introdotto nel layer controller (es. mappatura wrong endpoint, errore nel `@PathVariable`, risposta con status errato) non sarebbe rilevato dalla CI fino al test E2E o all'ambiente reale.
+
+**Soluzione implementata:** controller test con MockMvc standaloneSetup per tutti i 5 controller mancanti. Pattern uniforme: setup del `MockMvc` con `@ExtendWith(MockitoExtension.class)`, mock del service layer, test per ogni endpoint (happy path + error path 400/404/422). Copertura totale: 317 test Vitest frontend + tutti i servizi backend con >95% coverage verificata da JaCoCo.
+
+**Stato attuale:** ✅ Ogni controller ha test dedicati. Il CI esegue l'intera suite ad ogni push. I report JaCoCo sono pubblicati come artifacts.
+
+---
+
+### 8.7 Internazionalizzazione e zero hardcoded strings
+
+**Rischio originale (basso ma continuo):** Il codebase aveva due pattern i18n coesistenti (file JSON centralizzati + file `.i18n.ts` co-locati) con chiavi duplicate tra i due. Le stringhe hardcoded nei componenti React — anche una sola — vengono comunque visualizzate all'utente nella lingua sbagliata senza generare nessun errore a compile-time o runtime.
+
+**Impatto UX:** un hotel italiano che usa il sistema in italiano vede alcune scritte in inglese hardcoded, dando un'impressione di prodotto non rifinito o non localizzato. In un contesto B2B con albergatori reali, questo tipo di imperfezione riduce la fiducia nel prodotto.
+
+**Soluzione implementata:** eliminati tutti i file `.i18n.ts` co-locati; architettura unificata su 14 namespace JSON puri in `src/locales/{en,it}/`. Zero testo hardcoded verificato dal code review e dai test (ogni componente ha test che verificano che il testo sia la chiave i18n, non il testo diretto). La regola è documentata in `docs/I18N.md`.
+
+**Stato attuale:** ✅ Zero testo hardcoded. ESLint zero-warning policy previene regressioni. I test dei componenti usano il mock standard `t: (key) => key` per verificare le chiavi senza dipendere dalla traduzione.
