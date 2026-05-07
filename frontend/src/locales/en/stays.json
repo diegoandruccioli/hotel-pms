@@ -60,5 +60,6 @@
   "walkin_err_guest_required": "Please select a primary guest",
   "walkin_err_checkout_required": "Please enter the expected check-out date",
   "walkin_btn_checkin": "Complete Walk-in",
-  "walkin_success": "Walk-in check-in completed"
+  "walkin_success": "Walk-in check-in completed",
+  "walkin_loading_rooms": "Loading rooms…"
 }

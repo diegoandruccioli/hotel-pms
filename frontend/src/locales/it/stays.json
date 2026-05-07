@@ -60,5 +60,6 @@
   "walkin_err_guest_required": "Selezionare l'ospite principale",
   "walkin_err_checkout_required": "Inserire la data prevista di check-out",
   "walkin_btn_checkin": "Completa Walk-in",
-  "walkin_success": "Check-in walk-in completato"
+  "walkin_success": "Check-in walk-in completato",
+  "walkin_loading_rooms": "Caricamento camere…"
 }
