@@ -1,0 +1,55 @@
+version: 2
+
+updates:
+
+  # ── GitHub Actions ───────────────────────────────────────────────────────────
+  # Keeps CI action versions (checkout, setup-java, trivy, etc.) current.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # ── Gradle (Java / Spring Boot backend) ─────────────────────────────────────
+  # Monitors all services in the multi-module Gradle project.
+  # Minor and patch updates are auto-approved; major versions require manual review.
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "java"
+    open-pull-requests-limit: 10
+    ignore:
+      # commons-csv is pinned at 1.9.0 due to a commons-io compatibility constraint.
+      # 1.10.0+ requires commons-io >= 2.15, which conflicts with our forced 2.14.0
+      # (CVE-2024-47554 fix). See stay-service/build.gradle.kts for full explanation.
+      - dependency-name: "org.apache.commons:commons-csv"
+        versions: [">= 1.10"]
+
+  # ── npm (React / TypeScript frontend) ───────────────────────────────────────
+  # Monitors frontend/package.json. Major version bumps (React, Vite, TypeScript)
+  # require manual testing before merge.
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "frontend"
+    open-pull-requests-limit: 10
+    ignore:
+      # Ignore minor/patch updates for packages pinned to a specific major version
+      # by the framework (e.g. react@19, vite@7). Major bumps are reviewed manually.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
