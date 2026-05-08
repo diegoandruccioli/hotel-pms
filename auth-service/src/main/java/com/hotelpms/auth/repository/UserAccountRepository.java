@@ -4,6 +4,7 @@ import com.hotelpms.auth.domain.UserAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,9 +35,24 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
      * Checks if a user account exists by its username.
      *
      * @param username the username to check
-     * 
-     * @return true if an account with the specified username exists, false
-     *         otherwise
+     * @return true if an account with the specified username exists, false otherwise
      */
     boolean existsByUsername(String username);
+
+    /**
+     * Returns all active users belonging to the given hotel.
+     *
+     * @param hotelId the hotel UUID
+     * @return list of active user accounts for the hotel
+     */
+    List<UserAccount> findAllByHotelId(UUID hotelId);
+
+    /**
+     * Finds an active user by id scoped to a hotel (prevents cross-tenant access).
+     *
+     * @param id      the user UUID
+     * @param hotelId the hotel UUID
+     * @return the user if found and active within that hotel
+     */
+    Optional<UserAccount> findByIdAndHotelId(UUID id, UUID hotelId);
 }

@@ -36,4 +36,13 @@ public interface RestaurantOrderService {
      * @return a page of order responses
      */
     Page<RestaurantOrderResponse> getAllOrders(Pageable pageable);
+
+    /**
+     * Confirms a restaurant order: transitions it to BILLED_TO_ROOM and charges
+     * the amount to the guest's open billing invoice via billing-service.
+     *
+     * @param orderId the order UUID to confirm
+     * @return the updated order response
+     */
+    RestaurantOrderResponse confirmOrder(UUID orderId);
 }

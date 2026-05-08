@@ -1,8 +1,8 @@
 package com.hotelpms.inventory.controller;
 
-import com.hotelpms.inventory.domain.RoomStatus;
 import com.hotelpms.inventory.dto.RoomRequest;
 import com.hotelpms.inventory.dto.RoomResponse;
+import com.hotelpms.inventory.dto.RoomStatusRequest;
 import com.hotelpms.inventory.service.RoomService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +13,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -45,6 +47,7 @@ public class RoomController {
      * @return the response
      */
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public ResponseEntity<RoomResponse> createRoom(@NonNull @Valid @RequestBody final RoomRequest request) {
         final RoomResponse response = roomService.createRoom(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -58,7 +61,7 @@ public class RoomController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<RoomResponse> getRoomById(@NonNull @PathVariable final UUID id) {
-        return ResponseEntity.ok(roomService.getRoomById(id));
+        return ResponseEntity.ok(roomService.getRoomById(id, resolveHotelId()));
     }
 
     /**
@@ -86,22 +89,24 @@ public class RoomController {
      * @return the response
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public ResponseEntity<RoomResponse> updateRoom(@NonNull @PathVariable final UUID id,
             @NonNull @Valid @RequestBody final RoomRequest request) {
-        return ResponseEntity.ok(roomService.updateRoom(id, request));
+        return ResponseEntity.ok(roomService.updateRoom(id, resolveHotelId(), request));
     }
 
     /**
      * Updates only the housekeeping status of a room.
      *
-     * @param id     the room id
-     * @param status the new status
+     * @param id      the room id
+     * @param request the status update request
      * @return the updated response
      */
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'RECEPTIONIST')")
     public ResponseEntity<RoomResponse> updateRoomStatus(@NonNull @PathVariable final UUID id,
-            @NonNull @RequestBody final RoomStatus status) {
-        return ResponseEntity.ok(roomService.updateRoomStatus(id, status));
+            @NonNull @Valid @RequestBody final RoomStatusRequest request) {
+        return ResponseEntity.ok(roomService.updateRoomStatus(id, resolveHotelId(), request.status()));
     }
 
     /**
@@ -111,7 +116,20 @@ public class RoomController {
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public void deleteRoom(@NonNull @PathVariable final UUID id) {
-        roomService.deleteRoom(id);
+        roomService.deleteRoom(id, resolveHotelId());
+    }
+
+    /**
+     * Extracts the hotel UUID from the authenticated user's security context.
+     * The value is set by the internal auth filter from the {@code X-Auth-Hotel}
+     * header injected by the API Gateway.
+     *
+     * @return the hotel UUID of the authenticated user
+     */
+    private UUID resolveHotelId() {
+        final Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
+        return UUID.fromString(String.valueOf(details));
     }
 }

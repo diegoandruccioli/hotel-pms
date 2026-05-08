@@ -15,6 +15,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Opt into Node.js 24 for all JavaScript-based actions to silence
+# the Node.js 20 deprecation warning (removal scheduled Sep 2026).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 # ══════════════════════════════════════════════════════════════════════════════
 jobs:
 
@@ -22,6 +27,8 @@ jobs:
   backend:
     name: "Backend — Build · PMD · Checkstyle · JUnit"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -61,15 +68,17 @@ jobs:
   frontend:
     name: "Frontend — ESLint · TypeScript · Vitest"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -89,8 +98,181 @@ jobs:
         working-directory: frontend
         run: npm run test
 
-  # ── Job 3: E2E ──────────────────────────────────────────────────────────────
-  # Runs only after both backend and frontend pass.
+  # ── Job 3: Container Image Scan ──────────────────────────────────────────────
+  # Scans all 10 custom Docker images for OS/library CVEs (CRITICAL + HIGH).
+  # Uses a matrix strategy to scan each image in parallel.
+  # Uploads SARIF results to GitHub Security tab for centralised tracking.
+  # Also runs a misconfig scan on each Dockerfile (warn-only).
+  # ─────────────────────────────────────────────────────────────────────────────
+  trivy:
+    name: "Trivy — ${{ matrix.service }}"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: config-service
+            dockerfile: config-service/Dockerfile
+            image: hotel-pms/config-service
+            context: "."
+          - service: api-gateway
+            dockerfile: api-gateway/Dockerfile
+            image: hotel-pms/api-gateway
+            context: "."
+          - service: auth-service
+            dockerfile: auth-service/Dockerfile
+            image: hotel-pms/auth-service
+            context: "."
+          - service: guest-service
+            dockerfile: guest-service/Dockerfile
+            image: hotel-pms/guest-service
+            context: "."
+          - service: inventory-service
+            dockerfile: inventory-service/Dockerfile
+            image: hotel-pms/inventory-service
+            context: "."
+          - service: reservation-service
+            dockerfile: reservation-service/Dockerfile
+            image: hotel-pms/reservation-service
+            context: "."
+          - service: stay-service
+            dockerfile: stay-service/Dockerfile
+            image: hotel-pms/stay-service
+            context: "."
+          - service: billing-service
+            dockerfile: billing-service/Dockerfile
+            image: hotel-pms/billing-service
+            context: "."
+          - service: fb-service
+            dockerfile: fb-service/Dockerfile
+            image: hotel-pms/fb-service
+            context: "."
+          - service: frontend
+            dockerfile: frontend/Dockerfile
+            image: hotel-pms/frontend
+            context: ./frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Trivy DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+
+      - name: Build Docker image — ${{ matrix.service }}
+        run: |
+          docker build \
+            -t ${{ matrix.image }}:ci \
+            -f ${{ matrix.dockerfile }} \
+            ${{ matrix.context }}
+
+      - name: Trivy vulnerability scan — ${{ matrix.service }}
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: "${{ matrix.image }}:ci"
+          format: "table"
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          timeout: "10m0s"
+
+      - name: Trivy SARIF scan — ${{ matrix.service }}
+        if: always()
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: "${{ matrix.image }}:ci"
+          format: "sarif"
+          output: "trivy-${{ matrix.service }}.sarif"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          timeout: "10m0s"
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: "trivy-${{ matrix.service }}.sarif"
+          category: "trivy-${{ matrix.service }}"
+
+      - name: Trivy misconfig scan — ${{ matrix.service }}
+        if: always()
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: "config"
+          scan-ref: "${{ matrix.dockerfile }}"
+          format: "table"
+          exit-code: "0"
+          severity: "CRITICAL,HIGH"
+
+  # ── Job 4: Third-party Image Scan ──────────────────────────────────────────
+  # Warn-only scan of critical third-party images used in docker-compose.yml.
+  # Non-blocking: we don't control upstream release cycles, but we want
+  # visibility into CVEs in our infrastructure dependencies.
+  # ─────────────────────────────────────────────────────────────────────────────
+  trivy-thirdparty:
+    name: "Trivy 3rd-party — ${{ matrix.image }}"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - postgres:15-alpine
+          - redis:alpine
+          - grafana/grafana:10.2.0
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Trivy DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+
+      - name: Trivy scan — ${{ matrix.image }}
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: "${{ matrix.image }}"
+          format: "table"
+          exit-code: "0"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          timeout: "10m0s"
+
+      - name: Trivy SARIF scan — ${{ matrix.image }}
+        if: always()
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: "${{ matrix.image }}"
+          format: "sarif"
+          output: "trivy-thirdparty-${{ strategy.job-index }}.sarif"
+          severity: "CRITICAL,HIGH"
+          ignore-unfixed: true
+          timeout: "10m0s"
+
+      - name: Upload SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: "trivy-thirdparty-${{ strategy.job-index }}.sarif"
+          category: "trivy-thirdparty-${{ matrix.image }}"
+
+  # ── Job 5: E2E ──────────────────────────────────────────────────────────────
+  # Runs only after backend, frontend, and trivy pass.
   # Builds the full Docker stack, waits for every service to be healthy,
   # then runs Playwright E2E tests against the containerised frontend (nginx:80).
   #
@@ -101,10 +283,15 @@ jobs:
   e2e:
     name: "E2E — Docker Stack + Playwright"
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    needs: [backend, frontend, trivy]
     timeout-minutes: 30
+    permissions:
+      contents: read
     env:
       INTERNAL_HMAC_SECRET: ${{ secrets.INTERNAL_HMAC_SECRET }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      CONFIG_SERVER_PASSWORD: ${{ secrets.CONFIG_SERVER_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -119,10 +306,31 @@ jobs:
             exit 1
           fi
 
-      - name: Set up Node 20
+      # Ensure all required secrets are set before the Docker stack is built.
+      # If a GitHub repo secret is absent, the expression evaluates to "" and the
+      # stack would fail at runtime.  Generate ephemeral values so every CI run
+      # is self-contained even without secrets configured in the repository.
+      #
+      # JWT_SECRET      – auth-service fails fast with an empty value (T-CFG-02).
+      # POSTGRES_PASSWORD – shared by postgres + all Spring datasources.
+      # CONFIG_SERVER_PASSWORD – required by config-service HTTP Basic Auth (T-CFG-03).
+      # INTERNAL_HMAC_SECRET   – already validated above; no fallback needed.
+      - name: Ensure required CI secrets are set
+        run: |
+          if [ -z "$JWT_SECRET" ]; then
+            echo "JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')" >> "$GITHUB_ENV"
+          fi
+          if [ -z "$POSTGRES_PASSWORD" ]; then
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
+          fi
+          if [ -z "$CONFIG_SERVER_PASSWORD" ]; then
+            echo "CONFIG_SERVER_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          fi
+
+      - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -134,25 +342,46 @@ jobs:
         working-directory: frontend
         run: npx playwright install chromium --with-deps
 
-      # Build all Docker images (Spring services build their own JARs via
-      # multi-stage Dockerfiles; tests are skipped with -x test)
+      # Build only the services needed for E2E tests (Spring services build
+      # their own JARs via multi-stage Dockerfiles; tests are skipped with -x test).
+      # Monitoring services (loki, grafana, prometheus, zipkin) are excluded to
+      # stay within the GitHub runner's 7 GB RAM budget.
       - name: Build Docker images
-        run: docker compose build
+        run: >
+          docker compose build
+          postgres redis config-server
+          auth-service guest-service inventory-service
+          reservation-service stay-service billing-service fb-service
+          api-gateway frontend
 
-      # Start every service in detached mode and wait until all health checks
-      # pass (or until the step timeout fires after 10 minutes)
-      - name: Start full Docker stack
-        run: docker compose up -d --wait
-        timeout-minutes: 10
+      # Start backend services and wait for their health checks.  Frontend is
+      # started separately because its nginx healthcheck is unreliable under
+      # the resource pressure of a 7 GB GitHub runner; readiness is verified
+      # by the polling step below instead.
+      - name: Start backend stack (wait for healthy)
+        run: >
+          docker compose up -d --wait
+          postgres redis config-server
+          auth-service guest-service inventory-service
+          reservation-service stay-service billing-service fb-service
+          api-gateway
+        timeout-minutes: 20
 
-      # Extra guard: poll the gateway liveness endpoint directly.
-      # The gateway becomes healthy only after all downstream services are healthy.
+      # Start frontend without --wait; readiness is checked in a later step.
+      - name: Start frontend container
+        run: docker compose up -d frontend
+
+      # Extra guard: confirm the gateway process is accepting connections on port 8080.
+      # The actuator was moved to the internal-only management port (8090, T-CFG-01),
+      # so we probe port 8080 directly and accept any HTTP response (2xx/3xx/4xx)
+      # as proof that the gateway is alive. Connection failures return "000".
       - name: Wait for API Gateway to be healthy
         run: |
-          echo "Polling http://localhost:8080/actuator/health/liveness ..."
+          echo "Polling http://localhost:8080 for any HTTP response ..."
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:8080/actuator/health/liveness > /dev/null 2>&1; then
-              echo "API Gateway is healthy (attempt $i)."
+            STATUS=$(curl -so /dev/null -w "%{http_code}" http://localhost:8080/ 2>/dev/null || echo "000")
+            if [ "$STATUS" != "000" ]; then
+              echo "API Gateway is responding (HTTP $STATUS, attempt $i)."
               exit 0
             fi
             echo "Attempt $i/30 — retrying in 10 s ..."
@@ -161,15 +390,22 @@ jobs:
           echo "::error::API Gateway did not become healthy within 300 s."
           exit 1
 
-      # Confirm the nginx frontend is actually serving the React SPA
-      - name: Verify frontend (nginx) is serving
+      # Poll the nginx frontend until it serves the React SPA (HTTP 200).
+      # This replaces the unreliable Docker healthcheck with an explicit retry loop.
+      - name: Wait for frontend (nginx) to be serving
         run: |
-          HTTP_STATUS=$(curl -so /dev/null -w "%{http_code}" http://localhost:80)
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "::error::Frontend returned HTTP $HTTP_STATUS instead of 200."
-            exit 1
-          fi
-          echo "Frontend is serving (HTTP $HTTP_STATUS)."
+          echo "Polling http://localhost:80 for HTTP 200 ..."
+          for i in $(seq 1 30); do
+            STATUS=$(curl -so /dev/null -w "%{http_code}" http://localhost:80 2>/dev/null || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "Frontend is serving (HTTP 200, attempt $i)."
+              exit 0
+            fi
+            echo "Attempt $i/30 — got HTTP $STATUS, retrying in 5 s ..."
+            sleep 5
+          done
+          echo "::error::Frontend did not return HTTP 200 within 150 s."
+          exit 1
 
       # Run the full Playwright suite against the Docker-hosted frontend.
       # PLAYWRIGHT_BASE_URL overrides the config default (Vite dev server)
@@ -191,7 +427,35 @@ jobs:
       # Dump the last 200 lines of every container log to help diagnose failures
       - name: Dump container logs on failure
         if: failure()
-        run: docker compose logs --tail=200
+        run: |
+          {
+            echo "=== CONTAINER STATUS ==="
+            docker compose ps --all
+            echo ""
+            echo "=== HEALTH CHECK INSPECT ==="
+            for svc in config-server auth-service guest-service inventory-service reservation-service stay-service billing-service fb-service api-gateway; do
+              echo "--- $svc ---"
+              docker inspect "$svc" \
+                --format='State={{.State.Status}} Health={{if .State.Health}}{{.State.Health.Status}} Log={{range .State.Health.Log}}[exit={{.ExitCode}} out={{.Output}}]{{end}}{{else}}none{{end}}' \
+                2>/dev/null || echo "container not found"
+            done
+            echo ""
+            echo "=== MANUAL LIVENESS (config-server) ==="
+            docker exec config-server sh -c \
+              'wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness; echo "exit:$?"' \
+              2>&1 || echo "docker exec failed"
+            echo ""
+            echo "=== CONTAINER LOGS ==="
+            docker compose logs --tail=2000
+          } > /tmp/docker-logs.txt 2>&1 || true
+
+      - name: Upload container logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-container-logs
+          path: /tmp/docker-logs.txt
+          retention-days: 3
 
       - name: Tear down Docker stack and volumes
         if: always()

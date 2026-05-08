@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -69,9 +70,17 @@ public class Invoice {
     @Column(nullable = false)
     private UUID guestId;
 
+    @Column(name = "stay_id")
+    private UUID stayId;
+
     @Builder.Default
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Payment> payments = new ArrayList<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true,
+               fetch = FetchType.LAZY)
+    private List<InvoiceCharge> charges = new ArrayList<>();
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
@@ -87,7 +96,7 @@ public class Invoice {
 
     /**
      * Adds a payment to the invoice.
-     * 
+     *
      * @param payment the payment to add
      */
     public void addPayment(final Payment payment) {
@@ -97,11 +106,31 @@ public class Invoice {
 
     /**
      * Removes a payment from the invoice.
-     * 
+     *
      * @param payment the payment to remove
      */
     public void removePayment(final Payment payment) {
         payments.remove(payment);
         payment.setInvoice(null);
+    }
+
+    /**
+     * Adds a charge to the invoice, maintaining bidirectional consistency.
+     *
+     * @param charge the charge to add
+     */
+    public void addCharge(final InvoiceCharge charge) {
+        charges.add(charge);
+        charge.setInvoice(this);
+    }
+
+    /**
+     * Removes a charge from the invoice, maintaining bidirectional consistency.
+     *
+     * @param charge the charge to remove
+     */
+    public void removeCharge(final InvoiceCharge charge) {
+        charges.remove(charge);
+        charge.setInvoice(null);
     }
 }

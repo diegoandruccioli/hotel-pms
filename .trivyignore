@@ -1,0 +1,27 @@
+# ============================================================
+# .trivyignore — Accepted CVE suppressions for Trivy
+# ============================================================
+# CVE-2026-22732 — Spring Security: security policy bypass and information
+# disclosure (spring-security-web). Fixed in Spring Security 6.5.9 / 7.0.4,
+# which require Spring Boot 3.5.x / 4.0.x respectively. The project is
+# currently pinned to Spring Boot 3.4.x (Spring Cloud 2024.0.0 compatibility).
+# Migration to Spring Boot 3.5.x is planned for the next major dependency
+# update cycle. Risk mitigated by network-layer controls (API gateway, no
+# direct external exposure of internal services).
+CVE-2026-22732
+# CVE-2026-22739 — Spring Cloud Config Server: path traversal via profile parameter
+# (spring-cloud-config-server 4.2.0). Fixed in 4.3.2 / 5.0.2, which belong to the
+# Spring Cloud 2025.x train (requires Spring Boot 3.5.x). Project is pinned to Spring
+# Boot 3.4.x for Spring Cloud 2024.0.x compatibility. Config server is not exposed
+# externally (not routed through the API gateway). Migration planned for next major
+# Spring Boot upgrade.
+CVE-2026-22739
+# Format: one CVE-ID per line, with a comment explaining the
+# justification — mirrors the approach used in
+# config/dependency-check/suppressions.xml for OWASP DC.
+#
+# Example:
+#   # CVE-2024-99999 — not exploitable: affected component (libfoo)
+#   # is not reachable in our container configuration.
+#   CVE-2024-99999
+# ============================================================

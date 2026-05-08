@@ -1,6 +1,9 @@
 package com.hotelpms.reservation.client;
 
 import com.hotelpms.reservation.client.dto.GuestResponse;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,9 +15,17 @@ import java.util.UUID;
 
 /**
  * Feign client for the Guest Service.
+ *
+ * <p>
+ * A {@link CircuitBreaker} is applied to {@link #getGuestsBatch}.
+ * When the circuit is open the fallback returns an empty list, allowing the
+ * caller to degrade gracefully (guest names shown as "Unknown Guest").
  */
 @FeignClient(name = "guest-service", url = "${APPLICATION_CONFIG_GUEST_SERVICE_URL:http://guest-service:8083}")
 public interface GuestClient {
+
+    /** Logger used inside default fallback methods. */
+    Logger LOG = LoggerFactory.getLogger(GuestClient.class);
 
     /**
      * Gets a guest by ID.
@@ -32,5 +43,20 @@ public interface GuestClient {
      * @return the list of guest details
      */
     @PostMapping("/api/v1/guests/batch")
+    @CircuitBreaker(name = "guestService", fallbackMethod = "getGuestsBatchFallback")
     List<GuestResponse> getGuestsBatch(@RequestBody List<UUID> ids);
+
+    /**
+     * Fallback invoked when the Guest Service is unavailable or retries are
+     * exhausted. Returns an empty list so the caller can still build a response
+     * with "Unknown Guest" placeholders.
+     *
+     * @param ids       the guest IDs that were requested
+     * @param throwable the throwable that triggered the fallback
+     * @return an empty list
+     */
+    default List<GuestResponse> getGuestsBatchFallback(final List<UUID> ids, final Throwable throwable) {
+        LOG.warn("[GuestClient] getGuestsBatch fallback triggered for {} ids: {}", ids.size(), throwable.getMessage());
+        return List.of();
+    }
 }

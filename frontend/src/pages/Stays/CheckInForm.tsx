@@ -1,15 +1,34 @@
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, memo, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3TextField } from '../../components/m3/M3TextField';
 import { stayService } from '../../services/stayService';
-import type { StayRequest, StayGuestRequest } from '../../types/stay.types';
+import { guestService } from '../../services/guestService';
+import type {
+  AlloggiatiStato,
+  AlloggiatiTipdoc,
+  StayGuestRequest,
+  StayRequest,
+  TravellerType,
+} from '../../types/stay.types';
+import type { DocumentType } from '../../types/guest.types';
+import { GuestFieldSection } from './StayGuestFieldSection';
+import {
+  emptyGuest,
+  TYPES_WITHOUT_DOC,
+  CODICE_ITALIA,
+} from './stayGuestFieldHelpers';
+import type { IdentifiableGuest } from './stayGuestFieldHelpers';
 
-const ICON_SIZE_20 = { fontSize: 20 };
+const mapDocType = (dt: DocumentType): string => {
+  switch (dt) {
+    case 'PASSPORT': return 'PASOR';
+    case 'ID_CARD':  return 'CARTE';
+    default:         return '';
+  }
+};
 
 interface CheckInState {
   guestId: string;
@@ -17,182 +36,9 @@ interface CheckInState {
   expectedGuests: number;
 }
 
-interface IdentifiableGuest extends StayGuestRequest {
-  _id: string; // Internal ID for React keys
-}
-
-const emptyGuest = (isPrimary: boolean): IdentifiableGuest => ({
-  _id: Math.random().toString(36).substr(2, 9),
-  firstName: '',
-  lastName: '',
-  gender: '',
-  dateOfBirth: '',
-  placeOfBirth: '',
-  citizenship: '',
-  documentType: '',
-  documentNumber: '',
-  documentPlaceOfIssue: '',
-  isPrimaryGuest: isPrimary,
-  travellerType: isPrimary ? 'OSPITE_SINGOLO' : '',
-  travelPurpose: '',
-});
-
-const GuestFieldSection = memo(({
-  guest,
-  index,
-  canRemove,
-  onRemove,
-  onChange,
-}: {
-  guest: IdentifiableGuest;
-  index: number;
-  canRemove: boolean;
-  onRemove: (idx: number) => void;
-  onChange: (idx: number, field: keyof StayGuestRequest, value: string | boolean) => void;
-}) => {
-  const { t } = useTranslation('stays');
-
-  const handleFieldChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    const checked = (e.target as HTMLInputElement).checked;
-    onChange(index, name as keyof StayGuestRequest, type === 'checkbox' ? checked : value);
-  }, [index, onChange]);
-
-  const handleRemove = useCallback(() => onRemove(index), [index, onRemove]);
-
-  return (
-    <M3Card className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-display font-medium text-on-surface flex items-center">
-          <MaterialIcon name="person" className="mr-2 text-primary" />
-          Guest {index + 1} {guest.isPrimaryGuest && <span className="ml-2 text-xs bg-primary text-on-primary px-2 py-0.5 rounded-full">{t('guest_badge_primary')}</span>}
-        </h2>
-        {canRemove && (
-          <M3Button variant="text" icon="close" onClick={handleRemove} type="button">
-            {t('btn_remove')}
-          </M3Button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <M3TextField
-          label={t('label_first_name')}
-          name="firstName"
-          value={guest.firstName}
-          onChange={handleFieldChange}
-          required
-        />
-        <M3TextField
-          label={t('label_last_name')}
-          name="lastName"
-          value={guest.lastName}
-          onChange={handleFieldChange}
-          required
-        />
-        <M3TextField
-          label={t('label_gender')}
-          name="gender"
-          value={guest.gender}
-          onChange={handleFieldChange}
-          required
-        />
-        <M3TextField
-          label={t('label_date_of_birth')}
-          name="dateOfBirth"
-          type="date"
-          value={guest.dateOfBirth}
-          onChange={handleFieldChange}
-          required
-        />
-        <M3TextField
-          label={t('label_place_of_birth')}
-          name="placeOfBirth"
-          value={guest.placeOfBirth}
-          onChange={handleFieldChange}
-          required
-        />
-        <M3TextField
-          label={t('label_citizenship')}
-          name="citizenship"
-          value={guest.citizenship}
-          onChange={handleFieldChange}
-          required
-        />
-        <M3TextField
-          label={t('label_doc_type')}
-          name="documentType"
-          value={guest.documentType}
-          onChange={handleFieldChange}
-          required
-        />
-        <M3TextField
-          label={t('label_doc_number')}
-          name="documentNumber"
-          value={guest.documentNumber}
-          onChange={handleFieldChange}
-          required
-        />
-        <M3TextField
-          label={t('label_doc_issue_place')}
-          name="documentPlaceOfIssue"
-          value={guest.documentPlaceOfIssue}
-          onChange={handleFieldChange}
-          required
-        />
-        <div className="relative">
-          <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface">
-            <select
-              id={`traveller-type-${index}`}
-              name="travellerType"
-              value={guest.travellerType}
-              onChange={handleFieldChange}
-              className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-none appearance-none"
-              required
-            >
-              <option value="" disabled hidden></option>
-              <option value="OSPITE_SINGOLO">{t('guest_type_single')}</option>
-              <option value="CAPOFAMIGLIA">{t('guest_type_family_head')}</option>
-              <option value="CAPOGRUPPO">{t('guest_type_group_head')}</option>
-            </select>
-            <label
-              htmlFor={`traveller-type-${index}`}
-              className="absolute transition-all duration-150 pointer-events-none font-body left-4 top-1 text-xs text-on-surface-variant"
-            >
-              {t('label_guest_type')}
-            </label>
-            <span
-              className="material-symbols-outlined absolute right-3 pointer-events-none text-on-surface-variant z-10"
-              style={ICON_SIZE_20}
-            >
-              arrow_drop_down
-            </span>
-          </div>
-        </div>
-        <M3TextField
-          label={t('label_stay_reason')}
-          name="travelPurpose"
-          value={guest.travelPurpose}
-          onChange={handleFieldChange}
-        />
-        <div className="md:col-span-2 flex items-center gap-6 mt-2">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              name="isPrimaryGuest"
-              checked={guest.isPrimaryGuest}
-              onChange={handleFieldChange}
-              className="w-5 h-5 text-primary rounded focus:ring-primary"
-            />
-            <span className="text-sm font-body text-on-surface">{t('label_primary_guest')}</span>
-          </label>
-        </div>
-      </div>
-    </M3Card>
-  );
-});
-
-GuestFieldSection.displayName = 'GuestFieldSection';
-
+// ---------------------------------------------------------------------------
+// CheckInForm
+// ---------------------------------------------------------------------------
 export const CheckInForm = memo(() => {
   const { t } = useTranslation(['stays', 'common']);
   const navigate = useNavigate();
@@ -202,34 +48,73 @@ export const CheckInForm = memo(() => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [prefillFields, setPrefillFields] = useState<string[]>([]);
+  const [prefillSource, setPrefillSource] = useState<'stay' | 'profile' | null>(null);
+  const [stati, setStati] = useState<AlloggiatiStato[]>([]);
+  const [tipdoc, setTipdoc] = useState<AlloggiatiTipdoc[]>([]);
 
-  // Initialize guests based on expectedGuests, at least 1 primary guest
-  const initialGuestsCount = state?.expectedGuests && state.expectedGuests > 0 ? state.expectedGuests : 1;
+  const initialCount = state?.expectedGuests && state.expectedGuests > 0 ? state.expectedGuests : 1;
   const [guests, setGuests] = useState<IdentifiableGuest[]>(
-    Array.from({ length: initialGuestsCount }, (_, i) => emptyGuest(i === 0))
+    Array.from({ length: initialCount }, (_, i) => emptyGuest(i === 0))
   );
 
-  const handleGuestChange = useCallback((index: number, field: keyof StayGuestRequest, value: string | boolean) => {
+  useEffect(() => {
+    stayService.getLookupStati().then(setStati).catch(() => { /* non-blocking */ });
+    stayService.getLookupTipdoc().then(setTipdoc).catch(() => { /* non-blocking */ });
+  }, []);
+
+  const guestId = state?.guestId;
+  useEffect(() => {
+    if (!guestId) return;
+
+    Promise.allSettled([
+      stayService.getLastCompletedStayForGuest(guestId),
+      guestService.getGuestById(guestId),
+    ]).then(([stayResult, profileResult]) => {
+      const updates: Partial<IdentifiableGuest> = {};
+      const filled: string[] = [];
+
+      const lastStay = stayResult.status === 'fulfilled' ? stayResult.value : null;
+      const lastPrimary = lastStay?.guests?.find(g => g.isPrimaryGuest) ?? lastStay?.guests?.[0] ?? null;
+      if (lastPrimary) {
+        if (lastPrimary.firstName)    { updates.firstName    = lastPrimary.firstName;    filled.push('firstName'); }
+        if (lastPrimary.lastName)     { updates.lastName     = lastPrimary.lastName;     filled.push('lastName'); }
+        if (lastPrimary.gender)       { updates.gender       = lastPrimary.gender;       filled.push('gender'); }
+        if (lastPrimary.dateOfBirth)  { updates.dateOfBirth  = lastPrimary.dateOfBirth;  filled.push('dateOfBirth'); }
+        if (lastPrimary.citizenship)  { updates.citizenship  = lastPrimary.citizenship;  filled.push('citizenship'); }
+        if (lastPrimary.placeOfBirth) { updates.placeOfBirth = lastPrimary.placeOfBirth; filled.push('placeOfBirth'); }
+        if (lastPrimary.travellerType){ updates.travellerType= lastPrimary.travellerType; filled.push('travellerType'); }
+      }
+
+      const profile = profileResult.status === 'fulfilled' ? profileResult.value : null;
+      if (profile) {
+        const doc = profile.identityDocuments?.[0];
+        if (!updates.firstName    && profile.firstName)    { updates.firstName    = profile.firstName;           filled.push('firstName'); }
+        if (!updates.lastName     && profile.lastName)     { updates.lastName     = profile.lastName;            filled.push('lastName'); }
+        if (!updates.documentType   && doc?.documentType)   { updates.documentType   = mapDocType(doc.documentType); filled.push('documentType'); }
+        if (!updates.documentNumber && doc?.documentNumber) { updates.documentNumber = doc.documentNumber;           filled.push('documentNumber'); }
+      }
+
+      if (Object.keys(updates).length === 0) return;
+      setGuests(prev => [{ ...prev[0], ...updates }, ...prev.slice(1)]);
+      setPrefillFields(filled);
+      setPrefillSource(lastPrimary ? 'stay' : 'profile');
+    });
+  }, [guestId]);
+
+  const handleGuestChange = useCallback((index: number, patch: Partial<IdentifiableGuest>) => {
     setGuests(prev => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      
-      // Ensure only one primary guest if we are setting this one to primary
-      if (field === 'isPrimaryGuest' && value === true) {
+      updated[index] = { ...updated[index], ...patch };
+      if (patch.isPrimaryGuest === true) {
         return updated.map((g, i) => i === index ? g : { ...g, isPrimaryGuest: false });
       }
       return updated;
     });
   }, []);
 
-  const addGuest = useCallback(() => {
-    setGuests(prev => [...prev, emptyGuest(false)]);
-  }, []);
-
-  const removeGuest = useCallback((index: number) => {
-    setGuests(prev => prev.filter((_, i) => i !== index));
-  }, []);
-
+  const addGuest = useCallback(() => setGuests(prev => [...prev, emptyGuest(false)]), []);
+  const removeGuest = useCallback((index: number) => setGuests(prev => prev.filter((_, i) => i !== index)), []);
   const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const handleSubmit = useCallback(async (e: FormEvent) => {
@@ -240,31 +125,59 @@ export const CheckInForm = memo(() => {
       setError(t('err_missing_context'));
       return;
     }
-
-    // Validate at least one primary guest
     if (!guests.some(g => g.isPrimaryGuest)) {
       setError(t('err_primary_guest_required'));
       return;
     }
 
+    // Per-guest domain validation
+    for (const [idx, g] of guests.entries()) {
+      const num = idx + 1;
+      const gHasDoc = !TYPES_WITHOUT_DOC.includes(g.travellerType as TravellerType);
+      const isItalianBorn = g._statoDiNascita === CODICE_ITALIA;
+      const isItalianDocIssue = g._statoRilascioDoc === CODICE_ITALIA;
+
+      if (!g._statoDiNascita) {
+        setError(t('err_stato_nascita_required', { number: num }));
+        return;
+      }
+      if (isItalianBorn && !g.placeOfBirth) {
+        setError(t('err_comune_nascita_required', { number: num }));
+        return;
+      }
+      if (gHasDoc) {
+        if (!g._statoRilascioDoc) {
+          setError(t('err_stato_rilascio_required', { number: num }));
+          return;
+        }
+        if (isItalianDocIssue && !g.documentPlaceOfIssue) {
+          setError(t('err_comune_rilascio_required', { number: num }));
+          return;
+        }
+      }
+    }
+
     try {
       setLoading(true);
-      // Remove _id before sending to API
-      const apiGuests: StayGuestRequest[] = guests.map((g) => ({
-        firstName: g.firstName,
-        lastName: g.lastName,
-        gender: g.gender,
-        dateOfBirth: g.dateOfBirth,
-        placeOfBirth: g.placeOfBirth,
-        citizenship: g.citizenship,
-        documentType: g.documentType,
-        documentNumber: g.documentNumber,
-        documentPlaceOfIssue: g.documentPlaceOfIssue,
-        isPrimaryGuest: g.isPrimaryGuest,
-        travellerType: g.travellerType || undefined,
-        travelPurpose: g.travelPurpose || undefined,
-      }));
-      
+      const apiGuests: StayGuestRequest[] = guests.map(g => {
+        const withoutDoc = TYPES_WITHOUT_DOC.includes(g.travellerType as TravellerType);
+        return {
+          firstName: g.firstName,
+          lastName: g.lastName,
+          gender: g.gender,
+          dateOfBirth: g.dateOfBirth,
+          placeOfBirth: g.placeOfBirth,
+          citizenship: g.citizenship,
+          // Explicitly exclude doc fields for FAMILIARE/MEMBRO_GRUPPO per tracciato rules
+          documentType: withoutDoc ? undefined : (g.documentType || undefined),
+          documentNumber: withoutDoc ? undefined : (g.documentNumber || undefined),
+          documentPlaceOfIssue: withoutDoc ? undefined : (g.documentPlaceOfIssue || undefined),
+          isPrimaryGuest: g.isPrimaryGuest,
+          travellerType: g.travellerType || undefined,
+          travelPurpose: g.travelPurpose || undefined,
+        };
+      });
+
       const request: StayRequest = {
         reservationId,
         guestId: state.guestId,
@@ -276,7 +189,7 @@ export const CheckInForm = memo(() => {
       await stayService.createStay(request);
       navigate('/stays', { replace: true });
     } catch (err: unknown) {
-      const e = err as {response?: {data?: {detail?: string}}, message?: string};
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
       setError(e.response?.data?.detail || e.message || t('err_checkin_failed'));
     } finally {
       setLoading(false);
@@ -286,11 +199,20 @@ export const CheckInForm = memo(() => {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <M3Button variant="text" icon="arrow_back" onClick={handleBack}>
-          {t('back')}
-        </M3Button>
+        <M3Button variant="text" icon="arrow_back" onClick={handleBack}>{t('back')}</M3Button>
         <h1 className="text-2xl font-display font-bold text-on-surface">{t('checkin_title')}</h1>
       </div>
+
+      {prefillFields.length > 0 && (
+        <div className="bg-secondary-container text-on-secondary-container p-4 rounded-shape-sm flex items-start gap-3">
+          <MaterialIcon name="auto_fix_high" className="mt-0.5 flex-shrink-0" />
+          <p className="font-body text-sm">
+            {prefillSource === 'stay'
+              ? t('prefill_banner_stay', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })
+              : t('prefill_banner_profile', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })}
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="bg-error-container text-on-error-container p-4 rounded-shape-sm flex items-start gap-3">
@@ -306,6 +228,8 @@ export const CheckInForm = memo(() => {
             guest={guest}
             index={index}
             canRemove={guests.length > 1}
+            stati={stati}
+            tipdoc={tipdoc}
             onRemove={removeGuest}
             onChange={handleGuestChange}
           />
@@ -315,12 +239,7 @@ export const CheckInForm = memo(() => {
           <M3Button variant="outlined" icon="person_add" onClick={addGuest} type="button">
             {t('btn_add_guest')}
           </M3Button>
-          <M3Button
-            variant="filled"
-            icon="how_to_reg"
-            type="submit"
-            disabled={loading}
-          >
+          <M3Button variant="filled" icon="how_to_reg" type="submit" disabled={loading}>
             {loading ? t('btn_processing') : t('btn_complete_checkin')}
           </M3Button>
         </div>
@@ -328,7 +247,5 @@ export const CheckInForm = memo(() => {
     </div>
   );
 });
-
-CheckInForm.displayName = 'CheckInForm';
 
 CheckInForm.displayName = 'CheckInForm';

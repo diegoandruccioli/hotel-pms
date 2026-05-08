@@ -19,6 +19,7 @@ import java.util.UUID;
  * @param dateOfBirth       The date of birth of the guest.
  * @param identityDocuments The list of identity documents belonging to the
  *                          guest.
+ * @param gdprConsentDate   The date GDPR consent was recorded.
  * @param createdAt         The creation timestamp.
  * @param updatedAt         The last update timestamp.
  */
@@ -34,6 +35,7 @@ public record GuestResponse(
         String country,
         LocalDate dateOfBirth,
         List<IdentityDocumentResponseDTO> identityDocuments,
+        LocalDate gdprConsentDate,
         LocalDateTime createdAt,
         LocalDateTime updatedAt) {
 

@@ -9,6 +9,8 @@
   "RESERVATION_NOT_FOUND": "The specified reservation could not be found.",
   "RESERVATION_OVERLAP": "This room is already reserved for the selected dates.",
   "RESERVATION_NOT_CONFIRMED": "The reservation is not confirmed.",
+  "INVALID_RESERVATION_STATUS": "This reservation cannot be checked in because it is already checked in, cancelled, or otherwise closed.",
+  "RESERVATION_SERVICE_UNAVAILABLE": "Reservation service is currently unavailable. Please try again in a moment.",
   "INVALID_RESERVATION_DATES": "Check-out date must be after check-in date.",
   "STAY_NOT_FOUND": "The specified stay could not be found.",
   "GUEST_ALREADY_CHECKED_IN": "This guest is already checked in to a room.",

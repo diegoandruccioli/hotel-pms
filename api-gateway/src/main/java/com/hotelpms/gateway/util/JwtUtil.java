@@ -4,7 +4,6 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,18 +16,34 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret:bXktMzItYnl0ZS1zZWNyZXQta2V5LWZvci10ZXN0LWxvY2FsLWRldi0xMjM0NQ==}")
+    @Value("${jwt.secret}")
     private String secret;
 
     private Key key;
 
     /**
-     * Initializes the signing key based on the injected secret.
+     * Lazily initializes and returns the signing key.
+     *
+     * @return the signing key
+     * @throws IllegalArgumentException if the secret is null, empty, or not valid Base64
      */
-    @PostConstruct
-    public void init() {
-        byte[] keyBytes = Decoders.BASE64.decode(this.secret);
-        this.key = Keys.hmacShaKeyFor(keyBytes);
+    private Key getSigningKey() {
+        if (this.key == null) {
+            if (this.secret == null || this.secret.isBlank()) {
+                throw new IllegalArgumentException("JWT secret is not configured (null or empty)");
+            }
+            try {
+                byte[] keyBytes = Decoders.BASE64.decode(this.secret);
+                this.key = Keys.hmacShaKeyFor(keyBytes);
+            } catch (Exception e) {
+                // If the secret is literally "${JWT_SECRET}", it means config resolution failed
+                if (this.secret.contains("${")) {
+                    throw new IllegalArgumentException("JWT secret placeholder was not resolved: " + this.secret, e);
+                }
+                throw new IllegalArgumentException("Failed to decode JWT secret. Ensure it is a valid Base64 string.", e);
+            }
+        }
+        return this.key;
     }
 
     /**
@@ -39,7 +54,7 @@ public class JwtUtil {
      */
     public Claims getAllClaimsFromToken(final String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(key)
+                .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();

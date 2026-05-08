@@ -17,6 +17,7 @@ frontend/.vite/
 frontend/coverage/
 frontend/playwright-report/
 frontend/test-results/
+frontend/.eslintcache
 
 # ── IDE ──────────────────────────────────────────────────────────────────────
 .vscode/
@@ -49,3 +50,8 @@ backup/
 
 # ── Local tools ──────────────────────────────────────────────────────────────
 .antigravity.json
+
+# ── Screenshots ──────────────────────────────────────────────────────────────
+screenshots/
+bash.exe.stackdump
+frontend/bash.exe.stackdump

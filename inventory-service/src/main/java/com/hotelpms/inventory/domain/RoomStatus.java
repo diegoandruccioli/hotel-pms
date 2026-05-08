@@ -1,12 +1,15 @@
 package com.hotelpms.inventory.domain;
 
 /**
- * Represents the housekeeping status of a hotel room.
+ * Represents the operational status of a hotel room.
+ *
+ * <p>CLEAN / DIRTY / MAINTENANCE are housekeeping states managed by cleaning staff.
+ * OCCUPIED is set by the stay-service Saga (check-in) and cleared to DIRTY at check-out.
  */
 public enum RoomStatus {
 
     /**
-     * The room has been cleaned and is ready for guests.
+     * The room has been cleaned and is ready for new guests.
      */
     CLEAN,
 
@@ -16,7 +19,13 @@ public enum RoomStatus {
     DIRTY,
 
     /**
-     * The room is undergoing maintenance and is not available.
+     * The room is undergoing maintenance and is not available for booking.
      */
-    MAINTENANCE
+    MAINTENANCE,
+
+    /**
+     * A guest is currently checked in — set by the check-in Saga, cleared to DIRTY at check-out.
+     * Housekeeping staff cannot change this status directly.
+     */
+    OCCUPIED
 }

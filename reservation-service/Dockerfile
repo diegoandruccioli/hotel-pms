@@ -18,6 +18,7 @@ RUN ./gradlew build -x test
 
 # Stage 2: Runtime stage
 FROM eclipse-temurin:21-jre-alpine
+RUN apk update && apk upgrade --no-cache
 
 WORKDIR /app
 

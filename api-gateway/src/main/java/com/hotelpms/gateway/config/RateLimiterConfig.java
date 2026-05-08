@@ -3,47 +3,92 @@ package com.hotelpms.gateway.config;
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import reactor.core.publisher.Mono;
 
 import java.util.Objects;
 
 /**
- * Configures rate-limiting beans for the Spring Cloud Gateway.
+ * Configures rate-limiting key resolver beans for the Spring Cloud Gateway.
  *
- * <p>
- * The {@code remoteAddrKeyResolver} bean is referenced by name in the
- * {@code application.yml} rate-limiter filter definition:
- * 
- * <pre>key-resolver: "#{@remoteAddrKeyResolver}"</pre>
+ * <p>Two resolvers are provided:
+ * <ul>
+ *   <li>{@code remoteAddrKeyResolver} — for pre-authentication routes (e.g. /auth/**).
+ *       Extracts the leftmost IP from {@code X-Forwarded-For} when the gateway sits
+ *       behind a reverse proxy or load-balancer, falling back to the TCP remote address.
+ *       Without this fix, all clients share a single rate-limit bucket equal to the
+ *       proxy's IP, making per-IP isolation completely ineffective.</li>
+ *   <li>{@code userKeyResolver} — for authenticated routes. Uses the {@code X-Auth-User}
+ *       header injected by {@link com.hotelpms.gateway.filter.AuthenticationFilter} after
+ *       JWT validation. Per-user buckets prevent a single compromised or malicious account
+ *       from flooding the API and causing a denial-of-service for other tenants. Falls back
+ *       to the proxy-aware IP when the header is absent.</li>
+ * </ul>
  *
- * <p>
- * Using the client IP as the bucket key means each distinct IP address
- * receives its own independent token bucket, preventing a single attacker
- * from exhausting the global request quota of the authentication endpoint.
+ * <p>Both beans are referenced by name in the {@code api-gateway.yml} rate-limiter
+ * filter definitions:
+ * <pre>
+ *   key-resolver: "#{@remoteAddrKeyResolver}"   # pre-auth routes
+ *   key-resolver: "#{@userKeyResolver}"          # authenticated routes
+ * </pre>
  */
 @Configuration
 public class RateLimiterConfig {
 
     /**
-     * Resolves the rate-limit bucket key from the client's remote IP address.
+     * Resolves the rate-limit bucket key from the client IP address.
      *
-     * <p>
-     * This is intentionally the simplest production-safe key resolver.
-     * If the gateway sits behind a load-balancer or reverse proxy, consider
-     * extracting the {@code X-Forwarded-For} header instead:
-     * 
-     * <pre>
-     * Objects.requireNonNull(exchange.getRequest().getHeaders()
-     *         .getFirst("X-Forwarded-For"), "X-Forwarded-For header missing")
-     * </pre>
+     * <p>When an {@code X-Forwarded-For} header is present (set by a reverse proxy),
+     * the leftmost — i.e. the original client — IP is used.  Without the header the
+     * TCP-level remote address is used directly.
      *
-     * @return a {@link KeyResolver} backed by the client remote address
+     * <p>Marked {@code @Primary} so that {@code RequestRateLimiterGatewayFilterFactory}
+     * can auto-wire a single default resolver without ambiguity. Routes that need
+     * per-user buckets reference {@code userKeyResolver} explicitly via SpEL.
+     *
+     * @return a proxy-aware {@link KeyResolver} backed by client IP
      */
     @Bean
+    @Primary
     public KeyResolver remoteAddrKeyResolver() {
-        return exchange -> Mono.just(
-                Objects.requireNonNull(
-                        exchange.getRequest().getRemoteAddress(),
-                        "Remote address must not be null").getAddress().getHostAddress());
+        return exchange -> {
+            final String forwarded = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) {
+                return Mono.just(forwarded.split(",")[0].trim());
+            }
+            return Mono.just(
+                    Objects.requireNonNull(
+                            exchange.getRequest().getRemoteAddress(),
+                            "Remote address must not be null").getAddress().getHostAddress());
+        };
+    }
+
+    /**
+     * Resolves the rate-limit bucket key for authenticated routes.
+     *
+     * <p>The {@code X-Auth-User} header is injected by
+     * {@link com.hotelpms.gateway.filter.AuthenticationFilter} after successful JWT
+     * validation, so this resolver must run after that filter in the route filter chain.
+     * When the header is present, each authenticated user receives an independent token
+     * bucket (prefixed {@code "user:"}).  When absent, the resolver falls back to the
+     * proxy-aware IP (prefixed {@code "ip:"}).
+     *
+     * @return a {@link KeyResolver} that keys by authenticated username, or by IP as fallback
+     */
+    @Bean
+    public KeyResolver userKeyResolver() {
+        return exchange -> {
+            final String user = exchange.getRequest().getHeaders().getFirst("X-Auth-User");
+            if (user != null && !user.isBlank()) {
+                return Mono.just("user:" + user);
+            }
+            final String forwarded = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) {
+                return Mono.just("ip:" + forwarded.split(",")[0].trim());
+            }
+            return Mono.just("ip:" + Objects.requireNonNull(
+                    exchange.getRequest().getRemoteAddress(),
+                    "Remote address must not be null").getAddress().getHostAddress());
+        };
     }
 }

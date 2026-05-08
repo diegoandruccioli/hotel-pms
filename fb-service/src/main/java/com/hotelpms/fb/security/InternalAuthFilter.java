@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.slf4j.MDC;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -31,10 +32,9 @@ import java.util.List;
  * <p>
  * The filter enforces a two-layer check:
  * <ol>
- * <li><b>Presence check</b> – rejects requests missing any of the three
- * required
- * headers: {@code X-Auth-User}, {@code X-Auth-Role}, or
- * {@code X-Internal-Signature}.</li>
+ * <li><b>Presence check</b> – rejects requests missing any of the four
+ * required headers: {@code X-Auth-User}, {@code X-Auth-Role},
+ * {@code X-Auth-Hotel}, or {@code X-Internal-Signature}.</li>
  * <li><b>HMAC-SHA256 integrity check</b> – recomputes
  * {@code HMAC-SHA256(sharedSecret, "username:role")} and compares it against
  * the received signature using constant-time {@link MessageDigest#isEqual} to
@@ -54,8 +54,10 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
 
     private static final String HEADER_USER = "X-Auth-User";
     private static final String HEADER_ROLE = "X-Auth-Role";
+    private static final String HEADER_HOTEL = "X-Auth-Hotel";
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
 
     private final String hmacSecret;
 
@@ -87,14 +89,16 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
 
         final String username = request.getHeader(HEADER_USER);
         final String role = request.getHeader(HEADER_ROLE);
+        final String hotelId = request.getHeader(HEADER_HOTEL);
         final String signature = request.getHeader(HEADER_SIGNATURE);
 
-        if (!StringUtils.hasText(username) || !StringUtils.hasText(role) || !StringUtils.hasText(signature)) {
+        if (!StringUtils.hasText(username) || !StringUtils.hasText(role)
+                || !StringUtils.hasText(hotelId) || !StringUtils.hasText(signature)) {
             rejectRequest(response, "Missing required gateway authentication headers");
             return;
         }
 
-        if (!isSignatureValid(username, role, signature)) {
+        if (!isSignatureValid(username, role, hotelId, signature)) {
             LOG.warn("[InternalAuthFilter] HMAC signature mismatch for user={}", username);
             rejectRequest(response, "Invalid internal request signature");
             return;
@@ -102,9 +106,18 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
 
         final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 username, "", List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+        auth.setDetails(hotelId);
 
         SecurityContextHolder.getContext().setAuthentication(auth);
-        filterChain.doFilter(request, response);
+        final String correlationId = request.getHeader(CORRELATION_ID_HEADER);
+        if (correlationId != null) {
+            MDC.put("correlationId", correlationId);
+        }
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            MDC.remove("correlationId");
+        }
     }
 
     /**
@@ -118,13 +131,15 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
      *
      * @param username  the username from the {@code X-Auth-User} header
      * @param role      the role from the {@code X-Auth-Role} header
+     * @param hotelId   the hotel UUID from the {@code X-Auth-Hotel} header
      * @param signature the hex signature from the {@code X-Internal-Signature}
      *                  header
      * @return {@code true} if the recomputed digest matches the received signature
      */
-    private boolean isSignatureValid(final String username, final String role, final String signature) {
+    private boolean isSignatureValid(final String username, final String role,
+            final String hotelId, final String signature) {
         try {
-            final String expected = computeHmac(username, role);
+            final String expected = computeHmac(username, role, hotelId);
             return MessageDigest.isEqual(
                     expected.getBytes(StandardCharsets.UTF_8),
                     signature.getBytes(StandardCharsets.UTF_8));
@@ -135,21 +150,28 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Computes {@code HMAC-SHA256(secret, "username:role")} and returns the result
-     * as a lowercase hex string, matching the API Gateway's signing convention.
+     * Computes {@code HMAC-SHA256(secret, "username:role:hotelId")} and returns
+     * the result as a lowercase hex string, matching the API Gateway's signing
+     * convention.
+     *
+     * <p>Including {@code hotelId} in the signed payload guarantees the integrity
+     * of the {@code X-Auth-Hotel} tenant-isolation header, preventing any internal
+     * caller from tampering with the hotel context without invalidating the HMAC.
      *
      * @param username the authenticated username
      * @param role     the role associated with the user
+     * @param hotelId  the hotel UUID associated with the user
      * @return hex-encoded HMAC digest
      * @throws IllegalStateException if the JVM does not support HmacSHA256
      */
-    private String computeHmac(final String username, final String role) {
+    private String computeHmac(final String username, final String role, final String hotelId) {
         try {
             final Mac mac = Mac.getInstance(HMAC_ALGORITHM);
             final SecretKeySpec keySpec = new SecretKeySpec(
                     hmacSecret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM);
             mac.init(keySpec);
-            final byte[] digest = mac.doFinal((username + ":" + role).getBytes(StandardCharsets.UTF_8));
+            final byte[] digest = mac.doFinal(
+                    (username + ":" + role + ":" + hotelId).getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest);
         } catch (final NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("HMAC_SIGNATURE_FAILED", e);

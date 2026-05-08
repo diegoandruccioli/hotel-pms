@@ -24,16 +24,20 @@ export const Login = memo(() => {
     setError('');
 
     try {
-      await authService.login({ username, password });
+      const loginResult = await authService.login({ username, password });
       const user = await authService.fetchMe();
       login(user);
-      navigate('/');
+      if (loginResult.mustChangePassword) {
+        navigate('/profile', { state: { mustChangePassword: true } });
+      } else {
+        navigate('/');
+      }
     } catch (err: unknown) {
       const e = err as {response?: {status?: number}, message?: string};
       if (e.response?.status === 401) {
         setError(t('invalid_credentials'));
       } else {
-        setError(t('login_error_generic'));
+        setError(t('login_failed'));
       }
     } finally {
       setIsLoading(false);

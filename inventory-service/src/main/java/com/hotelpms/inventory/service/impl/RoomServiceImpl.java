@@ -36,6 +36,7 @@ public class RoomServiceImpl implements RoomService {
     private static final String TYPE_NOT_FOUND_MSG = "ROOM_TYPE_NOT_FOUND";
     private static final String ROOM_ID_NULL_MSG = "Room ID cannot be null";
     private static final String ROOM_TYPE_ID_NULL_MSG = "RoomType ID cannot be null";
+    private static final String HOTEL_ID_NULL_MSG = "Hotel ID cannot be null";
 
     private final RoomRepository roomRepository;
     private final RoomTypeRepository roomTypeRepository;
@@ -65,18 +66,19 @@ public class RoomServiceImpl implements RoomService {
     }
 
     /**
-     * Retrieves a single active room by its UUID.
+     * Retrieves a single active room by its UUID, scoped to the authenticated hotel.
      *
-     * @param id the room UUID; must not be {@code null}
+     * @param id      the room UUID; must not be {@code null}
+     * @param hotelId the hotel UUID; must not be {@code null}
      * @return the room as a response DTO
-     * @throws NotFoundException if no active room exists with the given {@code id}
+     * @throws NotFoundException if no active room exists for the given {@code id} and {@code hotelId}
      */
     @Override
     @Transactional(readOnly = true)
-    public RoomResponse getRoomById(final UUID id) {
+    public RoomResponse getRoomById(final UUID id, final UUID hotelId) {
         Objects.requireNonNull(id, ROOM_ID_NULL_MSG);
-        final Room room = roomRepository.findById(id)
-                .filter(Room::isActive)
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
+        final Room room = roomRepository.findByIdAndActiveTrueAndHotelId(id, hotelId)
                 .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
         return roomMapper.toResponse(room);
     }
@@ -99,9 +101,10 @@ public class RoomServiceImpl implements RoomService {
     }
 
     /**
-     * Updates the full details of an existing active room.
+     * Updates the full details of an existing active room, scoped to the authenticated hotel.
      *
      * @param id      the room UUID; must not be {@code null}
+     * @param hotelId the hotel UUID; must not be {@code null}
      * @param request the update request; must not be {@code null}
      * @return the updated room as a response DTO
      * @throws NotFoundException if the room or the referenced {@code RoomType} is
@@ -109,10 +112,10 @@ public class RoomServiceImpl implements RoomService {
      */
     @Override
     @Transactional
-    public RoomResponse updateRoom(final UUID id, final RoomRequest request) {
+    public RoomResponse updateRoom(final UUID id, final UUID hotelId, final RoomRequest request) {
         Objects.requireNonNull(id, ROOM_ID_NULL_MSG);
-        final Room room = roomRepository.findById(id)
-                .filter(Room::isActive)
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
+        final Room room = roomRepository.findByIdAndActiveTrueAndHotelId(id, hotelId)
                 .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
 
         final UUID roomTypeId = Objects.requireNonNull(request.roomTypeId(), ROOM_TYPE_ID_NULL_MSG);
@@ -131,19 +134,20 @@ public class RoomServiceImpl implements RoomService {
 
     /**
      * Updates only the housekeeping status of a room (e.g., {@code DIRTY} after
-     * check-out).
+     * check-out), scoped to the authenticated hotel.
      *
-     * @param id     the room UUID; must not be {@code null}
-     * @param status the new housekeeping status; must not be {@code null}
+     * @param id      the room UUID; must not be {@code null}
+     * @param hotelId the hotel UUID; must not be {@code null}
+     * @param status  the new housekeeping status; must not be {@code null}
      * @return the updated room as a response DTO
-     * @throws NotFoundException if no active room exists with the given {@code id}
+     * @throws NotFoundException if no active room exists with the given {@code id} and {@code hotelId}
      */
     @Override
     @Transactional
-    public RoomResponse updateRoomStatus(final UUID id, final RoomStatus status) {
+    public RoomResponse updateRoomStatus(final UUID id, final UUID hotelId, final RoomStatus status) {
         Objects.requireNonNull(id, ROOM_ID_NULL_MSG);
-        final Room room = roomRepository.findById(id)
-                .filter(Room::isActive)
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
+        final Room room = roomRepository.findByIdAndActiveTrueAndHotelId(id, hotelId)
                 .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
 
         room.setStatus(status);
@@ -156,16 +160,18 @@ public class RoomServiceImpl implements RoomService {
      * Soft-deletes a room by delegating to the repository's physical delete,
      * which is intercepted by the {@code @SQLDelete} annotation on the entity
      * to issue an {@code UPDATE active = false} instead.
+     * Scoped to the authenticated hotel to prevent cross-hotel deletion.
      *
-     * @param id the room UUID; must not be {@code null}
-     * @throws NotFoundException if no active room exists with the given {@code id}
+     * @param id      the room UUID; must not be {@code null}
+     * @param hotelId the hotel UUID; must not be {@code null}
+     * @throws NotFoundException if no active room exists with the given {@code id} and {@code hotelId}
      */
     @Override
     @Transactional
-    public void deleteRoom(final UUID id) {
+    public void deleteRoom(final UUID id, final UUID hotelId) {
         Objects.requireNonNull(id, ROOM_ID_NULL_MSG);
-        final Room room = roomRepository.findById(id)
-                .filter(Room::isActive)
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
+        final Room room = roomRepository.findByIdAndActiveTrueAndHotelId(id, hotelId)
                 .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
 
         roomRepository.delete(Objects.requireNonNull(room));

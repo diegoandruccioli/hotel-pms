@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { stayService } from '../services/stayService';
+import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import type { StayResponse, StayStatus } from '../types/stay.types';
 import { MaterialIcon } from '../components/MaterialIcon';
@@ -55,6 +56,12 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
       <M3TableCell>
         <M3StatusChip label={stay.status.replace('_', ' ')} tone={getStatusTone(stay.status)} />
       </M3TableCell>
+      <M3TableCell>
+        <M3StatusChip
+          label={stay.alloggiatiSent ? t('alloggiati_sent') : t('alloggiati_not_sent')}
+          tone={stay.alloggiatiSent ? 'success' : 'neutral'}
+        />
+      </M3TableCell>
       <M3TableCell className="text-right">
         {stay.status === 'CHECKED_IN' && (
           <M3Button
@@ -64,7 +71,7 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
             disabled={checkingOut === stay.id}
             onClick={handleCheckOut}
             id={`checkout-btn-${stay.id}`}
-            className="text-xs h-8 px-3"
+            className="text-xs h-10 px-3"
           >
             {t('action_checkout')}
           </M3Button>
@@ -83,7 +90,10 @@ export const Stays = memo(() => {
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
   const [alloggiatiDate, setAlloggiatiDate] = useState(getTodayString());
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [downloadingJson, setDownloadingJson] = useState(false);
   const addToast = useToastStore((s) => s.addToast);
+  const role = useAuthStore((s) => s.user?.role);
+  const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
 
   const loadStays = useCallback(async () => {
     try {
@@ -130,7 +140,21 @@ export const Stays = memo(() => {
     }
   }, [alloggiatiDate, addToast, t]);
 
+  const handleAlloggiatiJsonDownload = useCallback(async () => {
+    setDownloadingJson(true);
+    try {
+      await stayService.downloadAlloggiatiJson(alloggiatiDate);
+      addToast(t('alloggiati_json_downloaded', { date: alloggiatiDate }), 'success');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('failed_generate_report');
+      addToast(message, 'error');
+    } finally {
+      setDownloadingJson(false);
+    }
+  }, [alloggiatiDate, addToast, t]);
+
   const handleNewCheckIn = useCallback(() => navigate('/reservations'), [navigate]);
+  const handleWalkIn = useCallback(() => navigate('/stays/walk-in'), [navigate]);
   
   const handleAlloggiatiDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setAlloggiatiDate(e.target.value);
@@ -142,12 +166,13 @@ export const Stays = memo(() => {
   }, [i18n.language]);
 
   const headers = useMemo(() => [
-    t('room_id'), 
-    t('guest_id'), 
-    t('check_in'), 
-    t('check_out'), 
-    t('guests', 'Guests'), 
-    t('status'), 
+    t('room_id'),
+    t('guest_id'),
+    t('check_in'),
+    t('check_out'),
+    t('guests', 'Guests'),
+    t('status'),
+    t('alloggiati_column'),
     <span key="sr" className="sr-only">{t('actions')}</span>
   ], [t]);
 
@@ -161,9 +186,14 @@ export const Stays = memo(() => {
           </h1>
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('stays_subtitle')}</p>
         </div>
-        <M3Button icon="add" onClick={handleNewCheckIn}>
-          {t('new_checkin', 'New Check-in')}
-        </M3Button>
+        <div className="flex gap-2">
+          <M3Button icon="add" onClick={handleNewCheckIn}>
+            {t('new_checkin', 'New Check-in')}
+          </M3Button>
+          <M3Button icon="person_add" variant="outlined" onClick={handleWalkIn}>
+            {t('walkin_title', 'Walk-in')}
+          </M3Button>
+        </div>
       </div>
 
       {loading ? (
@@ -184,7 +214,7 @@ export const Stays = memo(() => {
       ) : (
         <M3Table headers={headers}>
           {stays.length === 0 ? (
-            <tr><td colSpan={7} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_active_stays')}</td></tr>
+            <tr><td colSpan={8} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_active_stays')}</td></tr>
           ) : (
             stays.map((stay) => (
               <StayRow 
@@ -205,7 +235,7 @@ export const Stays = memo(() => {
       <M3Card variant="outlined" className="p-5">
         <div className="flex items-center gap-2 mb-3">
           <MaterialIcon name="verified_user" size={20} className="text-primary" />
-          <h3 className="text-sm font-display font-semibold text-on-surface">{t('police_report_title')}</h3>
+          <h2 className="text-sm font-display font-semibold text-on-surface">{t('police_report_title')}</h2>
         </div>
         <p className="text-xs font-body text-on-surface-variant mb-4">{t('police_report_desc')}</p>
         <div className="flex flex-col sm:flex-row items-end gap-3">
@@ -230,6 +260,18 @@ export const Stays = memo(() => {
           >
             {t('generate_and_download')}
           </M3Button>
+          {isAdminOrOwner && (
+            <M3Button
+              id="download-alloggiati-json-btn"
+              variant="outlined"
+              icon={downloadingJson ? 'progress_activity' : 'data_object'}
+              loading={downloadingJson}
+              disabled={downloadingJson}
+              onClick={handleAlloggiatiJsonDownload}
+            >
+              {t('download_json_export')}
+            </M3Button>
+          )}
         </div>
       </M3Card>
     </div>

@@ -48,10 +48,10 @@ export const GuestSearchAndCreate = memo(({
   onClearGuest,
   readOnly = false
 }: GuestSearchAndCreateProps) => {
+  const { t } = useTranslation(['guests', 'common']);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<GuestResponseDTO[]>([]);
   const [isCreatingGuest, setIsCreatingGuest] = useState(false);
-  const { t } = useTranslation(['reservations', 'guests', 'common']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -135,15 +135,15 @@ export const GuestSearchAndCreate = memo(({
         <h3 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider mb-2">{t('heading_create_guest')}</h3>
         {error && <p className="text-error text-sm">{error}</p>}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <M3TextField label={t('guests:label_first_name')} name="firstName" value={newGuest.firstName} onChange={handleInputChange} required />
-          <M3TextField label={t('guests:label_last_name')} name="lastName" value={newGuest.lastName} onChange={handleInputChange} required />
-          <M3TextField label={t('common:email')} name="email" type="email" value={newGuest.email} onChange={handleInputChange} required />
-          <M3TextField label={t('common:phone')} name="phone" value={newGuest.phone || ''} onChange={handleInputChange} />
-          <M3TextField label={t('common:city')} name="city" value={newGuest.city || ''} onChange={handleInputChange} />
-          <M3TextField label={t('guests:label_country')} name="country" value={newGuest.country || ''} onChange={handleInputChange} />
+          <M3TextField label={t('label_first_name')} name="firstName" value={newGuest.firstName} onChange={handleInputChange} required />
+          <M3TextField label={t('label_last_name')} name="lastName" value={newGuest.lastName} onChange={handleInputChange} required />
+          <M3TextField label={t('email')} name="email" type="email" value={newGuest.email} onChange={handleInputChange} required />
+          <M3TextField label={t('phone')} name="phone" value={newGuest.phone || ''} onChange={handleInputChange} />
+          <M3TextField label={t('city')} name="city" value={newGuest.city || ''} onChange={handleInputChange} />
+          <M3TextField label={t('label_country')} name="country" value={newGuest.country || ''} onChange={handleInputChange} />
         </div>
         <div className="flex gap-2 justify-end pt-2">
-          <M3Button variant="text" onClick={handleCancelCreation}>{t('common:cancel')}</M3Button>
+          <M3Button variant="text" onClick={handleCancelCreation}>{t('cancel')}</M3Button>
           <M3Button onClick={handleCreateGuest} loading={loading}>{t('btn_save_guest')}</M3Button>
         </div>
       </div>

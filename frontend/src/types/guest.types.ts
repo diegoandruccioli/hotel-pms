@@ -17,7 +17,7 @@ export interface IdentityDocumentResponseDTO {
 export interface GuestRequestDTO {
   firstName: string;
   lastName: string;
-  email: string;
+  email?: string;
   phone?: string;
   address?: string;
   city?: string;

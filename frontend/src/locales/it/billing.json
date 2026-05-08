@@ -1,1 +1,24 @@
-{}
+{
+  "register_payment_title": "Registra Pagamento",
+  "payment_amount": "Importo",
+  "payment_method": "Metodo di Pagamento",
+  "transaction_reference": "Riferimento (opzionale)",
+  "reference_supporting": "es. ultime 4 cifre carta, ID bonifico",
+  "confirm_payment": "Conferma Pagamento",
+  "payment_registered": "Pagamento registrato con successo",
+  "payment_failed": "Registrazione pagamento fallita. Riprova.",
+  "error_invalid_amount": "Inserisci un importo valido maggiore di 0",
+  "payment_method_cash": "Contanti",
+  "payment_method_credit_card": "Carta di Credito",
+  "payment_method_debit_card": "Carta di Debito",
+  "payment_method_bank_transfer": "Bonifico Bancario",
+  "payment_method_check": "Assegno",
+  "invoice_detail_title": "Dettaglio Fattura",
+  "payments_history": "Storico Pagamenti",
+  "no_payments_yet": "Nessun pagamento registrato",
+  "total_paid": "Totale Pagato",
+  "charges": "Addebiti",
+  "charge_type_fb_order": "Ordine F&B",
+  "charge_type_room_service": "Room Service",
+  "charge_type_other": "Altro Addebito"
+}

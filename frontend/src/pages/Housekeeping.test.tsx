@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { Housekeeping } from './Housekeeping';
 import { inventoryService } from '../services/inventoryService';
 
@@ -66,5 +67,29 @@ describe('Housekeeping', () => {
     await waitFor(() => {
       expect(screen.getByText('nav_housekeeping')).toBeInTheDocument();
     });
+  });
+
+  it('should render OCCUPIED room without action buttons', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
+      content: [
+        { id: '2', roomNumber: '102', type: 'Standard', status: 'OCCUPIED', pricePerNight: 100 },
+      ],
+      totalElements: 1,
+    } as never);
+
+    render(<Housekeeping />);
+
+    await waitFor(() => {
+      expect(screen.getByText('room_status_occupied')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/→/)).not.toBeInTheDocument();
+  });
+
+  it('should have no accessibility violations', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({ content: [], totalElements: 0 } as never);
+    const { container } = render(<Housekeeping />);
+    await waitFor(() => expect(screen.getByText('no_rooms_found')).toBeInTheDocument());
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

@@ -2,6 +2,7 @@ package com.hotelpms.stay.client;
 
 import com.hotelpms.stay.client.dto.ReservationResponse;
 import com.hotelpms.stay.client.dto.ReservationStatusUpdateRequest;
+import com.hotelpms.stay.exception.ExternalServiceException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,13 +39,15 @@ public interface ReservationClient {
             @RequestBody ReservationStatusUpdateRequest request);
 
     /**
-     * Fallback method for getReservationById.
+     * Fallback method for getReservationById — called when the circuit breaker is open
+     * or the reservation-service is unreachable. Throws {@link ExternalServiceException}
+     * so the caller receives 502 (BAD_GATEWAY) instead of a misleading 409.
      *
      * @param id        the reservation ID
-     * @param throwable the throwable
-     * @return the reservation response or throws an exception
+     * @param throwable the cause (CallNotPermittedException or FeignException)
+     * @return never returns (always throws {@link ExternalServiceException})
      */
     default ReservationResponse getReservationByIdFallback(final UUID id, final Throwable throwable) {
-        return new ReservationResponse(id, null, null, "UNKNOWN", null);
+        throw new ExternalServiceException("RESERVATION_SERVICE_UNAVAILABLE", throwable);
     }
 }

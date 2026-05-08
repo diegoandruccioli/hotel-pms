@@ -9,6 +9,8 @@
   "RESERVATION_NOT_FOUND": "La prenotazione specificata non è stata trovata.",
   "RESERVATION_OVERLAP": "La camera è già prenotata per le date selezionate.",
   "RESERVATION_NOT_CONFIRMED": "La prenotazione non è confermata.",
+  "INVALID_RESERVATION_STATUS": "Impossibile effettuare il check-in: la prenotazione è già completata, annullata o non disponibile.",
+  "RESERVATION_SERVICE_UNAVAILABLE": "Il servizio prenotazioni non è raggiungibile. Riprova tra qualche istante.",
   "INVALID_RESERVATION_DATES": "La data di check-out deve essere successiva a quella di check-in.",
   "STAY_NOT_FOUND": "Il soggiorno specificato non è stato trovato.",
   "GUEST_ALREADY_CHECKED_IN": "Questo ospite è già registrato in una camera.",

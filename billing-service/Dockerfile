@@ -8,6 +8,7 @@ COPY billing-service/src billing-service/src
 RUN ./gradlew :billing-service:build -x test --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine
+RUN apk update && apk upgrade --no-cache
 RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring
 WORKDIR /app

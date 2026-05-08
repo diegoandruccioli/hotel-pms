@@ -39,7 +39,7 @@ type StatusTone = 'info' | 'warning' | 'success' | 'neutral' | 'error';
 
 const statusLegend: { labelKey: string; color: string; tone: StatusTone }[] = [
   { labelKey: 'status_confirmed', color: '#1A3A5C', tone: 'info' },
-  { labelKey: 'status_pending', color: '#B8860B', tone: 'warning' },
+  { labelKey: 'status_pending', color: '#5C4300', tone: 'warning' },
   { labelKey: 'status_checked_in', color: '#2E7D6A', tone: 'success' },
   { labelKey: 'status_checked_out', color: '#73777F', tone: 'neutral' },
   { labelKey: 'status_cancelled', color: '#BA1A1A', tone: 'error' },
@@ -49,7 +49,7 @@ const CALENDAR_VIEWS: View[] = ['month'];
 const CALENDAR_STYLE = { height: 600 };
 
 export const CalendarPlanning = () => {
-  const { t, i18n } = useTranslation(['common', 'calendar']);
+  const { t, i18n } = useTranslation(['calendar', 'common']);
   const [reservations, setReservations] = useState<ReservationResponse[]>([]);
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,7 +175,7 @@ export const CalendarPlanning = () => {
     const status = event.resource.status;
     const colorMap: Record<string, string> = {
       CONFIRMED: '#1A3A5C',
-      PENDING: '#B8860B',
+      PENDING: '#5C4300',
       CANCELLED: '#BA1A1A',
       CHECKED_IN: '#2E7D6A',
       CHECKED_OUT: '#73777F',
@@ -206,7 +206,7 @@ export const CalendarPlanning = () => {
           <button
             onClick={handlePrevMonth}
             className="p-1 rounded-full hover:bg-surface-container transition-colors text-primary"
-            aria-label={t('calendar:prev_month')}
+            aria-label={t('prev_month')}
           >
             <MaterialIcon name="chevron_left" size={28} />
           </button>
@@ -223,7 +223,7 @@ export const CalendarPlanning = () => {
           <button
             onClick={handleNextMonth}
             className="p-1 rounded-full hover:bg-surface-container transition-colors text-primary"
-            aria-label={t('calendar:next_month')}
+            aria-label={t('next_month')}
           >
             <MaterialIcon name="chevron_right" size={28} />
           </button>

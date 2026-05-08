@@ -63,6 +63,40 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles AlloggiatiRowLimitExceededException (export exceeds 1 000-row portal limit).
+     *
+     * @param ex the exception
+     * @return 422 Unprocessable Entity with row count detail
+     */
+    @ExceptionHandler(AlloggiatiRowLimitExceededException.class)
+    public ProblemDetail handleAlloggiatiRowLimitExceededException(
+            final AlloggiatiRowLimitExceededException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+        problemDetail.setType(Objects.requireNonNull(
+                URI.create("https://hotelpms.com/errors/alloggiati-row-limit-exceeded")));
+        problemDetail.setTitle("Alloggiati Row Limit Exceeded");
+        return problemDetail;
+    }
+
+    /**
+     * Handles AlloggiatiValidationException (domain coherence violation in stay data).
+     *
+     * @param ex the exception
+     * @return 422 Unprocessable Entity with violation detail
+     */
+    @ExceptionHandler(AlloggiatiValidationException.class)
+    public ProblemDetail handleAlloggiatiValidationException(
+            final AlloggiatiValidationException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+        problemDetail.setType(Objects.requireNonNull(
+                URI.create("https://hotelpms.com/errors/alloggiati-validation")));
+        problemDetail.setTitle("Alloggiati Validation Error");
+        return problemDetail;
+    }
+
+    /**
      * Handles IllegalStateException (e.g., check-out on a non-CHECKED_IN stay).
      *
      * @param ex the exception

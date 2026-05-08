@@ -3,6 +3,10 @@ spring:
     name: inventory-service
   config:
     import: "configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
+  cloud:
+    config:
+      username: ${CONFIG_SERVER_USERNAME:configuser}
+      password: ${CONFIG_SERVER_PASSWORD}
 
 eureka:
   client:

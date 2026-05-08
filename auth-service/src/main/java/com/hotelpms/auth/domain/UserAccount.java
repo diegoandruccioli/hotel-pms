@@ -57,9 +57,31 @@ public class UserAccount {
     @Column(nullable = false)
     private Role role;
 
+    @Column(nullable = false)
+    private UUID hotelId;
+
     @Builder.Default
     @Column(nullable = false)
     private boolean active = true;
+
+    /**
+     * When {@code true} the user must change their password before using the system.
+     * Set automatically for admin-created accounts and for the default seeded ADMIN.
+     * Default is {@code false}: users who self-register are not forced to change.
+     */
+    @Column(nullable = false)
+    private boolean mustChangePassword;
+
+    /**
+     * Monotonically incrementing counter embedded in the JWT {@code tv} claim.
+     *
+     * <p>Incrementing this value (on password change) invalidates all previously
+     * issued tokens for this user. {@code AuthServiceImpl.refresh()} rejects
+     * any refresh token whose {@code tv} claim does not match the value cached
+     * in Redis under {@code user:tv:<username>} (T-AUTH-04 residuo).</p>
+     */
+    @Column(nullable = false)
+    private int tokenVersion;
 
     @Column(nullable = false)
     private int failedAttempts;

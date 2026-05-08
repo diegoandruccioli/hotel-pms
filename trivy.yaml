@@ -1,0 +1,26 @@
+# ============================================================
+# Trivy — Global scanner configuration
+# ============================================================
+# This file is consumed by `trivy` CLI and `aquasecurity/trivy-action`
+# when run from the repository root.
+#
+# Docs: https://aquasecurity.github.io/trivy/latest/docs/references/configuration/config-file/
+# ============================================================
+
+severity:
+  - CRITICAL
+  - HIGH
+
+# Skip CVEs without an available patch — keeps findings actionable
+ignore-unfixed: true
+
+# Timeout for large multi-stage Spring Boot images
+timeout: 10m0s
+
+# Scan only for OS/library vulnerabilities, not secrets or misconfig
+# (misconfig is handled in a separate CI step)
+scanners:
+  - vuln
+
+# Suppress accepted CVEs (equivalent to OWASP dependency-check suppressions.xml)
+ignorefile: .trivyignore

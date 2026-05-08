@@ -41,21 +41,57 @@ function Write-Ok([string]$msg)   { Write-Host "  OK  $msg" -ForegroundColor Gre
 function Write-Skip([string]$msg) { Write-Host "  --  $msg" -ForegroundColor DarkGray }
 function Write-Warn([string]$msg) { Write-Host "  !!  $msg" -ForegroundColor Yellow }
 
-# ── Step 1: Create .env with a cryptographically-random 64-char hex secret ────
+# ── Helper: generate cryptographically-random bytes ───────────────────────────
+function New-RandomHex([int]$bytes) {
+    $buf = [byte[]]::new($bytes)
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    $rng.GetBytes($buf)
+    $rng.Dispose()
+    return -join ($buf | ForEach-Object { $_.ToString("x2") })
+}
+function New-RandomBase64([int]$bytes) {
+    $buf = [byte[]]::new($bytes)
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    $rng.GetBytes($buf)
+    $rng.Dispose()
+    return [Convert]::ToBase64String($buf)
+}
+
+# ── Step 1: Create/update .env with all required secrets ─────────────────────
 Write-Step "Step 1 - .env file"
 
 if (-Not (Test-Path $ENV_FILE)) {
-    # Use .NET RandomNumberGenerator for a true 32-byte (64 hex char) secret
-    $bytes  = [byte[]]::new(32)
-    $rng    = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-    $rng.GetBytes($bytes)
-    $rng.Dispose()
-    $secret = -join ($bytes | ForEach-Object { $_.ToString("x2") })
-
-    Set-Content -Path $ENV_FILE -Value "INTERNAL_HMAC_SECRET=$secret" -Encoding UTF8
-    Write-Ok ".env created with a fresh 64-char hex secret."
+    Set-Content -Path $ENV_FILE -Value "INTERNAL_HMAC_SECRET=$(New-RandomHex 32)" -Encoding UTF8
+    Write-Ok ".env created with a fresh HMAC secret."
 } else {
-    Write-Skip ".env already exists - skipping secret generation to avoid accidental rotation."
+    Write-Skip ".env already exists - skipping HMAC secret generation to avoid accidental rotation."
+}
+
+# Append JWT_SECRET if not already present (idempotent)
+$envContent = Get-Content $ENV_FILE -Raw -Encoding UTF8
+if ($envContent -notmatch '(?m)^JWT_SECRET=') {
+    Add-Content -Path $ENV_FILE -Value "JWT_SECRET=$(New-RandomBase64 48)" -Encoding UTF8
+    Write-Ok "JWT_SECRET added to .env."
+} else {
+    Write-Skip "JWT_SECRET already in .env - skipping."
+}
+
+# Append POSTGRES_PASSWORD if not already present (idempotent)
+$envContent = Get-Content $ENV_FILE -Raw -Encoding UTF8
+if ($envContent -notmatch '(?m)^POSTGRES_PASSWORD=') {
+    Add-Content -Path $ENV_FILE -Value "POSTGRES_PASSWORD=$(New-RandomHex 16)" -Encoding UTF8
+    Write-Ok "POSTGRES_PASSWORD added to .env."
+} else {
+    Write-Skip "POSTGRES_PASSWORD already in .env - skipping."
+}
+
+# Append CONFIG_SERVER_PASSWORD if not already present (idempotent) — T-CFG-03
+$envContent = Get-Content $ENV_FILE -Raw -Encoding UTF8
+if ($envContent -notmatch '(?m)^CONFIG_SERVER_PASSWORD=') {
+    Add-Content -Path $ENV_FILE -Value "CONFIG_SERVER_PASSWORD=$(New-RandomHex 24)" -Encoding UTF8
+    Write-Ok "CONFIG_SERVER_PASSWORD added to .env."
+} else {
+    Write-Skip "CONFIG_SERVER_PASSWORD already in .env - skipping."
 }
 
 # ── Step 2: Ensure .env is in .gitignore ──────────────────────────────────────

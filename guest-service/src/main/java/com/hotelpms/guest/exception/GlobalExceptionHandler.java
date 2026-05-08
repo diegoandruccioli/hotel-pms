@@ -1,8 +1,11 @@
 package com.hotelpms.guest.exception;
 
+import com.hotelpms.guest.dto.response.GdprLegalHoldResponse;
 import feign.FeignException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,6 +24,25 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private static final String TIMESTAMP_FIELD = "timestamp";
+
+    /**
+     * Handles GdprLegalHoldException — returns HTTP 451 Unavailable For Legal
+     * Reasons (RFC 7725) with a structured body indicating the unlock date and
+     * which legal obligation is blocking the deletion (T-GST-05).
+     *
+     * @param ex the exception
+     * @return 451 response with GdprLegalHoldResponse body
+     */
+    @ExceptionHandler(GdprLegalHoldException.class)
+    public ResponseEntity<GdprLegalHoldResponse> handleGdprLegalHold(
+            final GdprLegalHoldException ex) {
+        final GdprLegalHoldResponse body = new GdprLegalHoldResponse(
+                "LEGAL_HOLD_ACTIVE",
+                ex.getMessage(),
+                ex.getUnlocksAt(),
+                ex.getLegalBasis().name());
+        return ResponseEntity.status(HttpStatusCode.valueOf(HttpStatus.UNAVAILABLE_FOR_LEGAL_REASONS.value())).body(body);
+    }
 
     /**
      * Handles NotFoundException.

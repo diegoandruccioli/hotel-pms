@@ -12,7 +12,8 @@ COPY fb-service/src fb-service/src
 RUN ./gradlew :fb-service:bootJar --no-daemon
 # Final runtime stage
 FROM eclipse-temurin:21-jre-alpine
-# Add a non-root group and user 
+RUN apk update && apk upgrade --no-cache
+# Add a non-root group and user
 RUN addgroup -S spring && adduser -S spring -G spring
 # Switch to the non-root user
 USER spring:spring

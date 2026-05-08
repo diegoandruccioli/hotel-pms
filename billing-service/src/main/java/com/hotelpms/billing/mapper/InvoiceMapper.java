@@ -10,12 +10,13 @@ import org.mapstruct.ReportingPolicy;
 /**
  * MapStruct mapper for Invoice entities.
  */
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE, uses = PaymentMapper.class)
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE,
+        uses = {PaymentMapper.class, InvoiceChargeMapper.class})
 public interface InvoiceMapper {
 
     /**
      * Converts an Invoice entity to an InvoiceResponse DTO.
-     * 
+     *
      * @param invoice the entity
      * @return the DTO
      */
@@ -23,10 +24,12 @@ public interface InvoiceMapper {
 
     /**
      * Converts an InvoiceRequest DTO to an Invoice entity.
-     * 
+     * Collections (payments, charges) are excluded — managed by the service layer.
+     *
      * @param invoiceRequest the DTO
      * @return the entity
      */
     @Mapping(target = "payments", ignore = true)
+    @Mapping(target = "charges", ignore = true)
     Invoice toEntity(InvoiceRequest invoiceRequest);
 }

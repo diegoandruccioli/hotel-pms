@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { M3TextField } from './M3TextField';
 
 describe('M3TextField', () => {
@@ -45,6 +46,12 @@ describe('M3TextField', () => {
     render(<M3TextField label="Test" name="test" value="hello" onChange={handleChange} />);
     const input = screen.getByLabelText('Test');
     expect(input).toHaveValue('hello');
+  });
+
+  it('should have no accessibility violations', async () => {
+    const { container } = render(<M3TextField label="Email" name="email" />);
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });
 

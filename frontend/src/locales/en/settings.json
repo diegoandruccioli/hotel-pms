@@ -19,5 +19,9 @@
   "lang_italian": "Italian",
   "lang_english": "English",
   "user_menu_label": "User menu for {{name}}",
-  "log_out": "Log out"
+  "log_out": "Log out",
+
+  "settings_section_system": "System",
+  "alloggiati_auto_send_label": "Auto-send Alloggiati",
+  "alloggiati_auto_send_desc": "Automatically submit the Alloggiati report to the Polizia di Stato portal at each check-in"
 }

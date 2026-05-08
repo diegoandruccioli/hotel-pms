@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.4.3"
+    id("org.springframework.boot") version "3.4.13"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.danilopianini.gradle-java-qa") version "1.165.0"
 }
@@ -32,10 +32,12 @@ ext {
     set("springCloudVersion", "2024.0.0")
     set("mapStructVersion", "1.6.3")
     set("jjwtVersion", "0.11.5")
+    set("tomcat.version", "10.1.54")
 }
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-security")
@@ -51,6 +53,9 @@ dependencies {
     implementation("io.micrometer:micrometer-tracing-bridge-brave")
     implementation("io.zipkin.reporter2:zipkin-reporter-brave")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+
+    // --- GAP-4: Log aggregation SIEM (Loki via logback appender) ---
+    implementation("com.github.loki4j:loki-logback-appender:1.5.2")
 
     implementation("io.jsonwebtoken:jjwt-api:${property("jjwtVersion")}")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:${property("jjwtVersion")}")
@@ -82,9 +87,30 @@ dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
     }
+    dependencies {
+        // CVE-2025-48976 (commons-fileupload 1.5→1.6.0) + CVE-2024-47554 (commons-io 2.11.0→2.14.0)
+        // commons-fileupload is not managed by Spring Boot 3.4.x BOM (removed with CommonsMultipartResolver
+        // in Spring 6.1); dependencyManagement.dependencies forces the version regardless of BOM properties.
+        dependency("commons-fileupload:commons-fileupload:1.6.0")
+        dependency("commons-io:commons-io:2.14.0")
+    }
 }
 
 tasks.withType<Test> {
     useJUnitPlatform()
     systemProperty("net.bytebuddy.experimental", "true")
+}
+
+// SpotBugs false-positive in JUnit tests: @BeforeEach-initialized fields are not seen
+// by SpotBugs as constructor-initialized, triggering NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR.
+tasks.named("populateDefaultSpotBugsExcludes") {
+    doLast {
+        val f = file("${layout.buildDirectory.get()}/javaqa/spotbugs-excludes.xml")
+        f.writeText(
+            f.readText().replace(
+                "</FindBugsFilter>",
+                "    <Match>\n        <Bug pattern=\"NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR\"/>\n    </Match>\n</FindBugsFilter>"
+            )
+        )
+    }
 }

@@ -6,6 +6,7 @@ WORKDIR /app
 COPY gradlew .
 COPY gradle gradle
 COPY stay-service/build.gradle.kts stay-service/
+COPY stay-service/config stay-service/config
 COPY settings.gradle.kts .
 COPY stay-service/src stay-service/src
 
@@ -13,6 +14,7 @@ COPY stay-service/src stay-service/src
 RUN ./gradlew build -x test
 
 FROM eclipse-temurin:21-jre-alpine
+RUN apk update && apk upgrade --no-cache
 
 # Set non-root user
 RUN addgroup -S spring && adduser -S spring -G spring

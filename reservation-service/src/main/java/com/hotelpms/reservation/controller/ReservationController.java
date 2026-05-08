@@ -114,7 +114,7 @@ public class ReservationController {
     @PatchMapping("/{id}/status-and-guests")
     public ResponseEntity<ReservationResponse> updateStatusAndGuests(
             @NonNull @PathVariable final UUID id,
-            @NonNull @RequestBody final ReservationStatusUpdateRequest request) {
+            @NonNull @Valid @RequestBody final ReservationStatusUpdateRequest request) {
         final ReservationResponse response = reservationService.updateStatusAndGuests(
                 id, request.status(), request.actualGuests());
         return ResponseEntity.ok(response);

@@ -91,6 +91,36 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles NotFoundException (HTTP 404).
+     *
+     * @param ex the exception
+     * @return the problem detail mapping
+     */
+    @ExceptionHandler(NotFoundException.class)
+    public ProblemDetail handleNotFoundException(final NotFoundException ex) {
+        final ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        detail.setTitle("Not Found");
+        detail.setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/not-found")));
+        detail.setProperty(TIMESTAMP, Instant.now());
+        return detail;
+    }
+
+    /**
+     * Handles IllegalStateException (e.g. self-deactivation).
+     *
+     * @param ex the exception
+     * @return the problem detail mapping
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ProblemDetail handleIllegalStateException(final IllegalStateException ex) {
+        final ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        detail.setTitle("Conflict");
+        detail.setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/conflict")));
+        detail.setProperty(TIMESTAMP, Instant.now());
+        return detail;
+    }
+
+    /**
      * Handles generic Exception.
      *
      * @param ex the exception

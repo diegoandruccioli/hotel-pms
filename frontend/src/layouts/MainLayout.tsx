@@ -58,7 +58,7 @@ const RailNavItem = memo(({
     {({ isActive }) => (
       <>
         <span
-          className={`flex items-center justify-center w-14 h-8 rounded-shape-full transition-colors ${
+          className={`flex items-center justify-center w-14 h-10 rounded-shape-full transition-colors ${
             isActive
               ? 'bg-primary-container'
               : 'group-hover:bg-surface-container-highest'
@@ -122,6 +122,7 @@ export const MainLayout = () => {
   const closeDrawer    = useCallback(() => setDrawerOpen(false), []);
   const toggleUserMenu = useCallback(() => setUserMenuOpen((v) => !v), []);
   const closeUserMenu  = useCallback(() => setUserMenuOpen(false), []);
+  const openProfile    = useCallback(() => navigate('/profile'), [navigate]);
   const openSettings   = useCallback(() => setSettingsOpen(true), []);
   const closeSettings  = useCallback(() => setSettingsOpen(false), []);
 
@@ -131,6 +132,12 @@ export const MainLayout = () => {
 
   return (
     <div className="h-full flex overflow-hidden bg-surface">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:rounded-shape-full focus:bg-primary focus:text-on-primary focus:ring-2 focus:ring-primary focus:ring-offset-2"
+      >
+        {t('skip_to_main')}
+      </a>
       {/* ── Mobile Modal Drawer ─────────────────────── */}
       {drawerOpen && (
         <FocusTrap>
@@ -182,7 +189,7 @@ export const MainLayout = () => {
       )}
 
       {/* ── Desktop Navigation Rail ─────────────────── */}
-      <aside className="hidden md:flex flex-col items-center w-20 flex-shrink-0 glass-surface border-r border-outline-variant/50 py-4 gap-1 overflow-y-auto">
+      <aside className="hidden md:flex flex-col items-center md:fixed md:left-0 md:top-0 md:h-full w-20 flex-shrink-0 glass-surface border-r border-outline-variant/50 py-4 gap-1 overflow-y-auto md:z-20">
         <div className="flex items-center justify-center w-14 h-14 mb-3 bg-primary-container rounded-shape-lg">
           <MaterialIcon name="apartment" size={28} className="text-on-primary-container" />
         </div>
@@ -213,7 +220,7 @@ export const MainLayout = () => {
       </aside>
 
       {/* ── Main content area ───────────────────────── */}
-      <div className="flex flex-col flex-1 w-0 overflow-hidden">
+      <div className="flex flex-col flex-1 w-0 overflow-hidden md:ml-20">
         {/* Top Bar */}
         <header className="relative z-10 flex-shrink-0 flex items-center h-16 glass-surface-elevated border-b border-outline-variant/30 shadow-elevation-1 px-4">
           {/* Mobile hamburger */}
@@ -241,13 +248,14 @@ export const MainLayout = () => {
             open={userMenuOpen}
             onToggle={toggleUserMenu}
             onClose={closeUserMenu}
+            onOpenProfile={openProfile}
             onOpenSettings={openSettings}
             onLogout={handleLogout}
           />
         </header>
 
         {/* Page content */}
-        <main className="flex-1 relative overflow-y-auto focus:outline-none">
+        <main id="main-content" className="flex-1 relative overflow-y-auto focus:outline-none" tabIndex={-1}>
           <div className="py-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
               <Outlet />

@@ -19,6 +19,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -116,6 +117,28 @@ public class Stay {
     @Column(name = "active", nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    /**
+     * Reference to the billing invoice folio opened at check-in (cross-service, no DB FK).
+     * Null for stays created before the F&amp;B billing feature or when billing-service was unavailable.
+     */
+    @Column(name = "invoice_id")
+    private UUID invoiceId;
+
+    /**
+     * Whether the Alloggiati Web report for this stay has been successfully submitted
+     * to the Polizia di Stato portal (either automatically at check-in or manually).
+     */
+    @Column(name = "alloggiati_sent", nullable = false)
+    private boolean alloggiatiSent;
+
+    /**
+     * Expected check-out date sourced from the reservation at check-in time.
+     * Used to calculate the {@code permanenza} (number of nights) in the Alloggiati tracciato.
+     * May be {@code null} for stays created before this feature was introduced.
+     */
+    @Column(name = "expected_check_out_date")
+    private LocalDate expectedCheckOutDate;
 
     /**
      * The list of guests staying in this room.

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { M3Card } from './M3Card';
 
 describe('M3Card', () => {
@@ -36,5 +37,11 @@ describe('M3Card', () => {
     render(<M3Card className="p-4">Styled</M3Card>);
     const el = screen.getByText('Styled');
     expect(el.className).toContain('p-4');
+  });
+
+  it('should have no accessibility violations', async () => {
+    const { container } = render(<M3Card>Card content</M3Card>);
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

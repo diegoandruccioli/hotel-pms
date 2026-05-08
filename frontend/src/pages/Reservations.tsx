@@ -6,10 +6,15 @@ import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
+import { M3Dialog } from '../components/m3/M3Dialog';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { inventoryService } from '../services/inventoryService';
 import type { RoomResponse } from '../types/inventory.types';
+import { useAuthStore } from '../store/authStore';
+import { useToastStore } from '../store/toastStore';
+
+const CANCELLABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 
 const getStatusTone = (status: string) => {
   switch (status.toUpperCase()) {
@@ -28,10 +33,11 @@ interface ReservationRowProps {
   onCheckIn: (reservationId: string, roomId: string, expectedGuests: number, guestId: string) => void;
   onView: (reservationId: string) => void;
   onEdit: (reservationId: string) => void;
+  onCancel?: (id: string) => void;
   t: TFunction;
 }
 
-const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, t }: ReservationRowProps) => {
+const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, onCancel, t }: ReservationRowProps) => {
   const roomNumbers = useMemo(() => {
     return reservation.lineItems?.filter(li => li.active !== false).map(li => {
       const room = rooms.find(r => r.id === li.roomId);
@@ -55,6 +61,10 @@ const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, t 
   const handleEditClick = useCallback(() => {
     onEdit(reservation.id);
   }, [onEdit, reservation.id]);
+
+  const handleCancelClick = useCallback(() => {
+    onCancel?.(reservation.id);
+  }, [onCancel, reservation.id]);
 
   return (
     <M3TableRow>
@@ -83,21 +93,32 @@ const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, t 
             className="text-primary hover:text-primary/80 font-medium text-sm mr-4"
             onClick={handleCheckInClick}
           >
-            {t('check_in', 'Check-in')}
+            {t('check_in')}
           </button>
         )}
         <button 
           className="text-primary hover:text-primary/80 font-medium text-sm mr-4"
           onClick={handleViewClick}
         >
-          {t('view', 'Visualizza')}
+          {t('view')}
         </button>
-        <button 
+        <button
+          type="button"
           className="text-primary hover:text-primary/80 font-medium text-sm"
           onClick={handleEditClick}
         >
-          {t('edit', 'Modifica')}
+          {t('edit')}
         </button>
+        {onCancel && CANCELLABLE_STATUSES.has(reservation.status) && (
+          <button
+            type="button"
+            aria-label={`${t('cancel_reservation')} ${reservation.id}`}
+            onClick={handleCancelClick}
+            className="text-error hover:text-error/80 font-medium text-sm ml-4"
+          >
+            {t('cancel_reservation')}
+          </button>
+        )}
       </M3TableCell>
     </M3TableRow>
   );
@@ -108,10 +129,16 @@ ReservationRow.displayName = 'ReservationRow';
 export const Reservations = () => {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
+  const addToast = useToastStore((s) => s.addToast);
+  const role = useAuthStore((s) => s.user?.role);
+  const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
+
   const [reservations, setReservations] = useState<ReservationResponse[]>([]);
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reservationToCancel, setReservationToCancel] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const loadReservations = useCallback(async () => {
     try {
@@ -152,6 +179,31 @@ export const Reservations = () => {
   const handleEdit = useCallback((reservationId: string) => {
     navigate(`/reservations/edit/${reservationId}`);
   }, [navigate]);
+
+  const handleCancelRequest = useCallback((id: string) => {
+    setReservationToCancel(id);
+  }, []);
+
+  const handleCancelDialogClose = useCallback(() => {
+    setReservationToCancel(null);
+  }, []);
+
+  const handleCancelConfirm = useCallback(async () => {
+    if (!reservationToCancel) return;
+    setCancelling(true);
+    try {
+      await reservationService.cancelReservation(reservationToCancel);
+      setReservations((prev) =>
+        prev.map((r) => r.id === reservationToCancel ? { ...r, status: 'CANCELLED' } : r),
+      );
+      addToast(t('reservation_cancelled_success'), 'success');
+    } catch {
+      addToast(t('cancel_reservation_failed'), 'error');
+    } finally {
+      setCancelling(false);
+      setReservationToCancel(null);
+    }
+  }, [reservationToCancel, addToast, t]);
 
   const tableHeaders = useMemo(() => [
     t('guest_name'), 
@@ -199,18 +251,37 @@ export const Reservations = () => {
             <tr><td colSpan={6} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_reservations_found')}</td></tr>
           ) : (
             reservations.filter(r => r.active !== false).map((reservation) => (
-              <ReservationRow 
+              <ReservationRow
                 key={reservation.id}
                 reservation={reservation}
                 rooms={rooms}
                 onCheckIn={handleCheckIn}
                 onView={handleView}
                 onEdit={handleEdit}
+                onCancel={isAdminOrOwner ? handleCancelRequest : undefined}
                 t={t}
               />
             ))
           )}
         </M3Table>
+      )}
+      {reservationToCancel && (
+        <M3Dialog
+          open
+          title={t('cancel_reservation')}
+          titleId="confirm-cancel-reservation-dialog"
+          onClose={handleCancelDialogClose}
+        >
+          <p className="text-sm font-body text-on-surface">{t('cancel_reservation_confirm')}</p>
+          <div className="flex justify-end gap-3 pt-4">
+            <M3Button type="button" variant="outlined" onClick={handleCancelDialogClose} disabled={cancelling}>
+              {t('cancel')}
+            </M3Button>
+            <M3Button type="button" onClick={handleCancelConfirm} loading={cancelling}>
+              {t('cancel_reservation')}
+            </M3Button>
+          </div>
+        </M3Dialog>
       )}
     </div>
   );

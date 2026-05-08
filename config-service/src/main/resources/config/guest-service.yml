@@ -1,6 +1,11 @@
 server:
   port: 8083
 
+application:
+  config:
+    stay-service-url: http://stay-service:8084
+    billing-service-url: http://billing-service:8085
+
 internal:
   hmac:
     secret: ${INTERNAL_HMAC_SECRET}
@@ -28,3 +33,7 @@ management:
   zipkin:
     tracing:
       endpoint: http://zipkin:9411/api/v2/spans
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n"

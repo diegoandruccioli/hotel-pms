@@ -62,6 +62,9 @@ class AuthenticationFilterTest {
         /** Fixed HMAC shared secret used for X-Internal-Signature in tests. */
         private static final String HMAC_SECRET = "test-internal-hmac-secret-for-unit-tests";
 
+        /** Hotel UUID used in test JWTs — matches the default admin seed. */
+        private static final String TEST_HOTEL_ID = "00000000-0000-0000-0000-000000000001";
+
         private static final long ONE_HOUR_MS = 3_600_000L;
 
         private AuthenticationFilter authenticationFilter;
@@ -76,7 +79,6 @@ class AuthenticationFilterTest {
         void setUp() throws Exception {
                 final JwtUtil jwtUtil = new JwtUtil();
                 setPrivateField(jwtUtil, "secret", JWT_SECRET_B64);
-                jwtUtil.init();
 
                 authenticationFilter = new AuthenticationFilter(jwtUtil, HMAC_SECRET);
                 config = new AuthenticationFilter.Config();
@@ -94,6 +96,7 @@ class AuthenticationFilterTest {
                 return Jwts.builder()
                                 .setSubject(username)
                                 .claim("role", role)
+                                .claim("hotelId", TEST_HOTEL_ID)
                                 .setIssuedAt(now)
                                 .setExpiration(expiration)
                                 .signWith(key, SignatureAlgorithm.HS256)
@@ -163,8 +166,52 @@ class AuthenticationFilterTest {
                                         .isEqualTo("receptionist1");
                         assertThat(captured.get().getHeaders().getFirst("X-Auth-Role"))
                                         .isEqualTo("RECEPTIONIST");
+                        assertThat(captured.get().getHeaders().getFirst("X-Auth-Hotel"))
+                                        .isEqualTo(TEST_HOTEL_ID);
                         assertThat(captured.get().getHeaders().getFirst("X-Internal-Signature"))
                                         .isNotBlank();
+                }
+
+                @Test
+                @DisplayName("should produce a different X-Internal-Signature when hotelId differs")
+                void shouldProduceDifferentSignatureForDifferentHotelId() {
+                        final String hotelA = "00000000-0000-0000-0000-000000000001";
+                        final String hotelB = "00000000-0000-0000-0000-000000000002";
+
+                        final Key key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(JWT_SECRET_B64));
+                        final Date now = new Date();
+                        final Date exp = new Date(now.getTime() + ONE_HOUR_MS);
+
+                        final String tokenA = Jwts.builder()
+                                        .setSubject("admin").claim("role", "ADMIN")
+                                        .claim("hotelId", hotelA)
+                                        .setIssuedAt(now).setExpiration(exp)
+                                        .signWith(key, SignatureAlgorithm.HS256).compact();
+
+                        final String tokenB = Jwts.builder()
+                                        .setSubject("admin").claim("role", "ADMIN")
+                                        .claim("hotelId", hotelB)
+                                        .setIssuedAt(now).setExpiration(exp)
+                                        .signWith(key, SignatureAlgorithm.HS256).compact();
+
+                        final AtomicReference<String> sigA = new AtomicReference<>();
+                        final AtomicReference<String> sigB = new AtomicReference<>();
+
+                        authenticationFilter.apply(config).filter(
+                                MockServerWebExchange.from(MockServerHttpRequest.get("/api/v1/guests")
+                                        .cookie(new HttpCookie("jwt", tokenA)).build()),
+                                ex -> { sigA.set(ex.getRequest().getHeaders().getFirst("X-Internal-Signature")); return Mono.empty(); }
+                        ).block();
+
+                        authenticationFilter.apply(config).filter(
+                                MockServerWebExchange.from(MockServerHttpRequest.get("/api/v1/guests")
+                                        .cookie(new HttpCookie("jwt", tokenB)).build()),
+                                ex -> { sigB.set(ex.getRequest().getHeaders().getFirst("X-Internal-Signature")); return Mono.empty(); }
+                        ).block();
+
+                        assertThat(sigA.get()).isNotBlank();
+                        assertThat(sigB.get()).isNotBlank();
+                        assertThat(sigA.get()).isNotEqualTo(sigB.get());
                 }
         }
 
@@ -261,6 +308,133 @@ class AuthenticationFilterTest {
                                         .verifyComplete();
 
                         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+                }
+        }
+
+        @Nested
+        @DisplayName("RBAC enforcement")
+        class RbacTests {
+
+                @Test
+                @DisplayName("ADMIN can POST to /api/v1/room-types")
+                void adminCanCreateRoomType() {
+                        when(chainMock.filter(any())).thenReturn(Mono.empty());
+                        final String token = buildJwt(ONE_HOUR_MS, "admin", "ADMIN");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.post("/api/v1/room-types")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        verify(chainMock).filter(any());
+                }
+
+                @Test
+                @DisplayName("OWNER can POST to /api/v1/room-types")
+                void ownerCanCreateRoomType() {
+                        when(chainMock.filter(any())).thenReturn(Mono.empty());
+                        final String token = buildJwt(ONE_HOUR_MS, "owner1", "OWNER");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.post("/api/v1/room-types")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        verify(chainMock).filter(any());
+                }
+
+                @Test
+                @DisplayName("RECEPTIONIST is blocked from POST /api/v1/room-types with 403")
+                void receptionistBlockedFromRoomTypeWrite() {
+                        final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.post("/api/v1/room-types")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                }
+
+                @Test
+                @DisplayName("RECEPTIONIST can GET /api/v1/room-types (read is allowed)")
+                void receptionistCanReadRoomTypes() {
+                        when(chainMock.filter(any())).thenReturn(Mono.empty());
+                        final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/room-types")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        verify(chainMock).filter(any());
+                }
+
+                @Test
+                @DisplayName("RECEPTIONIST is blocked from POST /api/v1/rooms with 403")
+                void receptionistBlockedFromRoomCreate() {
+                        final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.post("/api/v1/rooms")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                }
+
+                @Test
+                @DisplayName("RECEPTIONIST can PATCH /api/v1/rooms/{id}/status (housekeeping)")
+                void receptionistCanPatchRoomStatus() {
+                        when(chainMock.filter(any())).thenReturn(Mono.empty());
+                        final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.patch("/api/v1/rooms/some-id/status")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        verify(chainMock).filter(any());
+                }
+
+                @Test
+                @DisplayName("RECEPTIONIST is blocked from GET /api/v1/reports with 403")
+                void receptionistBlockedFromReports() {
+                        final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/reports/owner")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                }
+
+                @Test
+                @DisplayName("GUEST is blocked from all authenticated paths with 403")
+                void guestBlockedFromAllPaths() {
+                        final String token = buildJwt(ONE_HOUR_MS, "guest1", "GUEST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/reservations")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                }
+
+                @Test
+                @DisplayName("RECEPTIONIST can GET /api/v1/reservations (operational access)")
+                void receptionistCanAccessReservations() {
+                        when(chainMock.filter(any())).thenReturn(Mono.empty());
+                        final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/reservations")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        verify(chainMock).filter(any());
                 }
         }
 }

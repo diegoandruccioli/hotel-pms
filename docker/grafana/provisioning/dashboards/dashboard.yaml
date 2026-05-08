@@ -1,0 +1,17 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Grafana — Dashboard provider configuration
+# Carica automaticamente i file JSON da questa directory
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: 1
+
+providers:
+  - name: hotel-pms
+    orgId: 1
+    folder: Hotel PMS Security
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

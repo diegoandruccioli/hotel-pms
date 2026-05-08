@@ -16,10 +16,19 @@ public interface GuestMapper {
 
     /**
      * Maps a {@link GuestRequest} to a {@link Guest} entity.
+     * Identity, audit, hotel-scoped and soft-delete fields are explicitly
+     * ignored to prevent mass-assignment from client-supplied data.
      *
      * @param request the incoming request DTO; must not be {@code null}
      * @return the mapped entity
      */
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "hotelId", ignore = true)
+    @Mapping(target = "identityDocuments", ignore = true)
+    @Mapping(target = "active", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "gdprConsentDate", ignore = true)
     Guest toEntity(GuestRequest request);
 
     /**
@@ -40,9 +49,11 @@ public interface GuestMapper {
      * @param target  the entity to be mutated; must not be {@code null}
      */
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "hotelId", ignore = true)
     @Mapping(target = "identityDocuments", ignore = true)
     @Mapping(target = "active", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "gdprConsentDate", ignore = true)
     void updateEntityFromRequest(GuestRequest request, @MappingTarget Guest target);
 }

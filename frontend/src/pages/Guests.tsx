@@ -4,17 +4,22 @@ import type { GuestResponseDTO } from '../types/guest.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
+import { M3Dialog } from '../components/m3/M3Dialog';
 import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '../store/authStore';
+import { useToastStore } from '../store/toastStore';
 import { GuestFormModal } from './GuestFormModal';
 
-const GuestRow = memo(({ guest, onEdit, t }: { 
-  guest: GuestResponseDTO; 
+interface GuestRowProps {
+  guest: GuestResponseDTO;
   onEdit: (g: GuestResponseDTO) => void;
+  onDelete?: (g: GuestResponseDTO) => void;
   t: (k: string) => string;
-}) => {
-  const handleEdit = useCallback(() => {
-    onEdit(guest);
-  }, [onEdit, guest]);
+}
+
+const GuestRow = memo(({ guest, onEdit, onDelete, t }: GuestRowProps) => {
+  const handleEdit = useCallback(() => onEdit(guest), [onEdit, guest]);
+  const handleDeleteClick = useCallback(() => onDelete?.(guest), [onDelete, guest]);
 
   return (
     <M3TableRow key={guest.id}>
@@ -23,12 +28,23 @@ const GuestRow = memo(({ guest, onEdit, t }: {
       <M3TableCell className="text-on-surface-variant">{guest.phone || '-'}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{guest.city || '-'} ({guest.country || '-'})</M3TableCell>
       <M3TableCell className="text-right">
-        <button 
-          className="text-primary hover:text-primary/80 font-medium text-sm"
+        <button
+          type="button"
+          className="text-primary hover:text-primary/80 font-medium text-sm rounded focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-none"
           onClick={handleEdit}
         >
           {t('edit')}
         </button>
+        {onDelete && (
+          <button
+            type="button"
+            aria-label={`${t('delete')} ${guest.firstName} ${guest.lastName}`}
+            onClick={handleDeleteClick}
+            className="ml-3 text-error hover:text-error/80 font-medium text-sm rounded focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-1 focus-visible:outline-none"
+          >
+            {t('delete')}
+          </button>
+        )}
       </M3TableCell>
     </M3TableRow>
   );
@@ -36,12 +52,17 @@ const GuestRow = memo(({ guest, onEdit, t }: {
 
 export const Guests = memo(() => {
   const { t } = useTranslation('common');
+  const addToast = useToastStore((s) => s.addToast);
+  const role = useAuthStore((s) => s.user?.role);
+  const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
+
   const [guests, setGuests] = useState<GuestResponseDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<GuestResponseDTO | undefined>();
+  const [guestToDelete, setGuestToDelete] = useState<GuestResponseDTO | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadGuests = useCallback(async () => {
     try {
@@ -79,6 +100,34 @@ export const Guests = memo(() => {
     setIsModalOpen(false);
     loadGuests();
   }, [loadGuests]);
+
+  const handleDeleteRequest = useCallback((guest: GuestResponseDTO) => {
+    setGuestToDelete(guest);
+  }, []);
+
+  const handleDeleteCancel = useCallback(() => {
+    setGuestToDelete(null);
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!guestToDelete) return;
+    setDeleting(true);
+    try {
+      await guestService.deleteGuest(guestToDelete.id);
+      setGuests((prev) => prev.filter((g) => g.id !== guestToDelete.id));
+      addToast(t('guest_deleted_success'), 'success');
+    } catch (err: unknown) {
+      const e = err as { response?: { status?: number } };
+      if (e.response?.status === 451) {
+        addToast(t('delete_guest_gdpr_hold'), 'error');
+      } else {
+        addToast(t('delete_guest_failed'), 'error');
+      }
+    } finally {
+      setDeleting(false);
+      setGuestToDelete(null);
+    }
+  }, [guestToDelete, addToast, t]);
 
   const headers = useMemo(() => [
     t('name'),
@@ -124,7 +173,13 @@ export const Guests = memo(() => {
             <tr><td colSpan={5} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_guests_found')}</td></tr>
           ) : (
             guests.map((guest) => (
-              <GuestRow key={guest.id} guest={guest} onEdit={handleOpenEditModal} t={t} />
+              <GuestRow
+                key={guest.id}
+                guest={guest}
+                onEdit={handleOpenEditModal}
+                onDelete={isAdminOrOwner ? handleDeleteRequest : undefined}
+                t={t}
+              />
             ))
           )}
         </M3Table>
@@ -136,6 +191,25 @@ export const Guests = memo(() => {
           onClose={handleCloseModal}
           onSaved={handleSaved}
         />
+      )}
+
+      {guestToDelete && (
+        <M3Dialog
+          open
+          title={t('delete')}
+          titleId="confirm-delete-guest-dialog"
+          onClose={handleDeleteCancel}
+        >
+          <p className="text-sm font-body text-on-surface">{t('delete_guest_confirm')}</p>
+          <div className="flex justify-end gap-3 pt-4">
+            <M3Button type="button" variant="outlined" onClick={handleDeleteCancel} disabled={deleting}>
+              {t('cancel')}
+            </M3Button>
+            <M3Button type="button" onClick={handleDeleteConfirm} loading={deleting}>
+              {t('delete')}
+            </M3Button>
+          </div>
+        </M3Dialog>
       )}
     </div>
   );

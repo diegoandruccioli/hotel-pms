@@ -1,13 +1,15 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Enterprise Hotel PMS – One-Click Startup (PowerShell 5.1+)
+    Enterprise Hotel PMS - One-Click Startup (PowerShell 5.1+)
 .DESCRIPTION
     Bootstraps Docker Desktop, generates HMAC secrets, starts all
     microservices via docker compose, waits for health checks, then
     launches the React/Vite frontend dev-server with automatic
     browser opener. Implements fatal error handling, timestamped
-    logging, port pre-checks, and graceful cleanup on exit.
+    logging, port pre-checks, and graceful cleanup on Ctrl+C.
+.NOTES
+    Encoding: ASCII-safe (no emoji/Unicode) for PS 5.1 compatibility.
 #>
 
 Set-StrictMode -Version Latest
@@ -20,9 +22,9 @@ Set-Location -LiteralPath $ScriptRoot
 # ── State flag: tracks whether docker compose was started ─────────────────────
 $script:ComposeStarted = $false
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 #  LOGGING & OUTPUT HELPERS
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 
 function Write-Log {
     param(
@@ -40,27 +42,27 @@ function Write-Step {
     )
     Write-Host ''
     Write-Log "[$Number] $Label" -Color Cyan
-    Write-Host ('─' * 60) -ForegroundColor DarkGray
+    Write-Host ('-' * 60) -ForegroundColor DarkGray
 }
 
-function Write-Success  { param([string]$Msg) Write-Log "  ✅  $Msg" -Color Green  }
-function Write-Info     { param([string]$Msg) Write-Log "  ℹ️   $Msg" -Color Yellow }
-function Write-Fatal    { param([string]$Msg) Write-Log "  ❌  $Msg" -Color Red    }
+function Write-Success { param([string]$Msg) Write-Log "  [OK]    $Msg" -Color Green  }
+function Write-Info    { param([string]$Msg) Write-Log "  [i]     $Msg" -Color Yellow }
+function Write-Fatal   { param([string]$Msg) Write-Log "  [ERR]   $Msg" -Color Red    }
 
 function Show-Banner {
     Write-Host ''
-    Write-Host '╔══════════════════════════════════════════════════════════╗' -ForegroundColor Cyan
-    Write-Host '║       🏨  Hotel PMS – One-Click Startup (PowerShell)    ║' -ForegroundColor Cyan
-    Write-Host '╚══════════════════════════════════════════════════════════╝' -ForegroundColor Cyan
+    Write-Host '+----------------------------------------------------------+' -ForegroundColor Cyan
+    Write-Host '|        Hotel PMS - One-Click Startup (PowerShell)        |' -ForegroundColor Cyan
+    Write-Host '+----------------------------------------------------------+' -ForegroundColor Cyan
     Write-Host ''
 }
 
 function Stop-WithError {
     param([Parameter(Mandatory)][string]$Reason)
     Write-Host ''
-    Write-Host '╔══════════════════════════════════════════════════════════╗' -ForegroundColor Red
-    Write-Host '║                    FATAL ERROR                          ║' -ForegroundColor Red
-    Write-Host '╚══════════════════════════════════════════════════════════╝' -ForegroundColor Red
+    Write-Host '+----------------------------------------------------------+' -ForegroundColor Red
+    Write-Host '|                      FATAL ERROR                        |' -ForegroundColor Red
+    Write-Host '+----------------------------------------------------------+' -ForegroundColor Red
     Write-Fatal $Reason
     Write-Host ''
     Write-Host 'Press any key to close this window...' -ForegroundColor DarkYellow
@@ -68,32 +70,82 @@ function Stop-WithError {
     exit 1
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
+#  NATIVE COMMAND WRAPPERS
+#
+#  Root cause of the PowerShell 5.1 "Statement" bug:
+#    $ErrorActionPreference = 'Stop'  +  Set-StrictMode -Version Latest
+#    cause native command stderr to be wrapped in a NativeCommandError; when
+#    PowerShell then tries to format that error it accesses .InvocationInfo.Statement
+#    which does not exist on native errors, producing a secondary PropertyNotFoundException.
+#
+#  Fix: lower $ErrorActionPreference to 'Continue' for the duration of every
+#  native command call. $LASTEXITCODE is always set by native commands regardless
+#  of $ErrorActionPreference, so real failures are still detected.
+# =============================================================================
+
+# Runs a native command that streams its output to the terminal.
+# Calls Stop-WithError if the exit code is non-zero.
+# -AllowStderr: lets stderr reach the terminal (docker pull progress, vite, etc.)
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory)][string]$Description,
+        [Parameter(Mandatory)][scriptblock]$Command,
+        [switch]$AllowStderr
+    )
+    # Set-StrictMode -Off prevents the PS 5.1 NativeCommandError .Statement bug:
+    # native stderr triggers an error record; PS then accesses .InvocationInfo.Statement
+    # which does not exist on NativeCommandError; with strict mode active that throws
+    # PropertyNotFoundException. Scope-bound: does not affect the caller's strict mode.
+    Set-StrictMode -Off
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        if ($AllowStderr) { & $Command } else { & $Command 2>$null }
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+    if ($LASTEXITCODE -ne 0) { Stop-WithError "$Description failed (exit code: $LASTEXITCODE)" }
+}
+
+# Runs a native command and returns its stdout lines as an array.
+# Does NOT call Stop-WithError - caller must check $LASTEXITCODE.
+# Use for probes and status reads where non-zero exit is an expected condition.
+function Invoke-NativeQuery {
+    param([Parameter(Mandatory)][scriptblock]$Command)
+    Set-StrictMode -Off  # same NativeCommandError .Statement guard as Invoke-Native
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $out = & $Command 2>$null } finally { $ErrorActionPreference = $prev }
+    return $out
+}
+
+# =============================================================================
 #  PORT PRE-CHECK
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 
 function Assert-PortAvailable {
     param([Parameter(Mandatory)][int]$Port, [string]$ServiceLabel)
     $listener = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue |
                 Where-Object { $_.State -eq 'Listen' }
     if ($listener) {
-        $procId = $listener[0].OwningProcess
+        $procId   = $listener[0].OwningProcess
         $procName = (Get-Process -Id $procId -ErrorAction SilentlyContinue).ProcessName
         Stop-WithError "Port $Port is already in use by '$procName' (PID $procId). Required for: $ServiceLabel"
     }
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 #  DOCKER DESKTOP DETECTION & LAUNCH
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 
 function Start-DockerDesktop {
     Write-Info 'Checking if Docker daemon is active...'
 
     # Fast path: Docker already running
-    $null = docker ps 2>&1
+    $null = Invoke-NativeQuery { docker ps }
     if ($LASTEXITCODE -eq 0) {
-        Write-Success 'Docker is already running!'
+        Write-Success 'Docker is already running.'
         return
     }
 
@@ -140,7 +192,6 @@ function Start-DockerDesktop {
         foreach ($path in $candidatePaths) {
             if (Test-Path $path) {
                 $dockerExe = $path
-                # Persist to cache
                 if (-not (Test-Path $cacheDir)) { New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null }
                 Set-Content -Path $cacheFile -Value $dockerExe -Encoding UTF8
                 Write-Info "Found Docker Desktop at: $dockerExe"
@@ -154,7 +205,7 @@ function Start-DockerDesktop {
     }
 
     # ── Launch and poll ───────────────────────────────────────────────────────
-    Write-Info "Starting Docker from: $dockerExe"
+    Write-Info "Starting Docker Desktop from: $dockerExe"
     Start-Process -FilePath $dockerExe
 
     $maxWaitSeconds = 90
@@ -163,9 +214,9 @@ function Start-DockerDesktop {
 
     Write-Info "Waiting for Docker daemon (timeout ${maxWaitSeconds}s)..."
     while ($elapsed -lt $maxWaitSeconds) {
-        $null = docker ps 2>&1
+        $null = Invoke-NativeQuery { docker ps }
         if ($LASTEXITCODE -eq 0) {
-            Write-Success 'Docker daemon is now active!'
+            Write-Success 'Docker daemon is now active.'
             return
         }
         Start-Sleep -Seconds $pollInterval
@@ -176,9 +227,9 @@ function Start-DockerDesktop {
     Stop-WithError "Docker daemon did not respond within ${maxWaitSeconds}s. Start Docker Desktop manually and retry."
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-#  CONTAINER HEALTH CHECK (via docker inspect — management port is internal-only)
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
+#  CONTAINER HEALTH CHECK (via docker inspect)
+# =============================================================================
 
 function Wait-ForContainerHealthy {
     param(
@@ -190,10 +241,17 @@ function Wait-ForContainerHealthy {
     Write-Info "Waiting for $ServiceName to become healthy (timeout ${TimeoutSeconds}s)..."
     $elapsed = 0
     while ($elapsed -lt $TimeoutSeconds) {
+        # Inline toggle: $ContainerName is function-scope; passing a scriptblock to
+        # Invoke-NativeQuery would execute it in a child scope where the variable
+        # is not visible. Toggle ErrorActionPreference here directly instead.
+        $prev = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
         $status = (docker inspect --format='{{.State.Health.Status}}' $ContainerName 2>$null) -join ''
+        $ErrorActionPreference = $prev
+
         if ($status -eq 'healthy') {
             Write-Host ''
-            Write-Success "$ServiceName is healthy!"
+            Write-Success "$ServiceName is healthy."
             return
         }
         Start-Sleep -Seconds 3
@@ -201,83 +259,91 @@ function Wait-ForContainerHealthy {
         Write-Host '.' -NoNewline -ForegroundColor DarkGray
     }
     Write-Host ''
-    Stop-WithError "$ServiceName did not become healthy within ${TimeoutSeconds}s. Check container logs with: docker compose logs $ContainerName"
+    Stop-WithError "$ServiceName did not become healthy within ${TimeoutSeconds}s. Check logs: docker compose logs $ContainerName"
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 #  CLEANUP HANDLER
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 
 function Invoke-Cleanup {
     if ($script:ComposeStarted) {
         Write-Host ''
-        Write-Log '🛑 Shutting down Docker containers...' -Color Yellow
+        Write-Log '[STOP] Shutting down Docker containers...' -Color Yellow
         Set-Location -LiteralPath $ScriptRoot
-        docker compose down 2>&1 | Out-Null
-        Write-Log '✅ Containers stopped. Goodbye!' -Color Green
+        # Best-effort: do not treat a non-zero exit as fatal during cleanup.
+        $prev = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        docker compose down 2>$null
+        $ErrorActionPreference = $prev
+        Write-Log '[OK]   Containers stopped. Goodbye!' -Color Green
     }
     Write-Host ''
     Write-Host 'Press any key to close this window...' -ForegroundColor DarkYellow
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 #  MAIN EXECUTION
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 
 $browserJob = $null
 try {
     Show-Banner
 
-    # ── Step 0: Port availability ─────────────────────────────────────────────
-    Write-Step '0/7' 'Pre-flight port checks'
-    Assert-PortAvailable -Port 8888 -ServiceLabel 'Config Server'
-    Assert-PortAvailable -Port 8080 -ServiceLabel 'API Gateway'
-    Assert-PortAvailable -Port 5173 -ServiceLabel 'Vite Dev Server'
-    Assert-PortAvailable -Port 5432 -ServiceLabel 'PostgreSQL'
-    Assert-PortAvailable -Port 6379 -ServiceLabel 'Redis'
-    Write-Success 'All required ports are available.'
-
-    # ── Step 1: Docker ────────────────────────────────────────────────────────
-    Write-Step '1/7' 'Ensuring Docker Desktop is running'
-    Start-DockerDesktop
-
-    # ── Step 2: HMAC Secret ───────────────────────────────────────────────────
-    Write-Step '2/7' 'HMAC secret bootstrap'
-    $hmacScript = Join-Path $ScriptRoot 'setup-hmac-secret.ps1'
-    if (-not (Test-Path $hmacScript)) {
-        Stop-WithError "HMAC setup script not found at: $hmacScript"
-    }
-    try {
-        & $hmacScript
-        if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
-            throw "setup-hmac-secret.ps1 exited with code $LASTEXITCODE"
+    # ── Detect if stack is already running ────────────────────────────────────
+    $stackAlreadyRunning = $false
+    $null = Invoke-NativeQuery { docker ps }
+    if ($LASTEXITCODE -eq 0) {
+        $gwHealth = (Invoke-NativeQuery { docker inspect --format='{{.State.Health.Status}}' api-gateway }) -join ''
+        if ($LASTEXITCODE -eq 0 -and $gwHealth -eq 'healthy') {
+            $stackAlreadyRunning = $true
+            Write-Host ''
+            Write-Info 'Docker stack already running -- resuming frontend only.'
         }
-    } catch {
-        Stop-WithError "HMAC secret setup failed: $_"
     }
-    Write-Success 'HMAC secret is ready.'
 
-    # ── Step 3: Docker Compose ────────────────────────────────────────────────
-    Write-Step '3/7' 'Starting Docker infrastructure'
-    $envFile = Join-Path $ScriptRoot '.env'
-    if (-not (Test-Path $envFile)) {
-        Stop-WithError ".env file not found at $envFile — HMAC setup may have failed silently."
+    if (-not $stackAlreadyRunning) {
+        # ── Step 0: Port availability ─────────────────────────────────────────
+        Write-Step '0/7' 'Pre-flight port checks'
+        Assert-PortAvailable -Port 8888 -ServiceLabel 'Config Server'
+        Assert-PortAvailable -Port 8080 -ServiceLabel 'API Gateway'
+        Assert-PortAvailable -Port 5173 -ServiceLabel 'Vite Dev Server'
+        Assert-PortAvailable -Port 5432 -ServiceLabel 'PostgreSQL'
+        Assert-PortAvailable -Port 6379 -ServiceLabel 'Redis'
+        Write-Success 'All required ports are available.'
+
+        # ── Step 1: Docker ────────────────────────────────────────────────────
+        Write-Step '1/7' 'Ensuring Docker Desktop is running'
+        Start-DockerDesktop
+
+        # ── Step 2: HMAC Secret ───────────────────────────────────────────────
+        Write-Step '2/7' 'HMAC secret bootstrap'
+        $hmacScript = Join-Path $ScriptRoot 'setup-hmac-secret.ps1'
+        if (-not (Test-Path $hmacScript)) {
+            Stop-WithError "HMAC setup script not found at: $hmacScript"
+        }
+        Invoke-Native 'HMAC secret setup' { & $hmacScript } -AllowStderr
+        Write-Success 'HMAC secret is ready.'
+
+        # ── Step 3: Docker Compose ────────────────────────────────────────────
+        Write-Step '3/7' 'Starting Docker infrastructure'
+        $envFile = Join-Path $ScriptRoot '.env'
+        if (-not (Test-Path $envFile)) {
+            Stop-WithError ".env file not found at $envFile -- HMAC setup may have failed silently."
+        }
+        Invoke-Native 'docker compose up' { docker compose --env-file $envFile up -d --build } -AllowStderr
+        $script:ComposeStarted = $true
+        Write-Success 'All containers are starting.'
+
+        # ── Step 4: Config Server health ──────────────────────────────────────
+        Write-Step '4/7' 'Waiting for Config Server'
+        Wait-ForContainerHealthy -ServiceName 'Config Server' -ContainerName 'config-server' -TimeoutSeconds 120
+
+        # ── Step 5: API Gateway health ────────────────────────────────────────
+        Write-Step '5/7' 'Waiting for API Gateway'
+        Wait-ForContainerHealthy -ServiceName 'API Gateway' -ContainerName 'api-gateway' -TimeoutSeconds 180
     }
-    docker compose --env-file $envFile up -d --build 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
-    if ($LASTEXITCODE -ne 0) {
-        Stop-WithError "docker compose up failed with exit code $LASTEXITCODE."
-    }
-    $script:ComposeStarted = $true
-    Write-Success 'All containers are starting.'
-
-    # ── Step 4: Config Server health ──────────────────────────────────────────
-    Write-Step '4/7' 'Waiting for Config Server'
-    Wait-ForContainerHealthy -ServiceName 'Config Server' -ContainerName 'config-server' -TimeoutSeconds 120
-
-    # ── Step 5: API Gateway health ────────────────────────────────────────────
-    Write-Step '5/7' 'Waiting for API Gateway'
-    Wait-ForContainerHealthy -ServiceName 'API Gateway' -ContainerName 'api-gateway' -TimeoutSeconds 180
 
     # ── Step 6: Frontend ──────────────────────────────────────────────────────
     Write-Step '6/7' 'Installing frontend dependencies'
@@ -286,16 +352,13 @@ try {
         Stop-WithError "frontend/ directory not found at: $frontendDir"
     }
     Set-Location -LiteralPath $frontendDir
-    npm install --silent 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
-    if ($LASTEXITCODE -ne 0) {
-        Stop-WithError "npm install failed with exit code $LASTEXITCODE."
-    }
+    Invoke-Native 'npm install' { npm install --silent }
     Write-Success 'Frontend dependencies installed.'
 
     # ── Step 7: Launch Vite + browser ─────────────────────────────────────────
     Write-Step '7/7' 'Launching Vite dev server'
 
-    # Background job: wait for port 3000 to respond, then open browser
+    # Background job: wait for port 5173 to respond, then open browser.
     $browserJob = Start-Job -ScriptBlock {
         $maxWait = 30
         $waited  = 0
@@ -304,7 +367,7 @@ try {
                 $tcp = New-Object System.Net.Sockets.TcpClient
                 $tcp.Connect('127.0.0.1', 5173)
                 $tcp.Close()
-                Start-Process 'http://localhost:5173'
+                Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'start', '', 'http://localhost:5173'
                 return
             } catch {
                 Start-Sleep -Seconds 1
@@ -313,21 +376,28 @@ try {
         }
     }
 
-    Write-Log '  💡 Press Ctrl+C to stop the server and shut down Docker.' -Color Yellow
-    Write-Log '  🚀 Vite dev server starting on http://localhost:5173' -Color Green
+    Write-Log '  [TIP] Press Ctrl+C to stop the server and shut down Docker.' -Color Yellow
+    Write-Log '  [DEV] Vite dev server starting on http://localhost:5173'     -Color Green
     Write-Host ''
 
+    # npm run dev streams stdout+stderr to the terminal; $ErrorActionPreference
+    # is lowered so that Ctrl+C (which exits npm with a signal code) is not
+    # misreported as a fatal error by the outer catch block.
+    Set-StrictMode -Off  # NativeCommandError .Statement guard (same as Invoke-Native)
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    Set-Location -LiteralPath $frontendDir
     npm run dev
+    $ErrorActionPreference = $prev
 }
 catch {
     Write-Host ''
-    Write-Host '╔══════════════════════════════════════════════════════════╗' -ForegroundColor Red
-    Write-Host '║                    FATAL ERROR                          ║' -ForegroundColor Red
-    Write-Host '╚══════════════════════════════════════════════════════════╝' -ForegroundColor Red
-    Write-Fatal "Startup aborted: $_"
+    Write-Host '+----------------------------------------------------------+' -ForegroundColor Red
+    Write-Host '|                      FATAL ERROR                        |' -ForegroundColor Red
+    Write-Host '+----------------------------------------------------------+' -ForegroundColor Red
+    Write-Fatal "Startup aborted: $($_.Exception.Message)"
 }
 finally {
-    # Clean up browser job if it exists
     if ($browserJob) { Remove-Job -Job $browserJob -Force -ErrorAction SilentlyContinue }
     Invoke-Cleanup
 }

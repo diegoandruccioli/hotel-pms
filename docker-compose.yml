@@ -6,6 +6,7 @@
 #   • Added /actuator/health/liveness healthchecks for every Spring service
 #   • api-gateway depends_on all downstream services (service_healthy)
 #   • Removed stale EUREKA_CLIENT_ENABLED flags (Eureka is being removed)
+#   • Network Segmentation: 5 isolated networks (dmz, gateway, backend, db, observability)
 # ============================================================
 
 services:
@@ -17,7 +18,7 @@ services:
     container_name: hotel_postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -29,11 +30,13 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    networks:
+      - db-network
     deploy:
       resources:
         limits:
           cpus: "1.0"
-          memory: 512M
+          memory: 384M
         reservations:
           cpus: "0.25"
           memory: 256M
@@ -52,6 +55,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
+    networks:
+      - gateway-network
     deploy:
       resources:
         limits:
@@ -62,6 +67,64 @@ services:
           memory: 128M
 
   # ----------------------------------------------------------
+  # Loki - Log Aggregation (GAP-4: aggregazione audit log SIEM)
+  # ----------------------------------------------------------
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: hotel_loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/config.yaml
+    volumes:
+      - ./docker/loki/loki-config.yaml:/etc/loki/config.yaml
+      - loki_data:/loki
+    healthcheck:
+      test: ["CMD-SHELL", "wget -T5 -q -O /dev/null http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - observability-network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
+  # Grafana - Dashboard SIEM (GAP-4: visualizzazione audit log)
+  # ----------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: hotel_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      loki:
+        condition: service_healthy
+    networks:
+      - observability-network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
   # Zipkin - Distributed Tracing
   # ----------------------------------------------------------
   zipkin:
@@ -69,11 +132,20 @@ services:
     container_name: hotel_zipkin
     ports:
       - "9411:9411"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -T5 -q -O /dev/null http://localhost:9411/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - observability-network
+      - backend-network
     deploy:
       resources:
         limits:
           cpus: "0.5"
-          memory: 768M
+          memory: 384M
         reservations:
           cpus: "0.10"
           memory: 256M
@@ -91,11 +163,14 @@ services:
     depends_on:
       config-server:
         condition: service_healthy
+    networks:
+      - observability-network
+      - backend-network
     deploy:
       resources:
         limits:
           cpus: "0.5"
-          memory: 768M
+          memory: 384M
         reservations:
           cpus: "0.10"
           memory: 256M
@@ -112,16 +187,24 @@ services:
       - "8888:8888"
     environment:
       - SPRING_PROFILES_ACTIVE=native
+      # T-CFG-03: credentials required by consumer microservices
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 300s
+    networks:
+      - backend-network
+      - observability-network
     deploy:
       resources:
         limits:
@@ -143,7 +226,10 @@ services:
       - "8080:8080"
     environment:
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
+      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
       # Service URIs – override with K8s ClusterIP or external URLs
       - GW_AUTH_SERVICE_URI=http://auth-service:8087
       - GW_GUEST_SERVICE_URI=http://guest-service:8083
@@ -179,20 +265,25 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 300s
+    networks:
+      - dmz-network
+      - gateway-network
+      - backend-network
+      - observability-network
     deploy:
       resources:
         limits:
           cpus: "0.5"
-          memory: 384M
+          memory: 768M
         reservations:
           cpus: "0.10"
-          memory: 192M
+          memory: 256M
 
   # ----------------------------------------------------------
   # Auth Service
@@ -207,12 +298,17 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=auth-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_auth
       - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
+      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       config-server:
         condition: service_healthy
@@ -220,12 +316,17 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 300s
+    networks:
+      - backend-network
+      - db-network
+      - gateway-network
+      - observability-network
     deploy:
       resources:
         limits:
@@ -248,11 +349,13 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=guest-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_guest
       - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - APPLICATION_CONFIG_RESERVATION_SERVICE_URL=http://reservation-service:8082
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -262,12 +365,16 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 300s
+    networks:
+      - backend-network
+      - db-network
+      - observability-network
     deploy:
       resources:
         limits:
@@ -290,10 +397,18 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=stay-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_stay
       - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      # T-STAY-03: PS portal credentials — real values injected via .env in production
+      # Obtain WsKey from: portal login -> account icon -> "Chiave Web Service"
+      - ALLOGGIATI_USERNAME=${ALLOGGIATI_USERNAME:-ci_placeholder_user}
+      - ALLOGGIATI_PASSWORD=${ALLOGGIATI_PASSWORD:-ci_placeholder_password}
+      - ALLOGGIATI_WS_KEY=${ALLOGGIATI_WS_KEY:-ci_placeholder_wskey}
+      - ALLOGGIATI_DRY_RUN=${ALLOGGIATI_DRY_RUN:-true}
+      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -303,12 +418,16 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 300s
+    networks:
+      - backend-network
+      - db-network
+      - observability-network
     deploy:
       resources:
         limits:
@@ -331,10 +450,12 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=billing-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_billing
       - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -344,12 +465,16 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 300s
+    networks:
+      - backend-network
+      - db-network
+      - observability-network
     deploy:
       resources:
         limits:
@@ -372,11 +497,14 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=fb-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_fb
       - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - APPLICATION_CONFIG_STAY_SERVICE_URL=http://stay-service:8084
+      - APPLICATION_CONFIG_BILLING_SERVICE_URL=http://billing-service:8085
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -386,12 +514,16 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 300s
+    networks:
+      - backend-network
+      - db-network
+      - observability-network
     deploy:
       resources:
         limits:
@@ -414,10 +546,12 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=inventory-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_inventory
       - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -427,12 +561,16 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 300s
+    networks:
+      - backend-network
+      - db-network
+      - observability-network
     deploy:
       resources:
         limits:
@@ -455,12 +593,14 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=reservation-service
       - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_reservation
       - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - APPLICATION_CONFIG_GUEST_SERVICE_URL=http://guest-service:8083
       - APPLICATION_CONFIG_INVENTORY_SERVICE_URL=http://inventory-service:8081
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -470,12 +610,16 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
         ]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 300s
+    networks:
+      - backend-network
+      - db-network
+      - observability-network
     deploy:
       resources:
         limits:
@@ -498,6 +642,14 @@ services:
     depends_on:
       api-gateway:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -T10 -q -O /dev/null http://localhost:80/ || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - dmz-network
     deploy:
       resources:
         limits:
@@ -509,3 +661,26 @@ services:
 
 volumes:
   postgres_data:
+  loki_data:
+  grafana_data:
+
+# ============================================================
+# Network Segmentation – Defense in Depth
+# ============================================================
+# dmz-network:          Frontend + API Gateway (public-facing layer)
+# gateway-network:      API Gateway + Redis + Auth Service (rate limiting & session cache)
+# backend-network:      All microservices + Config Server + Prometheus/Zipkin (internal API mesh)
+# db-network:           PostgreSQL + microservices only (transactional data, no external access)
+# observability-network: Loki, Grafana, Prometheus, Zipkin + services exposing metrics
+# ============================================================
+networks:
+  dmz-network:
+    driver: bridge
+  gateway-network:
+    driver: bridge
+  backend-network:
+    driver: bridge
+  db-network:
+    driver: bridge
+  observability-network:
+    driver: bridge

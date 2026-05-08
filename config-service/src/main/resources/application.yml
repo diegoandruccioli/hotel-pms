@@ -11,6 +11,10 @@ spring:
       server:
         native:
           search-locations: classpath:/config/
+  security:
+    user:
+      name: ${CONFIG_SERVER_USERNAME:configuser}
+      password: ${CONFIG_SERVER_PASSWORD}
 
 management:
   server:

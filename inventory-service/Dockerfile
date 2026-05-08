@@ -14,6 +14,7 @@ RUN ./gradlew clean build -x test
 
 # Stage 2: Create the runtime image using a minimal JRE
 FROM eclipse-temurin:21-jre-alpine
+RUN apk update && apk upgrade --no-cache
 
 WORKDIR /app
 

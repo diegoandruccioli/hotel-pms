@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { M3Button } from './M3Button';
 
 describe('M3Button', () => {
@@ -44,5 +45,11 @@ describe('M3Button', () => {
   it('should show icon when provided', () => {
     render(<M3Button icon="add">Add</M3Button>);
     expect(screen.getByText('add')).toBeInTheDocument();
+  });
+
+  it('should have no accessibility violations', async () => {
+    const { container } = render(<M3Button>Click me</M3Button>);
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

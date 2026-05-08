@@ -14,6 +14,9 @@ const Guests = lazy(() => import('./pages/Guests').then((m) => ({ default: m.Gue
 const Reservations = lazy(() => import('./pages/Reservations').then((m) => ({ default: m.Reservations })));
 const ReservationForm = lazy(() => import('./pages/Reservations/ReservationForm').then((m) => ({ default: m.ReservationForm })));
 const CheckInForm = lazy(() => import('./pages/Stays/CheckInForm').then((m) => ({ default: m.CheckInForm })));
+const WalkInCheckInForm = lazy(() => import('./pages/Stays/WalkInCheckInForm').then((m) => ({ default: m.WalkInCheckInForm })));
+const AdminUsers = lazy(() => import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })));
+const HotelProfile = lazy(() => import('./pages/HotelProfile').then((m) => ({ default: m.HotelProfile })));
 const Stays = lazy(() => import('./pages/Stays').then((m) => ({ default: m.Stays })));
 const Billing = lazy(() => import('./pages/Billing').then((m) => ({ default: m.Billing })));
 const Restaurant = lazy(() => import('./pages/Restaurant').then((m) => ({ default: m.Restaurant })));
@@ -21,6 +24,9 @@ const CalendarPlanning = lazy(() => import('./pages/CalendarPlanning').then((m) 
 const Housekeeping = lazy(() => import('./pages/Housekeeping').then((m) => ({ default: m.Housekeeping })));
 const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard').then((m) => ({ default: m.OwnerDashboard })));
 const Rooms = lazy(() => import('./pages/Rooms').then((m) => ({ default: m.Rooms })));
+const Profile = lazy(() => import('./pages/Profile').then((m) => ({ default: m.Profile })));
+
+const OWNER_ADMIN_ROLES = ['OWNER', 'ADMIN'] as const;
 
 function App() {
   const { t } = useTranslation('common');
@@ -75,12 +81,18 @@ function App() {
               <Route path="/reservations/edit/:id" element={<ReservationForm />} />
               <Route path="/stays" element={<Stays />} />
               <Route path="/stays/check-in/:reservationId" element={<CheckInForm />} />
+              <Route path="/stays/walk-in" element={<WalkInCheckInForm />} />
               <Route path="/billing" element={<Billing />} />
               <Route path="/restaurant" element={<Restaurant />} />
               <Route path="/calendar" element={<CalendarPlanning />} />
               <Route path="/housekeeping" element={<Housekeeping />} />
               <Route path="/rooms" element={<Rooms />} />
-              <Route path="/owner-dashboard" element={<OwnerDashboard />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route element={<ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />}>
+                <Route path="/owner-dashboard" element={<OwnerDashboard />} />
+                <Route path="/admin/users" element={<AdminUsers />} />
+                <Route path="/profile/hotel" element={<HotelProfile />} />
+              </Route>
             </Route>
           </Route>
 

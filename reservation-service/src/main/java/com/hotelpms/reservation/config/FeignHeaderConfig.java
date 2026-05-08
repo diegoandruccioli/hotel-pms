@@ -20,6 +20,7 @@ public class FeignHeaderConfig {
 
     private static final String HEADER_USER = "X-Auth-User";
     private static final String HEADER_ROLE = "X-Auth-Role";
+    private static final String HEADER_HOTEL = "X-Auth-Hotel";
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
 
@@ -52,29 +53,35 @@ public class FeignHeaderConfig {
             final HttpServletRequest request = attrs.getRequest();
             final String user = request.getHeader(HEADER_USER);
             final String role = request.getHeader(HEADER_ROLE);
+            final String hotel = request.getHeader(HEADER_HOTEL);
 
-            if (StringUtils.hasText(user) && StringUtils.hasText(role)) {
+            if (StringUtils.hasText(user) && StringUtils.hasText(role) && StringUtils.hasText(hotel)) {
                 template.header(HEADER_USER, user);
                 template.header(HEADER_ROLE, role);
-                template.header(HEADER_SIGNATURE, computeHmac(user, role));
+                template.header(HEADER_HOTEL, hotel);
+                template.header(HEADER_SIGNATURE, computeHmac(user, role, hotel));
             }
         };
     }
 
     /**
-     * Computes the HMAC-SHA256 signature for the given username and role.
+     * Computes the HMAC-SHA256 signature for the given username, role, and hotelId.
+     * Must match the payload format used by {@code InternalAuthFilter} in every
+     * downstream service: {@code "username:role:hotelId"}.
      *
      * @param username the authenticated username
      * @param role     the role associated with the user
+     * @param hotelId  the hotel UUID associated with the user
      * @return hex-encoded HMAC digest
      */
-    private String computeHmac(final String username, final String role) {
+    private String computeHmac(final String username, final String role, final String hotelId) {
         try {
             final javax.crypto.Mac mac = javax.crypto.Mac.getInstance(HMAC_ALGORITHM);
             final javax.crypto.spec.SecretKeySpec keySpec = new javax.crypto.spec.SecretKeySpec(
                     hmacSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8), HMAC_ALGORITHM);
             mac.init(keySpec);
-            final byte[] digest = mac.doFinal((username + ":" + role).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            final byte[] digest = mac.doFinal(
+                    (username + ":" + role + ":" + hotelId).getBytes(java.nio.charset.StandardCharsets.UTF_8));
             return java.util.HexFormat.of().formatHex(digest);
         } catch (final java.security.NoSuchAlgorithmException | java.security.InvalidKeyException e) {
             throw new IllegalStateException("FEIGN_HMAC_SIGNATURE_FAILED", e);

@@ -6,6 +6,7 @@ import com.hotelpms.guest.dto.response.GuestResponse;
 import com.hotelpms.guest.dto.response.IdentityDocumentResponseDTO;
 import com.hotelpms.guest.service.GuestService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -35,6 +37,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/guests")
 @RequiredArgsConstructor
+@Validated
 public final class GuestController {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
@@ -161,7 +164,8 @@ public final class GuestController {
      * @return a list of guest response DTOs
      */
     @PostMapping("/batch")
-    public ResponseEntity<List<GuestResponse>> getGuestsBatch(@NonNull @RequestBody final List<UUID> ids) {
+    public ResponseEntity<List<GuestResponse>> getGuestsBatch(
+            @NotEmpty(message = "IDs list cannot be empty") @NonNull @RequestBody final List<UUID> ids) {
         return ResponseEntity.ok(guestService.getGuestsByIds(ids));
     }
 }

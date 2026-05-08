@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.4.3"
+    id("org.springframework.boot") version "3.4.13"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.danilopianini.gradle-java-qa") version "1.165.0"
 }
@@ -31,6 +31,7 @@ repositories {
 ext {
     set("springCloudVersion", "2024.0.0")
     set("mapStructVersion", "1.6.3")
+    set("tomcat.version", "10.1.54")
 }
 
 dependencies {
@@ -51,12 +52,9 @@ dependencies {
 
     // --- Caching ---
     // spring-boot-starter-cache provides the @EnableCaching / @Cacheable / @CacheEvict
-    // abstraction layer. The actual store is Redis, provided by spring-boot-starter-data-redis
-    // (uses the Lettuce driver by default, no extra driver dependency needed).
-    // When spring.cache.type is not set in application.yml, Spring Boot auto-detects Redis
-    // on the classpath and configures RedisCacheManager automatically.
+    // abstraction layer. Spring Boot uses ConcurrentMapCacheManager by default (in-memory),
+    // which is sufficient for RoomType data that changes infrequently.
     implementation("org.springframework.boot:spring-boot-starter-cache")
-    implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
     // --- Observability ---
     implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -86,6 +84,13 @@ dependencies {
 dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
+    }
+    dependencies {
+        // CVE-2025-48976 (commons-fileupload 1.5→1.6.0) + CVE-2024-47554 (commons-io 2.11.0→2.14.0)
+        // commons-fileupload is not managed by Spring Boot 3.4.x BOM (removed with CommonsMultipartResolver
+        // in Spring 6.1); dependencyManagement.dependencies forces the version regardless of BOM properties.
+        dependency("commons-fileupload:commons-fileupload:1.6.0")
+        dependency("commons-io:commons-io:2.14.0")
     }
 }
 

@@ -18,6 +18,8 @@ import com.hotelpms.reservation.service.ReservationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,7 @@ import java.util.UUID;
 public class ReservationServiceImpl implements ReservationService {
 
     private static final String ID_NOT_NULL_MSG = "Reservation ID cannot be null";
+    private static final String HOTEL_ID_NOT_NULL_MSG = "Hotel ID cannot be null";
 
     private final ReservationRepository reservationRepository;
     private final ReservationMapper reservationMapper;
@@ -44,11 +47,14 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional
     public ReservationResponse createReservation(final ReservationRequest request) {
+        verifyDateRange(request);
+        final UUID hotelId = resolveHotelId();
         final GuestResponse guest = verifyGuestExists(request.guestId());
         verifyRoomsAvailability(request.lineItems());
         verifyNoOverlappingReservations(null, request);
 
         final Reservation reservation = reservationMapper.toEntity(request);
+        reservation.setHotelId(hotelId);
         reservation.setActualGuests(0);
         if (reservation.getStatus() == null) {
             reservation.setStatus(ReservationStatus.CONFIRMED);
@@ -68,7 +74,8 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional(readOnly = true)
     public ReservationResponse getReservationById(final UUID id) {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
-        final Reservation reservation = findReservationByIdOrThrow(id);
+        final UUID hotelId = resolveHotelId();
+        final Reservation reservation = findReservationByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = guestClient.getGuestById(reservation.getGuestId());
         return enrichWithGuestName(reservationMapper.toResponse(reservation), guest);
     }
@@ -78,12 +85,18 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional(readOnly = true)
     public Page<ReservationResponse> getAllReservations(final Pageable pageable) {
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
-        final Page<Reservation> reservationPage = reservationRepository.findAll(safePageable);
+        final UUID hotelId = resolveHotelId();
+        final Page<Reservation> reservationPage = reservationRepository.findAllByHotelId(hotelId, safePageable);
 
         final List<UUID> guestIds = reservationPage.getContent().stream()
                 .map(Reservation::getGuestId)
                 .distinct()
                 .toList();
+
+        if (guestIds.isEmpty()) {
+            return reservationPage.map(reservationMapper::toResponse);
+        }
+
         final java.util.Map<UUID, String> guestNameMap = guestClient.getGuestsBatch(guestIds).stream()
                 .collect(java.util.stream.Collectors.toMap(
                         GuestResponse::id,
@@ -100,8 +113,10 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional
     public ReservationResponse updateReservation(final UUID id, final ReservationRequest request) {
+        verifyDateRange(request);
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
-        final Reservation existingReservation = findReservationByIdOrThrow(id);
+        final UUID hotelId = resolveHotelId();
+        final Reservation existingReservation = findReservationByIdAndHotelOrThrow(id, hotelId);
 
         final GuestResponse guest = verifyGuestExists(request.guestId());
         verifyRoomsAvailability(request.lineItems());
@@ -125,7 +140,8 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional
     public void deleteReservation(final UUID id) {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
-        final Reservation reservation = findReservationByIdOrThrow(id);
+        final UUID hotelId = resolveHotelId();
+        final Reservation reservation = findReservationByIdAndHotelOrThrow(id, hotelId);
         reservationRepository.delete(Objects.requireNonNull(reservation));
     }
 
@@ -135,7 +151,8 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationResponse updateStatusAndGuests(final UUID id, final ReservationStatus status,
             final Integer actualGuests) {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
-        final Reservation reservation = findReservationByIdOrThrow(id);
+        final UUID hotelId = resolveHotelId();
+        final Reservation reservation = findReservationByIdAndHotelOrThrow(id, hotelId);
 
         if (status != null) {
             reservation.setStatus(status);
@@ -149,9 +166,25 @@ public class ReservationServiceImpl implements ReservationService {
         return enrichWithGuestName(reservationMapper.toResponse(saved), guest);
     }
 
-    private Reservation findReservationByIdOrThrow(final UUID id) {
+    /**
+     * Extracts the hotel UUID from the current security context details.
+     * The value is set by {@code InternalAuthFilter} from the {@code X-Auth-Hotel} header.
+     *
+     * @return the hotel UUID of the authenticated user
+     * @throws IllegalStateException if the hotel ID is absent or not a valid UUID
+     */
+    private UUID resolveHotelId() {
+        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)) {
+            throw new IllegalStateException(HOTEL_ID_NOT_NULL_MSG);
+        }
+        return UUID.fromString(hotelIdStr);
+    }
+
+    private Reservation findReservationByIdAndHotelOrThrow(final UUID id, final UUID hotelId) {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
-        return reservationRepository.findById(id)
+        Objects.requireNonNull(hotelId, HOTEL_ID_NOT_NULL_MSG);
+        return reservationRepository.findByIdAndHotelId(id, hotelId)
                 .orElseThrow(() -> new NotFoundException("RESERVATION_NOT_FOUND"));
     }
 
@@ -262,6 +295,26 @@ public class ReservationServiceImpl implements ReservationService {
             if (!room.active() || "UNAVAILABLE".equalsIgnoreCase(room.status())) {
                 throw new ExternalServiceException("ROOM_UNAVAILABLE");
             }
+        }
+    }
+
+    /**
+     * Defense-in-depth guard: rejects requests where {@code checkOutDate} is not
+     * strictly after {@code checkInDate}.
+     *
+     * <p>The primary enforcement is the {@code @ValidDateRange} class-level Bean
+     * Validation constraint on {@link ReservationRequest}. This method adds a
+     * second layer to protect programmatic callers that bypass controller validation.
+     *
+     * @param request the reservation request to validate
+     * @throws BadRequestException if {@code checkOutDate} is equal to or before
+     *         {@code checkInDate}
+     */
+    private static void verifyDateRange(final ReservationRequest request) {
+        if (request.checkInDate() != null
+                && request.checkOutDate() != null
+                && !request.checkOutDate().isAfter(request.checkInDate())) {
+            throw new BadRequestException("CHECKOUT_MUST_BE_AFTER_CHECKIN");
         }
     }
 

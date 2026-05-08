@@ -38,8 +38,23 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles InvoiceConflictException.
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 409 status
+     */
+    @ExceptionHandler(InvoiceConflictException.class)
+    public ProblemDetail handleInvoiceConflictException(final InvoiceConflictException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problemDetail.setTitle("Invoice Conflict");
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/conflict")));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
+
+    /**
      * Handles BillingValidationException.
-     * 
+     *
      * @param ex the exception
      * @return ProblemDetail with 400 status
      */

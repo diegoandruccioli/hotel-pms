@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { axe } from 'vitest-axe';
 import { OwnerDashboard } from './OwnerDashboard';
 
 vi.mock('react-i18next', () => ({
@@ -59,5 +60,12 @@ describe('OwnerDashboard', () => {
     mockUseAuthStore.mockReturnValue({ user: { role: 'OWNER' } });
     render(<OwnerDashboard />);
     expect(screen.getByText('generate_report')).toBeInTheDocument();
+  });
+
+  it('should have no accessibility violations', async () => {
+    mockUseAuthStore.mockReturnValue({ user: { role: 'OWNER' } });
+    const { container } = render(<OwnerDashboard />);
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });

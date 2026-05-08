@@ -1,6 +1,7 @@
 package com.hotelpms.reservation.dto;
 
 import com.hotelpms.reservation.domain.ReservationStatus;
+import com.hotelpms.reservation.validation.ValidDateRange;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotEmpty;
@@ -13,13 +14,19 @@ import java.util.UUID;
 /**
  * Request DTO for Reservation.
  *
- * @param guestId      the guest id
+ * <p>The {@link ValidDateRange} class-level constraint ensures that
+ * {@code checkOutDate} is strictly after {@code checkInDate}. A zero-night or
+ * inverted date range would otherwise pass individual field validation and could
+ * corrupt the overlap-detection query (T-RES-03).
+ *
+ * @param guestId        the guest id
  * @param expectedGuests the expected number of guests
- * @param checkInDate  the check in date
- * @param checkOutDate the check out date
- * @param status       the status
- * @param lineItems    the line items
+ * @param checkInDate    the check in date
+ * @param checkOutDate   the check out date
+ * @param status         the status
+ * @param lineItems      the line items
  */
+@ValidDateRange
 @SuppressWarnings({ "PMD.AvoidDuplicateLiterals", "EI_EXPOSE_REP", "EI_EXPOSE_REP2" })
 public record ReservationRequest(
                 @NotNull(message = "Required") UUID guestId,

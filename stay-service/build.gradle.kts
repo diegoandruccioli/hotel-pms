@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.4.3"
+    id("org.springframework.boot") version "3.4.13"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.danilopianini.gradle-java-qa") version "1.165.0"
 }
@@ -31,6 +31,7 @@ repositories {
 ext {
     set("springCloudVersion", "2024.0.0")
     set("mapStructVersion", "1.6.3")
+    set("tomcat.version", "10.1.54")
 }
 
 dependencies {
@@ -51,6 +52,9 @@ dependencies {
     implementation("io.zipkin.reporter2:zipkin-reporter-brave")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
+    // --- GAP-4: Log aggregation SIEM (Loki via logback appender) ---
+    implementation("com.github.loki4j:loki-logback-appender:1.5.2")
+
     compileOnly("org.projectlombok:lombok:1.18.38")
     annotationProcessor("org.projectlombok:lombok:1.18.38")
 
@@ -64,6 +68,25 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
 
+    // --- CSV parsing for Alloggiati Web lookup table downloads ---
+    // PINNED at 1.9.0 — DO NOT upgrade to 1.10.0+ without verifying commons-io compatibility.
+    //
+    // Root cause: commons-csv 1.10.0 introduced a dependency on commons-io >= 2.15.0, which
+    // added UnsynchronizedBufferedReader. This project forces commons-io at 2.14.0 across all
+    // services (see dependencyManagement below) to address CVE-2024-47554. Upgrading commons-csv
+    // while commons-io remains at 2.14.0 causes a NoClassDefFoundError at runtime inside
+    // AlloggiatiCsvParser when parsing the PS lookup tables (stati, comuni, tipdoc).
+    //
+    // To safely upgrade: first confirm that the Spring Boot BOM has absorbed commons-io >= 2.15
+    // (check the BOM release notes for the Spring Boot version in use), then update both
+    // commons-csv and the forced commons-io version together in all dependencyManagement blocks.
+    // Dependabot is configured to ignore commons-csv >= 1.10 (.github/dependabot.yml).
+    implementation("org.apache.commons:commons-csv:1.9.0")
+
+    // --- In-memory caching (Caffeine, version managed by Spring Boot BOM) ---
+    implementation("org.springframework.boot:spring-boot-starter-cache")
+    implementation("com.github.ben-manes.caffeine:caffeine")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("net.bytebuddy:byte-buddy:1.15.11")
     testImplementation("net.bytebuddy:byte-buddy-agent:1.15.11")
@@ -76,9 +99,23 @@ dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
     }
+    dependencies {
+        // CVE-2025-48976 (commons-fileupload 1.5→1.6.0) + CVE-2024-47554 (commons-io 2.11.0→2.14.0)
+        // commons-fileupload is not managed by Spring Boot 3.4.x BOM (removed with CommonsMultipartResolver
+        // in Spring 6.1); dependencyManagement.dependencies forces the version regardless of BOM properties.
+        dependency("commons-fileupload:commons-fileupload:1.6.0")
+        dependency("commons-io:commons-io:2.14.0")
+    }
 }
 
 tasks.withType<Test> {
     useJUnitPlatform()
     systemProperty("net.bytebuddy.experimental", "true")
+}
+
+// SpotBugs: project-specific exclusions (Spring DI beans — EI_EXPOSE_REP2 not applicable)
+tasks.withType<com.github.spotbugs.snom.SpotBugsTask>().configureEach {
+    extraArgs.addAll(
+        listOf("-exclude", "${project.projectDir}/config/spotbugs/exclude.xml")
+    )
 }
