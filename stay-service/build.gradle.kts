@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.4.13"
+    id("org.springframework.boot") version "3.5.14"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.danilopianini.gradle-java-qa") version "1.165.0"
 }
@@ -29,7 +29,9 @@ repositories {
 }
 
 ext {
-    set("springCloudVersion", "2024.0.0")
+    set("springCloudVersion", "2025.0.0")
+    // CVE-2026-42583/42584/42579/42587: fixed in Netty 4.1.133.Final — override Spring Boot BOM pin.
+    set("netty.version", "4.1.133.Final")
     set("mapStructVersion", "1.6.3")
     set("tomcat.version", "10.1.54")
 }
@@ -101,10 +103,14 @@ dependencyManagement {
     }
     dependencies {
         // CVE-2025-48976 (commons-fileupload 1.5→1.6.0) + CVE-2024-47554 (commons-io 2.11.0→2.14.0)
-        // commons-fileupload is not managed by Spring Boot 3.4.x BOM (removed with CommonsMultipartResolver
+        // commons-fileupload is not managed by Spring Boot 3.5.x BOM (removed with CommonsMultipartResolver
         // in Spring 6.1); dependencyManagement.dependencies forces the version regardless of BOM properties.
         dependency("commons-fileupload:commons-fileupload:1.6.0")
         dependency("commons-io:commons-io:2.14.0")
+        // CVE-2026-42198: fixed in PostgreSQL JDBC 42.7.11.
+        dependency("org.postgresql:postgresql:42.7.11")
+        // CVE-2026-5598: fixed in BouncyCastle 1.84.
+        dependency("org.bouncycastle:bcprov-jdk18on:1.84")
     }
 }
 

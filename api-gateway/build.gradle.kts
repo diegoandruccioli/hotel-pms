@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.4.13"
+    id("org.springframework.boot") version "3.5.14"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -22,12 +22,12 @@ repositories {
 }
 
 ext {
-    set("springCloudVersion", "2024.0.0")
+    set("springCloudVersion", "2025.0.0")
     set("jjwtVersion", "0.11.5")
     set("tomcat.version", "10.1.54")
-    // CVE-2026-33870 (netty-codec-http) + CVE-2026-33871 (netty-codec-http2):
-    // fixed in Netty 4.1.132.Final — override Spring Boot BOM pin.
-    set("netty.version", "4.1.132.Final")
+    // CVE-2026-33870/33871: fixed in 4.1.132.Final.
+    // CVE-2026-42583/42584/42579/42587: fixed in 4.1.133.Final — override Spring Boot BOM pin.
+    set("netty.version", "4.1.133.Final")
 }
 
 dependencies {
@@ -61,11 +61,8 @@ dependencyManagement {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
     }
     dependencies {
-        // CVE-2025-41235 (header forwarding from untrusted proxies) +
-        // CVE-2025-41253 (EL injection): both fixed in Spring Cloud Gateway 4.2.6.
-        // Overrides the 4.2.0 pinned by spring-cloud-dependencies:2024.0.0 BOM.
-        dependency("org.springframework.cloud:spring-cloud-gateway-server:4.2.6")
-        dependency("org.springframework.cloud:spring-cloud-starter-gateway:4.2.6")
+        // CVE-2026-5598: fixed in BouncyCastle 1.84.
+        dependency("org.bouncycastle:bcprov-jdk18on:1.84")
     }
 }
 
