@@ -188,10 +188,24 @@ npm run test:e2e
 
 ---
 
+## Branch Overview
+
+| Branch | Role |
+|--------|------|
+| `main` | Final integrated state — build green, all tests pass |
+| `pre-secure-coding` | Baseline snapshot before security hardening (exam reference) |
+| `feature/secure-coding-hardening` | Full security hardening history — SHA cited in LaTeX report |
+| `feature/frontend-development` | Development branch (source of all feature work) |
+
+See [`docs/BRANCH_STRATEGY.md`](docs/BRANCH_STRATEGY.md) for full topology and governance rules.
+
+---
+
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
+| [`docs/BRANCH_STRATEGY.md`](docs/BRANCH_STRATEGY.md) | **Branch topology, merge history, governance rules** |
 | [`docs/INTERACTION_FLOWS.md`](docs/INTERACTION_FLOWS.md) | End-to-end service call chains for all major flows |
 | [`docs/SECURITY_AND_PRIVACY.md`](docs/SECURITY_AND_PRIVACY.md) | Security model, GDPR/TULPS compliance, threat mitigations |
 | [`docs/USER_MANUAL.md`](docs/USER_MANUAL.md) | Step-by-step procedures for all user roles |
