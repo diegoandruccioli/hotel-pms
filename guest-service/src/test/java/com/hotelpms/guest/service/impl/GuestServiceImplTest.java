@@ -1,6 +1,10 @@
 package com.hotelpms.guest.service.impl;
 
+import com.hotelpms.guest.client.BillingServiceClient;
 import com.hotelpms.guest.client.ReservationClient;
+import com.hotelpms.guest.client.StayServiceClient;
+import com.hotelpms.guest.client.dto.GuestInvoiceClientResponse;
+import com.hotelpms.guest.client.dto.GuestLastStayClientResponse;
 import com.hotelpms.guest.dto.request.GuestRequest;
 import com.hotelpms.guest.dto.request.IdentityDocumentRequestDTO;
 import com.hotelpms.guest.dto.response.GuestResponse;
@@ -9,8 +13,10 @@ import com.hotelpms.guest.exception.NotFoundException;
 import com.hotelpms.guest.mapper.GuestMapper;
 import com.hotelpms.guest.mapper.IdentityDocumentMapper;
 import com.hotelpms.guest.model.Guest;
+import com.hotelpms.guest.model.GuestPrivacySettings;
 import com.hotelpms.guest.model.IdentityDocument;
 import com.hotelpms.guest.model.enums.DocumentType;
+import com.hotelpms.guest.service.GuestPrivacySettingsService;
 import com.hotelpms.guest.repository.GuestRepository;
 import com.hotelpms.guest.repository.IdentityDocumentRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -72,6 +78,15 @@ class GuestServiceImplTest {
 
     @Mock
     private ReservationClient reservationClient;
+
+    @Mock
+    private GuestPrivacySettingsService privacySettingsService;
+
+    @Mock
+    private StayServiceClient stayServiceClient;
+
+    @Mock
+    private BillingServiceClient billingServiceClient;
 
     @InjectMocks
     private GuestServiceImpl guestService;
@@ -241,14 +256,22 @@ class GuestServiceImplTest {
     void shouldDeleteGuestSuccessfully() {
         final UUID nonNullGuestId = Objects.requireNonNull(guestId);
         final Guest nonNullGuest = Objects.requireNonNull(guest);
+        final GuestPrivacySettings settings = GuestPrivacySettings.builder()
+                .hotelId(hotelId).guestRetentionYears(GuestPrivacySettings.TULPS_MIN_YEARS).build();
 
         when(guestRepository.findByIdAndHotelId(nonNullGuestId, hotelId))
                 .thenReturn(Optional.of(nonNullGuest));
         when(reservationClient.hasActiveReservations(nonNullGuestId)).thenReturn(false);
+        when(privacySettingsService.getOrCreateEntity(hotelId)).thenReturn(settings);
+        when(stayServiceClient.getLastStayDate(nonNullGuestId))
+                .thenReturn(new GuestLastStayClientResponse(false, null));
+        when(billingServiceClient.getLastInvoiceDate(nonNullGuestId))
+                .thenReturn(new GuestInvoiceClientResponse(false, null));
+        when(guestRepository.save(nonNullGuest)).thenReturn(nonNullGuest);
 
         guestService.deleteGuest(nonNullGuestId);
 
-        verify(guestRepository).delete(nonNullGuest);
+        verify(guestRepository).save(nonNullGuest);
     }
 
     @Test

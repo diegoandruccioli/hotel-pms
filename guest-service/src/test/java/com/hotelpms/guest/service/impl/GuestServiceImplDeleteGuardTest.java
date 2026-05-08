@@ -29,6 +29,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +47,14 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class GuestServiceImplDeleteGuardTest {
+
+    private static final int YEARS_4 = 4;
+    private static final int YEARS_5 = 5;
+    private static final int YEARS_6 = 6;
+    private static final int YEARS_7 = 7;
+    private static final int YEARS_9 = 9;
+    private static final int YEARS_10 = 10;
+    private static final int DAYS_364 = 364;
 
     @Mock private GuestRepository guestRepository;
     @Mock private IdentityDocumentRepository identityDocumentRepository;
@@ -66,8 +75,8 @@ class GuestServiceImplDeleteGuardTest {
 
     @BeforeEach
     void setUp() {
-        guestId  = UUID.randomUUID();
-        hotelId  = UUID.randomUUID();
+        guestId = UUID.randomUUID();
+        hotelId = UUID.randomUUID();
         guest = Guest.builder()
                 .id(guestId)
                 .hotelId(hotelId)
@@ -76,7 +85,7 @@ class GuestServiceImplDeleteGuardTest {
                 .email("mario@test.com")
                 .identityDocuments(new ArrayList<>())
                 .active(true)
-                .gdprConsentDate(LocalDate.now().minusYears(6))
+                .gdprConsentDate(LocalDate.now().minusYears(YEARS_6))
                 .build();
         defaultSettings = GuestPrivacySettings.builder()
                 .hotelId(hotelId)
@@ -106,12 +115,12 @@ class GuestServiceImplDeleteGuardTest {
         service.deleteGuest(guestId);
 
         assertEquals("GDPR", guest.getFirstName());
-        assertEquals(false, guest.isActive());
+        assertFalse(guest.isActive());
     }
 
     @Test
-    void shouldThrow451WhenTulpsHoldActive_4years364days() {
-        final LocalDate lastStay = LocalDate.now().minusYears(4).minusDays(364);
+    void shouldThrow451WhenTulpsHoldActive4years364days() {
+        final LocalDate lastStay = LocalDate.now().minusYears(YEARS_4).minusDays(DAYS_364);
         when(guestRepository.findByIdAndHotelId(
                 Objects.requireNonNull(guestId), Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(guest));
@@ -130,8 +139,8 @@ class GuestServiceImplDeleteGuardTest {
     }
 
     @Test
-    void shouldThrow451WhenTulpsHoldActive_exactlyAtBoundary5Years() {
-        final LocalDate lastStay = LocalDate.now().minusYears(5);
+    void shouldThrow451WhenTulpsHoldActiveExactlyAtBoundary5Years() {
+        final LocalDate lastStay = LocalDate.now().minusYears(YEARS_5);
         when(guestRepository.findByIdAndHotelId(
                 Objects.requireNonNull(guestId), Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(guest));
@@ -150,7 +159,7 @@ class GuestServiceImplDeleteGuardTest {
 
     @Test
     void shouldClearTulpsWhenLastStayIs5YearsAnd1DayAgo() {
-        final LocalDate lastStay = LocalDate.now().minusYears(5).minusDays(1);
+        final LocalDate lastStay = LocalDate.now().minusYears(YEARS_5).minusDays(1);
         when(guestRepository.findByIdAndHotelId(
                 Objects.requireNonNull(guestId), Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(guest));
@@ -165,13 +174,13 @@ class GuestServiceImplDeleteGuardTest {
 
         service.deleteGuest(guestId);
 
-        assertEquals(false, guest.isActive());
+        assertFalse(guest.isActive());
     }
 
     @Test
-    void shouldThrow451WhenFiscalHoldActive_exactlyAtBoundary10Years() {
-        final LocalDate lastStay   = LocalDate.now().minusYears(6);
-        final LocalDate lastInvoice = LocalDate.now().minusYears(10);
+    void shouldThrow451WhenFiscalHoldActiveExactlyAtBoundary10Years() {
+        final LocalDate lastStay = LocalDate.now().minusYears(YEARS_6);
+        final LocalDate lastInvoice = LocalDate.now().minusYears(YEARS_10);
         when(guestRepository.findByIdAndHotelId(
                 Objects.requireNonNull(guestId), Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(guest));
@@ -192,8 +201,8 @@ class GuestServiceImplDeleteGuardTest {
 
     @Test
     void shouldClearFiscalWhenLastInvoiceIs10YearsAnd1DayAgo() {
-        final LocalDate lastStay    = LocalDate.now().minusYears(6);
-        final LocalDate lastInvoice = LocalDate.now().minusYears(10).minusDays(1);
+        final LocalDate lastStay = LocalDate.now().minusYears(YEARS_6);
+        final LocalDate lastInvoice = LocalDate.now().minusYears(YEARS_10).minusDays(1);
         when(guestRepository.findByIdAndHotelId(
                 Objects.requireNonNull(guestId), Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(guest));
@@ -208,13 +217,13 @@ class GuestServiceImplDeleteGuardTest {
 
         service.deleteGuest(guestId);
 
-        assertEquals(false, guest.isActive());
+        assertFalse(guest.isActive());
     }
 
     @Test
     void shouldThrow451WithBothHoldsAndReturnLatestUnlockDate() {
-        final LocalDate lastStay    = LocalDate.now().minusYears(4);
-        final LocalDate lastInvoice = LocalDate.now().minusYears(9);
+        final LocalDate lastStay = LocalDate.now().minusYears(YEARS_4);
+        final LocalDate lastInvoice = LocalDate.now().minusYears(YEARS_9);
         when(guestRepository.findByIdAndHotelId(
                 Objects.requireNonNull(guestId), Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(guest));
@@ -229,7 +238,7 @@ class GuestServiceImplDeleteGuardTest {
                 GdprLegalHoldException.class, () -> service.deleteGuest(guestId));
 
         assertEquals(GdprLegalHoldException.LegalBasis.TULPS_AND_FISCAL, ex.getLegalBasis());
-        final LocalDate tulpsExpiry  = lastStay.plusYears(GuestPrivacySettings.TULPS_MIN_YEARS);
+        final LocalDate tulpsExpiry = lastStay.plusYears(GuestPrivacySettings.TULPS_MIN_YEARS);
         final LocalDate fiscalExpiry = lastInvoice.plusYears(GuestPrivacySettings.FISCAL_MIN_YEARS);
         assertEquals(fiscalExpiry.isAfter(tulpsExpiry) ? fiscalExpiry : tulpsExpiry,
                 ex.getUnlocksAt());
@@ -237,9 +246,9 @@ class GuestServiceImplDeleteGuardTest {
 
     @Test
     void shouldRespectCustomRetentionYearsFromHotelSettings() {
-        final LocalDate lastStay = LocalDate.now().minusYears(6);
+        final LocalDate lastStay = LocalDate.now().minusYears(YEARS_6);
         final GuestPrivacySettings customSettings = GuestPrivacySettings.builder()
-                .hotelId(hotelId).guestRetentionYears(7).build();
+                .hotelId(hotelId).guestRetentionYears(YEARS_7).build();
 
         when(guestRepository.findByIdAndHotelId(
                 Objects.requireNonNull(guestId), Objects.requireNonNull(hotelId)))
@@ -255,6 +264,6 @@ class GuestServiceImplDeleteGuardTest {
                 GdprLegalHoldException.class, () -> service.deleteGuest(guestId));
 
         assertEquals(GdprLegalHoldException.LegalBasis.TULPS, ex.getLegalBasis());
-        assertEquals(lastStay.plusYears(7), ex.getUnlocksAt());
+        assertEquals(lastStay.plusYears(YEARS_7), ex.getUnlocksAt());
     }
 }

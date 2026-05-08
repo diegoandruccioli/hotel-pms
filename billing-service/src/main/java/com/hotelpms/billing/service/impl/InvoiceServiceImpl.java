@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -207,9 +208,9 @@ public class InvoiceServiceImpl implements InvoiceService {
 
     @Override
     @Transactional(readOnly = true)
-    public GuestInvoiceCheckResponse getLastInvoiceDateForGuest(
+    public final GuestInvoiceCheckResponse getLastInvoiceDateForGuest(
             @NonNull final UUID guestId, @NonNull final UUID hotelId) {
-        final java.util.Optional<Invoice> latest = invoiceRepository
+        final Optional<Invoice> latest = invoiceRepository
                 .findTopByGuestIdAndHotelIdOrderByIssueDateDesc(guestId, hotelId);
         if (latest.isEmpty() || latest.get().getIssueDate() == null) {
             return new GuestInvoiceCheckResponse(false, null);

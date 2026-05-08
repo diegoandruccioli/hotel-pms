@@ -88,7 +88,7 @@ class GuestControllerTest {
                 TEST_EMAIL,
                 null, null, null, null, null,
                 Collections.emptyList(),
-                null, null);
+                null, null, null);
     }
 
     @Test

@@ -35,10 +35,10 @@ import java.util.UUID;
 public class GuestPrivacySettings {
 
     /** Minimum retention period mandated by TULPS (Alloggiati Web data). */
-    public static final int TULPS_MIN_YEARS   = 5;
+    public static final int TULPS_MIN_YEARS = 5;
 
     /** Minimum retention period mandated by Codice Civile art. 2220 (fiscal). */
-    public static final int FISCAL_MIN_YEARS  = 10;
+    public static final int FISCAL_MIN_YEARS = 10;
 
     @Id
     @Column(name = "hotel_id")

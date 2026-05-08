@@ -24,6 +24,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class GuestPrivacySettingsServiceImplTest {
 
+    private static final int RETENTION_YEARS_7 = 7;
+    private static final int RETENTION_YEARS_6 = 6;
+
     @Mock
     private GuestPrivacySettingsRepository repository;
 
@@ -35,7 +38,7 @@ class GuestPrivacySettingsServiceImplTest {
         final UUID hotelId = UUID.randomUUID();
         final GuestPrivacySettings existing = GuestPrivacySettings.builder()
                 .hotelId(hotelId)
-                .guestRetentionYears(7)
+                .guestRetentionYears(RETENTION_YEARS_7)
                 .build();
 
         when(repository.findById(Objects.requireNonNull(hotelId)))
@@ -45,7 +48,7 @@ class GuestPrivacySettingsServiceImplTest {
 
         assertNotNull(result);
         assertEquals(hotelId, result.hotelId());
-        assertEquals(7, result.guestRetentionYears());
+        assertEquals(RETENTION_YEARS_7, result.guestRetentionYears());
         assertEquals(GuestPrivacySettings.TULPS_MIN_YEARS, result.tulpsMinYears());
         assertEquals(GuestPrivacySettings.FISCAL_MIN_YEARS, result.fiscalMinYears());
         verify(repository, times(1)).findById(Objects.requireNonNull(hotelId));
@@ -86,10 +89,10 @@ class GuestPrivacySettingsServiceImplTest {
                 .thenReturn(Objects.requireNonNull(existing));
 
         final GuestPrivacySettingsResponse result =
-                service.update(hotelId, new GuestPrivacySettingsRequest(7));
+                service.update(hotelId, new GuestPrivacySettingsRequest(RETENTION_YEARS_7));
 
         assertNotNull(result);
-        assertEquals(7, result.guestRetentionYears());
+        assertEquals(RETENTION_YEARS_7, result.guestRetentionYears());
         verify(repository, times(1)).save(Objects.requireNonNull(existing));
     }
 
@@ -102,7 +105,7 @@ class GuestPrivacySettingsServiceImplTest {
                 .build();
         final GuestPrivacySettings saved = GuestPrivacySettings.builder()
                 .hotelId(hotelId)
-                .guestRetentionYears(6)
+                .guestRetentionYears(RETENTION_YEARS_6)
                 .build();
 
         when(repository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
@@ -112,7 +115,7 @@ class GuestPrivacySettingsServiceImplTest {
                 .thenReturn(Objects.requireNonNull(saved));
 
         final GuestPrivacySettingsResponse result =
-                service.update(hotelId, new GuestPrivacySettingsRequest(6));
+                service.update(hotelId, new GuestPrivacySettingsRequest(RETENTION_YEARS_6));
 
         assertNotNull(result);
         verify(repository).save(Objects.requireNonNull(toSave));
@@ -123,7 +126,7 @@ class GuestPrivacySettingsServiceImplTest {
     void shouldNotCallSaveWhenSettingsAlreadyExistOnGetOrCreate() {
         final UUID hotelId = UUID.randomUUID();
         final GuestPrivacySettings existing = GuestPrivacySettings.builder()
-                .hotelId(hotelId).guestRetentionYears(5).build();
+                .hotelId(hotelId).guestRetentionYears(GuestPrivacySettings.TULPS_MIN_YEARS).build();
 
         when(repository.findById(Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(existing));

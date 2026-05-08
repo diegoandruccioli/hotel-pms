@@ -20,11 +20,11 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Configuration
 public class FeignHeaderConfig {
 
-    private static final String HEADER_USER      = "X-Auth-User";
-    private static final String HEADER_ROLE      = "X-Auth-Role";
-    private static final String HEADER_HOTEL     = "X-Auth-Hotel";
+    private static final String HEADER_USER = "X-Auth-User";
+    private static final String HEADER_ROLE = "X-Auth-Role";
+    private static final String HEADER_HOTEL = "X-Auth-Hotel";
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
-    private static final String HMAC_ALGORITHM   = "HmacSHA256";
+    private static final String HMAC_ALGORITHM = "HmacSHA256";
 
     private final String hmacSecret;
 
@@ -53,14 +53,14 @@ public class FeignHeaderConfig {
                 return;
             }
             final HttpServletRequest request = attrs.getRequest();
-            final String user  = request.getHeader(HEADER_USER);
-            final String role  = request.getHeader(HEADER_ROLE);
+            final String user = request.getHeader(HEADER_USER);
+            final String role = request.getHeader(HEADER_ROLE);
             final String hotel = request.getHeader(HEADER_HOTEL);
 
             if (StringUtils.hasText(user) && StringUtils.hasText(role) && StringUtils.hasText(hotel)) {
-                template.header(HEADER_USER,      user);
-                template.header(HEADER_ROLE,      role);
-                template.header(HEADER_HOTEL,     hotel);
+                template.header(HEADER_USER, user);
+                template.header(HEADER_ROLE, role);
+                template.header(HEADER_HOTEL, hotel);
                 template.header(HEADER_SIGNATURE, computeHmac(user, role, hotel));
             }
         };

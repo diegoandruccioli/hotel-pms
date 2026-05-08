@@ -3,6 +3,7 @@ package com.hotelpms.guest.exception;
 import com.hotelpms.guest.dto.response.GdprLegalHoldResponse;
 import feign.FeignException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -40,7 +41,7 @@ public class GlobalExceptionHandler {
                 ex.getMessage(),
                 ex.getUnlocksAt(),
                 ex.getLegalBasis().name());
-        return ResponseEntity.status(451).body(body);
+        return ResponseEntity.status(HttpStatusCode.valueOf(HttpStatus.UNAVAILABLE_FOR_LEGAL_REASONS.value())).body(body);
     }
 
     /**

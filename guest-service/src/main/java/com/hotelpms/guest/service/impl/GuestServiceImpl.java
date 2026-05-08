@@ -197,7 +197,7 @@ public class GuestServiceImpl implements GuestService {
                 billingServiceClient.getLastInvoiceDate(guestId);
         final LocalDate fiscalExpiry = computeFiscalExpiry(invoiceInfo);
 
-        final boolean tulpsBlocked  = tulpsExpiry  != null && !LocalDate.now().isAfter(tulpsExpiry);
+        final boolean tulpsBlocked = tulpsExpiry != null && !LocalDate.now().isAfter(tulpsExpiry);
         final boolean fiscalBlocked = fiscalExpiry != null && !LocalDate.now().isAfter(fiscalExpiry);
 
         if (tulpsBlocked && fiscalBlocked) {

@@ -33,6 +33,13 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class GuestRetentionJobServiceImplTest {
 
+    private static final int YEARS_3 = 3;
+    private static final int YEARS_5 = 5;
+    private static final int YEARS_6 = 6;
+    private static final int YEARS_8 = 8;
+    private static final int YEARS_11 = 11;
+    private static final String FIRST_NAME_MARIO = "Mario";
+
     @Mock private GuestRepository guestRepository;
     @Mock private GuestPrivacySettingsRepository settingsRepository;
     @Mock private StayServiceClient stayServiceClient;
@@ -45,22 +52,22 @@ class GuestRetentionJobServiceImplTest {
         return Guest.builder()
                 .id(UUID.randomUUID())
                 .hotelId(hotelId)
-                .firstName("Mario")
+                .firstName(FIRST_NAME_MARIO)
                 .lastName("Rossi")
                 .email("m@t.com")
                 .identityDocuments(new ArrayList<>())
                 .active(true)
-                .gdprConsentDate(LocalDate.now().minusYears(11))
+                .gdprConsentDate(LocalDate.now().minusYears(YEARS_11))
                 .build();
     }
 
     @Test
     void shouldAnonymiseGuestWithBothHoldsExpired() {
         final UUID hotelId = UUID.randomUUID();
-        final Guest guest  = buildGuest(hotelId);
+        final Guest guest = buildGuest(hotelId);
         final UUID guestId = Objects.requireNonNull(guest.getId());
         final GuestPrivacySettings settings = GuestPrivacySettings.builder()
-                .hotelId(hotelId).guestRetentionYears(5).build();
+                .hotelId(hotelId).guestRetentionYears(YEARS_5).build();
 
         when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
                 .thenReturn(List.of(guest));
@@ -68,10 +75,10 @@ class GuestRetentionJobServiceImplTest {
                 .thenReturn(Optional.of(settings));
         when(stayServiceClient.getLastStayDate(guestId))
                 .thenReturn(new GuestLastStayClientResponse(true,
-                        LocalDate.now().minusYears(6)));
+                        LocalDate.now().minusYears(YEARS_6)));
         when(billingServiceClient.getLastInvoiceDate(guestId))
                 .thenReturn(new GuestInvoiceClientResponse(true,
-                        LocalDate.now().minusYears(11)));
+                        LocalDate.now().minusYears(YEARS_11)));
         when(guestRepository.save(Objects.requireNonNull(guest)))
                 .thenReturn(Objects.requireNonNull(guest));
 
@@ -85,10 +92,10 @@ class GuestRetentionJobServiceImplTest {
     @Test
     void shouldSkipGuestWithActiveTulpsHold() {
         final UUID hotelId = UUID.randomUUID();
-        final Guest guest  = buildGuest(hotelId);
+        final Guest guest = buildGuest(hotelId);
         final UUID guestId = Objects.requireNonNull(guest.getId());
         final GuestPrivacySettings settings = GuestPrivacySettings.builder()
-                .hotelId(hotelId).guestRetentionYears(5).build();
+                .hotelId(hotelId).guestRetentionYears(YEARS_5).build();
 
         when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
                 .thenReturn(List.of(guest));
@@ -96,21 +103,21 @@ class GuestRetentionJobServiceImplTest {
                 .thenReturn(Optional.of(settings));
         when(stayServiceClient.getLastStayDate(guestId))
                 .thenReturn(new GuestLastStayClientResponse(true,
-                        LocalDate.now().minusYears(3)));
+                        LocalDate.now().minusYears(YEARS_3)));
 
         job.runRetentionJob();
 
-        assertEquals("Mario", guest.getFirstName());
+        assertEquals(FIRST_NAME_MARIO, guest.getFirstName());
         assertTrue(guest.isActive());
     }
 
     @Test
     void shouldSkipGuestWithActiveFiscalHold() {
         final UUID hotelId = UUID.randomUUID();
-        final Guest guest  = buildGuest(hotelId);
+        final Guest guest = buildGuest(hotelId);
         final UUID guestId = Objects.requireNonNull(guest.getId());
         final GuestPrivacySettings settings = GuestPrivacySettings.builder()
-                .hotelId(hotelId).guestRetentionYears(5).build();
+                .hotelId(hotelId).guestRetentionYears(YEARS_5).build();
 
         when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
                 .thenReturn(List.of(guest));
@@ -118,14 +125,14 @@ class GuestRetentionJobServiceImplTest {
                 .thenReturn(Optional.of(settings));
         when(stayServiceClient.getLastStayDate(guestId))
                 .thenReturn(new GuestLastStayClientResponse(true,
-                        LocalDate.now().minusYears(6)));
+                        LocalDate.now().minusYears(YEARS_6)));
         when(billingServiceClient.getLastInvoiceDate(guestId))
                 .thenReturn(new GuestInvoiceClientResponse(true,
-                        LocalDate.now().minusYears(8)));
+                        LocalDate.now().minusYears(YEARS_8)));
 
         job.runRetentionJob();
 
-        assertEquals("Mario", guest.getFirstName());
+        assertEquals(FIRST_NAME_MARIO, guest.getFirstName());
         assertTrue(guest.isActive());
     }
 
@@ -136,11 +143,11 @@ class GuestRetentionJobServiceImplTest {
                 .id(UUID.randomUUID()).hotelId(hotelId)
                 .firstName("Anna").lastName("Verdi").email("a@v.com")
                 .identityDocuments(new ArrayList<>()).active(true)
-                .gdprConsentDate(LocalDate.now().minusYears(11))
+                .gdprConsentDate(LocalDate.now().minusYears(YEARS_11))
                 .build();
         final UUID guestId = Objects.requireNonNull(guestNoHistory.getId());
         final GuestPrivacySettings settings = GuestPrivacySettings.builder()
-                .hotelId(hotelId).guestRetentionYears(5).build();
+                .hotelId(hotelId).guestRetentionYears(YEARS_5).build();
 
         when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
                 .thenReturn(List.of(guestNoHistory));

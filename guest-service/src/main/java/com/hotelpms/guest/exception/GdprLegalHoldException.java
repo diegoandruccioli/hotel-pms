@@ -19,6 +19,8 @@ import java.time.LocalDate;
  */
 public class GdprLegalHoldException extends RuntimeException {
 
+    private static final long serialVersionUID = 1L;
+
     /** Identifies which legal obligation is blocking the deletion. */
     public enum LegalBasis { TULPS, FISCAL, TULPS_AND_FISCAL }
 
@@ -36,7 +38,7 @@ public class GdprLegalHoldException extends RuntimeException {
                                    final LocalDate unlocksAt,
                                    final LegalBasis legalBasis) {
         super(message);
-        this.unlocksAt  = unlocksAt;
+        this.unlocksAt = unlocksAt;
         this.legalBasis = legalBasis;
     }
 

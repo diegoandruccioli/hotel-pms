@@ -334,9 +334,9 @@ public class StayServiceImpl implements StayService {
 
     @Override
     @Transactional(readOnly = true)
-    public GuestLastStayResponse getLastStayDateForGuest(
+    public final GuestLastStayResponse getLastStayDateForGuest(
             @NonNull final UUID guestId, @NonNull final UUID hotelId) {
-        final java.util.Optional<Stay> latest = stayRepository
+        final Optional<Stay> latest = stayRepository
                 .findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(guestId, hotelId);
         if (latest.isEmpty() || latest.get().getActualCheckInTime() == null) {
             return new GuestLastStayResponse(false, null);
