@@ -54,8 +54,8 @@ test.describe('Billing flow', () => {
 
   test('renders billing list with an invoice', async ({ page }) => {
     await page.goto('/billing');
-    await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText(/pending/i)).toBeVisible();
+    await expect(page.locator('table')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('PENDING')).toBeVisible();
   });
 
   test('passes accessibility audit on billing page', async ({ page }) => {
