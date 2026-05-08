@@ -24,7 +24,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/guests/settings")
 @RequiredArgsConstructor
-public final class GuestPrivacySettingsController {
+public class GuestPrivacySettingsController {
 
     private final GuestPrivacySettingsService service;
 

@@ -38,7 +38,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/guests")
 @RequiredArgsConstructor
 @Validated
-public final class GuestController {
+public class GuestController {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
 
