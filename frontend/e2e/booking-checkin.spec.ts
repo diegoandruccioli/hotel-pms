@@ -76,6 +76,9 @@ test.describe('Booking → Check-in Scenario', () => {
   });
 
   test('should create a reservation, then check-in a guest', async ({ page }) => {
+    // This test performs a full E2E flow: login → reservation → check-in with
+    // Alloggiati fields (async API lookups for tipdoc/stati). Needs extra time.
+    test.setTimeout(60000);
     // ----- MOCK: guest search -----
     await page.route('**/api/v1/guests/search*', (route) =>
       route.fulfill({
