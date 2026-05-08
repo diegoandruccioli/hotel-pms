@@ -11,6 +11,7 @@ import com.hotelpms.stay.client.dto.ReservationStatusUpdateRequest;
 import com.hotelpms.stay.client.dto.StayInvoiceRequest;
 import com.hotelpms.stay.domain.Stay;
 import com.hotelpms.stay.domain.StayStatus;
+import com.hotelpms.stay.dto.GuestLastStayResponse;
 import com.hotelpms.stay.dto.HotelSettingsResponse;
 import com.hotelpms.stay.dto.StayRequest;
 import com.hotelpms.stay.dto.StayResponse;
@@ -329,5 +330,18 @@ public class StayServiceImpl implements StayService {
 
         reservationClient.updateStatusAndGuests(reservationId,
                 new ReservationStatusUpdateRequest(status, actualGuests));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GuestLastStayResponse getLastStayDateForGuest(
+            @NonNull final UUID guestId, @NonNull final UUID hotelId) {
+        final java.util.Optional<Stay> latest = stayRepository
+                .findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(guestId, hotelId);
+        if (latest.isEmpty() || latest.get().getActualCheckInTime() == null) {
+            return new GuestLastStayResponse(false, null);
+        }
+        return new GuestLastStayResponse(true,
+                latest.get().getActualCheckInTime().toLocalDate());
     }
 }

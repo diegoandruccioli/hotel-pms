@@ -28,6 +28,7 @@ public interface GuestMapper {
     @Mapping(target = "active", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "gdprConsentDate", ignore = true)
     Guest toEntity(GuestRequest request);
 
     /**
@@ -53,5 +54,6 @@ public interface GuestMapper {
     @Mapping(target = "active", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
+    @Mapping(target = "gdprConsentDate", ignore = true)
     void updateEntityFromRequest(GuestRequest request, @MappingTarget Guest target);
 }

@@ -9,6 +9,7 @@ import com.hotelpms.billing.domain.InvoiceCharge;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
+import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
@@ -202,5 +203,18 @@ public class InvoiceServiceImpl implements InvoiceService {
      */
     private String generateInvoiceNumber() {
         return "INV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GuestInvoiceCheckResponse getLastInvoiceDateForGuest(
+            @NonNull final UUID guestId, @NonNull final UUID hotelId) {
+        final java.util.Optional<Invoice> latest = invoiceRepository
+                .findTopByGuestIdAndHotelIdOrderByIssueDateDesc(guestId, hotelId);
+        if (latest.isEmpty() || latest.get().getIssueDate() == null) {
+            return new GuestInvoiceCheckResponse(false, null);
+        }
+        return new GuestInvoiceCheckResponse(true,
+                latest.get().getIssueDate().toLocalDate());
     }
 }

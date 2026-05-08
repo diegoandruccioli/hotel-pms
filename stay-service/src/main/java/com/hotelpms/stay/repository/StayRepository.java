@@ -3,6 +3,7 @@ package com.hotelpms.stay.repository;
 import com.hotelpms.stay.domain.Stay;
 import com.hotelpms.stay.domain.StayStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -61,4 +62,16 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      * @return an Optional containing the most recent matching stay
      */
     Optional<Stay> findTopByGuestIdAndStatusOrderByActualCheckInTimeDesc(UUID guestId, StayStatus status);
+
+    /**
+     * Finds the most recent stay for a guest within a hotel, regardless of status.
+     * Used by the guest-service GDPR legal-hold guard (T-GST-05) to verify whether
+     * the TULPS five-year retention obligation has expired before anonymising a guest profile.
+     *
+     * @param guestId the guest UUID
+     * @param hotelId the hotel UUID (tenant isolation)
+     * @return the most recent stay if present
+     */
+    Optional<Stay> findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(
+            @NonNull UUID guestId, @NonNull UUID hotelId);
 }

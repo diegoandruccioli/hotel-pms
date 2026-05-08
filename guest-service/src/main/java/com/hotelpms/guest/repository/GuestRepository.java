@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -71,4 +72,17 @@ public interface GuestRepository extends JpaRepository<Guest, UUID> {
             @Param("keyword") String keyword,
             @Param("hotelId") UUID hotelId,
             Pageable pageable);
+
+    /**
+     * Returns all active guests whose GDPR consent date is strictly before the
+     * given cutoff. Used by the nightly retention job as a pre-filter to identify
+     * candidates for anonymisation (T-GST-05).
+     *
+     * <p>The caller must still verify the legal-hold constraints (TULPS and
+     * fiscal) before proceeding with anonymisation.
+     *
+     * @param cutoff the exclusive upper bound for the consent date
+     * @return list of candidate guests
+     */
+    List<Guest> findByGdprConsentDateBefore(LocalDate cutoff);
 }
