@@ -201,16 +201,72 @@ test.describe('Booking → Check-in Scenario', () => {
     if (await firstNameInput.isVisible()) {
       await firstNameInput.fill('Mario');
       await page.getByLabel(/last name/i).first().fill('Rossi');
-      await page.getByLabel(/gender/i).first().fill('M');
+
+      // Gender is a native <select> with values "1" (male) / "2" (female)
+      await page.getByLabel(/gender/i).first().selectOption('1');
 
       const dobInput = page.locator('input[type="date"]').first();
       await dobInput.fill('1985-06-15');
 
-      await page.getByLabel(/place of birth/i).first().fill('Roma');
-      await page.getByLabel(/citizenship/i).first().fill('IT');
-      await page.getByLabel(/document type/i).first().fill('PASSPORT');
+      // TravellerType is a required native <select>
+      const travellerSelect = page.locator('select[name="travellerType"]').first();
+      if (await travellerSelect.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await travellerSelect.selectOption('OSPITE_SINGOLO');
+      }
+
+      // Citizenship — StatoSelect combobox: type to filter, then click first option
+      const citizenshipInput = page.getByLabel(/citizenship/i).first();
+      await citizenshipInput.fill('ITALIA');
+      const citizenshipListbox = page.locator('[role="listbox"]').first();
+      await citizenshipListbox.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+      const citizenshipOption = citizenshipListbox.locator('[role="option"]').first();
+      if (await citizenshipOption.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await citizenshipOption.click();
+      }
+
+      // Country of birth — StatoSelect combobox
+      const birthCountryInput = page.getByLabel(/country of birth/i).first();
+      if (await birthCountryInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await birthCountryInput.fill('ITALIA');
+        const birthListbox = page.locator('[role="listbox"]').first();
+        await birthListbox.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+        const birthOption = birthListbox.locator('[role="option"]').first();
+        if (await birthOption.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await birthOption.click();
+        }
+      }
+
+      // Place of Birth (municipality) — ComuneAutocomplete, only visible if Italian-born
+      const placeInput = page.getByLabel(/place of birth/i).first();
+      if (await placeInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await placeInput.fill('Roma');
+        const placeListbox = page.locator('[role="listbox"]').first();
+        await placeListbox.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+        const placeOption = placeListbox.locator('[role="option"]').first();
+        if (await placeOption.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await placeOption.click();
+        }
+      }
+
+      // Document Type — native <select> populated from tipdoc API; select first available option
+      const docTypeSelect = page.locator('select[name="documentType"]').first();
+      if (await docTypeSelect.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await docTypeSelect.selectOption({ index: 1 });
+      }
+
       await page.getByLabel(/document number/i).first().fill('AA1234567');
-      await page.getByLabel(/document place/i).first().fill('Roma');
+
+      // Document Issuing Country — StatoSelect combobox
+      const docCountryInput = page.getByLabel(/document issuing country/i).first();
+      if (await docCountryInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await docCountryInput.fill('ITALIA');
+        const docListbox = page.locator('[role="listbox"]').first();
+        await docListbox.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+        const docOption = docListbox.locator('[role="option"]').first();
+        if (await docOption.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await docOption.click();
+        }
+      }
     }
 
     // =====================================================================

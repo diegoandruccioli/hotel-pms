@@ -66,8 +66,8 @@ test.describe('Admin Users management', () => {
 
   test('shows active/inactive status badges', async ({ page }) => {
     await page.goto('/admin/users');
-    await expect(page.getByText('active')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('inactive')).toBeVisible();
+    await expect(page.getByText('Active', { exact: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Inactive', { exact: true })).toBeVisible();
   });
 
   test('shows must-change-password warning for flagged user', async ({ page }) => {
@@ -89,7 +89,7 @@ test.describe('Admin Users management', () => {
 
     // Modal should close and new user should appear
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 3000 });
-    await expect(page.getByText('newstaff')).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'newstaff', exact: true })).toBeVisible();
   });
 
   test('shows error in modal when fields are empty', async ({ page }) => {
