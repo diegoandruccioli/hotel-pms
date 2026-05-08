@@ -23,7 +23,7 @@
     "focus-trap-react": "^12.0.0",
     "i18next": "^25.8.14",
     "i18next-browser-languagedetector": "^8.2.1",
-    "material-symbols": "^0.44.3",
+    "material-symbols": "^0.44.6",
     "react": "^19.2.0",
     "react-big-calendar": "^1.19.4",
     "react-dom": "^19.2.0",
