@@ -54,7 +54,7 @@ jobs:
 
       - name: Upload test and quality reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-reports
           path: |
@@ -418,7 +418,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: frontend/playwright-report/
@@ -451,7 +451,7 @@ jobs:
 
       - name: Upload container logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docker-container-logs
           path: /tmp/docker-logs.txt
