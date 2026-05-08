@@ -22,6 +22,7 @@ vi.mock('../../components/m3/M3TextField', () => ({
 const GUEST = {
   id: 'g1', firstName: 'John', lastName: 'Doe', email: 'john@test.com',
   phone: '123', city: 'Rome', country: 'IT',
+  createdAt: '', updatedAt: '', active: true,
 };
 
 describe('GuestSearchAndCreate', () => {

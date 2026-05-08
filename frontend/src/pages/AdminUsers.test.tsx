@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
+import type { Role } from '../types/auth.types';
 import { AdminUsers } from './AdminUsers';
 import { userService } from '../services/userService';
 
@@ -36,12 +37,12 @@ vi.mock('../store/toastStore', () => ({
 
 const USER_ACTIVE = {
   id: 'u1', username: 'alice', email: 'alice@hotel.com',
-  role: 'RECEPTIONIST', active: true, mustChangePassword: false, createdAt: null,
+  role: 'RECEPTIONIST' as Role, active: true, mustChangePassword: false, createdAt: '',
 };
 
 const USER_INACTIVE = {
   id: 'u2', username: 'bob', email: 'bob@hotel.com',
-  role: 'OWNER', active: false, mustChangePassword: false, createdAt: null,
+  role: 'OWNER' as Role, active: false, mustChangePassword: false, createdAt: '',
 };
 
 describe('AdminUsers', () => {

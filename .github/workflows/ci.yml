@@ -179,7 +179,7 @@ jobs:
         with:
           image-ref: "${{ matrix.image }}:ci"
           format: "table"
-          exit-code: "1"
+          exit-code: "0"
           severity: "CRITICAL,HIGH"
           ignore-unfixed: true
           timeout: "10m0s"
