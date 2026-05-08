@@ -306,7 +306,7 @@ L'applicazione soddisfa tutti i requisiti minimi obbligatori indicati dalla trac
 
 \begin{enumerate}
   \item \textbf{Sistema di login e registrazione} — \texttt{auth-service}: form di autenticazione
-        con JWT in cookie httpOnly, gestione ruoli (ADMIN, MANAGER, RECEPTIONIST).
+        con JWT in cookie httpOnly, gestione ruoli (ADMIN, OWNER, RECEPTIONIST).
   \item \textbf{Interazione persistente con database} — PostgreSQL per ogni microservizio,
         ORM JPA/Hibernate con query parametrizzate tramite Spring Data JPA.
   \item \textbf{Gestione dei ruoli (RBAC)} — tre ruoli distinti con endpoint amministrativi
@@ -706,10 +706,6 @@ Classificato OWASP A09 --- Security Logging \& Monitoring Failures.
 \chapter{Implementazione del Secure Coding}
 \label{ch:storico}
 % ═════════════════════════════════════════════════════════════════════════════
-
-\textit{[Questo capitolo verrà popolato iterativamente. Per ogni vulnerabilità corretta,
-verrà mostrato il codice originale (insicuro) affiancato al codice sicuro, con
-riferimento al commit Git e alla entry corrispondente nel THREAT\_MODEL.md.]}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Autenticazione Sicura}
@@ -3267,7 +3263,7 @@ In React, nascondere un link di navigazione nel layout non impedisce l'accesso a
 corrispondente: un utente malintenzionato può semplicemente digitare l'URL nel browser e
 raggiungere la pagina. Nella baseline, la route \texttt{/owner-dashboard} era protetta
 esclusivamente dalla condizione \texttt{isOwnerOrAdmin} nel \texttt{MainLayout} (UI hiding),
-che rendeva invisibile la voce di menu per i ruoli \texttt{RECEPTIONIST} e \texttt{MANAGER}.
+che rendeva invisibile la voce di menu per il ruolo \texttt{RECEPTIONIST}.
 Il componente \texttt{ProtectedRoute} verificava unicamente lo stato di autenticazione,
 senza alcun controllo sul ruolo. Classificato OWASP A01 --- Broken Access Control.
 
