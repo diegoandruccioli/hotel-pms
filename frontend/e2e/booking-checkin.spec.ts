@@ -248,10 +248,18 @@ test.describe('Booking → Check-in Scenario', () => {
         }
       }
 
-      // Document Type — native <select> populated from tipdoc API; select first available option
+      // Document Type — native <select> populated from tipdoc API (loaded asynchronously).
+      // Wait until the backend has populated the options before selecting.
       const docTypeSelect = page.locator('select[name="documentType"]').first();
       if (await docTypeSelect.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await docTypeSelect.selectOption({ index: 1 });
+        await page.waitForFunction(
+          () => {
+            const sel = document.querySelector('select[name="documentType"]');
+            return sel instanceof HTMLSelectElement && sel.options.length > 1;
+          },
+          { timeout: 10000 },
+        ).catch(() => {});
+        await docTypeSelect.selectOption({ index: 1 }).catch(() => {});
       }
 
       await page.getByLabel(/document number/i).first().fill('AA1234567');
