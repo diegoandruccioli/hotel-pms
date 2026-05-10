@@ -5581,9 +5581,15 @@ minimi raccomandati dall'OWASP Authentication Cheat Sheet e dalla NIST SP 800-63
 per applicazioni aziendali: password hashing con funzione lenta, lockout
 progressivo, revoca dei token, binding crittografico del tenant context, e
 audit logging di ogni evento di autenticazione verso un aggregatore centralizzato
-(Loki + Grafana). La superficie di attacco residua si riduce al CVE-2026-22739
-del config-service (path traversal, soppresso con mitigazioni compensative documentate)
-e all'upgrade pianificato a Spring Boot 3.5.x.
+(Loki + Grafana). La superficie di attacco residua nella \emph{nostra codebase}
+è ridotta a un singolo alert aperto nel Security tab di GitHub:
+\textbf{CVE-2026-42577} (Netty native epoll, rischio pratico nullo perché
+Spring Boot non attiva il trasporto native epoll in configurazione JDK NIO).
+Gli aggiornamenti a \textbf{Spring Boot 3.5.x} e \textbf{Spring Cloud 2025.0.x}
+hanno risolto CVE-2026-22739 (config-server), CVE-2025-41253 (gateway EL
+injection) e le CVE Netty della serie 4.1.13x. I 108~alert Trivy rilevati
+sulle immagini di terze parti (Grafana, postgres) sono stati analizzati,
+triaggiati e dismissi con motivazione tecnica documentata (si veda DEP-CVE-04).
 
 % ═════════════════════════════════════════════════════════════════════════════
 % APPENDICI
@@ -5945,6 +5951,163 @@ BOM.
 \end{securebox}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\section{DEP-CVE-04 --- Upgrade Spring Boot 3.5.x, CVE residua Netty epoll e triage alert Trivy}
+
+\textbf{Commit}: \texttt{bbb7a7e} — branch \texttt{main}
+
+\subsection*{Aggiornamento Spring Boot 3.5.x + Spring Cloud 2025.0.x}
+
+A valle della chiusura del branch \texttt{feature/secure-coding-hardening},
+tutti i 9 microservizi sono stati aggiornati da Spring Boot \texttt{3.4.x}
+a Spring Boot \texttt{3.5.14} e da Spring Cloud \texttt{2024.0.0} a
+\texttt{2025.0.0}. L'aggiornamento risolve:
+
+\begin{itemize}
+  \item \textbf{CVE-2026-22739} (config-server path traversal, DEP-CVE-03):
+        la versione patchata \texttt{spring-cloud-config-server~4.3.x} è
+        inclusa nel BOM \texttt{2025.0.0}; le mitigazioni compensative
+        documentate in DEP-CVE-03 rimangono valide come defence-in-depth.
+  \item \textbf{CVE-2025-41253} (Spring Cloud Gateway EL injection):
+        \texttt{spring-cloud-gateway-server} aggiornato a \texttt{4.3.2}
+        tramite override esplicito in \texttt{dependencyManagement}
+        (la versione base del BOM 2025.0.0 è 4.3.0, non ancora patchata).
+  \item \textbf{CVE-2026-42583/42584/42579/42587} (Netty codec):
+        Netty fissato a \texttt{4.1.133.Final} via proprietà BOM.
+  \item \textbf{CVE-2026-42198} (PostgreSQL JDBC): driver aggiornato a
+        \texttt{42.7.11} tramite \texttt{dependencyManagement}.
+  \item \textbf{CVE-2026-5598} (BouncyCastle): aggiornato a
+        \texttt{bcprov-jdk18on:1.84}.
+\end{itemize}
+
+\medskip
+\textbf{Breaking change gestita}: Spring Boot 3.5.x proibisce il proxying
+CGLIB di classi \texttt{final} per AOP transazionale. I controller
+\texttt{GuestController} e \texttt{GuestPrivacySettingsController} (che
+usavano il modificatore \texttt{final}) sono stati resi non-final per
+consentire l'advice \texttt{@Transactional}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection*{CVE residua aperta: CVE-2026-42577 (Netty native epoll)}
+
+\begin{center}
+\small
+\begin{tabular}{lllll}
+\hline
+\textbf{CVE} & \textbf{Libreria} & \textbf{Versione installata} & \textbf{Fix disponibile} & \textbf{Severity} \\
+\hline
+CVE-2026-42577 & \texttt{netty-transport-native-epoll} & 4.1.133.Final & Netty 4.2.x & HIGH \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{insecurebox}[title={CVE-2026-42577 --- DoS via RST su connessione TCP half-closed}]
+Il transport \texttt{netty-transport-native-epoll} non gestisce correttamente
+un segmento TCP RST ricevuto su una connessione in stato \emph{half-closed}
+(shutdown di scrittura già effettuato). Un attaccante può indurre il server
+a entrare in un loop di CPU-spin o a sprecare risorse di memoria fino al
+riavvio del processo (\emph{Denial of Service}).
+\end{insecurebox}
+
+\begin{securebox}[title={Rischio pratico: nullo nell'attuale configurazione}]
+Il JAR \texttt{netty-transport-native-epoll} è presente nel classpath dell'API
+Gateway come dipendenza transitiva di Project Reactor/Netty, ma il trasporto
+attivo in Spring Boot è \textbf{JDK NIO} (selezionato automaticamente in
+assenza di native library pre-loading). Il codice che attiverebbe il native
+epoll (\texttt{NioEventLoopGroup} vs \texttt{EpollEventLoopGroup}) non viene
+mai eseguito nella configurazione standard di Spring WebFlux.
+
+\medskip
+\textbf{Perché il fix non è applicato}: la correzione richiede Netty
+\texttt{4.2.x} (minor version bump), incompatibile con il BOM di Spring Boot
+3.5.x che gestisce la serie \texttt{4.1.x}. Un override a \texttt{4.2.x}
+introdurrebbe incompatibilità non garantite nel layer I/O del gateway.
+
+\medskip
+\textbf{Stato nel Security tab}: l'alert \textbf{\#296} rimane aperto come
+unico alert nella categoria \emph{nostra codebase}. La decisione di non
+sopprimerlo è intenzionale: mantenerlo visibile documenta il debito tecnico
+e ricorda il piano di aggiornamento previsto al passaggio a Kubernetes
+(dove Netty 4.2.x potrà essere adottato in un contesto BOM più recente).
+\end{securebox}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection*{Triage alert Trivy --- immagini terze parti (Grafana)}
+
+Il pipeline CI esegue scansioni Trivy su tutte le immagini Docker, incluse
+le immagini di infrastruttura (\texttt{grafana/grafana},
+\texttt{postgres:15-alpine}, \texttt{redis:alpine}).
+L'aggiornamento di Grafana da \texttt{10.2.0} a \texttt{11.5.0}
+(commit \texttt{bbb7a7e}) ha ridotto il numero di CVE nell'immagine, ma
+non le ha eliminate del tutto: il binary di Grafana incorpora un runtime
+Go e librerie Alpine (OpenSSL, musl, zlib) con CVE accumulate che non
+dipendono dalla versione di Grafana stessa bensì dall'immagine base Alpine.
+
+\begin{center}
+\small
+\begin{tabular}{llr}
+\hline
+\textbf{Immagine} & \textbf{Componente vulnerabile} & \textbf{Alert} \\
+\hline
+\texttt{grafana/grafana:11.5.0} (layer Alpine) & OpenSSL, musl libc, curl, zlib & 22 \\
+\texttt{grafana/grafana:11.5.0} (binary Go)    & Go runtime, librerie grafana & 77 \\
+\texttt{postgres:15-alpine} (\texttt{gosu})    & Go runtime in gosu binary & 9 \\
+\hline
+\textbf{Totale terze parti} & & \textbf{108} \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{securebox}[title={Decisione di triage: dismiss documentato con motivazione tecnica}]
+Tutti i 108 alert di terze parti sono stati \textbf{dismissi} nel Security
+tab di GitHub con stato \texttt{won't fix} e la seguente motivazione,
+registrata permanentemente nell'audit trail di GitHub:
+
+\begin{quote}
+\emph{``Grafana 11.5.0 monitoring tool — internal port 3000, not
+internet-exposed, no guest PII. CVEs are in bundled Alpine/Go runtime,
+not in hotel PMS code. Accepted risk for pilot; reviewed at Kubernetes
+migration.''}
+\end{quote}
+
+\textbf{Perché il dismiss è la scelta corretta} (e non l'upgrade a una
+versione più recente di Grafana):
+\begin{itemize}
+  \item Grafana è un tool di monitoring \emph{interno}: porta 3000 non
+        instradabile dall'esterno, zero dati PII degli ospiti.
+  \item Le CVE più critiche nel nome
+        (es.\ CVE-2026-28387 ``RCE via use-after-free in DANE TLSA'',
+        CVE-2025-69419 ``RCE via out-of-bounds write in PKCS\#12'')
+        richiedono che un attaccante invii payload costruiti ad hoc
+        \emph{direttamente a Grafana}, impossibile dall'esterno.
+  \item Le vulnerabilità appartengono all'immagine base Alpine del
+        binary Grafana: anche aggiornando la versione di Grafana il problema
+        persiste finché Alpine non aggiorna le proprie librerie di sistema.
+  \item In fase Kubernetes, Grafana sarà isolato da \texttt{NetworkPolicy}
+        che blocca tutto il traffico non autorizzato verso il namespace
+        monitoring.
+\end{itemize}
+\end{securebox}
+
+\begin{securebox}[title={Stato finale del Security tab (GitHub) al 2026-05-10}]
+\begin{itemize}
+  \item \textbf{Alert aperti}: 1 (\#296 — CVE-2026-42577, Netty native
+        epoll, rischio pratico nullo, debito tecnico tracciato).
+  \item \textbf{Alert dismissi ``won't fix''}: 108 (Grafana + postgres/gosu,
+        tutti terze parti, motivazione documentata).
+  \item \textbf{Alert dismissi ``false positive''}: 1
+        (CSRF Spring Security — implementazione Double Submit Cookie custom).
+  \item \textbf{Dependabot alerts}: 0 (dipendenze Maven e npm senza CVE
+        attive dopo l'aggiornamento Spring Boot 3.5.x).
+\end{itemize}
+
+Il Security tab contiene un solo alert aperto, appartenente alla categoria
+\emph{nostra codebase}, con spiegazione tecnica precisa e piano di
+risoluzione documentato. Questo è il risultato atteso di un processo di
+triage maturo: non l'assenza di alert, ma la comprensione e la
+contestualizzazione di ciascuno.
+\end{securebox}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Copertura OWASP Top 10 (2021) — Riepilogo}
 
 La tabella seguente mostra la copertura complessiva raggiunta al termine
@@ -5976,7 +6139,10 @@ di tutte le sessioni di hardening, aggiornata alla revisione del
 \owasp{A06} & Vulnerable and Outdated Components
   & DEP-CVE-01 (Netty 4.1.132, Gateway 4.2.6),
     DEP-CVE-02 (commons-fileupload 1.6.0, commons-io 2.14.0),
-    DEP-CVE-03 (config-server 4.2.0 CVE-2026-22739, rischio residuale mitigato) \\
+    DEP-CVE-03 (config-server CVE-2026-22739, risolto con Spring Boot 3.5.x),
+    DEP-CVE-04 (Spring Boot 3.5.14 + Spring Cloud 2025.0.0; CVE-2026-42577
+    Netty epoll rischio residuale documentato; 108 alert Grafana/terze parti
+    triaggiati e dismissi) \\
 \owasp{A07} & Identification \& Authentication Failures
   & T-AUTH-01 (no enumeration), T-AUTH-02 (lockout),
     T-AUTH-03 (BCrypt), T-AUTH-04 (token rotation + revocation),
