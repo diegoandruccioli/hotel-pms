@@ -10,8 +10,11 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.NamedAttributeNode;
+import jakarta.persistence.NamedEntityGraph;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -42,11 +45,21 @@ import java.util.UUID;
 @EntityListeners(AuditingEntityListener.class)
 @SQLDelete(sql = "UPDATE invoices SET active = false WHERE id = ?")
 @SQLRestriction("active = true")
+@NamedEntityGraph(
+        name = "Invoice.withDetails",
+        attributeNodes = {
+            @NamedAttributeNode("charges"),
+            @NamedAttributeNode("payments")
+        })
 public class Invoice {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
 
     @Column(name = "hotel_id")
     private UUID hotelId;

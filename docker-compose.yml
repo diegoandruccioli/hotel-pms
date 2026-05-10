@@ -16,6 +16,7 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: hotel_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -47,6 +48,7 @@ services:
   redis:
     image: redis:alpine
     container_name: hotel_redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     healthcheck:
@@ -72,6 +74,7 @@ services:
   loki:
     image: grafana/loki:2.9.0
     container_name: hotel_loki
+    restart: unless-stopped
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/config.yaml
@@ -101,6 +104,7 @@ services:
   grafana:
     image: grafana/grafana:11.5.0
     container_name: hotel_grafana
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
@@ -130,6 +134,7 @@ services:
   zipkin:
     image: openzipkin/zipkin
     container_name: hotel_zipkin
+    restart: unless-stopped
     ports:
       - "9411:9411"
     healthcheck:
@@ -156,6 +161,7 @@ services:
   prometheus:
     image: prom/prometheus
     container_name: hotel_prometheus
+    restart: unless-stopped
     ports:
       - "9090:9090"
     volumes:
@@ -183,6 +189,7 @@ services:
       context: .
       dockerfile: config-service/Dockerfile
     container_name: config-server
+    restart: unless-stopped
     ports:
       - "8888:8888"
     environment:
@@ -222,6 +229,7 @@ services:
       context: .
       dockerfile: api-gateway/Dockerfile
     container_name: api-gateway
+    restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
@@ -293,6 +301,7 @@ services:
       context: .
       dockerfile: auth-service/Dockerfile
     container_name: auth-service
+    restart: unless-stopped
     ports:
       - "8087:8087"
     environment:
@@ -344,6 +353,7 @@ services:
       context: .
       dockerfile: guest-service/Dockerfile
     container_name: guest-service
+    restart: unless-stopped
     ports:
       - "8083:8083"
     environment:
@@ -392,6 +402,7 @@ services:
       context: .
       dockerfile: stay-service/Dockerfile
     container_name: stay-service
+    restart: unless-stopped
     ports:
       - "8084:8084"
     environment:
@@ -445,6 +456,7 @@ services:
       context: .
       dockerfile: billing-service/Dockerfile
     container_name: billing-service
+    restart: unless-stopped
     ports:
       - "8085:8085"
     environment:
@@ -492,6 +504,7 @@ services:
       context: .
       dockerfile: fb-service/Dockerfile
     container_name: fb-service
+    restart: unless-stopped
     ports:
       - "8086:8086"
     environment:
@@ -541,6 +554,7 @@ services:
       context: .
       dockerfile: inventory-service/Dockerfile
     container_name: inventory-service
+    restart: unless-stopped
     ports:
       - "8081:8081"
     environment:
@@ -588,6 +602,7 @@ services:
       context: .
       dockerfile: reservation-service/Dockerfile
     container_name: reservation-service
+    restart: unless-stopped
     ports:
       - "8082:8082"
     environment:
@@ -637,6 +652,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: frontend
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:
