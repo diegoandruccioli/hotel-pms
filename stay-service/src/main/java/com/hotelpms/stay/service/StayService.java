@@ -3,10 +3,12 @@ package com.hotelpms.stay.service;
 import com.hotelpms.stay.dto.GuestLastStayResponse;
 import com.hotelpms.stay.dto.StayRequest;
 import com.hotelpms.stay.dto.StayResponse;
+import com.hotelpms.stay.dto.StaySummaryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -80,4 +82,14 @@ public interface StayService {
      * @return a response containing whether stays exist and the most recent date
      */
     GuestLastStayResponse getLastStayDateForGuest(@NonNull UUID guestId, @NonNull UUID hotelId);
+
+    /**
+     * Returns all stay summaries for a guest within a hotel, ordered by check-in
+     * descending. Used by the GDPR Art. 20 data-export endpoint.
+     *
+     * @param guestId the guest UUID; must not be {@code null}
+     * @param hotelId the hotel UUID; must not be {@code null}
+     * @return list of stay summaries, most recent first
+     */
+    List<StaySummaryResponse> getStayHistoryForGuest(@NonNull UUID guestId, @NonNull UUID hotelId);
 }

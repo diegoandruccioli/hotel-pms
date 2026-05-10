@@ -15,6 +15,7 @@ import com.hotelpms.stay.dto.GuestLastStayResponse;
 import com.hotelpms.stay.dto.HotelSettingsResponse;
 import com.hotelpms.stay.dto.StayRequest;
 import com.hotelpms.stay.dto.StayResponse;
+import com.hotelpms.stay.dto.StaySummaryResponse;
 import com.hotelpms.stay.exception.BillingNotPaidException;
 import com.hotelpms.stay.exception.ExternalServiceException;
 import com.hotelpms.stay.exception.NotFoundException;
@@ -343,5 +344,22 @@ public class StayServiceImpl implements StayService {
         }
         return new GuestLastStayResponse(true,
                 latest.get().getActualCheckInTime().toLocalDate());
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<StaySummaryResponse> getStayHistoryForGuest(
+            @NonNull final UUID guestId, @NonNull final UUID hotelId) {
+        return stayRepository
+                .findByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(guestId, hotelId)
+                .stream()
+                .map(s -> new StaySummaryResponse(
+                        s.getId(),
+                        s.getActualCheckInTime(),
+                        s.getActualCheckOutTime(),
+                        s.getRoomId(),
+                        s.getStatus()))
+                .toList();
     }
 }

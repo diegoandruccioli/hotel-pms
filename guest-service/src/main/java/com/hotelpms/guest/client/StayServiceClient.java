@@ -1,11 +1,13 @@
 package com.hotelpms.guest.client;
 
 import com.hotelpms.guest.client.dto.GuestLastStayClientResponse;
+import com.hotelpms.guest.client.dto.StaySummaryClientResponse;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -13,7 +15,6 @@ import java.util.UUID;
  * Used exclusively by the GDPR legal-hold guard (T-GST-05) to verify
  * the TULPS five-year retention obligation before anonymising a guest profile.
  */
-@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 @FeignClient(name = "stay-service",
         url = "${application.config.stay-service-url:http://localhost:8084}")
 public interface StayServiceClient {
@@ -39,5 +40,27 @@ public interface StayServiceClient {
     default GuestLastStayClientResponse lastStayDateFallback(
             final UUID guestId, final Throwable throwable) {
         return new GuestLastStayClientResponse(true, null);
+    }
+
+    /**
+     * Returns all stay summaries for a guest. Used by the GDPR Art. 20 export.
+     *
+     * @param guestId the guest UUID
+     * @return list of stay summaries
+     */
+    @GetMapping("/api/v1/stays/guest/{guestId}/history")
+    @CircuitBreaker(name = "stayService", fallbackMethod = "stayHistoryFallback")
+    List<StaySummaryClientResponse> getStayHistory(@PathVariable("guestId") UUID guestId);
+
+    /**
+     * Fallback: returns an empty list so the export completes with a partial result.
+     *
+     * @param guestId   the guest UUID
+     * @param throwable the cause of the failure
+     * @return empty list
+     */
+    default List<StaySummaryClientResponse> stayHistoryFallback(
+            final UUID guestId, final Throwable throwable) {
+        return List.of();
     }
 }

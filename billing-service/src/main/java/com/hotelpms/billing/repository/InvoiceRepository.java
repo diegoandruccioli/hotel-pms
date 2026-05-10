@@ -96,4 +96,14 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
      * @return the most recent invoice if present
      */
     Optional<Invoice> findTopByGuestIdAndHotelIdOrderByIssueDateDesc(UUID guestId, UUID hotelId);
+
+    /**
+     * Finds all invoices for a guest within a hotel, ordered by issue date descending.
+     * Used by the GDPR Art. 20 data-export endpoint to return full invoice history.
+     *
+     * @param guestId the guest UUID
+     * @param hotelId the hotel UUID (tenant isolation)
+     * @return list of invoices, most recent first
+     */
+    List<Invoice> findByGuestIdAndHotelIdOrderByIssueDateDesc(UUID guestId, UUID hotelId);
 }

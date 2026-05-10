@@ -5,11 +5,13 @@ import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
+import com.hotelpms.billing.dto.InvoiceSummaryResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -83,4 +85,14 @@ public interface InvoiceService {
      * @return response containing whether invoices exist and the most recent date
      */
     GuestInvoiceCheckResponse getLastInvoiceDateForGuest(@NonNull UUID guestId, @NonNull UUID hotelId);
+
+    /**
+     * Returns all invoice summaries for a guest within a hotel, ordered by issue
+     * date descending. Used by the GDPR Art. 20 data-export endpoint.
+     *
+     * @param guestId the guest UUID; must not be {@code null}
+     * @param hotelId the hotel UUID; must not be {@code null}
+     * @return list of invoice summaries, most recent first
+     */
+    List<InvoiceSummaryResponse> getInvoiceHistoryForGuest(@NonNull UUID guestId, @NonNull UUID hotelId);
 }

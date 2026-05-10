@@ -74,4 +74,15 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      */
     Optional<Stay> findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(
             @NonNull UUID guestId, @NonNull UUID hotelId);
+
+    /**
+     * Finds all stays for a guest within a hotel, ordered by check-in descending.
+     * Used by the GDPR Art. 20 data-export endpoint to return full stay history.
+     *
+     * @param guestId the guest UUID
+     * @param hotelId the hotel UUID (tenant isolation)
+     * @return list of stays, most recent first
+     */
+    List<Stay> findByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(
+            @NonNull UUID guestId, @NonNull UUID hotelId);
 }

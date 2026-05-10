@@ -5,6 +5,7 @@ import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
+import com.hotelpms.billing.dto.InvoiceSummaryResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.service.InvoiceService;
 import jakarta.validation.Valid;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -145,6 +147,22 @@ public class InvoiceController {
         log.info("REST request for last invoice date — guest={} hotel={}", guestId, hotelId);
         return ResponseEntity.ok(
                 invoiceService.getLastInvoiceDateForGuest(guestId, Objects.requireNonNull(hotelId)));
+    }
+
+    /**
+     * Returns all invoice summaries for a guest within the caller's hotel.
+     * Called by guest-service GDPR Art. 20 data-export endpoint.
+     *
+     * @param guestId the guest UUID
+     * @return list of invoice summaries, most recent first
+     */
+    @GetMapping("/guest/{guestId}/history")
+    public ResponseEntity<List<InvoiceSummaryResponse>> getInvoiceHistoryForGuest(
+            @NonNull @PathVariable final UUID guestId) {
+        final UUID hotelId = extractHotelId();
+        log.info("REST request for invoice history — guest={} hotel={}", guestId, hotelId);
+        return ResponseEntity.ok(
+                invoiceService.getInvoiceHistoryForGuest(guestId, Objects.requireNonNull(hotelId)));
     }
 
     private UUID extractHotelId() {

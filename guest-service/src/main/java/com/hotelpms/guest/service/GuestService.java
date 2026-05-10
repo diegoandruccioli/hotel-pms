@@ -2,6 +2,7 @@ package com.hotelpms.guest.service;
 
 import com.hotelpms.guest.dto.request.GuestRequest;
 import com.hotelpms.guest.dto.request.IdentityDocumentRequestDTO;
+import com.hotelpms.guest.dto.response.GuestDataExportResponse;
 import com.hotelpms.guest.dto.response.GuestResponse;
 import com.hotelpms.guest.dto.response.IdentityDocumentResponseDTO;
 import org.springframework.data.domain.Page;
@@ -88,4 +89,14 @@ public interface GuestService {
      * @return a list of guest response DTOs
      */
     List<GuestResponse> getGuestsByIds(List<UUID> ids);
+
+    /**
+     * Produces a GDPR Art. 20 data-portability export for the specified guest.
+     * Aggregates: guest profile, identity documents, stay history, invoice history.
+     * Downstream Feign failures return empty lists — the export always succeeds.
+     *
+     * @param id the guest UUID; must not be {@code null}
+     * @return the full export response
+     */
+    GuestDataExportResponse exportGuestData(UUID id);
 }

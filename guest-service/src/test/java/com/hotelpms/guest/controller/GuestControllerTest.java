@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.hotelpms.guest.dto.request.GuestRequest;
 import com.hotelpms.guest.dto.request.IdentityDocumentRequestDTO;
+import com.hotelpms.guest.dto.response.GuestDataExportResponse;
 import com.hotelpms.guest.dto.response.GuestResponse;
 import com.hotelpms.guest.dto.response.IdentityDocumentResponseDTO;
 import com.hotelpms.guest.exception.GlobalExceptionHandler;
@@ -28,6 +29,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -49,6 +51,7 @@ class GuestControllerTest {
     private static final String BASE_URL = "/api/v1/guests";
     private static final String PATH_BY_ID = "/{id}";
     private static final String JSON_ID = "$.id";
+    private static final String JSON_FIRST_NAME = "$.firstName";
     private static final String TEST_FIRST_NAME = "John";
     private static final String TEST_LAST_NAME = "Doe";
     private static final String TEST_EMAIL = "john.doe@example.com";
@@ -104,7 +107,7 @@ class GuestControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath(JSON_ID).value(guestId.toString()))
-                .andExpect(jsonPath("$.firstName").value(TEST_FIRST_NAME));
+                .andExpect(jsonPath(JSON_FIRST_NAME).value(TEST_FIRST_NAME));
 
         verify(guestService).createGuest(any(GuestRequest.class));
     }
@@ -116,7 +119,7 @@ class GuestControllerTest {
         mockMvc.perform(get(BASE_URL + PATH_BY_ID, guestId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_ID).value(guestId.toString()))
-                .andExpect(jsonPath("$.firstName").value(TEST_FIRST_NAME));
+                .andExpect(jsonPath(JSON_FIRST_NAME).value(TEST_FIRST_NAME));
     }
 
     @Test
@@ -222,5 +225,23 @@ class GuestControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(guestService).removeIdentityDocument(guestId, docId);
+    }
+
+    @Test
+    void shouldExportGuestDataReturn200() throws Exception {
+        final GuestDataExportResponse exportResponse = new GuestDataExportResponse(
+                LocalDateTime.now(), guestId,
+                TEST_FIRST_NAME, TEST_LAST_NAME, TEST_EMAIL,
+                null, null, null, null, null, null, null,
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+
+        when(guestService.exportGuestData(guestId)).thenReturn(exportResponse);
+
+        mockMvc.perform(get(BASE_URL + "/{id}/export", guestId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.guestId").value(guestId.toString()))
+                .andExpect(jsonPath(JSON_FIRST_NAME).value(TEST_FIRST_NAME));
+
+        verify(guestService).exportGuestData(guestId);
     }
 }

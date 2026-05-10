@@ -5,8 +5,11 @@ import com.hotelpms.guest.client.ReservationClient;
 import com.hotelpms.guest.client.StayServiceClient;
 import com.hotelpms.guest.client.dto.GuestInvoiceClientResponse;
 import com.hotelpms.guest.client.dto.GuestLastStayClientResponse;
+import com.hotelpms.guest.client.dto.InvoiceSummaryClientResponse;
+import com.hotelpms.guest.client.dto.StaySummaryClientResponse;
 import com.hotelpms.guest.dto.request.GuestRequest;
 import com.hotelpms.guest.dto.request.IdentityDocumentRequestDTO;
+import com.hotelpms.guest.dto.response.GuestDataExportResponse;
 import com.hotelpms.guest.dto.response.GuestResponse;
 import com.hotelpms.guest.dto.response.IdentityDocumentResponseDTO;
 import com.hotelpms.guest.exception.GdprLegalHoldException;
@@ -31,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -95,6 +99,8 @@ public class GuestServiceImpl implements GuestService {
     @Transactional(readOnly = true)
     public GuestResponse getGuestById(final UUID id) {
         final UUID hotelId = extractHotelId();
+        final String userId = extractUserId();
+        log.info("[PII-ACCESS] READ | operation=GET_GUEST | userId={} | guestId={} | hotelId={}", userId, id, hotelId);
         return guestMapper.toResponse(resolveGuest(id, hotelId));
     }
 
@@ -108,6 +114,8 @@ public class GuestServiceImpl implements GuestService {
     @Transactional(readOnly = true)
     public Page<GuestResponse> getAllGuests(final Pageable pageable) {
         final UUID hotelId = extractHotelId();
+        final String userId = extractUserId();
+        log.info("[PII-ACCESS] READ | operation=LIST_GUESTS | userId={} | hotelId={}", userId, hotelId);
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
         return guestRepository.findAllByHotelId(hotelId, safePageable).map(guestMapper::toResponse);
     }
@@ -246,6 +254,8 @@ public class GuestServiceImpl implements GuestService {
             return getAllGuests(pageable);
         }
         final UUID hotelId = extractHotelId();
+        final String userId = extractUserId();
+        log.info("[PII-ACCESS] READ | operation=SEARCH_GUESTS | userId={} | hotelId={}", userId, hotelId);
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
         return guestRepository.searchByKeywordAndHotelId(safeQuery, hotelId, safePageable)
                 .map(guestMapper::toResponse);
@@ -316,9 +326,42 @@ public class GuestServiceImpl implements GuestService {
             return List.of();
         }
         final UUID hotelId = extractHotelId();
+        final String userId = extractUserId();
+        log.info("[PII-ACCESS] BATCH_GET | userId={} | count={} | hotelId={}", userId, ids.size(), hotelId);
         return guestRepository.findAllByIdInAndHotelId(ids, hotelId).stream()
                 .map(guestMapper::toResponse)
                 .toList();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public GuestDataExportResponse exportGuestData(final UUID id) {
+        final UUID hotelId = extractHotelId();
+        final String userId = extractUserId();
+        log.info("[PII-ACCESS] EXPORT | operation=GDPR_EXPORT | userId={} | guestId={} | hotelId={}", userId, id, hotelId);
+        final Guest guest = resolveGuest(id, hotelId);
+        final List<IdentityDocumentResponseDTO> docs = guest.getIdentityDocuments() == null
+                ? List.of()
+                : guest.getIdentityDocuments().stream().map(identityDocumentMapper::toResponse).toList();
+        final List<StaySummaryClientResponse> stays = stayServiceClient.getStayHistory(id);
+        final List<InvoiceSummaryClientResponse> invoices = billingServiceClient.getInvoiceHistory(id);
+        return new GuestDataExportResponse(
+                LocalDateTime.now(),
+                guest.getId(),
+                guest.getFirstName(),
+                guest.getLastName(),
+                guest.getEmail(),
+                guest.getPhone(),
+                guest.getAddress(),
+                guest.getCity(),
+                guest.getCountry(),
+                guest.getDateOfBirth(),
+                guest.getGdprConsentDate(),
+                guest.getCreatedAt(),
+                docs,
+                stays,
+                invoices);
     }
 
     /**
@@ -357,5 +400,10 @@ public class GuestServiceImpl implements GuestService {
             throw new IllegalStateException("HOTEL_ID_NOT_AVAILABLE");
         }
         return UUID.fromString(hotelIdStr);
+    }
+
+    private String extractUserId() {
+        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth == null ? "anonymous" : auth.getName();
     }
 }

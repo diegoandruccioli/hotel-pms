@@ -4,6 +4,7 @@ import com.hotelpms.stay.dto.AlloggiatiRowDto;
 import com.hotelpms.stay.dto.GuestLastStayResponse;
 import com.hotelpms.stay.dto.StayRequest;
 import com.hotelpms.stay.dto.StayResponse;
+import com.hotelpms.stay.dto.StaySummaryResponse;
 import com.hotelpms.stay.service.AlloggiatiReportService;
 import com.hotelpms.stay.service.AlloggiatiWebSenderService;
 import com.hotelpms.stay.service.StayService;
@@ -198,6 +199,21 @@ public class StayController {
         final UUID hotelId = extractHotelId();
         return ResponseEntity.ok(
                 stayService.getLastStayDateForGuest(guestId, Objects.requireNonNull(hotelId)));
+    }
+
+    /**
+     * Returns the full stay history for a guest within the caller's hotel.
+     * Called by guest-service GDPR Art. 20 data-export endpoint.
+     *
+     * @param guestId the guest UUID
+     * @return list of stay summaries, most recent first
+     */
+    @GetMapping("/guest/{guestId}/history")
+    public ResponseEntity<List<StaySummaryResponse>> getStayHistoryForGuest(
+            @NonNull @PathVariable final UUID guestId) {
+        final UUID hotelId = extractHotelId();
+        return ResponseEntity.ok(
+                stayService.getStayHistoryForGuest(guestId, Objects.requireNonNull(hotelId)));
     }
 
     private UUID extractHotelId() {

@@ -12,6 +12,7 @@ import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
+import com.hotelpms.billing.dto.InvoiceSummaryResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.BillingValidationException;
 import com.hotelpms.billing.exception.InvoiceConflictException;
@@ -32,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -217,5 +219,22 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
         return new GuestInvoiceCheckResponse(true,
                 latest.get().getIssueDate().toLocalDate());
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<InvoiceSummaryResponse> getInvoiceHistoryForGuest(
+            @NonNull final UUID guestId, @NonNull final UUID hotelId) {
+        return invoiceRepository
+                .findByGuestIdAndHotelIdOrderByIssueDateDesc(guestId, hotelId)
+                .stream()
+                .map(inv -> new InvoiceSummaryResponse(
+                        inv.getId(),
+                        inv.getInvoiceNumber(),
+                        inv.getIssueDate(),
+                        inv.getTotalAmount(),
+                        inv.getStatus()))
+                .toList();
     }
 }

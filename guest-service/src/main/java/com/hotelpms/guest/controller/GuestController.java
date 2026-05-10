@@ -2,6 +2,7 @@ package com.hotelpms.guest.controller;
 
 import com.hotelpms.guest.dto.request.GuestRequest;
 import com.hotelpms.guest.dto.request.IdentityDocumentRequestDTO;
+import com.hotelpms.guest.dto.response.GuestDataExportResponse;
 import com.hotelpms.guest.dto.response.GuestResponse;
 import com.hotelpms.guest.dto.response.IdentityDocumentResponseDTO;
 import com.hotelpms.guest.service.GuestService;
@@ -167,5 +168,19 @@ public class GuestController {
     public ResponseEntity<List<GuestResponse>> getGuestsBatch(
             @NotEmpty(message = "IDs list cannot be empty") @NonNull @RequestBody final List<UUID> ids) {
         return ResponseEntity.ok(guestService.getGuestsByIds(ids));
+    }
+
+    /**
+     * GDPR Art. 20 — produces a full data-portability export for the specified guest.
+     * Aggregates profile, identity documents, stay history and invoice history.
+     * Downstream service failures return empty lists — the export always completes.
+     *
+     * @param id the guest UUID; must not be {@code null}
+     * @return {@code 200 OK} with the complete export payload
+     */
+    @GetMapping("/{id}/export")
+    public ResponseEntity<GuestDataExportResponse> exportGuestData(
+            @NonNull @PathVariable final UUID id) {
+        return ResponseEntity.ok(guestService.exportGuestData(id));
     }
 }
