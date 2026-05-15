@@ -1,6 +1,7 @@
 package com.hotelpms.auth.controller;
 
 import com.hotelpms.auth.dto.CreateUserRequest;
+import com.hotelpms.auth.dto.ResetPasswordRequest;
 import com.hotelpms.auth.dto.UserResponse;
 import com.hotelpms.auth.service.UserManagementService;
 import jakarta.validation.Valid;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -103,5 +105,24 @@ public class UserManagementController {
             @NonNull @PathVariable final UUID userId) {
         return ResponseEntity.ok(
                 userManagementService.activateUser(UUID.fromString(hotelId), userId));
+    }
+
+    /**
+     * Resets a user's password to an admin-supplied value and forces a mandatory
+     * change on next login ({@code mustChangePassword=true}). All existing sessions
+     * for the target user are invalidated via token-version increment.
+     *
+     * @param hotelId the hotel UUID from the gateway-injected header
+     * @param userId  the target user's UUID
+     * @param request the new password payload
+     */
+    @PatchMapping("/{userId}/reset-password")
+    @PreAuthorize(ROLE_ADMIN_OWNER)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetPassword(
+            @NonNull @RequestHeader(HEADER_HOTEL) final String hotelId,
+            @NonNull @PathVariable final UUID userId,
+            @NonNull @Valid @RequestBody final ResetPasswordRequest request) {
+        userManagementService.resetPassword(UUID.fromString(hotelId), userId, request.newPassword());
     }
 }

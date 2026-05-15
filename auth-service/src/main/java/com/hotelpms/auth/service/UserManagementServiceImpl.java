@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,8 +25,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class UserManagementServiceImpl implements UserManagementService {
 
+    private static final Duration REFRESH_TOKEN_TTL = Duration.ofDays(7);
+    private static final String MSG_USER_NOT_FOUND = "USER_NOT_FOUND";
+
     private final UserAccountRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
     /** {@inheritDoc} */
     @Override
@@ -69,7 +74,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     public UserResponse deactivateUser(final UUID hotelId, final UUID targetUserId,
             final String requestingUser) {
         final UserAccount target = userRepository.findByIdAndHotelId(targetUserId, hotelId)
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
+                .orElseThrow(() -> new NotFoundException(MSG_USER_NOT_FOUND));
 
         if (target.getUsername().equals(requestingUser)) {
             throw new IllegalStateException("CANNOT_DEACTIVATE_SELF");
@@ -88,12 +93,31 @@ public class UserManagementServiceImpl implements UserManagementService {
         // Must query including inactive — use raw query bypassing @SQLRestriction
         final UserAccount target = userRepository.findById(targetUserId)
                 .filter(u -> hotelId.equals(u.getHotelId()))
-                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
+                .orElseThrow(() -> new NotFoundException(MSG_USER_NOT_FOUND));
 
         target.setActive(true);
         userRepository.save(target);
         log.info("[AUTH] USER_ACTIVATED | userId={}", targetUserId);
         return toResponse(target);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public void resetPassword(final UUID hotelId, final UUID targetUserId, final String newPassword) {
+        final UserAccount target = userRepository.findByIdAndHotelId(targetUserId, hotelId)
+                .orElseThrow(() -> new NotFoundException(MSG_USER_NOT_FOUND));
+
+        target.setPasswordHash(passwordEncoder.encode(newPassword));
+        target.setMustChangePassword(true);
+        target.setTokenVersion(target.getTokenVersion() + 1);
+        userRepository.save(target);
+
+        refreshTokenService.storeTokenVersion(target.getUsername(), target.getTokenVersion(),
+                REFRESH_TOKEN_TTL);
+
+        log.info("[AUTH] PASSWORD_RESET | userId={} | newTokenVersion={}", targetUserId,
+                target.getTokenVersion());
     }
 
     private UserResponse toResponse(final UserAccount u) {

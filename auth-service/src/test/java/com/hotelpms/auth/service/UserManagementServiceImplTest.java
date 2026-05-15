@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,6 +48,9 @@ class UserManagementServiceImplTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
 
     @InjectMocks
     private UserManagementServiceImpl userManagementService;
@@ -183,6 +188,41 @@ class UserManagementServiceImplTest {
 
         assertThrows(NotFoundException.class,
                 () -> userManagementService.activateUser(HOTEL_ID, USER_ID));
+    }
+
+    @Test
+    void resetPasswordShouldUpdateHashAndSetMustChangePasswordTrue() {
+        final int originalVersion = activeUser.getTokenVersion();
+        when(userRepository.findByIdAndHotelId(USER_ID, HOTEL_ID)).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.encode(PASSWORD)).thenReturn(HASHED_PW);
+
+        userManagementService.resetPassword(HOTEL_ID, USER_ID, PASSWORD);
+
+        assertTrue(activeUser.isMustChangePassword());
+        assertEquals(originalVersion + 1, activeUser.getTokenVersion());
+        verify(passwordEncoder).encode(PASSWORD);
+        verify(userRepository).save(activeUser);
+        verify(refreshTokenService).storeTokenVersion(
+                eq(USERNAME), eq(activeUser.getTokenVersion()), any(Duration.class));
+    }
+
+    @Test
+    void resetPasswordShouldThrowWhenUserNotFound() {
+        when(userRepository.findByIdAndHotelId(USER_ID, HOTEL_ID)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> userManagementService.resetPassword(HOTEL_ID, USER_ID, PASSWORD));
+        verify(userRepository, never()).save(any());
+        verify(refreshTokenService, never()).storeTokenVersion(any(), any(int.class), any());
+    }
+
+    @Test
+    void resetPasswordShouldThrowWhenUserBelongsToAnotherHotel() {
+        when(userRepository.findByIdAndHotelId(USER_ID, HOTEL_ID)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> userManagementService.resetPassword(HOTEL_ID, USER_ID, PASSWORD));
+        verify(userRepository, never()).save(any());
     }
 
     @Test

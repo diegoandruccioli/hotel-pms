@@ -30,6 +30,8 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -44,6 +46,9 @@ class UserManagementControllerTest {
     private static final String BASE_URL = "/api/v1/auth/users";
     private static final String PATH_DEACTIVATE = "/{userId}/deactivate";
     private static final String PATH_ACTIVATE = "/{userId}/activate";
+    private static final String PATH_RESET_PW = "/{userId}/reset-password";
+    private static final String STRONG_RESET_PASSWORD = "NewPassReset@@22";
+    private static final String MSG_USER_NOT_FOUND = "USER_NOT_FOUND";
     private static final String HEADER_HOTEL = "X-Auth-Hotel";
     private static final String ADMIN_USERNAME = "adminuser";
     private static final String NEW_USERNAME = "newuser";
@@ -158,7 +163,7 @@ class UserManagementControllerTest {
     @Test
     void shouldDeactivateUserReturn404WhenNotFound() throws Exception {
         when(userManagementService.deactivateUser(HOTEL_ID, USER_ID, ADMIN_USERNAME))
-                .thenThrow(new NotFoundException("USER_NOT_FOUND"));
+                .thenThrow(new NotFoundException(MSG_USER_NOT_FOUND));
 
         mockMvc.perform(patch(BASE_URL + PATH_DEACTIVATE, USER_ID)
                         .with(req -> {
@@ -196,9 +201,46 @@ class UserManagementControllerTest {
     }
 
     @Test
+    void shouldResetPasswordReturn204() throws Exception {
+        doNothing().when(userManagementService)
+                .resetPassword(eq(HOTEL_ID), eq(USER_ID), any(String.class));
+
+        final String body = "{\"newPassword\":\"" + STRONG_RESET_PASSWORD + "\"}";
+        mockMvc.perform(patch(BASE_URL + PATH_RESET_PW, USER_ID)
+                        .header(HEADER_HOTEL, HOTEL_ID.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldResetPasswordReturn400WhenPasswordTooWeak() throws Exception {
+        final String body = "{\"newPassword\":\"weak\"}";
+        mockMvc.perform(patch(BASE_URL + PATH_RESET_PW, USER_ID)
+                        .header(HEADER_HOTEL, HOTEL_ID.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldResetPasswordReturn404WhenUserNotFound() throws Exception {
+        doThrow(new NotFoundException(MSG_USER_NOT_FOUND))
+                .when(userManagementService)
+                .resetPassword(eq(HOTEL_ID), eq(USER_ID), any(String.class));
+
+        final String body = "{\"newPassword\":\"" + STRONG_RESET_PASSWORD + "\"}";
+        mockMvc.perform(patch(BASE_URL + PATH_RESET_PW, USER_ID)
+                        .header(HEADER_HOTEL, HOTEL_ID.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void shouldActivateUserReturn404WhenNotFound() throws Exception {
         when(userManagementService.activateUser(HOTEL_ID, USER_ID))
-                .thenThrow(new NotFoundException("USER_NOT_FOUND"));
+                .thenThrow(new NotFoundException(MSG_USER_NOT_FOUND));
 
         mockMvc.perform(patch(BASE_URL + PATH_ACTIVATE, USER_ID)
                         .header(HEADER_HOTEL, HOTEL_ID.toString()))

@@ -36,11 +36,11 @@ public class SecurityConfig {
     private static final String AUTH_ME = "/api/v1/auth/me";
 
     // Argon2id parameters — exercise A04:2025, T-AUTH-03 (memory-hard KDF)
-    private static final int ARGON2_SALT_LEN   = 16;          // bytes
-    private static final int ARGON2_HASH_LEN   = 32;          // bytes
+    private static final int ARGON2_SALT_LEN = 16; // bytes
+    private static final int ARGON2_HASH_LEN = 32; // bytes
     private static final int ARGON2_PARALLELISM = 1;
-    private static final int ARGON2_MEMORY      = 19 * 1024;  // 19 MiB in KiB
-    private static final int ARGON2_ITERATIONS  = 2;
+    private static final int ARGON2_MEMORY = 19 * 1024; // 19 MiB in KiB
+    private static final int ARGON2_ITERATIONS = 2;
     // BCrypt kept for lazy-rehash migration of pre-existing hashes
     private static final int BCRYPT_LEGACY_STRENGTH = 12;
 
