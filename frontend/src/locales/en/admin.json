@@ -48,5 +48,15 @@
   "toast_profile_saved": "Hotel profile saved",
   "err_profile_save": "Failed to save hotel profile",
   "label_alloggiati_auto_send": "Auto-send to PS Portal",
-  "hint_alloggiati_auto_send": "Automatically send the Alloggiati report at each check-in"
+  "hint_alloggiati_auto_send": "Automatically send the Alloggiati report at each check-in",
+
+  "btn_reset_password": "Reset password",
+  "modal_reset_title": "Reset password for {{username}}",
+  "label_new_password": "New password",
+  "label_confirm_password": "Confirm password",
+  "err_passwords_mismatch": "Passwords do not match",
+  "err_password_too_short": "Password must be at least 16 characters",
+  "err_password_too_weak": "Password must have 2 uppercase, 2 digits, 2 special characters",
+  "err_reset_failed": "Failed to reset password",
+  "toast_reset_success": "Password reset. User must change it on next login."
 }

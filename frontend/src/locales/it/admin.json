@@ -48,5 +48,15 @@
   "toast_profile_saved": "Profilo hotel salvato",
   "err_profile_save": "Salvataggio profilo non riuscito",
   "label_alloggiati_auto_send": "Invio automatico al Portale PS",
-  "hint_alloggiati_auto_send": "Invia automaticamente la comunicazione alloggiati ad ogni check-in"
+  "hint_alloggiati_auto_send": "Invia automaticamente la comunicazione alloggiati ad ogni check-in",
+
+  "btn_reset_password": "Reset password",
+  "modal_reset_title": "Reset password per {{username}}",
+  "label_new_password": "Nuova password",
+  "label_confirm_password": "Conferma password",
+  "err_passwords_mismatch": "Le password non coincidono",
+  "err_password_too_short": "La password deve avere almeno 16 caratteri",
+  "err_password_too_weak": "La password deve avere 2 maiuscole, 2 cifre, 2 caratteri speciali",
+  "err_reset_failed": "Reset password non riuscito",
+  "toast_reset_success": "Password resettata. L'utente dovrà cambiarla al prossimo accesso."
 }

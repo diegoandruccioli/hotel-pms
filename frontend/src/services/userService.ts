@@ -23,4 +23,8 @@ export const userService = {
     const response = await api.patch<UserResponse>(`${BASE_PATH}/${userId}/activate`);
     return response.data;
   },
+
+  resetUserPassword: async (userId: string, newPassword: string): Promise<void> => {
+    await api.patch(`${BASE_PATH}/${userId}/reset-password`, { newPassword });
+  },
 };

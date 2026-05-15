@@ -5,6 +5,7 @@ import type { UserResponse, CreateUserRequest } from '../types/user.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { useToastStore } from '../store/toastStore';
+import { useAuthStore } from '../store/authStore';
 import type { Role } from '../types/auth.types';
 
 // -----------------------------------------------------------------------
@@ -119,17 +120,105 @@ const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProps) => {
 CreateUserModal.displayName = 'CreateUserModal';
 
 // -----------------------------------------------------------------------
+// ResetPasswordModal
+// -----------------------------------------------------------------------
+
+interface ResetPasswordModalProps {
+  user: UserResponse;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const PW_REGEX = /^(?=.*[A-Z].*[A-Z])(?=.*[0-9].*[0-9])(?=.*[^A-Za-z0-9].*[^A-Za-z0-9]).{16,}$/;
+
+const ResetPasswordModal = memo(({ user, onClose, onSuccess }: ResetPasswordModalProps) => {
+  const { t } = useTranslation('admin');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleNewPw = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setNewPw(e.target.value), []);
+  const handleConfirmPw = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setConfirmPw(e.target.value), []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') onClose();
+  }, [onClose]);
+
+  const handleSubmit = useCallback(async () => {
+    setError('');
+    if (newPw.length < 16) { setError(t('err_password_too_short')); return; }
+    if (!PW_REGEX.test(newPw)) { setError(t('err_password_too_weak')); return; }
+    if (newPw !== confirmPw) { setError(t('err_passwords_mismatch')); return; }
+    setLoading(true);
+    try {
+      await userService.resetUserPassword(user.id, newPw);
+      onSuccess();
+    } catch {
+      setError(t('err_reset_failed'));
+    } finally {
+      setLoading(false);
+    }
+  }, [newPw, confirmPw, user.id, onSuccess, t]);
+
+  return (
+    <dialog
+      open
+      aria-labelledby="reset-pw-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-0 border-0 max-w-none w-full h-full"
+    >
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+      <div className="bg-surface rounded-2xl shadow-elevation-3 w-full max-w-md p-6 space-y-4"
+        onKeyDown={handleKeyDown}>
+        <h2 id="reset-pw-title" className="text-lg font-semibold text-on-surface">
+          {t('modal_reset_title', { username: user.username })}
+        </h2>
+        <div>
+          <label htmlFor="reset-new-pw" className="block text-sm font-medium text-on-surface mb-1">
+            {t('label_new_password')}
+          </label>
+          <input id="reset-new-pw" type="password" value={newPw} onChange={handleNewPw}
+            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+        </div>
+        <div>
+          <label htmlFor="reset-confirm-pw" className="block text-sm font-medium text-on-surface mb-1">
+            {t('label_confirm_password')}
+          </label>
+          <input id="reset-confirm-pw" type="password" value={confirmPw} onChange={handleConfirmPw}
+            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+        </div>
+        {error && <p role="alert" className="text-sm text-error">{error}</p>}
+        <div className="flex justify-end gap-3 pt-2">
+          <button type="button" onClick={onClose}
+            className="rounded-full border border-outline px-5 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary">
+            {t('btn_cancel')}
+          </button>
+          <button type="button" onClick={handleSubmit} disabled={loading}
+            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary">
+            {loading ? t('btn_saving') : t('btn_reset_password')}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  );
+});
+ResetPasswordModal.displayName = 'ResetPasswordModal';
+
+// -----------------------------------------------------------------------
 // UserRow
 // -----------------------------------------------------------------------
 
 interface UserRowProps {
   user: UserResponse;
   onToggle: (u: UserResponse) => void;
+  onResetPassword: (u: UserResponse) => void;
+  currentUsername: string | undefined;
 }
 
-const UserRow = memo(({ user, onToggle }: UserRowProps) => {
+const UserRow = memo(({ user, onToggle, onResetPassword, currentUsername }: UserRowProps) => {
   const { t } = useTranslation('admin');
   const handleToggle = useCallback(() => onToggle(user), [onToggle, user]);
+  const handleReset = useCallback(() => onResetPassword(user), [onResetPassword, user]);
 
   return (
     <tr className="hover:bg-surface-variant/40 transition-colors">
@@ -156,11 +245,20 @@ const UserRow = memo(({ user, onToggle }: UserRowProps) => {
         )}
       </td>
       <td className="px-4 py-3">
-        <button type="button" onClick={handleToggle}
-          className="text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary"
-          aria-label={user.active ? t('btn_deactivate') : t('btn_activate')}>
-          {user.active ? t('btn_deactivate') : t('btn_activate')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={handleToggle}
+            className="text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary"
+            aria-label={user.active ? t('btn_deactivate') : t('btn_activate')}>
+            {user.active ? t('btn_deactivate') : t('btn_activate')}
+          </button>
+          {user.username !== currentUsername && (
+            <button type="button" onClick={handleReset}
+              className="text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-label={`${t('btn_reset_password')} ${user.username}`}>
+              {t('btn_reset_password')}
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -174,12 +272,16 @@ UserRow.displayName = 'UserRow';
 export function AdminUsers() {
   const { t } = useTranslation('admin');
   const { addToast } = useToastStore();
+  const currentUser = useAuthStore((s) => s.user);
   const [users, setUsers] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [resetTarget, setResetTarget] = useState<UserResponse | null>(null);
 
   const openCreate = useCallback(() => setShowCreate(true), []);
   const closeCreate = useCallback(() => setShowCreate(false), []);
+  const openReset = useCallback((u: UserResponse) => setResetTarget(u), []);
+  const closeReset = useCallback(() => setResetTarget(null), []);
 
   const load = useCallback(() => {
     userService
@@ -201,6 +303,11 @@ export function AdminUsers() {
     },
     [addToast, t, closeCreate],
   );
+
+  const handleResetSuccess = useCallback(() => {
+    closeReset();
+    addToast(t('toast_reset_success'), 'success');
+  }, [closeReset, addToast, t]);
 
   const handleToggle = useCallback(
     async (u: UserResponse) => {
@@ -255,7 +362,13 @@ export function AdminUsers() {
             </thead>
             <tbody className="divide-y divide-outline-variant">
               {users.map((u) => (
-                <UserRow key={u.id} user={u} onToggle={handleToggle} />
+                <UserRow
+                  key={u.id}
+                  user={u}
+                  onToggle={handleToggle}
+                  onResetPassword={openReset}
+                  currentUsername={currentUser?.username}
+                />
               ))}
             </tbody>
           </table>
@@ -267,6 +380,13 @@ export function AdminUsers() {
 
       {showCreate && (
         <CreateUserModal onClose={closeCreate} onCreated={handleCreated} />
+      )}
+      {resetTarget && (
+        <ResetPasswordModal
+          user={resetTarget}
+          onClose={closeReset}
+          onSuccess={handleResetSuccess}
+        />
       )}
     </main>
   );
