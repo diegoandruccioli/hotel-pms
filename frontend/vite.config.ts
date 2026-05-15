@@ -23,6 +23,12 @@ export default defineConfig({
         '**/setupTests.*',
         '**/*.d.ts',
       ],
+      thresholds: {
+        statements: 63,
+        branches: 50,
+        functions: 58,
+        lines: 66,
+      },
     },
   },
   resolve: {
