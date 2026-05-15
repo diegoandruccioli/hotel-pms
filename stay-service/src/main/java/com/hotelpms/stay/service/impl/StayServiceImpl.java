@@ -191,7 +191,7 @@ public class StayServiceImpl implements StayService {
     @Transactional(readOnly = true)
     public Optional<StayResponse> getLastCompletedStayForGuest(@NonNull final UUID guestId) {
         log.debug("Pre-fill check: verifying guest profile active for guestId={}", guestId);
-        final com.hotelpms.stay.client.dto.GuestResponse guest = guestClient.getGuestById(guestId);
+        final GuestResponse guest = guestClient.getGuestById(guestId);
 
         // GuestClient fallback returns UNKNOWN_VALUE when guest-service is unreachable or
         // the guest profile no longer exists (anonymised). Fail-safe: return empty.
