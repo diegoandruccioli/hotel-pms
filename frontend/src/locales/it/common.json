@@ -233,5 +233,11 @@
   "cancel_reservation": "Annulla",
   "cancel_reservation_confirm": "Sei sicuro di voler annullare questa prenotazione? L'azione non può essere annullata.",
   "reservation_cancelled_success": "Prenotazione annullata con successo.",
-  "cancel_reservation_failed": "Impossibile annullare la prenotazione. Riprova."
+  "cancel_reservation_failed": "Impossibile annullare la prenotazione. Riprova.",
+
+  "alloggiati_submit": "Invia a Questura",
+  "alloggiati_submit_confirm": "Inviare la lista Alloggiati del {{date}} al portale della Polizia di Stato?",
+  "alloggiati_submit_success": "Lista inviata al portale PS con successo.",
+  "alloggiati_submit_error": "Errore portale: {{message}}",
+  "alloggiati_submit_failed": "Invio non riuscito. Verificare i log del servizio."
 }

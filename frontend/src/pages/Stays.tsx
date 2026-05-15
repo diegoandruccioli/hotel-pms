@@ -91,6 +91,7 @@ export const Stays = memo(() => {
   const [alloggiatiDate, setAlloggiatiDate] = useState(getTodayString());
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [downloadingJson, setDownloadingJson] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const addToast = useToastStore((s) => s.addToast);
   const role = useAuthStore((s) => s.user?.role);
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
@@ -156,6 +157,21 @@ export const Stays = memo(() => {
   const handleNewCheckIn = useCallback(() => navigate('/reservations'), [navigate]);
   const handleWalkIn = useCallback(() => navigate('/stays/walk-in'), [navigate]);
   
+  const handleAlloggiatiSubmit = useCallback(async () => {
+    const confirmed = window.confirm(t('alloggiati_submit_confirm', { date: alloggiatiDate }));
+    if (!confirmed) return;
+    setSubmitting(true);
+    try {
+      await stayService.submitAlloggiatiReport(alloggiatiDate);
+      addToast(t('alloggiati_submit_success'), 'success');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '';
+      addToast(message ? t('alloggiati_submit_error', { message }) : t('alloggiati_submit_failed'), 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [alloggiatiDate, addToast, t]);
+
   const handleAlloggiatiDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setAlloggiatiDate(e.target.value);
   }, []);
@@ -270,6 +286,18 @@ export const Stays = memo(() => {
               onClick={handleAlloggiatiJsonDownload}
             >
               {t('download_json_export')}
+            </M3Button>
+          )}
+          {isAdminOrOwner && (
+            <M3Button
+              id="submit-alloggiati-btn"
+              variant="tonal"
+              icon={submitting ? 'progress_activity' : 'send'}
+              loading={submitting}
+              disabled={submitting}
+              onClick={handleAlloggiatiSubmit}
+            >
+              {t('alloggiati_submit')}
             </M3Button>
           )}
         </div>

@@ -233,5 +233,11 @@
   "cancel_reservation": "Cancel",
   "cancel_reservation_confirm": "Are you sure you want to cancel this reservation? This action cannot be undone.",
   "reservation_cancelled_success": "Reservation cancelled successfully.",
-  "cancel_reservation_failed": "Failed to cancel reservation. Please try again."
+  "cancel_reservation_failed": "Failed to cancel reservation. Please try again.",
+
+  "alloggiati_submit": "Send to police portal",
+  "alloggiati_submit_confirm": "Send the Alloggiati report for {{date}} to the Polizia di Stato portal?",
+  "alloggiati_submit_success": "Report sent to PS portal successfully.",
+  "alloggiati_submit_error": "Portal error: {{message}}",
+  "alloggiati_submit_failed": "Failed to submit report. Check service logs."
 }

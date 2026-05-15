@@ -101,6 +101,10 @@ export const stayService = {
     return response.data;
   },
 
+  submitAlloggiatiReport: async (date: string): Promise<void> => {
+    await api.post(`${BASE_PATH}/reports/alloggiati/submit`, null, { params: { date } });
+  },
+
   getLookupTipdoc: async (): Promise<AlloggiatiTipdoc[]> => {
     const response = await api.get<AlloggiatiTipdoc[]>(`${BASE_PATH}/lookup/tipdoc`);
     return response.data;

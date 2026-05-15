@@ -61,6 +61,24 @@ describe('stayService', () => {
     expect(result).toEqual(mockResponse);
   });
 
+  it('should submit alloggiati report', async () => {
+    vi.mocked(api.post).mockResolvedValueOnce({ data: null, status: 200 });
+
+    await stayService.submitAlloggiatiReport('2026-05-15');
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/v1/stays/reports/alloggiati/submit',
+      null,
+      { params: { date: '2026-05-15' } },
+    );
+  });
+
+  it('should propagate error from submitAlloggiatiReport', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(new Error('Portal error'));
+
+    await expect(stayService.submitAlloggiatiReport('2026-05-15')).rejects.toThrow('Portal error');
+  });
+
   it('should check out', async () => {
     const mockResponse = { id: '1', status: 'CHECKED_OUT' };
     vi.mocked(api.put).mockResolvedValueOnce({ data: mockResponse });
