@@ -27,10 +27,11 @@ describe('dashboardService', () => {
       { id: 'r2', status: 'CANCELLED', active: false },
     ] as never);
 
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([
-      { id: 's1', status: 'CHECKED_IN' },
-      { id: 's2', status: 'CHECKED_OUT' },
-    ] as never);
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [{ id: 's1', status: 'CHECKED_IN' }, { id: 's2', status: 'CHECKED_OUT' }],
+      totalElements: 2, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 2, first: true, last: true, empty: false,
+    } as never);
 
     vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
       content: [{ id: 'rm1' }, { id: 'rm2' }, { id: 'rm3' }, { id: 'rm4' }],
@@ -56,7 +57,10 @@ describe('dashboardService', () => {
   it('should handle zero rooms gracefully', async () => {
     vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([]);
     vi.mocked(reservationService.getAllReservations).mockResolvedValueOnce([]);
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([]);
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 0, first: true, last: true, empty: true,
+    } as never);
     vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({ content: [], totalElements: 0 } as never);
     vi.mocked(billingReportService.getOwnerFinancialReport).mockResolvedValueOnce({
       invoices: [],

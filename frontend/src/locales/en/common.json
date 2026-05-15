@@ -239,5 +239,10 @@
   "alloggiati_submit_confirm": "Send the Alloggiati report for {{date}} to the Polizia di Stato portal?",
   "alloggiati_submit_success": "Report sent to PS portal successfully.",
   "alloggiati_submit_error": "Portal error: {{message}}",
-  "alloggiati_submit_failed": "Failed to submit report. Check service logs."
+  "alloggiati_submit_failed": "Failed to submit report. Check service logs.",
+
+  "pagination": "Pagination",
+  "prev_page": "Previous",
+  "next_page": "Next",
+  "page_x_of_y": "Page {{current}} of {{total}}"
 }

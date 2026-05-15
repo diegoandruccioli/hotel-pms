@@ -89,6 +89,8 @@ export const Stays = memo(() => {
   const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
   const [stays, setStays] = useState<StayResponse[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
@@ -104,15 +106,16 @@ export const Stays = memo(() => {
     try {
       setLoading(true);
       setError(null);
-      const data = await stayService.getAllStays();
-      setStays(data);
+      const data = await stayService.getAllStays(page);
+      setStays(data.content);
+      setTotalPages(data.totalPages);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('failed_load_stays');
       setError(message);
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [page, t]);
 
   useEffect(() => {
     loadStays();
@@ -160,6 +163,8 @@ export const Stays = memo(() => {
 
   const handleNewCheckIn = useCallback(() => navigate('/reservations'), [navigate]);
   const handleWalkIn = useCallback(() => navigate('/stays/walk-in'), [navigate]);
+  const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
+  const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
   
   const handleAlloggiatiSubmit = useCallback(async () => {
     const confirmed = window.confirm(t('alloggiati_submit_confirm', { date: alloggiatiDate }));
@@ -249,6 +254,33 @@ export const Stays = memo(() => {
             ))
           )}
         </M3Table>
+      )}
+
+      {/* Pagination */}
+      {!loading && !error && totalPages > 1 && (
+        <nav aria-label={t('pagination')} className="flex items-center justify-center gap-3">
+          <M3Button
+            variant="outlined"
+            icon="chevron_left"
+            disabled={page === 0}
+            onClick={handlePrevPage}
+            aria-label={t('prev_page')}
+          >
+            {t('prev_page')}
+          </M3Button>
+          <span className="text-sm font-body text-on-surface-variant">
+            {t('page_x_of_y', { current: page + 1, total: totalPages })}
+          </span>
+          <M3Button
+            variant="outlined"
+            icon="chevron_right"
+            disabled={page >= totalPages - 1}
+            onClick={handleNextPage}
+            aria-label={t('next_page')}
+          >
+            {t('next_page')}
+          </M3Button>
+        </nav>
       )}
 
       {/* Police Report / Alloggiati Web Section */}

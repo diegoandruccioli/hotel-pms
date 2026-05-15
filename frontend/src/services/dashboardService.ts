@@ -30,7 +30,7 @@ export const dashboardService = {
     const activeReservations = reservations.filter(r => r.active || r.status === 'CONFIRMED').length;
     const activeReservationsPercentage = (activeReservations / totalRooms) * 100;
 
-    const currentStays = stays.filter(s => s.status === 'CHECKED_IN').length;
+    const currentStays = stays.content.filter(s => s.status === 'CHECKED_IN').length;
     const currentStaysPercentage = (currentStays / totalRooms) * 100;
 
     const pendingRevenue = report.invoices

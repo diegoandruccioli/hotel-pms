@@ -42,9 +42,12 @@ describe('Stays', () => {
   });
 
   it('should render stays on success', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([
-      { id: 's1', roomId: 'room-1234-abcd', guestId: 'guest-5678-efgh', status: 'CHECKED_IN', actualCheckInTime: '2026-03-15T14:00:00' },
-    ] as never);
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [{ id: 's1', roomId: 'room-1234-abcd', guestId: 'guest-5678-efgh',
+        status: 'CHECKED_IN', actualCheckInTime: '2026-03-15T14:00:00' }],
+      totalElements: 1, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 1, first: true, last: true, empty: false,
+    } as never);
 
     render(<Stays />);
 
@@ -54,7 +57,10 @@ describe('Stays', () => {
   });
 
   it('should show empty state when no stays', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([]);
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 0, first: true, last: true, empty: true,
+    } as never);
     render(<Stays />);
 
     await waitFor(() => {
@@ -72,7 +78,10 @@ describe('Stays', () => {
   });
 
   it('should render page title', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([]);
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 0, first: true, last: true, empty: true,
+    } as never);
     render(<Stays />);
 
     await waitFor(() => {
@@ -81,7 +90,10 @@ describe('Stays', () => {
   });
 
   it('should have no accessibility violations', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([]);
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 0, first: true, last: true, empty: true,
+    } as never);
     const { container } = render(<Stays />);
     await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
     const results = await axe(container);
@@ -92,7 +104,10 @@ describe('Stays', () => {
     vi.mocked(useAuthStore).mockImplementation((selector: unknown) =>
       (selector as (s: { user: { role: string } }) => unknown)({ user: { role: 'RECEPTIONIST' } })
     );
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([]);
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 0, first: true, last: true, empty: true,
+    } as never);
     render(<Stays />);
     await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
     expect(screen.queryByText('download_json_export')).not.toBeInTheDocument();
@@ -102,7 +117,10 @@ describe('Stays', () => {
     vi.mocked(useAuthStore).mockImplementation((selector: unknown) =>
       (selector as (s: { user: { role: string } }) => unknown)({ user: { role: 'ADMIN' } })
     );
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([]);
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 0, first: true, last: true, empty: true,
+    } as never);
     render(<Stays />);
     await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
     expect(screen.getByText('download_json_export')).toBeInTheDocument();
@@ -112,7 +130,10 @@ describe('Stays', () => {
     vi.mocked(useAuthStore).mockImplementation((selector: unknown) =>
       (selector as (s: { user: { role: string } }) => unknown)({ user: { role: 'OWNER' } })
     );
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce([]);
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 0, first: true, last: true, empty: true,
+    } as never);
     render(<Stays />);
     await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
     expect(screen.getByText('download_json_export')).toBeInTheDocument();

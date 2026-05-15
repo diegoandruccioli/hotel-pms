@@ -239,5 +239,10 @@
   "alloggiati_submit_confirm": "Inviare la lista Alloggiati del {{date}} al portale della Polizia di Stato?",
   "alloggiati_submit_success": "Lista inviata al portale PS con successo.",
   "alloggiati_submit_error": "Errore portale: {{message}}",
-  "alloggiati_submit_failed": "Invio non riuscito. Verificare i log del servizio."
+  "alloggiati_submit_failed": "Invio non riuscito. Verificare i log del servizio.",
+
+  "pagination": "Paginazione",
+  "prev_page": "Precedente",
+  "next_page": "Successivo",
+  "page_x_of_y": "Pagina {{current}} di {{total}}"
 }
