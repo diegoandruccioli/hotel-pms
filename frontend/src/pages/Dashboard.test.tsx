@@ -53,7 +53,7 @@ describe('Dashboard Component', () => {
     expect(screen.getByText('200')).toBeInTheDocument(); // total guests
     expect(screen.getByText('80.00%')).toBeInTheDocument(); // active reservations percentage
     expect(screen.getByText('50.00%')).toBeInTheDocument(); // current stays percentage
-    expect(screen.getByText('$10,000.00')).toBeInTheDocument(); // pending revenue
+    expect(screen.getByText(/10\.000,00\s*€|€\s*10\.000,00|10,000\.00\s*€|€\s*10,000\.00/)).toBeInTheDocument(); // pending revenue EUR
   });
 
   it('renders loading state correctly', () => {

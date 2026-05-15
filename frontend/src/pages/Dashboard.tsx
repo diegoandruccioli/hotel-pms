@@ -39,7 +39,7 @@ export const Dashboard = () => {
     },
     {
       nameKey: 'stat_pending_revenue',
-      stat: stats ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(stats.pendingRevenue) : '$0',
+      stat: stats ? new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(stats.pendingRevenue) : '€0',
       icon: 'receipt_long',
       containerClass: 'bg-error-container text-on-error-container',
     },
