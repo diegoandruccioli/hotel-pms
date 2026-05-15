@@ -9,14 +9,16 @@ describe('stayService', () => {
     vi.clearAllMocks();
   });
 
-  it('should fetch all stays', async () => {
+  it('should fetch all stays paginated', async () => {
     const mockStays = [{ id: '1', status: 'CHECKED_IN' }];
-    vi.mocked(api.get).mockResolvedValueOnce({ data: { content: mockStays } });
+    const mockPage = { content: mockStays, totalElements: 1, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 1, first: true, last: true, empty: false };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockPage });
 
-    const result = await stayService.getAllStays();
+    const result = await stayService.getAllStays(0, 20);
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/stays');
-    expect(result).toEqual(mockStays);
+    expect(api.get).toHaveBeenCalledWith('/api/v1/stays?page=0&size=20&sort=actualCheckInTime,desc');
+    expect(result).toEqual(mockPage);
   });
 
   it('should fetch stay by id', async () => {
@@ -37,27 +39,6 @@ describe('stayService', () => {
     const result = await stayService.createStay(request as never);
 
     expect(api.post).toHaveBeenCalledWith('/api/v1/stays', request);
-    expect(result).toEqual(mockResponse);
-  });
-
-  it('should update a stay', async () => {
-    const request = { guestId: 'g1', reservationId: 'r1', roomId: 'rm1' };
-    const mockResponse = { id: '1', ...request };
-    vi.mocked(api.put).mockResolvedValueOnce({ data: mockResponse });
-
-    const result = await stayService.updateStay('1', request as never);
-
-    expect(api.put).toHaveBeenCalledWith('/api/v1/stays/1', request);
-    expect(result).toEqual(mockResponse);
-  });
-
-  it('should extend a stay', async () => {
-    const mockResponse = { id: '1', status: 'CHECKED_IN' };
-    vi.mocked(api.put).mockResolvedValueOnce({ data: mockResponse });
-
-    const result = await stayService.extendStay('1', '2026-04-01');
-
-    expect(api.put).toHaveBeenCalledWith('/api/v1/stays/1/extend', { newCheckOutDate: '2026-04-01' });
     expect(result).toEqual(mockResponse);
   });
 

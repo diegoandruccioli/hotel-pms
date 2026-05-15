@@ -14,9 +14,11 @@ import type { SpringPage } from '../types/page.types';
 const BASE_PATH = '/api/v1/stays';
 
 export const stayService = {
-  getAllStays: async (): Promise<StayResponse[]> => {
-    const response = await api.get<SpringPage<StayResponse>>(BASE_PATH);
-    return response.data.content;
+  getAllStays: async (page = 0, size = 20): Promise<SpringPage<StayResponse>> => {
+    const response = await api.get<SpringPage<StayResponse>>(
+      `${BASE_PATH}?page=${page}&size=${size}&sort=actualCheckInTime,desc`,
+    );
+    return response.data;
   },
 
   getStayById: async (id: string): Promise<StayResponse> => {
@@ -26,16 +28,6 @@ export const stayService = {
 
   createStay: async (data: StayRequest): Promise<StayResponse> => {
     const response = await api.post<StayResponse>(BASE_PATH, data);
-    return response.data;
-  },
-
-  updateStay: async (id: string, data: StayRequest): Promise<StayResponse> => {
-    const response = await api.put<StayResponse>(`${BASE_PATH}/${id}`, data);
-    return response.data;
-  },
-
-  extendStay: async (id: string, newCheckOutDate: string): Promise<StayResponse> => {
-    const response = await api.put<StayResponse>(`${BASE_PATH}/${id}/extend`, { newCheckOutDate });
     return response.data;
   },
 
