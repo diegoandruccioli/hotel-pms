@@ -4,10 +4,12 @@ import com.hotelpms.stay.client.BillingClient;
 import com.hotelpms.stay.client.GuestClient;
 import com.hotelpms.stay.client.InventoryClient;
 import com.hotelpms.stay.client.ReservationClient;
+import com.hotelpms.stay.client.dto.GuestResponse;
 import com.hotelpms.stay.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.stay.client.dto.InvoiceStatusResponse;
 import com.hotelpms.stay.client.dto.ReservationResponse;
 import com.hotelpms.stay.client.dto.ReservationStatusUpdateRequest;
+import com.hotelpms.stay.client.dto.RoomResponse;
 import com.hotelpms.stay.client.dto.StayInvoiceRequest;
 import com.hotelpms.stay.domain.Stay;
 import com.hotelpms.stay.domain.StayStatus;
@@ -68,13 +70,15 @@ public class StayServiceImpl implements StayService {
         log.info("Processing check-in | reservationId={} | walkIn={}",
                 request.reservationId(), request.reservationId() == null);
 
-        final LocalDate expectedCheckOutDate = request.reservationId() == null
+        final CheckInContext ctx = request.reservationId() == null
                 ? validateWalkInAndGetCheckOutDate(request.guestId(), request.roomId(),
                         request.expectedCheckOutDate())
                 : validateAndGetCheckOutDate(request.reservationId(), request.guestId(), request.roomId());
 
         final Stay newStay = stayMapper.toEntity(request);
-        newStay.setExpectedCheckOutDate(expectedCheckOutDate);
+        newStay.setExpectedCheckOutDate(ctx.checkOutDate());
+        newStay.setGuestDisplayName(ctx.guestDisplayName());
+        newStay.setRoomNumber(ctx.roomNumber());
 
         if (newStay.getGuests() != null) {
             newStay.getGuests().forEach(guest -> guest.setStay(newStay));
@@ -210,13 +214,13 @@ public class StayServiceImpl implements StayService {
      * @param reservationId the reservation to validate
      * @param guestId       the guest to validate
      * @param roomId        the room to validate
-     * @return the reservation's check-out date (may be {@code null} if not set)
+     * @return check-in context with check-out date, guest display name, room number
      */
-    private LocalDate validateAndGetCheckOutDate(
+    private CheckInContext validateAndGetCheckOutDate(
             final UUID reservationId, final UUID guestId, final UUID roomId) {
         try {
             log.debug("Validating guest ID: {}", guestId);
-            guestClient.getGuestById(guestId);
+            final GuestResponse guest = guestClient.getGuestById(guestId);
 
             log.debug("Validating reservation ID: {}", reservationId);
             final ReservationResponse reservation = reservationClient.getReservationById(reservationId);
@@ -227,9 +231,10 @@ public class StayServiceImpl implements StayService {
             }
 
             log.debug("Validating room ID: {}", roomId);
-            inventoryClient.getRoomById(roomId);
+            final RoomResponse room = inventoryClient.getRoomById(roomId);
 
-            return reservation.checkOutDate();
+            final String displayName = guest.lastName() + " " + guest.firstName();
+            return new CheckInContext(reservation.checkOutDate(), displayName, room.roomNumber());
         } catch (final feign.FeignException ex) {
             log.warn("[STAY] CHECK_IN_FAILED | reservationId={} | reason=EXTERNAL_SERVICE_UNAVAILABLE | detail={}",
                     reservationId, ex.getMessage());
@@ -238,26 +243,27 @@ public class StayServiceImpl implements StayService {
     }
 
     /**
-     * Validates a walk-in check-in (no reservation) by confirming guest and room exist,
-     * then returns the provided expected check-out date.
+     * Validates a walk-in check-in by confirming guest and room exist, then returns
+     * a context with the provided checkout date and denormalized display info.
      *
      * @param guestId              the guest to validate
      * @param roomId               the room to validate
-     * @param expectedCheckOutDate the check-out date supplied by the operator; may be null
-     * @return the expected check-out date (may be null)
+     * @param expectedCheckOutDate the operator-supplied check-out date; may be null
+     * @return context with checkout date, guest display name, room number
      */
-    private LocalDate validateWalkInAndGetCheckOutDate(
+    private CheckInContext validateWalkInAndGetCheckOutDate(
             final UUID guestId, final UUID roomId, final LocalDate expectedCheckOutDate) {
         try {
             log.debug("[STAY] WALK_IN validating guest={}", guestId);
-            guestClient.getGuestById(guestId);
+            final GuestResponse guest = guestClient.getGuestById(guestId);
             log.debug("[STAY] WALK_IN validating room={}", roomId);
-            inventoryClient.getRoomById(roomId);
+            final RoomResponse room = inventoryClient.getRoomById(roomId);
+            final String displayName = guest.lastName() + " " + guest.firstName();
+            return new CheckInContext(expectedCheckOutDate, displayName, room.roomNumber());
         } catch (final feign.FeignException ex) {
             log.warn("[STAY] WALK_IN_FAILED | reason=EXTERNAL_SERVICE_UNAVAILABLE | detail={}", ex.getMessage());
             throw new ExternalServiceException("EXTERNAL_SERVICE_UNAVAILABLE: " + ex.getMessage(), ex);
         }
-        return expectedCheckOutDate;
     }
 
     private void sendAlloggiatiIfEnabled(final Stay stay) {

@@ -79,6 +79,20 @@ public class Stay {
     private UUID roomId;
 
     /**
+     * Denormalized primary guest display name ("Cognome Nome") captured at check-in.
+     * Null for stays created before this field was introduced.
+     */
+    @Column(name = "guest_display_name")
+    private String guestDisplayName;
+
+    /**
+     * Denormalized room number captured at check-in from inventory-service.
+     * Null for stays created before this field was introduced.
+     */
+    @Column(name = "room_number")
+    private String roomNumber;
+
+    /**
      * The current status of the stay.
      */
     @Enumerated(EnumType.STRING)

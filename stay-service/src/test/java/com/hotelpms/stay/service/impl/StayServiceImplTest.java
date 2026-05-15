@@ -128,7 +128,7 @@ class StayServiceImplTest {
 
         validResponse = new StayResponse(stayId, null, reservationId, guestId, roomId,
                 StayStatus.CHECKED_IN, savedStay.getActualCheckInTime(), null,
-                LocalDateTime.now(), LocalDateTime.now(), null, false, new ArrayList<>());
+                LocalDateTime.now(), LocalDateTime.now(), null, false, new ArrayList<>(), null, null);
     }
 
     @Test

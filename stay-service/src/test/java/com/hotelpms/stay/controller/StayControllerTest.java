@@ -105,7 +105,7 @@ class StayControllerTest {
 
         stayResponse = new StayResponse(
                 stayId, hotelId, null, guestId, UUID.randomUUID(),
-                StayStatus.CHECKED_IN, null, null, null, null, null, false, List.of());
+                StayStatus.CHECKED_IN, null, null, null, null, null, false, List.of(), null, null);
     }
 
     @Test
@@ -139,7 +139,7 @@ class StayControllerTest {
     void shouldCheckOutReturn200() throws Exception {
         final StayResponse checkedOut = new StayResponse(
                 stayId, hotelId, null, guestId, UUID.randomUUID(),
-                StayStatus.CHECKED_OUT, null, null, null, null, null, false, List.of());
+                StayStatus.CHECKED_OUT, null, null, null, null, null, false, List.of(), null, null);
         when(stayService.checkOut(stayId)).thenReturn(checkedOut);
 
         mockMvc.perform(put(BASE_URL + PATH_CHECKOUT, stayId))

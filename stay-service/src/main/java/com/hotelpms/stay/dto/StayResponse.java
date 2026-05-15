@@ -22,6 +22,8 @@ import java.util.UUID;
  * @param invoiceId          the billing invoice folio UUID opened at check-in (may be null)
  * @param alloggiatiSent     whether the Alloggiati report was submitted to the PS portal
  * @param guests             the list of guests
+ * @param guestDisplayName   denormalized primary guest "Cognome Nome", null for legacy stays
+ * @param roomNumber         denormalized room number, null for legacy stays
  */
 public record StayResponse(
                 UUID id,
@@ -36,7 +38,9 @@ public record StayResponse(
                 LocalDateTime updatedAt,
                 UUID invoiceId,
                 boolean alloggiatiSent,
-                List<StayGuestResponse> guests) {
+                List<StayGuestResponse> guests,
+                String guestDisplayName,
+                String roomNumber) {
     /**
      * Compact constructor to ensure defensive copying of the guests list.
      */
