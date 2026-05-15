@@ -47,6 +47,7 @@ class UserManagementControllerTest {
     private static final String HEADER_HOTEL = "X-Auth-Hotel";
     private static final String ADMIN_USERNAME = "adminuser";
     private static final String NEW_USERNAME = "newuser";
+    private static final String STRONG_PASSWORD = "TestPassword@@22";
     private static final String USER_EMAIL = "user@example.com";
     private static final UUID HOTEL_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
@@ -100,7 +101,7 @@ class UserManagementControllerTest {
 
     @Test
     void shouldCreateUserReturn201() throws Exception {
-        final CreateUserRequest request = new CreateUserRequest(NEW_USERNAME, "password123", USER_EMAIL, Role.RECEPTIONIST);
+        final CreateUserRequest request = new CreateUserRequest(NEW_USERNAME, STRONG_PASSWORD, USER_EMAIL, Role.RECEPTIONIST);
         when(userManagementService.createUser(eq(HOTEL_ID), any(CreateUserRequest.class)))
                 .thenReturn(userResponse);
 
@@ -126,7 +127,7 @@ class UserManagementControllerTest {
 
     @Test
     void shouldCreateUserReturn409WhenUsernameAlreadyExists() throws Exception {
-        final CreateUserRequest request = new CreateUserRequest(NEW_USERNAME, "password123", USER_EMAIL, Role.RECEPTIONIST);
+        final CreateUserRequest request = new CreateUserRequest(NEW_USERNAME, STRONG_PASSWORD, USER_EMAIL, Role.RECEPTIONIST);
         when(userManagementService.createUser(eq(HOTEL_ID), any(CreateUserRequest.class)))
                 .thenThrow(new DuplicateResourceException("USERNAME_ALREADY_EXISTS"));
 

@@ -9,8 +9,13 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.HashMap;
+import java.util.Map;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import lombok.SneakyThrows;
@@ -30,8 +35,14 @@ public class SecurityConfig {
     private static final String AUTH_CHANGE_PW = "/api/v1/auth/change-password";
     private static final String AUTH_ME = "/api/v1/auth/me";
 
-    /** BCrypt cost factor — OWASP minimum 10, recommended 12 for modern hardware (T-AUTH-03). */
-    private static final int BCRYPT_STRENGTH = 12;
+    // Argon2id parameters — exercise A04:2025, T-AUTH-03 (memory-hard KDF)
+    private static final int ARGON2_SALT_LEN   = 16;          // bytes
+    private static final int ARGON2_HASH_LEN   = 32;          // bytes
+    private static final int ARGON2_PARALLELISM = 1;
+    private static final int ARGON2_MEMORY      = 19 * 1024;  // 19 MiB in KiB
+    private static final int ARGON2_ITERATIONS  = 2;
+    // BCrypt kept for lazy-rehash migration of pre-existing hashes
+    private static final int BCRYPT_LEGACY_STRENGTH = 12;
 
     private final String hmacSecret;
 
@@ -75,17 +86,27 @@ public class SecurityConfig {
     }
 
     /**
-     * Provides the password encoder bean.
+     * Provides the password encoder bean (T-AUTH-03, A04:2025 — Cryptographic Failures).
      *
-     * <p>Cost factor 12 satisfies the OWASP recommendation for BCrypt (minimum 10,
-     * recommended 12 for modern hardware).  The value is intentionally higher than
-     * the BCrypt default (10) to increase the work factor against brute-force
-     * attacks on stolen hashes (T-AUTH-03).
+     * <p>New passwords are hashed with <b>Argon2id</b> (memory-hard KDF, resistant to
+     * GPU/ASIC brute-force): 19 MiB memory, 2 iterations, parallelism 1 — parameters
+     * matching the course exercise specification.</p>
      *
-     * @return a {@link BCryptPasswordEncoder} with strength 12
+     * <p>A {@link DelegatingPasswordEncoder} wraps both Argon2id (default) and BCrypt
+     * (legacy). Hashes stored without a {@code {prefix}} are treated as BCrypt.
+     * The lazy-rehash mechanism in {@code AuthServiceImpl.login()} upgrades
+     * every BCrypt hash to Argon2id on the owner's next successful login,
+     * with zero downtime and no forced password resets.</p>
+     *
+     * @return a {@link DelegatingPasswordEncoder} defaulting to Argon2id
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(BCRYPT_STRENGTH);
+        final Map<String, PasswordEncoder> encoders = new HashMap<>();
+        encoders.put("argon2", new Argon2PasswordEncoder(
+                ARGON2_SALT_LEN, ARGON2_HASH_LEN,
+                ARGON2_PARALLELISM, ARGON2_MEMORY, ARGON2_ITERATIONS));
+        encoders.put("bcrypt", new BCryptPasswordEncoder(BCRYPT_LEGACY_STRENGTH));
+        return new DelegatingPasswordEncoder("argon2", encoders);
     }
 }

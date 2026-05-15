@@ -72,6 +72,9 @@ dependencies {
     // --- OpenAPI / Swagger UI ---
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4")
 
+    // Argon2id password hashing (A04:2025 — Cryptographic Failures, T-AUTH-03)
+    implementation("org.bouncycastle:bcprov-jdk18on")
+
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")

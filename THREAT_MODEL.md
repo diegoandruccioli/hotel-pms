@@ -69,7 +69,7 @@
 |----|-----------------|--------|---------|-------------|-------|
 | T-AUTH-01 | Information Disclosure | User Enumeration: messaggi di errore distinti per "utente non trovato" vs "password errata" | ALTO | ALTA | ✅ RISOLTO |
 | T-AUTH-02 | Denial of Service | Brute Force: nessun rate limiting sul login a livello di servizio | CRITICO | ALTA | ✅ RISOLTO |
-| T-AUTH-03 | Spoofing | Password debole: algoritmo di hashing da verificare (bcrypt vs Argon2) | CRITICO | MEDIA | ✅ RISOLTO |
+| T-AUTH-03 | Spoofing | Password debole: algoritmo di hashing da verificare (bcrypt vs Argon2) + policy complessità insufficiente | CRITICO | MEDIA | ✅ RISOLTO |
 | T-AUTH-04 | Elevation of Privilege | Refresh Token: assenza di meccanismo di revoca (token rotation) | ALTO | MEDIA | ✅ RISOLTO |
 | T-AUTH-05 | Repudiation | Assenza di audit log per eventi di autenticazione (login, logout, failed attempts) | MEDIO | ALTA | ✅ RISOLTO |
 

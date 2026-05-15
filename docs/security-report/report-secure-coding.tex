@@ -1133,6 +1133,74 @@ venga eseguita quando l'hash è già aggiornato e i tentativi falliti sono zero)
 
 \paragraph{Riferimento} Commit: \commitref{4e1f1e9}{fix(security): T-AUTH-03 — BCrypt cost 12 + lazy rehash on login on auth-service}
 
+% ─── Upgrade T-AUTH-03: Argon2id + password complexity (A04:2025 + A07:2021) ───────────────
+\paragraph{Upgrade T-AUTH-03 — Argon2id e Password Complexity Policy (esercizi OWASP)}
+
+\subparagraph{Argon2id — KDF memory-hard}
+L'analisi degli esercizi OWASP Top10 ha evidenziato un ulteriore gap: BCrypt, pur con
+cost~12, è un algoritmo \textit{memory-weak} — il calcolo di un singolo hash usa al
+massimo pochi kB di RAM, rendendo gli attacchi con GPU/ASIC efficienti.
+\textbf{Argon2id} (vincitore del Password Hashing Competition 2015, raccomandato da
+NIST SP 800-63B) è \textit{memory-hard}: il parametro \texttt{memory} forza l'attaccante
+a allocare RAM proporzionale, abbattendo drasticamente il throughput su hardware
+parallelo. Classificato OWASP A04:2025 --- Cryptographic Failures.
+
+\begin{enumerate}
+  \item \textbf{DelegatingPasswordEncoder} (default: \texttt{argon2}): nuove password
+        codificate come \texttt{\{argon2\}\$argon2id\$v=19\$m=19456,t=2,p=1\$...\$...}
+        Parametri: memoria 19\,MiB, 2 iterazioni, parallelismo~1, coerenti con
+        l'esercizio A04:2025.
+  \item \textbf{Legacy BCrypt}: hash già presenti nel DB mantengono il prefisso
+        \texttt{\{bcrypt\}\$2a\$12\$...}. Il meccanismo di lazy rehash esistente
+        (\texttt{upgradeEncoding}) li migra ad Argon2id al primo login successivo,
+        senza downtime né password reset forzati.
+  \item \textbf{Dipendenza}: \texttt{org.bouncycastle:bcprov-jdk18on:1.84}
+        (già presente nel BOM per CVE-2026-5598; aggiunta come
+        \texttt{implementation} dependency).
+\end{enumerate}
+
+\begin{securebox}[title={Codice Sicuro --- SecurityConfig.java (Argon2id + DelegatingPasswordEncoder)}]
+\begin{lstlisting}[style=java]
+// SICURO: Argon2id memory-hard (19 MiB, 2 iter, parallelismo 1)
+// DelegatingPasswordEncoder gestisce anche gli hash BCrypt legacy.
+@Bean
+public PasswordEncoder passwordEncoder() {
+    final Map<String, PasswordEncoder> encoders = new HashMap<>();
+    encoders.put("argon2", new Argon2PasswordEncoder(
+            16, 32, 1, 19 * 1024, 2));   // salt=16B, hash=32B
+    encoders.put("bcrypt", new BCryptPasswordEncoder(12));
+    return new DelegatingPasswordEncoder("argon2", encoders);
+}
+\end{lstlisting}
+\end{securebox}
+
+\subparagraph{Password Complexity Policy — A07:2021}
+L'esercizio A07:2021 richiedeva la validazione della password in fase di registrazione:
+almeno \textbf{16 caratteri}, \textbf{2 maiuscole}, \textbf{2 cifre}, \textbf{2 caratteri speciali}.
+La baseline accettava password di soli 8 caratteri senza requisiti di complessità
+(\texttt{@Size(min~=~8)}), classificato OWASP A07:2021 --- Identification and Authentication Failures.
+
+La mitigazione applica un'annotazione \texttt{@Pattern} con lookahead regex su tutti
+i DTO che accettano password in input: \texttt{RegisterRequest}, \texttt{CreateUserRequest},
+\texttt{ChangePasswordRequest} (solo \texttt{newPassword}).
+\texttt{LoginRequest} non è soggetto alla policy (l'utente non può modificare la password
+storica a retroattività).
+
+\begin{securebox}[title={Codice Sicuro --- RegisterRequest.java (password complexity)}]
+\begin{lstlisting}[style=java]
+// SICURO: >=16 caratteri, 2 maiuscole, 2 cifre, 2 speciali.
+// LoginRequest escluso: la policy non e' retroattiva sul login.
+@NotBlank
+@Pattern(
+    regexp = "^(?=.*[A-Z].*[A-Z])(?=.*[0-9].*[0-9])"
+           + "(?=.*[^A-Za-z0-9].*[^A-Za-z0-9]).{16,}$",
+    message = "PASSWORD_TOO_WEAK")
+String password
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Riferimento} Commit: \commitref{TBD}{feat(security): T-AUTH-03 upgrade — Argon2id KDF + password complexity policy (A04+A07:2025)}
+
 \subsection{Refresh Token Rotation e Blacklist \threat{T-AUTH-04}}
 
 \paragraph{Descrizione}

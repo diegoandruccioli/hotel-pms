@@ -55,6 +55,7 @@ class AuthControllerTest {
     private static final String TEST_REFRESH = "test.refresh.token";
     private static final String TEST_USERNAME = "testuser";
     private static final String TEST_PASSWORD = "password123";
+    private static final String STRONG_PASSWORD = "TestPassword@@22";
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String TEST_EMAIL = "test@example.com";
     private static final UUID TEST_HOTEL_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -130,7 +131,7 @@ class AuthControllerTest {
     @Test
     void shouldRegisterReturn201WithCookies() throws Exception {
         final RegisterRequest request = new RegisterRequest(
-                TEST_USERNAME, TEST_PASSWORD, TEST_EMAIL, Role.RECEPTIONIST, TEST_HOTEL_ID);
+                TEST_USERNAME, STRONG_PASSWORD, TEST_EMAIL, Role.RECEPTIONIST, TEST_HOTEL_ID);
         when(authService.register(any(RegisterRequest.class))).thenReturn(authResponse);
 
         mockMvc.perform(post(BASE_URL + PATH_REGISTER)
@@ -167,7 +168,7 @@ class AuthControllerTest {
 
     @Test
     void shouldChangePasswordReturn200() throws Exception {
-        final ChangePasswordRequest request = new ChangePasswordRequest("currentPw1", "newPassword1");
+        final ChangePasswordRequest request = new ChangePasswordRequest("currentPw1", STRONG_PASSWORD);
         when(jwtService.extractUsername(TEST_TOKEN)).thenReturn(TEST_USERNAME);
         when(jwtService.isTokenValid(TEST_TOKEN, TEST_USERNAME)).thenReturn(true);
         when(authService.changePassword(eq(TEST_USERNAME), any(ChangePasswordRequest.class)))
@@ -183,7 +184,7 @@ class AuthControllerTest {
 
     @Test
     void shouldChangePasswordReturn401WhenNoCookie() throws Exception {
-        final ChangePasswordRequest request = new ChangePasswordRequest("currentPw1", "newPassword1");
+        final ChangePasswordRequest request = new ChangePasswordRequest("currentPw1", STRONG_PASSWORD);
 
         mockMvc.perform(post(BASE_URL + PATH_CHANGE_PASSWORD)
                         .contentType(MediaType.APPLICATION_JSON)
