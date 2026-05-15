@@ -39,7 +39,7 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 | **Gestione configurazione e segreti** | 🟢 Verde | `.env` in `.gitignore`, Spring Cloud Config, secrets via env var, nessun hardcoding. `.env.example` presente con documentazione variabili. |
 | **Migrazioni DB** | 🟢 Verde | Flyway in tutti i servizi, versioning sequenziale corretto. |
 | **Logging e osservabilità** | 🟢 Verde | Zipkin + Prometheus + Grafana + Loki configurati. `X-Correlation-ID` propagato via MDC dal gateway a tutti i servizi — errori distribuiti tracciabili con un solo ID. |
-| **Test automatici** | 🟢 Verde | 317 test Vitest su 50 file, copertura >95% su tutti i servizi frontend. Backend: controller e service test su tutti i 9 servizi, copertura >95%. Playwright: walk-in, admin users, checkout, billing completi. |
+| **Test automatici** | 🟡 Giallo | 317/317 test Vitest su 50 file. Frontend (Vitest + V8, misurato 2026-05-11): stmt 68.6%, branch 54.2%, funcs 63.9%, lines 71.1%. Backend (JaCoCo, misurato 2026-05-11): istruzioni ~60% weighted avg (range 47%–82% per servizio, vedi tabella sotto). Playwright: walk-in, admin users, checkout, billing completi. Nessuna soglia enforced — deferred fino a baseline consolidata. |
 | **UX operativa receptionist** | 🟢 Verde | Tutti i flussi principali coperti: walk-in, check-in, checkout, billing, F&B, housekeeping, camere, gestione utenti, profilo hotel. i18n EN/IT. Residuale: nessun wizard onboarding al primo avvio, nessuna notifica push. |
 | **Resilienza a errori di rete** | 🟢 Verde | CircuitBreaker Resilience4j su tutti i Feign client, fallback dichiarati, GlobalExceptionHandler RFC 7807 in tutti i servizi. Alloggiati SOAP failure non blocca il check-in. |
 | **Documentazione tecnica** | 🟢 Verde | `ALLOGGIATI_README.md`, `DOCUMENTAZIONE_TECNICA_ALLOGGIATI_PS.md`, `INTERACTION_FLOWS.md`, `SECURITY_AND_PRIVACY.md`, Swagger aggregato all'API Gateway, `backup/DECISIONS.md`, `THREAT_MODEL.md`. |
@@ -92,6 +92,42 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 - Nessun wizard di onboarding al primo avvio.
 - Nessuna notifica push/email per eventi critici (prenotazione in scadenza, camera da pulire).
 - Nessuna pagina `/help` integrata nell'app.
+
+---
+
+## 5b. Coverage Baseline — Misurata 2026-05-11
+
+### Backend (JaCoCo, `./gradlew test jacocoTestReport`)
+
+| Service | Instructions | Branch | Line |
+|---------|-------------|--------|------|
+| api-gateway | 72.7% | 68.2% | 73.2% |
+| auth-service | 73.3% | 63.3% | 71.1% |
+| billing-service | 52.8% | 28.7% | 42.3% |
+| config-service | 81.6% | — | 71.4% |
+| fb-service | 65.7% | 52.0% | 63.7% |
+| guest-service | 55.2% | 47.8% | 47.6% |
+| inventory-service | 57.2% | 0%* | 45.7% |
+| reservation-service | 47.4% | 36.2% | 42.1% |
+| stay-service | 61.7% | 56.3% | 57.3% |
+| **Weighted avg** | **~60.1%** | **~50.4%** | **~57.4%** |
+
+\* inventory-service: 20 branch totali, tutti nei mapper MapStruct auto-generati — non testabili con unit test.
+
+### Frontend (Vitest + V8, `npm run test:coverage`)
+
+| Metric | Value |
+|--------|-------|
+| Statements | 68.59% (1479/2156) |
+| Branches | 54.2% (599/1105) |
+| Functions | 63.88% (375/587) |
+| Lines | 71.07% (1369/1926) |
+
+**Componenti con alta copertura (>90%):** `src/components` (95%), `src/components/m3` (94%), `Billing.tsx` (95%), `Dashboard.tsx` (92%), `Login.tsx` (94%).
+
+**Componenti con bassa copertura (<50%):** `CheckInForm.tsx` (48%), `GuestFormModal.tsx` (35%), `stayService.ts` (30%), `api.ts` (10% — Axios interceptor difficile da testare con jsdom).
+
+**Nota:** Nessuna soglia minima enforced — scelta consapevole per stabilire la baseline prima di fissare gate automatici. Comando: `./gradlew test jacocoTestReport` (backend) e `npm run test:coverage` (frontend).
 
 ---
 

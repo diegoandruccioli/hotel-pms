@@ -2,6 +2,47 @@
 
 An enterprise-grade, microservices-based **Hotel Property Management System**.  
 This platform orchestrates hotel operations — from reservations and guest management to food & beverage point-of-sale, billing, and housekeeping — powered by a modern React frontend and a highly scalable Spring Boot backend ecosystem.
+
+---
+
+## Project Status & Scope
+
+This is a **production-grade enterprise PMS** validated for real hotel operations with a single property. The system meets the minimum bar for enterprise classification across all five dimensions below.
+
+### Enterprise minimum bar — met
+
+| Dimension | Requirement | This system |
+|-----------|-------------|-------------|
+| **Multi-tenancy** | Data isolated per tenant at row level, enforced by infrastructure | `hotel_id` NOT NULL on every entity; injected from verified JWT, never from client input; all repositories filter by `hotel_id` |
+| **Security posture** | Hardened auth, inter-service trust, least-privilege access | JWT in httpOnly cookies (XSS-proof), HMAC-SHA256 on every Feign call (zero-trust internal), CSRF, Redis token-bucket rate limiting, RBAC enforced at gateway + endpoint level, GDPR Art. 20 + right-to-erasure |
+| **Operational compliance** | Regulatory integrations handled in production | Alloggiati Web v2.0 SOAP (art. 109 TULPS) — two-step protocol, 168-char fixed-width format, CRLF, error codes; collaudo plan documented |
+| **Observability** | Distributed tracing, metrics, structured logging | Zipkin (trace propagation via `X-Correlation-ID`), Prometheus + Grafana, Loki, Spring Boot Actuator on all services |
+| **Resilience** | Graceful degradation under partial failure | Resilience4j `@CircuitBreaker` on every Feign client; service outages do not cascade; RFC 7807 problem details from all services |
+
+### Complete and production-ready
+
+- 9 microservices, full RBAC (ADMIN / OWNER / RECEPTIONIST), JWT httpOnly + HMAC internal auth, CSRF, rate limiting
+- Alloggiati Web v2.0 SOAP integration (art. 109 TULPS) — collaudo with real PS portal documented in [`docs/ALLOGGIATI_COLLAUDO_REALE.md`](docs/ALLOGGIATI_COLLAUDO_REALE.md)
+- F&B → room charge billing, walk-in check-in, multi-tenant data isolation (`hotel_id` on every entity)
+- GDPR Art. 20 data export, structured PII audit log, right-to-erasure anonymisation
+- Security hardening fully documented in `docs/security-report/report-secure-coding.tex`
+- CI pipeline (GitHub Actions): build, unit tests, Playwright E2E, Trivy image scan
+
+### Stable but without enforced gates
+
+- **Coverage**: JaCoCo (backend) and Vitest (frontend) generate reports but have no minimum threshold configured — intentionally deferred until a real baseline is measured with `./gradlew build` / `npm run test:coverage`
+- **CVE-2026-42577** (Netty epoll DoS): accepted residual risk — JDK NIO transport is active, Netty 4.2.x is not yet compatible with the fix; mitigated by network-layer isolation
+
+### Planned — not yet implemented
+
+- Kubernetes migration (all containers are stateless and K8s-ready by design)
+- Testcontainers integration tests (current backend tests use Mockito only — no real DB)
+- Automated backup and disaster recovery
+- CI/CD push-to-deploy pipeline
+- JaCoCo / Vitest coverage threshold enforcement
+
+See [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) for the evidence-based audit with all open gaps, accepted risks, and the explicit roadmap.
+
 ---
 
 ## Tech Stack
@@ -83,6 +124,24 @@ The system follows a **distributed microservices** pattern with centralized conf
 
 ---
 
+## Key Technical Decisions & Trade-offs
+
+Non-obvious choices made during development, with the reasoning behind each.
+
+| Decision | Chosen approach | Why | Alternative not chosen |
+|---|---|---|---|
+| **Service topology** | One PostgreSQL DB per microservice | True data isolation; no cross-service SQL JOINs; independent schema evolution via Flyway | Shared DB: simpler but creates coupling, blocks independent deployments, risks GDPR data leakage across tenants |
+| **Auth token storage** | JWT in httpOnly cookies | Eliminates XSS token theft — browser never exposes the token to JavaScript | `localStorage`: simpler but vulnerable to XSS; rejected as a non-negotiable security baseline |
+| **Internal service auth** | HMAC-SHA256 on every Feign call (`X-Internal-Signature`) | Zero-trust between services: a compromised internal network cannot forge calls without the shared secret | Mutual TLS: stronger but requires certificate infrastructure not yet justified at this scale |
+| **Guest full-text search** | PostgreSQL `pg_trgm` GIN index | ILIKE `%keyword%` goes from O(n) full-table scan to O(log n) index scan; no additional infrastructure | Elasticsearch / OpenSearch: more powerful but adds a full search cluster for a problem PostgreSQL solves natively at single-hotel volumes |
+| **Invoice collection loading** | `@NamedEntityGraph` + `@EntityGraph` on repository | Eliminates N+1: `findByHotelId(pageable)` loads `charges` + `payments` in one LEFT JOIN instead of N separate queries per row | `@Transactional` + `Hibernate.initialize()`: works but couples service logic to persistence internals |
+| **Concurrent billing writes** | `@Version` optimistic locking on `Invoice` | F&B and billing can both add charges; Hibernate raises `OptimisticLockException` on conflict instead of silently overwriting data | Pessimistic lock (`SELECT FOR UPDATE`): serialises all writes, degrades throughput unnecessarily for low-contention workloads |
+| **Resilience** | Resilience4j `@CircuitBreaker` on all Feign clients | Graceful degradation: if `stay-service` is down, GDPR export returns partial data; check-in is never blocked by a `billing-service` outage | No circuit breaker: simpler code but a single service failure cascades to full system outage |
+| **Multi-tenancy** | `hotel_id` column on every entity, injected from JWT via API Gateway | Row-level isolation with no application-layer complexity; `hotel_id` is extracted from the verified JWT, never from client input | Schema-per-tenant: stronger isolation but 9× schema management overhead per hotel added |
+| **Why microservices at this scale** | 9 bounded contexts, independent deployability | Each domain (billing, stays, guests, inventory) has distinct data models and lifecycles; boundary design anticipates multi-hotel scaling and eventual Kubernetes deployment | Monolith: faster initial development but mixing billing/stay/GDPR domains creates long-term coupling that is harder to isolate for compliance audits |
+
+---
+
 ## How to Run
 
 ### Prerequisites
@@ -123,6 +182,29 @@ start.bat
 ```
 
 Once all services are running, open **http://localhost:5173** in your browser.
+
+### Environment Variables
+
+Copy `.env.example` to `.env` before starting. Key variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `HMAC_SECRET` | Shared secret for internal service-to-service auth (auto-generated by setup script) | — |
+| `ALLOGGIATI_USERNAME` | Polizia di Stato portal username | `test_user` |
+| `ALLOGGIATI_PASSWORD` | Polizia di Stato portal password | `test_pass` |
+| `ALLOGGIATI_WSKEY` | PS web service key | `test_key` |
+| `ALLOGGIATI_DRY_RUN` | `true` = skip real SOAP calls (safe for development) | `true` |
+
+### Operational Limits
+
+| Limit | Detail |
+|-------|--------|
+| **No automated deployment** | GitHub Actions CI runs tests and Trivy scans on push; no push-to-deploy pipeline. |
+| **No backup strategy** | PostgreSQL data lives in Docker named volumes. No automated backup or point-in-time recovery. |
+| **No Kubernetes yet** | Infrastructure is Docker Compose only. K8s manifests are planned post-exam. All containers are stateless and K8s-ready by design (`restart: unless-stopped` on all services). |
+| **Single region / single node** | No geographic redundancy. Each service runs as a single container with a single PostgreSQL instance. |
+| **No outbound notifications** | Reservation confirmations, check-in receipts, and billing summaries are not sent via email or SMS. |
+| **Grafana CVE residue** | Grafana 11.5.0 Alpine layer carries unpatched OS-level CVEs (OpenSSL, musl, zlib). Dismissed as "won't fix" — internal monitoring tool, no guest PII, isolated Docker network. Documented in `report-secure-coding.tex` §DEP-CVE-04. |
 
 ---
 
@@ -171,13 +253,17 @@ hotel-pms/
 
 ### Backend (JUnit 5 + Mockito)
 ```bash
-./gradlew clean build        # Runs all tests + PMD checks
+./gradlew clean build              # Runs all tests + PMD + Checkstyle
+./gradlew test jacocoTestReport    # Tests + JaCoCo coverage reports (HTML + XML)
+# Reports: {service}/build/reports/jacoco/test/html/index.html
 ```
 
 ### Frontend Unit Tests (Vitest)
 ```bash
 cd frontend
-npm run test
+npm run test                       # Run once
+npm run test:coverage              # Run once + V8 coverage report
+# Report: frontend/coverage/index.html
 ```
 
 ### Frontend E2E Tests (Playwright)
@@ -185,6 +271,15 @@ npm run test
 cd frontend
 npm run test:e2e
 ```
+
+### Coverage Baseline (measured 2026-05-11, no thresholds enforced)
+
+| Layer | Statements | Branches | Lines |
+|-------|-----------|----------|-------|
+| Frontend (Vitest V8) | 68.6% | 54.2% | 71.1% |
+| Backend avg (JaCoCo) | ~60.1% instr. | ~50.4% | ~57.4% |
+
+See [`docs/PILOT_READINESS_AUDIT.md §5b`](docs/PILOT_READINESS_AUDIT.md) for per-service breakdown and gap analysis.
 
 ---
 
@@ -205,17 +300,22 @@ See [`docs/BRANCH_STRATEGY.md`](docs/BRANCH_STRATEGY.md) for full topology and g
 
 | Document | Description |
 |----------|-------------|
-| [`docs/BRANCH_STRATEGY.md`](docs/BRANCH_STRATEGY.md) | **Branch topology, merge history, governance rules** |
-| [`docs/INTERACTION_FLOWS.md`](docs/INTERACTION_FLOWS.md) | End-to-end service call chains for all major flows |
-| [`docs/SECURITY_AND_PRIVACY.md`](docs/SECURITY_AND_PRIVACY.md) | Security model, GDPR/TULPS compliance, threat mitigations |
+| [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) | **Production-readiness audit** — evidence-based, open gaps, accepted risks, roadmap |
+| [`docs/PILOT_READINESS_AUDIT.md`](docs/PILOT_READINESS_AUDIT.md) | Pilot readiness assessment — all critical blockers resolved; real coverage baseline §5b |
+| [`THREAT_MODEL.md`](THREAT_MODEL.md) | Threat model — attack surfaces, mitigations table with commit references (security exam artifact) |
+| [`docs/SECURITY_AND_PRIVACY.md`](docs/SECURITY_AND_PRIVACY.md) | Security model: JWT, HMAC, RBAC, CSRF, GDPR, TULPS compliance |
+| [`docs/INTERACTION_FLOWS.md`](docs/INTERACTION_FLOWS.md) | 12 end-to-end service call chains (check-in, billing, walk-in, GDPR export, …) |
 | [`docs/USER_MANUAL.md`](docs/USER_MANUAL.md) | Step-by-step procedures for all user roles |
-| [`docs/I18N.md`](docs/I18N.md) | i18n architecture, namespace conventions, contribution guide |
-| [`docs/ALLOGGIATI_README.md`](docs/ALLOGGIATI_README.md) | Polizia di Stato SOAP integration and configuration |
-| [`docs/PILOT_READINESS_AUDIT.md`](docs/PILOT_READINESS_AUDIT.md) | Pilot readiness assessment (all critical blockers resolved) |
-| [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) | **Production-readiness & university-grade audit** — evidence-based, includes open gaps and roadmap |
+| [`docs/ALLOGGIATI_README.md`](docs/ALLOGGIATI_README.md) | Polizia di Stato SOAP integration — configuration and architecture |
+| [`docs/DOCUMENTAZIONE_TECNICA_ALLOGGIATI_PS.md`](docs/DOCUMENTAZIONE_TECNICA_ALLOGGIATI_PS.md) | Deep-dive: WSDL bindings, field mapping, error codes, TULPS legal context |
+| [`docs/ALLOGGIATI_COLLAUDO_REALE.md`](docs/ALLOGGIATI_COLLAUDO_REALE.md) | Real-portal test plan — 18 test cases, Go/No-Go criteria |
+| [`docs/I18N.md`](docs/I18N.md) | i18n architecture, namespace conventions, anti-hardcoding rules |
+| [`docs/GAP_ANALYSIS.md`](docs/GAP_ANALYSIS.md) | Gap analysis — 17 items tracked (all resolved as of 2026-05-07) |
+| [`docs/BRANCH_STRATEGY.md`](docs/BRANCH_STRATEGY.md) | Branch topology, merge history, governance rules |
+| [`backup/DECISIONS.md`](backup/DECISIONS.md) | All binding architectural and business decisions (internal reference — read at session start) |
 
 ---
 
 ## License
 
-This project is for educational and demonstration purposes.
+This project is open source and available for evaluation, adaptation, and deployment.
