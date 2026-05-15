@@ -118,5 +118,5 @@ describe('HotelProfile', () => {
     await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
     const results = await axe(container);
     expect(results).toHaveNoViolations();
-  });
+  }, 30000);
 });

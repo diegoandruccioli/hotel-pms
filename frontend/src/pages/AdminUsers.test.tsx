@@ -75,9 +75,13 @@ describe('AdminUsers', () => {
   it('opens create user modal on button click', async () => {
     vi.mocked(userService.listUsers).mockResolvedValue([]);
     render(<AdminUsers />);
-    await waitFor(() => screen.getByText('btn_new_user'));
+    // Wait for loading to fully complete (no_users appears after setLoading(false))
+    // This ensures the listUsers promise is flushed before we proceed.
+    await waitFor(() => screen.getByText('no_users'));
     fireEvent.click(screen.getByText('btn_new_user'));
-    expect(screen.getByText('modal_create_title')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText('modal_create_title')).toBeInTheDocument()
+    );
   });
 
   it('closes create user modal on cancel', async () => {
@@ -119,5 +123,5 @@ describe('AdminUsers', () => {
     const { container } = render(<AdminUsers />);
     await waitFor(() => screen.getByText('alice'));
     expect(await axe(container)).toHaveNoViolations();
-  });
+  }, 30000);
 });

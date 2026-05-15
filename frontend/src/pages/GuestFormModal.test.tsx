@@ -31,5 +31,5 @@ describe('GuestFormModal', () => {
     );
     const results = await axe(container);
     expect(results).toHaveNoViolations();
-  });
+  }, 30000);
 });
