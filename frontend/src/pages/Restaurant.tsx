@@ -1,15 +1,65 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { fbService } from '../services/fbService';
-import type { RestaurantOrderResponse, OrderStatus } from '../types/fb.types';
+import type { MenuItemResponse, RestaurantOrderResponse, OrderStatus } from '../types/fb.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
+import { M3Card } from '../components/m3/M3Card';
 import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '../store/authStore';
+import { useToastStore } from '../store/toastStore';
 import { OrderFormModal } from './Restaurant/OrderFormModal';
 import { OrderDetailModal } from './Restaurant/OrderDetailModal';
+import { MenuFormModal } from './Restaurant/MenuFormModal';
 
 const CONFIRMABLE_STATUSES = new Set<string>(['PENDING', 'PREPARED']);
+
+interface MenuItemRowProps {
+  mi: MenuItemResponse;
+  deletingMenuId: string | null;
+  onEdit: (mi: MenuItemResponse) => void;
+  onDelete: (mi: MenuItemResponse) => void;
+  formatCurrencyFn: (price: number) => string;
+  tLabel: (key: string) => string;
+  tCommon: (key: string) => string;
+}
+
+const MenuItemRow = memo(({
+  mi, deletingMenuId, onEdit, onDelete, formatCurrencyFn, tLabel, tCommon,
+}: MenuItemRowProps) => {
+  const handleEdit = useCallback(() => onEdit(mi), [onEdit, mi]);
+  const handleDelete = useCallback(() => onDelete(mi), [onDelete, mi]);
+  return (
+    <tr key={mi.id} className="hover:bg-surface-variant/30">
+      <td className="px-3 py-2 font-medium">{mi.name}</td>
+      <td className="px-3 py-2 text-on-surface-variant">{mi.category}</td>
+      <td className="px-3 py-2 text-right">{formatCurrencyFn(mi.price)}</td>
+      <td className="px-3 py-2 text-center">
+        <M3StatusChip
+          label={mi.available ? tLabel('menu_available_yes') : tLabel('menu_available_no')}
+          tone={mi.available ? 'success' : 'neutral'}
+        />
+      </td>
+      <td className="px-3 py-2 text-right">
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={handleEdit}
+            className="text-primary hover:text-primary/80 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary rounded"
+            aria-label={`${tLabel('menu_edit_item')} ${mi.name}`}>
+            {tCommon('edit')}
+          </button>
+          <button type="button" onClick={handleDelete}
+            disabled={deletingMenuId === mi.id}
+            className="text-error hover:text-error/80 text-xs font-medium disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-error rounded"
+            aria-label={`${tLabel('menu_delete_item')} ${mi.name}`}>
+            {tCommon('delete')}
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+});
+MenuItemRow.displayName = 'MenuItemRow';
 
 const getStatusTone = (status: OrderStatus | string) => {
   switch (status) {
@@ -84,12 +134,21 @@ const OrderRow = memo(({ order, confirmingId, onConfirm, onView, formatCurrency,
 
 export const Restaurant = memo(() => {
   const { t, i18n } = useTranslation('common');
+  const { t: tMenu } = useTranslation('restaurant');
+  const role = useAuthStore((s) => s.user?.role);
+  const { addToast } = useToastStore();
+  const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
+
   const [orders, setOrders] = useState<RestaurantOrderResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<RestaurantOrderResponse | null>(null);
+
+  const [menuItems, setMenuItems] = useState<MenuItemResponse[]>([]);
+  const [menuFormTarget, setMenuFormTarget] = useState<MenuItemResponse | 'new' | null>(null);
+  const [deletingMenuId, setDeletingMenuId] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
     try {
@@ -121,6 +180,40 @@ export const Restaurant = memo(() => {
       setConfirmingId(null);
     }
   }, [loadOrders, t]);
+
+  const loadMenu = useCallback(async () => {
+    if (!isAdminOrOwner) return;
+    try {
+      const items = await fbService.getMenuItems();
+      setMenuItems(items);
+    } catch { /* non-blocking */ }
+  }, [isAdminOrOwner]);
+
+  useEffect(() => { loadMenu(); }, [loadMenu]);
+
+  const handleMenuSaved = useCallback(async () => {
+    setMenuFormTarget(null);
+    await loadMenu();
+  }, [loadMenu]);
+
+  const handleMenuEdit = useCallback((mi: MenuItemResponse) => setMenuFormTarget(mi), []);
+  const handleOpenMenuForm = useCallback(() => setMenuFormTarget('new'), []);
+  const handleCloseMenuForm = useCallback(() => setMenuFormTarget(null), []);
+
+  const handleDeleteMenuItem = useCallback(async (item: MenuItemResponse) => {
+    const confirmed = window.confirm(tMenu('menu_delete_confirm', { name: item.name }));
+    if (!confirmed) return;
+    setDeletingMenuId(item.id);
+    try {
+      await fbService.deleteMenuItem(item.id);
+      addToast(tMenu('menu_delete_success'), 'success');
+      await loadMenu();
+    } catch {
+      addToast(tMenu('menu_delete_error'), 'error');
+    } finally {
+      setDeletingMenuId(null);
+    }
+  }, [addToast, loadMenu, tMenu]);
 
   const handleOrderCreated = useCallback(async () => { await loadOrders(); }, [loadOrders]);
 
@@ -196,12 +289,65 @@ export const Restaurant = memo(() => {
         </M3Table>
       )}
 
+      {isAdminOrOwner && (
+        <M3Card variant="outlined" className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MaterialIcon name="menu_book" size={20} className="text-primary" />
+              <h2 className="text-sm font-display font-semibold text-on-surface">{tMenu('menu_title')}</h2>
+            </div>
+            <M3Button icon="add" variant="tonal" onClick={handleOpenMenuForm}>
+              {tMenu('menu_add_item')}
+            </M3Button>
+          </div>
+          {menuItems.length === 0 ? (
+            <p className="text-sm text-on-surface-variant text-center py-4">{tMenu('menu_no_items')}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-on-surface">
+                <thead className="bg-surface-variant text-on-surface-variant uppercase text-xs tracking-wide">
+                  <tr>
+                    <th className="px-3 py-2 text-left">{tMenu('menu_name')}</th>
+                    <th className="px-3 py-2 text-left">{tMenu('menu_category')}</th>
+                    <th className="px-3 py-2 text-right">{tMenu('menu_price')}</th>
+                    <th className="px-3 py-2 text-center">{tMenu('menu_available')}</th>
+                    <th className="px-3 py-2 text-right">{t('actions')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant">
+                  {menuItems.map((mi) => (
+                    <MenuItemRow
+                      key={mi.id}
+                      mi={mi}
+                      deletingMenuId={deletingMenuId}
+                      onEdit={handleMenuEdit}
+                      onDelete={handleDeleteMenuItem}
+                      formatCurrencyFn={formatCurrency}
+                      tLabel={tMenu}
+                      tCommon={t}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </M3Card>
+      )}
+
       {isOrderModalOpen && (
         <OrderFormModal onClose={handleCloseOrderModal} onCreated={handleOrderCreated} />
       )}
 
       {selectedOrder && (
         <OrderDetailModal order={selectedOrder} onClose={handleCloseDetail} />
+      )}
+
+      {menuFormTarget && (
+        <MenuFormModal
+          item={menuFormTarget === 'new' ? undefined : menuFormTarget}
+          onClose={handleCloseMenuForm}
+          onSaved={handleMenuSaved}
+        />
       )}
     </div>
   );

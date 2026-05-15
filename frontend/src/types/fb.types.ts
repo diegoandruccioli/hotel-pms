@@ -4,6 +4,17 @@ export interface MenuItemResponse {
   id: string;
   name: string;
   price: number;
+  category: string;
+  description: string | null;
+  available: boolean;
+}
+
+export interface MenuItemRequest {
+  name: string;
+  price: number;
+  category: string;
+  description?: string;
+  available: boolean;
 }
 
 export interface OrderItemRequest {

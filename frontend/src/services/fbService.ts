@@ -1,5 +1,5 @@
 import api from './api';
-import type { MenuItemResponse, RestaurantOrderRequest, RestaurantOrderResponse } from '../types/fb.types';
+import type { MenuItemRequest, MenuItemResponse, RestaurantOrderRequest, RestaurantOrderResponse } from '../types/fb.types';
 import type { SpringPage } from '../types/page.types';
 
 const BASE_PATH = '/api/v1/fb/orders';
@@ -29,5 +29,19 @@ export const fbService = {
   getMenuItems: async (): Promise<MenuItemResponse[]> => {
     const response = await api.get<MenuItemResponse[]>(MENU_ITEMS_PATH);
     return response.data;
+  },
+
+  createMenuItem: async (data: MenuItemRequest): Promise<MenuItemResponse> => {
+    const response = await api.post<MenuItemResponse>(MENU_ITEMS_PATH, data);
+    return response.data;
+  },
+
+  updateMenuItem: async (id: string, data: MenuItemRequest): Promise<MenuItemResponse> => {
+    const response = await api.put<MenuItemResponse>(`${MENU_ITEMS_PATH}/${id}`, data);
+    return response.data;
+  },
+
+  deleteMenuItem: async (id: string): Promise<void> => {
+    await api.delete(`${MENU_ITEMS_PATH}/${id}`);
   },
 };

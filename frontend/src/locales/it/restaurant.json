@@ -1,1 +1,19 @@
-{}
+{
+  "menu_title": "Gestione Menu",
+  "menu_add_item": "Aggiungi voce",
+  "menu_edit_item": "Modifica voce",
+  "menu_delete_item": "Elimina voce",
+  "menu_delete_confirm": "Eliminare \"{{name}}\" dal menu?",
+  "menu_delete_success": "Voce eliminata dal menu",
+  "menu_delete_error": "Impossibile eliminare la voce. Riprova.",
+  "menu_save_success": "Voce menu salvata",
+  "menu_save_error": "Impossibile salvare la voce. Riprova.",
+  "menu_name": "Nome",
+  "menu_category": "Categoria",
+  "menu_price": "Prezzo (€)",
+  "menu_description": "Descrizione (opzionale)",
+  "menu_available": "Visibile nel form ordini",
+  "menu_no_items": "Nessuna voce menu. Clicca \"Aggiungi voce\" per crearne una.",
+  "menu_available_yes": "Disponibile",
+  "menu_available_no": "Nascosta"
+}

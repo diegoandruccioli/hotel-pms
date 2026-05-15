@@ -1,1 +1,19 @@
-{}
+{
+  "menu_title": "Menu Management",
+  "menu_add_item": "Add item",
+  "menu_edit_item": "Edit item",
+  "menu_delete_item": "Delete item",
+  "menu_delete_confirm": "Delete \"{{name}}\" from the menu?",
+  "menu_delete_success": "Item removed from menu",
+  "menu_delete_error": "Failed to delete item. Please try again.",
+  "menu_save_success": "Menu item saved",
+  "menu_save_error": "Failed to save item. Please try again.",
+  "menu_name": "Name",
+  "menu_category": "Category",
+  "menu_price": "Price (€)",
+  "menu_description": "Description (optional)",
+  "menu_available": "Visible in order form",
+  "menu_no_items": "No menu items. Click \"Add item\" to create the first one.",
+  "menu_available_yes": "Available",
+  "menu_available_no": "Hidden"
+}

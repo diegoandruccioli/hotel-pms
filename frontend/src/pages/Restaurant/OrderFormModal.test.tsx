@@ -23,8 +23,8 @@ vi.mock('focus-trap-react', () => ({
 }));
 
 const MENU_ITEMS = [
-  { id: 'item-uuid-1', name: 'Espresso', price: 2.5 },
-  { id: 'item-uuid-2', name: 'Cappuccino', price: 3.0 },
+  { id: 'item-uuid-1', name: 'Espresso', price: 2.5, category: 'Bar', description: null, available: true },
+  { id: 'item-uuid-2', name: 'Cappuccino', price: 3.0, category: 'Bar', description: null, available: true },
 ];
 
 describe('OrderFormModal', () => {
