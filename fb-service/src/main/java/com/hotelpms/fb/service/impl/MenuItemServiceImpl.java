@@ -17,6 +17,7 @@ import java.util.UUID;
 /**
  * Implementation of {@link MenuItemService}.
  */
+@SuppressWarnings("null")
 @Service
 @RequiredArgsConstructor
 @Slf4j
