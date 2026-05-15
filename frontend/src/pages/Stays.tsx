@@ -40,10 +40,14 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
   return (
     <M3TableRow key={stay.id}>
       <M3TableCell className="font-medium">
-        <span className="truncate block max-w-[120px]" title={stay.roomId}>{stay.roomId.substring(0, 8)}…</span>
+        <span className="truncate block max-w-[120px]" title={stay.roomId}>
+          {stay.roomNumber ?? `${stay.roomId.substring(0, 8)}…`}
+        </span>
       </M3TableCell>
       <M3TableCell className="text-on-surface-variant">
-        <span className="truncate block max-w-[120px]" title={stay.guestId}>{stay.guestId.substring(0, 8)}…</span>
+        <span className="truncate block max-w-[120px]" title={stay.guestId}>
+          {stay.guestDisplayName ?? `${stay.guestId.substring(0, 8)}…`}
+        </span>
       </M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(stay.actualCheckInTime)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(stay.actualCheckOutTime)}</M3TableCell>

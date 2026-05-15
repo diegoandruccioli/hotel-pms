@@ -99,6 +99,10 @@ export interface StayResponse {
   updatedAt: string;
   alloggiatiSent: boolean;
   guests?: StayGuestResponse[];
+  /** Denormalized "Cognome Nome" set at check-in; null for legacy stays. */
+  guestDisplayName?: string | null;
+  /** Denormalized room number set at check-in; null for legacy stays. */
+  roomNumber?: string | null;
 }
 
 export interface HotelSettingsRequest {
