@@ -18,6 +18,7 @@ import java.util.UUID;
 /**
  * Default implementation of {@link UserManagementService}.
  */
+@SuppressWarnings("null")
 @Slf4j
 @Service
 @RequiredArgsConstructor

@@ -52,6 +52,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class ReservationServiceImplTest {
 

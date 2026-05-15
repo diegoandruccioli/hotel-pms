@@ -33,6 +33,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
  * {@link MockRestServiceServer} intercepts all HTTP calls to the portal URL,
  * so no real network connections are made.
  */
+@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class AlloggiatiWebSenderServiceImplTest {
 

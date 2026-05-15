@@ -41,7 +41,6 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
     private static final float PAGE_WIDTH = PDRectangle.A4.getWidth();
     private static final float MARGIN = 50f;
     private static final float RIGHT_EDGE = PAGE_WIDTH - MARGIN;
-    private static final float CONTENT_WIDTH = RIGHT_EDGE - MARGIN;
     private static final float TOP_Y = PAGE_HEIGHT - MARGIN;
 
     private static final float FONT_SIZE_TITLE = 15f;
@@ -82,6 +81,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
 
     /** {@inheritDoc} */
     @Override
+    @SuppressWarnings("null")
     public byte[] generateInvoicePdf(final UUID invoiceId) {
         log.info("Generating PDF for invoice {}", invoiceId);
         final InvoiceResponse invoice = invoiceService.getInvoice(invoiceId);

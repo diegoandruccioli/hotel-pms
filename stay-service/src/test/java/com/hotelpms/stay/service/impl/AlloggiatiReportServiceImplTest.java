@@ -83,8 +83,6 @@ class AlloggiatiReportServiceImplTest {
     private static final int POS_PERMANENZA_END = 14;
     private static final int POS_COGNOME_START = 14;
     private static final int POS_COGNOME_END = 64;
-    private static final int POS_NOME_START = 64;
-    private static final int POS_NOME_END = 94;
     private static final int POS_SESSO_START = 94;
     private static final int POS_SESSO_END = 95;
     private static final int POS_COMUNE_NASCITA_START = 105;

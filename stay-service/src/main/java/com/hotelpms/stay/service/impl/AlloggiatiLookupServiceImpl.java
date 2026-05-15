@@ -23,6 +23,7 @@ import java.util.Optional;
  * Default implementation of {@link AlloggiatiLookupService}.
  * All reads are read-only transactions.
  */
+@SuppressWarnings("null")
 @Service
 @RequiredArgsConstructor
 @Slf4j

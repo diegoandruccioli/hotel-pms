@@ -38,10 +38,12 @@ public final class AlloggiatiCsvParser {
     // COMUNI: Codice, Descrizione, Provincia,  DataFineVal
     private static final int COL_DATA_FINE_VAL = 3;
 
-    private static final CSVFormat PORTAL_FORMAT = CSVFormat.DEFAULT
-            .withFirstRecordAsHeader()
-            .withIgnoreSurroundingSpaces()
-            .withIgnoreEmptyLines();
+    private static final CSVFormat PORTAL_FORMAT = CSVFormat.DEFAULT.builder()
+            .setHeader()
+            .setSkipHeaderRecord(true)
+            .setIgnoreSurroundingSpaces(true)
+            .setIgnoreEmptyLines(true)
+            .build();
 
     private AlloggiatiCsvParser() {
         throw new UnsupportedOperationException("Utility class");

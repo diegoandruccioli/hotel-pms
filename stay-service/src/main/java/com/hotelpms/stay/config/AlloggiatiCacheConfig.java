@@ -44,6 +44,7 @@ public class AlloggiatiCacheConfig {
      * @return configured cache manager
      */
     @Bean
+    @SuppressWarnings("null")
     public CacheManager alloggiatiCacheManager() {
         final CaffeineCacheManager manager = new CaffeineCacheManager();
         manager.registerCustomCache(CACHE_COMUNI,

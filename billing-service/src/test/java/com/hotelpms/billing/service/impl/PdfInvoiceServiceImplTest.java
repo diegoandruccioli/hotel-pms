@@ -27,6 +27,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+@SuppressWarnings("null")
 @ExtendWith(MockitoExtension.class)
 class PdfInvoiceServiceImplTest {
 

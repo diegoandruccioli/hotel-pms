@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.MDC;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -41,15 +42,15 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
     private final String hmacSecret;
 
     @Override
-    protected boolean shouldNotFilter(final HttpServletRequest request) {
+    protected boolean shouldNotFilter(@NonNull final HttpServletRequest request) {
         final String path = request.getRequestURI();
         return !path.startsWith("/api/v1/auth/users");
     }
 
     @Override
-    protected void doFilterInternal(final HttpServletRequest request,
-            final HttpServletResponse response,
-            final FilterChain chain) throws ServletException, IOException {
+    protected void doFilterInternal(@NonNull final HttpServletRequest request,
+            @NonNull final HttpServletResponse response,
+            @NonNull final FilterChain chain) throws ServletException, IOException {
 
         final String username = request.getHeader(HEADER_USER);
         final String role = request.getHeader(HEADER_ROLE);

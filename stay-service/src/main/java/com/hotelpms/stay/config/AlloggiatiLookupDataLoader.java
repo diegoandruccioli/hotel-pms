@@ -22,6 +22,7 @@ import java.time.Duration;
  * Polizia di Stato portal and delegates parsing to {@link AlloggiatiCsvParser}.
  * Failures are non-blocking: the application continues even if downloads fail.
  */
+@SuppressWarnings("null")
 @Component
 @RequiredArgsConstructor
 @Slf4j
