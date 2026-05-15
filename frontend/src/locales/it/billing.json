@@ -20,5 +20,7 @@
   "charges": "Addebiti",
   "charge_type_fb_order": "Ordine F&B",
   "charge_type_room_service": "Room Service",
-  "charge_type_other": "Altro Addebito"
+  "charge_type_other": "Altro Addebito",
+  "download_pdf": "Scarica PDF",
+  "pdf_downloading": "Download in corso…"
 }

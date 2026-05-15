@@ -1,6 +1,10 @@
 server:
   port: 8085
 
+application:
+  config:
+    stay-service-url: http://stay-service:8084
+
 internal:
   hmac:
     secret: ${INTERNAL_HMAC_SECRET}

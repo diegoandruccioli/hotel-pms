@@ -13,6 +13,7 @@ import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.GlobalExceptionHandler;
 import com.hotelpms.billing.exception.NotFoundException;
 import com.hotelpms.billing.service.InvoiceService;
+import com.hotelpms.billing.service.PdfInvoiceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +39,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -57,8 +60,13 @@ class InvoiceControllerTest {
     private static final BigDecimal AMOUNT_100 = BigDecimal.valueOf(100);
     private static final String JSON_ID = "$.id";
 
+    private static final String PATH_PDF = "/{id}/pdf";
+
     @Mock
     private InvoiceService invoiceService;
+
+    @Mock
+    private PdfInvoiceService pdfInvoiceService;
 
     @InjectMocks
     private InvoiceController invoiceController;
@@ -166,6 +174,29 @@ class InvoiceControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.stayId").value(STAY_ID.toString()));
+    }
+
+    @Test
+    void shouldGetPdfReturn200WithApplicationPdf() throws Exception {
+        final byte[] pdfBytes = {0x25, 0x50, 0x44, 0x46};  // %PDF magic bytes
+        when(pdfInvoiceService.generateInvoicePdf(INVOICE_ID)).thenReturn(pdfBytes);
+
+        mockMvc.perform(get(BASE_URL + PATH_PDF, INVOICE_ID)
+                        .accept(MediaType.APPLICATION_PDF))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(header().string("Content-Disposition",
+                        org.hamcrest.Matchers.containsString("attachment")));
+    }
+
+    @Test
+    void shouldGetPdfReturn404WhenInvoiceNotFound() throws Exception {
+        when(pdfInvoiceService.generateInvoicePdf(INVOICE_ID))
+                .thenThrow(new NotFoundException("INVOICE_NOT_FOUND"));
+
+        mockMvc.perform(get(BASE_URL + PATH_PDF, INVOICE_ID)
+                        .accept(MediaType.APPLICATION_PDF))
+                .andExpect(status().isNotFound());
     }
 
     @Test

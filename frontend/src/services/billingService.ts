@@ -24,4 +24,18 @@ export const billingService = {
     const response = await api.get<SpringPage<InvoiceResponse>>(BASE_PATH);
     return response.data.content;
   },
+
+  downloadPdf: async (invoiceId: string, invoiceNumber: string): Promise<void> => {
+    const response = await api.get(`${BASE_PATH}/${invoiceId}/pdf`, {
+      responseType: 'blob',
+    });
+    const url = URL.createObjectURL(new Blob([response.data as BlobPart], { type: 'application/pdf' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${invoiceNumber}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  },
 };

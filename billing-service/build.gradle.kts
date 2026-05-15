@@ -66,6 +66,9 @@ dependencies {
     // --- OpenAPI / Swagger UI ---
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4")
 
+    // PDF invoice generation — Apache 2.0 licence
+    implementation("org.apache.pdfbox:pdfbox:3.0.3")
+
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
@@ -87,7 +90,8 @@ dependencyManagement {
         // commons-fileupload is not managed by Spring Boot 3.5.x BOM (removed with CommonsMultipartResolver
         // in Spring 6.1); dependencyManagement.dependencies forces the version regardless of BOM properties.
         dependency("commons-fileupload:commons-fileupload:1.6.0")
-        dependency("commons-io:commons-io:2.14.0")
+        // bumped 2.14.0 → 2.16.1: PDFBox 3.0.x requires 2.15+; CVE-2024-47554 fix still present
+        dependency("commons-io:commons-io:2.16.1")
         // CVE-2026-42198: fixed in PostgreSQL JDBC 42.7.11.
         dependency("org.postgresql:postgresql:42.7.11")
         // CVE-2026-5598: fixed in BouncyCastle 1.84.

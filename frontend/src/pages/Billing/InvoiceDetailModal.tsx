@@ -1,4 +1,5 @@
-import { useCallback, memo } from 'react';
+import { useCallback, memo, useState } from 'react';
+import { billingService } from '../../services/billingService';
 
 const ICON_STYLE: React.CSSProperties = { fontSize: 18 };
 import { useTranslation } from 'react-i18next';
@@ -33,6 +34,16 @@ const chargeTypeIcon: Record<ChargeType, string> = {
 
 export const InvoiceDetailModal = memo(({ invoice, onClose }: Props) => {
   const { t, i18n } = useTranslation(['billing', 'common']);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadPdf = useCallback(async () => {
+    setDownloading(true);
+    try {
+      await billingService.downloadPdf(invoice.id, invoice.invoiceNumber);
+    } finally {
+      setDownloading(false);
+    }
+  }, [invoice.id, invoice.invoiceNumber]);
 
   const formatCurrency = useCallback(
     (val: number) =>
@@ -150,6 +161,24 @@ export const InvoiceDetailModal = memo(({ invoice, onClose }: Props) => {
             </>
           )}
         </section>
+      </div>
+
+      {/* PDF download action */}
+      <div className="flex justify-end pt-2 border-t border-outline-variant mt-4">
+        <button
+          type="button"
+          onClick={handleDownloadPdf}
+          disabled={downloading}
+          aria-busy={downloading}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-medium hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px]"
+        >
+          <span className="material-symbols-outlined" style={ICON_STYLE} aria-hidden="true">
+            download
+          </span>
+          {downloading
+            ? t('pdf_downloading', { ns: 'billing' })
+            : t('download_pdf', { ns: 'billing' })}
+        </button>
       </div>
     </M3Dialog>
   );

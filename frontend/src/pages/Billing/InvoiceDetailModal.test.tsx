@@ -1,8 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
 import type { InvoiceResponse } from '../../types/billing.types';
+import { billingService } from '../../services/billingService';
+
+vi.mock('../../services/billingService', () => ({
+  billingService: {
+    downloadPdf: vi.fn().mockResolvedValue(undefined),
+  },
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
@@ -77,8 +84,34 @@ describe('InvoiceDetailModal', () => {
     expect(screen.getByText('PAID')).toBeInTheDocument();
   });
 
+  it('renders download PDF button', () => {
+    render(<InvoiceDetailModal invoice={BASE_INVOICE} onClose={onClose} />);
+    expect(screen.getByRole('button', { name: /download_pdf/i })).toBeInTheDocument();
+  });
+
+  it('calls billingService.downloadPdf on button click', async () => {
+    render(<InvoiceDetailModal invoice={BASE_INVOICE} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: /download_pdf/i }));
+    await waitFor(() => {
+      expect(billingService.downloadPdf).toHaveBeenCalledWith('inv1', 'INV-001');
+    });
+  });
+
+  it('disables button while downloading', async () => {
+    let resolve!: () => void;
+    vi.mocked(billingService.downloadPdf).mockImplementationOnce(
+      () => new Promise<void>((res) => { resolve = res; }),
+    );
+    render(<InvoiceDetailModal invoice={BASE_INVOICE} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: /download_pdf/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /pdf_downloading/i })).toBeDisabled();
+    });
+    resolve();
+  });
+
   it('passes axe accessibility check', async () => {
     const { container } = render(<InvoiceDetailModal invoice={BASE_INVOICE} onClose={onClose} />);
     expect(await axe(container)).toHaveNoViolations();
-  });
+  }, 30000);
 });

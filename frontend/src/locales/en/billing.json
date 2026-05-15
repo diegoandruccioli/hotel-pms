@@ -20,5 +20,7 @@
   "charges": "Charges",
   "charge_type_fb_order": "F&B Order",
   "charge_type_room_service": "Room Service",
-  "charge_type_other": "Other Charge"
+  "charge_type_other": "Other Charge",
+  "download_pdf": "Download PDF",
+  "pdf_downloading": "Downloading…"
 }

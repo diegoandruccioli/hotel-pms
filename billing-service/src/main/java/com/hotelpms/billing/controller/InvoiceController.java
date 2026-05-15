@@ -8,6 +8,7 @@ import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.service.InvoiceService;
+import com.hotelpms.billing.service.PdfInvoiceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +16,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
@@ -41,8 +44,11 @@ import java.util.UUID;
 public class InvoiceController {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final String PDF_FILENAME_PREFIX = "fattura-";
+    private static final String PDF_EXTENSION = ".pdf";
 
     private final InvoiceService invoiceService;
+    private final PdfInvoiceService pdfInvoiceService;
 
     /**
      * Creates a new invoice.
@@ -163,6 +169,24 @@ public class InvoiceController {
         log.info("REST request for invoice history — guest={} hotel={}", guestId, hotelId);
         return ResponseEntity.ok(
                 invoiceService.getInvoiceHistoryForGuest(guestId, Objects.requireNonNull(hotelId)));
+    }
+
+    /**
+     * Returns a PDF representation of the invoice for download.
+     *
+     * @param id the invoice UUID
+     * @return PDF bytes with {@code Content-Disposition: attachment} header
+     */
+    @GetMapping(value = "/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> getInvoicePdf(@NonNull @PathVariable final UUID id) {
+        log.info("REST request to download PDF for invoice {}", id);
+        final byte[] pdf = pdfInvoiceService.generateInvoicePdf(id);
+        final ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(PDF_FILENAME_PREFIX + id + PDF_EXTENSION)
+                .build();
+        return ResponseEntity.ok()
+                .headers(h -> h.setContentDisposition(disposition))
+                .body(pdf);
     }
 
     private UUID extractHotelId() {
