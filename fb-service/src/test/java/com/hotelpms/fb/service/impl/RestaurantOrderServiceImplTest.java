@@ -127,7 +127,7 @@ class RestaurantOrderServiceImplTest {
         // Arrange
         when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN));
         when(orderMapper.toEntity(request)).thenReturn(order);
-        when(menuItemRepository.findById(Objects.requireNonNull(menuItemId))).thenReturn(Optional.of(menuItem));
+        when(menuItemRepository.findByIdAndHotelId(menuItemId, hotelId)).thenReturn(Optional.of(menuItem));
         when(orderRepository.save(Objects.requireNonNull(order))).thenReturn(order);
         when(orderMapper.toResponse(Objects.requireNonNull(order))).thenReturn(response);
 
@@ -140,7 +140,7 @@ class RestaurantOrderServiceImplTest {
         assertEquals(OrderStatus.PENDING, result.status());
 
         verify(stayClient).getStayById(stayId);
-        verify(menuItemRepository).findById(Objects.requireNonNull(menuItemId));
+        verify(menuItemRepository).findByIdAndHotelId(menuItemId, hotelId);
         verify(orderRepository).save(Objects.requireNonNull(order));
     }
 
@@ -149,7 +149,7 @@ class RestaurantOrderServiceImplTest {
         // Arrange: verify hotel_id is set server-side from SecurityContext (T-FB-01)
         when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN));
         when(orderMapper.toEntity(request)).thenReturn(order);
-        when(menuItemRepository.findById(Objects.requireNonNull(menuItemId))).thenReturn(Optional.of(menuItem));
+        when(menuItemRepository.findByIdAndHotelId(menuItemId, hotelId)).thenReturn(Optional.of(menuItem));
         when(orderRepository.save(Objects.requireNonNull(order))).thenReturn(order);
         when(orderMapper.toResponse(Objects.requireNonNull(order))).thenReturn(response);
 
@@ -171,7 +171,7 @@ class RestaurantOrderServiceImplTest {
                 .name("Bistecca ai Ferri")
                 .price(new BigDecimal("22.00"))
                 .build();
-        when(menuItemRepository.findById(Objects.requireNonNull(menuItemId))).thenReturn(Optional.of(expensiveItem));
+        when(menuItemRepository.findByIdAndHotelId(menuItemId, hotelId)).thenReturn(Optional.of(expensiveItem));
         when(orderRepository.save(Objects.requireNonNull(order))).thenAnswer(inv -> inv.getArgument(0));
         when(orderMapper.toResponse(Objects.requireNonNull(order))).thenReturn(response);
 
@@ -179,7 +179,7 @@ class RestaurantOrderServiceImplTest {
         orderService.createOrder(request);
 
         // Assert: verify the item was built using catalog price (22.00), not any client value
-        verify(menuItemRepository).findById(Objects.requireNonNull(menuItemId));
+        verify(menuItemRepository).findByIdAndHotelId(menuItemId, hotelId);
         // The order passed to save must contain items with server-side price 22.00
         verify(orderRepository).save(Objects.requireNonNull(order));
     }
@@ -189,14 +189,14 @@ class RestaurantOrderServiceImplTest {
         // Arrange: menu item UUID does not exist in the catalog
         when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN));
         when(orderMapper.toEntity(request)).thenReturn(order);
-        when(menuItemRepository.findById(Objects.requireNonNull(menuItemId))).thenReturn(Optional.empty());
+        when(menuItemRepository.findByIdAndHotelId(menuItemId, hotelId)).thenReturn(Optional.empty());
 
         // Act & Assert
         final OrderValidationException exception = assertThrows(OrderValidationException.class,
                 () -> orderService.createOrder(request));
 
         assertNotNull(exception.getMessage());
-        verify(menuItemRepository).findById(Objects.requireNonNull(menuItemId));
+        verify(menuItemRepository).findByIdAndHotelId(menuItemId, hotelId);
         verifyNoInteractions(orderRepository);
     }
 

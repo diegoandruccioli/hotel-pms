@@ -43,6 +43,10 @@ public class MenuItem {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /** Hotel scope for multi-tenant isolation — set server-side, never from client. */
+    @Column(name = "hotel_id", nullable = false)
+    private UUID hotelId;
+
     /** Display name of the item (e.g. "Espresso", "Club Sandwich"). */
     @Column(nullable = false)
     private String name;
@@ -50,6 +54,19 @@ public class MenuItem {
     /** Canonical price in EUR, set by hotel management — never by the client. */
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
+
+    /** Display category (e.g. "Bar", "Cucina", "Dessert"). */
+    @Column(nullable = false, length = 100)
+    private String category;
+
+    /** Optional free-text description. */
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    /** Visibility for ordering; false hides from order form without deleting. */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean available = true;
 
     /** Soft-delete flag. */
     @Column(nullable = false)

@@ -82,7 +82,7 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
         order.setStatus(OrderStatus.PENDING);
 
         // Resolve items with server-side prices from the catalog (T-FB-02 mitigation)
-        final List<OrderItem> items = buildItemsFromCatalog(request.items(), order);
+        final List<OrderItem> items = buildItemsFromCatalog(request.items(), order, hotelId);
         items.forEach(order::addItem);
 
         // Calculate total amount using only server-side prices
@@ -194,17 +194,20 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
      *
      * @param itemRequests the list of item requests from the client
      * @param order        the parent order (used for bidirectional FK)
+     * @param hotelId      the hotel scope for menu item lookup (IDOR-safe)
      * @return list of fully populated OrderItem entities with server-side prices
      * @throws OrderValidationException if any {@code menuItemId} does not exist
-     *                                  in the active catalog
+     *                                  in the active catalog for the given hotel
      */
     private List<OrderItem> buildItemsFromCatalog(
             final List<OrderItemRequest> itemRequests,
-            final RestaurantOrder order) {
+            final RestaurantOrder order,
+            final UUID hotelId) {
 
         final List<OrderItem> items = new ArrayList<>();
         for (final OrderItemRequest req : itemRequests) {
-            final MenuItem menuItem = menuItemRepository.findById(Objects.requireNonNull(req.menuItemId()))
+            final MenuItem menuItem = menuItemRepository
+                    .findByIdAndHotelId(Objects.requireNonNull(req.menuItemId()), hotelId)
                     .orElseThrow(() -> new OrderValidationException(
                             "MENU_ITEM_NOT_FOUND: " + req.menuItemId()));
 

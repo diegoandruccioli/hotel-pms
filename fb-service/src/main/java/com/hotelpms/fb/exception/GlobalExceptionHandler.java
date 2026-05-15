@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private static final String TIMESTAMP_FIELD = "timestamp";
+    private static final String URI_NOT_FOUND = "https://hotel-pms.com/errors/not-found";
 
     /**
      * Handles StayNotFoundException.
@@ -32,7 +33,22 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleStayNotFoundException(final StayNotFoundException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problemDetail.setTitle("Stay Not Found");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/not-found")));
+        problemDetail.setType(Objects.requireNonNull(URI.create(URI_NOT_FOUND)));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
+
+    /**
+     * Handles MenuItemNotFoundException.
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 404 status
+     */
+    @ExceptionHandler(MenuItemNotFoundException.class)
+    public ProblemDetail handleMenuItemNotFoundException(final MenuItemNotFoundException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problemDetail.setTitle("Menu Item Not Found");
+        problemDetail.setType(Objects.requireNonNull(URI.create(URI_NOT_FOUND)));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
@@ -47,7 +63,7 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleOrderNotFoundException(final OrderNotFoundException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problemDetail.setTitle("Order Not Found");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/not-found")));
+        problemDetail.setType(Objects.requireNonNull(URI.create(URI_NOT_FOUND)));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
