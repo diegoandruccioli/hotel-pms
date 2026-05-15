@@ -1,6 +1,6 @@
 # Hotel PMS — Manuale Operativo
 
-**Versione:** 1.0 — 2026-05-07  
+**Versione:** 1.1 — 2026-05-15  
 **Destinatari:** Receptionist, Owner, Admin  
 **Lingua sistema:** Italiano / Inglese (selezionabile)
 
@@ -134,12 +134,16 @@
 
 ---
 
-### 3.8 Generare il Report Alloggiati PS
+### 3.8 Generare e Inviare il Report Alloggiati PS
 
 1. Menu → **Soggiorni** → sezione **Report Portale PS** in fondo alla pagina
 2. Selezionare la data del rapporto
 3. Clicca **Genera e Scarica** — scarica il file `.txt` in formato 168 caratteri per upload manuale sul portale
-4. Per il formato JSON (debug): clicca **Scarica export JSON**
+4. Per il formato JSON (debug): clicca **Scarica export JSON** (visibile solo a ADMIN/OWNER)
+5. *(Solo ADMIN/OWNER)* Clicca **Invia a Questura** — appare una finestra di conferma; confermando, il sistema invia il report al portale PS via SOAP in tempo reale
+   - Risposta di successo: toast verde "Lista inviata al portale PS con successo"
+   - Risposta di errore portale (422): toast rosso con il messaggio ricevuto dal portale
+   - Errore di rete: toast rosso generico — riprovare più tardi
 
 **Invio automatico:** Se il toggle `alloggiatiAutoSend` è attivo nel Profilo Hotel, l'invio avviene automaticamente ad ogni check-in. Il badge **Inviato PS** appare nella colonna PS della lista soggiorni.
 
@@ -165,6 +169,25 @@ Per disattivare un utente: pulsante **Disattiva** accanto all'utente. L'account 
 
 ---
 
+### 3.12 Reset password utente (solo ADMIN/OWNER)
+
+Usare quando un utente ha dimenticato la password o per motivi di sicurezza (es. sospetta compromissione).
+
+1. Menu → **Gestione Utenti** → trova l'utente nella lista
+2. Clicca **Reset password** accanto all'utente
+3. Inserire la nuova password temporanea nel campo **Nuova password** (minimo 16 caratteri, 2 maiuscole, 2 cifre, 2 caratteri speciali)
+4. Confermare la password nel campo **Conferma password**
+5. Clicca **Reset password**
+6. Il sistema:
+   - Sostituisce la password dell'utente con quella nuova
+   - Attiva il flag `mustChangePassword` — al prossimo accesso l'utente sarà obbligato a scegliere una password personale
+   - Invalida tutte le sessioni attive dell'utente (token esistenti non più validi)
+7. Comunicare la nuova password temporanea all'utente via canale sicuro (telefono, messaggio cifrato)
+
+**Nota:** Non è possibile resettare la propria password da questa pagina — usare il Profilo → Cambia Password.
+
+---
+
 ### 3.11 Configurare il Profilo Hotel (solo ADMIN)
 
 1. Menu → icona utente → **Profilo Hotel** (o naviga a `/profile/hotel`)
@@ -181,7 +204,7 @@ Per disattivare un utente: pulsante **Disattiva** accanto all'utente. L'account 
 |------------|--------------|-------------------|
 | Ospite ha soggiorni attivi → si tenta cancellazione | Sistema risponde 451 (Legal Hold) | Non cancellare ospiti con soggiorni attivi o fatture aperte |
 | Camera già occupata nelle date selezionate | Errore 409 Conflict | Scegliere date diverse o camera diversa |
-| Portale PS irraggiungibile al check-in | Check-in completato, badge PS assente | Inviare il report manualmente quando il portale torna disponibile |
+| Portale PS irraggiungibile al check-in | Check-in completato, badge PS assente | Usare il pulsante **Invia a Questura** (Soggiorni → Report Portale PS) quando il portale torna disponibile |
 | Pagamento parziale: il check-out è bloccato | Sistema rifiuta il checkout | Registrare il saldo rimanente prima di procedere |
 | Password temporanea al primo login | Redirect obbligatorio al cambio password | Inserire e confermare la nuova password |
 | Token JWT scaduto durante l'uso | L'app rinnova il token silenziosamente in background | Nessuna azione — l'utente non vede interruzioni |

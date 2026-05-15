@@ -90,7 +90,7 @@ nei test Mockito.
 | Performance | ✅ Buono | ✅ Adeguato | ✅ Adeguato | Tutte le 15+ pagine lazy-loaded in `App.tsx`; `React.memo()` sui componenti stabili | — |
 | Auth interceptor | ✅ Eccellente | ✅ Eccellente | ✅ Eccellente | `api.ts:74-114`: refresh silenzioso, coda richieste in attesa, logout su refresh fallito | — |
 | Copertura test | ⚠️ Dichiarata | ⚠️ Non enforced | ❌ Non enforced | `vite.config.ts` senza `coverage.thresholds`; nessun gate di build | Cifra "95%" non verificabile |
-| Error handling UI | ⚠️ Parziale | ⚠️ Parziale | ❌ Gap | Loading/error/empty states presenti nelle pagine principali | Nessun `ErrorBoundary` a livello route; un crash lazy-loaded biancha l'intera app |
+| Error handling UI | ✅ Buono | ✅ Adeguato | ⚠️ Parziale | Loading/error/empty states presenti; `ErrorBoundary` class component avvolge `<Suspense>/<Routes>` in `App.tsx` (commit `fc3e86c`) | Nessuna `ErrorBoundary` granulare per route singola; crash in provider Zustand non catturato |
 | i18n | ✅ Buono | ✅ Adeguato | ✅ Adeguato | 14 namespace, zero stringhe hardcoded da spot-check | — |
 
 ---
@@ -118,7 +118,7 @@ Questo è il rischio organizzativo numero uno prima della consegna.
 
 | Servizio | File test | Note |
 |---|---|---|
-| auth-service | 5 | AuthService, RefreshToken, UserMgmt (impl + controller) |
+| auth-service | 6 | AuthService, RefreshToken, UserMgmt (impl + controller), resetPassword (3 service + 3 controller test) |
 | guest-service | **2** | GuestServiceImpl (17 test), GuestController — il più sottile per un servizio PII |
 | inventory-service | 4 | RoomService, RoomType (impl + controller) |
 | reservation-service | 3 | ReservationService, Controller, DateRangeValidator |
@@ -163,7 +163,7 @@ una migration che compila ma rompe dati esistenti supera tutti i test unitari.
 |---|---|---|
 | `docs/INTERACTION_FLOWS.md` | ✅ OK | 12 flussi end-to-end con catene di chiamate inter-service |
 | `docs/SECURITY_AND_PRIVACY.md` | ✅ OK | 12 sezioni, PII classification, sanzioni GDPR/TULPS |
-| `docs/USER_MANUAL.md` | ✅ OK | 11 procedure operative, edge cases, glossario |
+| `docs/USER_MANUAL.md` | ✅ OK | 12 procedure operative (aggiunta §3.12 reset password; §3.8 esteso con submit PS manuale) — aggiornato 2026-05-15 |
 | `docs/I18N.md` | ✅ OK | 14 namespace, convenzioni chiavi, anti-hardcoding |
 | `docs/ALLOGGIATI_README.md` | ✅ OK | Integrazione SOAP PS documentata |
 | `docs/PILOT_READINESS_AUDIT.md` | ⚠️ WEAK | Afferma ">95% copertura backend" senza evidenza JaCoCo; non menziona Invoice @Version, LIKE search, assenza restart policy |
@@ -239,9 +239,8 @@ in `DECISIONS.md §1.2`, ma il codice non è cambiato. Con 10k ospiti: lento. Co
 `Invoice.java:82` — `@OneToMany(fetch = FetchType.LAZY)`. Nessun `@EntityGraph` in
 `InvoiceServiceImpl`. Non rilevabile con Mockito.
 
-**M3 — Nessun ErrorBoundary React a livello route**  
-Un componente lazy-loaded che lancia un'eccezione non catturata crasha l'intera SPA.
-Nessun fallback UI.
+~~**M3 — Nessun ErrorBoundary React a livello route**~~  
+✅ **Risolto** (commit `fc3e86c`) — `ErrorBoundary.tsx` class component avvolge `<Suspense>` in `App.tsx`. Fallback UI con messaggio utente + pulsante reload. 4 Vitest test. Residuale: nessuna boundary granulare per singola route.
 
 **M4 — Nessuna alert rule Prometheus/Grafana**  
 Stack osservabilità presente (Prometheus + Grafana + Loki), ma nessuna regola di alerting.

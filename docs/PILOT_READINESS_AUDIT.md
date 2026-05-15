@@ -1,7 +1,7 @@
 # Audit Tecnico-Funzionale — Hotel PMS Pilot Readiness
 
 **Data audit iniziale:** 2026-05-05  
-**Ultimo aggiornamento:** 2026-05-07  
+**Ultimo aggiornamento:** 2026-05-15  
 **Branch analizzato:** `feature/frontend-development`  
 **Scope:** Valutazione completa della readiness per pilot con albergatori reali
 
@@ -67,7 +67,7 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 | **Configurazione hotel** | ✅ Completo | Profilo hotel con nome, indirizzo, PIVA/CF, logo, toggle `alloggiatiAutoSend`. |
 | **Autenticazione** | ✅ Completo | Login, refresh token silenzioso, logout, cambio password, `mustChangePassword` con blocco. JWT access 15min, refresh 7gg. |
 | **Autorizzazione** | 🟡 Parziale | RBAC con ruoli ADMIN/OWNER/RECEPTIONIST. Route-level enforcement nel gateway per le route admin. `@PreAuthorize` su endpoint amministrativi. Residuale: enforcement non esaustivo su tutti i singoli endpoint di ogni microservizio. |
-| **Gestione utenti** | ✅ Completo | Pagina `/admin/users` (solo ADMIN): lista, crea, disattiva/riattiva account. |
+| **Gestione utenti** | ✅ Completo | Pagina `/admin/users` (solo ADMIN/OWNER): lista, crea, disattiva/riattiva account, reset password con invalidazione sessioni (tokenVersion++). |
 
 ---
 
@@ -146,6 +146,10 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 9. ✅ **Test CalendarPlanning e Rooms** — unit test aggiunti (`8913029`)
 10. ✅ **Profilo hotel configurabile** — nome, indirizzo, PIVA/CF, logo, toggle Alloggiati (`f053531`, `a849107`)
 11. ✅ **Documentazione utente** — `docs/USER_MANUAL.md`, `docs/INTERACTION_FLOWS.md`, `docs/SECURITY_AND_PRIVACY.md`
+12. ✅ **G4 — Dashboard valuta EUR** — corretta `currency: 'USD'` → `'EUR'` con locale `it-IT` (`4fd7b06`)
+13. ✅ **G8 — ErrorBoundary React** — class component avvolge `<Suspense>` in `App.tsx`; fallback UI con reload; 4 Vitest test (`fc3e86c`)
+14. ✅ **G1 — Submit Alloggiati UI** — pulsante "Invia a Questura" (ADMIN/OWNER) in Soggiorni con confirmation dialog, loading state, toast EN/IT (`7219b30`)
+15. ✅ **G3 — Reset password utente** — `PATCH /users/{id}/reset-password` (ADMIN/OWNER) con encode Argon2id, `mustChangePassword=true`, `tokenVersion++`, Redis invalidation; `ResetPasswordModal` nel frontend (`4e6a7f4`, `6f9dfe9`)
 
 ### Pendenti ⏳
 
