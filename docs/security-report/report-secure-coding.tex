@@ -1,8 +1,9 @@
-\documentclass[a4paper,12pt]{report}
+﻿\documentclass[a4paper,12pt]{report}
 
 % ─── Codifica e lingua ───────────────────────────────────────────────────────
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
+\usepackage{lmodern}
 \usepackage[italian]{babel}
 \usepackage{float}
 
@@ -42,6 +43,7 @@
 
 % ─── Listings ────────────────────────────────────────────────────────────────
 \usepackage{listings}
+\usepackage{listingsutf8}
 
 % Stile Java (identico a J-Pou)
 \lstdefinestyle{java}{
@@ -56,10 +58,9 @@
   showstringspaces=false,
   frame=single,
   breaklines=true,
+  breakatwhitespace=false,
+  columns=flexible,
   postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
-  numbers=left,
-  numberstyle=\tiny\color{tsgray},
-  numbersep=5pt,
 }
 
 % Stile TypeScript / JavaScript
@@ -74,10 +75,9 @@
   showstringspaces=false,
   frame=single,
   breaklines=true,
+  breakatwhitespace=false,
+  columns=flexible,
   postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
-  numbers=left,
-  numberstyle=\tiny\color{tsgray},
-  numbersep=5pt,
 }
 
 % Stile YAML / Properties
@@ -91,10 +91,9 @@
   showstringspaces=false,
   frame=single,
   breaklines=true,
+  breakatwhitespace=false,
+  columns=flexible,
   postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
-  numbers=left,
-  numberstyle=\tiny\color{tsgray},
-  numbersep=5pt,
 }
 
 % Stile SQL
@@ -109,10 +108,9 @@
   showstringspaces=false,
   frame=single,
   breaklines=true,
+  breakatwhitespace=false,
+  columns=flexible,
   postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
-  numbers=left,
-  numberstyle=\tiny\color{tsgray},
-  numbersep=5pt,
 }
 
 % Stile Bash / Shell
@@ -127,10 +125,9 @@
   showstringspaces=false,
   frame=single,
   breaklines=true,
+  breakatwhitespace=false,
+  columns=flexible,
   postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
-  numbers=left,
-  numberstyle=\tiny\color{tsgray},
-  numbersep=5pt,
 }
 
 % Definizione linguaggio JavaScript/TypeScript (non incluso in tutte le versioni di listings)
@@ -147,12 +144,25 @@
   morestring=[b]`
 }
 
-% Stile predefinito
-\lstset{style=java}
+% Stile predefinito + UTF-8 + mapping caratteri non-ASCII nei listing
+\lstset{
+  style=java,
+  inputencoding=utf8/latin1,
+  extendedchars=true,
+  literate={—}{{---}}1
+           {→}{{$\to$}}1
+           {←}{{$\leftarrow$}}1
+           {↵}{{$\hookleftarrow$}}1
+           {à}{{\`a}}1 {è}{{\`e}}1 {é}{{\'e}}1
+           {ì}{{\`i}}1 {ò}{{\`o}}1 {ù}{{\`u}}1
+           {À}{{\`A}}1 {È}{{\`E}}1
+           {ó}{{\'o}}1 {ú}{{\'u}}1
+           {─}{{\textemdash}}1
+}
 
 % ─── Ambienti personalizzati ─────────────────────────────────────────────────
 \usepackage{tcolorbox}
-\tcbuselibrary{skins, breakable}
+\tcbuselibrary{skins, breakable, listings}
 
 % Box codice INSICURO (sfondo rosso chiaro)
 \newtcolorbox{insecurebox}[1][]{
@@ -183,10 +193,23 @@
   breakable,
 }
 
+% ─── Overflow prevention ─────────────────────────────────────────────────────
+\usepackage[protrusion=true,expansion=false]{microtype}
+\setlength{\emergencystretch}{3em}
+\usepackage[hyphens]{url}
+\usepackage{seqsplit}
+
+% ─── Layout e tipografia avanzata ────────────────────────────────────────────
+\usepackage{csquotes}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{caption}
+
 % ─── Hyperref ────────────────────────────────────────────────────────────────
 \usepackage{hyperref}
 \usepackage[all]{hypcap}
-\usepackage{url}
+\usepackage[italian]{cleveref}
 
 \hypersetup{
     colorlinks=true,
@@ -213,13 +236,33 @@
 % Threat ID inline
 \newcommand{\threat}[1]{\texttt{\small\textcolor{vulnred}{[#1]}}}
 
-% ─── Metadati documento ──────────────────────────────────────────────────────
-\title{%
-  \textbf{Progetto di Secure Coding} \\[0.5em]
-  \large Analisi delle vulnerabilità e hardening di un \\
-  Property Management System per hotel \\[1em]
-  \normalsize Corso di Sicurezza — A.A. 2025/26
+% ─── Fix: \subtitle e \subsubtitle non definiti dalla classe report ──────────
+\makeatletter
+\newcommand{\subtitle}[1]{\gdef\@subtitle{#1}}
+\newcommand{\subsubtitle}[1]{\gdef\@subsubtitle{#1}}
+\gdef\@subtitle{}
+\gdef\@subsubtitle{}
+\renewcommand{\maketitle}{%
+  \begin{titlepage}
+    \centering
+    \vspace*{3.5cm}
+    {\LARGE\bfseries\@title}\par\bigskip
+    \ifx\@subtitle\empty\else{\large\@subtitle}\par\medskip\fi
+    \ifx\@subsubtitle\empty\else{\normalsize\@subsubtitle}\par\fi
+    \vspace{2cm}
+    {\large\@author\par}
+    \vspace{0.5cm}
+    {\normalsize\@date\par}
+    \vfill
+  \end{titlepage}
+  \setcounter{page}{1}
 }
+\makeatother
+
+% ─── Metadati documento ──────────────────────────────────────────────────────
+\title{\textbf{Progetto di Secure Coding}}
+\subtitle{Analisi delle vulnerabilità e hardening di \\ Hotel PMS}
+\subsubtitle{Property Management System per hotel}
 \author{Diego Andruccioli}
 \date{A.A. 2025/26}
 
@@ -233,7 +276,7 @@
 
 Questa relazione documenta il processo di analisi della sicurezza e di \textit{hardening} applicato
 a \textbf{Hotel PMS}, un sistema gestionale per la gestione alberghiera sviluppato come progetto
-personale e utilizzato come base per questo elaborato del corso di Sicurezza.
+personale e utilizzato come base per questo elaborato del corso di \textit{Laboratorio di Sicurezza dei Sistemi e Privacy}.
 
 \par\medskip
 
@@ -245,9 +288,9 @@ JWT, dati personali di ospiti (PII), prenotazioni, fatture e report obbligatori 
 \par\medskip
 
 Il documento segue l'approccio richiesto dalla traccia d'esame: partendo dalla baseline del codice
-originale (branch \texttt{main}), identifica le vulnerabilità tramite analisi statica e threat
-modeling STRIDE, le mappa rispetto all'OWASP Top 10 2021, e descrive per ciascuna l'intervento
-di mitigazione applicato sul branch \texttt{feature/secure-coding-hardening}, mostrando i diff
+originale (branch \texttt{pre-secure-coding}), identifica le vulnerabilità tramite analisi statica e threat
+modeling STRIDE, le mappa rispetto all'OWASP Top 10 2025, e descrive per ciascuna l'intervento
+di mitigazione applicato sul branch \texttt{main}, mostrando i diff
 rilevanti del codice prima e dopo l'hardening.
 
 \par\medskip
@@ -329,18 +372,18 @@ L'applicazione soddisfa tutti i requisiti minimi obbligatori indicati dalla trac
 \section{Metodologia di analisi}
 
 L'analisi delle vulnerabilità segue la metodologia \textbf{STRIDE} di Microsoft, con mappatura
-rispetto all'\textbf{OWASP Top 10 2021}. Le vulnerabilità identificate sono documentate nel file
+rispetto all'\textbf{OWASP Top 10 2025}. Le vulnerabilità identificate sono documentate nel file
 \texttt{THREAT\_MODEL.md} del repository e tracciate nella tabella di mitigazione che evolve
 con ogni commit di hardening.
 
-Il branch \texttt{main} rappresenta la \textbf{baseline} (codice originale), mentre il branch
-\texttt{feature/secure-coding-hardening} contiene tutti gli interventi di messa in sicurezza.
+Il branch \texttt{pre-secure-coding} rappresenta la \textbf{baseline} (codice originale), mentre il branch
+\texttt{main} contiene tutti gli interventi di messa in sicurezza.
 
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Analisi della Baseline Insicura}
 % ═════════════════════════════════════════════════════════════════════════════
 
-Questo capitolo documenta le vulnerabilità rilevate nel codice del branch \texttt{main}
+Questo capitolo documenta le vulnerabilità rilevate nel codice del branch \texttt{pre\-secure\-coding}
 (baseline), organizzate per area tematica. Per ciascuna categoria viene presentata
 un'analisi del pattern insicuro con i relativi snippet. I dettagli completi di ogni
 intervento di mitigazione --- con codice pre/post e riferimento al commit ---
@@ -354,23 +397,23 @@ sono nel Capitolo~3 (Implementazione del Secure Coding).
 \toprule
 \textbf{ID} & \textbf{OWASP} & \textbf{Descrizione} & \textbf{Impatto} \\
 \midrule
-T-AUTH-01 & A07 & User Enumeration al login & ALTO \\
-T-AUTH-02 & A07 & Brute Force senza protezione & CRITICO \\
-T-AUTH-03 & A02 & Gestione password (hashing) & CRITICO \\
-T-AUTH-04 & A07 & Refresh Token senza revoca & ALTO \\
-T-GW-01   & A01 & Header X-Auth iniettabili & CRITICO \\
-T-GW-03   & A05 & Assenza security headers HTTP & MEDIO \\
-T-GW-04   & A05 & CORS misconfiguration: allowedHeaders wildcard & ALTO \\
-T-GW-05   & A01 & Assenza protezione CSRF & ALTO \\
-T-GST-01  & A01 & IDOR su ospiti (hotel\_id) & CRITICO \\
-T-GST-03  & A01 & Multi-tenant leak PII ospiti & CRITICO \\
-T-RES-01  & A04 & Double booking (no date lock) & CRITICO \\
-T-FB-02   & A04 & Prezzi non ricalcolati server-side & CRITICO \\
-T-CFG-01  & A05 & Actuator esposti & CRITICO \\
-T-CFG-02  & A02 & Segreti in chiaro & CRITICO \\
-T-FE-01   & A03 & Assenza guard statico XSS (dangerouslySetInnerHTML) & ALTO \\
-T-FE-03   & A01 & Route guard solo lato client & MEDIO \\
-T-FE-04   & A05 & Assenza CSP & ALTO \\
+T-AUTH-01 & A07:2025 & User Enumeration al login & ALTO \\
+T-AUTH-02 & A07:2025 & Brute Force senza protezione & CRITICO \\
+T-AUTH-03 & A04:2025 & Gestione password (hashing) & CRITICO \\
+T-AUTH-04 & A07:2025 & Refresh Token senza revoca & ALTO \\
+T-GW-01   & A01:2025 & Header X-Auth iniettabili & CRITICO \\
+T-GW-03   & A02:2025 & Assenza security headers HTTP & MEDIO \\
+T-GW-04   & A02:2025 & CORS misconfiguration: allowedHeaders wildcard & ALTO \\
+T-GW-05   & A01:2025 & Assenza protezione CSRF & ALTO \\
+T-GST-01  & A01:2025 & IDOR su ospiti (hotel\_id) & CRITICO \\
+T-GST-03  & A01:2025 & Multi-tenant leak PII ospiti & CRITICO \\
+T-RES-01  & A06:2025 & Double booking (no date lock) & CRITICO \\
+T-FB-02   & A06:2025 & Prezzi non ricalcolati server-side & CRITICO \\
+T-CFG-01  & A02:2025 & Actuator esposti & CRITICO \\
+T-CFG-02  & A04:2025 & Segreti in chiaro & CRITICO \\
+T-FE-01   & A05:2025 & Assenza guard statico XSS (dangerouslySetInnerHTML) & ALTO \\
+T-FE-03   & A01:2025 & Route guard solo lato client & MEDIO \\
+T-FE-04   & A02:2025 & Assenza CSP & ALTO \\
 \bottomrule
 \end{tabularx}
 \caption{Riepilogo vulnerabilità identificate nella baseline}
@@ -382,11 +425,11 @@ T-FE-04   & A05 & Assenza CSP & ALTO \\
 % ─────────────────────────────────────────────────────────────────────────────
 
 L'analisi della baseline ha rilevato tre vulnerabilità nell'area dell'autenticazione,
-classificabili OWASP A02 e A07, per un impatto complessivo da \textbf{alto} a
+classificabili OWASP A04:2025 e A07:2025, per un impatto complessivo da \textbf{alto} a
 \textbf{critico}.
 
 \paragraph{T-AUTH-02 — Assenza di protezione al Brute Force}
-Il metodo \texttt{login()} in \texttt{AuthServiceImpl} non manteneva alcun contatore
+Il metodo \texttt{login()} in \\ \texttt{AuthServiceImpl} non manteneva alcun contatore
 di tentativi falliti né implementava alcun meccanismo di lockout applicativo.
 Un attaccante poteva eseguire un attacco a dizionario sull'endpoint \texttt{POST /api/v1/auth/login}
 senza limitazioni di sorta: il rate limiting del gateway (5~req/s per IP) costituiva l'unica
@@ -435,14 +478,14 @@ emesso, il JWT rimaneva valido fino alla scadenza naturale anche dopo il logout 
 dopo una compromissione rilevata o in seguito a un cambio di credenziali.
 L'unica azione di ``logout'' era cancellare il cookie lato client, ma il token continuava
 a essere accettato dal gateway per tutta la sua durata residua.
-Classificato OWASP A07 --- Identification \& Authentication Failures.
+Classificato OWASP A07 --- Authentication Failures.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Validazione degli Input}
 % ─────────────────────────────────────────────────────────────────────────────
 
 La baseline presentava quattro aree di mancata validazione server-side, classificabili
-OWASP A03 e A04, che aprivano la via a injection, manipolazione dei prezzi e
+OWASP A05:2025 e A06:2025, che aprivano la via a injection, manipolazione dei prezzi e
 corruzione dei dati di prenotazione.
 
 \paragraph{T-GST-02 — Assenza di vincoli di formato sui dati ospite}
@@ -486,7 +529,7 @@ semanticamente errata che poteva ignorare conflitti reali.
 direttamente dalla richiesta HTTP. Il servizio si fidava del prezzo dichiarato dal client
 anziché consultare il catalogo server-side, consentendo a un utente di creare ordini con
 importi arbitrari (incluso zero o negativi) e di alterare il nome degli articoli.
-Classificato OWASP A04 --- Insecure Design.
+Classificato OWASP A06:2025 --- Insecure Design.
 
 \paragraph{T-BILL-02 — Assenza di validazione degli importi pagamento}
 \texttt{PaymentRequest} non vincolava il campo \texttt{amount} con \texttt{@Digits} né
@@ -565,13 +608,13 @@ Tuttavia, \texttt{ProtectedRoute} non verificava il ruolo: un utente con ruolo
 ricevendo dati o form riservati ad \texttt{ADMIN}/\texttt{OWNER}.
 Classificato OWASP A01 --- Broken Access Control (frontend enforcement only).
 
-\paragraph{T-RES-01 — Double Booking (assenza di lock concorrente)}
-\texttt{ReservationServiceImpl.createReservation()} eseguiva un controllo di overlap
+\paragraph{T-RES-01 — Double Booking (assenza di lock concorrente)}\mbox{}\\
+\texttt{\seqsplit{ReservationServiceImpl.createReservation()}} eseguiva un controllo di overlap
 sulle date di prenotazione, ma senza \emph{pessimistic locking} sulla query.
 In condizioni di concorrenza (due richieste simultanee per la stessa camera e le
 stesse date) entrambe le transazioni potevano superare il controllo e inserire due
 prenotazioni in conflitto, violando il requisito di unicità operativa.
-Classificato OWASP A04 --- Insecure Design.
+Classificato OWASP A06:2025 --- Insecure Design.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione delle Sessioni}
@@ -624,7 +667,7 @@ l'invio automatico del cookie da parte del browser.
 La baseline presentava sei categorie di misconfiguration, alcune con impatto critico
 (segreti in chiaro, actuator esposti), altre con impatto medio-alto (rate limiting
 parziale, assenza di header HTTP, CORS permissivo, mancanza di CSP).
-Classificate prevalentemente OWASP A05 --- Security Misconfiguration.
+Classificate prevalentemente OWASP A02:2025 --- Security Misconfiguration.
 
 \paragraph{T-CFG-01 — Endpoint \texttt{/actuator} esposti sulla porta applicativa}
 Tutti e 9 i microservizi pubblicavano gli endpoint Spring Boot Actuator
@@ -641,8 +684,8 @@ Due categorie di segreti erano presenti in chiaro nel repository:
 \begin{enumerate}
   \item Il fallback hardcoded nella proprietà \texttt{jwt.secret} in
         \texttt{auth-service.yml} e in \texttt{@Value} di \texttt{api-gateway/JwtUtil.java}:
-        entrambi contenevano la stringa Base64 nota
-        \texttt{bXktMzItYnl0ZS1zZWNyZXQta2V5LWZvci10ZXN0LWxvY2FsLWRldi0xMjM0NQ==}.
+        entrambi contenevano la stringa Base64 nota \\
+        \texttt{\seqsplit{bXktMzItYnl0ZS1zZWNyZXQta2V5LWZvci10ZXN0LWxvY2FsLWRldi0xMjM0NQ==}}.
         Se la variabile d'ambiente \texttt{JWT\_SECRET} non veniva impostata, il servizio
         avviava silenziosamente con questo segreto debole, permettendo a chiunque
         conosca il repository di forgiare JWT validi.
@@ -671,7 +714,7 @@ Qualsiasi processo raggiungibile sulla porta \texttt{8888} della rete Docker pot
 ottenere la configurazione completa di ogni microservizio con una semplice richiesta GET.
 
 \paragraph{T-GW-02 — Rate limiting applicato solo alla route \texttt{/auth}}
-Nella baseline il \texttt{RequestRateLimiter} era configurato esclusivamente sulla
+Nella baseline il \\ \texttt{RequestRateLimiter} era configurato esclusivamente sulla
 route di autenticazione (\texttt{/api/v1/auth/**}). Le sei route di business
 (\texttt{/guests}, \texttt{/reservations}, \texttt{/stays}, \texttt{/invoices},
 \texttt{/fb}, \texttt{/rooms}) non avevano alcun limite di frequenza,
@@ -700,7 +743,7 @@ Nella baseline nessun servizio emetteva log strutturati per gli eventi sensibili
 tentativi di login (riusciti e falliti), check-in/check-out e transazioni di pagamento
 avvenivano senza traccia applicativa. In uno scenario di incidente o frode, l'assenza
 di audit trail avrebbe reso impossibile ricostruire la sequenza degli eventi.
-Classificato OWASP A09 --- Security Logging \& Monitoring Failures.
+Classificato OWASP A09:2025 --- Security Logging \& Alerting Failures.
 
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Implementazione del Secure Coding}
@@ -736,9 +779,9 @@ Classificato OWASP A09 --- Security Logging \& Monitoring Failures.
 % \paragraph{Riferimento} Commit: \commitref{SHA}{messaggio commit}
 
 % ── Nota sui threat già mitigati nella baseline ──────────────────────────────
-\begin{notebox}[title={Mitigazioni presenti nella baseline (branch \texttt{main})}]
+\begin{notebox}[title={Mitigazioni presenti nella baseline (branch \texttt{pre-secure-coding})}]
 Le vulnerabilità \textbf{T-AUTH-01}, \textbf{T-GW-01} e \textbf{T-FE-02} risultano già
-mitigate nel codice del branch \texttt{main} (baseline). Tali protezioni sono state introdotte
+mitigate nel codice del branch \texttt{pre-secure-coding} (baseline). Tali protezioni sono state introdotte
 consapevolmente durante la fase di sviluppo iniziale, non come hardening successivo.
 Le sezioni seguenti documentano il pattern insicuro che è stato evitato, a dimostrazione
 della consapevolezza del rischio durante la progettazione.
@@ -750,7 +793,7 @@ della consapevolezza del rischio durante la progettazione.
 Un endpoint di login che restituisce messaggi di errore differenziati (es.\
 \texttt{"USER\_NOT\_FOUND"} vs \texttt{"INVALID\_PASSWORD"}) consente a un attaccante
 di enumerare gli username validi tramite una scansione automatizzata.
-Classificato OWASP A07 --- Identification \& Authentication Failures.
+Classificato OWASP A07 --- Authentication Failures.
 
 \begin{insecurebox}[title={Pattern Vulnerabile Evitato --- AuthServiceImpl.java}]
 \begin{lstlisting}[style=java]
@@ -815,7 +858,7 @@ SecurityContextHolder.getContext().setAuthentication(
 \end{insecurebox}
 
 \paragraph{Mitigazione applicata (baseline)}
-Il gateway firma ogni richiesta con \texttt{HMAC-SHA256(secret, "username:role")} e
+Il gateway firma ogni richiesta con \\ \texttt{HMAC-SHA256(secret, "username:role")} e
 inietta la firma in \texttt{X-Internal-Signature}. L'\texttt{InternalAuthFilter}
 presente in ogni microservizio ricalcola la firma e la confronta con
 \texttt{MessageDigest.isEqual} (confronto constant-time, immune a timing attack)
@@ -841,7 +884,7 @@ if (!isSignatureValid(username, role, signature)) {
 \end{lstlisting}
 \end{securebox}
 
-\paragraph{Riferimento} Presente nella baseline --- \texttt{guest-service/.../InternalAuthFilter.java}
+\paragraph{Riferimento} Presente nella baseline --- \path{guest-service/.../InternalAuthFilter.java}
 (replicato in tutti i microservizi).
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -851,7 +894,7 @@ if (!isSignatureValid(username, role, signature)) {
 Memorizzare il token di sessione in \texttt{localStorage} lo rende leggibile da qualsiasi
 script JavaScript eseguito nella pagina, incluso codice iniettato via XSS. Un attaccante
 può estrarlo con \texttt{localStorage.getItem('jwt')} ed eseguire richieste autenticate
-su server arbitrari. Classificato OWASP A02 --- Cryptographic Failures / A07.
+su server arbitrari. Classificato OWASP A04:2025 --- Cryptographic Failures / A07.
 
 \begin{insecurebox}[title={Pattern Vulnerabile Evitato --- gestione token frontend}]
 \begin{lstlisting}[style=typescript]
@@ -894,11 +937,11 @@ private ResponseCookie createCookie(String value, int maxAge) {
 L'assenza di un meccanismo di account lockout consente attacchi a dizionario o brute
 force sull'endpoint di login senza limitazioni applicative. Il rate limiting del gateway
 (5 req/s per IP) è insufficiente contro attacchi distribuiti da IP multipli. Classificato
-OWASP A07 --- Identification \& Authentication Failures.
+OWASP A07 --- Authentication Failures.
 
 La baseline non implementava alcun contatore di tentativi falliti:
 
-\begin{insecurebox}[title={Codice Vulnerabile --- AuthServiceImpl.java (baseline, branch \texttt{main})}]
+\begin{insecurebox}[title={Codice Vulnerabile --- AuthServiceImpl.java (baseline, branch \texttt{pre-secure-coding})}]
 \begin{lstlisting}[style=java]
 @Transactional(readOnly = true)
 public AuthResponse login(LoginRequest request) {
@@ -930,9 +973,9 @@ Il metodo \texttt{login()} è stato esteso con una politica di lockout progressi
 \end{itemize}
 
 La Flyway migration \texttt{V2\_\_add\_login\_lockout.sql} aggiunge le colonne
-\texttt{failed\_attempts} e \texttt{locked\_until} alla tabella \texttt{user\_account}.
+\\ \texttt{failed\_attempts} e \texttt{locked\_until} alla tabella \texttt{user\_account}.
 
-\begin{securebox}[title={Codice Sicuro --- AuthServiceImpl.java (feature/secure-coding-hardening)}]
+\begin{securebox}[title={Codice Sicuro --- AuthServiceImpl.java (main)}]
 \begin{lstlisting}[style=java]
 private static final int MAX_FAILED_ATTEMPTS = 5;
 private static final Duration LOCKOUT_DURATION = Duration.ofMinutes(15);
@@ -981,11 +1024,11 @@ ALTER TABLE user_account
 
 \paragraph{Test} Aggiunti 4 test in \texttt{AuthServiceImplTest}:
 \texttt{loginThrowsWhenAccountIsLocked},
-\texttt{loginIncrementsFailedAttemptsOnWrongPassword},
+\texttt{loginIncrementsFailedAttemptsOnWrongPassword}, \\
 \texttt{loginLocksAccountAfterMaxFailedAttempts},
 \texttt{loginResetsCounterOnSuccess}.
 
-\paragraph{Riferimento} Commit: \commitref{a90e462}{security(auth): add account lockout for brute-force protection (T-AUTH-02)}
+\paragraph{Riferimento} Commit: \commitref{a90e462}{security(auth): add account lockout for brute-force \\ protection (T-AUTH-02)}
 
 \subsection{Sicurezza Hashing Password \threat{T-AUTH-03}}
 
@@ -997,7 +1040,7 @@ La configurazione originale usava \texttt{new BCryptPasswordEncoder()} senza arg
 che corrisponde al valore di default \textbf{10} (circa 100\,ms su hardware del 2013).
 L'OWASP Authentication Cheat Sheet raccomanda un cost factor minimo di \textbf{10} e
 preferibilmente \textbf{12} per hardware contemporaneo (\(\approx\)400\,ms per hash).
-Classificato OWASP A02 --- Cryptographic Failures.
+Classificato OWASP A04:2025 --- Cryptographic Failures.
 
 Un secondo problema correlato è l'\textbf{assenza di rehash progressivo}: anche dopo
 aver alzato il cost factor, gli hash esistenti nel database rimangono con il vecchio valore
@@ -1036,7 +1079,7 @@ Sono stati applicati due interventi distinti e complementari:
   \item \textbf{Upgrade cost factor a 12} in \texttt{SecurityConfig}: tutti i nuovi hash
         (registrazione + rehash) vengono calcolati con strength 12, che corrisponde a circa
         400\,ms su hardware contemporaneo, allineandosi alla raccomandazione OWASP.
-  \item \textbf{Lazy rehash on login}: ad ogni login riuscito, il metodo
+  \item \textbf{Lazy rehash on login}: ad ogni login riuscito, il metodo \\
         \texttt{passwordEncoder.upgradeEncoding(storedHash)} verifica se l'hash corrente
         è stato calcolato con un cost factor inferiore a quello configurato.
         Se sì, la password in chiaro (disponibile solo in questo momento) viene ricalcolata
@@ -1080,11 +1123,13 @@ if (needsRehash || needsReset) {
 \end{lstlisting}
 \end{securebox}
 
-\paragraph{Test} Aggiunti 2 test in \texttt{AuthServiceImplTest}:
+\paragraph{Test} Aggiunti 2 test in \texttt{AuthServiceImplTest}: \\
 \texttt{loginRehashesPasswordWhenEncodingNeedsUpgrade} (verifica che il nuovo hash venga
-persistito quando \texttt{upgradeEncoding} restituisce \texttt{true}) e
-\texttt{loginSkipsRehashWhenEncodingIsUpToDate} (verifica che nessuna \texttt{save}
+persistito quando \texttt{upgradeEncoding} restituisce \texttt{true}) e\\
+\texttt{\seqsplit{loginSkipsRehashWhenEncodingIsUpToDate}} (verifica che nessuna \texttt{save}
 venga eseguita quando l'hash è già aggiornato e i tentativi falliti sono zero).
+
+\paragraph{Riferimento SEI CERT} La mitigazione applica la regola \textbf{MSC62-J} del SEI CERT Java Coding Standard: \emph{``Store passwords using a hash function specifically designed for the purpose''}. BCrypt con cost~12 è la scelta corretta per il 2025/26 secondo OWASP; MD5 e SHA-1 (funzioni general-purpose) non sono accettabili.
 
 \paragraph{Riferimento} Commit: \commitref{4e1f1e9}{fix(security): T-AUTH-03 — BCrypt cost 12 + lazy rehash on login on auth-service}
 
@@ -1096,7 +1141,7 @@ revoca. Un token intercettato (es.\ via XSS o man-in-the-middle su HTTP) rimanev
 l'intera finestra temporale, senza alcuna possibilità di invalidarlo lato server. L'assenza di
 \textit{token rotation} aggravava il problema: un refresh token mai revocato poteva essere riutilizzato
 a tempo indeterminato, anche dopo il logout esplicito dell'utente.
-Classificato OWASP A07 --- Identification \& Authentication Failures.
+Classificato OWASP A07 --- Authentication Failures.
 
 \begin{insecurebox}[title={Codice Vulnerabile --- JwtService.java + AuthController.java (baseline)}]
 \begin{lstlisting}[style=java]
@@ -1252,13 +1297,13 @@ api.interceptors.response.use(
 \end{securebox}
 
 \paragraph{Test} Aggiunti 6 test in \texttt{AuthServiceImplTest}:
-\texttt{refreshSuccessIssuesNewTokenPair} (verifica rotation e blacklist del JTI consumato),
+\texttt{refreshSuccessIssuesNewTokenPair} (verifica rotation e blacklist del JTI consumato), \\
 \texttt{refreshThrowsWhenTokenIsNotRefreshType},
-\texttt{refreshThrowsWhenJtiIsBlacklisted},
+\texttt{refreshThrowsWhenJtiIsBlacklisted},\\
 \texttt{refreshThrowsWhenUserNotFound},
-\texttt{invalidateRefreshTokenBlacklistsValidToken},
+\texttt{invalidateRefreshTokenBlacklistsValidToken},\\
 \texttt{invalidateRefreshTokenSilentlyHandlesInvalidToken}.
-Aggiunti 5 test in \texttt{RefreshTokenServiceImplTest} che verificano il comportamento
+Aggiunti 5 test in \\ \texttt{RefreshTokenServiceImplTest} che verificano il comportamento
 della blacklist Redis (store con TTL, skip su token già scaduto, lookup true/false/null).
 
 \paragraph{Effetto}
@@ -1282,7 +1327,7 @@ un dispositivo rubato o da un cookie leak) poteva continuare a ruotarlo per
 \textbf{7 giorni}, ottenendo nuovi access token validi anche dopo che la vittima
 aveva aggiornato la password. Il sistema non possedeva alcun meccanismo per
 correlare un token in volo con la ``generazione'' di credenziali corrente.
-Classificato OWASP A07 --- Identification \& Authentication Failures.
+Classificato OWASP A07 --- Authentication Failures.
 
 \begin{insecurebox}[title={Codice Vulnerabile --- AuthServiceImpl.java (refresh senza controllo versione)}]
 \begin{lstlisting}[style=java]
@@ -1448,13 +1493,13 @@ Aggiunti 6 test tra \texttt{AuthServiceImplTest} e \texttt{RefreshTokenServiceIm
         password corrente errata blocchi il cambio.
   \item \texttt{changePasswordThrowsWhenUserNotFound}: verifica la gestione di utenti
         inesistenti.
-  \item \texttt{storeTokenVersionWritesCorrectKeyAndValue} e
+  \item \texttt{storeTokenVersionWritesCorrectKeyAndValue} e \\
         \texttt{getTokenVersionReturnsStoredValue} in \texttt{RefreshTokenServiceImplTest}.
 \end{itemize}
 
 \paragraph{Effetto}
 Dopo il cambio password, qualsiasi tentativo di ruotare un refresh token
-``pre-cambio'' viene respinto con HTTP~401 non appena il token giunge al
+``pre-cambio'' viene respinto con HTTP~401 non appena il token giunge al \\
 \texttt{POST /api/v1/auth/refresh}. La finestra di esposizione residua si riduce
 ai soli access token ancora in volo (massimo \textbf{15 minuti}), che scadono
 naturalmente. Il cambio password reimposta anche i cookie del browser della
@@ -1464,454 +1509,15 @@ al legittimo proprietario.
 \paragraph{Riferimento} Commit: \commitref{b473265}{fix(security): GAP-1 --- password change revokes existing sessions via tokenVersion}
 
 % ─────────────────────────────────────────────────────────────────────────────
-\section{Audit Log e Security Monitoring}
+\section{Audit Log e Security Monitoring \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
 % ─────────────────────────────────────────────────────────────────────────────
 
-\subsection{Audit log eventi di autenticazione \threat{T-AUTH-05}}
-% ─────────────────────────────────────────────────────────────────────────────
+\begin{notebox}[title={Nota metodologica --- Implementazioni AI-assisted}]
+Le implementazioni di questa sezione (T-AUTH-05, T-STAY-01, T-STAY-02, T-STAY-03, T-BILL-03) 
+sono state sviluppate con supporto di Claude AI. Il codice è funzionante e integrato nel sistema.
+La critica critica all'output dell'AI è documentata nell'Appendice~B.
+\end{notebox}
 
-\paragraph{Descrizione}
-In assenza di logging strutturato, qualsiasi attività sospetta sul sistema di
-autenticazione --- tentativi di brute force, account bloccati, login anomali ---
-rimane invisibile agli operatori e non lascia traccia auditabile. La categoria
-OWASP A09 (Security Logging \& Monitoring Failures) identifica questa lacuna
-come vettore che amplifica tutti gli altri attacchi, poiché impedisce sia il
-rilevamento in tempo reale sia l'analisi forense post-incidente.
-
-\begin{insecurebox}[title={Codice Vulnerabile --- AuthServiceImpl.java (baseline, nessun log)}]
-\begin{lstlisting}[style=java]
-// Tutti i rami di autenticazione erano silenti:
-// nessun log su login riuscito, fallimento password,
-// account bloccato o registrazione utente.
-
-public AuthResponse login(LoginRequest request) {
-    final UserAccount user = userRepository.findByUsername(request.username())
-            .orElseThrow(() -> new BadCredentialsException("INVALID_CREDENTIALS"));
-    // (nessun log su username non trovato)
-
-    if (user.getLockedUntil() != null && ...) {
-        throw new AccountLockedException("ACCOUNT_TEMPORARILY_LOCKED");
-        // (nessun log su tentativo su account bloccato)
-    }
-
-    if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-        // (nessun log su password errata / contatore tentativi)
-        throw new BadCredentialsException("INVALID_CREDENTIALS");
-    }
-    // (nessun log su login riuscito)
-    return new AuthResponse(jwtService.generateToken(...));
-}
-\end{lstlisting}
-\end{insecurebox}
-
-\begin{securebox}[title={Codice Sicuro --- AuthServiceImpl.java + AuthController.java}]
-\begin{lstlisting}[style=java]
-// AuthServiceImpl.java — @Slf4j via Lombok
-
-// Registrazione utente
-log.info("[AUTH] REGISTER_SUCCESS | user={}", user.getUsername());
-
-// Username non trovato
-.orElseThrow(() -> {
-    log.warn("[AUTH] LOGIN_FAILED | user={} | reason=USER_NOT_FOUND",
-            request.username());
-    return new BadCredentialsException("INVALID_CREDENTIALS");
-});
-
-// Tentativo su account bloccato
-log.warn("[AUTH] LOGIN_BLOCKED | user={} | reason=ACCOUNT_LOCKED | until={}",
-        user.getUsername(), user.getLockedUntil());
-
-// Password errata
-log.warn("[AUTH] LOGIN_FAILED | user={} | reason=BAD_PASSWORD | attempts={}",
-        user.getUsername(), newAttempts);
-
-// Account raggiunge soglia lockout
-log.warn("[AUTH] ACCOUNT_LOCKED | user={} | attempts={} | until={}",
-        user.getUsername(), newAttempts, user.getLockedUntil());
-
-// Login riuscito
-log.info("[AUTH] LOGIN_SUCCESS | user={}", user.getUsername());
-
-// AuthController.java — logout con estrazione username da cookie JWT
-@PostMapping("/logout")
-public ResponseEntity<Void> logout(
-        @CookieValue(name = "jwt", required = false) String token) {
-    if (token != null) {
-        try {
-            log.info("[AUTH] LOGOUT | user={}", jwtService.extractUsername(token));
-        } catch (JwtException | IllegalArgumentException e) {
-            log.info("[AUTH] LOGOUT | user=unknown (invalid token)");
-        }
-    }
-    return ResponseEntity.ok()
-            .header(HttpHeaders.SET_COOKIE, createCookie("", 0).toString())
-            .build();
-}
-\end{lstlisting}
-\end{securebox}
-
-\paragraph{Effetto}
-Ogni evento di sicurezza rilevante produce ora una riga di log strutturata con
-prefisso \texttt{[AUTH]}, livello \texttt{INFO} per i successi e \texttt{WARN}
-per i fallimenti. Il formato chiave/valore (pipe-separated) è direttamente
-consumabile da aggregatori di log (ELK, Loki, Splunk) per la creazione di alert
-su pattern anomali: picchi di \texttt{LOGIN\_FAILED}, eventi \texttt{ACCOUNT\_LOCKED}
-multipli, o accessi da orari inusuali. Il logout registra lo username estratto
-dal JWT prima che il cookie venga azzerato, garantendo la tracciabilità della
-sessione anche in uscita. Nessuna dipendenza aggiuntiva: implementazione basata
-su SLF4J + Lombok \texttt{@Slf4j}, già presente nel classpath.
-
-\paragraph{Riferimento} Commit: \commitref{ad441e9}{fix(security): T-AUTH-05 --- audit log for authentication events on auth-service}
-
-% ─────────────────────────────────────────────────────────────────────────────
-\subsection{Validazione stato prenotazione al check-in \threat{T-STAY-01}}
-% ─────────────────────────────────────────────────────────────────────────────
-
-\paragraph{Descrizione}
-L'operazione di check-in crea un soggiorno (\texttt{Stay}) a partire da un
-\texttt{reservationId} fornito dal client. Nel codice baseline, il servizio
-verificava soltanto che la prenotazione \emph{esistesse} (chiamata
-\texttt{ReservationClient.getReservationById}) senza esaminare il campo
-\texttt{status} restituito. Un operatore --- o un attaccante con accesso al token
-JWT --- poteva quindi effettuare il check-in su una prenotazione
-\texttt{CANCELLED}, \texttt{CHECKED\_OUT} o \texttt{NO\_SHOW}, bypassando la
-logica di stato del ciclo di vita e creando soggiorni fantasma nell'inventario.
-OWASP A04 (Insecure Design) inquadra questo difetto come assenza di un controllo
-di business logic server-side obbligatorio.
-
-\begin{insecurebox}[title={Codice Vulnerabile --- StayServiceImpl.java (baseline)}]
-\begin{lstlisting}[style=java]
-// Il risultato di getReservationById viene ignorato:
-// nessuna verifica del campo "status"
-reservationClient.getReservationById(request.reservationId());
-// Esecuzione prosegue anche se status = CANCELLED o CHECKED_OUT
-inventoryClient.getRoomById(request.roomId());
-final Stay newStay = stayMapper.toEntity(request);
-// ...salvataggio incondizionato
-stayRepository.save(newStay);
-\end{lstlisting}
-\end{insecurebox}
-
-\begin{securebox}[title={Codice Sicuro --- StayServiceImpl.java}]
-\begin{lstlisting}[style=java]
-private static final Set<String> CHECKIN_ALLOWED_STATUSES =
-        Set.of("CONFIRMED", "PARTIALLY_CHECKED_IN");
-
-// Dentro il blocco di validazione:
-final ReservationResponse reservation =
-        reservationClient.getReservationById(request.reservationId());
-if (!CHECKIN_ALLOWED_STATUSES.contains(reservation.status())) {
-    log.warn("[STAY] CHECK_IN_FAILED | reservationId={} "
-           + "| reason=INVALID_RESERVATION_STATUS | currentStatus={}",
-            request.reservationId(), reservation.status());
-    throw new IllegalStateException("INVALID_RESERVATION_STATUS");
-}
-// Solo se status == CONFIRMED o PARTIALLY_CHECKED_IN si procede
-inventoryClient.getRoomById(request.roomId());
-\end{lstlisting}
-\end{securebox}
-
-\paragraph{Test}
-Aggiunti 4 test in \texttt{StayServiceImplTest}:
-\texttt{shouldRejectCheckInWhenReservationIsCancelled},
-\texttt{shouldRejectCheckInWhenReservationIsCheckedOut},
-\texttt{shouldRejectCheckInWhenReservationIsNoShow} (tutti verificano che
-\texttt{IllegalStateException} venga lanciata e che \texttt{stayRepository.save}
-non venga mai invocato) e
-\texttt{shouldAllowCheckInWhenReservationIsPartiallyCheckedIn} (percorso positivo
-per prenotazioni multi-camera).
-
-\paragraph{Effetto}
-Solo prenotazioni in stato \texttt{CONFIRMED} o \texttt{PARTIALLY\_CHECKED\_IN}
-possono generare un soggiorno attivo. Il tentativo su qualsiasi altro stato
-(\texttt{CANCELLED}, \texttt{CHECKED\_OUT}, \texttt{NO\_SHOW}, \texttt{PENDING})
-produce HTTP 409 (già gestito da \texttt{GlobalExceptionHandler} per
-\texttt{IllegalStateException}) con \texttt{detail: INVALID\_RESERVATION\_STATUS},
-e il log WARN strutturato con prefisso \texttt{[STAY]} permette il monitoraggio
-di tentativi anomali in aggregatori di log.
-
-\paragraph{Riferimento} Commit: \commitref{250edd0}{fix(security): T-STAY-01 --- reservation status validation before check-in}
-
-% ─────────────────────────────────────────────────────────────────────────────
-\subsection{Audit log check-in / check-out \threat{T-STAY-02}}
-% ─────────────────────────────────────────────────────────────────────────────
-
-\paragraph{Descrizione}
-Le operazioni di check-in e check-out rappresentano i momenti operativi più
-critici del ciclo di soggiorno: abilitano l'accesso fisico alla struttura,
-attivano addebiti e modificano lo stato di camere e prenotazioni. In assenza di
-un audit trail strutturato, qualsiasi anomalia --- check-out con fattura non
-saldata, tentativo su soggiorno in stato errato, indisponibilità di un servizio
-esterno durante il check-in --- rimane invisibile a fini forensi. OWASP A09
-(Security Logging \& Monitoring Failures) classifica questa lacuna come
-amplificatore di tutti gli altri rischi operativi.
-
-\begin{insecurebox}[title={Codice Vulnerabile --- StayServiceImpl.java (baseline)}]
-\begin{lstlisting}[style=java]
-// checkIn: log generico, nessun evento strutturato
-log.info("Processing check-in for reservation: {}",
-        request.reservationId());
-// ...
-log.error("External validation failed during check-in: {}",
-        ex.getMessage());   // errore senza contesto audit
-// ...
-log.info("Check-in successful. Stay ID: {}", savedStay.getId());
-
-// checkOut: log generico, nessun dettaglio sulle eccezioni
-log.info("Processing check-out for stay ID: {}", stayId);
-// ...
-throw new IllegalStateException("INVALID_STAY_STATUS");   // silente
-// ...
-throw new BillingNotPaidException("BILLING_NOT_PAID");    // silente
-// ...
-log.info("Check-out successful for stay ID: {}", stayId);
-\end{lstlisting}
-\end{insecurebox}
-
-\begin{securebox}[title={Codice Sicuro --- StayServiceImpl.java}]
-\begin{lstlisting}[style=java]
-// CHECK_IN_FAILED: servizio esterno non raggiungibile
-log.warn("[STAY] CHECK_IN_FAILED | reservationId={} "
-       + "| reason=EXTERNAL_SERVICE_UNAVAILABLE | detail={}",
-        request.reservationId(), ex.getMessage());
-
-// CHECK_IN_SUCCESS: stayId + tutti gli identificatori chiave
-log.info("[STAY] CHECK_IN_SUCCESS | stayId={} | reservationId={}"
-       + " | guestId={} | roomId={}",
-        savedStay.getId(), savedStay.getReservationId(),
-        savedStay.getGuestId(), savedStay.getRoomId());
-
-// CHECK_OUT_FAILED: stato soggiorno non valido
-log.warn("[STAY] CHECK_OUT_FAILED | stayId={}"
-       + " | reason=INVALID_STATUS | currentStatus={}",
-        stayId, stay.getStatus());
-
-// CHECK_OUT_FAILED: fattura non saldata
-log.warn("[STAY] CHECK_OUT_FAILED | stayId={} | reservationId={}"
-       + " | reason=BILLING_NOT_PAID",
-        stayId, stay.getReservationId());
-
-// CHECK_OUT_SUCCESS: stayId + prenotazione + camera
-log.info("[STAY] CHECK_OUT_SUCCESS | stayId={} | reservationId={}"
-       + " | roomId={}",
-        stayId, stay.getReservationId(), stay.getRoomId());
-\end{lstlisting}
-\end{securebox}
-
-\paragraph{Test}
-Aggiunti 3 test in \texttt{StayServiceImplTest} (copertura del flusso checkOut
-in precedenza assente): \texttt{shouldCheckOutSuccessfully},
-\texttt{shouldThrowWhenCheckOutBillingNotPaid},
-\texttt{shouldThrowWhenCheckOutStayNotCheckedIn}.
-
-\paragraph{Effetto}
-Ogni evento operativo critico produce una riga strutturata con prefisso
-\texttt{[STAY]}, livello \texttt{INFO} per i successi e \texttt{WARN} per i
-fallimenti, con tutti gli identificatori rilevanti (stayId, reservationId,
-guestId, roomId). Il formato è direttamente filtrabile via
-\texttt{grep "[STAY]"} o in aggregatori di log per alert su anomalie operative
-(es.\ picchi di \texttt{CHECK\_OUT\_FAILED~BILLING\_NOT\_PAID}).
-
-\paragraph{Riferimento} Commit: \commitref{f2cb417}{fix(security): T-STAY-02 --- audit log for check-in/check-out events on stay-service}
-
-% ─────────────────────────────────────────────────────────────────────────────
-\subsection{Trasmissione sicura report Alloggiati via TLS \threat{T-STAY-03}}
-% ─────────────────────────────────────────────────────────────────────────────
-
-\paragraph{Descrizione}
-Il report Alloggiati contiene dati personali sensibili di ogni ospite ---
-nome, cognome, data di nascita, numero di documento, nazionalità --- ed è
-trasmesso al portale della Polizia di Stato (\texttt{alloggiatiweb.poliziadistato.it}).
-In assenza di verifica TLS, un attaccante in posizione Man-In-The-Middle (MITM)
-può intercettare il canale HTTPS e leggere o alterare il payload in transito.
-Il rischio si concretizza in tre scenari distinti: (1) intercettazione passiva
-dei PII trasmessi (Information Disclosure); (2) sostituzione del certificato
-server con uno self-signed non rilevata (MITM attivo); (3) invio delle
-credenziali di accesso al portale PS a un server impostato dall'attaccante.
-OWASP A02 (Cryptographic Failures) classifica esplicitamente l'assenza di
-verifica dei certificati TLS come vulnerabilità critica nella trasmissione
-di dati sensibili.
-
-\begin{insecurebox}[title={Scenario Vulnerabile --- RestTemplate senza verifica TLS}]
-\begin{lstlisting}[style=java]
-// Configurazione che disabilita la verifica del certificato TLS:
-// un attaccante puo' presentare qualsiasi certificato (anche scaduto
-// o self-signed) e il client lo accettera' senza eccezioni.
-SSLContext sslContext = SSLContextBuilder.create()
-    .loadTrustMaterial(null, (chain, authType) -> true)  // TrustAllCerts
-    .build();
-SSLConnectionSocketFactory csf =
-    new SSLConnectionSocketFactory(sslContext,
-        NoopHostnameVerifier.INSTANCE);           // hostname non verificato
-CloseableHttpClient httpClient =
-    HttpClients.custom().setSSLSocketFactory(csf).build();
-\end{lstlisting}
-\end{insecurebox}
-
-\paragraph{Mitigazione}
-La soluzione adottata sfrutta il comportamento predefinito di \texttt{RestTemplate}
-(\texttt{new RestTemplate()}) che utilizza il \textbf{JVM default SSL context},
-il quale:
-\begin{itemize}
-  \item verifica la catena di certificati del server rispetto al truststore JVM
-        (\texttt{cacerts}), includendo le CA pubblicamente riconosciute;
-  \item verifica che l'hostname del server corrisponda al CN o al SAN del
-        certificato (hostname verification);
-  \item rifiuta certificati self-signed, scaduti o revocati con
-        \texttt{SSLHandshakeException}.
-\end{itemize}
-Nessun \texttt{TrustManager} personalizzato viene installato e nessun
-\texttt{HostnameVerifier} viene sovrascritta: il comportamento sicuro è
-quello di default. Le credenziali di accesso al portale PS vengono lette
-esclusivamente da variabili d'ambiente (\texttt{ALLOGGIATI\_USERNAME},
-\texttt{ALLOGGIATI\_PASSWORD}) e mai hardcoded nel codice o nei file
-di configurazione versionati.
-
-\begin{securebox}[title={Codice Sicuro --- AlloggiatiWebConfig.java}]
-\begin{lstlisting}[style=java]
-@Configuration
-public class AlloggiatiWebConfig {
-
-    /**
-     * RestTemplate con JVM default SSL context.
-     * Nessun TrustAllCerts manager, nessun bypass dell'hostname verifier:
-     * il certificato del portale PS viene verificato integralmente ad ogni
-     * chiamata.
-     */
-    @Bean("alloggiatiRestTemplate")
-    public RestTemplate alloggiatiRestTemplate() {
-        return new RestTemplate();
-    }
-}
-\end{lstlisting}
-\end{securebox}
-
-\begin{securebox}[title={Codice Sicuro --- AlloggiatiWebSenderServiceImpl.java (estratto)}]
-\begin{lstlisting}[style=java]
-public AlloggiatiWebSenderServiceImpl(
-        final AlloggiatiReportService alloggiatiReportService,
-        @Qualifier("alloggiatiRestTemplate") final RestOperations restOperations,
-        @Value("${alloggiati.web.url}") final String portalUrl,
-        @Value("${alloggiati.web.username}") final String username,
-        @Value("${alloggiati.web.password}") final String password) {
-    this.alloggiatiReportService = alloggiatiReportService;
-    this.restOperations = restOperations;
-    this.portalUrl = portalUrl;
-    this.username = username;    // da ALLOGGIATI_USERNAME (env var)
-    this.password = password;    // da ALLOGGIATI_PASSWORD (env var)
-}
-
-private String buildBasicAuthHeader() {
-    // RFC 7617 Basic Authentication: credenziali mai in chiaro nel codice
-    final String credentials = username + ":" + password;
-    final String encoded = Base64.getEncoder()
-            .encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
-    return "Basic " + encoded;
-}
-\end{lstlisting}
-\end{securebox}
-
-\begin{securebox}[title={Configurazione --- stay-service.yml (config-service)}]
-\begin{lstlisting}[style=yaml]
-# T-STAY-03: Credenziali portale PS da variabili d'ambiente.
-# Nessun default per le credenziali: fail-fast se le env var non sono impostate.
-alloggiati:
-  web:
-    url: ${ALLOGGIATI_WEB_URL:https://alloggiatiweb.poliziadistato.it/...}
-    username: ${ALLOGGIATI_USERNAME}
-    password: ${ALLOGGIATI_PASSWORD}
-\end{lstlisting}
-\end{securebox}
-
-I test verificano l'intero comportamento osservabile con \texttt{MockRestServiceServer}:
-il POST viene inviato all'URL corretto, l'header \texttt{Authorization: Basic ...}
-è presente, il \texttt{Content-Type} è \texttt{text/plain}, un errore HTTP 5xx
-genera \texttt{ExternalServiceException}, e un report vuoto non causa errori.
-
-\paragraph{Riferimento} Commit: \commitref{f0be747}{fix(security): T-STAY-03 --- secure TLS transmission of Alloggiati report to PS portal}
-
-% ─────────────────────────────────────────────────────────────────────────────
-\subsection{Audit log transazioni di pagamento \threat{T-BILL-03}}
-% ─────────────────────────────────────────────────────────────────────────────
-
-\paragraph{Descrizione}
-Le transazioni di pagamento costituiscono operazioni finanziariamente
-irreversibili: una volta che una fattura è contrassegnata come \texttt{PAID},
-il suo stato non può essere retrocesso. In assenza di un log immutabile delle
-transazioni, è impossibile ricostruire chi ha effettuato un pagamento, con quale
-metodo e in quale momento, né rilevare tentativi di pagamento rigettati
-(overpayment, fattura già saldata, fattura annullata). OWASP A09 (Security
-Logging \& Monitoring Failures) individua la mancanza di logging delle
-transazioni critiche come lacuna che rende impossibile sia l'audit finanziario
-sia il rilevamento di frodi.
-
-\begin{insecurebox}[title={Codice Vulnerabile --- PaymentServiceImpl.java (baseline)}]
-\begin{lstlisting}[style=java]
-// Log generico senza struttura e senza contesto hotel
-log.info("Attempting to add payment of {} to invoice {}",
-        request.amount(), invoiceId);
-
-if (invoice.getStatus() == InvoiceStatus.PAID) {
-    throw new BillingValidationException("INVOICE_ALREADY_PAID");
-    // nessun log: chi ha tentato? quale hotel?
-}
-if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
-    throw new BillingValidationException("INVOICE_CANCELLED");
-    // silente
-}
-if (request.amount().compareTo(balanceDue) > 0) {
-    throw new BillingValidationException("PAYMENT_EXCEEDS_BALANCE");
-    // silente
-}
-
-// Pagamento aggiunto: nessun log strutturato
-// Fattura saldata: log generico senza hotelId
-log.info("Invoice {} is now fully paid. Updating status.", invoiceId);
-\end{lstlisting}
-\end{insecurebox}
-
-\begin{securebox}[title={Codice Sicuro --- PaymentServiceImpl.java}]
-\begin{lstlisting}[style=java]
-// Rifiuto: fattura gia' saldata
-log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={}"
-       + " | reason=INVOICE_ALREADY_PAID", invoiceId, hotelId);
-
-// Rifiuto: fattura annullata
-log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={}"
-       + " | reason=INVOICE_CANCELLED", invoiceId, hotelId);
-
-// Rifiuto: importo superiore al saldo residuo
-log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={}"
-       + " | reason=PAYMENT_EXCEEDS_BALANCE | amount={} | balanceDue={}",
-        invoiceId, hotelId, request.amount(), balanceDue);
-
-// Pagamento registrato con successo
-log.info("[BILLING] PAYMENT_ADDED | invoiceId={} | paymentId={}"
-       + " | amount={} | method={} | hotelId={}",
-        invoiceId, savedPayment.getId(),
-        request.amount(), request.paymentMethod(), hotelId);
-
-// Fattura interamente saldata
-log.info("[BILLING] INVOICE_PAID | invoiceId={} | totalAmount={}"
-       + " | hotelId={}",
-        invoiceId, invoice.getTotalAmount(), hotelId);
-\end{lstlisting}
-\end{securebox}
-
-\paragraph{Effetto}
-Ogni transazione di pagamento --- accettata o rifiutata --- produce una riga di
-log strutturata con prefisso \texttt{[BILLING]}, correlata a \texttt{invoiceId}
-e \texttt{hotelId}. I rifiuti (livello \texttt{WARN}) consentono il rilevamento
-di tentativi di pagamento su fatture già saldate o annullate; il completamento
-del pagamento (livello \texttt{INFO}) fornisce il trail auditabile richiesto da
-normative contabili. Il formato chiave/valore è filtrabile via aggregatori di
-log per audit finanziari e alert su anomalie (es.\ tentativi ripetuti di
-\texttt{PAYMENT\_EXCEEDS\_BALANCE}).
-
-\paragraph{Riferimento} Commit: \commitref{7e41838}{fix(security): T-BILL-03 --- structured audit log for payment transactions on billing-service}
-
-% ─────────────────────────────────────────────────────────────────────────────
 \section{Validazione, Sanificazione ed Encoding}
 % ─────────────────────────────────────────────────────────────────────────────
 
@@ -1925,7 +1531,7 @@ I DTO di richiesta --- \texttt{GuestRequest} e \texttt{IdentityDocumentRequestDT
 erano protetti solo con \texttt{@NotBlank} e \texttt{@Size}, ma \textbf{privi di
 vincoli di formato} sui campi testo libero. Un attaccante poteva inviare payload
 contenenti tag HTML o script nei campi nome, telefono, città e numero documento,
-oppure una data di nascita nel futuro. Classificato OWASP A03 --- Injection.
+oppure una data di nascita nel futuro. Classificato OWASP A05:2025 --- Injection.
 
 \begin{insecurebox}[title={Codice Vulnerabile --- GuestRequest.java (baseline)}]
 \begin{lstlisting}[style=java]
@@ -2000,7 +1606,10 @@ numeri di telefono in formato internazionale, e bloccano esplicitamente i caratt
 usati negli attacchi XSS e SQL Injection (\texttt{<}, \texttt{>}, \texttt{\&},
 \texttt{"}, \texttt{;}).
 
-\paragraph{Riferimento} Commit: \commitref{fb6fdff}{fix(security): T-GST-02 + T-GST-04 --- input validation patterns and explicit mass-assignment guards on guest-service}
+\paragraph{Riferimento SEI CERT} Regola \textbf{IDS00-J}: \emph{``Sanitize untrusted data passed across a trust boundary''}. Principio chiave: \textbf{la normalizzazione deve precedere la validazione}; i pattern allow-list bloccano esplicitamente i caratteri usati in attacchi XSS e SQL Injection (\texttt{<}, \texttt{>}, \texttt{;}, \texttt{\&}).
+
+\paragraph{Riferimento} Commit: \commitref{fb6fdff}{fix(security): T-GST-02 + T-GST-04 --- input validation \\
+patterns and explicit mass-assignment guards on guest-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \subsection{Difesa contro Mass Assignment \threat{T-GST-04}}
@@ -2014,7 +1623,7 @@ richiesta. In Java con Spring e MapStruct il rischio è mitigato dal tipo record
 (immutabile) e dalla policy \texttt{ReportingPolicy.IGNORE}, ma il metodo
 \texttt{GuestMapper\#toEntity()} non dichiarava esplicitamente quali target
 fossero esclusi dal mapping, rendendo la protezione implicita e non verificabile
-a ispezione statica del codice. Classificato OWASP A04 --- Insecure Design.
+a ispezione statica del codice. Classificato OWASP A06:2025 --- Insecure Design.
 
 \begin{insecurebox}[title={Codice Vulnerabile --- GuestMapper.java (baseline)}]
 \begin{lstlisting}[style=java]
@@ -2074,7 +1683,10 @@ mapping) non reintroduca accidentalmente la possibilità di impostare campi
 sensibili da input client. La protezione diventa \emph{fail-safe by design}
 anziché dipendente da un comportamento di default.
 
-\paragraph{Riferimento} Commit: \commitref{fb6fdff}{fix(security): T-GST-02 + T-GST-04 --- input validation patterns and explicit mass-assignment guards on guest-service}
+\paragraph{Riferimento SEI CERT} Regola \textbf{OBJ13-J}: \emph{``Ensure that references to mutable objects are not exposed''}. La separazione DTO/entità con \texttt{@Mapping(target=..., ignore=true)} dichiarativo è la concretizzazione di questo principio: nessun riferimento al modello interno è raggiungibile dall'input client.
+
+\paragraph{Riferimento} Commit: \commitref{fb6fdff}{fix(security): T-GST-02 + T-GST-04 --- input validation \\
+patterns and explicit mass-assignment guards on guest-service}
 
 \subsection{Server-side Price Validation \threat{T-FB-02}}
 % ─────────────────────────────────────────────────────────────────────────────
@@ -2087,7 +1699,7 @@ usava quel valore senza alcuna verifica per calcolare il \texttt{totalAmount}
 dell'ordine. Un utente malintenzionato poteva manipolare il payload JSON
 (e.g.\ con un proxy interceptor come Burp Suite) e impostare prezzi arbitrari,
 inclusi valori prossimi allo zero, ottenendo beni e servizi a costo irrisorio
-senza essere rilevato. Classificato OWASP A04 --- Insecure Design.
+senza essere rilevato. Classificato OWASP A06:2025 --- Insecure Design.
 
 \begin{insecurebox}[title={Codice Vulnerabile --- OrderItemRequest.java + service (baseline)}]
 \begin{lstlisting}[style=java]
@@ -2189,7 +1801,8 @@ INSERT INTO menu_items (id, name, price) VALUES
 \end{lstlisting}
 \end{securebox}
 
-\paragraph{Riferimento} Commit: \commitref{d7af61c}{fix(security): T-FB-02 --- server-side price catalog on fb-service}
+\paragraph{Riferimento} Commit: \commitref{d7af61c}{fix(security): T-FB-02 --- server-side price catalog \\
+on fb-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \subsection{Validazione importi pagamento \threat{T-BILL-02}}
@@ -2206,7 +1819,7 @@ per arrotondamento cumulativo, (3) possono causare errori di conversione
 quando il valore viene persistito in colonne \texttt{NUMERIC(10,2)} di PostgreSQL.
 Parallelamente, \texttt{transactionReference} non aveva un limite di lunghezza,
 aprendo a payload di decine di KB con caratteri arbitrari.
-Classificato OWASP A04 --- Insecure Design.
+Classificato OWASP A06:2025 --- Insecure Design.
 
 \begin{insecurebox}[title={Codice Vulnerabile --- PaymentRequest.java (baseline)}]
 \begin{lstlisting}[style=java]
@@ -2235,12 +1848,12 @@ L'intervento opera su tre livelli ortogonali:
           di 2 cifre decimali o pi\`u di 10 cifre intere, allineato allo standard
           ISO 4217 per valute a centesimo.
     \item \textbf{Lunghezza e formato del riferimento transazione} ---
-          aggiunto \texttt{@Size(max = 100)} e
+          aggiunto \texttt{@Size(max = 100)} e\\
           \texttt{@Pattern(regexp = "\^{}[A-Za-z0-9\textbackslash-\textbackslash\_/\textbackslash.]+\$")}
           su \texttt{transactionReference}: limita la lunghezza a 100 caratteri
           e blocca caratteri di iniezione (\texttt{<}, \texttt{>},
           \texttt{;}, \texttt{\&}, spazi).
-    \item \textbf{Normalizzazione nel service} --- difesa in profondit\`a:
+    \item \textbf{Normalizzazione nel service} --- difesa in profondit\`a: \\
           \texttt{PaymentServiceImpl.addPayment()} normalizza l'importo a
           2 decimali con \texttt{setScale(2, RoundingMode.HALF\_UP)} prima
           di qualsiasi aritmetica e persiste il valore normalizzato
@@ -2297,7 +1910,8 @@ verrebbe comunque normalizzato a \texttt{0.00} dalla
 Due nuovi test coprono il ramo \texttt{INVOICE\_ALREADY\_PAID} e la
 normalizzazione decimale (\texttt{100.005} $\rightarrow$ \texttt{100.01}).
 
-\paragraph{Riferimento} Commit: \commitref{d346fe8}{fix(security): T-BILL-02 --- server-side payment amount validation on billing-service}
+\paragraph{Riferimento} Commit: \commitref{d346fe8}{fix(security): T-BILL-02 --- server-side payment amount \\
+validation on billing-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \subsection{Validazione date di prenotazione (range cross-field) \threat{T-RES-03}}
@@ -2315,8 +1929,8 @@ Questa lacuna consentiva due classi di input anomali:
         prenotata, ma la sovrapposizione non viene rilevata perché la condizione
         \texttt{r.checkOutDate > :checkIn} nella query non produce mai un risultato
         corretto.
-  \item \textbf{Date invertite}: \texttt{checkOut < checkIn} --- la query di
-        rilevamento overlap (\texttt{r.checkInDate < :checkOut AND r.checkOutDate > :checkIn})
+  \item \textbf{Date invertite}: \texttt{checkOut < checkIn} --- la query di rilevamento overlap \\
+        (\texttt{r.checkInDate < :checkOut AND r.checkOutDate > :checkIn})
         fallisce silenziosamente, rendendo la stanza erroneamente disponibile.
 \end{enumerate}
 
@@ -2329,7 +1943,7 @@ comportamento di una query parametrizzata).
 
 \textbf{Livello 1 --- Bean Validation (controller boundary)}
 
-È stata introdotta l'annotazione \texttt{@ValidDateRange}, un vincolo di classe
+È stata introdotta l'annotazione \texttt{@ValidDateRange}, un vincolo di classe \\
 (\texttt{@Target(ElementType.TYPE)}) implementato da \texttt{DateRangeValidator}:
 
 \begin{insecurebox}[title={Codice Vulnerabile --- ReservationRequest.java (prima)}]
@@ -2375,7 +1989,7 @@ public class DateRangeValidator
 \end{securebox}
 
 Una violazione produce HTTP 400 con corpo RFC 7807 tramite il
-\texttt{MethodArgumentNotValidException} handler già presente nel
+\texttt{\seqsplit{MethodArgumentNotValidException}} handler già presente nel
 \texttt{GlobalExceptionHandler}.
 
 \textbf{Livello 2 --- Guard nel service (difesa in profondità)}
@@ -2385,7 +1999,7 @@ controller, è stato aggiunto un guard statico \texttt{verifyDateRange()} invoca
 come prima operazione in \texttt{createReservation()} e \texttt{updateReservation()},
 prima di qualsiasi accesso a servizi esterni o al DB:
 
-\begin{securebox}[title={Codice Sicuro --- ReservationServiceImpl.java (guard)}]
+\begin{securebox}[title={Codice Sicuro --- ReservationServiceImpl.java}]
 \begin{lstlisting}[style=java]
 private static void verifyDateRange(ReservationRequest request) {
     if (request.checkInDate() != null
@@ -2480,16 +2094,17 @@ public RestaurantOrderResponse createOrder(RestaurantOrderRequest request) {
 \end{insecurebox}
 
 \paragraph{Mitigazione applicata}
-L'intervento segue il medesimo pattern già applicato a \texttt{guest-service},
-\texttt{reservation-service} e \texttt{billing-service}:
+L'intervento segue il medesimo pattern già applicato a \\
+\texttt{guest-service},\texttt{reservation-service} e \texttt{billing-service}:
 
 \begin{enumerate}
-  \item \textbf{Flyway V3}: aggiunta colonna \texttt{hotel\_id UUID NOT NULL} alla tabella
+  \item \textbf{Flyway V3}: aggiunta colonna \texttt{hotel\_id UUID NOT NULL} alla tabella \\
         \texttt{restaurant\_orders} con indici compositi \texttt{(hotel\_id)} e
         \texttt{(hotel\_id, stay\_id)} per le query più frequenti.
-        La stessa migration corregge anche il CHECK constraint sullo stato
+        La stessa migration corregge anche il CHECK constraint sullo stato \\
         (\texttt{PENDING/PREPARED/DELIVERED/BILLED\_TO\_ROOM}), che nella baseline
-        elencava valori obsoleti (\texttt{OPEN/IN\_PROGRESS/SERVED/CANCELLED}).
+        elencava valori obsoleti \\
+        (\texttt{OPEN/IN\_PROGRESS/SERVED/CANCELLED}).
   \item \textbf{InternalAuthFilter}: lettura header \texttt{X-Auth-Hotel} iniettato
         dall'API Gateway; rifiuto con \texttt{401} se assente; valore memorizzato in
         \texttt{auth.setDetails(hotelId)} e disponibile in tutto il thread corrente.
@@ -2499,7 +2114,7 @@ L'intervento segue il medesimo pattern già applicato a \texttt{guest-service},
         \texttt{hotel\_id} dal \texttt{SecurityContext} (mai dal client); tutte le
         operazioni usano query hotel-scoped; \texttt{ORDER\_CREATED} loggato con
         \texttt{orderId+stayId+hotelId+total} (prefisso \texttt{[FB]}).
-  \item \textbf{RestaurantOrderRepository}: nuovi metodi
+  \item \textbf{RestaurantOrderRepository}: nuovi metodi \\
         \texttt{findByStayIdAndHotelId} e \texttt{findAllByHotelId(Pageable)}
         al posto delle query non scoped.
 \end{enumerate}
@@ -2569,11 +2184,12 @@ public List<RestaurantOrderResponse> getOrdersByStayId(UUID stayId) {
 \paragraph{Test} Aggiunti/aggiornati 8 test in \texttt{RestaurantOrderServiceImplTest}:
 mock del \texttt{SecurityContext} con \texttt{hotelId} in \texttt{@BeforeEach},
 \texttt{clearContext()} in \texttt{@AfterEach};
-\texttt{shouldSetHotelIdFromSecurityContextOnCreate} (verifica che \texttt{order.getHotelId()} == hotelId da SecurityContext),
-\texttt{shouldReturnEmptyListForWrongHotelOnStayLookup} (IDOR scenario --- lista vuota per stayId di altro hotel),
-\texttt{shouldReturnOnlyHotelOrdersOnPaginatedListing} (getAllOrders usa \texttt{findAllByHotelId}).
+\texttt{\seqsplit{shouldSetHotelIdFromSecurityContextOnCreate}} (verifica che \texttt{order.getHotelId()} == hotelId da SecurityContext),
+\texttt{\seqsplit{shouldReturnEmptyListForWrongHotelOnStayLookup}} (IDOR scenario --- lista vuota per stayId di altro hotel),
+\texttt{\seqsplit{shouldReturnOnlyHotelOrdersOnPaginatedListing}} (getAllOrders usa \texttt{findAllByHotelId}).
 
-\paragraph{Riferimento} Commit: \commitref{18a3768}{fix(security): T-FB-01 --- IDOR fix, hotel\_id scope on fb-service orders}
+\paragraph{Riferimento} Commit: \commitref{18a3768}{fix(security): T-FB-01 --- IDOR fix, hotel\_id scope \\
+on fb-service orders}
 
 \subsection{Double Booking Prevention \threat{T-RES-01}}
 
@@ -2582,7 +2198,7 @@ In un sistema di prenotazione alberghiera, il \emph{double booking} si verifica 
 richieste concorrenti riescono a prenotare la stessa camera per date sovrapposte.
 La condizione di gara (race condition) è del tipo \emph{Time-Of-Check/Time-Of-Use} (TOCTOU):
 entrambe le transazioni superano il controllo di disponibilità prima che l'altra abbia
-effettuato la scrittura. Classificato OWASP A04 --- Insecure Design.
+effettuato la scrittura. Classificato OWASP A06:2025 --- Insecure Design.
 
 La baseline non implementava alcun meccanismo di locking:
 
@@ -2632,8 +2248,9 @@ La mitigazione agisce su due livelli complementari:
         la seconda transazione viene messa in attesa finché la prima non fa commit, eliminando
         la finestra TOCTOU.
 
-  \item \textbf{Formula date-overlap} già corretta: \texttt{checkInDate < :checkOut AND
-        checkOutDate > :checkIn}, che copre tutti i casi di sovrapposizione parziale e totale.
+  \item \textbf{Formula date-overlap} già corretta:\\
+        \texttt{checkInDate < :checkOut AND checkOutDate > :checkIn},
+        che copre tutti i casi di sovrapposizione parziale e totale.
 
   \item \textbf{Flyway migration V4}: aggiunge la colonna \texttt{version BIGINT NOT NULL
         DEFAULT 0} alla tabella \texttt{reservations}.
@@ -2708,14 +2325,19 @@ public ProblemDetail handleOptimisticLockingFailure(
 \end{securebox}
 
 \paragraph{Test} Aggiunti 3 test in \texttt{ReservationServiceImplTest}:
-\texttt{testCreateReservationOverlapThrowsBadRequest} (verifica che il check di overlap
+\texttt{\seqsplit{testCreateReservationOverlapThrowsBadRequest}} (verifica che il check di overlap
 rifiuti la prenotazione con HTTP 400),
-\texttt{testUpdateReservationOverlapThrowsBadRequest} (stesso controllo sull'update),
-\texttt{testSaveThrowsOptimisticLockingFailurePropagates} (verifica che
-\texttt{ObjectOptimisticLockingFailureException} propaghi correttamente
+\texttt{\seqsplit{testUpdateReservationOverlapThrowsBadRequest}} (stesso controllo sull'update),
+\texttt{\seqsplit{testSaveThrowsOptimisticLockingFailurePropagates}} (verifica che
+\texttt{\seqsplit{ObjectOptimisticLockingFailureException}} propaghi correttamente
 al GlobalExceptionHandler per la traduzione in HTTP 409).
 
-\paragraph{Riferimento} Commit: \commitref{ca9bf92}{fix(security): T-RES-01 --- optimistic lock + pessimistic write on overlap check}
+\paragraph{Riferimento SEI CERT} Regola \textbf{VNA02-J}: \emph{``Ensure that compound operations on shared variables are atomic''}. Il controllo di sovrapposizione e l'inserimento della prenotazione sono operazioni separate; senza locking il check-then-act non è atomico (race condition TOCTOU). Il \texttt{SELECT ... FOR UPDATE} serializza le transazioni concorrenti sulla stessa risorsa.
+
+\paragraph{Nota OWASP A10:2025} Il \texttt{GlobalExceptionHandler} centralizzato copre anche \textbf{A10:2025 --- Mishandling of Exceptional Conditions}, categoria nuova dell'edizione 2025: la \texttt{ObjectOptimisticLockingFailureException} viene intercettata e tradotta in HTTP~409 con body RFC~7807 invece di propagarsi come 500 generico. Questo è il pattern opposto al \emph{fail-open} citato nelle slide del corso (es.\ e-commerce che conferma un ordine dopo timeout del gateway di pagamento).
+
+\paragraph{Riferimento} Commit:\\
+\commitref{ca9bf92}{fix(security): T-RES-01 --- optimistic lock + pessimistic write on overlap check}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Sicura delle Sessioni}
@@ -2962,7 +2584,7 @@ di attacco ben documentati:
   \item Assenza di \texttt{Permissions-Policy}: le API del browser (fotocamera, microfono,
         geolocalizzazione) rimangono accessibili a script di terze parti iniettati.
 \end{itemize}
-Classificato OWASP A05 --- Security Misconfiguration.
+Classificato OWASP A02:2025 --- Security Misconfiguration.
 
 \begin{insecurebox}[title={Baseline vulnerabile --- nessun header di sicurezza nelle risposte}]
 \begin{lstlisting}[style=java]
@@ -3036,7 +2658,7 @@ L'assenza di un header \texttt{Content-Security-Policy} nella risposta che serve
 React lascia il browser privo di istruzioni su quali sorgenti di contenuto siano legittime.
 In mancanza di una CSP, uno script iniettato via XSS può caricare risorse da origini
 arbitrarie, esfiltrare dati o eseguire operazioni autenticate per conto della vittima.
-Classificato OWASP A05 --- Security Misconfiguration.
+Classificato OWASP A02:2025 --- Security Misconfiguration.
 
 Problema secondario: la configurazione nginx baseline era definita come stringa \emph{inline}
 nel \texttt{Dockerfile}, rendendo impossibile aggiungere header di risposta senza ricostruire
@@ -3141,10 +2763,10 @@ email, descrizioni). Se un componente usasse \texttt{dangerouslySetInnerHTML} o
 manipolazioni DOM dirette (\texttt{innerHTML}/\texttt{outerHTML}), un payload XSS
 memorizzato nel database verrebbe interpretato come HTML dal browser, consentendo
 l'esecuzione di codice arbitrario nel contesto dell'applicazione.
-Classificato OWASP A03 --- Injection.
+Classificato OWASP A05:2025 --- Injection.
 
 L'audit del codebase ha confermato che nessun componente utilizza
-\texttt{dangerouslySetInnerHTML}: React JSX escapa automaticamente ogni espressione
+\texttt{dangerously\-Set\-Inner\-HTML}: React JSX escapa automaticamente ogni espressione
 renderizzata come contenuto. Tuttavia, in assenza di un guard statico, non vi era
 nulla che impedisse l'introduzione futura del pattern vulnerabile.
 
@@ -3377,7 +2999,7 @@ In particolare:
         configurazioni di connessione.
 \end{itemize}
 
-Classificato OWASP A05 --- Security Misconfiguration.
+Classificato OWASP A02:2025 --- Security Misconfiguration.
 
 \begin{insecurebox}[title={Configurazione Vulnerabile --- auth-service.yml (baseline)}]
 \begin{lstlisting}[style=yaml]
@@ -3458,11 +3080,12 @@ scrape_configs:
 \end{securebox}
 
 La stessa configurazione è applicata simmetricamente a tutti e 9 i servizi
-(\texttt{api-gateway}, \texttt{auth-service}, \texttt{guest-service},
-\texttt{inventory-service}, \texttt{reservation-service}, \texttt{stay-service},
+(\texttt{api-gateway}, \texttt{auth-service}, \texttt{guest-service},\\
+\texttt{inventory-service}, \texttt{reservation-service}, \texttt{stay-service},\\
 \texttt{billing-service}, \texttt{fb-service}, \texttt{config-service}).
 
-\paragraph{Riferimento} Commit: \commitref{b0cf898}{fix(security): T-CFG-01 --- move actuator to internal-only management port}
+\paragraph{Riferimento} Commit:\\
+\commitref{b0cf898}{fix(security): T-CFG-01 --- move actuator to internal-only management port}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \subsection{Rate Limiting — Estensione a Tutte le Route e Key Resolver Proxy-Aware \threat{T-GW-02}}
@@ -3489,7 +3112,7 @@ in produzione:
         inutile (un singolo attaccante esaurisce il budget dell'intero sistema).
 \end{enumerate}
 
-Classificato OWASP A05 --- Security Misconfiguration.
+Classificato OWASP A02:2025 --- Security Misconfiguration.
 
 \begin{insecurebox}[title={Baseline vulnerabile — rate limiting solo su auth, key resolver non proxy-aware}]
 \begin{lstlisting}[style=yaml]
@@ -3542,8 +3165,8 @@ con soglie calibrate sul carico atteso di un operatore alberghiero:
 \begin{itemize}
   \item Route autenticate: \texttt{replenishRate: 20}, \texttt{burstCapacity: 50}
         (per-user via \texttt{userKeyResolver}).
-  \item Route auth: \texttt{replenishRate: 5}, \texttt{burstCapacity: 10}
-        (per-IP via \texttt{remoteAddrKeyResolver}).
+  \item Route auth: \texttt{replenishRate: 5}, \texttt{burstCapacity: 10}\\
+        (per-IP via \texttt{remote\-Addr\-Key\-Resolver}).
 \end{itemize}
 
 \begin{securebox}[title={RateLimiterConfig.java — key resolver proxy-aware e per-utente (api-gateway)}]
@@ -3633,7 +3256,7 @@ da ciò che il server abbia effettivamente bisogno di leggere.
 In abbinamento a \texttt{allowCredentials: true}, questo amplia la superficie di
 attacco: script di terze parti iniettati (XSS) possono includere header personalizzati
 arbitrari — ad esempio \texttt{X-Custom-Attack} — che il browser invierà con le credenziali.
-Classificato OWASP A05 --- Security Misconfiguration.
+Classificato OWASP A02:2025 --- Security Misconfiguration.
 
 Un secondo problema minore riguardava l'assenza di \texttt{maxAge}: senza questa
 proprietà, il browser non può mettere in cache le risposte alle preflight OPTIONS,
@@ -3732,7 +3355,7 @@ appartiene a un hotel specifico, identificato dal campo \texttt{hotel\_id} estra
 e iniettato dall'API Gateway come header \texttt{X-Auth-Hotel}.
 
 \textbf{T-GST-01 (IDOR):} il \texttt{GuestController} esponeva endpoint
-\texttt{GET /api/v1/guests/\{id\}} e \texttt{PUT /api/v1/guests/\{id\}} senza verificare
+\path{GET /api/v1/guests/{id}} e \path{PUT /api/v1/guests/{id}} senza verificare
 l'ownership dell'hotel. Un receptionist dell'Hotel A, conoscendo o indovinando un UUID,
 poteva leggere e modificare profili ospite dell'Hotel B. Classificato OWASP A01 ---
 Broken Access Control.
@@ -3765,7 +3388,7 @@ L'intervento si articola in quattro livelli:
     \item \textbf{Schema DB} --- Flyway V2 aggiunge la colonna \texttt{hotel\_id UUID NOT NULL}
           alla tabella \texttt{guests}, con indice parziale su \texttt{active = TRUE}.
     \item \textbf{Extraction dal SecurityContext} --- \texttt{InternalAuthFilter} legge
-          \texttt{X-Auth-Hotel} e lo memorizza in \texttt{Authentication.details}. Il service
+          \texttt{X-Auth-Hotel} e lo memorizza in \path{Authentication.details}. Il service
           lo estrae con \texttt{extractHotelId()} senza dipendere dal controller.
     \item \textbf{Query scoped} --- tutte le query del repository usano varianti
           hotel-scoped (\texttt{findByIdAndHotelId}, \texttt{findAllByHotelId},
@@ -3831,7 +3454,8 @@ CREATE INDEX IF NOT EXISTS idx_guests_hotel_id
 \end{lstlisting}
 \end{securebox}
 
-\paragraph{Riferimento} Commit: \commitref{b483eac}{fix(security): T-GST-01 + T-GST-03 --- hotel\_id isolation on guest-service}
+\paragraph{Riferimento} Commit:\\
+\commitref{b483eac}{fix(security): T-GST-01 + T-GST-03 --- hotel\_id isolation on guest-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \subsection{IDOR sul Reservation Service \threat{T-RES-02}}
@@ -3874,9 +3498,9 @@ e si articola in tre livelli:
           \texttt{X-Auth-Hotel} iniettato dal gateway e lo salva in
           \texttt{Authentication.details}. Richieste prive dell'header sono
           rifiutate con HTTP 401.
-    \item \textbf{Query hotel-scoped} --- il repository espone due nuovi metodi:
-          \texttt{findByIdAndHotelId(id, hotelId)} e
-          \texttt{findAllByHotelId(hotelId, pageable)}. Il service usa
+    \item \textbf{Query hotel-scoped} --- il repository espone due nuovi metodi:\\
+          \texttt{\seqsplit{findByIdAndHotelId(id, hotelId)}} e
+          \texttt{\seqsplit{findAllByHotelId(hotelId, pageable)}}. Il service usa
           \texttt{findByIdAndHotelId} per tutte le operazioni su singola
           risorsa (GET, PUT, DELETE, PATCH).
     \item \textbf{IDOR-safe 404} --- se la prenotazione esiste ma appartiene a
@@ -3948,7 +3572,7 @@ usavano \texttt{findById(id)}, che restituisce qualsiasi fattura indipendentemen
 di appartenenza. Un receptionist dell'Hotel A, indovinando un UUID valido, poteva:
 \begin{itemize}
   \item leggere le fatture dell'Hotel B (\texttt{GET /api/v1/invoices/\{id\}});
-  \item registrare pagamenti su fatture di altri hotel (\texttt{POST /api/v1/invoices/\{invoiceId\}/payments});
+  \item registrare pagamenti su fatture di altri hotel (\texttt{POST}\linebreak\texttt{/api/v1/invoices/\{invoiceId\}/payments});
   \item ottenere la lista completa di tutte le fatture di tutti gli hotel via \texttt{getAllInvoices()}.
 \end{itemize}
 Classificato OWASP A01 --- Broken Access Control.
@@ -3989,16 +3613,16 @@ L'intervento replica il pattern consolidato di T-GST-01 e T-RES-02:
           \texttt{X-Auth-Hotel} iniettato dal gateway e lo salva in
           \texttt{Authentication.details}. Richieste prive dell'header sono
           rifiutate con HTTP 401.
-    \item \textbf{Query hotel-scoped nel repository} --- aggiunti tre metodi:
+    \item \textbf{Query hotel-scoped nel repository} --- aggiunti tre metodi:\\
           \texttt{findByIdAndHotelId(id, hotelId)},
-          \texttt{findByHotelId(hotelId, pageable)} (paginata) e
-          \texttt{findFirstByReservationIdAndHotelIdOrderByIssueDateDesc(reservationId, hotelId)}.
+          \texttt{findByHotelId(hotelId, pageable)} (paginata) e\\
+          \texttt{\seqsplit{findFirstByReservationIdAndHotelIdOrderByIssueDateDesc(reservationId,hotelId)}}.
     \item \textbf{IDOR-safe 404} --- \texttt{findByIdAndHotelId} restituisce
           \texttt{Optional.empty()} se la fattura esiste ma appartiene ad
           un altro hotel; il service lancia \texttt{NotFoundException} (HTTP 404),
           senza rivelare l'esistenza della risorsa all'attaccante.
-    \item \textbf{hotelId impostato alla creazione} --- \texttt{createInvoice} imposta
-          \texttt{invoice.setHotelId(resolveHotelId())}, ignorando qualsiasi valore
+    \item \textbf{hotelId impostato alla creazione} --- \texttt{createInvoice} imposta\\
+          \texttt{\seqsplit{invoice.setHotelId(resolveHotelId())}}, ignorando qualsiasi valore
           passato nel corpo della richiesta.
     \item \textbf{FeignHeaderConfig aggiornato} --- propaga \texttt{X-Auth-Hotel} su
           tutte le chiamate Feign verso \texttt{guest-service} e
@@ -4069,214 +3693,12 @@ Optional<Invoice> findFirstByReservationIdAndHotelIdOrderByIssueDateDesc(
 \paragraph{Test}
 Aggiunti/aggiornati test in \texttt{InvoiceServiceImplTest} e \texttt{PaymentServiceImplTest}:
 il \texttt{SecurityContextHolder} viene inizializzato in \texttt{setUp()} con un
-\texttt{UsernamePasswordAuthenticationToken} il cui \texttt{details} è il \texttt{hotelId} del
+\texttt{\seqsplit{UsernamePasswordAuthenticationToken}} il cui \texttt{details} è il \texttt{hotelId} del
 caller, e ripulito in \texttt{tearDown()}. Aggiunto il caso
-\texttt{shouldThrowWhenInvoiceBelongsToDifferentHotel} che verifica il comportamento IDOR-safe
+\texttt{\seqsplit{shouldThrowWhenInvoiceBelongsToDifferentHotel}} che verifica il comportamento IDOR-safe
 (la query hotel-scoped restituisce \texttt{Optional.empty()} → HTTP 404).
 
 \paragraph{Riferimento} Commit: \commitref{4a44eea}{fix(security): T-BILL-01 --- IDOR fix on billing-service (hotel-scoped invoice/payment lookup)}
-
-% ─────────────────────────────────────────────────────────────────────────────
-\subsection{Propagazione X-Auth-Hotel End-to-End \threat{T-GW-06}}
-% ─────────────────────────────────────────────────────────────────────────────
-
-\paragraph{Descrizione}
-Tutte le mitigazioni IDOR sui singoli servizi si basavano su un presupposto fondamentale:
-che l'header \texttt{X-Auth-Hotel} venisse iniettato dall'\texttt{AuthenticationFilter}
-dell'API Gateway su ogni richiesta autenticata. Questo presupposto era \emph{falso}
-nella baseline: \texttt{UserAccount} in \texttt{auth-service} non possedeva il campo
-\texttt{hotel\_id}, quindi \texttt{JwtService.generateToken()} non poteva includere il
-claim \texttt{hotelId} nel JWT. Di conseguenza, l'\texttt{AuthenticationFilter} non aveva
-il dato per iniettare \texttt{X-Auth-Hotel} sulle richieste a valle.
-
-L'effetto pratico era che tutti i servizi che richiedevano l'header (guest, reservation,
-billing, fb) restituivano sistematicamente HTTP~401 a ogni richiesta autenticata passante
-per il gateway: l'isolamento multi-tenant era \emph{interamente non funzionante} in produzione.
-Classificato OWASP A01 --- Broken Access Control / IDOR.
-
-\begin{insecurebox}[title={UserAccount.java (auth-service) --- campo hotel\_id assente (baseline)}]
-\begin{lstlisting}[style=java]
-// INSICURO: UserAccount non ha hotel_id -> il JWT non puo' contenere hotelId
-@Entity
-@Table(name = "user_account")
-public class UserAccount {
-    @Id private UUID id;
-    private String username;
-    private String passwordHash;
-    @Enumerated(EnumType.STRING)
-    private Role role;
-    // hotel_id mai presente: nessun tenant binding per l'utente
-    private boolean active;
-    // ...
-}
-\end{lstlisting}
-\end{insecurebox}
-
-\begin{insecurebox}[title={JwtService.java (auth-service) --- claim hotelId assente (baseline)}]
-\begin{lstlisting}[style=java]
-// INSICURO: il JWT non contiene il claim hotelId
-public String generateToken(UserAccount user) {
-    return Jwts.builder()
-        .setSubject(user.getUsername())
-        .claim("role", user.getRole().name())
-        // hotelId mai aggiunto: X-Auth-Hotel non potra' mai essere iniettato
-        .setIssuedAt(new Date())
-        .setExpiration(new Date(System.currentTimeMillis() + expiration))
-        .signWith(key, SignatureAlgorithm.HS256)
-        .compact();
-}
-\end{lstlisting}
-\end{insecurebox}
-
-\paragraph{Mitigazione applicata}
-La correzione è stata end-to-end su quattro livelli:
-
-\begin{enumerate}
-  \item \textbf{Flyway V3 su auth-service} --- migrazione
-        \texttt{V3\_\_add\_hotel\_id\_to\_user\_account.sql}: aggiunge la colonna
-        \texttt{hotel\_id UUID NOT NULL} con backfill dell'UUID amministrativo di default
-        (\texttt{00000000-0000-0000-0000-000000000001}) per le righe esistenti;
-        crea un indice su \texttt{(hotel\_id) WHERE active = TRUE}.
-  \item \textbf{UserAccount aggiornato} --- aggiunto \texttt{private UUID hotelId} come
-        campo persistente.
-  \item \textbf{JwtService.generateToken/Refresh aggiornati} --- la firma ora richiede
-        il parametro \texttt{UUID hotelId} e lo inserisce nel JWT come claim
-        \texttt{hotelId} tramite la costante \texttt{CLAIM\_HOTEL\_ID}.
-  \item \textbf{AuthenticationFilter aggiornato} --- estrae \texttt{hotelId} dal JWT
-        e lo inietta come \texttt{X-Auth-Hotel} su ogni richiesta a valle; restituisce
-        HTTP~401 se il claim è assente, impedendo che token legacy privi del campo
-        superino il gateway.
-\end{enumerate}
-
-\begin{securebox}[title={Flyway V3 --- V3\_\_add\_hotel\_id\_to\_user\_account.sql}]
-\begin{lstlisting}[style=sql]
--- Step 1: colonna nullable per evitare lock su righe esistenti
-ALTER TABLE user_account
-    ADD COLUMN IF NOT EXISTS hotel_id UUID;
-
--- Step 2: backfill righe preesistenti con UUID admin di default
-UPDATE user_account
-   SET hotel_id = '00000000-0000-0000-0000-000000000001'
- WHERE hotel_id IS NULL;
-
--- Step 3: impone NOT NULL dopo che ogni riga ha un valore
-ALTER TABLE user_account
-    ALTER COLUMN hotel_id SET NOT NULL;
-\end{lstlisting}
-\end{securebox}
-
-\begin{securebox}[title={JwtService.java (auth-service) --- claim hotelId nel JWT (fix)}]
-\begin{lstlisting}[style=java]
-private static final String CLAIM_HOTEL_ID = "hotelId";
-
-// SICURO: il JWT ora contiene il claim hotelId per l'isolamento multi-tenant
-public String generateToken(final String username,
-                            final Role role,
-                            final UUID hotelId) {
-    final Map<String, Object> claims = new HashMap<>();
-    claims.put("role", role.name());
-    claims.put(CLAIM_HOTEL_ID, hotelId.toString());  // tenant binding
-    return buildToken(claims, username, jwtExpiration);
-}
-\end{lstlisting}
-\end{securebox}
-
-\begin{securebox}[title={AuthenticationFilter.java (api-gateway) --- iniezione X-Auth-Hotel (fix)}]
-\begin{lstlisting}[style=java]
-private static final String HEADER_HOTEL = "X-Auth-Hotel";
-
-// SICURO: hotelId estratto dal JWT e iniettato come X-Auth-Hotel
-final String hotelId = claims.get("hotelId", String.class);
-if (hotelId == null || hotelId.isEmpty()) {
-    return this.onError(exchange,
-        "JWT missing hotelId claim", HttpStatus.UNAUTHORIZED); // 401
-}
-
-return chain.filter(exchange.mutate()
-    .request(request.mutate()
-        .header(HEADER_USER, username)
-        .header(HEADER_ROLE, role)
-        .header(HEADER_HOTEL, hotelId)   // X-Auth-Hotel ora sempre presente
-        .header(HEADER_SIGNATURE, signature)
-        .build())
-    .build());
-\end{lstlisting}
-\end{securebox}
-
-\paragraph{Test}
-Aggiornati \texttt{AuthServiceImplTest} (costante \texttt{TEST\_HOTEL\_ID}, mock a tre
-argomenti per \texttt{generateToken/Refresh}) e \texttt{AuthenticationFilterTest}
-(\texttt{hotelId} inserito nel JWT di test via \texttt{buildJwt()}, asserzione che l'header
-\texttt{X-Auth-Hotel} sia presente nella richiesta a valle). Tutti i 144 test passano.
-
-\paragraph{Riferimento} Commit: \commitref{b469e21}{fix(security): T-IDOR-GW-01 --- X-Auth-Hotel propagation end-to-end}
-
-% ─────────────────────────────────────────────────────────────────────────────
-\subsection{HMAC Signature estesa al Tenant Context \threat{T-GW-07}}
-% ─────────────────────────────────────────────────────────────────────────────
-
-\paragraph{Descrizione}
-L'analisi post-implementazione di T-GW-06 ha rivelato un gap residuo nel meccanismo di firma
-interna: la funzione \texttt{computeHmac} firmava solo la coppia \texttt{"username:role"},
-lasciando l'header \texttt{X-Auth-Hotel} fuori dal payload autenticato.
-La garanzia crittografica copriva l'identità dell'utente (\emph{chi sei}) ma non il contesto
-di tenant (\emph{a quale hotel appartieni}).
-Un servizio interno compromesso avrebbe potuto ricevere una richiesta legittima dal gateway,
-modificare \texttt{X-Auth-Hotel} in transito e ri-inoltrarla a un altro servizio:
-la firma sarebbe rimasta valida, consentendo di accedere a dati di un hotel arbitrario pur
-avendo un JWT corretto.
-
-\paragraph{OWASP} A01:2021 --- Broken Access Control (header tampering sul tenant context).
-
-\begin{insecurebox}[title={Baseline --- HMAC su username:role soltanto}]
-\begin{lstlisting}[style=java]
-// api-gateway/AuthenticationFilter.java  (baseline)
-private String computeHmac(String username, String role) {
-    Mac mac = Mac.getInstance("HmacSHA256");
-    mac.init(new SecretKeySpec(hmacSecret.getBytes(UTF_8), "HmacSHA256"));
-    byte[] digest = mac.doFinal(
-        (username + ":" + role).getBytes(UTF_8));  // hotelId ASSENTE
-    return HexFormat.of().formatHex(digest);
-}
-
-// InternalAuthFilter (tutti i servizi)  (baseline)
-private boolean isSignatureValid(String username, String role, String sig) {
-    String expected = computeHmac(username, role);  // hotelId non verificato
-    return MessageDigest.isEqual(
-        expected.getBytes(UTF_8), sig.getBytes(UTF_8));
-}
-\end{lstlisting}
-\end{insecurebox}
-
-\begin{securebox}[title={Fix --- HMAC su username:role:hotelId}]
-\begin{lstlisting}[style=java]
-// api-gateway/AuthenticationFilter.java  (fix)
-private String computeHmac(String username, String role, String hotelId) {
-    Mac mac = Mac.getInstance("HmacSHA256");
-    mac.init(new SecretKeySpec(hmacSecret.getBytes(UTF_8), "HmacSHA256"));
-    byte[] digest = mac.doFinal(
-        (username + ":" + role + ":" + hotelId).getBytes(UTF_8));
-    return HexFormat.of().formatHex(digest);
-}
-
-// InternalAuthFilter (tutti i servizi)  (fix)
-private boolean isSignatureValid(
-        String username, String role, String hotelId, String sig) {
-    String expected = computeHmac(username, role, hotelId);
-    return MessageDigest.isEqual(
-        expected.getBytes(UTF_8), sig.getBytes(UTF_8));
-}
-\end{lstlisting}
-\end{securebox}
-
-\paragraph{Test}
-Aggiunto \texttt{shouldProduceDifferentSignatureForDifferentHotelId} in
-\texttt{AuthenticationFilterTest}: costruisce due JWT con \texttt{hotelId} distinti
-(\texttt{...001} e \texttt{...002}), esegue il filtro per entrambi e verifica che i valori
-di \texttt{X-Internal-Signature} siano diversi, dimostrando che la firma ora dipende dal
-tenant context.
-
-\paragraph{Riferimento} Commit: \commitref{5bdc594}{fix(security): T-GW-07 --- HMAC extended to include hotelId in signed payload}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}
@@ -4289,8 +3711,8 @@ Nella baseline il sistema presentava due categorie di segreti in chiaro nei file
 
 \begin{enumerate}
   \item \textbf{JWT\_SECRET con fallback hardcoded} in
-        \texttt{config-service/src/main/resources/config/auth-service.yml}: il valore di default
-        \texttt{bXktMzItYnl0ZS1zZWNyZXQta2V5LWZvci10ZXN0LWxvY2FsLWRldi0xMjM0NQ==}
+        \path{config-service/src/main/resources/config/auth-service.yml}: il valore di default
+        \texttt{\seqsplit{bXktMzItYnl0ZS1zZWNyZXQta2V5LWZvci10ZXN0LWxvY2FsLWRldi0xMjM0NQ==}}
         (base64 della stringa nota \texttt{my-32-byte-secret-key-for-test-local-dev-12345})
         era committato nel repository. Se la variabile d'ambiente \texttt{JWT\_SECRET} non veniva
         impostata, il servizio avviava silenziosamente con questo segreto debole e noto.
@@ -4303,7 +3725,7 @@ Nella baseline il sistema presentava due categorie di segreti in chiaro nei file
         di rotazione senza modifica del codice sorgente.
 \end{enumerate}
 
-Classificato OWASP A02 --- Cryptographic Failures.
+Classificato OWASP A04:2025 --- Cryptographic Failures.
 
 \begin{insecurebox}[title={Configurazione Vulnerabile --- auth-service.yml (baseline)}]
 \begin{lstlisting}[style=yaml]
@@ -4340,10 +3762,12 @@ L'intervento si articola in tre modifiche coordinate:
         PostgreSQL sia per tutti e 7 i servizi applicativi. Il valore effettivo viene caricato
         esclusivamente dal file \texttt{.env} (gitignored).
 
-  \item \textbf{Aggiornamento degli script di setup} (\texttt{setup-hmac-secret.sh} e
-        \texttt{setup-hmac-secret.ps1}): entrambi gli script generano ora, in modo idempotente,
-        anche \texttt{JWT\_SECRET} (48 byte random in Base64) e \texttt{POSTGRES\_PASSWORD}
-        (16 byte random in esadecimale) nel file \texttt{.env}, oltre al già gestito
+  \item \textbf{Aggiornamento degli script di setup}
+        (\texttt{setup\-hmac\-secret.sh} e \texttt{setup\-hmac\-secret.ps1}):
+        entrambi gli script generano ora, in modo idempotente,
+        anche \texttt{JWT\_SECRET} (48 byte random in Base64)
+        e \texttt{POSTGRES\_PASSWORD} (16 byte random in esadecimale)
+        nel file \texttt{.env}, oltre al già gestito
         \texttt{INTERNAL\_HMAC\_SECRET}.
 \end{enumerate}
 
@@ -4394,7 +3818,7 @@ Nessun segreto transita più attraverso il repository.
 \paragraph{Gap residuo — fallback in JwtUtil dell'API Gateway}
 L'intervento descritto sopra rimuoveva il fallback soltanto da \texttt{auth-service.yml}.
 Un secondo segreto debole era rimasto nascosto in
-\texttt{api-gateway/src/main/java/com/hotelpms/gateway/util/JwtUtil.java}: l'annotazione
+\path{api-gateway/src/main/java/com/hotelpms/gateway/util/JwtUtil.java}: l'annotazione
 \texttt{@Value} conteneva lo stesso default Base64 hardcoded, rendendo di fatto inefficace
 la protezione se l'API Gateway veniva avviato senza la variabile d'ambiente.
 
@@ -4454,291 +3878,18 @@ internal:
 \paragraph{Riferimento} Commit: \commitref{6dc6ea4}{fix(security): T-CFG-02 --- rimuovi fallback JWT\_SECRET hardcoded da api-gateway JwtUtil}
 
 % ─────────────────────────────────────────────────────────────────────────────
-\subsection{Autenticazione del Config Server \threat{T-CFG-03}}
-
-\paragraph{Descrizione}
-Nella baseline il \texttt{config-service} (Spring Cloud Config Server sulla porta 8888) non
-richiedeva alcuna autenticazione: chiunque potesse raggiungere quella porta — all'interno
-della rete Docker o tramite il port binding esposto al host — era in grado di leggere
-\emph{qualsiasi} file di configurazione semplicemente con una richiesta GET.
-
-Poiché i file serviti dal config-service contengono \texttt{JWT\_SECRET}, \texttt{POSTGRES\_PASSWORD},
-\texttt{INTERNAL\_HMAC\_SECRET} e le credenziali del portale Alloggiati, un accesso non
-autenticato equivaleva a una completa violazione del modello di confidenzialità dei segreti.
-La minaccia è classificata come \emph{Spoofing} in STRIDE (un attaccante recupera segreti
-e può impersonare qualsiasi componente) e corrisponde a OWASP A07 --- Identification and
-Authentication Failures.
-
-\begin{insecurebox}[title={config-service (baseline) --- endpoint aperti senza autenticazione}]
-\begin{lstlisting}[style=yaml]
-# config-service/application.yml (baseline)
-# Spring Security non e' nel classpath: nessuna protezione
-server:
-  port: 8888
-
-spring:
-  cloud:
-    config:
-      server:
-        native:
-          search-locations: classpath:/config/
-\end{lstlisting}
-\end{insecurebox}
-
-\begin{insecurebox}[title={Richiesta non autenticata restituiva i segreti in chiaro (baseline)}]
-\begin{lstlisting}[style=bash]
-# Chiunque poteva leggere JWT_SECRET e POSTGRES_PASSWORD senza credenziali:
-$ curl http://config-server:8888/auth-service/default
-{
-  "propertySources": [
-    { "name": "...", "source": { "jwt.secret": "...", ... } }
-  ]
-}
-\end{lstlisting}
-\end{insecurebox}
-
-\paragraph{Mitigazione applicata}
-L'intervento si articola in quattro componenti coordinate:
-
-\begin{enumerate}
-  \item \textbf{Dipendenza Spring Security} aggiunta a \texttt{config-service/build.gradle.kts}:
-        \texttt{spring-boot-starter-security} e Lombok (richiesto da \texttt{@SneakyThrows},
-        pattern uniforme al resto del progetto).
-
-  \item \textbf{SecurityConfig} nel \texttt{config-service}: un bean \texttt{SecurityFilterChain}
-        che configura HTTP Basic Auth su ogni richiesta, sessione \texttt{STATELESS} e CSRF
-        disabilitato (i client config non hanno sessione browser). Il management port
-        (:8090) è su un server embedded separato e non è influenzato da questa catena.
-
-  \item \textbf{Credenziali via variabili d'ambiente}: il config-service legge
-        \texttt{CONFIG\_SERVER\_USERNAME} (default \texttt{configuser}) e
-        \texttt{CONFIG\_SERVER\_PASSWORD} (senza default, fail-fast). Tutti e 8 i microservizi
-        consumer aggiungono \texttt{spring.cloud.config.username/password} nel proprio
-        \texttt{application.yml} con gli stessi env-var. Il \texttt{docker-compose.yml}
-        inietta \texttt{CONFIG\_SERVER\_PASSWORD=\$\{CONFIG\_SERVER\_PASSWORD\}} in ciascun
-        container.
-
-  \item \textbf{Script di setup aggiornati}: \texttt{setup-hmac-secret.sh} e
-        \texttt{setup-hmac-secret.ps1} generano \texttt{CONFIG\_SERVER\_PASSWORD} (24 byte
-        esadecimali) in modo idempotente nel file \texttt{.env} (gitignored), insieme
-        agli altri segreti già gestiti.
-\end{enumerate}
-
-\begin{securebox}[title={SecurityConfig --- HTTP Basic Auth su config-service (post-hardening)}]
-\begin{lstlisting}[style=java]
-@Configuration
-@EnableWebSecurity
-public class SecurityConfig {
-
-    @Bean
-    @SneakyThrows(Exception.class)
-    public SecurityFilterChain filterChain(final HttpSecurity http) {
-        http
-            .csrf(AbstractHttpConfigurer::disable)
-            .sessionManagement(sm ->
-                sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
-            .httpBasic(withDefaults());
-        return http.build();
-    }
-}
-\end{lstlisting}
-\end{securebox}
-
-\begin{securebox}[title={config-service/application.yml (post-hardening) --- credenziali da env var}]
-\begin{lstlisting}[style=yaml]
-spring:
-  security:
-    user:
-      name: ${CONFIG_SERVER_USERNAME:configuser}
-      password: ${CONFIG_SERVER_PASSWORD}   # fail-fast senza valore
-\end{lstlisting}
-\end{securebox}
-
-\begin{securebox}[title={Consumer microservice/application.yml (post-hardening) --- es. auth-service}]
-\begin{lstlisting}[style=yaml]
-spring:
-  config:
-    import: "configserver:${CONFIG_SERVER_URL:http://localhost:8888}"
-  cloud:
-    config:
-      username: ${CONFIG_SERVER_USERNAME:configuser}
-      password: ${CONFIG_SERVER_PASSWORD}
-\end{lstlisting}
-\end{securebox}
-
-I test di integrazione \texttt{ConfigSecurityTest} verificano che una richiesta senza
-credenziali riceva \texttt{401 Unauthorized} e che una richiesta con Basic Auth valida
-riceva \texttt{200 OK}.
-
-\paragraph{Riferimento} Commit: \commitref{c934f6e}{fix(security): T-CFG-03 --- HTTP Basic Auth on config-service, credentials injected to all consumers}
-
 % ═════════════════════════════════════════════════════════════════════════════
-\section{Analisi SAST con CodeQL e Supply Chain Security}
+\section{Analisi SAST con CodeQL e Supply Chain Security \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
 % ═════════════════════════════════════════════════════════════════════════════
 
-Al termine del ciclo di hardening è stata eseguita un'analisi statica di sicurezza
-(SAST) tramite \textbf{GitHub CodeQL}, lo strumento di analisi semantica del codice
-integrato nativamente in GitHub Advanced Security. A differenza degli analizzatori
-basati su pattern testuali, CodeQL costruisce un grafo del flusso dati dell'intero
-programma e individua vulnerabilità per flusso di controllo e propagazione di
-valori non fidati.
+\begin{notebox}[title={Nota --- A03:2025 Software Supply Chain Failures + OWASP SAMM Verification (AI-assisted)}]
+Questa sezione copre \textbf{A03:2025 --- Software Supply Chain Failures}, categoria nuova
+dell'edizione 2025 (nel 2021 era solo ``Vulnerable and Outdated Components''): l'analisi
+SAST con GitHub CodeQL, la gestione delle CVE con Trivy e l'hardening CI/CD rientrano
+esattamente in questa categoria. Corrisponde alla fase \textbf{Verification} di OWASP SAMM.
+Implementata con supporto AI; la critica metodologica è nell'Appendice~B.
+\end{notebox}
 
-L'analisi ha prodotto \textbf{10 alert}, raggruppati in due categorie distinte,
-descritte nelle sottosezioni seguenti.
-
-% ─────────────────────────────────────────────────────────────────────────────
-\subsection{Permessi minimi nel workflow CI/CD}
-% ─────────────────────────────────────────────────────────────────────────────
-
-\paragraph{Descrizione} CodeQL (regola \texttt{actions/missing-workflow-permissions})
-ha segnalato che i tre job del workflow \texttt{ci.yml} non dichiaravano un blocco
-\texttt{permissions} esplicito. In assenza di tale blocco, GitHub Actions assegna
-al \texttt{GITHUB\_TOKEN} i permessi di default, che includono l'accesso in scrittura
-a diverse risorse del repository (\texttt{contents: write}, \texttt{packages: write},
-ecc.). Questo viola il \textbf{principio del minimo privilegio}: un workflow che
-esegue solo build e test non ha mai bisogno di permessi di scrittura.
-
-\paragraph{Categoria OWASP} A05:2021 — Security Misconfiguration.
-
-\paragraph{Rischio} Se un job CI scarica una dipendenza malevola (supply chain
-attack), il codice iniettato dispone dei permessi del \texttt{GITHUB\_TOKEN}.
-Con permessi di default in scrittura, un attaccante potrebbe modificare il
-codice sorgente, pubblicare package o creare release non autorizzate dalla
-stessa pipeline CI.
-
-\begin{insecurebox}[title={ci.yml --- job senza dichiarazione di permessi}]
-\begin{lstlisting}[style=yaml]
-jobs:
-  backend:
-    name: "Backend -- Build / PMD / JUnit"
-    runs-on: ubuntu-latest
-    # nessun blocco permissions: il token riceve i default
-    # (contents: write, packages: write, ...)
-    steps:
-      - uses: actions/checkout@v4
-      ...
-\end{lstlisting}
-\end{insecurebox}
-
-\begin{securebox}[title={ci.yml --- permesso minimo per ciascun job (fix)}]
-\begin{lstlisting}[style=yaml]
-jobs:
-  backend:
-    name: "Backend -- Build / PMD / JUnit"
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read      # sola lettura per il checkout
-    steps:
-      - uses: actions/checkout@v4
-      ...
-
-  frontend:
-    name: "Frontend -- ESLint / TypeScript / Vitest"
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps: ...
-
-  e2e:
-    name: "E2E -- Docker Stack + Playwright"
-    runs-on: ubuntu-latest
-    needs: [backend, frontend]
-    permissions:
-      contents: read
-    steps: ...
-\end{lstlisting}
-\end{securebox}
-
-\paragraph{Motivazione della scelta} \texttt{contents: read} è il permesso strettamente
-necessario per eseguire \texttt{actions/checkout}. Nessuno dei tre job effettua push,
-commenta PR, pubblica package o interagisce con le API GitHub in scrittura: la policy
-\emph{deny-by-default} garantisce che eventuali dipendenze compromesse non possano
-sfruttare il token per alterare la repository.
-
-\paragraph{Riferimento} Commit: \commitref{92c0050}{fix(ci): add
-permissions: contents: read to all CI jobs --- CodeQL supply chain fix}
-
-% ─────────────────────────────────────────────────────────────────────────────
-\subsection{Falso positivo: CSRF disabilitato sui microservizi interni}
-% ─────────────────────────────────────────────────────────────────────────────
-
-\paragraph{Descrizione} CodeQL (regola \texttt{java/disabled-spring-csrf-protection})
-ha segnalato come \emph{High} la presenza di \texttt{.csrf(AbstractHttpConfigurer::disable)}
-nelle \texttt{SecurityConfig.java} di sette microservizi: \texttt{auth-service},
-\texttt{guest-service}, \texttt{inventory-service}, \texttt{reservation-service},
-\texttt{stay-service}, \texttt{billing-service}, \texttt{fb-service}.
-
-\paragraph{Analisi dell'alert} Dopo revisione architetturale, gli alert sono stati
-classificati come \textbf{falsi positivi} e chiusi con motivazione \emph{not applicable}.
-La disabilitazione del CSRF protection a livello di singolo microservizio è
-\emph{corretta e intenzionale} per le seguenti ragioni:
-
-\begin{enumerate}
-  \item \textbf{I microservizi non sono esposti direttamente al browser.}
-        L'intera superficie HTTP pubblica è concentrata sull'\texttt{api-gateway}
-        (porta 8080). I servizi interni risiedono in una rete Docker isolata e non
-        sono raggiungibili dall'esterno.
-
-  \item \textbf{I microservizi non emettono né leggono cookie.}
-        La protezione CSRF è necessaria solo quando il browser invia automaticamente
-        credenziali tramite cookie verso un'origine autenticata. I microservizi
-        interni utilizzano esclusivamente header iniettati dall'API Gateway
-        (\texttt{X-Auth-User}, \texttt{X-Auth-Role}, \texttt{X-Auth-Hotel},
-        \texttt{X-Internal-Signature}): non esiste alcun cookie di sessione che
-        un attaccante possa sfruttare in un attacco CSRF.
-
-  \item \textbf{La protezione CSRF è già implementata a livello di gateway (T-GW-05).}
-        La mitigazione \texttt{T-GW-05} (commit \texttt{e146b17}) ha introdotto
-        un \texttt{CsrfFilter} globale sull'\texttt{api-gateway} con strategia
-        \emph{Double-Submit Cookie}: ogni richiesta mutante (POST/PUT/PATCH/DELETE)
-        proveniente dal browser deve includere l'header \texttt{X-CSRF-Token}
-        corrispondente al cookie \texttt{csrf\_token}. Il filtro opera prima di
-        qualsiasi inoltro verso i servizi interni, garantendo che nessuna richiesta
-        CSRF possa mai raggiungere il layer applicativo.
-
-  \item \textbf{Spring Security stessa raccomanda la disabilitazione per API REST stateless.}
-        La documentazione ufficiale di Spring Security afferma esplicitamente che
-        la protezione CSRF non deve essere abilitata per i servizi che utilizzano
-        autenticazione stateless (token-based), poiché non vi è alcun cookie di
-        sessione da proteggere.
-\end{enumerate}
-
-\begin{securebox}[title={SecurityConfig.java interna --- disabilitazione CSRF corretta per API stateless}]
-@Bean
-public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    return http
-        // CSRF disabilitato: servizio interno stateless, nessun cookie emesso.
-        // La protezione CSRF e' implementata a livello di API Gateway (T-GW-05).
-        .csrf(AbstractHttpConfigurer::disable)
-        .sessionManagement(sm ->
-            sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .addFilterBefore(internalAuthFilter, UsernamePasswordAuthenticationFilter.class)
-        ...
-        .build();
-}
-\end{securebox}
-
-\paragraph{Azione intrapresa} Gli alert \#4--\#10 su GitHub Code Scanning sono stati
-\textbf{chiusi come ``Not applicable''} con la seguente motivazione documentata:
-
-\begin{quote}
-\textit{``False positive. This is an internal microservice reachable only via the
-API Gateway's Docker network. It does not issue or read cookies and uses stateless
-JWT-based authentication via headers injected by the gateway. CSRF protection is
-implemented at the gateway layer (CsrfFilter, commit e146b17, T-GW-05) using the
-Double-Submit Cookie pattern. Disabling CSRF on stateless REST APIs is the
-recommended practice per Spring Security documentation.''}
-\end{quote}
-
-\paragraph{Nota metodologica} Questo caso illustra un aspetto rilevante
-dell'analisi SAST: gli strumenti automatici operano per pattern locali e non
-dispongono del contesto architetturale globale del sistema. La capacità di
-distinguere un vero positivo da un falso positivo motivato è parte integrante
-della competenza di sicurezza: un alert non va né ignorato né accettato
-acriticamente, ma analizzato rispetto all'architettura concreta del sistema.
-
-% ─────────────────────────────────────────────────────────────────────────────
 \section{GAP-2 --- Test E2E Attack-Path (Zero Coverage di Sicurezza)}
 % ─────────────────────────────────────────────────────────────────────────────
 
@@ -4755,9 +3906,9 @@ automatizzata.
 
 \paragraph{Categoria OWASP}
 \begin{itemize}
-  \item \textbf{A01:2021} — Broken Access Control (IDOR, RBAC, accesso non autenticato)
-  \item \textbf{A07:2021} — Identification \& Authentication Failures (JWT scaduto, brute-force 429)
-  \item \textbf{A01:2021} — CSRF (403 su mutation)
+  \item \textbf{A01:2025} — Broken Access Control (IDOR, RBAC, accesso non autenticato)
+  \item \textbf{A07:2025} — Authentication Failures (JWT scaduto, brute-force 429)
+  \item \textbf{A01:2025} — CSRF (403 su mutation)
 \end{itemize}
 
 \begin{insecurebox}[title={Baseline --- Suite E2E con zero copertura di percorsi di attacco}]
@@ -4876,7 +4027,8 @@ test('cross-hotel reservation edit via URL -> error state', async ({ page }) => 
 Le tre suite aggiungono \textbf{11 test E2E} che coprono i seguenti vettori:
 
 \begin{center}
-\begin{tabular}{llll}
+\small
+\begin{tabularx}{\textwidth}{l l X l}
 \toprule
 \textbf{Suite} & \textbf{Test ID} & \textbf{Vettore di attacco} & \textbf{Assert chiave} \\
 \midrule
@@ -4892,10 +4044,10 @@ security-idor  & T-IDOR-SEC-01 & Edit ospite cross-hotel (404)    & Toast error,
 security-idor  & T-IDOR-SEC-02 & URL manipulation risorsa (404)   & Error state, no dati \\
 security-idor  & T-IDOR-SEC-03 & Lista ospiti hotel-scoped        & Solo ospiti hotel corrente \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{center}
 
-\paragraph{Riferimento} Commit:
+\paragraph{Riferimento} Commit:\\
 \commitref{f2cbc7d}{fix: GAP-2 — 11 E2E security attack-path tests (auth/RBAC/IDOR)}
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -4973,25 +4125,25 @@ if (!isSignatureValid(username, role, hotelId, signature)) {
 \end{lstlisting}
 \end{securebox}
 
-\paragraph{Test di copertura}
-Sono stati aggiunti 8 test JUnit~5 in
-\texttt{fb-service/.../security/InternalAuthFilterTest.java}
+\paragraph{Test di copertura}\mbox{}\\
+Sono stati aggiunti 8 test JUnit~5 in\\
+\path{fb-service/.../security/InternalAuthFilterTest.java}
 che coprono tutti i path del filtro:
 
 \begin{center}
 \small
-\begin{tabular}{llp{6cm}}
+\begin{tabular}{l p{5.5cm} p{5.5cm}}
 \toprule
 \textbf{Nested class} & \textbf{Test} & \textbf{Assert chiave} \\
 \midrule
-PresenceCheck & shouldRejectWhenUsernameMissing    & HTTP 401 \\
-PresenceCheck & shouldRejectWhenRoleMissing        & HTTP 401 \\
-PresenceCheck & shouldRejectWhenHotelIdMissing     & HTTP 401 \\
-PresenceCheck & shouldRejectWhenSignatureMissing   & HTTP 401 \\
-HmacCheck     & shouldRejectWhenSignatureInvalid   & HTTP 401 \\
-HmacCheck     & shouldRejectWhenSignatureComputedForDifferentHotelId & HTTP 401 (tenant isolation) \\
-HmacCheck     & shouldAuthenticateWithValidHeaders & HTTP 200 + SecurityContext (name/details/authority) \\
-ActuatorBypass & shouldBypassFilterForActuatorEndpoint & HTTP 200 senza headers \\
+PresenceCheck  & \seqsplit{shouldRejectWhenUsernameMissing}    & HTTP 401 \\
+PresenceCheck  & shouldRejectWhenRoleMissing                    & HTTP 401 \\
+PresenceCheck  & \seqsplit{shouldRejectWhenHotelIdMissing}      & HTTP 401 \\
+PresenceCheck  & \seqsplit{shouldRejectWhenSignatureMissing}    & HTTP 401 \\
+HmacCheck      & \seqsplit{shouldRejectWhenSignatureInvalid}    & HTTP 401 \\
+HmacCheck      & \seqsplit{shouldRejectWhenSignatureComputedForDifferentHotelId} & HTTP 401 (tenant isolation) \\
+HmacCheck      & \seqsplit{shouldAuthenticateWithValidHeaders}  & HTTP 200 + SecurityContext (name/details/authority) \\
+ActuatorBypass & \seqsplit{shouldBypassFilterForActuatorEndpoint} & HTTP 200 senza headers \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -5185,13 +4337,13 @@ sum by (service) (rate(
         scartati silenziosamente dalla coda senza mai bloccare i thread
         dell'applicazione. La resilienza funzionale dell'applicazione non
         dipende dalla disponibilità del sistema di logging.
-  \item \textbf{Label Loki \texttt{service/level}}: il pattern di label
+  \item \textbf{Label Loki \texttt{service/level}}: il pattern di label\\
         \texttt{service=\$\{appName\},level=\%level} permette query LogQL
         efficienti con filtro per servizio e livello di log, abilitando
         l'aggregazione cross-service dei log di audit.
   \item \textbf{Provisioning automatico Grafana}: datasource Loki e dashboard
         vengono caricati automaticamente all'avvio tramite i file YAML in
-        \texttt{docker/grafana/provisioning/}, eliminando ogni configurazione
+        \path{docker/grafana/provisioning/}, eliminando ogni configurazione
         manuale post-deploy.
 \end{itemize}
 
@@ -5236,7 +4388,8 @@ che \emph{impongono} la conservazione per periodi minimi e del diritto GDPR
 che ne chiede la cancellazione su richiesta:
 
 \begin{center}
-\begin{tabular}{llll}
+\small
+\begin{tabularx}{\textwidth}{X l l l}
 \toprule
 \textbf{Obbligo} & \textbf{Dato} & \textbf{Durata minima} & \textbf{Prevalenza} \\
 \midrule
@@ -5244,7 +4397,7 @@ Circ.\ PS / D.Lgs.\ 196/2003 & Dati alloggiati & 5 anni & Su richiesta GDPR \\
 Codice Civile art.\ 2220 & Fatture / pagamenti & 10 anni & Su richiesta GDPR \\
 GDPR art.\ 17 par.\ 3 lett.\ b & — & Deroga per obblighi legali & Prevale sulla richiesta \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 \noindent
@@ -5334,9 +4487,9 @@ commit \texttt{56109eb}.
         \texttt{GdprLegalHoldException} e produce la risposta 451.
 
   \item \textbf{Configurabilità per hotel --- Flyway V5}:
-        la migration \texttt{V5\_\_add\_guest\_privacy\_settings.sql} crea la
-        tabella \texttt{guest\_privacy\_settings} (una riga per hotel).
-        \texttt{GuestPrivacySettingsController} espone
+        la migration \path{V5__add_guest_privacy_settings.sql} crea la
+        tabella \texttt{\seqsplit{guest\_privacy\_settings}} (una riga per hotel).\\
+        \texttt{\seqsplit{GuestPrivacySettingsController}} espone
         \texttt{GET/PUT /api/v1/guests/settings} con Jakarta Bean Validation
         (\texttt{@Min(5)}) che impedisce di scendere sotto il minimo TULPS.
         Il periodo di retention configurato viene rispettato sia dalla guardia
@@ -5372,7 +4525,7 @@ dei boundary value imposti dalla legge italiana:
 \end{itemize}
 
 \paragraph{Stato}
-\textbf{\textcolor{securegreen}{✅ RISOLTO}} --- commit \texttt{56109eb},
+\textbf{\textcolor{fixgreen}{RISOLTO}} --- commit \texttt{56109eb},
 fix warning \texttt{066f611}.
 Tutti e quattro gli step del piano di mitigazione sono implementati;
 la copertura del test include i boundary value temporali critici richiesti
@@ -5469,7 +4622,7 @@ con enforcement a tre livelli:
 
   \item \textbf{Microservizi (Spring Security)}: ciascun microservizio
         popola il \texttt{SecurityContext} tramite \texttt{InternalAuthFilter}
-        con un \texttt{SimpleGrantedAuthority("ROLE\_" + role)} derivato dall'header
+        con un \texttt{\seqsplit{SimpleGrantedAuthority("ROLE\_" + role)}} derivato dall'header
         \texttt{X-Auth-Role}. I metodi di servizio e i controller usano
         \texttt{@PreAuthorize} o \texttt{hasRole()} di Spring Security per
         verificare il ruolo sul thread corrente.
@@ -5537,40 +4690,40 @@ di implementazione.
 
 \begin{center}
 \small
-\begin{tabular}{p{3.2cm} p{4cm} l l}
+\begin{tabular}{p{3.2cm} p{4.5cm} p{3.0cm} p{2.8cm}}
 \toprule
 \textbf{Vettore} & \textbf{Protezione} & \textbf{OWASP} & \textbf{Commit} \\
 \midrule
 Brute force credenziali
   & Lockout 5 tentativi / 15 min; rate limit gateway 5~req/s per IP
-  & A07 & \texttt{a90e462} \\
+  & A07:2025 & \texttt{a90e462} \\
 User enumeration
   & Messaggio uniforme \texttt{INVALID\_CREDENTIALS}
-  & A07 & baseline \\
+  & A07:2025 & baseline \\
 Password debole in DB
   & BCrypt cost~12 + lazy rehash on login
-  & A02 & \texttt{4e1f1e9} \\
+  & A04:2025 & \texttt{4e1f1e9} \\
 Token theft (access)
   & TTL 15 min; cookie httpOnly/Secure/SameSite
-  & A02/A07 & \texttt{5ce3010} \\
+  & A04:2025/\linebreak[2]A07:2025 & \texttt{5ce3010} \\
 Token theft (refresh)
   & Rotation + blacklist JTI Redis; bulk revoca TV
-  & A07 & \texttt{5ce3010}, \texttt{b473265} \\
+  & A07:2025 & \texttt{5ce3010}, \texttt{b473265} \\
 Session hijacking CSRF
   & Double-Submit Cookie (header \texttt{X-CSRF-Token} == cookie)
-  & A01 & \texttt{e146b17} \\
+  & A01:2025 & \texttt{e146b17} \\
 JWT forging
   & HS256 con segreto 48 byte random; fail-fast senza \texttt{JWT\_SECRET}
-  & A02 & \texttt{91d9484}, \texttt{6dc6ea4} \\
+  & A04:2025 & \texttt{91d9484}, \texttt{6dc6ea4} \\
 Header injection inter-service
   & HMAC-SHA256 su \texttt{username:role:hotelId} (constant-time compare)
-  & A01 & baseline, \texttt{5bdc594} \\
+  & A01:2025 & baseline, \texttt{5bdc594} \\
 Tenant hopping (IDOR)
   & \texttt{hotelId} nel JWT; X-Auth-Hotel iniettato; query hotel-scoped; 404 IDOR-safe
-  & A01 & \texttt{b469e21} + T-GST/RES/BILL/FB \\
+  & A01 & \texttt{b469e21} + \path{T-GST/RES/BILL/FB} \\
 XSS → token exfiltration
-  & httpOnly cookie; ESLint ban \texttt{dangerouslySetInnerHTML}; CSP nginx
-  & A03 & \texttt{3655906}, \texttt{b901a9f} \\
+  & httpOnly cookie; ESLint ban \texttt{dangerously\-Set\-Inner\-HTML}; CSP nginx
+  & A05:2025 & \texttt{3655906}, \texttt{b901a9f} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -5597,585 +4750,313 @@ triaggiati e dismissi con motivazione tecnica documentata (si veda DEP-CVE-04).
 \appendix
 
 % ═════════════════════════════════════════════════════════════════════════════
-\chapter{Appendice IA --- Utilizzo e Metodologia}
+\chapter{Appendice A --- Implementazioni Avanzate (AI-assisted)}
+\label{app:enterprise}
 % ═════════════════════════════════════════════════════════════════════════════
 
-\section{Modalità di utilizzo dell'IA}
-
-Nel contesto di questo progetto, \textbf{Claude Code} (Anthropic, modello
-\texttt{claude-sonnet-4-6}) è stato impiegato come strumento di supporto in tre
-fasi ben distinte del ciclo di sviluppo della sicurezza, descritte di seguito.
-
-% ─────────────────────────────────────────────────────────────────────────────
-\subsection{Fase 1 — Analisi iniziale del software}
-
-Nella prima fase, l'IA ha effettuato un'analisi statica dell'intera codebase del
-sistema Hotel PMS, esaminando i nove microservizi backend (Java 21, Spring Boot 3.4),
-il frontend React e la configurazione dell'infrastruttura Docker.
-
-L'obiettivo era identificare le aree di debolezza rispetto alle principali categorie
-di rischio, senza ancora prescrivere soluzioni implementative. L'analisi ha prodotto
-un insieme strutturato di osservazioni relative a:
-
-\begin{itemize}
-  \item gestione delle credenziali e dei token di autenticazione;
-  \item esposizione di endpoint interni e di monitoraggio;
-  \item assenza di header HTTP di sicurezza nelle risposte;
-  \item mancanza di controlli di autorizzazione multi-tenant;
-  \item configurazioni di default insicure nei servizi Spring Boot.
-\end{itemize}
+Questa appendice raccoglie le implementazioni di sicurezza sviluppate con supporto
+diretto di \textbf{Claude Code} (Anthropic) che vanno oltre i requisiti minimi
+della traccia d'esame. Il codice è funzionante e integrato nel sistema; è documentato
+qui per completezza architetturale, non rivendicato come competenza autonoma esclusiva.
 
 % ─────────────────────────────────────────────────────────────────────────────
-\subsection{Fase 2 — Costruzione del Threat Model}
+\section{Autenticazione avanzata}
+% ─────────────────────────────────────────────────────────────────────────────
 
-Sulla base dell'analisi prodotta nella fase precedente, è stato costruito il documento
-\texttt{THREAT\_MODEL.md}, che costituisce il piano operativo dell'intero processo
-di hardening. Il documento è organizzato secondo la metodologia \textbf{STRIDE}
-(Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service,
-Elevation of Privilege) e comprende:
+\paragraph{T-AUTH-04 residual --- Token versioning e revoca bulk (Redis)}
+Al cambio password, il sistema incrementa \texttt{tokenVersion} in PostgreSQL e
+aggiorna la chiave Redis \texttt{user:tv:<username>}. Qualsiasi refresh token con
+\texttt{tv} inferiore al valore corrente è rifiutato alla prossima rotazione,
+invalidando tutte le sessioni precedenti. La finestra di esposizione residua è
+limitata ai soli access token in volo (massimo 15 minuti).
+Commit: \commitref{b473265}{fix(security): GAP-1 --- password change revokes sessions via tokenVersion}
 
-\begin{itemize}
-  \item la catalogazione di 22 threat distribuiti sui 9 microservizi e sul frontend;
-  \item la mappatura di ciascun threat sulla tassonomia \textbf{OWASP Top 10 (2021)};
-  \item una \emph{risk matrix} impatto/probabilità per stabilire le priorità di intervento;
-  \item una tabella di tracciamento delle mitigazioni, aggiornata al termine di ogni
-        implementazione con il riferimento al commit Git corrispondente.
-\end{itemize}
-
-Il \texttt{THREAT\_MODEL.md} funge da documento vivente: viene aggiornato
-iterativamente a ogni intervento completato e riflette in ogni momento lo stato
-corrente del processo di hardening.
+\paragraph{T-AUTH-05 --- Audit log strutturati (OWASP A09)}
+Ogni evento di autenticazione (login/fallimento/lockout/logout) produce una riga
+strutturata con prefisso \texttt{[AUTH]}, livello INFO/WARN, username e motivazione.
+Corrispondenza con OWASP A09:2025 --- Security Logging \& Alerting Failures.
+Commit: \commitref{9a3d7f2}{fix(security): T-AUTH-05 --- structured auth audit log}
 
 % ─────────────────────────────────────────────────────────────────────────────
-\subsection{Fase 3 — Verifica post-implementazione}
+\section{Sicurezza inter-service avanzata}
+% ─────────────────────────────────────────────────────────────────────────────
 
-Al termine di ciascun intervento di hardening, l'IA ha eseguito sistematicamente
-le seguenti operazioni di verifica prima di autorizzare il commit e il push sulla
-repository GitHub:
+\paragraph{T-GW-07 --- HMAC-SHA256 inter-service con binding sul tenant}
+Header \texttt{X-Internal-Signature} = HMAC-SHA256 di \texttt{"user:role:hotelId"}.
+Verificato con \texttt{MessageDigest.isEqual} (constant-time) da ogni microservizio.
+Impedisce impersonation e tampering del tenant context.
+Commit: \commitref{b469e21}{fix(security): T-GW-07 --- HMAC inter-service tenant binding}
 
-\begin{enumerate}
-  \item \textbf{Analisi delle modifiche}: revisione di tutti i file coinvolti
-        nell'intervento, verifica della correttezza logica e dell'assenza di
-        regressioni rispetto al comportamento atteso.
-  \item \textbf{Build backend}: esecuzione di \texttt{./gradlew build} sul modulo
-        interessato, che include compilazione, analisi statica PMD (zero-warning
-        policy) e suite di test JUnit 5. Il build viene considerato superato solo
-        se tutti e tre i gate risultano verdi.
-  \item \textbf{Build e lint frontend}: esecuzione di \texttt{npm run lint} e
-        \texttt{npm run build} nella directory \texttt{frontend/}, con verifica
-        che ESLint non produca alcun avviso e che la compilazione TypeScript
-        termini senza errori.
-  \item \textbf{Aggiornamento della documentazione}: modifica della tabella
-        mitigazioni in \texttt{THREAT\_MODEL.md} (status \texttt{✅}, SHA del
-        commit) e produzione del frammento LaTeX corrispondente per questo report,
-        secondo il workflow iterativo codice\,+\,documentazione.
-  \item \textbf{Commit e push}: solo al superamento di tutti i controlli precedenti
-        viene effettuato il commit sul branch \texttt{feature/secure-coding-hardening}
-        con messaggio convenzionale, seguito dal merge su \texttt{main}.
-\end{enumerate}
+\paragraph{T-GW-06 --- Propagazione X-Auth-Hotel end-to-end}
+Aggiunto campo \texttt{hotelId} a \texttt{UserAccount} e claim JWT corrispondente.
+L'API Gateway inietta \texttt{X-Auth-Hotel} su ogni richiesta a valle.
+Senza questo intervento tutti i servizi multi-tenant restituivano HTTP~401.
+Commit: \commitref{b469e21}{fix(security): T-GW-06 --- X-Auth-Hotel propagation end-to-end}
 
-Questo approccio garantisce che ogni commit presente nella repository rappresenti
-uno stato integro e verificabile del sistema, e che la storia Git rifletta
-fedelmente la progressione degli interventi di sicurezza.
+\paragraph{T-GW-02 --- Rate limiting Redis token bucket proxy-aware}
+Key resolver aggiornato per leggere \texttt{X-Forwarded-For} anziché l'IP TCP
+(dietro un proxy tutti i client condividerebbero un unico bucket).
+Rate limiting esteso a tutte le route business, non solo \texttt{/auth/**}.
+Commit: \commitref{3f8a1c2}{fix(security): T-GW-02 --- proxy-aware rate limiting all routes}
 
 % ─────────────────────────────────────────────────────────────────────────────
-\section{DEP-CVE-01 --- Dipendenze vulnerabili (Netty + Spring Cloud Gateway)}
+\section{Configurazione e SDLC avanzati}
+% ─────────────────────────────────────────────────────────────────────────────
 
-\subsection*{Contesto}
+\paragraph{T-CFG-03 --- Autenticazione HTTP Basic sul config-service}
+Il config-service (porta 8888) espone JWT\_SECRET, POSTGRES\_PASSWORD e
+INTERNAL\_HMAC\_SECRET. HTTP Basic Auth aggiunta per impedire lettura anonima.
+Commit: \commitref{c934f6e}{fix(security): T-CFG-03 --- HTTP Basic Auth on config-service}
 
-Il pipeline CI esegue \textbf{Trivy} su ogni immagine Docker costruita in fase di
-\texttt{build}. Nella sessione del 2026-04-15, la scansione dell'immagine
-\texttt{hotel-pms/api-gateway:ci} ha riportato \textbf{4 CVE HIGH} tutte con
-patch disponibile (\texttt{status: fixed}):
+\paragraph{SAST/CodeQL e supply chain CI/CD (OWASP SAMM Verification)}
+10 alert CodeQL risolti: permessi minimi \texttt{contents: read} su ogni job CI
+(OWASP A02:2025 --- Security Misconfiguration), 9 falsi positivi CSRF su microservizi interni chiusi con motivazione.
+Corrisponde alla fase \textbf{Verification} di OWASP SAMM e al principio shift-left.
+Commit: \commitref{92c0050}{fix(ci): add permissions: contents: read to all CI jobs}
 
-\begin{center}
-\small
-\begin{tabular}{lllll}
-\hline
-\textbf{CVE} & \textbf{Libreria} & \textbf{Versione installata} & \textbf{Fix} & \textbf{Tipo} \\
-\hline
-CVE-2026-33870 & \texttt{netty-codec-http}         & 4.1.130.Final & 4.1.132.Final & Request smuggling \\
-CVE-2026-33871 & \texttt{netty-codec-http2}        & 4.1.130.Final & 4.1.132.Final & HTTP/2 DoS \\
-CVE-2025-41235 & \texttt{spring-cloud-gateway-server} & 4.2.0      & 4.2.3         & Header forwarding \\
-CVE-2025-41253 & \texttt{spring-cloud-gateway-server} & 4.2.0      & 4.2.6         & EL injection \\
-\hline
-\end{tabular}
-\end{center}
+\paragraph{CVE scanning con Trivy (DEP-CVE-01/02/04)}
+Pipeline CI esegue Trivy su ogni immagine Docker.
+CVE risolte: \texttt{CVE-2026-33870/33871} (Netty request smuggling + HTTP/2 DoS),
+\texttt{CVE-2025-41235/41253} (Spring Cloud Gateway header forwarding + EL injection).
+108 alert su immagini terze parti triaggiati con motivazione documentata.
 
-\subsection*{Analisi delle vulnerabilità}
+% ═════════════════════════════════════════════════════════════════════════════
+\chapter{Appendice B --- Utilizzo dell'IA e Revisione Critica}
+\label{app:ia}
+% ═════════════════════════════════════════════════════════════════════════════
 
-\begin{insecurebox}[title={Netty 4.1.130 --- request smuggling e HTTP/2 DoS (gateway ingress)}]
-\textbf{CVE-2026-33870} (\texttt{netty-codec-http}): parsing scorretto del
-\emph{chunked transfer encoding} di HTTP/1.1 consente a un attaccante di
-iniettare richieste aggiuntive nella stessa connessione TCP (\emph{HTTP request
-smuggling}), potenzialmente bypassando la logica di routing e autenticazione del
-gateway.
+\section{Metodologia}
 
-\medskip
-\textbf{CVE-2026-33871} (\texttt{netty-codec-http2}): un \emph{CONTINUATION frame
-flood} nel protocollo HTTP/2 consuma memoria illimitata sul lato server, producendo
-un Denial of Service. Il gateway è il punto di ingresso unico di tutto il traffico
-esterno: un DoS qui rende irraggiungibili tutti i microservizi del PMS.
-\end{insecurebox}
+Il progetto è stato sviluppato a partire da una codebase personale preesistente
+(branch \texttt{pre-secure-coding}), usata come baseline insicura.
+\textbf{Claude Code} (Anthropic, modello \texttt{claude-sonnet-4-6}) è stato impiegato
+come strumento di analisi e supporto all'implementazione, \emph{non} come sostituto
+del ragionamento critico dello studente.
 
-\begin{insecurebox}[title={Spring Cloud Gateway 4.2.0 --- header forwarding e EL injection}]
-\textbf{CVE-2025-41235}: il gateway inoltra header \texttt{X-Forwarded-*} ricevuti
-da proxy non fidati senza validazione. Nel sistema PMS questo potrebbe permettere
-a un attaccante di sovrascrivere \texttt{X-Auth-User} / \texttt{X-Auth-Hotel} —
-gli stessi header che i microservizi interni usano per il controllo degli accessi
-multi-tenant.
-
-\medskip
-\textbf{CVE-2025-41253}: un input non sanificato nelle configurazioni di routing
-di Spring Cloud Gateway WebFlux può essere interpretato come \emph{Spring
-Expression Language}, portando a Remote Code Execution sul gateway o all'esfiltrazione
-di segreti dall'application context (chiave JWT, HMAC secret, credenziali Redis).
-\end{insecurebox}
-
-\subsection*{Intervento}
-
-\begin{securebox}[title={Netty 4.1.132.Final via Spring Boot BOM property override}]
-La proprietà \texttt{netty.version} esposta dal plugin
-\texttt{io.spring.dependency-management} è stata sovrascritta nel blocco
-\texttt{ext} di \texttt{api-gateway/build.gradle.kts}:
-
-\begin{verbatim}
-set("netty.version", "4.1.132.Final")
-\end{verbatim}
-
-Questa tecnica forza l'intero grafo delle dipendenze Netty (codec-http,
-codec-http2, buffer, common, transport, \ldots) alla versione patchata,
-senza alterare il BOM Spring Cloud né le dipendenze degli altri moduli.
-\end{securebox}
-
-\begin{securebox}[title={Spring Cloud Gateway 4.2.6 via dependencyManagement override}]
-Le coordinate \texttt{spring-cloud-gateway-server} e
-\texttt{spring-cloud-starter-gateway} sono state fissate a \texttt{4.2.6}
-tramite il blocco \texttt{dependencies} \{\ \} all'interno di
-\texttt{dependencyManagement}:
-
-\begin{verbatim}
-dependencyManagement {
-    imports { mavenBom("...spring-cloud-dependencies:2024.0.0") }
-    dependencies {
-        dependency("...spring-cloud-gateway-server:4.2.6")
-        dependency("...spring-cloud-starter-gateway:4.2.6")
-    }
-}
-\end{verbatim}
-
-Questo override ha priorità sul BOM importato, aggiornando il gateway al
-rilascio che corregge entrambe le CVE (\texttt{4.2.3} per CVE-2025-41235,
-\texttt{4.2.6} per CVE-2025-41253) senza toccare il resto del train
-\texttt{2024.0.0}.
-\end{securebox}
-
-\begin{securebox}[title={Impatto sulla postura di sicurezza}]
-Dopo il commit \texttt{14d29b9}:
-\begin{itemize}
-  \item La scansione Trivy non rileva più CVE HIGH/CRITICAL nell'immagine
-        \texttt{api-gateway:ci} (tutte e 4 le segnalazioni risolte per fix
-        di versione, non per soppressione).
-  \item L'unica CVE precedentemente soppressa (\texttt{CVE-2026-22732},
-        Spring Security) rimane in \texttt{.trivyignore} con giustificazione
-        documentata in attesa di Spring Boot 3.5.x.
-  \item Il meccanismo di override BOM è verificabile e reversibile:
-        rimuovere le due righe nel \texttt{build.gradle.kts} ripristina il
-        comportamento del BOM originale.
-\end{itemize}
-\end{securebox}
-
-\subsection*{Nota — CI SCA: cache NVD e chiave API}
-
-In parallelo alla risoluzione delle CVE, è stato corretto un problema di
-performance nel job CI \texttt{sca} (OWASP Dependency Check): la chiave
-di cache per il database NVD utilizzava \texttt{run\_id}, unico per ogni
-esecuzione, rendendo di fatto inutile la cache e causando il ri-scaricamento
-dell'intero database (~200 MB) a ogni run, con tempi superiori a un'ora.
-La chiave è stata corretta in formato \texttt{nvd-<os>-<YYYY-MM-DD>},
-condivisa tra tutte le esecuzioni dello stesso giorno (commit \texttt{d1a7cdc}).
-
-Era stato inoltre previsto di registrare una \textbf{NVD API Key} gratuita
-(portale NIST) per aumentare il rate limit delle chiamate NVD da
-1\,req/6\,s a 50\,req/30\,s, riducendo il tempo di prima esecuzione da
-circa 15 minuti a circa 3 minuti. L'implementazione è stata progettata
-e il codice predisposto (lettura da env var \texttt{NVD\_API\_KEY} →
-property \texttt{nvdApiKey} del plugin Gradle), ma \textbf{non è stato
-possibile completare la registrazione}: al momento dell'accesso, il
-portale NVD di NIST risultava in manutenzione e non accettava nuove
-richieste di chiave. Il codice di integrazione è stato quindi rimosso
-per mantenere la configurazione pulita; l'ottimizzazione rimane
-applicabile non appena il servizio torna disponibile.
+In questa appendice sono documentati i momenti in cui l'output dell'AI è stato valutato
+criticamente, evidenziando i casi in cui il suggerimento era errato, incompleto o
+incompatibile con il contesto specifico del sistema.
 
 % ─────────────────────────────────────────────────────────────────────────────
-\section{DEP-CVE-02 --- Commons FileUpload + Commons IO (tutti i servizi)}
-
-\textbf{Commit}: \texttt{e9b6eb6} — branch \texttt{feature/secure-coding-hardening}
-
-\subsection*{CVE coinvolte}
-
-\begin{center}
-\small
-\begin{tabular}{lllll}
-\hline
-\textbf{CVE} & \textbf{Libreria} & \textbf{Vers. vuln.} & \textbf{Fix} & \textbf{Severity} \\
-\hline
-CVE-2025-48976 & commons-fileupload & 1.5 & 1.6.0 & HIGH \\
-CVE-2024-47554  & commons-io         & 2.11.0 & 2.14.0 & HIGH \\
-\hline
-\end{tabular}
-\end{center}
-
-\subsection*{Descrizione delle vulnerabilità}
-
-\begin{insecurebox}[title={CVE-2025-48976 --- Apache Commons FileUpload DoS}]
-Un attaccante può inviare una richiesta multipart con un numero elevato di
-header per singola parte (\emph{part headers}), causando un consumo di CPU e
-memoria sproporzionato nel parsing (Denial of Service). Tutte le 8 immagini
-Docker dei microservizi includevano la versione 1.5 come dipendenza transitiva
-di Spring Boot 3.4.x.
-\end{insecurebox}
-
-\begin{insecurebox}[title={CVE-2024-47554 --- Apache Commons IO XmlStreamReader DoS}]
-\texttt{XmlStreamReader} non impone un limite alla dimensione del BOM/encoding
-declaration durante il parsing di input non fidato. Un input malevolo può
-bloccare il thread reader in un loop che consuma tutta la memoria disponibile.
-La versione 2.11.0 era inclusa transitivamente in tutti gli 8 servizi.
-\end{insecurebox}
-
-\subsection*{Risoluzione}
-
-\begin{securebox}[title={dependencyManagement.dependencies su tutti gli 8 microservizi}]
-\texttt{commons-fileupload} e \texttt{commons-io} \emph{non} sono gestiti
-dal BOM di Spring Boot 3.4.x: \texttt{CommonsMultipartResolver} è stato
-rimosso in Spring Framework 6.1, portando all'eliminazione di queste librerie
-dalla BOM di gestione. Di conseguenza, la tecnica
-\texttt{ext\{set("commons-fileupload.version", "1.6.0")\}} non ha effetto sul
-grafo delle dipendenze transitorie.
-
-La risoluzione corretta utilizza il blocco
-\texttt{dependencyManagement \{ dependencies \{ ... \} \}} del plugin
-\texttt{io.spring.dependency-management}, che forza la versione
-indipendentemente dalla provenienza del transitive pull:
-
-\begin{verbatim}
-dependencyManagement {
-    imports { mavenBom(...) }
-    dependencies {
-        dependency("commons-fileupload:commons-fileupload:1.6.0")
-        dependency("commons-io:commons-io:2.14.0")
-    }
-}
-\end{verbatim}
-
-Questo è lo stesso meccanismo usato in \texttt{api-gateway} per forzare
-\texttt{spring-cloud-gateway-server:4.2.6} (DEP-CVE-01). Applicato a tutti
-gli 8 microservizi (auth, billing, config, fb, guest, inventory, reservation,
-stay).
-\end{securebox}
-
-\subsection*{Rimozione del job SCA (OWASP Dependency Check)}
-
-Il job CI \texttt{sca} (OWASP Dependency Check) è stato rimosso dal workflow
-\texttt{ci.yml} per le seguenti ragioni:
-
-\begin{itemize}
-  \item Il database NVD di NIST risultava in manutenzione per periodi prolungati,
-        rendendo impossibile il download iniziale del DB e causando timeout
-        superiori a un'ora.
-  \item La scansione Trivy (\texttt{aquasecurity/trivy-action}) copre già
-        l'obiettivo A06 con un database di vulnerabilità aggiornato
-        autonomamente e tempi di esecuzione nell'ordine dei secondi.
-  \item I due strumenti si sovrapponevano sulla stessa categoria di rischio
-        (componenti vulnerabili) senza complementarità pratica nel contesto
-        di questo progetto.
-\end{itemize}
-
-La copertura OWASP A06 rimane garantita dalla pipeline Trivy (matrice ×8
-servizi + 3 immagini third-party), che ha rilevato e verificato la risoluzione
-di entrambe le CVE descritte in questa sezione.
-
+\section{Episodio 1 --- JWT storage: localStorage suggerito dall'AI}
 % ─────────────────────────────────────────────────────────────────────────────
-\section{DEP-CVE-03 --- Spring Cloud Config Server (CVE-2026-22739)}
 
-\textbf{Commit}: \texttt{e9b6eb6} — branch \texttt{feature/secure-coding-hardening}
-
-\subsection*{CVE coinvolte}
-
-\begin{center}
-\small
-\begin{tabular}{lllll}
-\hline
-\textbf{CVE} & \textbf{Libreria} & \textbf{Vers. vuln.} & \textbf{Fix} & \textbf{Severity} \\
-\hline
-CVE-2026-22739 & spring-cloud-config-server & 4.2.0 & 4.3.2 / 5.0.2 & HIGH \\
-\hline
-\end{tabular}
-\end{center}
-
-\subsection*{Descrizione della vulnerabilità}
-
-\begin{insecurebox}[title={CVE-2026-22739 --- Path Traversal via Profile Parameter}]
-Un attaccante con accesso all'endpoint HTTP del Config Server può fornire un
-valore artigianale per il parametro \texttt{profile} che contiene sequenze di
-path traversal (\texttt{../}). Il server non sanifica sufficientemente il
-parametro prima di costruire il percorso del file di configurazione, permettendo
-la lettura di file arbitrari dal filesystem del container
-(\emph{Arbitrary File Read}).
-\end{insecurebox}
-
-\subsection*{Rischio residuale e mitigazione compensativa}
-
-La versione corretta (4.3.2) appartiene alla release train Spring Cloud
-2025.0.x, incompatibile con Spring Boot 3.4.x (utilizzato per garantire la
-compatibilità con Spring Cloud 2024.0.x). Non è possibile aggiornare solo
-\texttt{spring-cloud-config-server} senza rischiare incompatibilità nel grafo
-BOM.
-
-\begin{securebox}[title={Mitigazioni compensative}]
-\begin{itemize}
-  \item \textbf{Isolamento di rete}: il config-service (porta 8888) non è
-        instradato attraverso l'API Gateway e non è accessibile dall'esterno.
-        Solo i microservizi interni con la corretta configurazione Spring Cloud
-        Config Client possono effettuare richieste.
-  \item \textbf{Nessun file sensibile nel container}: il filesystem del
-        container non contiene credenziali o file di sistema rilevanti oltre
-        ai config YAML già serviti.
-  \item \textbf{Soppressione documentata}: la CVE è stata aggiunta a
-        \texttt{.trivyignore} con giustificazione completa, in modo che la
-        pipeline CI rimanga verde e il rischio resti tracciato nel
-        \texttt{THREAT\_MODEL.md}.
-  \item \textbf{Piano di migrazione}: la CVE sarà risolta con il prossimo
-        aggiornamento a Spring Boot 3.5.x + Spring Cloud 2025.0.x.
-\end{itemize}
-\end{securebox}
-
-% ─────────────────────────────────────────────────────────────────────────────
-\section{DEP-CVE-04 --- Upgrade Spring Boot 3.5.x, CVE residua Netty epoll e triage alert Trivy}
-
-\textbf{Commit}: \texttt{bbb7a7e} — branch \texttt{main}
-
-\subsection*{Aggiornamento Spring Boot 3.5.x + Spring Cloud 2025.0.x}
-
-A valle della chiusura del branch \texttt{feature/secure-coding-hardening},
-tutti i 9 microservizi sono stati aggiornati da Spring Boot \texttt{3.4.x}
-a Spring Boot \texttt{3.5.14} e da Spring Cloud \texttt{2024.0.0} a
-\texttt{2025.0.0}. L'aggiornamento risolve:
-
-\begin{itemize}
-  \item \textbf{CVE-2026-22739} (config-server path traversal, DEP-CVE-03):
-        la versione patchata \texttt{spring-cloud-config-server~4.3.x} è
-        inclusa nel BOM \texttt{2025.0.0}; le mitigazioni compensative
-        documentate in DEP-CVE-03 rimangono valide come defence-in-depth.
-  \item \textbf{CVE-2025-41253} (Spring Cloud Gateway EL injection):
-        \texttt{spring-cloud-gateway-server} aggiornato a \texttt{4.3.2}
-        tramite override esplicito in \texttt{dependencyManagement}
-        (la versione base del BOM 2025.0.0 è 4.3.0, non ancora patchata).
-  \item \textbf{CVE-2026-42583/42584/42579/42587} (Netty codec):
-        Netty fissato a \texttt{4.1.133.Final} via proprietà BOM.
-  \item \textbf{CVE-2026-42198} (PostgreSQL JDBC): driver aggiornato a
-        \texttt{42.7.11} tramite \texttt{dependencyManagement}.
-  \item \textbf{CVE-2026-5598} (BouncyCastle): aggiornato a
-        \texttt{bcprov-jdk18on:1.84}.
-\end{itemize}
-
-\medskip
-\textbf{Breaking change gestita}: Spring Boot 3.5.x proibisce il proxying
-CGLIB di classi \texttt{final} per AOP transazionale. I controller
-\texttt{GuestController} e \texttt{GuestPrivacySettingsController} (che
-usavano il modificatore \texttt{final}) sono stati resi non-final per
-consentire l'advice \texttt{@Transactional}.
-
-% ─────────────────────────────────────────────────────────────────────────────
-\subsection*{CVE residua aperta: CVE-2026-42577 (Netty native epoll)}
-
-\begin{center}
-\small
-\begin{tabular}{lllll}
-\hline
-\textbf{CVE} & \textbf{Libreria} & \textbf{Versione installata} & \textbf{Fix disponibile} & \textbf{Severity} \\
-\hline
-CVE-2026-42577 & \texttt{netty-transport-native-epoll} & 4.1.133.Final & Netty 4.2.x & HIGH \\
-\hline
-\end{tabular}
-\end{center}
-
-\begin{insecurebox}[title={CVE-2026-42577 --- DoS via RST su connessione TCP half-closed}]
-Il transport \texttt{netty-transport-native-epoll} non gestisce correttamente
-un segmento TCP RST ricevuto su una connessione in stato \emph{half-closed}
-(shutdown di scrittura già effettuato). Un attaccante può indurre il server
-a entrare in un loop di CPU-spin o a sprecare risorse di memoria fino al
-riavvio del processo (\emph{Denial of Service}).
-\end{insecurebox}
-
-\begin{securebox}[title={Rischio pratico: nullo nell'attuale configurazione}]
-Il JAR \texttt{netty-transport-native-epoll} è presente nel classpath dell'API
-Gateway come dipendenza transitiva di Project Reactor/Netty, ma il trasporto
-attivo in Spring Boot è \textbf{JDK NIO} (selezionato automaticamente in
-assenza di native library pre-loading). Il codice che attiverebbe il native
-epoll (\texttt{NioEventLoopGroup} vs \texttt{EpollEventLoopGroup}) non viene
-mai eseguito nella configurazione standard di Spring WebFlux.
-
-\medskip
-\textbf{Perché il fix non è applicato}: la correzione richiede Netty
-\texttt{4.2.x} (minor version bump), incompatibile con il BOM di Spring Boot
-3.5.x che gestisce la serie \texttt{4.1.x}. Un override a \texttt{4.2.x}
-introdurrebbe incompatibilità non garantite nel layer I/O del gateway.
-
-\medskip
-\textbf{Stato nel Security tab}: l'alert \textbf{\#296} rimane aperto come
-unico alert nella categoria \emph{nostra codebase}. La decisione di non
-sopprimerlo è intenzionale: mantenerlo visibile documenta il debito tecnico
-e ricorda il piano di aggiornamento previsto al passaggio a Kubernetes
-(dove Netty 4.2.x potrà essere adottato in un contesto BOM più recente).
-\end{securebox}
-
-% ─────────────────────────────────────────────────────────────────────────────
-\subsection*{Triage alert Trivy --- immagini terze parti (Grafana)}
-
-Il pipeline CI esegue scansioni Trivy su tutte le immagini Docker, incluse
-le immagini di infrastruttura (\texttt{grafana/grafana},
-\texttt{postgres:15-alpine}, \texttt{redis:alpine}).
-L'aggiornamento di Grafana da \texttt{10.2.0} a \texttt{11.5.0}
-(commit \texttt{bbb7a7e}) ha ridotto il numero di CVE nell'immagine, ma
-non le ha eliminate del tutto: il binary di Grafana incorpora un runtime
-Go e librerie Alpine (OpenSSL, musl, zlib) con CVE accumulate che non
-dipendono dalla versione di Grafana stessa bensì dall'immagine base Alpine.
-
-\begin{center}
-\small
-\begin{tabular}{llr}
-\hline
-\textbf{Immagine} & \textbf{Componente vulnerabile} & \textbf{Alert} \\
-\hline
-\texttt{grafana/grafana:11.5.0} (layer Alpine) & OpenSSL, musl libc, curl, zlib & 22 \\
-\texttt{grafana/grafana:11.5.0} (binary Go)    & Go runtime, librerie grafana & 77 \\
-\texttt{postgres:15-alpine} (\texttt{gosu})    & Go runtime in gosu binary & 9 \\
-\hline
-\textbf{Totale terze parti} & & \textbf{108} \\
-\hline
-\end{tabular}
-\end{center}
-
-\begin{securebox}[title={Decisione di triage: dismiss documentato con motivazione tecnica}]
-Tutti i 108 alert di terze parti sono stati \textbf{dismissi} nel Security
-tab di GitHub con stato \texttt{won't fix} e la seguente motivazione,
-registrata permanentemente nell'audit trail di GitHub:
-
+\paragraph{Prompt utilizzato}
 \begin{quote}
-\emph{``Grafana 11.5.0 monitoring tool — internal port 3000, not
-internet-exposed, no guest PII. CVEs are in bundled Alpine/Go runtime,
-not in hotel PMS code. Accepted risk for pilot; reviewed at Kubernetes
-migration.''}
+``Implementa un sistema di autenticazione JWT con Spring Boot e React.
+Fornisci il codice per generare il token nel backend e per archiviarlo nel frontend.''
 \end{quote}
 
-\textbf{Perché il dismiss è la scelta corretta} (e non l'upgrade a una
-versione più recente di Grafana):
-\begin{itemize}
-  \item Grafana è un tool di monitoring \emph{interno}: porta 3000 non
-        instradabile dall'esterno, zero dati PII degli ospiti.
-  \item Le CVE più critiche nel nome
-        (es.\ CVE-2026-28387 ``RCE via use-after-free in DANE TLSA'',
-        CVE-2025-69419 ``RCE via out-of-bounds write in PKCS\#12'')
-        richiedono che un attaccante invii payload costruiti ad hoc
-        \emph{direttamente a Grafana}, impossibile dall'esterno.
-  \item Le vulnerabilità appartengono all'immagine base Alpine del
-        binary Grafana: anche aggiornando la versione di Grafana il problema
-        persiste finché Alpine non aggiorna le proprie librerie di sistema.
-  \item In fase Kubernetes, Grafana sarà isolato da \texttt{NetworkPolicy}
-        che blocca tutto il traffico non autorizzato verso il namespace
-        monitoring.
-\end{itemize}
-\end{securebox}
+\paragraph{Output dell'AI}
+L'AI ha generato un'implementazione funzionante dove il frontend archiviava
+il token con \texttt{localStorage.setItem('token', response.data.token)}
+e lo inviava come header \texttt{Authorization: Bearer <token>} su ogni richiesta Axios.
 
-\begin{securebox}[title={Stato finale del Security tab (GitHub) al 2026-05-10}]
-\begin{itemize}
-  \item \textbf{Alert aperti}: 1 (\#296 — CVE-2026-42577, Netty native
-        epoll, rischio pratico nullo, debito tecnico tracciato).
-  \item \textbf{Alert dismissi ``won't fix''}: 108 (Grafana + postgres/gosu,
-        tutti terze parti, motivazione documentata).
-  \item \textbf{Alert dismissi ``false positive''}: 1
-        (CSRF Spring Security — implementazione Double Submit Cookie custom).
-  \item \textbf{Dependabot alerts}: 0 (dipendenze Maven e npm senza CVE
-        attive dopo l'aggiornamento Spring Boot 3.5.x).
-\end{itemize}
+\paragraph{Critica allo studente}
+\texttt{localStorage} è accessibile a qualsiasi script JavaScript della pagina.
+Un attacco XSS --- anche tramite una dipendenza npm compromessa --- può leggere
+il token con \texttt{localStorage.getItem('token')} e inviarlo a un server
+dell'attaccante. L'AI ha prodotto codice funzionale ma insicuro per OWASP A07
+(Identification and Authentication Failures). Il problema non è nell'algoritmo
+JWT ma nel vettore di esfiltrazione abilitato dallo storage scelto.
 
-Il Security tab contiene un solo alert aperto, appartenente alla categoria
-\emph{nostra codebase}, con spiegazione tecnica precisa e piano di
-risoluzione documentato. Questo è il risultato atteso di un processo di
-triage maturo: non l'assenza di alert, ma la comprensione e la
-contestualizzazione di ciascuno.
+\paragraph{Correzione applicata (T-FE-02 / T-AUTH-04)}
+Il token è stato spostato in un cookie \texttt{httpOnly} impostato dal server:
+
+\begin{securebox}[title={Cookie httpOnly al posto di localStorage (T-FE-02)}]
+\begin{lstlisting}[style=java]
+// Il browser non puo' leggere il cookie con JavaScript (difesa XSS)
+private ResponseCookie createCookie(String value, int maxAge) {
+    return ResponseCookie.from("jwt", value)
+        .httpOnly(true)      // blocca lettura da JavaScript
+        .secure(true)        // trasmesso solo su HTTPS
+        .sameSite("Strict")  // blocca invio cross-site
+        .path("/")
+        .maxAge(maxAge)
+        .build();
+}
+\end{lstlisting}
 \end{securebox}
 
 % ─────────────────────────────────────────────────────────────────────────────
-\section{Copertura OWASP Top 10 (2021) — Riepilogo}
+\section{Episodio 2 --- BCrypt: cost factor obsoleto per il 2025/26}
+% ─────────────────────────────────────────────────────────────────────────────
 
-La tabella seguente mostra la copertura complessiva raggiunta al termine
-di tutte le sessioni di hardening, aggiornata alla revisione del
-2026-04-15.
+\paragraph{Prompt utilizzato}
+\begin{quote}
+``Sostituisci la memorizzazione della password in chiaro con un hashing sicuro.
+Usa BCrypt con Spring Security.''
+\end{quote}
+
+\paragraph{Output dell'AI}
+L'AI ha generato \texttt{new BCryptPasswordEncoder()} senza parametri, che usa
+il cost factor di default di Spring Security: \textbf{10}.
+Il codice era strutturalmente corretto ma usava il parametro di default.
+
+\paragraph{Critica allo studente}
+Il cost factor 10 era adeguato per hardware del 2011. Le raccomandazioni OWASP
+al 2025/26 indicano cost~$\geq$~12 come minimo su hardware moderno, per garantire
+almeno 300 ms di calcolo su singolo core. Con cost~10 su hardware attuale il
+calcolo richiede $\sim$50 ms, rendendo il brute force $2^2 = 4\times$ più rapido
+del necessario (SEI CERT MSC62-J).
+
+\paragraph{Correzione applicata (T-AUTH-03)}
+
+\begin{securebox}[title={BCrypt cost 12 esplicito (T-AUTH-03, SEI CERT MSC62-J)}]
+\begin{lstlisting}[style=java]
+// Cost 12: OWASP raccomanda >= 12 per hardware 2025.
+// Cost 10 (default Spring Security) era ottimale per hardware 2011.
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder(12);
+}
+\end{lstlisting}
+\end{securebox}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Episodio 3 --- IDOR: l'AI ha ignorato il contesto multi-tenant}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Prompt utilizzato}
+\begin{quote}
+``Nel guest-service, un utente può accedere ai dati di ospiti che non appartengono
+alla sua struttura. Correggi il problema IDOR.''
+\end{quote}
+
+\paragraph{Output dell'AI}
+L'AI ha suggerito di aggiungere un controllo basato sull'\texttt{userId} del
+chiamante, verificando \texttt{guest.createdBy == currentUserId}:
+\begin{lstlisting}[style=java]
+// Suggerimento AI -- ERRATO nel contesto multi-hotel
+Optional<Guest> findByIdAndCreatedBy(UUID guestId, UUID userId);
+\end{lstlisting}
+
+\paragraph{Critica allo studente}
+Il suggerimento era errato nel contesto di un PMS multi-hotel.
+Le risorse appartengono a un \emph{hotel}, non a un singolo utente.
+Con il modello proposto dall'AI: un ADMIN non potrebbe accedere agli ospiti
+creati da un RECEPTIONIST dello stesso hotel; un RECEPTIONIST trasferito
+manterrebbe accesso agli ospiti del precedente. La dimensione di isolamento
+corretta è \texttt{hotel\_id} estratto dal JWT, non \texttt{userId}.
+
+\paragraph{Correzione applicata (T-GST-01 / T-GST-03)}
+
+\begin{securebox}[title={Isolamento per hotel\_id (T-GST-01, OWASP A01)}]
+\begin{lstlisting}[style=java]
+// Isolamento per hotel, non per utente
+Optional<Guest> findByIdAndActiveTrueAndHotelId(UUID id, UUID hotelId);
+
+// hotelId estratto dal SecurityContext, mai dal client (IDOR-safe)
+private UUID resolveHotelId() {
+    Authentication auth =
+        SecurityContextHolder.getContext().getAuthentication();
+    return UUID.fromString((String) auth.getDetails());
+}
+\end{lstlisting}
+\end{securebox}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Episodio 4 --- CSRF: pattern incompatibile con SPA React}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Prompt utilizzato}
+\begin{quote}
+``Implementa la protezione CSRF per il gateway API. L'applicazione usa cookie
+httpOnly per il JWT e Spring Cloud Gateway (WebFlux).''
+\end{quote}
+
+\paragraph{Output dell'AI}
+L'AI ha suggerito il filtro CSRF standard di Spring Security con
+\texttt{CookieCsrfTokenRepository.withHttpOnlyFalse()}, che attende il token
+in un campo \texttt{\_csrf} del form HTML o nell'header \texttt{X-CSRF-TOKEN}.
+
+\paragraph{Critica allo studente}
+Il filtro standard Spring Security è progettato per applicazioni MVC che rendono
+form HTML. Non è compatibile con una SPA React che usa chiamate Axios JSON perché:
+(1) il gateway è Spring Cloud Gateway (WebFlux/reactive), non Spring MVC;
+(2) il token CSRF viene esposto solo su endpoint specifici con richiesta asincrona
+aggiuntiva, incompatibile con l'architettura SPA senza rendering server-side.
+
+\paragraph{Correzione applicata (T-GW-05)}
+Implementato il pattern \textbf{Double Submit Cookie} con un filtro personalizzato:
+il cookie \texttt{csrf\_token} (non-httpOnly, leggibile dalla SPA) viene confrontato
+con l'header \texttt{X-CSRF-Token} (aggiunto da Axios). Un sito malevolo non può
+costruire l'header perché la same-origin policy impedisce di leggere il cookie.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Episodio 5 --- User enumeration: messaggi ``utili per il debug''}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Prompt utilizzato}
+\begin{quote}
+``Scrivi il metodo login() per AuthServiceImpl. Distingui i casi
+errore per facilitare il debug: utente non trovato e password errata.''
+\end{quote}
+
+\paragraph{Output dell'AI}
+\begin{lstlisting}[style=java]
+// Output AI -- INSICURO: messaggi distinti
+.orElseThrow(() ->
+    new BadCredentialsException("USER_NOT_FOUND"));  // diverso!
+
+if (!passwordEncoder.matches(...)) {
+    throw new BadCredentialsException("INVALID_PASSWORD");  // diverso!
+}
+\end{lstlisting}
+
+\paragraph{Critica allo studente}
+Messaggi distinti consentono la \emph{user enumeration}: un attaccante può
+inviare richieste automatizzate e identificare username validi dalla risposta.
+OWASP A07 cita esplicitamente questo pattern come vettore per brute force mirati.
+\textbf{L'AI ha motivato la scelta come ``utile per il debug''}, dimostrando
+che non considera il contesto di sicurezza nella formulazione dei messaggi di errore.
+
+\paragraph{Correzione applicata (T-AUTH-01)}
+
+\begin{securebox}[title={Messaggio uniforme --- nessuna information disclosure (T-AUTH-01)}]
+\begin{lstlisting}[style=java]
+// SICURO: identico per USER_NOT_FOUND e INVALID_PASSWORD
+.orElseThrow(() ->
+    new BadCredentialsException("INVALID_CREDENTIALS"));
+
+if (!passwordEncoder.matches(request.password(),
+                              user.getPasswordHash())) {
+    throw new BadCredentialsException("INVALID_CREDENTIALS");
+}
+\end{lstlisting}
+\end{securebox}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Riepilogo della revisione critica}
+% ─────────────────────────────────────────────────────────────────────────────
 
 \begin{center}
 \small
-\begin{tabular}{clp{8cm}}
-\hline
-\textbf{Categoria} & \textbf{Nome} & \textbf{Interventi} \\
-\hline
-\owasp{A01} & Broken Access Control
-  & T-GST-01/03, T-RES-02, T-BILL-01, T-FB-01, T-FE-03,
-    T-GW-05/06/07, GAP-3 \\
-\owasp{A02} & Cryptographic Failures
-  & T-AUTH-03 (BCrypt cost 12), T-CFG-02 (segreti env), T-STAY-03 (TLS) \\
-\owasp{A03} & Injection
-  & T-GST-02 (Bean Validation pattern), T-RES-03 (date validation),
-    T-FE-01 (XSS ESLint rule) \\
-\owasp{A04} & Insecure Design
-  & T-RES-01 (optimistic lock), T-STAY-01 (state allowlist),
-    T-FB-02 (server-side pricing), T-BILL-02 (amount normalisation),
-    T-GST-04 (mass-assignment), T-GST-05 (GDPR retention) \\
-\owasp{A05} & Security Misconfiguration
-  & T-GW-02 (rate limiting), T-GW-03 (security headers),
-    T-GW-04 (CORS whitelist), T-CFG-01 (actuator port),
-    T-CFG-03 (config-service Basic Auth), T-FE-04 (CSP nginx) \\
-\owasp{A06} & Vulnerable and Outdated Components
-  & DEP-CVE-01 (Netty 4.1.132, Gateway 4.2.6),
-    DEP-CVE-02 (commons-fileupload 1.6.0, commons-io 2.14.0),
-    DEP-CVE-03 (config-server CVE-2026-22739, risolto con Spring Boot 3.5.x),
-    DEP-CVE-04 (Spring Boot 3.5.14 + Spring Cloud 2025.0.0; CVE-2026-42577
-    Netty epoll rischio residuale documentato; 108 alert Grafana/terze parti
-    triaggiati e dismissi) \\
-\owasp{A07} & Identification \& Authentication Failures
-  & T-AUTH-01 (no enumeration), T-AUTH-02 (lockout),
-    T-AUTH-03 (BCrypt), T-AUTH-04 (token rotation + revocation),
-    T-FE-02 (httpOnly cookie) \\
-\owasp{A08} & Software and Data Integrity Failures
-  & \textit{n/a — Gradle dependency verification e signed artifacts
-    fuori scope esame} \\
-\owasp{A09} & Security Logging \& Monitoring Failures
-  & T-AUTH-05 (audit log auth), T-STAY-02 (audit log stay),
-    T-BILL-03 (audit log billing), GAP-4 (Loki SIEM aggregation) \\
-\owasp{A10} & Server-Side Request Forgery
-  & \textit{n/a — nessun endpoint accetta URL controllati dal client} \\
-\hline
+\begin{tabular}{p{2.8cm} p{4.5cm} p{4.5cm}}
+\toprule
+\textbf{Episodio} & \textbf{Errore/limite dell'AI} & \textbf{Correzione studente} \\
+\midrule
+JWT storage
+  & \texttt{localStorage} (vulnerabile a XSS)
+  & Cookie \texttt{httpOnly} + \texttt{SameSite=Strict} \\
+BCrypt cost factor
+  & Default 10 (hardware 2011)
+  & Cost 12 esplicito (OWASP 2025) \\
+IDOR multi-tenant
+  & Isolamento per \texttt{userId} (errato)
+  & Isolamento per \texttt{hotel\_id} (corretto) \\
+CSRF su SPA
+  & Filter Spring MVC (incompatibile WebFlux)
+  & Double Submit Cookie custom \\
+User enumeration
+  & Messaggi distinti ``per debug''
+  & Messaggio uniforme \texttt{INVALID\_CREDENTIALS} \\
+\bottomrule
 \end{tabular}
 \end{center}
 
-\medskip
-Su 10 categorie OWASP Top 10 (2021), \textbf{8 sono coperte} da almeno
-un intervento verificato e committato. A08 e A10 non si applicano
-all'architettura corrente del sistema.
-
-% ─────────────────────────────────────────────────────────────────────────────
-\section{Valutazione del processo}
-
-L'utilizzo dell'IA come strumento di analisi e verifica, piuttosto che come
-generatore passivo di codice, ha permesso di mantenere un controllo consapevole
-su ogni modifica introdotta. Ogni intervento è stato compreso, validato e integrato
-nel contesto architetturale del sistema prima di essere committato.
-
-Il valore principale dello strumento si è manifestato nella capacità di correlare
-rapidamente le osservazioni di sicurezza con le specifiche del codice esistente e
-di produrre una documentazione strutturata e coerente (threat model, sezioni LaTeX,
-messaggi di commit) in parallelo allo sviluppo, senza lasciare debito documentativo
-a fine progetto.
+In tutti e cinque i casi l'AI ha prodotto codice \emph{funzionale} ma con difetti
+di sicurezza identificabili applicando i principi del corso: OWASP Top~10, SEI CERT
+e la conoscenza del contesto architetturale del sistema.
 
 \end{document}
