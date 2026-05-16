@@ -69,7 +69,7 @@ test.describe('Authentication – Happy Path', () => {
         await route.fallback();
       }
     });
-    await page.route('**/api/v1/stays', (route) =>
+    await page.route((url) => url.pathname === '/api/v1/stays', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(emptyPage) })
     );
     await page.route('**/api/v1/rooms**', (route) =>

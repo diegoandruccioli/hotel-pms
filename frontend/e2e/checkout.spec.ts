@@ -27,7 +27,7 @@ test.describe('Check-out flow', () => {
         body: JSON.stringify({ hotelId: 'h-001', alloggiatiAutoSend: false }),
       }),
     );
-    await page.route('**/api/v1/stays', (route) => {
+    await page.route((url) => url.pathname === '/api/v1/stays', (route) => {
       if (route.request().method() === 'GET') {
         return route.fulfill({
           status: 200,
