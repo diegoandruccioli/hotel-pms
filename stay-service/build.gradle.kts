@@ -47,6 +47,9 @@ dependencies {
     }
     implementation("org.springframework.cloud:spring-cloud-starter-loadbalancer")
     implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j")
+    // Apache HttpClient 5 for Feign — enables PATCH support (Java HttpURLConnection does not support PATCH).
+    // Activated via spring.cloud.openfeign.httpclient.hc5.enabled=true in stay-service.yml.
+    implementation("io.github.openfeign:feign-hc5")
 
     // --- Observability: Actuator + Micrometer Tracing (Zipkin/Brave) ---
     implementation("org.springframework.boot:spring-boot-starter-actuator")

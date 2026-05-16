@@ -7,16 +7,34 @@ internal:
 
 spring:
   cloud:
-    loadbalancer:
-      instances:
-        reservation-service:
-          - uri: http://reservation-service:8082
-        guest-service:
-          - uri: http://guest-service:8083
-        inventory-service:
-          - uri: http://inventory-service:8081
-        billing-service:
-          - uri: http://billing-service:8085
+    openfeign:
+      httpclient:
+        hc5:
+          enabled: true
+    discovery:
+      client:
+        simple:
+          instances:
+            reservation-service:
+              - serviceId: reservation-service
+                host: reservation-service
+                port: 8082
+                secure: false
+            guest-service:
+              - serviceId: guest-service
+                host: guest-service
+                port: 8083
+                secure: false
+            inventory-service:
+              - serviceId: inventory-service
+                host: inventory-service
+                port: 8081
+                secure: false
+            billing-service:
+              - serviceId: billing-service
+                host: billing-service
+                port: 8085
+                secure: false
 
 # T-STAY-03: Alloggiati Web portal credentials and URL.
 # All values MUST be provided as environment variables — no defaults for credentials.

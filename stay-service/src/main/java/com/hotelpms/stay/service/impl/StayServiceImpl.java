@@ -6,6 +6,7 @@ import com.hotelpms.stay.client.InventoryClient;
 import com.hotelpms.stay.client.ReservationClient;
 import com.hotelpms.stay.client.dto.GuestResponse;
 import com.hotelpms.stay.client.dto.InvoiceCreatedResponse;
+import com.hotelpms.stay.client.dto.RoomStatusRequest;
 import com.hotelpms.stay.client.dto.InvoiceStatusResponse;
 import com.hotelpms.stay.client.dto.ReservationResponse;
 import com.hotelpms.stay.client.dto.ReservationStatusUpdateRequest;
@@ -143,7 +144,7 @@ public class StayServiceImpl implements StayService {
 
         // 2. Mark the room as DIRTY via the Inventory Service
         log.debug("Marking room {} as DIRTY after check-out", stay.getRoomId());
-        inventoryClient.updateRoomStatus(stay.getRoomId(), "DIRTY");
+        inventoryClient.updateRoomStatus(stay.getRoomId(), new RoomStatusRequest("DIRTY"));
 
         // 3. Update the stay entity
         stay.setStatus(StayStatus.CHECKED_OUT);
@@ -288,7 +289,7 @@ public class StayServiceImpl implements StayService {
 
     private void markRoomOccupied(final Stay stay) {
         try {
-            inventoryClient.updateRoomStatus(stay.getRoomId(), ROOM_STATUS_OCCUPIED);
+            inventoryClient.updateRoomStatus(stay.getRoomId(), new RoomStatusRequest(ROOM_STATUS_OCCUPIED));
             log.info("[STAY] SAGA_ROOM_OCCUPIED | stayId={} | roomId={}",
                     stay.getId(), stay.getRoomId());
         } catch (final ExternalServiceException ex) {
