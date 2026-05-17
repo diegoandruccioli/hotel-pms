@@ -157,6 +157,54 @@ Solo dopo questi passi il sistema è operativo per ricevere prenotazioni e gesti
 
 ---
 
+### 3.7b Configurazione iniziale credenziali portale PS
+(intervento tecnico obbligatorio — una tantum per installazione)
+
+Prima di poter inviare i dati al portale della Polizia di Stato,
+il tecnico IT che gestisce il sistema deve configurare le
+credenziali nel file `.env` del server.
+
+**Cosa comunicare al tecnico IT:**
+1. Username dell'account struttura su `alloggiatiweb.poliziadistato.it`
+2. Password dell'account
+3. Chiave Web Service — generabile dal portale PS:
+   accedere a `alloggiatiweb.poliziadistato.it` →
+   icona account → "Chiave Web Service" → "Genera nuova chiave"
+4. Comunicare al tecnico se si vuole partire in modalità TEST
+   (nessun invio reale) o PRODUZIONE (invio con effetto legale)
+
+**Cosa fa il tecnico (non richiede azione dell'admin):**
+Il tecnico inserisce le credenziali nel file di configurazione
+del server e riavvia il servizio (operazione di 5 minuti).
+
+**Quando ripetere questa procedura:**
+- La Chiave Web Service ha una scadenza — quando l'invio
+  inizia a fallire sistematicamente, contattare il tecnico
+  per rigenerare la chiave dal portale PS e aggiornarla.
+- In caso di cambio password sul portale PS.
+
+**Come verificare che la configurazione sia attiva:**
+Dopo la configurazione, eseguire un check-in di test e
+verificare il badge "PS Portal" nella lista Soggiorni:
+- Badge verde = credenziali corrette, invio riuscito
+- Badge rosso = credenziali errate o portale PS non raggiungibile
+  → contattare il tecnico IT
+
+**Nota sulla modalità TEST vs PRODUZIONE:**
+Sono due livelli indipendenti:
+
+| | Modalità TEST | Modalità PRODUZIONE |
+|---|---|---|
+| Chi la imposta | Tecnico IT (`.env`) | Tecnico IT (`.env`) |
+| Cosa fa | Valida i dati, non registra | Invio reale alla Questura |
+| Quando usarla | Durante il collaudo | Operatività normale |
+
+Il toggle "Invio automatico" nel Profilo Hotel controlla **solo**
+se l'invio avviene in automatico ad ogni check-in oppure
+solo manualmente — non controlla TEST vs PRODUZIONE.
+
+---
+
 ### 3.8 Generare e Inviare il Report Alloggiati PS
 
 1. Menu → **Soggiorni** → sezione **Report Portale PS** in fondo alla pagina
