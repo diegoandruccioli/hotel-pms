@@ -281,7 +281,7 @@ personale e utilizzato come base per questo elaborato del corso di \textit{Labor
 \par\medskip
 
 Il sistema è un'applicazione enterprise a microservizi composta da 9 servizi backend (Java 21,
-Spring Boot 3.4, Spring Cloud) e un frontend React 19, accessibili tramite un API Gateway centrale.
+Spring Boot 3.5, Spring Cloud 2025.0) e un frontend React 19, accessibili tramite un API Gateway centrale.
 La superficie di attacco è ampia e significativa: il sistema gestisce credenziali utente, sessioni
 JWT, dati personali di ospiti (PII), prenotazioni, fatture e report obbligatori per la Polizia di Stato.
 
@@ -1199,7 +1199,7 @@ String password
 \end{lstlisting}
 \end{securebox}
 
-\paragraph{Riferimento} Commit: \commitref{TBD}{feat(security): T-AUTH-03 upgrade — Argon2id KDF + password complexity policy (A04+A07:2025)}
+\paragraph{Riferimento} Commit: \commitref{446ad8d}{feat(security): T-AUTH-03 upgrade — Argon2id KDF + password complexity policy (A04+A07:2025)}
 
 \subsection{Refresh Token Rotation e Blacklist \threat{T-AUTH-04}}
 
@@ -4618,13 +4618,14 @@ Il flusso di autenticazione nella baseline era un unico JWT con scadenza di
 24 ore, privo di revoca e senza binding al tenant dell'utente.
 Il ridisegno, completato in cinque iterazioni successive (commit
 \commitref{a90e462}{T-AUTH-02}, \commitref{4e1f1e9}{T-AUTH-03},
+\commitref{446ad8d}{T-AUTH-03 upgrade Argon2id},
 \commitref{5ce3010}{T-AUTH-04}, \commitref{b469e21}{T-GW-06},
 \commitref{b473265}{T-AUTH-04 residuo}), produce il seguente flusso
 di autenticazione:
 
 \begin{enumerate}
   \item \textbf{Login} (\texttt{POST /api/v1/auth/login}):
-    verifica lockout → verifica password (BCrypt cost~12) → genera
+    verifica lockout → verifica password (Argon2id via DelegatingPasswordEncoder, memory-hard) → genera
     \emph{access token} (TTL 15 min, claim \texttt{role}, \texttt{hotelId},
     \texttt{tv}) + \emph{refresh token} (TTL 7 giorni, \texttt{jti} UUID,
     \texttt{typ=refresh}) → emette tre cookie:
@@ -4657,6 +4658,15 @@ di autenticazione:
     blacklista il JTI del refresh token → azzera i tre cookie
     (\texttt{jwt}, \texttt{refresh\_token}, \texttt{csrf\_token}).
     Il log \texttt{[AUTH] LOGOUT | user=...} garantisce tracciabilità.
+
+  \item \textbf{Reset password admin} (\texttt{PATCH /api/v1/auth/users/\{id\}/reset-password}):
+    ADMIN/OWNER invia nuova password → Argon2id encode →
+    \texttt{mustChangePassword=true} → incrementa \texttt{tokenVersion}
+    → sovrascrive Redis \texttt{user:tv:<username>} → 204 No Content.
+    Tutte le sessioni attive dell'utente vengono invalidate (TV mismatch
+    al prossimo refresh). Al login successivo il sistema reindirizza a
+    \texttt{/profile} per impostare una nuova password personale.
+    Commit: \commitref{4e6a7f4}{G3 --- reset password con invalidazione sessioni (ADMIN/OWNER)}.
 \end{enumerate}
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -4769,8 +4779,8 @@ User enumeration
   & Messaggio uniforme \texttt{INVALID\_CREDENTIALS}
   & A07:2025 & baseline \\
 Password debole in DB
-  & BCrypt cost~12 + lazy rehash on login
-  & A04:2025 & \texttt{4e1f1e9} \\
+  & Argon2id memory-hard (DelegatingPasswordEncoder); BCrypt legacy migrati on login
+  & A04:2025 & \texttt{4e1f1e9}, \texttt{446ad8d} \\
 Token theft (access)
   & TTL 15 min; cookie httpOnly/Secure/SameSite
   & A04:2025/\linebreak[2]A07:2025 & \texttt{5ce3010} \\
