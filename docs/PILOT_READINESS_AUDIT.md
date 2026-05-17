@@ -39,12 +39,13 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 | **Gestione configurazione e segreti** | 🟢 Verde | `.env` in `.gitignore`, Spring Cloud Config, secrets via env var, nessun hardcoding. `.env.example` presente con documentazione variabili. |
 | **Migrazioni DB** | 🟢 Verde | Flyway in tutti i servizi, versioning sequenziale corretto. |
 | **Logging e osservabilità** | 🟢 Verde | Zipkin + Prometheus + Grafana + Loki configurati. `X-Correlation-ID` propagato via MDC dal gateway a tutti i servizi — errori distribuiti tracciabili con un solo ID. |
-| **Test automatici** | 🟡 Giallo | 317/317 test Vitest su 50 file. Frontend (Vitest + V8, misurato 2026-05-11): stmt 68.6%, branch 54.2%, funcs 63.9%, lines 71.1%. Backend (JaCoCo, misurato 2026-05-11): istruzioni ~60% weighted avg (range 47%–82% per servizio, vedi tabella sotto). Playwright: walk-in, admin users, checkout, billing completi. Nessuna soglia enforced — deferred fino a baseline consolidata. |
+| **Test automatici** | ✅ Verde | 324/324 test Vitest su 50+ file. Frontend (Vitest + V8): stmt 65.69%, branch 52.28%, funcs 60.78%, lines 68.4% — soglie enforced in CI (G9 — `dab4eea`). Backend (JaCoCo): ~60% istruzioni weighted avg — threshold ≥40% enforced su tutti i moduli. Playwright: 31 spec, walk-in, admin users, checkout, billing, E2E completi in Docker. |
 | **UX operativa receptionist** | 🟢 Verde | Tutti i flussi principali coperti: walk-in, check-in, checkout, billing, F&B, housekeeping, camere, gestione utenti, profilo hotel. i18n EN/IT. Residuale: nessun wizard onboarding al primo avvio, nessuna notifica push. |
 | **Resilienza a errori di rete** | 🟢 Verde | CircuitBreaker Resilience4j su tutti i Feign client, fallback dichiarati, GlobalExceptionHandler RFC 7807 in tutti i servizi. Alloggiati SOAP failure non blocca il check-in. |
 | **Documentazione tecnica** | 🟢 Verde | `ALLOGGIATI_README.md`, `DOCUMENTAZIONE_TECNICA_ALLOGGIATI_PS.md`, `INTERACTION_FLOWS.md`, `SECURITY_AND_PRIVACY.md`, Swagger aggregato all'API Gateway, `backup/DECISIONS.md`, `THREAT_MODEL.md`. |
 | **Documentazione utente** | 🟡 Giallo | `USER_MANUAL.md` creato con flussi operativi e procedure passo-passo. Residuale: nessun tooltip contestuale nell'UI, nessuna pagina `/help` integrata nell'app. |
 | **Deploy locale/staging** | 🟢 Verde | `docker-compose.yml` production-grade (15 servizi, 5 reti isolate, healthcheck, resource limits), script `start.sh/.ps1/.bat`, `setup-hmac-secret.sh/.ps1`. |
+| **CI/CD** | ✅ Verde | GitHub Actions `ci.yml` presente: build Gradle + test JUnit + lint ESLint + E2E Playwright in Docker su ogni push/PR verso main. |
 | **Multi-hotel / multi-tenant** | 🟢 Verde | `hotel_id` NOT NULL su tutte le entity rilevanti (incluso `Room.hotelId` con migration Flyway), tutte le repository filtrano per `hotel_id`, JWT porta `hotelId` verificato via HMAC. Residuale: nessuna UI per selezione hotel in un account multi-hotel. |
 | **Compliance operativa Alloggiati** | 🟡 Giallo | Export 168-char conforme, CRLF corretto, SOAP two-step implementato, piano collaudo completo in `ALLOGGIATI_COLLAUDO_REALE.md`. Residuale: collaudo reale con credenziali PS ancora da eseguire (richiede accesso VPN Questura). |
 
@@ -63,7 +64,7 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 | **Food & Beverage** | ✅ Completo | Creazione ordini con selezione menu, conferma ordine → addebito automatico su invoice soggiorno via HMAC. |
 | **Billing** | ✅ Completo | Invoice aperta al check-in, addebiti F&B, pagamento con metodo, checkout bloccato se non PAID. |
 | **Alloggiati PS** | ✅ Completo | Export .txt 168-char e JSON, invio SOAP two-step, badge `alloggiatiSent` per riga, toggle `alloggiatiAutoSend` nel profilo hotel. |
-| **Report / export** | 🟡 Parziale | Report finanziario proprietario (OwnerDashboard) con export CSV. Mancano: report occupazione per periodo, export fatture PDF. |
+| **Report / export** | ✅ Completo | Report finanziario proprietario (OwnerDashboard) con export CSV. PDF fattura scaricabile (PDFBox — `GET /api/v1/invoices/{id}/pdf`), testato end-to-end nel smoke test 2026-05-17. Residuale: report occupazione per periodo. |
 | **Configurazione hotel** | ✅ Completo | Profilo hotel con nome, indirizzo, PIVA/CF, logo, toggle `alloggiatiAutoSend`. |
 | **Autenticazione** | ✅ Completo | Login, refresh token silenzioso, logout, cambio password, `mustChangePassword` con blocco. JWT access 15min, refresh 7gg. |
 | **Autorizzazione** | 🟡 Parziale | RBAC con ruoli ADMIN/OWNER/RECEPTIONIST. Route-level enforcement nel gateway per le route admin. `@PreAuthorize` su endpoint amministrativi. Residuale: enforcement non esaustivo su tutti i singoli endpoint di ogni microservizio. |
@@ -118,16 +119,16 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 
 | Metric | Value |
 |--------|-------|
-| Statements | 68.59% (1479/2156) |
-| Branches | 54.2% (599/1105) |
-| Functions | 63.88% (375/587) |
-| Lines | 71.07% (1369/1926) |
+| Statements | 65.69% |
+| Branches | 52.28% |
+| Functions | 60.78% |
+| Lines | 68.40% |
 
 **Componenti con alta copertura (>90%):** `src/components` (95%), `src/components/m3` (94%), `Billing.tsx` (95%), `Dashboard.tsx` (92%), `Login.tsx` (94%).
 
 **Componenti con bassa copertura (<50%):** `CheckInForm.tsx` (48%), `GuestFormModal.tsx` (35%), `stayService.ts` (30%), `api.ts` (10% — Axios interceptor difficile da testare con jsdom).
 
-**Nota:** Nessuna soglia minima enforced — scelta consapevole per stabilire la baseline prima di fissare gate automatici. Comando: `./gradlew test jacocoTestReport` (backend) e `npm run test:coverage` (frontend).
+**Nota:** Soglie minime enforced in CI (G9 — `dab4eea`): Vitest stmt/branch/fn/lines con buffer di sicurezza sulla baseline; JaCoCo ≥40% instruction su tutti i moduli backend. Build fallisce se scende sotto soglia. Comando: `./gradlew test jacocoTestReport` (backend) e `npm run test:coverage` (frontend).
 
 ---
 
@@ -150,6 +151,11 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 13. ✅ **G8 — ErrorBoundary React** — class component avvolge `<Suspense>` in `App.tsx`; fallback UI con reload; 4 Vitest test (`fc3e86c`)
 14. ✅ **G1 — Submit Alloggiati UI** — pulsante "Invia a Questura" (ADMIN/OWNER) in Soggiorni con confirmation dialog, loading state, toast EN/IT (`7219b30`)
 15. ✅ **G3 — Reset password utente** — `PATCH /users/{id}/reset-password` (ADMIN/OWNER) con encode Argon2id, `mustChangePassword=true`, `tokenVersion++`, Redis invalidation; `ResetPasswordModal` nel frontend (`4e6a7f4`, `6f9dfe9`)
+16. ✅ **G2 — Menu CRUD F&B per-hotel** — CRUD `menu_items` con `hotel_id` isolamento, ADMIN/OWNER only, migration V4; UI Restaurant con sezione gestione menu (`3be5b72`, `0ecf2a7`)
+17. ✅ **G5 — guestDisplayName + roomNumber in StayResponse** — Feign lookup al check-in popola i campi; Stays.tsx mostra Cognome Nome e numero camera al posto degli UUID troncati (`f3a7e97`, `d1e2dd0`, `309f085`)
+18. ✅ **G9 — Coverage thresholds enforced** — JaCoCo `jacocoTestCoverageVerification` ≥40% instruction su tutti i moduli backend; Vitest `coverage.thresholds` stmt/branch/fn/lines in `vite.config.ts` (`dab4eea`)
+19. ✅ **G11 — Paginazione Stays UI server-side** — `getAllStays(page, size)` con SpringPage, Stays.tsx prev/next, i18n EN+IT (`7687241`)
+20. ✅ **G6/G7 — Dead code rimosso** — `stayService.updateStay()` e `extendStay()` rimossi (zero callers) con relativi test (`3be5b72`)
 
 ### Pendenti ⏳
 
@@ -157,6 +163,8 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 - ⏳ **Vista occupazione del giorno** — CalendarPlanning/PlanningBoard presenti ma nessun widget dedicato "occupazione rapida" nella dashboard
 - ⏳ **Dependabot auto-PR** — da attivare sul repository GitHub
 - ⏳ **Commento vincolo `commons-csv:1.9.0`** in `build.gradle.kts`
+
+**Nota audit 2026-05-17:** 6 bug runtime trovati e risolti durante l'audit con Docker stack reale (immagini stale — tutti i fix sono stati committati). **TODO aperto:** admin password hash `{bcrypt}` prefix — fix DB-only, da consolidare in Flyway migration prima del deploy in produzione.
 
 ### Post-pilot (Nice-to-have)
 

@@ -112,6 +112,8 @@
 4. Conferma il check-out
 5. La camera passa in stato **DIRTY** (da pulire)
 
+**Colonne Camera e Ospite nella lista Soggiorni:** La colonna "Camera" mostra il numero camera (es. "102") e la colonna "Ospite" mostra "Cognome Nome" dell'ospite principale al posto degli UUID troncati. Questo vale per i soggiorni creati dopo l'aggiornamento (G5); i soggiorni precedenti mostrano ancora l'ID troncato.
+
 ---
 
 ### 3.6 Ordine F&B con addebito su camera
@@ -169,6 +171,16 @@ Per disattivare un utente: pulsante **Disattiva** accanto all'utente. L'account 
 
 ---
 
+### 3.11 Configurare il Profilo Hotel (solo ADMIN)
+
+1. Menu → icona utente → **Profilo Hotel** (o naviga a `/profile/hotel`)
+2. Compilare: nome hotel, indirizzo, PIVA, Codice Fiscale
+3. Per il logo: seleziona il file e carica
+4. Per l'invio automatico Alloggiati: spuntare/rimuovere il toggle **Invio automatico al portale PS**
+5. Clicca **Salva**
+
+---
+
 ### 3.12 Reset password utente (solo ADMIN/OWNER)
 
 Usare quando un utente ha dimenticato la password o per motivi di sicurezza (es. sospetta compromissione).
@@ -188,13 +200,30 @@ Usare quando un utente ha dimenticato la password o per motivi di sicurezza (es.
 
 ---
 
-### 3.11 Configurare il Profilo Hotel (solo ADMIN)
+### 3.13 Gestione Menu F&B (solo ADMIN e OWNER)
 
-1. Menu → icona utente → **Profilo Hotel** (o naviga a `/profile/hotel`)
-2. Compilare: nome hotel, indirizzo, PIVA, Codice Fiscale
-3. Per il logo: seleziona il file e carica
-4. Per l'invio automatico Alloggiati: spuntare/rimuovere il toggle **Invio automatico al portale PS**
-5. Clicca **Salva**
+La pagina Ristorante include una sezione di gestione del menu
+visibile solo agli utenti con ruolo ADMIN o OWNER.
+
+**Aggiungere una voce menu:**
+1. Vai su Ristorante → sezione "Gestione menu"
+2. Clicca "Aggiungi voce"
+3. Compila: nome (obbligatorio), categoria, prezzo (≥ 0),
+   descrizione (opzionale), disponibile (toggle)
+4. Salva — la voce appare immediatamente nella lista ordini
+
+**Modificare una voce menu:**
+1. Clicca l'icona matita sulla riga della voce
+2. Modifica i campi desiderati e salva
+
+**Eliminare una voce menu:**
+1. Clicca l'icona cestino sulla riga della voce
+2. Conferma nel dialog  
+Nota: non è possibile eliminare una voce con ordini in corso
+(stato PENDING). Chiudi o completa prima gli ordini attivi.
+
+Il menu è specifico per hotel: ogni struttura gestisce
+il proprio listino indipendentemente.
 
 ---
 

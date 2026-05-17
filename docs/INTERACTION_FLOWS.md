@@ -114,6 +114,8 @@ Browser → POST /api/v1/stays/check-in
               fallback: log error, stay.alloggiatiSent=false, check-in completato
 ```
 
+**Nota G5 — StayResponse arricchito:** `StayResponse` include i campi `guestDisplayName` (Cognome Nome dell'ospite principale) e `roomNumber` (numero camera), popolati al momento del check-in dai dati già disponibili via Feign. I soggiorni precedenti alla migration V9 hanno questi campi null; la UI mostra il fallback all'ID troncato.
+
 ---
 
 ## 5. Check-in Walk-in
@@ -228,6 +230,57 @@ GET /api/v1/reports/owner?startDate=...&endDate=...
       ├── @PreAuthorize: OWNER / ADMIN
       ├── aggrega invoices nel periodo per hotelId
       └── risponde con {totalRevenue, totalInvoices, paidInvoices, collectionRate}
+```
+
+---
+
+## Reset Password Utente
+
+**Attori:** ADMIN, OWNER  
+**Endpoint:** `PATCH /api/v1/auth/users/{userId}/reset-password`
+
+```
+Browser → PATCH /api/v1/auth/users/{userId}/reset-password {newPassword}
+  → Gateway (valida JWT, verifica ruolo ADMIN/OWNER)
+  → auth-service
+      ├── @PreAuthorize: ADMIN / OWNER
+      ├── verifica che userId appartenga allo stesso hotel (multi-tenant)
+      ├── encode nuova password con Argon2id
+      ├── imposta mustChangePassword = true
+      ├── incrementa tokenVersion → invalida tutti i token attivi in Redis
+      └── risponde 204 No Content
+
+Al prossimo login: auth-service rileva mustChangePassword=true
+  → risponde con flag nel body → frontend reindirizza a /profile
+  → utente deve impostare una nuova password personale
+```
+
+---
+
+## Gestione Menu F&B per Hotel
+
+**Attori:** ADMIN, OWNER  
+**Endpoint:** `POST/PUT/DELETE /api/v1/fb/menu-items`
+
+```
+Flusso creazione:
+Browser → POST /api/v1/fb/menu-items {name, category, price, available}
+  → Gateway (inietta X-Auth-Hotel con hotelId)
+  → fb-service
+      ├── @PreAuthorize: ADMIN / OWNER
+      ├── associa la voce all'hotel (hotel_id = hotelId dal header)
+      └── risponde 201 con MenuItemResponse
+
+Flusso eliminazione:
+Browser → DELETE /api/v1/fb/menu-items/{id}
+  → fb-service
+      ├── verifica che non esistano ordini in stato PENDING che referenziano la voce
+      │     se sì: risponde 409 Conflict
+      └── se nessun ordine PENDING: elimina e risponde 204
+
+Flusso modifica:
+Browser → PUT /api/v1/fb/menu-items/{id} {name, category, price, available, description}
+  → fb-service → aggiorna voce (stesso hotel_id) → risponde 200 MenuItemResponse
 ```
 
 ---
