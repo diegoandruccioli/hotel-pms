@@ -4669,6 +4669,13 @@ di autenticazione:
     Commit: \commitref{4e6a7f4}{G3 --- reset password con invalidazione sessioni (ADMIN/OWNER)}.
 \end{enumerate}
 
+\paragraph{Limitazione operativa — recovery accesso amministrativo.}
+In assenza di un secondo account ADMIN attivo, il ripristino dell'accesso
+amministrativo richiede accesso diretto al database PostgreSQL del container
+\texttt{auth-service} (es.\ \texttt{UPDATE user\_account SET active = true WHERE ...}
+e reset dell'hash). Non esiste un endpoint applicativo di recovery:
+questa è una limitazione operativa nota, da documentare nel runbook di deployment.
+
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Modello RBAC}
 % ─────────────────────────────────────────────────────────────────────────────
@@ -4703,7 +4710,13 @@ con enforcement a tre livelli:
         con un \texttt{\seqsplit{SimpleGrantedAuthority("ROLE\_" + role)}} derivato dall'header
         \texttt{X-Auth-Role}. I metodi di servizio e i controller usano
         \texttt{@PreAuthorize} o \texttt{hasRole()} di Spring Security per
-        verificare il ruolo sul thread corrente.
+        verificare il ruolo sul thread corrente. Un audit post-sviluppo ha
+        identificato due endpoint (\texttt{POST /stays/reports/alloggiati/submit}
+        e \texttt{PUT /stays/settings}) privi di \texttt{@PreAuthorize}
+        lato server — l'accesso era limitato solo via UI.
+        Entrambi sono stati corretti aggiungendo
+        \texttt{@PreAuthorize("hasAnyRole('ADMIN','OWNER')")}
+        con \texttt{@EnableMethodSecurity} abilitato su \texttt{SecurityConfig}.
 
   \item \textbf{Frontend (React)}: il componente \texttt{ProtectedRoute}
         con prop \texttt{allowedRoles} redirige a \texttt{/} gli utenti
