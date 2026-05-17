@@ -55,6 +55,9 @@ public class StayController {
 
     /**
      * Endpoint to check in a guest and create a stay.
+     * The {@code hotelId} is always taken from the gateway-injected {@code X-Auth-Hotel}
+     * header (via SecurityContext) to enforce multi-tenant isolation — any value
+     * present in the request body is overridden.
      *
      * @param request the stay request
      * @return the created stay response
@@ -62,7 +65,18 @@ public class StayController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public StayResponse checkIn(@NonNull @Valid @RequestBody final StayRequest request) {
-        return stayService.checkIn(request);
+        final UUID hotelId = Objects.requireNonNull(extractHotelId());
+        final StayRequest enriched = new StayRequest(
+                hotelId,
+                request.reservationId(),
+                request.guestId(),
+                request.roomId(),
+                request.status(),
+                request.expectedCheckOutDate(),
+                request.actualCheckInTime(),
+                request.actualCheckOutTime(),
+                request.guests());
+        return stayService.checkIn(enriched);
     }
 
     /**
