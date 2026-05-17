@@ -215,9 +215,9 @@ PATCH /api/v1/users/{id}/activate → auth-service → imposta active=true
 ## 11. Profilo Hotel (ADMIN)
 
 ```
-GET /api/v1/hotel-settings → stay-service → restituisce HotelSettings (nome, indirizzo, PIVA, CF, alloggiatiAutoSend, logoUrl)
-PUT /api/v1/hotel-settings → stay-service → aggiorna HotelSettings
-POST /api/v1/hotel-settings/logo → stay-service → carica logo, salva file, aggiorna logoUrl
+GET /api/v1/stays/settings → stay-service → restituisce HotelSettings (nome, indirizzo, PIVA, CF, alloggiatiAutoSend, logoUrl)
+PUT /api/v1/stays/settings → stay-service → aggiorna HotelSettings
+POST /api/v1/stays/settings/logo → stay-service → carica logo, salva file, aggiorna logoUrl
 ```
 
 ---

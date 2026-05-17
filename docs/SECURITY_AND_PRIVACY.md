@@ -96,7 +96,7 @@ Il segreto `INTERNAL_HMAC_SECRET` viene generato una volta con `setup-hmac-secre
 **Livello gateway:** Il gateway legge `X-Auth-Role` dal JWT e applica whitelist per path prefix:
 - `/api/v1/users` → solo ADMIN
 - `/api/v1/reports/owner` → OWNER, ADMIN
-- `/api/v1/hotel-settings` → ADMIN
+- `/api/v1/stays/settings` → ADMIN/OWNER
 
 **Livello servizio:** Gli endpoint sensibili hanno `@PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")` — secondo livello di difesa anche se il gateway venisse bypassato.
 
