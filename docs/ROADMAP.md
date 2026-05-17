@@ -46,6 +46,7 @@ Prerequisiti bloccanti per il primo hotel reale in produzione.
 | P6 | GIN index + `pg_trgm` su `GuestRepository` | 🟡 Alta | 4h + Flyway | `LIKE '%keyword%'` O(n) full-table scan — inutilizzabile con >50k ospiti |
 | P7 | Testcontainers su stay-service e billing-service | 🟡 Media | 3-5gg | Migration Flyway non testate da codice Java — regressioni DB invisibili a Mockito |
 | P8 | Credenziali Alloggiati PS configurabili da UI | 🟡 Media | 3-5gg | Attuale: richiede accesso `.env` + riavvio container per ogni hotel onboarding |
+| P9 | Dependabot auto-PR per aggiornamenti dipendenze | 🟢 Bassa | 30min | Aggiornamenti dipendenze manuali — CVE latenti invisibili senza alert automatico |
 
 ---
 
@@ -66,6 +67,7 @@ Feature necessarie per la vendibilità del prodotto.
 | C8 | Multi-currency (campo `currency` in HotelSettings) | 🟢 Bassa | 3-5gg | Hotel in zona turistica internazionale o al confine |
 | C9 | Grafana Tempo + OpenTelemetry (migrazione da Zipkin) | 🟢 Bassa | 3-5gg | Standard industria — Zipkin dichiarato deprecated in `backup/DECISIONS.md §7.2` |
 | C10 | TailwindCSS 3 → 4 | 🟢 Bassa | 1-2gg | Breaking changes CSS — pianificare con tempo dedicato (`backup/DECISIONS.md §7.1`) |
+| C11 | CONTRIBUTING.md — guida contribuzione e onboarding dev | 🟡 Media | 4h | Nessuna guida per handover a un team o nuovo sviluppatore |
 
 ---
 
@@ -91,6 +93,7 @@ Feature che abilitano la competizione con PMS commerciali.
 | E13 | Audit log immutabile append-only (GDPR Art. 30) | 🟡 Media | M | Nessuna | Registro trattamenti PII non modificabile — GDPR enterprise |
 | E14 | Rate limiting per-utente granulare | 🟢 Media | S | Redis già presente | Credential stuffing da IP distribuiti non bloccato dall'attuale per-IP |
 | E15 | SLA monitoring e status page | 🟢 Media | M | Prometheus già presente | Contratto SaaS richiede uptime dichiarato |
+| E16 | Google Hotel Ads integration | 🟡 Media | 2-3 sett | E2 (Booking Engine) | Google Hotels mostra il "prezzo diretto" se il booking engine è accreditato |
 
 ---
 
@@ -107,6 +110,7 @@ Feature di differenziazione competitiva ad alto impatto ROI.
 | R4 | Housekeeping mobile ottimizzata (task assignment, foto prova) | M (2-3 sett) | Personale pulizie usa telefono — gap operativo reale |
 | R5 | Notifiche push/email operativi (camera pronta, check-in atteso) | M (1-2 sett) | Coordinamento front desk — housekeeping |
 | R6 | Multi-region / HA cross-AZ | L | Uptime enterprise, disaster recovery geografico |
+| R7 | AI/ML pricing engine avanzato | XL (6-9 mesi) | Ottimizzazione tariffe basata su dati storici, comp set, eventi — oltre le regole statiche di R1 |
 
 ---
 
@@ -146,6 +150,50 @@ Feature di differenziazione competitiva ad alto impatto ROI.
 
 ---
 
-*Documento aggiornato al termine dell'analisi enterprise del 2026-05-17.
-Fare riferimento a [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](FINAL_AUDIT_ULTRA_SEVERE.md)
+## Pricing commerciale SaaS
+
+Modello di riferimento per il lancio commerciale.
+
+| Piano | Target | Canone | Setup | Utenti | F&B POS | Channel Manager* |
+|---|---|---|---|---|---|---|
+| **Starter** | B&B, 1-15 camere | **€99/mese** | €500 | 3 | ❌ | ❌ |
+| **Professional** | Hotel, 15-50 camere | **€199/mese** | €1.500 | 10 | ✅ | ✅ |
+| **Enterprise** | Hotel/catena, 50+ | **€349/mese** | €3.000+ | Illimitati | ✅ | ✅ |
+
+*\*Quando sviluppato (Sprint 3 E1)*
+
+| Piano | Revenue/anno | Costo infra/anno | Margine |
+|---|---|---|---|
+| Starter | €1.188 | ~€600 | **49%** |
+| Professional | €2.388 | ~€900 | **62%** |
+| Enterprise | €4.188 | ~€1.200 | **71%** |
+
+**Strategia lancio:** Primi 10 hotel pilota a €149/mese con setup al 50%.
+Dopo 10 clienti, prezzo pieno €199/mese. I pilota mantengono il prezzo per 12 mesi.
+
+**Costi extra:** personalizzazioni €80/ora · migrazione dati €500-1.500 ·
+formazione €150/sessione · hotel aggiuntivo (catena) +€79/mese.
+
+---
+
+## Documentazione enterprise mancante
+
+Documenti necessari per il livello enterprise che richiedono produzione
+(alcuni necessitano revisione legale prima della pubblicazione).
+
+| Documento | Priorità | Chi lo produce | Effort | Obbligatorio |
+|---|---|---|---|---|
+| Privacy Policy (GDPR Art. 13/14 — informativa agli interessati) | 🔴 Alta | Legal | 2-4h con template | **Sì — GDPR** |
+| Data Processing Agreement (DPA GDPR Art. 28) | 🔴 Alta | Legal | 4-8h | **Sì — GDPR** |
+| Cookie Policy (JWT httpOnly + CSRF + refresh token) | 🔴 Alta | Legal | 1-2h | **Sì — ePrivacy Directive** |
+| Terms of Service | 🟡 Media | Legal + Product | 4h | No (ma atteso da clienti enterprise) |
+| SLA document (uptime, tempi risposta supporto) | 🟡 Media | Product + DevOps | 2h | No (ma atteso da clienti enterprise) |
+| Capacity Planning (n. hotel per server, dimensionamento) | 🟢 Bassa | DevOps | 4h | No |
+
+*I documenti contrassegnati come obbligatori richiedono revisione legale prima della pubblicazione.*
+
+---
+
+*Documento aggiornato 2026-05-17. Fare riferimento a
+[`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](FINAL_AUDIT_ULTRA_SEVERE.md)
 per i gap tecnici specifici e le evidenze da codice.*
