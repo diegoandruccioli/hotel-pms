@@ -13,12 +13,16 @@ import com.hotelpms.stay.exception.NotFoundException;
 import com.hotelpms.stay.service.AlloggiatiReportService;
 import com.hotelpms.stay.service.AlloggiatiWebSenderService;
 import com.hotelpms.stay.service.StayService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -106,6 +110,16 @@ class StayControllerTest {
         stayResponse = new StayResponse(
                 stayId, hotelId, null, guestId, UUID.randomUUID(),
                 StayStatus.CHECKED_IN, null, null, null, null, null, false, List.of(), null, null);
+
+        final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                "admin", "", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        auth.setDetails(hotelId.toString());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test

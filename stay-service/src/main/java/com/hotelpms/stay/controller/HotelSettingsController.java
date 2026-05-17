@@ -5,6 +5,7 @@ import com.hotelpms.stay.dto.HotelSettingsResponse;
 import com.hotelpms.stay.service.HotelSettingsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -37,10 +38,13 @@ public class HotelSettingsController {
 
     /**
      * Updates settings for the authenticated hotel.
+     * Restricted to ADMIN and OWNER — RECEPTIONIST must not be able to modify
+     * hotel-level configuration even via direct API calls.
      *
      * @param request the new settings values
      * @return the updated settings
      */
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     @PutMapping
     public HotelSettingsResponse updateSettings(@Valid @RequestBody final HotelSettingsRequest request) {
         return hotelSettingsService.update(resolveHotelId(), request);

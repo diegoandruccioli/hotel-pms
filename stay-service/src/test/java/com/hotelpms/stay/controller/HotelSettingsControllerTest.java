@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -57,7 +58,8 @@ class HotelSettingsControllerTest {
         hotelId = UUID.randomUUID();
 
         final UsernamePasswordAuthenticationToken auth =
-                new UsernamePasswordAuthenticationToken("user", "", List.of());
+                new UsernamePasswordAuthenticationToken(
+                        "user", "", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
         auth.setDetails(hotelId.toString());
         SecurityContextHolder.getContext().setAuthentication(auth);
 

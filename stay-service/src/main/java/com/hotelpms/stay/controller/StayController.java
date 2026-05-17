@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
@@ -173,6 +174,7 @@ public class StayController {
      * @param date the check-in date in YYYY-MM-DD format
      * @return the downloadable JSON array of guest arrival records
      */
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     @GetMapping("/reports/alloggiati/json")
     @SuppressWarnings("PMD.LooseCoupling")
     public ResponseEntity<List<AlloggiatiRowDto>> downloadAlloggiatiJson(
@@ -193,6 +195,7 @@ public class StayController {
      * @param date the check-in date in YYYY-MM-DD format
      * @return 200 OK on successful transmission
      */
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     @PostMapping("/reports/alloggiati/submit")
     public ResponseEntity<Void> submitAlloggiatiReport(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {

@@ -2,6 +2,7 @@ package com.hotelpms.stay.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -147,6 +148,23 @@ public class GlobalExceptionHandler {
                 "INVALID_JSON_PAYLOAD");
         problemDetail.setType(Objects.requireNonNull(URI.create("https://hotelpms.com/errors/invalid-json-payload")));
         problemDetail.setTitle("Bad Request");
+        return problemDetail;
+    }
+
+    /**
+     * Handles AccessDeniedException thrown by @PreAuthorize when the caller's role
+     * is not in the allowed set. Must be explicit so the catch-all handler below
+     * does not swallow it and accidentally return 500 instead of 403.
+     *
+     * @param ex the exception
+     * @return the ProblemDetail response
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDeniedException(final AccessDeniedException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, "ACCESS_DENIED");
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotelpms.com/errors/access-denied")));
+        problemDetail.setTitle("Forbidden");
         return problemDetail;
     }
 
