@@ -21,7 +21,7 @@ public interface StayClient {
      * @param id the ID of the stay to retrieve
      * @return the stay details
      */
-    @GetMapping("/api/stays/{id}")
+    @GetMapping("/api/v1/stays/{id}")
     @CircuitBreaker(name = "stayService", fallbackMethod = "getStayFallback")
     StayResponse getStayById(@PathVariable("id") UUID id);
 
