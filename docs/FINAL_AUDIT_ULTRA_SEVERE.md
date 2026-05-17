@@ -359,6 +359,10 @@ Parti che reggono una revisione severa:
 
 ## 7. Roadmap Finale
 
+> La roadmap completa con analisi enterprise, confronto competitor e piano di investimento
+> è in [`docs/ROADMAP.md`](ROADMAP.md). Di seguito i punti architetturali specifici
+> identificati dall'audit tecnico del codice.
+
 ### Bloccanti prima del pilot
 
 1. **Unificare i due branch** — merge `feature/secure-coding-hardening` in

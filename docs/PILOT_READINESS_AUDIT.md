@@ -175,12 +175,21 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 ### Post-pilot (Nice-to-have)
 
 - **Notifiche**: email/push per prenotazioni in scadenza, camere da pulire prima del check-in
-- **Export fatture PDF**: invoice scaricabile come PDF branded con header hotel
 - **Report occupazione e RevPAR**: dashboard proprietario con trend temporale
 - **Wizard di onboarding**: configurazione guidata al primo avvio
 - **Multi-hotel UI**: selezione hotel attivo nella navbar per ADMIN di catena
 - **Integration test end-to-end** cross-service (Testcontainers)
 - **Email conferma prenotazione** all'ospite (SMTP configurabile)
+
+**Roadmap completa:** [`docs/ROADMAP.md`](ROADMAP.md)
+
+**Sprint 1 priorità assolute (Production-ready):**
+vedi `ROADMAP.md §Sprint 1` — items P1-P8 (da `@Version Invoice` a
+credenziali Alloggiati PS configurabili da UI).
+
+**Per la commercializzazione:**
+vedi `ROADMAP.md §Sprint 2` (quick wins: email, fattura valida, mobile, KPI)
+e `ROADMAP.md §Sprint 3` (enterprise: channel manager, booking engine, K8s, API pubblica).
 
 ---
 

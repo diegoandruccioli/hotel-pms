@@ -33,12 +33,27 @@ This is a **production-grade enterprise PMS** validated for real hotel operation
 - **Coverage**: JaCoCo (≥40% instruction) and Vitest (stmt/branch/fn/lines) coverage thresholds are enforced in CI — build fails if coverage drops below configured minimums. (commit `dab4eea`)
 - **CVE-2026-42577** (Netty epoll DoS): accepted residual risk — JDK NIO transport is active, Netty 4.2.x is not yet compatible with the fix; mitigated by network-layer isolation
 
-### Planned — not yet implemented
+### Roadmap
 
-- Kubernetes migration (all containers are stateless and K8s-ready by design)
-- Testcontainers integration tests (current backend tests use Mockito only — no real DB)
-- Automated backup and disaster recovery
-- CI/CD push-to-deploy pipeline
+Le implementazioni future sono documentate in dettaglio in
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+**Prossime priorità (Sprint 1 — Production-ready, 4-6 settimane):**
+- `@Version` su `Invoice` (race condition con F&B e billing concorrenti)
+- `restart: unless-stopped` in docker-compose
+- Backup PostgreSQL automatizzato (pg_dump cron)
+- Prometheus alert rules (error rate, latency, container restarts)
+- Operations Runbook (recovery ADMIN, rollback migration)
+
+**Gap commerciali principali (Sprint 2-3):**
+- Channel Manager OTA — prerequisito per 80% del mercato hotel
+- Email/SMS conferme prenotazione (standard minimo assoluto)
+- Fattura fiscalmente valida (numerazione legale italiana, IVA disaggregata)
+- Mobile PWA (70% infrastruttura già presente)
+- Booking Engine + Stripe Checkout
+
+Vedi [`docs/ROADMAP.md`](docs/ROADMAP.md) per la roadmap completa
+con effort, dipendenze, confronto competitor e timeline Enterprise SaaS.
 
 See [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) for the evidence-based audit with all open gaps, accepted risks, and the explicit roadmap.
 
