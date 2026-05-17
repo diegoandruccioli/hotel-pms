@@ -285,6 +285,59 @@ Browser → PUT /api/v1/fb/menu-items/{id} {name, category, price, available, de
 
 ---
 
+## GDPR Art. 20 — Portabilità dei dati ospite
+
+**Attori:** qualsiasi ruolo autenticato (ADMIN / OWNER / RECEPTIONIST)  
+**Endpoint:** `GET /api/v1/guests/{guestId}/export`
+
+```
+Browser → GET /api/v1/guests/{guestId}/export
+  → Gateway (valida JWT, inietta X-Auth-Hotel)
+  → guest-service
+      ├── verifica che il guest appartenga all'hotel (multi-tenant check con hotel_id)
+      ├── verifica che il guest non sia anonymizzato (active=true)
+      ├── raccoglie profilo completo: nome, email, telefono, gdprConsentDate
+      ├── chiama stay-service via Feign → GET /api/v1/stays/guest/{guestId}/history
+      │     → lista soggiorni con date, camera, hotel (solo hotel corrente)
+      └── risponde 200 JSON con struttura machine-readable (GDPR Art. 20)
+
+Casi di errore:
+  404 → guest non trovato o non appartiene all'hotel
+  451 → legal hold attivo (soggiorni attivi o fatture aperte — raro per export)
+```
+
+L'export non modifica né cancella i dati. I dati sono esportati in formato JSON strutturato
+per garantire la portabilità richiesta dal GDPR Art. 20 (diritto alla portabilità).
+
+---
+
+## Download PDF Fattura
+
+**Attori:** qualsiasi ruolo autenticato  
+**Endpoint:** `GET /api/v1/invoices/{invoiceId}/pdf`
+
+```
+Browser → GET /api/v1/invoices/{invoiceId}/pdf
+  → Gateway (valida JWT, inietta X-Auth-Hotel)
+  → billing-service
+      ├── verifica che invoice.hotelId = X-Auth-Hotel (multi-tenant check)
+      ├── recupera Invoice con charges e payments (EntityGraph — no N+1)
+      ├── recupera dati hotel da stay-service via Feign → GET /api/v1/stays/settings
+      ├── genera PDF on-the-fly con Apache PDFBox:
+      │     header con logo e dati fiscali hotel (nome, indirizzo, P.IVA, CF)
+      │     dati soggiorno, lista addebiti, totale, stato pagamento (ISSUED/PAID)
+      └── risponde 200 con Content-Type: application/pdf
+              Content-Disposition: attachment; filename="invoice-{id}.pdf"
+
+Casi di errore:
+  404 → invoice non trovata o non appartiene all'hotel
+```
+
+Il PDF viene generato a ogni richiesta (no caching persistente).
+I dati fiscali dell'hotel devono essere configurati in `/profile/hotel` per un PDF completo.
+
+---
+
 ## Gestione degli errori
 
 | HTTP | Significato | Comportamento frontend |

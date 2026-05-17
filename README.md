@@ -28,9 +28,9 @@ This is a **production-grade enterprise PMS** validated for real hotel operation
 - Security hardening fully documented in `docs/security-report/report-secure-coding.tex`
 - CI pipeline (GitHub Actions): build, unit tests, Playwright E2E, Trivy image scan
 
-### Stable but without enforced gates
+### Stable
 
-- **Coverage**: JaCoCo (backend) and Vitest (frontend) generate reports but have no minimum threshold configured — intentionally deferred until a real baseline is measured with `./gradlew build` / `npm run test:coverage`
+- **Coverage**: JaCoCo (≥40% instruction) and Vitest (stmt/branch/fn/lines) coverage thresholds are enforced in CI — build fails if coverage drops below configured minimums. (commit `dab4eea`)
 - **CVE-2026-42577** (Netty epoll DoS): accepted residual risk — JDK NIO transport is active, Netty 4.2.x is not yet compatible with the fix; mitigated by network-layer isolation
 
 ### Planned — not yet implemented
@@ -39,7 +39,6 @@ This is a **production-grade enterprise PMS** validated for real hotel operation
 - Testcontainers integration tests (current backend tests use Mockito only — no real DB)
 - Automated backup and disaster recovery
 - CI/CD push-to-deploy pipeline
-- JaCoCo / Vitest coverage threshold enforcement
 
 See [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) for the evidence-based audit with all open gaps, accepted risks, and the explicit roadmap.
 
@@ -51,7 +50,7 @@ See [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) for t
 |-------|-----------|
 | **Language (Backend)** | Java 21 |
 | **Language (Frontend)** | TypeScript 5.x |
-| **Backend Framework** | Spring Boot 3.4.x, Spring Cloud 2024.x |
+| **Backend Framework** | Spring Boot 3.5.x, Spring Cloud 2025.0 |
 | **Frontend Framework** | React 19, Vite 7.x |
 | **State Management** | Zustand |
 | **Styling** | Tailwind CSS 3.x |
@@ -221,6 +220,20 @@ The system is seeded with a default administrator account on first boot:
 
 > ⚠️ **Change the default password** in any non-development environment.
 
+### First login
+
+On first login the system forces a password change — no operations are available until a new password is set. The redirect to `/profile` is automatic and mandatory.
+
+Password policy: ≥16 characters, 2 uppercase, 2 digits, 2 special characters.
+
+After changing the password, complete the initial setup before starting operations:
+
+1. **Hotel Profile** (`/profile/hotel`) — name, address, VAT number, fiscal code, logo
+2. **Room types** (`/rooms`) — define types (Single, Double, Suite) with rates and capacity
+3. **Rooms** — add physical rooms with number and type
+4. **F&B menu** (`/restaurant`) — add menu items with prices (ADMIN/OWNER only)
+5. **User accounts** (`/admin/users`) — create receptionist accounts with temporary passwords
+
 ---
 
 ## Project Structure
@@ -272,12 +285,14 @@ cd frontend
 npm run test:e2e
 ```
 
-### Coverage Baseline (measured 2026-05-11, no thresholds enforced)
+### Coverage Baseline (measured 2026-05-11)
 
 | Layer | Statements | Branches | Lines |
 |-------|-----------|----------|-------|
 | Frontend (Vitest V8) | 68.6% | 54.2% | 71.1% |
 | Backend avg (JaCoCo) | ~60.1% instr. | ~50.4% | ~57.4% |
+
+Thresholds enforced since 2026-05-16 (`dab4eea`). Build fails if coverage drops below configured minimums.
 
 See [`docs/PILOT_READINESS_AUDIT.md §5b`](docs/PILOT_READINESS_AUDIT.md) for per-service breakdown and gap analysis.
 

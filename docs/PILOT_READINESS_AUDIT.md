@@ -39,7 +39,7 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 | **Gestione configurazione e segreti** | 🟢 Verde | `.env` in `.gitignore`, Spring Cloud Config, secrets via env var, nessun hardcoding. `.env.example` presente con documentazione variabili. |
 | **Migrazioni DB** | 🟢 Verde | Flyway in tutti i servizi, versioning sequenziale corretto. |
 | **Logging e osservabilità** | 🟢 Verde | Zipkin + Prometheus + Grafana + Loki configurati. `X-Correlation-ID` propagato via MDC dal gateway a tutti i servizi — errori distribuiti tracciabili con un solo ID. |
-| **Test automatici** | ✅ Verde | 324/324 test Vitest su 50+ file. Frontend (Vitest + V8): stmt 65.69%, branch 52.28%, funcs 60.78%, lines 68.4% — soglie enforced in CI (G9 — `dab4eea`). Backend (JaCoCo): ~60% istruzioni weighted avg — threshold ≥40% enforced su tutti i moduli. Playwright: 31 spec, walk-in, admin users, checkout, billing, E2E completi in Docker. |
+| **Test automatici** | ✅ Verde | 324/324 test Vitest su 51 file (stabili, verificato 3/3 esecuzioni consecutive). Frontend (Vitest + V8): stmt 65.69%, branch 52.28%, funcs 60.78%, lines 68.4% — soglie enforced in CI (G9 — `dab4eea`). Backend (JaCoCo): ~60% istruzioni weighted avg — threshold ≥40% enforced su tutti i moduli. Playwright: 31 spec, walk-in, admin users, checkout, billing, E2E completi in Docker. |
 | **UX operativa receptionist** | 🟢 Verde | Tutti i flussi principali coperti: walk-in, check-in, checkout, billing, F&B, housekeeping, camere, gestione utenti, profilo hotel. i18n EN/IT. Residuale: nessun wizard onboarding al primo avvio, nessuna notifica push. |
 | **Resilienza a errori di rete** | 🟢 Verde | CircuitBreaker Resilience4j su tutti i Feign client, fallback dichiarati, GlobalExceptionHandler RFC 7807 in tutti i servizi. Alloggiati SOAP failure non blocca il check-in. |
 | **Documentazione tecnica** | 🟢 Verde | `ALLOGGIATI_README.md`, `DOCUMENTAZIONE_TECNICA_ALLOGGIATI_PS.md`, `INTERACTION_FLOWS.md`, `SECURITY_AND_PRIVACY.md`, Swagger aggregato all'API Gateway, `backup/DECISIONS.md`, `THREAT_MODEL.md`. |
@@ -67,7 +67,7 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 | **Report / export** | ✅ Completo | Report finanziario proprietario (OwnerDashboard) con export CSV. PDF fattura scaricabile (PDFBox — `GET /api/v1/invoices/{id}/pdf`), testato end-to-end nel smoke test 2026-05-17. Residuale: report occupazione per periodo. |
 | **Configurazione hotel** | ✅ Completo | Profilo hotel con nome, indirizzo, PIVA/CF, logo, toggle `alloggiatiAutoSend`. |
 | **Autenticazione** | ✅ Completo | Login, refresh token silenzioso, logout, cambio password, `mustChangePassword` con blocco. JWT access 15min, refresh 7gg. |
-| **Autorizzazione** | 🟡 Parziale | RBAC con ruoli ADMIN/OWNER/RECEPTIONIST. Route-level enforcement nel gateway per le route admin. `@PreAuthorize` su endpoint amministrativi. Residuale: enforcement non esaustivo su tutti i singoli endpoint di ogni microservizio. |
+| **Autorizzazione** | ✅ Completo | RBAC con ruoli ADMIN/OWNER/RECEPTIONIST. Route-level enforcement nel gateway + `@PreAuthorize` su tutti gli endpoint sensibili. Fix 2026-05-17 (`52e869c`): `@PreAuthorize("hasAnyRole('ADMIN','OWNER')")` aggiunto su submit Alloggiati, JSON export Alloggiati, PUT hotel-settings. Verificato a runtime (RECEPTIONIST → 403, ADMIN → 200). |
 | **Gestione utenti** | ✅ Completo | Pagina `/admin/users` (solo ADMIN/OWNER): lista, crea, disattiva/riattiva account, reset password con invalidazione sessioni (tokenVersion++). |
 
 ---
@@ -93,6 +93,12 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 - Nessun wizard di onboarding al primo avvio.
 - Nessuna notifica push/email per eventi critici (prenotazione in scadenza, camera da pulire).
 - Nessuna pagina `/help` integrata nell'app.
+
+**Sicurezza operativa:**
+- **Recovery ADMIN**: se tutti gli account ADMIN vengono disattivati, il ripristino richiede
+  accesso diretto al DB PostgreSQL del container `auth-service`
+  (`UPDATE user_account SET active = true WHERE ...`). Non esiste endpoint applicativo di recovery.
+  Documentare nel runbook operativo prima del deploy in produzione.
 
 ---
 
@@ -164,7 +170,7 @@ Tutti i bloccanti identificati nell'audit iniziale (B1–B5) sono stati risolti.
 - ⏳ **Dependabot auto-PR** — da attivare sul repository GitHub
 - ⏳ **Commento vincolo `commons-csv:1.9.0`** in `build.gradle.kts`
 
-**Nota audit 2026-05-17:** 6 bug runtime trovati e risolti durante l'audit con Docker stack reale (immagini stale — tutti i fix sono stati committati). **TODO aperto:** admin password hash `{bcrypt}` prefix — fix DB-only, da consolidare in Flyway migration prima del deploy in produzione.
+**Nota audit 2026-05-17:** 6 bug runtime trovati e risolti durante l'audit con Docker stack reale (immagini stale — tutti i fix sono stati committati). Admin password hash `{bcrypt}` prefix: ✅ **RISOLTO** — Flyway `V6__fix_admin_password_bcrypt_prefix.sql` (`44edf35`) si applica automaticamente al primo avvio su DB fresco.
 
 ### Post-pilot (Nice-to-have)
 

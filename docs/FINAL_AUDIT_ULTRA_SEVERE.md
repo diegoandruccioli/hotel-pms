@@ -102,8 +102,8 @@ nei test Mockito.
 | Session management | ✅ Eccellente | ✅ Eccellente | ✅ Eccellente | JWT httpOnly, token rotation, Redis blacklist, `tokenVersion` | — |
 | Security headers | ✅ Eccellente | ✅ Eccellente | ✅ Eccellente | HSTS `max-age=31536000`, CSP `default-src 'none'`, X-Frame-Options DENY (`SecurityHeadersFilter.java:94-100`) | — |
 | HMAC inter-service | ✅ Eccellente | ✅ Eccellente | ✅ Adeguato | Constant-time compare, segreto da script dedicato, startup check bloccante | Nessun mTLS; HMAC è unico layer di auth interna |
-| RBAC | ✅ Buono | ✅ Adeguato | ⚠️ Non uniforme | Gateway route-level + `@PreAuthorize` su endpoint sensibili | Enforcement granulare non verificato su ogni controller |
-| GDPR / PII | ✅ Buono | ⚠️ Branch separato | ⚠️ Branch separato | Retention job, hard-anonymize, `gdprConsentDate` su branch `feature/secure-coding-hardening` | NON visibile dal branch corrente |
+| RBAC | ✅ Buono | ✅ Adeguato | ✅ Adeguato | Gateway route-level + `@PreAuthorize` su endpoint sensibili. Fix `52e869c` (2026-05-17): `@PreAuthorize("hasAnyRole('ADMIN','OWNER')")` su submit Alloggiati, JSON export, PUT hotel-settings. `GlobalExceptionHandler` → 403 su `AccessDeniedException`. | — |
+| GDPR / PII | ✅ Buono | ✅ Adeguato | ✅ Adeguato | Retention job, hard-anonymize, `gdprConsentDate` su `main` (branch unificato). | — |
 | Alerting & audit | ✅ Buono | ⚠️ Passivo | ❌ Mancante | X-Correlation-ID via MDC, Prometheus + Grafana + Loki presenti | Nessuna alert rule configurata |
 
 **Rischio esame — branch non unificato:**  
@@ -202,11 +202,10 @@ L'entità ha due scritture concorrenti indipendenti: `processPayment()` e `addCh
 che operano contemporaneamente sulla stessa stanza possono causare perdita silente di
 un addebito F&B. Scenario concreto: checkout + conferma ordine bar sulla stessa camera.
 
-**C2 — Branch security non unificato**  
-`feature/secure-coding-hardening` contiene: GDPR retention job (T-GST-05), hard-anonymize
-con guardia TULPS, `GuestPrivacySettings`, `GuestRetentionJobServiceImpl`, `gdprConsentDate`,
-`THREAT_MODEL.md`, `report-secure-coding.tex`. Nessuno di questi è visibile dal branch
-corrente. Per un esame di Secure Coding, questo è il gap organizzativo più grave.
+~~**C2 — Branch security non unificato**~~  
+✅ **RISOLTO** — tutto il lavoro di sicurezza è su `main`. `THREAT_MODEL.md`, `report-secure-coding.tex`,
+GDPR retention (T-GST-05), hard-anonymize, `GuestRetentionJobServiceImpl`, `gdprConsentDate` —
+tutto visibile dal branch corrente. Il gap organizzativo è chiuso.
 
 ### Alti
 
@@ -258,9 +257,9 @@ configurabile, ma il default sbagliato è un rischio in un deploy frettoloso.
 `auth-service` usa `@ControllerAdvice`, tutti gli altri `@RestControllerAdvice`. Funzionalmente
 equivalente, ma segnala mancanza di convenzione condivisa.
 
-**B2 — Nessun GitHub Actions CI/CD**  
-Dependabot configurato. Nessun workflow per build automatica su PR. La qualità del codice
-è verificata solo localmente.
+~~**B2 — Nessun GitHub Actions CI/CD**~~  
+✅ **RISOLTO** — `ci.yml` presente: build Gradle + JUnit + ESLint + Playwright E2E in Docker
+su ogni push/PR verso main. Vedi §2.8 per evidenza.
 
 **B3 — Swagger esposto senza autenticazione in dev**  
 Tutti i `/swagger-ui.html` raggiungibili via API Gateway senza JWT in sviluppo. Disabilitato
@@ -453,9 +452,9 @@ i container giravano con versioni precedenti al rebuild):
 5. `fb-service` `StayClient` path `/api/stays` → `/api/v1/stays`  
    Fix: path corretto in `StayClient` Feign interface
 6. Admin password hash nel DB senza prefisso `{bcrypt}`  
-   Fix applicato al DB (`UPDATE` su `user_account`).  
-   **NOTA:** fix DB-only — alla re-init del DB va riapplicato.  
-   **TODO:** aggiungere migration Flyway o `data.sql` con hash già prefissato.
+   ✅ **RISOLTO (commit `44edf35`)** — Flyway `V6__fix_admin_password_bcrypt_prefix.sql`
+   aggiunge UPDATE idempotente con guard `NOT LIKE '{%}%'`. Fix si applica automaticamente
+   al primo avvio su DB fresco.
 
 Gateway: route predicate `/api/v1/auth/users/**` → `/api/v1/auth/users,/api/v1/auth/users/**`  
 Fix in `config-service/src/main/resources/config/api-gateway.yml`

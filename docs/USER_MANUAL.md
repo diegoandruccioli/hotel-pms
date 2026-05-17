@@ -42,6 +42,27 @@
 
 ## 3. Procedure Operative
 
+### 3.0 Configurazione iniziale del sistema (primo avvio)
+
+Al primo avvio del sistema, seguire questa sequenza prima di iniziare le operazioni:
+
+1. **Login** con le credenziali di default (`admin` / `password`)
+2. **Cambio password obbligatorio** — il sistema reindirizza automaticamente a `/profile`.
+   Impostare una password sicura (policy: ≥16 caratteri, 2 maiuscole, 2 cifre, 2 caratteri speciali).
+3. **Profilo Hotel** → Menu → icona utente → **Profilo Hotel** (`/profile/hotel`)
+   Inserire: nome struttura, indirizzo, P.IVA, Codice Fiscale. Senza questi dati le fatture PDF non saranno complete.
+4. **Tipi camera** → Menu → **Camere** → sezione **Tipologie** → pulsante **Aggiungi tipo**
+   Definire le tipologie disponibili (Singola, Doppia, Suite, ecc.) con tariffa e capacità.
+5. **Camere** → Aggiungi le camere fisiche con numero di stanza e tipo associato.
+6. **Menu F&B** → Menu → **Ristorante** → sezione **Gestione menu** (solo ADMIN/OWNER)
+   Inserire le voci del bar/ristorante con nome, categoria, prezzo e disponibilità.
+7. **Utenti** → Menu → **Gestione Utenti** → **Aggiungi Utente** (solo ADMIN)
+   Creare gli account per il personale (receptionist, altri ADMIN). Comunicare username e password temporanea via canale sicuro. Al primo accesso l'utente dovrà impostare una nuova password.
+
+Solo dopo questi passi il sistema è operativo per ricevere prenotazioni e gestire i soggiorni.
+
+---
+
 ### 3.1 Login e Primo Accesso
 
 1. Accedere all'URL del sistema (es. `http://localhost:5173`)
@@ -148,6 +169,12 @@
    - Errore di rete: toast rosso generico — riprovare più tardi
 
 **Invio automatico:** Se il toggle `alloggiatiAutoSend` è attivo nel Profilo Hotel, l'invio avviene automaticamente ad ogni check-in. Il badge **Inviato PS** appare nella colonna PS della lista soggiorni.
+
+> **Importante — modalità DRY_RUN:** Se il sistema è configurato con `ALLOGGIATI_DRY_RUN=true`
+> (impostazione predefinita in ambienti di sviluppo e staging), l'invio viene indirizzato
+> all'endpoint di **test** del portale PS e **non costituisce adempimento** ai fini dell'art. 109 TULPS.
+> Per l'invio effettivo ai fini di legge, verificare con l'amministratore di sistema che
+> `ALLOGGIATI_DRY_RUN=false` e che le credenziali WsKey reali siano configurate nel file `.env`.
 
 ---
 
