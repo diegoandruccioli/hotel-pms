@@ -4669,6 +4669,18 @@ di autenticazione:
     Commit: \commitref{4e6a7f4}{G3 --- reset password con invalidazione sessioni (ADMIN/OWNER)}.
 \end{enumerate}
 
+\paragraph{Fix inizializzazione hash admin — Flyway V6.}
+L'adozione di \texttt{DelegatingPasswordEncoder} richiede che ogni hash in database
+sia prefissato con il nome dell'algoritmo (es.\ \texttt{\{bcrypt\}}) per permettere
+il dispatch corretto al verificatore.
+Il seed iniziale dell'utente \texttt{admin} in Flyway era privo di tale prefisso,
+causando un crash \texttt{IllegalArgumentException} al primo login.
+La migrazione \texttt{V6\_\_fix\_admin\_password\_bcrypt\_prefix.sql} corregge
+l'hash con una guardia idempotente
+(\texttt{WHERE NOT password LIKE '\textbackslash\{bcrypt\textbackslash\}\%'})
+che risulta no-op su installazioni già corrette.
+Commit: \commitref{953be80}{fix(security): V6 Flyway --- prefisso bcrypt mancante sull'hash admin iniziale}.
+
 \paragraph{Limitazione operativa — recovery accesso amministrativo.}
 In assenza di un secondo account ADMIN attivo, il ripristino dell'accesso
 amministrativo richiede accesso diretto al database PostgreSQL del container
@@ -4717,6 +4729,11 @@ con enforcement a tre livelli:
         Entrambi sono stati corretti aggiungendo
         \texttt{@PreAuthorize("hasAnyRole('ADMIN','OWNER')")}
         con \texttt{@EnableMethodSecurity} abilitato su \texttt{SecurityConfig}.
+        \texttt{AccessDeniedException} è gestito dal \texttt{GlobalExceptionHandler}
+        che restituisce HTTP 403 anziché 500; il comportamento è verificato da
+        \texttt{StayControllerSecurityTest} con test \texttt{@WebMvcTest} e HMAC reale.
+        Commit: \commitref{52e869c}{fix(security): RBAC --- @PreAuthorize su StayController (submit/download alloggiati)}
+        e \commitref{44edf35}{fix(security): RBAC --- @PreAuthorize su HotelSettingsController.updateSettings}.
 
   \item \textbf{Frontend (React)}: il componente \texttt{ProtectedRoute}
         con prop \texttt{allowedRoles} redirige a \texttt{/} gli utenti
