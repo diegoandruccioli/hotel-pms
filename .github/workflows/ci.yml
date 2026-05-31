@@ -230,7 +230,7 @@ jobs:
         image:
           - postgres:15-alpine
           - redis:alpine
-          - grafana/grafana:11.5.0
+          - grafana/grafana:11.6-security-01
 
     steps:
       - name: Checkout repository
@@ -284,7 +284,7 @@ jobs:
     name: "E2E — Docker Stack + Playwright"
     runs-on: ubuntu-latest
     needs: [backend, frontend, trivy]
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
     env:
@@ -337,6 +337,19 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Resolve Playwright version for cache key
+        id: pw-version
+        working-directory: frontend
+        run: |
+          echo "version=$(node -e "console.log(require('./node_modules/@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+          restore-keys: playwright-chromium-${{ runner.os }}-
 
       - name: Install Playwright + Chromium system dependencies
         working-directory: frontend
