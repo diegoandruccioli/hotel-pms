@@ -356,14 +356,12 @@ jobs:
       # their own JARs via multi-stage Dockerfiles; tests are skipped with -x test).
       # Monitoring services (loki, grafana, prometheus, zipkin) are excluded to
       # stay within the GitHub runner's 7 GB RAM budget.
-      # --no-parallel avoids simultaneous JVM processes exceeding the 7 GB runner RAM.
       - name: Build Docker images (with layer cache)
         run: |
           mkdir -p /tmp/.buildx-cache
           docker buildx bake \
             --file docker-compose.yml \
             --load \
-            --no-parallel \
             --set "*.cache-from=type=local,src=/tmp/.buildx-cache" \
             --set "*.cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max" \
             config-server auth-service guest-service inventory-service \
