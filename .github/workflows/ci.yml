@@ -337,17 +337,17 @@ jobs:
             --set "*.cache-to=type=gha,mode=max" \
             frontend
 
-      # Playwright install runs AFTER Docker build so the 46-min cold build does
-      # not consume time that would otherwise be saved for later steps.
-      # On cache-hit runs this step takes ~30 s (browser already cached).
       - name: Resolve Playwright version for cache key
         id: pw-version
         working-directory: frontend
         run: |
           echo "version=$(node -e "console.log(require('./node_modules/@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
+      # Restore only — save is explicit below so the cache is written even when
+      # cancel-in-progress kills the job before post-steps run.
+      - name: Restore Playwright browser cache
+        id: pw-cache
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
@@ -356,6 +356,15 @@ jobs:
       - name: Install Playwright + Chromium system dependencies
         working-directory: frontend
         run: npx playwright install chromium --with-deps
+
+      # Save immediately after install — not in post-step — so a subsequent
+      # cancel-in-progress does not evict the freshly downloaded binary.
+      - name: Save Playwright browser cache
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
       # --no-deps prevents Compose from starting the api-gateway dependency chain.
       - name: Start frontend container
