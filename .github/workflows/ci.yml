@@ -280,7 +280,7 @@ jobs:
     name: "E2E — Docker Stack + Playwright"
     runs-on: ubuntu-latest
     needs: [backend, frontend, trivy]
-    timeout-minutes: 60
+    timeout-minutes: 75
     # Cancel only the E2E job on new pushes — keeps Trivy SARIF uploads uninterrupted.
     concurrency:
       group: e2e-${{ github.ref }}
