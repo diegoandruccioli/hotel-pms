@@ -301,10 +301,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend, frontend, trivy]
     timeout-minutes: 75
-    # Cancel only the E2E job on new pushes — keeps Trivy SARIF uploads uninterrupted.
+    # Do not cancel running E2E jobs — lets playwright install complete so the
+    # browser cache saves correctly. GitHub Actions keeps only the latest queued run.
     concurrency:
       group: e2e-${{ github.ref }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     permissions:
       contents: read
     steps:
