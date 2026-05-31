@@ -362,6 +362,7 @@ jobs:
           docker buildx bake \
             --file docker-compose.yml \
             --load \
+            --allow fs.write=/tmp \
             --set "*.cache-from=type=local,src=/tmp/.buildx-cache" \
             --set "*.cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max" \
             config-server auth-service guest-service inventory-service \
