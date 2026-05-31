@@ -307,45 +307,9 @@ jobs:
       cancel-in-progress: true
     permissions:
       contents: read
-    env:
-      INTERNAL_HMAC_SECRET: ${{ secrets.INTERNAL_HMAC_SECRET }}
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-      CONFIG_SERVER_PASSWORD: ${{ secrets.CONFIG_SERVER_PASSWORD }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # Fail early and clearly if the required secret is missing
-      - name: Validate INTERNAL_HMAC_SECRET
-        run: |
-          if [ -z "$INTERNAL_HMAC_SECRET" ]; then
-            echo "::error::INTERNAL_HMAC_SECRET is not configured."
-            echo "::error::Go to Settings → Secrets → Actions and add it (openssl rand -hex 32)."
-            exit 1
-          fi
-
-      # Ensure all required secrets are set before the Docker stack is built.
-      # If a GitHub repo secret is absent, the expression evaluates to "" and the
-      # stack would fail at runtime.  Generate ephemeral values so every CI run
-      # is self-contained even without secrets configured in the repository.
-      #
-      # JWT_SECRET      – auth-service fails fast with an empty value (T-CFG-02).
-      # POSTGRES_PASSWORD – shared by postgres + all Spring datasources.
-      # CONFIG_SERVER_PASSWORD – required by config-service HTTP Basic Auth (T-CFG-03).
-      # INTERNAL_HMAC_SECRET   – already validated above; no fallback needed.
-      - name: Ensure required CI secrets are set
-        run: |
-          if [ -z "$JWT_SECRET" ]; then
-            echo "JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')" >> "$GITHUB_ENV"
-          fi
-          if [ -z "$POSTGRES_PASSWORD" ]; then
-            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" >> "$GITHUB_ENV"
-          fi
-          if [ -z "$CONFIG_SERVER_PASSWORD" ]; then
-            echo "CONFIG_SERVER_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
-          fi
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
@@ -358,30 +322,20 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      # JARs were built and uploaded by the backend job — no Gradle re-run needed.
-      - name: Download Spring Boot JARs
-        uses: actions/download-artifact@v4
-        with:
-          name: spring-boot-jars
-          path: .
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # type=gha is the GitHub Actions native BuildKit cache backend.
-      # No filesystem write permissions needed; no manual rotation required.
-      # Monitoring services (loki, grafana, prometheus, zipkin) are excluded
-      # to stay within the GitHub runner's 7 GB RAM budget.
-      - name: Build Docker images (with layer cache)
+      # All Playwright tests intercept every API call via page.route() before
+      # it reaches the network — no backend service is needed at runtime.
+      # Only the nginx frontend image is required to serve the React SPA.
+      - name: Build frontend Docker image (with layer cache)
         run: |
           docker buildx bake \
             --file docker-compose.yml \
             --load \
             --set "*.cache-from=type=gha" \
             --set "*.cache-to=type=gha,mode=max" \
-            config-server auth-service guest-service inventory-service \
-            reservation-service stay-service billing-service fb-service \
-            api-gateway frontend
+            frontend
 
       # Playwright install runs AFTER Docker build so the 46-min cold build does
       # not consume time that would otherwise be saved for later steps.
@@ -403,44 +357,10 @@ jobs:
         working-directory: frontend
         run: npx playwright install chromium --with-deps
 
-      # Start backend services and wait for their health checks.  Frontend is
-      # started separately because its nginx healthcheck is unreliable under
-      # the resource pressure of a 7 GB GitHub runner; readiness is verified
-      # by the polling step below instead.
-      - name: Start backend stack (wait for healthy)
-        run: >
-          docker compose up -d --wait
-          postgres redis config-server
-          auth-service guest-service inventory-service
-          reservation-service stay-service billing-service fb-service
-          api-gateway
-        timeout-minutes: 20
-
-      # Start frontend without --wait; readiness is checked in a later step.
+      # --no-deps prevents Compose from starting the api-gateway dependency chain.
       - name: Start frontend container
-        run: docker compose up -d frontend
+        run: docker compose up -d --no-deps frontend
 
-      # Extra guard: confirm the gateway process is accepting connections on port 8080.
-      # The actuator was moved to the internal-only management port (8090, T-CFG-01),
-      # so we probe port 8080 directly and accept any HTTP response (2xx/3xx/4xx)
-      # as proof that the gateway is alive. Connection failures return "000".
-      - name: Wait for API Gateway to be healthy
-        run: |
-          echo "Polling http://localhost:8080 for any HTTP response ..."
-          for i in $(seq 1 30); do
-            STATUS=$(curl -so /dev/null -w "%{http_code}" http://localhost:8080/ 2>/dev/null || echo "000")
-            if [ "$STATUS" != "000" ]; then
-              echo "API Gateway is responding (HTTP $STATUS, attempt $i)."
-              exit 0
-            fi
-            echo "Attempt $i/30 — retrying in 10 s ..."
-            sleep 10
-          done
-          echo "::error::API Gateway did not become healthy within 300 s."
-          exit 1
-
-      # Poll the nginx frontend until it serves the React SPA (HTTP 200).
-      # This replaces the unreliable Docker healthcheck with an explicit retry loop.
       - name: Wait for frontend (nginx) to be serving
         run: |
           echo "Polling http://localhost:80 for HTTP 200 ..."
@@ -473,7 +393,6 @@ jobs:
           path: frontend/playwright-report/
           retention-days: 30
 
-      # Dump the last 200 lines of every container log to help diagnose failures
       - name: Dump container logs on failure
         if: failure()
         run: |
@@ -481,21 +400,8 @@ jobs:
             echo "=== CONTAINER STATUS ==="
             docker compose ps --all
             echo ""
-            echo "=== HEALTH CHECK INSPECT ==="
-            for svc in config-server auth-service guest-service inventory-service reservation-service stay-service billing-service fb-service api-gateway; do
-              echo "--- $svc ---"
-              docker inspect "$svc" \
-                --format='State={{.State.Status}} Health={{if .State.Health}}{{.State.Health.Status}} Log={{range .State.Health.Log}}[exit={{.ExitCode}} out={{.Output}}]{{end}}{{else}}none{{end}}' \
-                2>/dev/null || echo "container not found"
-            done
-            echo ""
-            echo "=== MANUAL LIVENESS (config-server) ==="
-            docker exec config-server sh -c \
-              'wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness; echo "exit:$?"' \
-              2>&1 || echo "docker exec failed"
-            echo ""
             echo "=== CONTAINER LOGS ==="
-            docker compose logs --tail=2000
+            docker compose logs --tail=500
           } > /tmp/docker-logs.txt 2>&1 || true
 
       - name: Upload container logs on failure
