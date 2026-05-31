@@ -10,12 +10,6 @@ on:
     branches:
       - main
 
-# Queue runs on the same branch but do NOT cancel in-progress runs at workflow
-# level — Trivy SARIF uploads must always complete to keep Code Scanning healthy.
-# cancel-in-progress is set only on the E2E job (the expensive one).
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
 
 # Opt into Node.js 24 for all JavaScript-based actions to silence
 # the Node.js 20 deprecation warning (removal scheduled Sep 2026).
