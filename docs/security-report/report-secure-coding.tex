@@ -1725,12 +1725,15 @@ public interface GuestMapper {
 
     // Ignores espliciti: nessun dato client puo' influenzare questi campi,
     // indipendentemente dalla policy del mapper o da future refactoring.
+    // gdprConsentDate aggiunto successivamente nell'ambito della fix T-GST-05
+    // (GDPR data retention): campo di sistema impostato dal service, mai dal client.
     @Mapping(target = "id",                ignore = true)
     @Mapping(target = "hotelId",           ignore = true)
     @Mapping(target = "identityDocuments", ignore = true)
     @Mapping(target = "active",            ignore = true)
     @Mapping(target = "createdAt",         ignore = true)
     @Mapping(target = "updatedAt",         ignore = true)
+    @Mapping(target = "gdprConsentDate",   ignore = true)
     Guest toEntity(GuestRequest request);
 
     @Mapping(target = "id",                ignore = true)
@@ -1739,6 +1742,7 @@ public interface GuestMapper {
     @Mapping(target = "active",            ignore = true)
     @Mapping(target = "createdAt",         ignore = true)
     @Mapping(target = "updatedAt",         ignore = true)
+    @Mapping(target = "gdprConsentDate",   ignore = true)
     void updateEntityFromRequest(GuestRequest request, @MappingTarget Guest target);
 }
 \end{lstlisting}
