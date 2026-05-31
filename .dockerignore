@@ -1,0 +1,13 @@
+# Exclude source code — Spring Boot JARs are pre-built by Gradle on the runner.
+# Docker only needs */build/libs/*.jar for the 9 Spring services.
+# (Frontend service uses context: ./frontend and is unaffected by this file.)
+*/src/
+.gradle/
+*/build/classes/
+*/build/generated-sources/
+*/build/tmp/
+*/build/resources/
+frontend/
+docs/
+backup/
+.git/
