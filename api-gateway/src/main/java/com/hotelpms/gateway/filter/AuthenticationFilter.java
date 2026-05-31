@@ -29,21 +29,22 @@ import java.util.Set;
  * <p>
  * After a successful JWT validation, this filter:
  * <ol>
- * <li>Extracts {@code username} and {@code role} from the token claims.</li>
- * <li>Injects {@code X-Auth-User} and {@code X-Auth-Role} headers so downstream
- * services can identify the caller without re-parsing the JWT.</li>
- * <li>Computes an {@code HMAC-SHA256} signature over {@code "username:role"}
- * using
- * the shared secret {@code internal.hmac.secret} and injects it as the
- * {@code X-Internal-Signature} header.</li>
+ * <li>Extracts {@code username}, {@code role}, and {@code hotelId} from the token claims.</li>
+ * <li>Injects {@code X-Auth-User}, {@code X-Auth-Role}, and {@code X-Auth-Hotel} headers so
+ * downstream services can identify the caller and enforce tenant isolation without re-parsing
+ * the JWT.</li>
+ * <li>Computes an {@code HMAC-SHA256} signature over {@code "username:role:hotelId"}
+ * using the shared secret {@code internal.hmac.secret} and injects it as the
+ * {@code X-Internal-Signature} header (T-GW-07: {@code hotelId} is included in the signed
+ * payload so the tenant-isolation header {@code X-Auth-Hotel} cannot be tampered
+ * independently of the identity headers on the internal network).</li>
  * </ol>
  *
  * <p>
  * Downstream {@code InternalAuthFilter} instances verify this signature to
  * guarantee that the gateway — and only the gateway — was the entry point,
- * making
- * it impossible for internal callers to spoof {@code X-Auth-User} /
- * {@code X-Auth-Role}.
+ * making it impossible for internal callers to spoof {@code X-Auth-User},
+ * {@code X-Auth-Role}, or {@code X-Auth-Hotel}.
  */
 @Component
 public class AuthenticationFilter extends AbstractGatewayFilterFactory<AuthenticationFilter.Config> {
