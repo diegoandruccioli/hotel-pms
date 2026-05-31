@@ -30,7 +30,12 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        // In CI, use the pre-installed system Chrome (google-chrome-stable on
+        // ubuntu-latest) instead of downloading playwright's bundled binary.
+        ...(isCI ? { channel: 'chrome' } : {}),
+      },
     },
   ],
   // webServer is only used locally — in CI the full Docker stack is already up

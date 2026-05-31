@@ -371,9 +371,6 @@ jobs:
         working-directory: frontend
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:80
-          # Use the pre-installed system Chrome instead of playwright's bundled
-          # Chromium build — eliminates the 167 MB per-run download entirely.
-          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
         run: npm run test:e2e:ci
 
       - name: Upload Playwright report
