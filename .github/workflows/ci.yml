@@ -338,34 +338,12 @@ jobs:
             --set "*.cache-to=type=gha,mode=max" \
             frontend
 
-      - name: Resolve Playwright version for cache key
-        id: pw-version
+      # ubuntu-latest ships google-chrome-stable — no 167 MB download needed.
+      # install-deps installs only the system libs playwright needs (apt-get, fast;
+      # most packages are already present on the runner image).
+      - name: Install Playwright system dependencies
         working-directory: frontend
-        run: |
-          echo "version=$(node -e "console.log(require('./node_modules/@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
-
-      # Restore only — save is explicit below so the cache is written even when
-      # cancel-in-progress kills the job before post-steps run.
-      - name: Restore Playwright browser cache
-        id: pw-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
-          restore-keys: playwright-chromium-${{ runner.os }}-
-
-      - name: Install Playwright + Chromium system dependencies
-        working-directory: frontend
-        run: npx playwright install chromium --with-deps
-
-      # Save immediately after install — not in post-step — so a subsequent
-      # cancel-in-progress does not evict the freshly downloaded binary.
-      - name: Save Playwright browser cache
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+        run: npx playwright install-deps chromium
 
       # --no-deps prevents Compose from starting the api-gateway dependency chain.
       - name: Start frontend container
@@ -393,6 +371,9 @@ jobs:
         working-directory: frontend
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:80
+          # Use the pre-installed system Chrome instead of playwright's bundled
+          # Chromium build — eliminates the 167 MB per-run download entirely.
+          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
         run: npm run test:e2e:ci
 
       - name: Upload Playwright report
