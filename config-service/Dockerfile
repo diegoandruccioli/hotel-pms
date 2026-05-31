@@ -4,6 +4,7 @@ COPY gradlew .
 COPY gradle/ gradle/
 COPY settings.gradle.kts .
 COPY config-service/build.gradle.kts config-service/
+RUN ./gradlew :config-service:dependencies --no-daemon
 COPY config-service/src/ config-service/src/
 RUN ./gradlew :config-service:build -x test --no-daemon
 

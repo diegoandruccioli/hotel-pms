@@ -6,11 +6,10 @@ COPY gradlew .
 COPY gradle gradle
 COPY guest-service/build.gradle.kts guest-service/
 COPY settings.gradle.kts .
-COPY guest-service/src guest-service/src
-
-# Make wrapper executable and build
 RUN chmod +x ./gradlew
-RUN ./gradlew clean build -x test --no-daemon
+RUN ./gradlew :guest-service:dependencies --no-daemon
+COPY guest-service/src guest-service/src
+RUN ./gradlew :guest-service:build -x test --no-daemon
 
 # Create lightweight production image
 FROM eclipse-temurin:21-jre-alpine

@@ -10,11 +10,10 @@ COPY gradlew .
 COPY gradle ./gradle
 COPY reservation-service/build.gradle.kts reservation-service/
 COPY settings.gradle.kts .
-COPY reservation-service/src reservation-service/src
-
-# Ensure gradle wrapper is executable and build
 RUN chmod +x gradlew
-RUN ./gradlew build -x test
+RUN ./gradlew :reservation-service:dependencies --no-daemon
+COPY reservation-service/src reservation-service/src
+RUN ./gradlew build -x test --no-daemon
 
 # Stage 2: Runtime stage
 FROM eclipse-temurin:21-jre-alpine

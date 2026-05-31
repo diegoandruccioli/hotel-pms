@@ -188,6 +188,7 @@ services:
     build:
       context: .
       dockerfile: config-service/Dockerfile
+    image: hotel-pms/config-service
     container_name: config-server
     restart: unless-stopped
     ports:
@@ -228,6 +229,7 @@ services:
     build:
       context: .
       dockerfile: api-gateway/Dockerfile
+    image: hotel-pms/api-gateway
     container_name: api-gateway
     restart: unless-stopped
     ports:
@@ -300,6 +302,7 @@ services:
     build:
       context: .
       dockerfile: auth-service/Dockerfile
+    image: hotel-pms/auth-service
     container_name: auth-service
     restart: unless-stopped
     ports:
@@ -352,6 +355,7 @@ services:
     build:
       context: .
       dockerfile: guest-service/Dockerfile
+    image: hotel-pms/guest-service
     container_name: guest-service
     restart: unless-stopped
     ports:
@@ -401,6 +405,7 @@ services:
     build:
       context: .
       dockerfile: stay-service/Dockerfile
+    image: hotel-pms/stay-service
     container_name: stay-service
     restart: unless-stopped
     ports:
@@ -455,6 +460,7 @@ services:
     build:
       context: .
       dockerfile: billing-service/Dockerfile
+    image: hotel-pms/billing-service
     container_name: billing-service
     restart: unless-stopped
     ports:
@@ -503,6 +509,7 @@ services:
     build:
       context: .
       dockerfile: fb-service/Dockerfile
+    image: hotel-pms/fb-service
     container_name: fb-service
     restart: unless-stopped
     ports:
@@ -553,6 +560,7 @@ services:
     build:
       context: .
       dockerfile: inventory-service/Dockerfile
+    image: hotel-pms/inventory-service
     container_name: inventory-service
     restart: unless-stopped
     ports:
@@ -601,6 +609,7 @@ services:
     build:
       context: .
       dockerfile: reservation-service/Dockerfile
+    image: hotel-pms/reservation-service
     container_name: reservation-service
     restart: unless-stopped
     ports:
@@ -651,6 +660,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    image: hotel-pms/frontend
     container_name: frontend
     restart: unless-stopped
     ports:

@@ -355,17 +355,39 @@ jobs:
         working-directory: frontend
         run: npx playwright install chromium --with-deps
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Cache key covers all Dockerfiles + build files so the cache is
+      # invalidated exactly when the layer structure or dependencies change.
+      # restore-keys allows a partial hit when only source files change.
+      - name: Cache Docker build layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: buildx-${{ runner.os }}-${{ hashFiles('**/Dockerfile', '**/*.gradle.kts', '**/gradle-wrapper.properties', 'frontend/package-lock.json') }}
+          restore-keys: |
+            buildx-${{ runner.os }}-
+
       # Build only the services needed for E2E tests (Spring services build
       # their own JARs via multi-stage Dockerfiles; tests are skipped with -x test).
       # Monitoring services (loki, grafana, prometheus, zipkin) are excluded to
       # stay within the GitHub runner's 7 GB RAM budget.
-      - name: Build Docker images
-        run: >
-          docker compose build
-          postgres redis config-server
-          auth-service guest-service inventory-service
-          reservation-service stay-service billing-service fb-service
-          api-gateway frontend
+      # --no-parallel avoids simultaneous JVM processes exceeding the 7 GB runner RAM.
+      - name: Build Docker images (with layer cache)
+        run: |
+          mkdir -p /tmp/.buildx-cache
+          docker buildx bake \
+            --file docker-compose.yml \
+            --load \
+            --no-parallel \
+            --set "*.cache-from=type=local,src=/tmp/.buildx-cache" \
+            --set "*.cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max" \
+            config-server auth-service guest-service inventory-service \
+            reservation-service stay-service billing-service fb-service \
+            api-gateway frontend
+          rm -rf /tmp/.buildx-cache
+          [ -d /tmp/.buildx-cache-new ] && mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true
 
       # Start backend services and wait for their health checks.  Frontend is
       # started separately because its nginx healthcheck is unreliable under

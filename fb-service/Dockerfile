@@ -7,6 +7,7 @@ COPY gradlew .
 COPY gradle gradle
 COPY settings.gradle.kts .
 COPY fb-service/build.gradle.kts fb-service/
+RUN ./gradlew :fb-service:dependencies --no-daemon
 COPY fb-service/src fb-service/src
 # Build the application
 RUN ./gradlew :fb-service:bootJar --no-daemon

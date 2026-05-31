@@ -7,6 +7,7 @@ WORKDIR /app
 COPY gradle/ gradle/
 COPY gradlew settings.gradle.kts ./
 COPY inventory-service/build.gradle.kts inventory-service/
+RUN ./gradlew :inventory-service:dependencies --no-daemon
 COPY inventory-service/src inventory-service/src
 
 # Build the application (exclude tests for Docker build)

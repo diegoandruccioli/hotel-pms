@@ -6,12 +6,13 @@ WORKDIR /app
 COPY gradlew .
 COPY gradle gradle
 COPY stay-service/build.gradle.kts stay-service/
-COPY stay-service/config stay-service/config
 COPY settings.gradle.kts .
+RUN ./gradlew :stay-service:dependencies --no-daemon
+COPY stay-service/config stay-service/config
 COPY stay-service/src stay-service/src
 
 # Build the application
-RUN ./gradlew build -x test
+RUN ./gradlew build -x test --no-daemon
 
 FROM eclipse-temurin:21-jre-alpine
 RUN apk update && apk upgrade --no-cache

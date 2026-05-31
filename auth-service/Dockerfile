@@ -4,6 +4,7 @@ COPY gradlew .
 COPY gradle/ gradle/
 COPY settings.gradle.kts .
 COPY auth-service/build.gradle.kts auth-service/
+RUN ./gradlew :auth-service:dependencies --no-daemon
 COPY auth-service/src/ auth-service/src/
 RUN ./gradlew :auth-service:build -x test --no-daemon
 

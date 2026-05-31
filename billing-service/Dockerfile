@@ -4,6 +4,7 @@ COPY gradlew .
 COPY gradle/ gradle/
 COPY settings.gradle.kts .
 COPY billing-service/build.gradle.kts billing-service/
+RUN ./gradlew :billing-service:dependencies --no-daemon
 COPY billing-service/src billing-service/src
 RUN ./gradlew :billing-service:build -x test --no-daemon
 

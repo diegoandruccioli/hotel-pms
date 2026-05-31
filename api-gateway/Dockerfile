@@ -4,6 +4,7 @@ COPY gradlew .
 COPY gradle/ gradle/
 COPY settings.gradle.kts .
 COPY api-gateway/build.gradle.kts api-gateway/
+RUN ./gradlew :api-gateway:dependencies --no-daemon
 COPY api-gateway/src/ api-gateway/src/
 RUN ./gradlew :api-gateway:build -x test --no-daemon
 
