@@ -17,6 +17,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
@@ -63,7 +64,8 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
         }
 
         final String expected = computeHmac(username, role, hotelId);
-        if (!expected.equals(signature)) {
+        if (!MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
+                signature.getBytes(StandardCharsets.UTF_8))) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "INVALID_INTERNAL_SIGNATURE");
             return;
         }

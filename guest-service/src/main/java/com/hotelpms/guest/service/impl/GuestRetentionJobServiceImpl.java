@@ -4,6 +4,7 @@ import com.hotelpms.guest.client.BillingServiceClient;
 import com.hotelpms.guest.client.StayServiceClient;
 import com.hotelpms.guest.client.dto.GuestInvoiceClientResponse;
 import com.hotelpms.guest.client.dto.GuestLastStayClientResponse;
+import com.hotelpms.guest.config.BatchJobContext;
 import com.hotelpms.guest.model.Guest;
 import com.hotelpms.guest.model.GuestPrivacySettings;
 import com.hotelpms.guest.repository.GuestRepository;
@@ -39,17 +40,12 @@ import java.util.stream.Collectors;
  *       hard-deleted, and {@code active} is set to {@code false}.</li>
  * </ol>
  *
- * <p><strong>Note</strong>: Feign calls in this job rely on the
- * {@code RequestContextHolder} being populated; because this runs outside an
- * HTTP request, the {@code FeignHeaderConfig} interceptor will find no
- * attributes and skip header injection, causing downstream 401 responses.
- * The circuit-breaker fallback on both Feign clients defaults to
- * {@code hasStays/hasInvoices = true}, which conservatively blocks deletion.
- * This is the safe fail-closed behaviour: no guest is ever erroneously
- * anonymised due to a downstream service being unavailable.
- *
- * <p>In a production deployment this limitation is resolved by propagating a
- * system-level service account token (see ADR on background-job authentication).
+ * <p>Inter-service Feign calls run outside an HTTP request context. Authentication
+ * headers are injected via {@link com.hotelpms.guest.config.BatchJobContext}, which
+ * provides a system-level identity ({@code gdpr-retention-job / ADMIN}) scoped to the
+ * hotel of the guest being processed. The circuit-breaker fallback on both Feign clients
+ * defaults to {@code hasStays/hasInvoices = true} so that a downstream outage never
+ * causes accidental anonymisation (fail-closed).
  */
 @Service
 @RequiredArgsConstructor
@@ -110,30 +106,35 @@ public class GuestRetentionJobServiceImpl {
         final int retentionYears = Math.max(settings.getGuestRetentionYears(),
                 GuestPrivacySettings.TULPS_MIN_YEARS);
 
-        final GuestLastStayClientResponse stayInfo =
-                stayServiceClient.getLastStayDate(guestId);
-        if (stayInfo.hasStays() && stayInfo.lastStayDate() != null) {
-            final LocalDate tulpsExpiry = stayInfo.lastStayDate().plusYears(retentionYears);
-            if (!LocalDate.now().isAfter(tulpsExpiry)) {
-                log.debug("{} guest={} blocked by TULPS hold (expires {})",
-                        LOG_PREFIX, guestId, tulpsExpiry);
-                return false;
+        BatchJobContext.set(Objects.requireNonNull(guest.getHotelId()).toString());
+        try {
+            final GuestLastStayClientResponse stayInfo =
+                    stayServiceClient.getLastStayDate(guestId);
+            if (stayInfo.hasStays() && stayInfo.lastStayDate() != null) {
+                final LocalDate tulpsExpiry = stayInfo.lastStayDate().plusYears(retentionYears);
+                if (!LocalDate.now().isAfter(tulpsExpiry)) {
+                    log.debug("{} guest={} blocked by TULPS hold (expires {})",
+                            LOG_PREFIX, guestId, tulpsExpiry);
+                    return false;
+                }
             }
-        }
 
-        final GuestInvoiceClientResponse invoiceInfo =
-                billingServiceClient.getLastInvoiceDate(guestId);
-        if (invoiceInfo.hasInvoices() && invoiceInfo.lastInvoiceDate() != null) {
-            final LocalDate fiscalExpiry = invoiceInfo.lastInvoiceDate()
-                    .plusYears(GuestPrivacySettings.FISCAL_MIN_YEARS);
-            if (!LocalDate.now().isAfter(fiscalExpiry)) {
-                log.debug("{} guest={} blocked by FISCAL hold (expires {})",
-                        LOG_PREFIX, guestId, fiscalExpiry);
-                return false;
+            final GuestInvoiceClientResponse invoiceInfo =
+                    billingServiceClient.getLastInvoiceDate(guestId);
+            if (invoiceInfo.hasInvoices() && invoiceInfo.lastInvoiceDate() != null) {
+                final LocalDate fiscalExpiry = invoiceInfo.lastInvoiceDate()
+                        .plusYears(GuestPrivacySettings.FISCAL_MIN_YEARS);
+                if (!LocalDate.now().isAfter(fiscalExpiry)) {
+                    log.debug("{} guest={} blocked by FISCAL hold (expires {})",
+                            LOG_PREFIX, guestId, fiscalExpiry);
+                    return false;
+                }
             }
-        }
 
-        return true;
+            return true;
+        } finally {
+            BatchJobContext.clear();
+        }
     }
 
     private void anonymiseGuest(final Guest guest) {

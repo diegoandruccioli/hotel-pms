@@ -154,6 +154,12 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
 
             return chain.filter(exchange.mutate()
                     .request(request.mutate()
+                            .headers(headers -> {
+                                headers.remove(HEADER_USER);
+                                headers.remove(HEADER_ROLE);
+                                headers.remove(HEADER_HOTEL);
+                                headers.remove(HEADER_SIGNATURE);
+                            })
                             .header(HEADER_USER, username)
                             .header(HEADER_ROLE, role)
                             .header(HEADER_HOTEL, hotelId)

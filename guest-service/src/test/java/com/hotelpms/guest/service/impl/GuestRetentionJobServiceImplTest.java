@@ -2,6 +2,7 @@ package com.hotelpms.guest.service.impl;
 
 import com.hotelpms.guest.client.BillingServiceClient;
 import com.hotelpms.guest.client.StayServiceClient;
+import com.hotelpms.guest.config.BatchJobContext;
 import com.hotelpms.guest.client.dto.GuestInvoiceClientResponse;
 import com.hotelpms.guest.client.dto.GuestLastStayClientResponse;
 import com.hotelpms.guest.model.Guest;
@@ -23,6 +24,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -175,5 +177,28 @@ class GuestRetentionJobServiceImplTest {
 
         verify(stayServiceClient, never()).getLastStayDate(any());
         verify(billingServiceClient, never()).getLastInvoiceDate(any());
+    }
+
+    @Test
+    void shouldClearBatchContextAfterProcessing() {
+        final UUID hotelId = UUID.randomUUID();
+        final Guest guest = buildGuest(hotelId);
+        final UUID guestId = Objects.requireNonNull(guest.getId());
+        final GuestPrivacySettings settings = GuestPrivacySettings.builder()
+                .hotelId(hotelId).guestRetentionYears(YEARS_5).build();
+
+        when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
+                .thenReturn(List.of(guest));
+        when(settingsRepository.findById(Objects.requireNonNull(hotelId)))
+                .thenReturn(Optional.of(settings));
+        when(stayServiceClient.getLastStayDate(guestId))
+                .thenReturn(new GuestLastStayClientResponse(false, null));
+        when(billingServiceClient.getLastInvoiceDate(guestId))
+                .thenReturn(new GuestInvoiceClientResponse(false, null));
+        when(guestRepository.save(any())).thenReturn(guest);
+
+        job.runRetentionJob();
+
+        assertNull(BatchJobContext.get(), "BatchJobContext must be cleared after job completes");
     }
 }

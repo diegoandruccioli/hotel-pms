@@ -49,19 +49,28 @@ public class FeignHeaderConfig {
         return (final RequestTemplate template) -> {
             final ServletRequestAttributes attrs = (ServletRequestAttributes)
                     RequestContextHolder.getRequestAttributes();
-            if (attrs == null) {
-                return;
-            }
-            final HttpServletRequest request = attrs.getRequest();
-            final String user = request.getHeader(HEADER_USER);
-            final String role = request.getHeader(HEADER_ROLE);
-            final String hotel = request.getHeader(HEADER_HOTEL);
-
-            if (StringUtils.hasText(user) && StringUtils.hasText(role) && StringUtils.hasText(hotel)) {
-                template.header(HEADER_USER, user);
-                template.header(HEADER_ROLE, role);
-                template.header(HEADER_HOTEL, hotel);
-                template.header(HEADER_SIGNATURE, computeHmac(user, role, hotel));
+            if (attrs != null) {
+                final HttpServletRequest request = attrs.getRequest();
+                final String user = request.getHeader(HEADER_USER);
+                final String role = request.getHeader(HEADER_ROLE);
+                final String hotel = request.getHeader(HEADER_HOTEL);
+                if (StringUtils.hasText(user) && StringUtils.hasText(role)
+                        && StringUtils.hasText(hotel)) {
+                    template.header(HEADER_USER, user);
+                    template.header(HEADER_ROLE, role);
+                    template.header(HEADER_HOTEL, hotel);
+                    template.header(HEADER_SIGNATURE, computeHmac(user, role, hotel));
+                }
+            } else {
+                final BatchJobContext batchCtx = BatchJobContext.get();
+                if (batchCtx != null) {
+                    template.header(HEADER_USER, batchCtx.getUser());
+                    template.header(HEADER_ROLE, batchCtx.getRole());
+                    template.header(HEADER_HOTEL, batchCtx.getHotelId());
+                    template.header(HEADER_SIGNATURE,
+                            computeHmac(batchCtx.getUser(), batchCtx.getRole(),
+                                    batchCtx.getHotelId()));
+                }
             }
         };
     }
