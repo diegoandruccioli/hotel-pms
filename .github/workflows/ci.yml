@@ -338,23 +338,6 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Resolve Playwright version for cache key
-        id: pw-version
-        working-directory: frontend
-        run: |
-          echo "version=$(node -e "console.log(require('./node_modules/@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
-          restore-keys: playwright-chromium-${{ runner.os }}-
-
-      - name: Install Playwright + Chromium system dependencies
-        working-directory: frontend
-        run: npx playwright install chromium --with-deps
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -388,6 +371,26 @@ jobs:
             api-gateway frontend
           rm -rf /tmp/.buildx-cache
           [ -d /tmp/.buildx-cache-new ] && mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true
+
+      # Playwright install runs AFTER Docker build so the 46-min cold build does
+      # not consume time that would otherwise be saved for later steps.
+      # On cache-hit runs this step takes ~30 s (browser already cached).
+      - name: Resolve Playwright version for cache key
+        id: pw-version
+        working-directory: frontend
+        run: |
+          echo "version=$(node -e "console.log(require('./node_modules/@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+          restore-keys: playwright-chromium-${{ runner.os }}-
+
+      - name: Install Playwright + Chromium system dependencies
+        working-directory: frontend
+        run: npx playwright install chromium --with-deps
 
       # Start backend services and wait for their health checks.  Frontend is
       # started separately because its nginx healthcheck is unreliable under
