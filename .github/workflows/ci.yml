@@ -358,27 +358,12 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Set up JDK 21 (Temurin)
-        uses: actions/setup-java@v4
+      # JARs were built and uploaded by the backend job — no Gradle re-run needed.
+      - name: Download Spring Boot JARs
+        uses: actions/download-artifact@v4
         with:
-          java-version: "21"
-          distribution: temurin
-
-      # Same key as the backend job — restores the cache populated by that job.
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
-          restore-keys: gradle-${{ runner.os }}-
-
-      # Build all Spring Boot JARs on the runner (with cached Gradle deps).
-      # Dockerfiles no longer contain a Gradle build stage — they only COPY
-      # the pre-built JAR, so Docker never touches Maven Central.
-      - name: Build Spring Boot JARs
-        run: ./gradlew build -x test --no-daemon
+          name: spring-boot-jars
+          path: .
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

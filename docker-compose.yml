@@ -199,7 +199,7 @@ services:
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=96m -XX:+ExitOnOutOfMemoryError
     healthcheck:
       test:
         [
@@ -217,7 +217,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 768M
+          memory: 512M
         reservations:
           cpus: "0.10"
           memory: 256M
@@ -239,7 +239,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - CONFIG_SERVER_URL=http://config-server:8888
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
-      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=96m -XX:+ExitOnOutOfMemoryError
       # Service URIs – override with K8s ClusterIP or external URLs
       - GW_AUTH_SERVICE_URI=http://auth-service:8087
       - GW_GUEST_SERVICE_URI=http://guest-service:8083
@@ -290,7 +290,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 768M
+          memory: 512M
         reservations:
           cpus: "0.10"
           memory: 256M
@@ -316,7 +316,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - JWT_SECRET=${JWT_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=96m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -343,7 +343,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 768M
+          memory: 512M
         reservations:
           cpus: "0.10"
           memory: 256M
@@ -369,7 +369,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - APPLICATION_CONFIG_RESERVATION_SERVICE_URL=http://reservation-service:8082
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=96m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -393,7 +393,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 768M
+          memory: 512M
         reservations:
           cpus: "0.10"
           memory: 256M
@@ -424,7 +424,7 @@ services:
       - ALLOGGIATI_PASSWORD=${ALLOGGIATI_PASSWORD:-ci_placeholder_password}
       - ALLOGGIATI_WS_KEY=${ALLOGGIATI_WS_KEY:-ci_placeholder_wskey}
       - ALLOGGIATI_DRY_RUN=${ALLOGGIATI_DRY_RUN:-true}
-      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=96m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -448,7 +448,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 768M
+          memory: 512M
         reservations:
           cpus: "0.10"
           memory: 256M
@@ -473,7 +473,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=96m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -497,7 +497,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 768M
+          memory: 512M
         reservations:
           cpus: "0.10"
           memory: 256M
@@ -524,7 +524,7 @@ services:
       - APPLICATION_CONFIG_STAY_SERVICE_URL=http://stay-service:8084
       - APPLICATION_CONFIG_BILLING_SERVICE_URL=http://billing-service:8085
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=96m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -548,7 +548,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 768M
+          memory: 512M
         reservations:
           cpus: "0.10"
           memory: 256M
@@ -573,7 +573,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=96m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -597,7 +597,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 768M
+          memory: 512M
         reservations:
           cpus: "0.10"
           memory: 256M
@@ -624,7 +624,7 @@ services:
       - APPLICATION_CONFIG_GUEST_SERVICE_URL=http://guest-service:8083
       - APPLICATION_CONFIG_INVENTORY_SERVICE_URL=http://inventory-service:8081
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=96m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -648,7 +648,7 @@ services:
       resources:
         limits:
           cpus: "0.5"
-          memory: 768M
+          memory: 512M
         reservations:
           cpus: "0.10"
           memory: 256M
