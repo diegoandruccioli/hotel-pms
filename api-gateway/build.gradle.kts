@@ -24,7 +24,8 @@ repositories {
 ext {
     set("springCloudVersion", "2025.0.0")
     set("jjwtVersion", "0.11.5")
-    set("tomcat.version", "10.1.54")
+    // CVE-2026-43512/43513/43515/41284/41293/42498: fixed in Tomcat 10.1.55 (2026-05-05).
+    set("tomcat.version", "10.1.55")
     // CVE-2026-33870/33871: fixed in 4.1.132.Final.
     // CVE-2026-42583/42584/42579/42587: fixed in 4.1.133.Final — override Spring Boot BOM pin.
     set("netty.version", "4.1.133.Final")

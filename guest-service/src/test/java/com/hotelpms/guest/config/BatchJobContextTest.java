@@ -27,7 +27,7 @@ class BatchJobContextTest {
     }
 
     @Test
-    void getReturnsNullWhenNotSet() {
+    void returnsNullWhenNotSet() {
         assertNull(BatchJobContext.get());
     }
 

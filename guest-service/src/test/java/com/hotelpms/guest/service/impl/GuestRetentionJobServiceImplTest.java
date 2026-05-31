@@ -195,7 +195,7 @@ class GuestRetentionJobServiceImplTest {
                 .thenReturn(new GuestLastStayClientResponse(false, null));
         when(billingServiceClient.getLastInvoiceDate(guestId))
                 .thenReturn(new GuestInvoiceClientResponse(false, null));
-        when(guestRepository.save(any())).thenReturn(guest);
+        when(guestRepository.save(any())).thenReturn(Objects.requireNonNull(guest));
 
         job.runRetentionJob();
 

@@ -2,26 +2,65 @@
 # .trivyignore — Accepted CVE suppressions for Trivy
 # ============================================================
 # CVE-2026-22732 — Spring Security: security policy bypass and information
-# disclosure (spring-security-web). Fixed in Spring Security 6.5.9 / 7.0.4,
-# which require Spring Boot 3.5.x / 4.0.x respectively. The project is
-# currently pinned to Spring Boot 3.4.x (Spring Cloud 2024.0.0 compatibility).
-# Migration to Spring Boot 3.5.x is planned for the next major dependency
-# update cycle. Risk mitigated by network-layer controls (API gateway, no
-# direct external exposure of internal services).
+# disclosure (spring-security-web). Fixed in Spring Security 6.5.9, included
+# in Spring Boot 3.5.x. Project is now on Spring Boot 3.5.14 — suppression
+# retained as belt-and-suspenders pending confirmation from next Trivy run.
+# Remove after next clean scan confirms the CVE no longer appears.
 CVE-2026-22732
-# CVE-2026-22739 — Spring Cloud Config Server: path traversal via profile parameter
-# (spring-cloud-config-server 4.2.0). Fixed in 4.3.2 / 5.0.2, which belong to the
-# Spring Cloud 2025.x train (requires Spring Boot 3.5.x). Project is pinned to Spring
-# Boot 3.4.x for Spring Cloud 2024.0.x compatibility. Config server is not exposed
-# externally (not routed through the API gateway). Migration planned for next major
-# Spring Boot upgrade.
+# CVE-2026-22739 — Spring Cloud Config Server: path traversal via profile parameter.
+# Fixed in spring-cloud-config-server 4.3.2 (Spring Cloud 2025.x train).
+# Project is now on Spring Cloud 2025.0.0 — suppression retained pending
+# confirmation from next Trivy run. Remove after next clean scan.
 CVE-2026-22739
+# ── Go stdlib CVEs (gosu + Grafana binaries) ────────────────────────────────
+# These CVEs are in Go standard library code compiled into gosu and Grafana
+# binaries. They are NOT present in our Java Spring Boot service images.
+#
+# For gosu (postgres:15-alpine / redis:alpine):
+#   The gosu maintainers confirm these CVEs do not apply because gosu does
+#   not invoke the affected code paths (net/mail, html/template, httputil,
+#   HTTP/2 transport). Reference: github.com/tianon/gosu/issues/104.
+#
+# For Grafana (grafana/grafana:11.6-security-01, third-party monitoring):
+#   Grafana is a monitoring dependency, not part of the application attack
+#   surface. Accepted upstream pending Grafana release with Go ≥ 1.26.3.
+#
+# CVE-2026-33811 — net: CNAME double-free/DoS via long CNAME response (cgo DNS).
+#   gosu: does not make cgo DNS queries.
+#   Java images: not affected (JVM DNS, not Go net).
+CVE-2026-33811
+# CVE-2026-33814 — golang.org/x/net: HTTP/2 SETTINGS_MAX_FRAME_SIZE=0 infinite loop.
+#   gosu: does not use HTTP/2 transport.
+#   Java images: not affected (use Netty/Tomcat, not Go x/net).
+CVE-2026-33814
+# CVE-2026-39820 — net/mail: ParseAddress/ParseAddressList/ParseDate excessive CPU.
+#   gosu: does not parse RFC 5322 email addresses.
+CVE-2026-39820
+# CVE-2026-39836 — net: panic in Dial/LookupPort on NUL byte (Windows only).
+#   Containers run on Linux Alpine; Windows code path is unreachable.
+CVE-2026-39836
+# CVE-2026-42499 — net/mail: consumePhrase quadratic DoS.
+#   gosu: does not parse email headers.
+CVE-2026-42499
+# CVE-2026-27142 — html/template: URL not escaped in meta content attribute (XSS).
+#   gosu: does not render HTML templates.
+#   Grafana: fix requires rebuild with Go ≥ 1.26.3; accepted upstream.
+CVE-2026-27142
+# CVE-2026-39825 — net/http/httputil: ReverseProxy forwards invisible query params.
+#   gosu: does not use httputil.ReverseProxy.
+#   Grafana: accepted upstream.
+CVE-2026-39825
+# CVE-2026-39826 — html/template: script type="" escaper bypass (XSS).
+#   gosu: does not render HTML templates.
+#   Grafana: accepted upstream.
+CVE-2026-39826
+# ── Spring Cloud Config ──────────────────────────────────────────────────────
+# CVE-2026-41002 — Spring Cloud Config Server TOCTOU on Git clone base dir.
+#   config-service is internal-only (not routed through API gateway, T-CFG-01).
+#   Protected by HTTP Basic Auth (T-CFG-03). No external exposure.
+#   Affected: spring-cloud-config-server 5.x. Fix pending Spring Cloud 2025.x patch.
+CVE-2026-41002
 # Format: one CVE-ID per line, with a comment explaining the
 # justification — mirrors the approach used in
 # config/dependency-check/suppressions.xml for OWASP DC.
-#
-# Example:
-#   # CVE-2024-99999 — not exploitable: affected component (libfoo)
-#   # is not reachable in our container configuration.
-#   CVE-2024-99999
 # ============================================================
