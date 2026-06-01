@@ -1,5 +1,12 @@
 # 🏨 Enterprise Hotel PMS
 
+[![CI Quality Gate](https://github.com/diegoandruccioli/hotel-pms/actions/workflows/ci.yml/badge.svg)](https://github.com/diegoandruccioli/hotel-pms/actions/workflows/ci.yml)
+[![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![TypeScript 5](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+
 An enterprise-grade, microservices-based **Hotel Property Management System**.  
 This platform orchestrates hotel operations — from reservations and guest management to food & beverage point-of-sale, billing, and housekeeping — powered by a modern React frontend and a highly scalable Spring Boot backend ecosystem.
 
@@ -39,11 +46,10 @@ Le implementazioni future sono documentate in dettaglio in
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 **Prossime priorità (Sprint 1 — Production-ready, 4-6 settimane):**
-- `@Version` su `Invoice` (race condition con F&B e billing concorrenti)
-- `restart: unless-stopped` in docker-compose
 - Backup PostgreSQL automatizzato (pg_dump cron)
 - Prometheus alert rules (error rate, latency, container restarts)
-- Operations Runbook (recovery ADMIN, rollback migration)
+
+_Già completati:_ `@Version` su `Invoice` ✓ · `restart: unless-stopped` su tutti i container ✓ · Operations Runbook ✓
 
 **Gap commerciali principali (Sprint 2-3):**
 - Channel Manager OTA — prerequisito per 80% del mercato hotel
@@ -90,28 +96,47 @@ See [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) for t
 
 The system follows a **distributed microservices** pattern with centralized configuration and an API Gateway as the single entry point.
 
-```
-┌──────────────┐     ┌──────────────┐     ┌────────────────────┐
-│   React SPA  │────▶│  API Gateway │────▶│   Config Server    │
-│  (Vite dev)  │     │   :8080      │     │     :8888          │
-│   :5173      │     └──────┬───────┘     └────────────────────┘
-└──────────────┘            │
-                 ┌──────────┼──────────────────────┐
-                 │          │                      │
-          ┌──────▼──┐ ┌─────▼────┐ ┌──────────┐ ┌─▼──────────┐
-          │  Auth   │ │  Guest   │ │Inventory │ │Reservation │
-          │ :8087   │ │  :8083   │ │  :8081   │ │   :8082    │
-          └─────────┘ └──────────┘ └──────────┘ └────────────┘
-                 │          │                      │
-          ┌──────▼──┐ ┌─────▼────┐ ┌──────────┐
-          │  Stay   │ │ Billing  │ │   F&B    │
-          │ :8084   │ │  :8085   │ │  :8086   │
-          └─────────┘ └──────────┘ └──────────┘
-                 │
-          ┌──────▼──────────────────────────────┐
-          │   PostgreSQL :5432  │  Redis :6379   │
-          │   Zipkin :9411     │  Prometheus :9090│
-          └─────────────────────────────────────┘
+```mermaid
+graph TD
+    Browser["🌐 React SPA\n:5173 dev · :80 Docker/Nginx"]
+
+    subgraph GW_BOX["API Gateway :8080"]
+        GW["JWT validation · CSRF filter\nRedis token-bucket rate limiting\nHMAC signing · CORS · Routing"]
+    end
+
+    subgraph SVC["Microservices"]
+        Auth["Auth :8087"]
+        Guest["Guest :8083"]
+        Inv["Inventory :8081"]
+        Res["Reservation :8082"]
+        Stay["Stay :8084"]
+        Bill["Billing :8085"]
+        FB["F&amp;B :8086"]
+    end
+
+    subgraph INFRA["Infrastructure"]
+        PG[("PostgreSQL :5432\none DB per service")]
+        Redis[("Redis :6379\nrate-limit store")]
+        Config["Config Server :8888"]
+    end
+
+    subgraph OBS["Observability"]
+        Zipkin["Zipkin :9411"]
+        Prom["Prometheus :9090"]
+        Grafana["Grafana :3000"]
+        Loki["Loki :3100"]
+    end
+
+    Browser -->|"JWT cookie + X-CSRF-Token"| GW_BOX
+    GW_BOX -->|"X-Auth-* + X-Internal-Signature HMAC"| SVC
+    GW_BOX <-->|"token bucket"| Redis
+    SVC -.->|"reads config on startup"| Config
+    SVC --- PG
+    SVC -.->|"traces"| Zipkin
+    SVC -.->|"metrics"| Prom
+    SVC -.->|"structured logs"| Loki
+    Prom --- Grafana
+    Loki --- Grafana
 ```
 
 ### Ports Map
@@ -138,6 +163,22 @@ The system follows a **distributed microservices** pattern with centralized conf
 
 ---
 
+## Performance & Rate Limits
+
+Design targets for single-property deployment (≤ 20 concurrent hotel staff users):
+
+| Endpoint group | Sustained rate | Burst capacity | Notes |
+|---|---|---|---|
+| `POST /api/v1/auth/login` | 5 req/s | 10 req | Per client IP — brute-force mitigation |
+| `GET|POST /api/v1/auth/users/**` | 10 req/s | 20 req | Per authenticated user |
+| All other `/api/v1/**` | 20 req/s | 50 req | Per authenticated user |
+
+Rate limits are enforced by Spring Cloud Gateway's Redis token-bucket (`RequestRateLimiterGatewayFilterFactory`). Clients exceeding the limit receive `429 Too Many Requests` with `Retry-After: 1` and a RFC 9110 problem details body.
+
+> **Note:** No formal load testing has been performed. The figures above are the configured gateway limits, not measured throughput ceilings.
+
+---
+
 ## Key Technical Decisions & Trade-offs
 
 Non-obvious choices made during development, with the reasoning behind each.
@@ -157,6 +198,20 @@ Non-obvious choices made during development, with the reasoning behind each.
 ---
 
 ## How to Run
+
+### TL;DR — up and running in 3 commands
+
+```bash
+# Linux / macOS
+cp .env.example .env && chmod +x setup-hmac-secret.sh && ./setup-hmac-secret.sh && ./start.sh
+
+# Windows PowerShell
+Copy-Item .env.example .env; .\setup-hmac-secret.ps1; .\start.ps1
+```
+
+Open **http://localhost:5173** · Login: `admin` / `password` · Password change required on first login.
+
+---
 
 ### Prerequisites
 
@@ -344,11 +399,32 @@ See [`docs/BRANCH_STRATEGY.md`](docs/BRANCH_STRATEGY.md) for full topology and g
 | [`docs/BRANCH_STRATEGY.md`](docs/BRANCH_STRATEGY.md) | Branch topology, merge history, governance rules |
 | [`backup/DECISIONS.md`](backup/DECISIONS.md) | All binding architectural and business decisions (internal reference — read at session start) |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Enterprise roadmap — 4 sprints from Pilot-ready to Enterprise SaaS, competitor matrix, pricing model |
+| [`SECURITY.md`](SECURITY.md) | Responsible disclosure policy, in-scope vulnerabilities, accepted risks, security contact |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Developer onboarding, commit conventions, branch strategy, testing patterns |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history — v0.1.0-pilot feature list, security hardening, infrastructure |
 | [`docs/OPERATIONS_RUNBOOK.md`](docs/OPERATIONS_RUNBOOK.md) | Operational procedures — start/stop, backup, ADMIN recovery, log reading, credentials update |
 | [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) | Production deployment — server requirements, HTTPS, nginx, firewall, update procedure |
 | [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | API reference — auth flow, main endpoints, error codes, rate limiting |
+
+---
+
+## API Stability
+
+All endpoints under `/api/v1/` are stable within the current major version. Breaking changes (removed fields, changed semantics, authentication requirements) will increment the path prefix to `/api/v2/`. No `/api/v2/` endpoints exist in the current release.
+
+| Guarantee | Scope |
+|---|---|
+| **Stable** | All `/api/v1/**` request/response shapes |
+| **Internal** | `X-Auth-*`, `X-Internal-Signature` headers — consumed by services only, not by external clients |
+| **No guarantee** | Actuator endpoints (`/actuator/**`) — management use only, exposed on port `:8090`, not through the public gateway |
+
+---
+
+## Security
+
+Found a vulnerability? See [SECURITY.md](SECURITY.md) for the responsible disclosure policy.
+
+**Do not** open a public GitHub issue for security findings — private disclosure first.
 
 ---
 
