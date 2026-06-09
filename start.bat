@@ -33,7 +33,7 @@ echo.
 :: ═══════════════════════════════════════════════════════════════════════════════
 ::  STEP 0 — Port pre-checks
 :: ═══════════════════════════════════════════════════════════════════════════════
-call :LOG_STEP "0/7" "Pre-flight port checks"
+call :LOG_STEP "0/8" "Pre-flight port checks"
 
 call :CHECK_PORT 8888 "Config Server"
 if !ERRORLEVEL! neq 0 goto FATAL
@@ -51,7 +51,7 @@ call :LOG_OK "All required ports are available."
 :: ═══════════════════════════════════════════════════════════════════════════════
 ::  STEP 1 — Ensure Docker is running
 :: ═══════════════════════════════════════════════════════════════════════════════
-call :LOG_STEP "1/7" "Ensuring Docker Desktop is running"
+call :LOG_STEP "1/8" "Ensuring Docker Desktop is running"
 
 docker ps >nul 2>&1
 if !ERRORLEVEL! equ 0 (
@@ -145,7 +145,7 @@ goto POLL_DOCKER
 :: ═══════════════════════════════════════════════════════════════════════════════
 ::  STEP 2 — HMAC Secret bootstrap
 :: ═══════════════════════════════════════════════════════════════════════════════
-call :LOG_STEP "2/7" "HMAC secret bootstrap"
+call :LOG_STEP "2/8" "HMAC secret bootstrap"
 
 if not exist "%~dp0setup-hmac-secret.ps1" (
     set "FATAL_MSG=setup-hmac-secret.ps1 not found in project root."
@@ -160,9 +160,26 @@ if !ERRORLEVEL! neq 0 (
 call :LOG_OK "HMAC secret is ready."
 
 :: ═══════════════════════════════════════════════════════════════════════════════
-::  STEP 3 — Docker Compose
+::  STEP 3 — Gradle build
 :: ═══════════════════════════════════════════════════════════════════════════════
-call :LOG_STEP "3/7" "Starting Docker infrastructure"
+call :LOG_STEP "3/8" "Building microservices (Gradle)"
+
+if not exist "%~dp0gradlew.bat" (
+    set "FATAL_MSG=gradlew.bat not found in project root."
+    goto FATAL
+)
+
+call "%~dp0gradlew.bat" clean build -x test
+if !ERRORLEVEL! neq 0 (
+    set "FATAL_MSG=Gradle build failed (exit code !ERRORLEVEL!). Check output above."
+    goto FATAL
+)
+call :LOG_OK "All microservices built successfully."
+
+:: ═══════════════════════════════════════════════════════════════════════════════
+::  STEP 4 — Docker Compose
+:: ═══════════════════════════════════════════════════════════════════════════════
+call :LOG_STEP "4/8" "Starting Docker infrastructure"
 
 if not exist "%~dp0.env" (
     set "FATAL_MSG=.env file not found — HMAC setup may have failed silently."
@@ -178,9 +195,9 @@ set "COMPOSE_STARTED=1"
 call :LOG_OK "All containers are starting."
 
 :: ═══════════════════════════════════════════════════════════════════════════════
-::  STEP 4 — Config Server health check (via docker inspect, management port is internal)
+::  STEP 5 — Config Server health check (via docker inspect, management port is internal)
 :: ═══════════════════════════════════════════════════════════════════════════════
-call :LOG_STEP "4/7" "Waiting for Config Server"
+call :LOG_STEP "5/8" "Waiting for Config Server"
 
 set /a "ELAPSED_H=0"
 set /a "TIMEOUT_H=120"
@@ -203,9 +220,9 @@ goto WAIT_CONFIG
 :CONFIG_READY
 
 :: ═══════════════════════════════════════════════════════════════════════════════
-::  STEP 5 — API Gateway health check (via docker inspect, management port is internal)
+::  STEP 6 — API Gateway health check (via docker inspect, management port is internal)
 :: ═══════════════════════════════════════════════════════════════════════════════
-call :LOG_STEP "5/7" "Waiting for API Gateway"
+call :LOG_STEP "6/8" "Waiting for API Gateway"
 
 set /a "ELAPSED_H=0"
 set /a "TIMEOUT_H=180"
@@ -228,9 +245,9 @@ goto WAIT_GW
 :GW_READY
 
 :: ═══════════════════════════════════════════════════════════════════════════════
-::  STEP 6 — Frontend dependencies
+::  STEP 7 — Frontend dependencies
 :: ═══════════════════════════════════════════════════════════════════════════════
-call :LOG_STEP "6/7" "Installing frontend dependencies"
+call :LOG_STEP "7/8" "Installing frontend dependencies"
 
 pushd "%~dp0frontend" 2>nul
 if !ERRORLEVEL! neq 0 (
@@ -247,9 +264,9 @@ if !ERRORLEVEL! neq 0 (
 call :LOG_OK "Frontend dependencies installed."
 
 :: ═══════════════════════════════════════════════════════════════════════════════
-::  STEP 7 — Vite + Browser
+::  STEP 8 — Vite + Browser
 :: ═══════════════════════════════════════════════════════════════════════════════
-call :LOG_STEP "7/7" "Launching Vite dev server"
+call :LOG_STEP "8/8" "Launching Vite dev server"
 
 :: Background: poll port 5173 then open browser
 start /b "" cmd /c "for /l %%W in (1,1,30) do (curl -sf http://localhost:5173 >nul 2>&1 && (start http://localhost:5173 & exit /b 0) || timeout /t 1 /nobreak >nul)"

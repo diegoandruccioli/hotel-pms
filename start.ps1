@@ -3,11 +3,11 @@
 .SYNOPSIS
     Enterprise Hotel PMS - One-Click Startup (PowerShell 5.1+)
 .DESCRIPTION
-    Bootstraps Docker Desktop, generates HMAC secrets, starts all
-    microservices via docker compose, waits for health checks, then
-    launches the React/Vite frontend dev-server with automatic
-    browser opener. Implements fatal error handling, timestamped
-    logging, port pre-checks, and graceful cleanup on Ctrl+C.
+    Bootstraps Docker Desktop, generates HMAC secrets, builds all
+    microservices via Gradle, starts them via docker compose, waits
+    for health checks, then launches the React/Vite frontend dev-server
+    with automatic browser opener. Implements fatal error handling,
+    timestamped logging, port pre-checks, and graceful cleanup on Ctrl+C.
 .NOTES
     Encoding: ASCII-safe (no emoji/Unicode) for PS 5.1 compatibility.
 #>
@@ -305,7 +305,7 @@ try {
 
     if (-not $stackAlreadyRunning) {
         # ── Step 0: Port availability ─────────────────────────────────────────
-        Write-Step '0/7' 'Pre-flight port checks'
+        Write-Step '0/8' 'Pre-flight port checks'
         Assert-PortAvailable -Port 8888 -ServiceLabel 'Config Server'
         Assert-PortAvailable -Port 8080 -ServiceLabel 'API Gateway'
         Assert-PortAvailable -Port 5173 -ServiceLabel 'Vite Dev Server'
@@ -314,11 +314,11 @@ try {
         Write-Success 'All required ports are available.'
 
         # ── Step 1: Docker ────────────────────────────────────────────────────
-        Write-Step '1/7' 'Ensuring Docker Desktop is running'
+        Write-Step '1/8' 'Ensuring Docker Desktop is running'
         Start-DockerDesktop
 
         # ── Step 2: HMAC Secret ───────────────────────────────────────────────
-        Write-Step '2/7' 'HMAC secret bootstrap'
+        Write-Step '2/8' 'HMAC secret bootstrap'
         $hmacScript = Join-Path $ScriptRoot 'setup-hmac-secret.ps1'
         if (-not (Test-Path $hmacScript)) {
             Stop-WithError "HMAC setup script not found at: $hmacScript"
@@ -326,8 +326,17 @@ try {
         Invoke-Native 'HMAC secret setup' { & $hmacScript } -AllowStderr
         Write-Success 'HMAC secret is ready.'
 
-        # ── Step 3: Docker Compose ────────────────────────────────────────────
-        Write-Step '3/7' 'Starting Docker infrastructure'
+        # ── Step 3: Gradle build ──────────────────────────────────────────────
+        Write-Step '3/8' 'Building microservices (Gradle)'
+        $gradlew = Join-Path $ScriptRoot 'gradlew.bat'
+        if (-not (Test-Path $gradlew)) {
+            Stop-WithError "gradlew.bat not found at: $gradlew"
+        }
+        Invoke-Native 'Gradle build' { & $gradlew clean build -x test } -AllowStderr
+        Write-Success 'All microservices built successfully.'
+
+        # ── Step 4: Docker Compose ────────────────────────────────────────────
+        Write-Step '4/8' 'Starting Docker infrastructure'
         $envFile = Join-Path $ScriptRoot '.env'
         if (-not (Test-Path $envFile)) {
             Stop-WithError ".env file not found at $envFile -- HMAC setup may have failed silently."
@@ -336,17 +345,17 @@ try {
         $script:ComposeStarted = $true
         Write-Success 'All containers are starting.'
 
-        # ── Step 4: Config Server health ──────────────────────────────────────
-        Write-Step '4/7' 'Waiting for Config Server'
+        # ── Step 5: Config Server health ──────────────────────────────────────
+        Write-Step '5/8' 'Waiting for Config Server'
         Wait-ForContainerHealthy -ServiceName 'Config Server' -ContainerName 'config-server' -TimeoutSeconds 120
 
-        # ── Step 5: API Gateway health ────────────────────────────────────────
-        Write-Step '5/7' 'Waiting for API Gateway'
+        # ── Step 6: API Gateway health ────────────────────────────────────────
+        Write-Step '6/8' 'Waiting for API Gateway'
         Wait-ForContainerHealthy -ServiceName 'API Gateway' -ContainerName 'api-gateway' -TimeoutSeconds 180
     }
 
-    # ── Step 6: Frontend ──────────────────────────────────────────────────────
-    Write-Step '6/7' 'Installing frontend dependencies'
+    # ── Step 7: Frontend ──────────────────────────────────────────────────────
+    Write-Step '7/8' 'Installing frontend dependencies'
     $frontendDir = Join-Path $ScriptRoot 'frontend'
     if (-not (Test-Path $frontendDir)) {
         Stop-WithError "frontend/ directory not found at: $frontendDir"
@@ -355,8 +364,8 @@ try {
     Invoke-Native 'npm install' { npm install --silent }
     Write-Success 'Frontend dependencies installed.'
 
-    # ── Step 7: Launch Vite + browser ─────────────────────────────────────────
-    Write-Step '7/7' 'Launching Vite dev server'
+    # ── Step 8: Launch Vite + browser ─────────────────────────────────────────
+    Write-Step '8/8' 'Launching Vite dev server'
 
     # Background job: wait for port 5173 to respond, then open browser.
     $browserJob = Start-Job -ScriptBlock {
@@ -376,8 +385,8 @@ try {
         }
     }
 
-    Write-Log '  [TIP] Press Ctrl+C to stop the server and shut down Docker.' -Color Yellow
-    Write-Log '  [DEV] Vite dev server starting on http://localhost:5173'     -Color Green
+    Write-Log '  [TIP] Press Ctrl+C to stop the server and shut down Docker.'  -Color Yellow
+    Write-Log '  [DEV] Vite dev server starting on http://localhost:5173'      -Color Green
     Write-Host ''
 
     # npm run dev streams stdout+stderr to the terminal; $ErrorActionPreference

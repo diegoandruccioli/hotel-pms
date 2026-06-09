@@ -259,7 +259,7 @@ launch_browser_when_ready() {
 show_banner
 
 # ── Step 0: Port pre-checks ──────────────────────────────────────────────────
-log_step "0/7" "Pre-flight port checks"
+log_step "0/8" "Pre-flight port checks"
 assert_port_free 8888 "Config Server"
 assert_port_free 8080 "API Gateway"
 assert_port_free 5173 "Vite Dev Server"
@@ -268,11 +268,11 @@ assert_port_free 6379 "Redis"
 log_ok "All required ports are available."
 
 # ── Step 1: Docker ────────────────────────────────────────────────────────────
-log_step "1/7" "Ensuring Docker is running"
+log_step "1/8" "Ensuring Docker is running"
 start_docker
 
 # ── Step 2: HMAC Secret ──────────────────────────────────────────────────────
-log_step "2/7" "HMAC secret bootstrap"
+log_step "2/8" "HMAC secret bootstrap"
 hmac_script="$SCRIPT_DIR/setup-hmac-secret.sh"
 if [[ ! -f "$hmac_script" ]]; then
     die "HMAC setup script not found at: $hmac_script"
@@ -282,8 +282,20 @@ if ! bash "$hmac_script"; then
 fi
 log_ok "HMAC secret is ready."
 
-# ── Step 3: Docker Compose ────────────────────────────────────────────────────
-log_step "3/7" "Starting Docker infrastructure"
+# ── Step 3: Gradle build ──────────────────────────────────────────────────────
+log_step "3/8" "Building microservices (Gradle)"
+gradlew="$SCRIPT_DIR/gradlew"
+if [[ ! -f "$gradlew" ]]; then
+    die "gradlew not found at: $gradlew"
+fi
+chmod +x "$gradlew"
+if ! "$gradlew" clean build -x test; then
+    die "Gradle build failed. Check the output above for details."
+fi
+log_ok "All microservices built successfully."
+
+# ── Step 4: Docker Compose ────────────────────────────────────────────────────
+log_step "4/8" "Starting Docker infrastructure"
 if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
     die ".env file not found — HMAC setup may have failed silently."
 fi
@@ -291,16 +303,16 @@ docker compose --env-file .env up -d --build
 COMPOSE_STARTED=1
 log_ok "All containers are starting."
 
-# ── Step 4: Config Server health ──────────────────────────────────────────────
-log_step "4/7" "Waiting for Config Server"
+# ── Step 5: Config Server health ──────────────────────────────────────────────
+log_step "5/8" "Waiting for Config Server"
 wait_for_container_healthy "Config Server" "config-server" 120
 
-# ── Step 5: API Gateway health ────────────────────────────────────────────────
-log_step "5/7" "Waiting for API Gateway"
+# ── Step 6: API Gateway health ────────────────────────────────────────────────
+log_step "6/8" "Waiting for API Gateway"
 wait_for_container_healthy "API Gateway" "api-gateway" 180
 
-# ── Step 6: Frontend dependencies ─────────────────────────────────────────────
-log_step "6/7" "Installing frontend dependencies"
+# ── Step 7: Frontend dependencies ─────────────────────────────────────────────
+log_step "7/8" "Installing frontend dependencies"
 frontend_dir="$SCRIPT_DIR/frontend"
 if [[ ! -d "$frontend_dir" ]]; then
     die "frontend/ directory not found at: $frontend_dir"
@@ -309,8 +321,8 @@ cd "$frontend_dir"
 npm install --silent
 log_ok "Frontend dependencies installed."
 
-# ── Step 7: Launch Vite + browser ─────────────────────────────────────────────
-log_step "7/7" "Launching Vite dev server"
+# ── Step 8: Launch Vite + browser ─────────────────────────────────────────────
+log_step "8/8" "Launching Vite dev server"
 
 # Start background browser opener (waits for port 3000)
 launch_browser_when_ready &

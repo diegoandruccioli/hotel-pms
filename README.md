@@ -234,10 +234,14 @@ chmod +x setup-hmac-secret.sh && ./setup-hmac-secret.sh
 ### One-Click Startup
 
 Use the provided scripts to boot the entire ecosystem. Each script will:
-1. Start all Docker containers (`docker compose up -d`)
-2. Wait for the **Config Server** to become healthy
-3. Wait for the **API Gateway** to become healthy
-4. Install frontend dependencies (if needed) and start the Vite dev server
+1. Run a pre-flight port check
+2. Ensure Docker Desktop is running
+3. Generate HMAC / JWT secrets (first time only)
+4. Build all microservices with `./gradlew clean build -x test`
+5. Start all Docker containers (`docker compose up -d --build`)
+6. Wait for the **Config Server** to become healthy
+7. Wait for the **API Gateway** to become healthy
+8. Install frontend dependencies (if needed) and start the Vite dev server
 
 ```bash
 # Linux / macOS
