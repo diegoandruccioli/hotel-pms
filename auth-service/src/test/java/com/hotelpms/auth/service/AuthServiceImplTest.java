@@ -31,6 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.mockito.ArgumentCaptor;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -217,11 +219,10 @@ class AuthServiceImplTest {
 
         assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
 
-        final org.mockito.ArgumentCaptor<java.time.Instant> lockCaptor =
-                org.mockito.ArgumentCaptor.forClass(java.time.Instant.class);
+        final ArgumentCaptor<Instant> lockCaptor = ArgumentCaptor.forClass(Instant.class);
         verify(userRepository).updateFailedAttempts(
-                org.mockito.ArgumentMatchers.eq(TEST_USER),
-                org.mockito.ArgumentMatchers.eq(MAX_FAILED_ATTEMPTS),
+                eq(TEST_USER),
+                eq(MAX_FAILED_ATTEMPTS),
                 lockCaptor.capture());
         assertNotNull(lockCaptor.getValue(), "Account must be locked after reaching MAX_FAILED_ATTEMPTS");
     }
