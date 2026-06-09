@@ -37,29 +37,27 @@ This is a **production-grade enterprise PMS** validated for real hotel operation
 
 ### Stable
 
-- **Coverage**: JaCoCo (≥40% instruction) and Vitest (stmt/branch/fn/lines) coverage thresholds are enforced in CI — build fails if coverage drops below configured minimums. (commit `dab4eea`)
+- **Coverage**: JaCoCo (≥40% instruction) and Vitest (stmt/branch/fn/lines) thresholds are enforced in CI — build fails if coverage drops below minimums. The enforced floor is conservative (40%) to allow incremental growth; per-service targets in the development guidelines are ≥95%, currently averaging ~60% backend instruction coverage. (commit `dab4eea`)
 - **CVE-2026-42577** (Netty epoll DoS): accepted residual risk — JDK NIO transport is active, Netty 4.2.x is not yet compatible with the fix; mitigated by network-layer isolation
 
 ### Roadmap
 
-Le implementazioni future sono documentate in dettaglio in
-[`docs/ROADMAP.md`](docs/ROADMAP.md).
+Future implementations are documented in detail in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-**Prossime priorità (Sprint 1 — Production-ready, 4-6 settimane):**
-- Backup PostgreSQL automatizzato (pg_dump cron)
+**Next priorities (Sprint 1 — Production-ready, 4–6 weeks):**
+- Automated PostgreSQL backup (pg_dump cron)
 - Prometheus alert rules (error rate, latency, container restarts)
 
-_Già completati:_ `@Version` su `Invoice` ✓ · `restart: unless-stopped` su tutti i container ✓ · Operations Runbook ✓
+_Already completed:_ `@Version` on `Invoice` ✓ · `restart: unless-stopped` on all containers ✓ · Operations Runbook ✓
 
-**Gap commerciali principali (Sprint 2-3):**
-- Channel Manager OTA — prerequisito per 80% del mercato hotel
-- Email/SMS conferme prenotazione (standard minimo assoluto)
-- Fattura fiscalmente valida (numerazione legale italiana, IVA disaggregata)
-- Mobile PWA (70% infrastruttura già presente)
+**Main commercial gaps (Sprint 2–3):**
+- Channel Manager OTA — prerequisite for 80% of the hotel market
+- Email/SMS booking confirmations (absolute minimum standard)
+- Legally-valid Italian invoice (sequential numbering, disaggregated VAT)
+- Mobile PWA (70% of infrastructure already in place)
 - Booking Engine + Stripe Checkout
 
-Vedi [`docs/ROADMAP.md`](docs/ROADMAP.md) per la roadmap completa
-con effort, dipendenze, confronto competitor e timeline Enterprise SaaS.
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full roadmap with effort estimates, dependencies, competitor matrix, and Enterprise SaaS timeline.
 
 See [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) for the evidence-based audit with all open gaps, accepted risks, and the explicit roadmap.
 
@@ -85,7 +83,7 @@ See [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) for t
 | **Resilience** | Resilience4j (Circuit Breaker on Feign clients) |
 | **Observability** | Zipkin (distributed tracing), Prometheus (metrics), Spring Boot Actuator |
 | **Code Quality** | PMD via `gradle-java-qa` plugin (zero-warning policy) |
-| **Testing (Backend)** | JUnit 5 + Mockito |\
+| **Testing (Backend)** | JUnit 5 + Mockito |
 | **Testing (Frontend)** | Vitest (unit), Playwright (E2E), vitest-axe (a11y) |
 | **Build** | Gradle (Kotlin DSL), npm |
 | **Containerization** | Docker, Docker Compose |
@@ -225,18 +223,6 @@ Open **http://localhost:5173** · Login: `admin` / `password` · Password change
 - **Node.js 18+** & **npm**
 - **Docker** & **Docker Compose**
 
-### HMAC Secret Setup (first time only)
-
-Before starting, generate the shared HMAC secret used for internal service-to-service authentication:
-
-```bash
-# Linux / macOS
-chmod +x setup-hmac-secret.sh && ./setup-hmac-secret.sh
-
-# Windows PowerShell
-.\setup-hmac-secret.ps1
-```
-
 ### One-Click Startup
 
 Use the provided scripts to boot the entire ecosystem. Each script will:
@@ -264,7 +250,7 @@ Once all services are running, open **http://localhost:5173** in your browser.
 
 ### Environment Variables
 
-Copy `.env.example` to `.env` before starting. Key variables:
+The startup script auto-generates `.env` with strong random secrets on first run. To override defaults (e.g. real Alloggiati PS credentials), copy `.env.example` to `.env` and edit before running. Key variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -412,7 +398,7 @@ See [`docs/BRANCH_STRATEGY.md`](docs/BRANCH_STRATEGY.md) for full topology and g
 | [`docs/I18N.md`](docs/I18N.md) | i18n architecture, namespace conventions, anti-hardcoding rules |
 | [`docs/GAP_ANALYSIS.md`](docs/GAP_ANALYSIS.md) | Gap analysis — 17 items tracked (all resolved as of 2026-05-07) |
 | [`docs/BRANCH_STRATEGY.md`](docs/BRANCH_STRATEGY.md) | Branch topology, merge history, governance rules |
-| [`backup/DECISIONS.md`](backup/DECISIONS.md) | All binding architectural and business decisions (internal reference — read at session start) |
+| [`backup/DECISIONS.md`](backup/DECISIONS.md) | All binding architectural and business decisions — rationale, constraints, and non-negotiable rules |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Enterprise roadmap — 4 sprints from Pilot-ready to Enterprise SaaS, competitor matrix, pricing model |
 | [`SECURITY.md`](SECURITY.md) | Responsible disclosure policy, in-scope vulnerabilities, accepted risks, security contact |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Developer onboarding, commit conventions, branch strategy, testing patterns |
