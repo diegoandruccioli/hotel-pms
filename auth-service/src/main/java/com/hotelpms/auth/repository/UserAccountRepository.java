@@ -2,8 +2,13 @@ package com.hotelpms.auth.repository;
 
 import com.hotelpms.auth.domain.UserAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -55,4 +60,20 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
      * @return the user if found and active within that hotel
      */
     Optional<UserAccount> findByIdAndHotelId(UUID id, UUID hotelId);
+
+    /**
+     * Atomically increments the failed-login counter and sets the lock expiry.
+     * Runs in its own transaction so the update is committed even when the caller
+     * rolls back (e.g. after throwing BadCredentialsException).
+     *
+     * @param username   the account username
+     * @param attempts   the new failed-attempts value
+     * @param lockedUntil the lock expiry (null = not yet locked)
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    @Modifying
+    @Query("UPDATE UserAccount u SET u.failedAttempts = :attempts, u.lockedUntil = :lockedUntil WHERE u.username = :username")
+    void updateFailedAttempts(@Param("username") String username,
+                              @Param("attempts") int attempts,
+                              @Param("lockedUntil") Instant lockedUntil);
 }

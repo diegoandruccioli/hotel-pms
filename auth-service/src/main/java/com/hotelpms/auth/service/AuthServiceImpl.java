@@ -93,7 +93,7 @@ public class AuthServiceImpl implements AuthService {
      * @return the auth response containing a fresh access token and refresh token
      */
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = {BadCredentialsException.class, AccountLockedException.class})
     public AuthResponse login(final LoginRequest request) {
         final UserAccount user = userRepository.findByUsername(request.username())
                 .orElseThrow(() -> {
@@ -109,16 +109,17 @@ public class AuthServiceImpl implements AuthService {
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             final int newAttempts = user.getFailedAttempts() + 1;
-            user.setFailedAttempts(newAttempts);
-            if (newAttempts >= MAX_FAILED_ATTEMPTS) {
-                user.setLockedUntil(Instant.now().plus(LOCKOUT_DURATION));
+            final Instant lockedUntil = newAttempts >= MAX_FAILED_ATTEMPTS
+                    ? Instant.now().plus(LOCKOUT_DURATION)
+                    : null;
+            userRepository.updateFailedAttempts(user.getUsername(), newAttempts, lockedUntil);
+            if (lockedUntil != null) {
                 log.warn("[AUTH] ACCOUNT_LOCKED | user={} | attempts={} | until={}",
-                        user.getUsername(), newAttempts, user.getLockedUntil());
+                        user.getUsername(), newAttempts, lockedUntil);
             } else {
                 log.warn("[AUTH] LOGIN_FAILED | user={} | reason=BAD_PASSWORD | attempts={}",
                         user.getUsername(), newAttempts);
             }
-            userRepository.save(user);
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
 

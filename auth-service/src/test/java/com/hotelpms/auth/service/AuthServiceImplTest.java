@@ -198,11 +198,7 @@ class AuthServiceImplTest {
 
         assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
 
-        verify(userRepository).save(Objects.requireNonNull(testUser));
-        assertEquals(1, testUser.getFailedAttempts(),
-                "Failed attempts counter should be incremented to 1");
-        assertNull(testUser.getLockedUntil(),
-                "Account should not be locked after a single failure");
+        verify(userRepository).updateFailedAttempts(TEST_USER, 1, null);
     }
 
     @Test
@@ -221,11 +217,13 @@ class AuthServiceImplTest {
 
         assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
 
-        verify(userRepository).save(Objects.requireNonNull(nearLockUser));
-        assertEquals(MAX_FAILED_ATTEMPTS, nearLockUser.getFailedAttempts(),
-                "Failed attempts counter should reach MAX_FAILED_ATTEMPTS");
-        assertNotNull(nearLockUser.getLockedUntil(),
-                "Account must be locked after reaching MAX_FAILED_ATTEMPTS");
+        final org.mockito.ArgumentCaptor<java.time.Instant> lockCaptor =
+                org.mockito.ArgumentCaptor.forClass(java.time.Instant.class);
+        verify(userRepository).updateFailedAttempts(
+                org.mockito.ArgumentMatchers.eq(TEST_USER),
+                org.mockito.ArgumentMatchers.eq(MAX_FAILED_ATTEMPTS),
+                lockCaptor.capture());
+        assertNotNull(lockCaptor.getValue(), "Account must be locked after reaching MAX_FAILED_ATTEMPTS");
     }
 
     @Test
