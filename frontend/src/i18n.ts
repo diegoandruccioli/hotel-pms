@@ -74,6 +74,7 @@ i18n
     resources,
     fallbackLng: 'en',
     defaultNS: 'common',
+    fallbackNS: 'common',
     interpolation: {
       escapeValue: false, // react already safes from xss
     },
