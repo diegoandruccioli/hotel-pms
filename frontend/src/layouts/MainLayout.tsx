@@ -26,7 +26,7 @@ const ownerNavigation = [
 ];
 
 const getRailNavItemClasses = ({ isActive }: { isActive: boolean }) =>
-  `group flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-shape-lg transition-colors ${
+  `group flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-shape-lg transition-colors w-full ${
     isActive
       ? 'text-on-primary-container'
       : 'text-on-surface-variant hover:text-on-surface'
@@ -189,7 +189,7 @@ export const MainLayout = () => {
       )}
 
       {/* ── Desktop Navigation Rail ─────────────────── */}
-      <aside className="hidden md:flex flex-col items-center md:fixed md:left-0 md:top-0 md:h-full w-20 flex-shrink-0 glass-surface border-r border-outline-variant/50 py-4 gap-1 overflow-y-auto md:z-20">
+      <aside className="hidden md:flex flex-col items-center md:fixed md:left-0 md:top-0 md:h-full w-20 flex-shrink-0 glass-surface border-r border-outline-variant/50 py-4 gap-1 overflow-y-auto [scrollbar-gutter:stable] md:z-20">
         <div className="flex items-center justify-center w-14 h-14 mb-3 bg-primary-container rounded-shape-lg">
           <MaterialIcon name="apartment" size={28} className="text-on-primary-container" />
         </div>
