@@ -195,7 +195,7 @@ export const Stays = memo(() => {
     t('guest_id'),
     t('check_in'),
     t('check_out'),
-    t('guests', 'Guests'),
+    t('guests'),
     t('status'),
     t('alloggiati_column'),
     <span key="sr" className="sr-only">{t('actions')}</span>

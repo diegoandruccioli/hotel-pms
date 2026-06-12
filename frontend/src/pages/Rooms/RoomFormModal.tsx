@@ -81,7 +81,7 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="roomNumber" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                    {t('room_number')} *
+                    {t('room_number_col')} *
                   </label>
                   <input
                     required

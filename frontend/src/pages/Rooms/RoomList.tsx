@@ -99,8 +99,8 @@ export const RoomList = memo(() => {
   }, [loadData]);
 
   const headers = useMemo(() => [
-    t('room_number'), 
-    t('room_type'), 
+    t('room_number_col'),
+    t('room_type'),
     t('status'), 
     t('actions')
   ], [t]);
