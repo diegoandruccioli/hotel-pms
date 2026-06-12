@@ -17,7 +17,9 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
-const MOCK_ROOMS = [
+import type { RoomResponse } from '../types/inventory.types';
+
+const MOCK_ROOMS: RoomResponse[] = [
   { id: 'r1', roomNumber: '101', status: 'CLEAN',       hotelId: 'h1', active: true, roomType: { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 80, active: true, createdAt: '', updatedAt: '' }, createdAt: '', updatedAt: '' },
   { id: 'r2', roomNumber: '102', status: 'OCCUPIED',    hotelId: 'h1', active: true, roomType: { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 80, active: true, createdAt: '', updatedAt: '' }, createdAt: '', updatedAt: '' },
   { id: 'r3', roomNumber: '103', status: 'DIRTY',       hotelId: 'h1', active: true, roomType: { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 80, active: true, createdAt: '', updatedAt: '' }, createdAt: '', updatedAt: '' },
