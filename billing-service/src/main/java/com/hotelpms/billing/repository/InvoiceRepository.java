@@ -3,7 +3,6 @@ package com.hotelpms.billing.repository;
 import com.hotelpms.billing.domain.Invoice;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -31,14 +30,13 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     /**
      * Finds all invoices belonging to a specific hotel, paginated (multi-tenancy).
-     * Uses an entity graph to eagerly load charges and payments in a single JOIN,
-     * preventing the N+1 query problem when the mapper serialises line items.
+     * Collections (charges, payments) are loaded lazily within the caller's transaction.
+     * Using @EntityGraph with two Bag collections causes MultipleBagFetchException.
      *
      * @param hotelId  the hotel UUID
      * @param pageable pagination parameters
      * @return a page of invoices for the given hotel
      */
-    @EntityGraph("Invoice.withDetails")
     Page<Invoice> findByHotelId(UUID hotelId, Pageable pageable);
 
     /**

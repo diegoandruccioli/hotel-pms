@@ -1,6 +1,7 @@
 package com.hotelpms.billing.exception;
 
 import feign.FeignException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.validation.FieldError;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 /**
  * Global exception handler providing RFC 7807 Problem Details responses.
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -116,6 +118,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGenericException(final Exception ex) {
+        log.error("Unhandled exception: {}", ex.getMessage(), ex);
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
                 "INTERNAL_SERVER_ERROR");
         problemDetail.setTitle("Internal Server Error");
