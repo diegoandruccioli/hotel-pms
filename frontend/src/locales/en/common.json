@@ -253,6 +253,8 @@
   "alloggiati_submit_error": "Portal error: {{message}}",
   "alloggiati_submit_failed": "Failed to submit report. Check service logs.",
 
+  "room_overview_title": "Room Status Overview",
+
   "pagination": "Pagination",
   "prev_page": "Previous",
   "next_page": "Next",

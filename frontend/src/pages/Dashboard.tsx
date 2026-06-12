@@ -1,10 +1,32 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Card } from '../components/m3/M3Card';
+import type { RoomResponse, RoomStatus } from '../types/inventory.types';
+
+const ROOM_GRID_STYLE = { gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))' } as const;
+
+const ROOM_STATUS_COLORS: Record<RoomStatus, string> = {
+  CLEAN:       'bg-tertiary-container/60 text-on-tertiary-container border-tertiary/50',
+  DIRTY:       'bg-error-container/60 text-on-error-container border-error/50',
+  MAINTENANCE: 'bg-secondary-container/60 text-on-secondary-container border-secondary/50',
+  OCCUPIED:    'bg-primary-container/60 text-on-primary-container border-primary/50',
+};
+
+const RoomCell = memo(({ room, statusLabel }: { room: RoomResponse; statusLabel: string }) => (
+  <div
+    className={`border rounded-shape-sm p-2 text-center ${ROOM_STATUS_COLORS[room.status]}`}
+    title={`${room.roomNumber} — ${statusLabel}`}
+    aria-label={`${room.roomNumber} ${statusLabel}`}
+  >
+    <div className="text-sm font-display font-semibold leading-tight">{room.roomNumber}</div>
+    <div className="text-[10px] font-body mt-0.5 truncate">{statusLabel}</div>
+  </div>
+));
+RoomCell.displayName = 'RoomCell';
 
 interface StatCardConfig {
   nameKey: string;
@@ -101,7 +123,7 @@ export const Dashboard = () => {
           </div>
         </div>
       ) : (
-        <div className="mt-8">
+        <div className="mt-8 space-y-6">
           <div data-testid="stats-grid" className={gridClass}>
             {allStats.map((item) => (
               <M3Card key={item.nameKey} variant="glass" className="overflow-hidden">
@@ -135,6 +157,39 @@ export const Dashboard = () => {
               </M3Card>
             ))}
           </div>
+
+          {/* Room status overview grid */}
+          {stats && stats.rooms.length > 0 && (
+            <M3Card variant="outlined" className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <MaterialIcon name="grid_view" size={20} className="text-primary" />
+                  <h2 className="text-sm font-display font-semibold text-on-surface">
+                    {t('room_overview_title')}
+                  </h2>
+                </div>
+                <Link
+                  to="/housekeeping"
+                  className="text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                >
+                  {t('view_all')}
+                </Link>
+              </div>
+              <div
+                data-testid="room-overview-grid"
+                className="grid gap-2"
+                style={ROOM_GRID_STYLE}
+              >
+                {stats.rooms.map((room) => (
+                  <RoomCell
+                    key={room.id}
+                    room={room}
+                    statusLabel={t(`room_status_${room.status.toLowerCase()}`)}
+                  />
+                ))}
+              </div>
+            </M3Card>
+          )}
         </div>
       )}
     </div>

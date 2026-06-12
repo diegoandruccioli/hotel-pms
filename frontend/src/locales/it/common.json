@@ -253,6 +253,8 @@
   "alloggiati_submit_error": "Errore portale: {{message}}",
   "alloggiati_submit_failed": "Invio non riuscito. Verificare i log del servizio.",
 
+  "room_overview_title": "Stato Camere",
+
   "pagination": "Paginazione",
   "prev_page": "Precedente",
   "next_page": "Successivo",

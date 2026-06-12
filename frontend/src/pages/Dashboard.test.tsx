@@ -17,6 +17,13 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
+const MOCK_ROOMS = [
+  { id: 'r1', roomNumber: '101', status: 'CLEAN',       hotelId: 'h1', active: true, roomType: { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 80, active: true, createdAt: '', updatedAt: '' }, createdAt: '', updatedAt: '' },
+  { id: 'r2', roomNumber: '102', status: 'OCCUPIED',    hotelId: 'h1', active: true, roomType: { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 80, active: true, createdAt: '', updatedAt: '' }, createdAt: '', updatedAt: '' },
+  { id: 'r3', roomNumber: '103', status: 'DIRTY',       hotelId: 'h1', active: true, roomType: { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 80, active: true, createdAt: '', updatedAt: '' }, createdAt: '', updatedAt: '' },
+  { id: 'r4', roomNumber: '104', status: 'MAINTENANCE', hotelId: 'h1', active: true, roomType: { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 80, active: true, createdAt: '', updatedAt: '' }, createdAt: '', updatedAt: '' },
+];
+
 const MOCK_STATS_ADMIN = {
   totalGuests: 200,
   todayArrivals: 5,
@@ -24,7 +31,7 @@ const MOCK_STATS_ADMIN = {
   currentStays: 12,
   availableRooms: 8,
   pendingRevenue: 10000,
-  rooms: [],
+  rooms: MOCK_ROOMS,
 };
 
 const renderDashboard = () => render(<MemoryRouter><Dashboard /></MemoryRouter>);
@@ -84,6 +91,26 @@ describe('Dashboard Component', () => {
     useDashboardStore.setState({ isLoading: true, stats: null, error: null, fetchStats: vi.fn() });
     const { container } = renderDashboard();
     expect(container.getElementsByClassName('animate-pulse').length).toBeGreaterThan(0);
+  });
+
+  it('renders room overview grid when rooms are present', () => {
+    renderDashboard();
+    expect(screen.getByTestId('room-overview-grid')).toBeInTheDocument();
+    expect(screen.getByText('101')).toBeInTheDocument();
+    expect(screen.getByText('102')).toBeInTheDocument();
+    expect(screen.getByText('103')).toBeInTheDocument();
+    expect(screen.getByText('104')).toBeInTheDocument();
+  });
+
+  it('hides room overview grid when rooms array is empty', () => {
+    useDashboardStore.setState({
+      stats: { ...MOCK_STATS_ADMIN, rooms: [] },
+      isLoading: false,
+      error: null,
+      fetchStats: vi.fn(),
+    });
+    renderDashboard();
+    expect(screen.queryByTestId('room-overview-grid')).not.toBeInTheDocument();
   });
 
   it('renders error state with retry button', () => {
