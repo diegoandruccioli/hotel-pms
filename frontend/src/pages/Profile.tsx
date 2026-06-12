@@ -46,7 +46,7 @@ export const Profile = () => {
       setError(t('passwords_dont_match'));
       return;
     }
-    if (newPassword.length < 8) {
+    if (newPassword.length < 16) {
       setError(t('password_too_short'));
       return;
     }
