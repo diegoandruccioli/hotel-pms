@@ -43,9 +43,11 @@ public class CorrelationIdFilter implements GlobalFilter, Ordered {
                 .header(CORRELATION_ID_HEADER, correlationId)
                 .build();
 
-        return chain.filter(exchange.mutate().request(mutatedRequest).build())
-                .doOnSuccess(v -> exchange.getResponse().getHeaders()
-                        .set(CORRELATION_ID_HEADER, correlationId));
+        final ServerWebExchange mutatedExchange = exchange.mutate()
+                .request(mutatedRequest)
+                .build();
+        mutatedExchange.getResponse().getHeaders().add(CORRELATION_ID_HEADER, correlationId);
+        return chain.filter(mutatedExchange);
     }
 
     @Override
