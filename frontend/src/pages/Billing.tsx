@@ -49,6 +49,7 @@ const InvoiceRow = memo(({
   tRegisterPayment,
   tPending,
 }: InvoiceRowProps) => {
+  const { t } = useTranslation('common');
   const handleView = useCallback(() => onView(invoice), [onView, invoice]);
   const handlePay  = useCallback(() => onPay(invoice),  [onPay,  invoice]);
 
@@ -62,7 +63,7 @@ const InvoiceRow = memo(({
       <M3TableCell className="text-on-surface-variant">{formatDate(invoice.issueDate)}</M3TableCell>
       <M3TableCell className="font-medium">{formatCurrency(invoice.totalAmount)}</M3TableCell>
       <M3TableCell>
-        <M3StatusChip label={invoice.status} tone={getStatusTone(invoice.status)} />
+        <M3StatusChip label={t(`invoice_status_${invoice.status}`, invoice.status)} tone={getStatusTone(invoice.status)} />
       </M3TableCell>
       <M3TableCell className="text-right">
         <button type="button" onClick={handleView} className={VIEW_BTN_CLASS}>

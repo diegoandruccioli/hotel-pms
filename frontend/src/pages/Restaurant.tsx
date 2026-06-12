@@ -81,7 +81,7 @@ interface OrderRowProps {
   onView: (order: RestaurantOrderResponse) => void;
   formatCurrency: (amount: number) => string;
   formatDate: (dateStr?: string) => string;
-  t: (key: string) => string;
+  t: (key: string, fallback?: string) => string;
 }
 
 const OrderRow = memo(({ order, confirmingId, onConfirm, onView, formatCurrency, formatDate, t }: OrderRowProps) => {
@@ -101,7 +101,7 @@ const OrderRow = memo(({ order, confirmingId, onConfirm, onView, formatCurrency,
       <M3TableCell className="text-on-surface-variant">{formatDate(order.orderDate)}</M3TableCell>
       <M3TableCell className="font-medium">{formatCurrency(order.totalAmount)}</M3TableCell>
       <M3TableCell>
-        <M3StatusChip label={order.status.replace('_', ' ')} tone={getStatusTone(order.status)} />
+        <M3StatusChip label={t(`order_status_${order.status}`, order.status.replace(/_/g, ' '))} tone={getStatusTone(order.status)} />
       </M3TableCell>
       <M3TableCell className="text-right">
         <div className="flex justify-end gap-2">
