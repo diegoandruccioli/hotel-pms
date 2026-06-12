@@ -76,12 +76,7 @@ export const ReservationForm = () => {
         }
       }
 
-      // Filter rooms: include CLEAN, DIRTY, and those already selected for this reservation
-      setRooms(allRooms.filter((room: RoomResponse) => 
-        room.status === 'CLEAN' || 
-        room.status === 'DIRTY' || 
-        initialRoomIds.includes(room.id)
-      ));
+      setRooms(allRooms);
     } catch (err: unknown) {
       const e = err as {response?: {data?: {detail?: string}}, message?: string};
       setError(e.response?.data?.detail || e.message || t('failed_load_data'));
