@@ -194,7 +194,7 @@ export const MainLayout = () => {
           <MaterialIcon name="apartment" size={28} className="text-on-primary-container" />
         </div>
 
-        <nav className="flex flex-col items-center gap-0.5 flex-1">
+        <nav className="flex flex-col items-center gap-0.5 flex-1 w-full">
           {navigation.map((item) => (
             <RailNavItem
               key={item.nameKey}
