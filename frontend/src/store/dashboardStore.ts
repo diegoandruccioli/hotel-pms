@@ -6,23 +6,23 @@ interface DashboardState {
   stats: DashboardStats | null;
   isLoading: boolean;
   error: string | null;
-  fetchStats: () => Promise<void>;
+  fetchStats: (isOwnerOrAdmin: boolean) => Promise<void>;
 }
 
 export const useDashboardStore = create<DashboardState>((set) => ({
   stats: null,
   isLoading: false,
   error: null,
-  fetchStats: async () => {
+  fetchStats: async (isOwnerOrAdmin: boolean) => {
     set({ isLoading: true, error: null });
     try {
-      const stats = await dashboardService.getDashboardStats();
+      const stats = await dashboardService.getDashboardStats(isOwnerOrAdmin);
       set({ stats, isLoading: false });
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string, detail?: string } } };
-      set({ 
-        error: e.response?.data?.message || e.response?.data?.detail || 'ERROR_FETCH_DASHBOARD', 
-        isLoading: false 
+      const e = err as { response?: { data?: { message?: string; detail?: string } } };
+      set({
+        error: e.response?.data?.message || e.response?.data?.detail || 'ERROR_FETCH_DASHBOARD',
+        isLoading: false,
       });
     }
   },

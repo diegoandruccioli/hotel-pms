@@ -1,49 +1,85 @@
 import { useEffect, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Card } from '../components/m3/M3Card';
 
+interface StatCardConfig {
+  nameKey: string;
+  stat: string;
+  icon: string;
+  containerClass: string;
+  href: string;
+}
+
 export const Dashboard = () => {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const user = useAuthStore((state) => state.user);
   const { stats, isLoading, error, fetchStats } = useDashboardStore();
 
+  const isOwnerOrAdmin = user?.role === 'OWNER' || user?.role === 'ADMIN';
+
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    fetchStats(isOwnerOrAdmin);
+  }, [fetchStats, isOwnerOrAdmin]);
 
   const handleRefresh = useCallback(() => {
-    fetchStats();
-  }, [fetchStats]);
+    fetchStats(isOwnerOrAdmin);
+  }, [fetchStats, isOwnerOrAdmin]);
 
-  const statsConfig = useMemo(() => [
+  const universalStats = useMemo<StatCardConfig[]>(() => [
     {
       nameKey: 'stat_total_guests',
       stat: stats ? stats.totalGuests.toLocaleString() : '0',
       icon: 'group',
       containerClass: 'bg-primary-container text-on-primary-container',
+      href: '/guests',
     },
     {
-      nameKey: 'stat_active_reservations',
-      stat: stats ? `${stats.activeReservationsPercentage.toFixed(2)}%` : '0%',
-      icon: 'event',
+      nameKey: 'stat_today_checkins',
+      stat: stats ? stats.todayArrivals.toString() : '0',
+      icon: 'login',
       containerClass: 'bg-tertiary-container text-on-tertiary-container',
+      href: '/reservations',
     },
     {
-      nameKey: 'stat_current_stays',
-      stat: stats ? `${stats.currentStaysPercentage.toFixed(2)}%` : '0%',
-      icon: 'hotel',
+      nameKey: 'stat_today_checkouts',
+      stat: stats ? stats.todayDepartures.toString() : '0',
+      icon: 'logout',
       containerClass: 'bg-secondary-container text-on-secondary-container',
+      href: '/stays',
     },
     {
-      nameKey: 'stat_pending_revenue',
-      stat: stats ? new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(stats.pendingRevenue) : '€0',
-      icon: 'receipt_long',
-      containerClass: 'bg-error-container text-on-error-container',
+      nameKey: 'stat_available_rooms',
+      stat: stats ? stats.availableRooms.toString() : '0',
+      icon: 'meeting_room',
+      containerClass: 'bg-surface-container-highest text-on-surface',
+      href: '/rooms',
     },
   ], [stats]);
+
+  const ownerStat = useMemo<StatCardConfig | null>(() => {
+    if (!isOwnerOrAdmin || stats?.pendingRevenue === null || stats?.pendingRevenue === undefined) return null;
+    return {
+      nameKey: 'stat_pending_revenue',
+      stat: new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' })
+        .format(stats.pendingRevenue),
+      icon: 'receipt_long',
+      containerClass: 'bg-error-container text-on-error-container',
+      href: '/billing',
+    };
+  }, [isOwnerOrAdmin, stats, i18n.language]);
+
+  const allStats = useMemo<StatCardConfig[]>(
+    () => (ownerStat ? [...universalStats, ownerStat] : universalStats),
+    [universalStats, ownerStat],
+  );
+
+  const gridClass = allStats.length === 5
+    ? 'grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
+    : 'grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4';
 
   return (
     <div data-testid="dashboard-page">
@@ -66,15 +102,15 @@ export const Dashboard = () => {
         </div>
       ) : (
         <div className="mt-8">
-          <div data-testid="stats-grid" className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {statsConfig.map((item) => (
+          <div data-testid="stats-grid" className={gridClass}>
+            {allStats.map((item) => (
               <M3Card key={item.nameKey} variant="glass" className="overflow-hidden">
                 <div className="p-5">
                   <div className="flex items-center">
-                    <div className={`flex items-center justify-center w-12 h-12 rounded-shape-lg ${item.containerClass}`}>
+                    <div className={`flex items-center justify-center w-12 h-12 rounded-shape-lg flex-shrink-0 ${item.containerClass}`}>
                       <MaterialIcon name={item.icon} size={24} />
                     </div>
-                    <div className="ml-4 flex-1">
+                    <div className="ml-4 flex-1 min-w-0">
                       <dl>
                         <dt className="text-sm font-body font-medium text-on-surface-variant truncate">{t(item.nameKey)}</dt>
                         <dd>
@@ -89,9 +125,12 @@ export const Dashboard = () => {
                   </div>
                 </div>
                 <div className="bg-surface-container-low px-5 py-3">
-                  <button type="button" className="text-sm font-medium font-body text-primary hover:text-primary/80" disabled={isLoading}>
+                  <Link
+                    to={item.href}
+                    className="text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                  >
                     {t('view_all')}
-                  </button>
+                  </Link>
                 </div>
               </M3Card>
             ))}

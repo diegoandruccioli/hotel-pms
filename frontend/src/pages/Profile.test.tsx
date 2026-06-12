@@ -98,12 +98,12 @@ describe('Profile', () => {
     vi.mocked(authService.changePassword).mockResolvedValueOnce(undefined);
     renderProfile();
     fireEvent.change(screen.getByLabelText('current_password'), { target: { value: 'oldPass1' } });
-    fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'newPass123' } });
-    fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'newPass123' } });
+    fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'HotelPms@@2026xx' } });
+    fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'HotelPms@@2026xx' } });
     fireEvent.click(screen.getByRole('button', { name: 'change_password' }));
     await waitFor(() => expect(authService.changePassword).toHaveBeenCalledWith({
       currentPassword: 'oldPass1',
-      newPassword: 'newPass123',
+      newPassword: 'HotelPms@@2026xx',
     }));
     expect(addToastMock).toHaveBeenCalledWith('password_changed_success', 'success');
     expect(logoutMock).toHaveBeenCalled();
@@ -116,8 +116,8 @@ describe('Profile', () => {
     });
     renderProfile();
     fireEvent.change(screen.getByLabelText('current_password'), { target: { value: 'wrong' } });
-    fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'newPass123' } });
-    fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'newPass123' } });
+    fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'HotelPms@@2026xx' } });
+    fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'HotelPms@@2026xx' } });
     fireEvent.click(screen.getByRole('button', { name: 'change_password' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Wrong current password');
   });
@@ -126,8 +126,8 @@ describe('Profile', () => {
     vi.mocked(authService.changePassword).mockRejectedValueOnce(new Error('Network'));
     renderProfile();
     fireEvent.change(screen.getByLabelText('current_password'), { target: { value: 'oldPass' } });
-    fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'newPass123' } });
-    fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'newPass123' } });
+    fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'HotelPms@@2026xx' } });
+    fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'HotelPms@@2026xx' } });
     fireEvent.click(screen.getByRole('button', { name: 'change_password' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('password_change_failed');
   });

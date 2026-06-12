@@ -1,41 +1,42 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { Dashboard } from './Dashboard';
 import { axe } from 'vitest-axe';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
 
-// Mock react-i18next
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: { name?: string }) => {
-      if (key === 'welcome_back' && options?.name) {
-        return `welcome_back ${options.name}`;
-      }
+      if (key === 'welcome_back' && options?.name) return `welcome_back ${options.name}`;
       return key;
     },
+    i18n: { language: 'en' },
   }),
-  initReactI18next: {
-    type: '3rdParty',
-    init: vi.fn(),
-  }
+  initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
+
+const MOCK_STATS_ADMIN = {
+  totalGuests: 200,
+  todayArrivals: 5,
+  todayDepartures: 3,
+  currentStays: 12,
+  availableRooms: 8,
+  pendingRevenue: 10000,
+  rooms: [],
+};
+
+const renderDashboard = () => render(<MemoryRouter><Dashboard /></MemoryRouter>);
 
 describe('Dashboard Component', () => {
   beforeEach(() => {
-    // Reset Zustand stores
     useDashboardStore.setState({
-      stats: {
-        totalGuests: 200,
-        activeReservationsPercentage: 80,
-        currentStaysPercentage: 50,
-        pendingRevenue: 10000,
-      },
+      stats: MOCK_STATS_ADMIN,
       isLoading: false,
       error: null,
       fetchStats: vi.fn(),
     });
-
     useAuthStore.setState({
       user: { sub: 'user1', username: 'admin', role: 'ADMIN' },
       isAuthenticated: true,
@@ -43,35 +44,57 @@ describe('Dashboard Component', () => {
     });
   });
 
-  it('renders dashboard with stats', () => {
-    render(<Dashboard />);
+  it('renders dashboard heading and stats grid', () => {
+    renderDashboard();
     expect(screen.getByTestId('dashboard-page')).toBeInTheDocument();
     expect(screen.getByTestId('dashboard-heading')).toHaveTextContent('welcome_back admin');
     expect(screen.getByTestId('stats-grid')).toBeInTheDocument();
-    
-    // Check if stats are rendered
-    expect(screen.getByText('200')).toBeInTheDocument(); // total guests
-    expect(screen.getByText('80.00%')).toBeInTheDocument(); // active reservations percentage
-    expect(screen.getByText('50.00%')).toBeInTheDocument(); // current stays percentage
-    expect(screen.getByText(/10\.000,00\s*€|€\s*10\.000,00|10,000\.00\s*€|€\s*10,000\.00/)).toBeInTheDocument(); // pending revenue EUR
   });
 
-  it('renders loading state correctly', () => {
-    useDashboardStore.setState({ isLoading: true, stats: null });
-    const { container } = render(<Dashboard />);
-    // Stats elements won't display numbers, rendering logic shows skeletons
+  it('shows today arrivals and departures counts', () => {
+    renderDashboard();
+    expect(screen.getByText('5')).toBeInTheDocument();  // todayArrivals
+    expect(screen.getByText('3')).toBeInTheDocument();  // todayDepartures
+    expect(screen.getByText('8')).toBeInTheDocument();  // availableRooms
+    expect(screen.getByText('200')).toBeInTheDocument(); // totalGuests
+  });
+
+  it('shows pending revenue card for ADMIN', () => {
+    renderDashboard();
+    expect(screen.getByText('stat_pending_revenue')).toBeInTheDocument();
+  });
+
+  it('hides pending revenue card for RECEPTIONIST', () => {
+    useAuthStore.setState({
+      user: { sub: 'user2', username: 'reception', role: 'RECEPTIONIST' },
+      isAuthenticated: true,
+      isLoading: false,
+    });
+    useDashboardStore.setState({
+      stats: { ...MOCK_STATS_ADMIN, pendingRevenue: null },
+      isLoading: false,
+      error: null,
+      fetchStats: vi.fn(),
+    });
+    renderDashboard();
+    expect(screen.queryByText('stat_pending_revenue')).not.toBeInTheDocument();
+  });
+
+  it('renders loading skeleton', () => {
+    useDashboardStore.setState({ isLoading: true, stats: null, error: null, fetchStats: vi.fn() });
+    const { container } = renderDashboard();
     expect(container.getElementsByClassName('animate-pulse').length).toBeGreaterThan(0);
   });
 
-  it('renders error state correctly', () => {
-    useDashboardStore.setState({ error: 'FETCH_ERROR', stats: null, isLoading: false });
-    render(<Dashboard />);
+  it('renders error state with retry button', () => {
+    useDashboardStore.setState({ error: 'FETCH_ERROR', stats: null, isLoading: false, fetchStats: vi.fn() });
+    renderDashboard();
     expect(screen.getByText('FETCH_ERROR')).toBeInTheDocument();
     expect(screen.getByText('try_again')).toBeInTheDocument();
   });
 
-  it('should have no accessibility violations', async () => {
-    const { container } = render(<Dashboard />);
+  it('has no accessibility violations', async () => {
+    const { container } = renderDashboard();
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
