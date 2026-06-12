@@ -189,7 +189,7 @@ export const MainLayout = () => {
       )}
 
       {/* ── Desktop Navigation Rail ─────────────────── */}
-      <aside className="hidden md:flex flex-col items-center md:fixed md:left-0 md:top-0 md:h-full w-20 flex-shrink-0 glass-surface border-r border-outline-variant/50 py-4 gap-1 overflow-y-auto [scrollbar-gutter:stable] md:z-20">
+      <aside className="hidden md:flex flex-col items-center md:fixed md:left-0 md:top-0 md:h-full w-24 flex-shrink-0 glass-surface border-r border-outline-variant/50 py-4 gap-1 overflow-y-auto [scrollbar-gutter:stable] md:z-20">
         <div className="flex items-center justify-center w-14 h-14 mb-3 bg-primary-container rounded-shape-lg">
           <MaterialIcon name="apartment" size={28} className="text-on-primary-container" />
         </div>
@@ -220,7 +220,7 @@ export const MainLayout = () => {
       </aside>
 
       {/* ── Main content area ───────────────────────── */}
-      <div className="flex flex-col flex-1 w-0 overflow-hidden md:ml-20">
+      <div className="flex flex-col flex-1 w-0 overflow-hidden md:ml-24">
         {/* Top Bar */}
         <header className="relative z-10 flex-shrink-0 flex items-center h-16 glass-surface-elevated border-b border-outline-variant/30 shadow-elevation-1 px-4">
           {/* Mobile hamburger */}
