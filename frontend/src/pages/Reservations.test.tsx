@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { MemoryRouter } from 'react-router-dom';
+
+const mockNavigate = vi.hoisted(() => vi.fn());
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => mockNavigate };
+});
 import { Reservations } from './Reservations';
 import { reservationService } from '../services/reservationService';
 import { inventoryService } from '../services/inventoryService';
@@ -187,6 +193,19 @@ describe('Reservations', () => {
       expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
       expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     }, { timeout: 500 });
+  });
+
+  it('should navigate to check-in when check-in button is clicked on CONFIRMED reservation', async () => {
+    vi.mocked(reservationService.getAllReservations).mockResolvedValue([CONFIRMED_RESERVATION] as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'check_in' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'check_in' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith(
+      '/stays/check-in/res-1',
+      expect.objectContaining({ state: expect.objectContaining({ guestId: 'g1' }) })
+    );
   });
 
   it('should have no accessibility violations', async () => {

@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { Guests } from './Guests';
+
+const mockUseSearchParams = vi.hoisted(() => vi.fn(() => [new URLSearchParams()] as [URLSearchParams]));
+vi.mock('react-router-dom', () => ({
+  useSearchParams: mockUseSearchParams,
+}));
 import { guestService } from '../services/guestService';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
@@ -215,6 +220,20 @@ describe('Guests', () => {
       expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
       expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     }, { timeout: 500 });
+  });
+
+  it('should pre-populate search from URL ?search param', async () => {
+    mockUseSearchParams.mockReturnValueOnce([new URLSearchParams('search=Jane')] as [URLSearchParams]);
+    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([
+      GUEST,
+      { id: 'g2', firstName: 'Jane', lastName: 'Smith', email: 'jane@test.com', phone: '', city: '', country: '' },
+    ] as never);
+    render(<Guests />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    });
   });
 
   it('should have no accessibility violations', async () => {

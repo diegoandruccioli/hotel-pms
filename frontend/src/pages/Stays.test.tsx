@@ -26,8 +26,9 @@ vi.mock('../store/toastStore', () => ({
     (selector as (s: { addToast: () => void }) => unknown)({ addToast: vi.fn() }),
 }));
 
+const mockNavigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router-dom', () => ({
-  useNavigate: () => vi.fn()
+  useNavigate: () => mockNavigate,
 }));
 
 describe('Stays', () => {
@@ -166,6 +167,21 @@ describe('Stays', () => {
     render(<Stays />);
     await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
     expect(screen.getByText('download_json_export')).toBeInTheDocument();
+  });
+
+  it('should navigate to guests page when guest name is clicked', async () => {
+    vi.mocked(stayService.getAllStays).mockResolvedValue({
+      content: [
+        { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'guest-uuid-001', guestDisplayName: 'John Doe', status: 'CHECKED_IN' },
+      ],
+      totalElements: 1, totalPages: 1, number: 0, size: 20, numberOfElements: 1, first: true, last: true, empty: false,
+    } as never);
+    render(<Stays />);
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'John Doe' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/guests?search=John%20Doe');
   });
 
   it('should render JSON export button for OWNER', async () => {

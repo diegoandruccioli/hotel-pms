@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { guestService } from '../services/guestService';
 import type { GuestResponseDTO } from '../types/guest.types';
 import { MaterialIcon } from '../components/MaterialIcon';
@@ -63,8 +64,10 @@ export const Guests = memo(() => {
   const [selectedGuest, setSelectedGuest] = useState<GuestResponseDTO | undefined>();
   const [guestToDelete, setGuestToDelete] = useState<GuestResponseDTO | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get('search') ?? '';
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchQuery), 300);

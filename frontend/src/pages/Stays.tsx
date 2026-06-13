@@ -25,17 +25,22 @@ const getStatusTone = (status: StayStatus) => {
   }
 };
 
-const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone, t }: {
+const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone, t, onGuestClick }: {
   stay: StayResponse;
   onCheckOut: (s: StayResponse) => void;
   checkingOut: string | null;
   formatDate: (d?: string) => string;
   getStatusTone: (s: StayStatus) => "success" | "neutral" | "info";
   t: (k: string) => string;
+  onGuestClick: (guestDisplayName: string) => void;
 }) => {
   const handleCheckOut = useCallback(() => {
     onCheckOut(stay);
   }, [onCheckOut, stay]);
+
+  const handleGuestNameClick = useCallback(() => {
+    onGuestClick(stay.guestDisplayName ?? stay.guestId);
+  }, [onGuestClick, stay.guestDisplayName, stay.guestId]);
 
   return (
     <M3TableRow key={stay.id}>
@@ -45,9 +50,14 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
         </span>
       </M3TableCell>
       <M3TableCell className="text-on-surface-variant">
-        <span className="truncate block max-w-[120px]" title={stay.guestId}>
+        <button
+          type="button"
+          onClick={handleGuestNameClick}
+          className="truncate block max-w-[120px] text-left text-primary hover:text-primary/80 font-medium text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 rounded"
+          title={stay.guestId}
+        >
           {stay.guestDisplayName ?? `${stay.guestId.substring(0, 8)}…`}
-        </span>
+        </button>
       </M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(stay.actualCheckInTime)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(stay.actualCheckOutTime)}</M3TableCell>
@@ -219,6 +229,9 @@ export const Stays = memo(() => {
 
   const handleNewCheckIn = useCallback(() => navigate('/reservations'), [navigate]);
   const handleWalkIn = useCallback(() => navigate('/stays/walk-in'), [navigate]);
+  const handleGuestNavigate = useCallback((guestDisplayName: string) => {
+    navigate('/guests?search=' + encodeURIComponent(guestDisplayName));
+  }, [navigate]);
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
   const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
   
@@ -323,14 +336,15 @@ export const Stays = memo(() => {
             <tr><td colSpan={8} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_active_stays')}</td></tr>
           ) : (
             filteredStays.map((stay) => (
-              <StayRow 
-                key={stay.id} 
-                stay={stay} 
-                onCheckOut={handleCheckOut} 
+              <StayRow
+                key={stay.id}
+                stay={stay}
+                onCheckOut={handleCheckOut}
                 checkingOut={checkingOut}
                 formatDate={formatDate}
                 getStatusTone={getStatusTone}
                 t={t}
+                onGuestClick={handleGuestNavigate}
               />
             ))
           )}
