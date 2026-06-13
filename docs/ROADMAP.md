@@ -1,6 +1,6 @@
 # Roadmap — Hotel PMS
 
-**Versione:** 1.0 — 2026-05-17  
+**Versione:** 1.1 — 2026-06-13  
 **Branch:** `main`
 
 Questo documento raccoglie le implementazioni future pianificate,
@@ -16,13 +16,13 @@ mono-hotel Docker Compose. La roadmap descrive il percorso verso
 | Dimensione | Livello | Note |
 |---|---|---|
 | Sicurezza | 8.5/10 | Argon2id, HMAC, RBAC doppio livello, GDPR |
-| Affidabilità | 7.0/10 | Circuit breaker, saga checkIn — manca backup DB e @Version Invoice |
+| Affidabilità | 8.0/10 | Circuit breaker, saga checkIn, @Version Invoice ✅ — manca solo backup DB |
 | Osservabilità | 7.5/10 | Zipkin + Prometheus + Loki — mancano alert rule |
-| Scalabilità | 6.0/10 | Microservizi corretti — SimpleDiscovery statico, LIKE non indicizzato |
-| Qualità codice | 8.0/10 | 324/324 test, PMD zero — Testcontainers mancanti |
-| Operabilità | 5.5/10 | Docker Compose mono-host — no K8s, no backup, no restart policy |
+| Scalabilità | 6.5/10 | Microservizi corretti, GIN pg_trgm ✅ — SimpleDiscovery statico |
+| Qualità codice | 8.0/10 | 344/344 test, PMD zero — Testcontainers mancanti |
+| Operabilità | 6.5/10 | Docker Compose mono-host, restart:unless-stopped ✅ — no K8s, no backup |
 | Conformità normativa | 9.0/10 | Alloggiati SOAP nativo, GDPR — no SDI/fattura B2B |
-| UX e funzionalità | 7.0/10 | Flussi core completi — no mobile, no email, no channel manager |
+| UX e funzionalità | 7.5/10 | Flussi core completi, room-status grid dashboard ✅ — no mobile, no email |
 
 **Punto di forza unico rispetto ai competitor:**
 Implementazione Alloggiati PS nativa (SOAP, DRY_RUN, auto-send,
@@ -38,15 +38,15 @@ Prerequisiti bloccanti per il primo hotel reale in produzione.
 
 | # | Implementazione | Priorità | Effort | Note |
 |---|---|---|---|---|
-| P1 | `@Version` su `Invoice` + migration Flyway | 🔴 Critica | 2h | Race condition con F&B + billing concorrenti — perdita silenziosa di addebiti |
-| P2 | `restart: unless-stopped` in docker-compose | 🔴 Critica | 30min | Container crashato rimane down fino a intervento manuale |
+| P1 | ~~`@Version` su `Invoice` + migration Flyway~~ | ✅ **Fatto** | — | Implementato: `Invoice.java` campo `@Version Long version`, Flyway V3 |
+| P2 | ~~`restart: unless-stopped` in docker-compose~~ | ✅ **Fatto** | — | Tutti i 16 container in `docker-compose.yml` già configurati |
 | P3 | Backup PostgreSQL automatizzato (pg_dump cron) | 🔴 Critica | 4h | Data loss catastrofico su crash disco — tutti i dati hotel persi |
-| P4 | Prometheus alert rules (error rate, latency, restarts) | 🟡 Alta | 1-2gg | Degradi invisibili senza notifica — SLA impossibile senza alert |
-| P5 | Operations Runbook | 🟡 Alta | 1gg | Recovery ADMIN, rollback migration, restart ordinato — assenza = disastro in notturna |
-| P6 | GIN index + `pg_trgm` su `GuestRepository` | 🟡 Alta | 4h + Flyway | `LIKE '%keyword%'` O(n) full-table scan — inutilizzabile con >50k ospiti |
+| P4 | Prometheus alert rules (error rate, latency, restarts) | 🟡 Alta | 1-2gg | `prometheus.yml` ha solo scrape_configs — zero alerting rules configurate |
+| P5 | ~~Operations Runbook~~ | ✅ **Fatto** | — | `docs/OPERATIONS_RUNBOOK.md` creato con 10 procedure operative |
+| P6 | ~~GIN index + `pg_trgm` su `GuestRepository`~~ | ✅ **Fatto** | — | Flyway V7 `V7__add_trgm_search_indexes.sql`: 4 indici GIN su first_name/last_name/email/city |
 | P7 | Testcontainers su stay-service e billing-service | 🟡 Media | 3-5gg | Migration Flyway non testate da codice Java — regressioni DB invisibili a Mockito |
 | P8 | Credenziali Alloggiati PS configurabili da UI | 🟡 Media | 3-5gg | Attuale: richiede accesso `.env` + riavvio container per ogni hotel onboarding |
-| P9 | Dependabot auto-PR per aggiornamenti dipendenze | 🟢 Bassa | 30min | Aggiornamenti dipendenze manuali — CVE latenti invisibili senza alert automatico |
+| P9 | Dependabot auto-PR per aggiornamenti dipendenze | 🟢 Bassa | 30min | `.github/dependabot.yml` non presente — CVE latenti invisibili senza alert automatico |
 
 ---
 
@@ -58,16 +58,16 @@ Feature necessarie per la vendibilità del prodotto.
 | # | Implementazione | Priorità | Effort | Impatto |
 |---|---|---|---|---|
 | C1 | Email/SMS conferme prenotazione (notification-service) | 🔴 Critica | 1-2 sett | Standard minimo assoluto — senza non vendibile |
-| C2 | Numerazione fattura sequenziale certificata | 🔴 Critica | 4h + Flyway | Obbligatorio per fattura fiscalmente valida in Italia (D.P.R. 633/72) |
-| C3 | IVA disaggregata nella fattura PDF | 🔴 Alta | 2-4h | Richiesto per nota spese B2B — PDF attuale non valido per clientela business |
-| C4 | Report KPI avanzati (RevPAR, ADR, GOPPAR, Occupancy) | 🟡 Alta | 1-2 sett | Proprietario non può misurare performance senza KPI standard di settore |
+| C2 | Numerazione fattura sequenziale certificata | 🔴 Critica | 4h + Flyway | `generateInvoiceNumber()` usa UUID random (`INV-XXXXXXXX`) — non valido D.P.R. 633/72 |
+| C3 | IVA disaggregata nella fattura PDF | 🔴 Alta | 2-4h | PDF attuale non valido per nota spese B2B |
+| C4 | Report KPI avanzati (RevPAR, ADR, GOPPAR, Occupancy) | 🟡 Alta | 1-2 sett | Dashboard ha KPI operativi base (arrivi/partenze/camere) — mancano RevPAR/ADR/GOPPAR |
 | C5 | Mobile PWA (responsive ottimizzato) | 🟡 Alta | 2-4 sett | 70% già fatto — housekeeping e front desk usano telefono |
-| C6 | Wizard onboarding primo avvio | 🟡 Media | 1 sett | Attuale: sequenza configurazione non guidata — rischio errori setup |
-| C7 | Vista occupazione rapida nella dashboard | 🟡 Media | 2-3gg | Receptionist vede tabella, non ha widget visivo immediato per status camere |
+| C6 | Wizard onboarding primo avvio | 🟡 Media | 1 sett | Sequenza configurazione non guidata — rischio errori setup |
+| C7 | ~~Vista occupazione rapida nella dashboard~~ | ✅ **Fatto** | — | `RoomCell` grid per status camere implementata in `Dashboard.tsx` |
 | C8 | Multi-currency (campo `currency` in HotelSettings) | 🟢 Bassa | 3-5gg | Hotel in zona turistica internazionale o al confine |
-| C9 | Grafana Tempo + OpenTelemetry (migrazione da Zipkin) | 🟢 Bassa | 3-5gg | Standard industria — Zipkin dichiarato deprecated in `backup/DECISIONS.md §7.2` |
+| C9 | Grafana Tempo + OpenTelemetry (migrazione da Zipkin) | 🟢 Bassa | 3-5gg | Loki ✅ già presente — manca solo migrazione Zipkin → Tempo per distributed tracing |
 | C10 | TailwindCSS 3 → 4 | 🟢 Bassa | 1-2gg | Breaking changes CSS — pianificare con tempo dedicato (`backup/DECISIONS.md §7.1`) |
-| C11 | CONTRIBUTING.md — guida contribuzione e onboarding dev | 🟡 Media | 4h | Nessuna guida per handover a un team o nuovo sviluppatore |
+| C11 | ~~CONTRIBUTING.md — guida contribuzione e onboarding dev~~ | ✅ **Fatto** | — | `CONTRIBUTING.md` presente nella root del repository |
 
 ---
 
@@ -138,8 +138,8 @@ Feature di differenziazione competitiva ad alto impatto ROI.
 
 | Fase | Durata | Team | Output |
 |---|---|---|---|
-| Production-ready | 4-6 sett | 1 dev | Backup, alert, @Version, runbook |
-| Quick wins commerciali | 2-3 mesi | 2 persone | Email, mobile, KPI, fattura valida |
+| Production-ready | ~~4-6 sett~~ **~1 sett residua** | 1 dev | ~~@Version ✅~~ ~~restart ✅~~ ~~runbook ✅~~ ~~GIN ✅~~ — resta: backup DB, alert rules, Dependabot |
+| Quick wins commerciali | 2-3 mesi | 2 persone | Email, mobile, KPI avanzati, fattura legale (C2 sequenziale) |
 | Enterprise core | 3-6 mesi | 2-3 persone | Channel manager, booking engine, K8s |
 | Enterprise SaaS | 6-12 mesi | 3-4 persone | API pubblica, revenue mgmt, HA |
 
