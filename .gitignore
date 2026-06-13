@@ -53,5 +53,9 @@ backup/
 
 # ── Screenshots ──────────────────────────────────────────────────────────────
 screenshots/
+*.png
 bash.exe.stackdump
 frontend/bash.exe.stackdump
+
+# ── Playwright MCP ───────────────────────────────────────────────────────────
+.playwright-mcp/
