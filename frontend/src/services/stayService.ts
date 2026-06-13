@@ -106,6 +106,6 @@ export const stayService = {
     const response = await api.get<{ content: AvailableRoom[] }>('/api/v1/rooms', {
       params: { size: 200 },
     });
-    return (response.data.content ?? []).filter((r) => r.status === 'AVAILABLE');
+    return (response.data.content ?? []).filter((r) => r.status === 'CLEAN');
   },
 };
