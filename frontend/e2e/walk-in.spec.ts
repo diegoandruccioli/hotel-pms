@@ -3,8 +3,8 @@ import { test, expect } from '@playwright/test';
 const MOCK_USER = { username: 'admin', role: 'ADMIN', sub: 'admin', mustChangePassword: false };
 
 const MOCK_ROOMS = [
-  { id: 'room-001', roomNumber: '101', status: 'AVAILABLE', roomType: { name: 'Standard', basePrice: 80 } },
-  { id: 'room-002', roomNumber: '102', status: 'AVAILABLE', roomType: { name: 'Double', basePrice: 120 } },
+  { id: 'room-001', roomNumber: '101', status: 'CLEAN', roomType: { name: 'Standard', basePrice: 80 } },
+  { id: 'room-002', roomNumber: '102', status: 'CLEAN', roomType: { name: 'Double', basePrice: 120 } },
 ];
 
 const MOCK_GUEST = {
