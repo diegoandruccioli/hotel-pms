@@ -39,12 +39,17 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Direct paths to known microservices (before API Gateway)
+      // User management must go through the gateway (needs HMAC + role injection)
+      '/api/v1/auth/users': {
+        target: 'http://localhost:8080',
+        changeOrigin: true
+      },
+      // Direct to auth-service for login/register/me (no gateway HMAC needed)
       '/api/v1/auth': {
         target: 'http://localhost:8087',
         changeOrigin: true
       },
-      // Fallback for an API Gateway or default port
+      // All other API calls through the gateway
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true
