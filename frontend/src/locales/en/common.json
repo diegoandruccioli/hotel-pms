@@ -255,6 +255,11 @@
 
   "room_overview_title": "Room Status Overview",
 
+  "search_placeholder": "Search",
+  "filter_all": "All",
+  "filter_status": "Filter by status",
+  "status_expected": "Expected",
+
   "pagination": "Pagination",
   "prev_page": "Previous",
   "next_page": "Next",

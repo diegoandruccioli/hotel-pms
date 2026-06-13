@@ -255,6 +255,11 @@
 
   "room_overview_title": "Stato Camere",
 
+  "search_placeholder": "Cerca",
+  "filter_all": "Tutti",
+  "filter_status": "Filtra per stato",
+  "status_expected": "In Arrivo",
+
   "pagination": "Paginazione",
   "prev_page": "Precedente",
   "next_page": "Successivo",

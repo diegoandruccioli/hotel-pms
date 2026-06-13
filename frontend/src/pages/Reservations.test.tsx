@@ -8,10 +8,13 @@ import { inventoryService } from '../services/inventoryService';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
-}));
+vi.mock('react-i18next', () => {
+  const t = (key: string) => key;
+  return {
+    useTranslation: () => ({ t, i18n: { language: 'en' } }),
+    initReactI18next: { type: '3rdParty', init: vi.fn() },
+  };
+});
 
 vi.mock('../services/reservationService', () => ({
   reservationService: { getAllReservations: vi.fn(), cancelReservation: vi.fn() },
@@ -167,6 +170,23 @@ describe('Reservations', () => {
       expect(reservationService.cancelReservation).toHaveBeenCalledWith('res-1');
       expect(mockAddToast).toHaveBeenCalledWith('reservation_cancelled_success', 'success');
     });
+  });
+
+  it('should filter reservations by guest name on search input', async () => {
+    vi.mocked(reservationService.getAllReservations).mockResolvedValue([
+      CONFIRMED_RESERVATION,
+      { ...CONFIRMED_RESERVATION, id: 'res-3', guestFullName: 'Jane Smith' },
+    ] as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+    const input = screen.getByRole('searchbox');
+    fireEvent.change(input, { target: { value: 'Jane' } });
+
+    await waitFor(() => {
+      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    }, { timeout: 500 });
   });
 
   it('should have no accessibility violations', async () => {

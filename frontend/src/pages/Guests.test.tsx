@@ -183,6 +183,40 @@ describe('Guests', () => {
     });
   });
 
+  it('should filter guests by name on search input', async () => {
+    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([
+      GUEST,
+      { id: 'g2', firstName: 'Jane', lastName: 'Smith', email: 'jane@test.com', phone: '', city: '', country: '' },
+    ] as never);
+    render(<Guests />);
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+    const input = screen.getByRole('searchbox');
+    fireEvent.change(input, { target: { value: 'Jane' } });
+
+    await waitFor(() => {
+      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    }, { timeout: 500 });
+  });
+
+  it('should filter guests by email on search input', async () => {
+    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([
+      GUEST,
+      { id: 'g2', firstName: 'Jane', lastName: 'Smith', email: 'jane@test.com', phone: '', city: '', country: '' },
+    ] as never);
+    render(<Guests />);
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+    const input = screen.getByRole('searchbox');
+    fireEvent.change(input, { target: { value: 'jane@test' } });
+
+    await waitFor(() => {
+      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    }, { timeout: 500 });
+  });
+
   it('should have no accessibility violations', async () => {
     vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([]);
     const { container } = render(<Guests />);

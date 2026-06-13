@@ -139,6 +139,24 @@ export const Reservations = () => {
   const [error, setError] = useState<string | null>(null);
   const [reservationToCancel, setReservationToCancel] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
+
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  const filteredReservations = useMemo(() => {
+    const active = reservations.filter((r) => r.active !== false);
+    if (!debouncedSearch.trim()) return active;
+    const q = debouncedSearch.toLowerCase();
+    return active.filter((r) => r.guestFullName?.toLowerCase().includes(q));
+  }, [reservations, debouncedSearch]);
 
   const loadReservations = useCallback(async () => {
     try {
@@ -225,9 +243,22 @@ export const Reservations = () => {
           </h1>
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('reservations_subtitle')}</p>
         </div>
-        <M3Button data-testid="new-reservation-btn" icon="add" onClick={handleNewReservation}>
-          {t('new_reservation')}
-        </M3Button>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <MaterialIcon name="search" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              placeholder={t('search_placeholder')}
+              aria-label={t('search_placeholder')}
+              className="pl-9 pr-3 py-2 w-full sm:w-56 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+            />
+          </div>
+          <M3Button data-testid="new-reservation-btn" icon="add" onClick={handleNewReservation}>
+            {t('new_reservation')}
+          </M3Button>
+        </div>
       </div>
 
       {loading ? (
@@ -247,10 +278,10 @@ export const Reservations = () => {
         </div>
       ) : (
         <M3Table headers={tableHeaders}>
-          {reservations.length === 0 ? (
+          {filteredReservations.length === 0 ? (
             <tr><td colSpan={6} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_reservations_found')}</td></tr>
           ) : (
-            reservations.filter(r => r.active !== false).map((reservation) => (
+            filteredReservations.map((reservation) => (
               <ReservationRow
                 key={reservation.id}
                 reservation={reservation}

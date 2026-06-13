@@ -205,6 +205,41 @@ describe('Billing', () => {
     expect(screen.getByText('Dinner')).toBeInTheDocument();
   });
 
+  it('should filter to only ISSUED invoices when ISSUED chip is clicked', async () => {
+    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE, PAID_INVOICE]);
+    render(<Billing />);
+    await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'invoice_status_ISSUED' }));
+
+    expect(screen.getByText('INV-001')).toBeInTheDocument();
+    expect(screen.queryByText('INV-002')).not.toBeInTheDocument();
+  });
+
+  it('should filter to only PAID invoices when PAID chip is clicked', async () => {
+    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE, PAID_INVOICE]);
+    render(<Billing />);
+    await waitFor(() => expect(screen.getByText('INV-002')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'invoice_status_PAID' }));
+
+    expect(screen.getByText('INV-002')).toBeInTheDocument();
+    expect(screen.queryByText('INV-001')).not.toBeInTheDocument();
+  });
+
+  it('should show all invoices when ALL chip is clicked after filtering', async () => {
+    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE, PAID_INVOICE]);
+    render(<Billing />);
+    await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'invoice_status_PAID' }));
+    expect(screen.queryByText('INV-001')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'filter_all' }));
+    expect(screen.getByText('INV-001')).toBeInTheDocument();
+    expect(screen.getByText('INV-002')).toBeInTheDocument();
+  });
+
   it('should have no accessibility violations on empty state', async () => {
     vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([]);
     const { container } = render(<Billing />);

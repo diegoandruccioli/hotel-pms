@@ -85,6 +85,30 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
   );
 });
 
+const StayStatusChip = memo(({ value, active, label, onClick }: {
+  value: StayStatus | 'ALL';
+  active: boolean;
+  label: string;
+  onClick: (v: StayStatus | 'ALL') => void;
+}) => {
+  const handleClick = useCallback(() => onClick(value), [onClick, value]);
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={handleClick}
+      className={`px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors ${
+        active
+          ? 'bg-primary text-on-primary border-primary'
+          : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
+      }`}
+    >
+      {label}
+    </button>
+  );
+});
+StayStatusChip.displayName = 'StayStatusChip';
+
 export const Stays = memo(() => {
   const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
@@ -94,6 +118,9 @@ export const Stays = memo(() => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StayStatus | 'ALL'>('ALL');
   const [alloggiatiDate, setAlloggiatiDate] = useState(getTodayString());
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [downloadingJson, setDownloadingJson] = useState(false);
@@ -101,6 +128,35 @@ export const Stays = memo(() => {
   const addToast = useToastStore((s) => s.addToast);
   const role = useAuthStore((s) => s.user?.role);
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
+
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  const handleStatusFilterClick = useCallback((s: StayStatus | 'ALL') => {
+    setStatusFilter(s);
+  }, []);
+
+  const filteredStays = useMemo(() => {
+    let result = stays;
+    if (statusFilter !== 'ALL') {
+      result = result.filter((s) => s.status === statusFilter);
+    }
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase();
+      result = result.filter(
+        (s) =>
+          s.roomNumber?.toLowerCase().includes(q) ||
+          s.guestDisplayName?.toLowerCase().includes(q),
+      );
+    }
+    return result;
+  }, [stays, statusFilter, debouncedSearch]);
 
   const loadStays = useCallback(async () => {
     try {
@@ -221,6 +277,31 @@ export const Stays = memo(() => {
         </div>
       </div>
 
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="relative">
+          <MaterialIcon name="search" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            placeholder={t('search_placeholder')}
+            aria-label={t('search_placeholder')}
+            className="pl-9 pr-3 py-2 w-full sm:w-56 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t('filter_status')}>
+          {(['ALL', 'EXPECTED', 'CHECKED_IN', 'CHECKED_OUT'] as const).map((s) => (
+            <StayStatusChip
+              key={s}
+              value={s}
+              active={statusFilter === s}
+              label={s === 'ALL' ? t('filter_all') : s === 'EXPECTED' ? t('status_expected') : s === 'CHECKED_IN' ? t('status_checked_in') : t('status_checked_out')}
+              onClick={handleStatusFilterClick}
+            />
+          ))}
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">
           <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
@@ -238,10 +319,10 @@ export const Stays = memo(() => {
         </div>
       ) : (
         <M3Table headers={headers}>
-          {stays.length === 0 ? (
+          {filteredStays.length === 0 ? (
             <tr><td colSpan={8} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_active_stays')}</td></tr>
           ) : (
-            stays.map((stay) => (
+            filteredStays.map((stay) => (
               <StayRow 
                 key={stay.id} 
                 stay={stay} 

@@ -1,14 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { Stays } from './Stays';
 import { stayService } from '../services/stayService';
 import { useAuthStore } from '../store/authStore';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
-}));
+vi.mock('react-i18next', () => {
+  const t = (key: string) => key;
+  return {
+    useTranslation: () => ({ t, i18n: { language: 'en' } }),
+    initReactI18next: { type: '3rdParty', init: vi.fn() },
+  };
+});
 
 vi.mock('../services/stayService', () => ({
   stayService: { getAllStays: vi.fn(), downloadAlloggiatiJson: vi.fn(), downloadAlloggiatiReport: vi.fn() },
@@ -86,6 +89,45 @@ describe('Stays', () => {
 
     await waitFor(() => {
       expect(screen.getByText('nav_stays')).toBeInTheDocument();
+    });
+  });
+
+  it('should filter stays by room number on search input', async () => {
+    vi.mocked(stayService.getAllStays).mockResolvedValue({
+      content: [
+        { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'John Doe', status: 'CHECKED_IN' },
+        { id: 's2', roomId: 'r2', roomNumber: '202', guestId: 'g2', guestDisplayName: 'Jane Smith', status: 'CHECKED_IN' },
+      ],
+      totalElements: 2, totalPages: 1, number: 0, size: 20, numberOfElements: 2, first: true, last: true, empty: false,
+    } as never);
+    render(<Stays />);
+    await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
+
+    const input = screen.getByRole('searchbox');
+    fireEvent.change(input, { target: { value: '202' } });
+
+    await waitFor(() => {
+      expect(screen.queryByText('101')).not.toBeInTheDocument();
+      expect(screen.getByText('202')).toBeInTheDocument();
+    }, { timeout: 500 });
+  });
+
+  it('should filter stays by status chip', async () => {
+    vi.mocked(stayService.getAllStays).mockResolvedValue({
+      content: [
+        { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'John Doe', status: 'CHECKED_IN' },
+        { id: 's2', roomId: 'r2', roomNumber: '202', guestId: 'g2', guestDisplayName: 'Jane Smith', status: 'EXPECTED' },
+      ],
+      totalElements: 2, totalPages: 1, number: 0, size: 20, numberOfElements: 2, first: true, last: true, empty: false,
+    } as never);
+    render(<Stays />);
+    await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'status_expected' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('101')).not.toBeInTheDocument();
+      expect(screen.getByText('202')).toBeInTheDocument();
     });
   });
 

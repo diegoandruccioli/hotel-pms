@@ -63,6 +63,27 @@ export const Guests = memo(() => {
   const [selectedGuest, setSelectedGuest] = useState<GuestResponseDTO | undefined>();
   const [guestToDelete, setGuestToDelete] = useState<GuestResponseDTO | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
+
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  const filteredGuests = useMemo(() => {
+    if (!debouncedSearch.trim()) return guests;
+    const q = debouncedSearch.toLowerCase();
+    return guests.filter(
+      (g) =>
+        `${g.firstName} ${g.lastName}`.toLowerCase().includes(q) ||
+        g.email?.toLowerCase().includes(q),
+    );
+  }, [guests, debouncedSearch]);
 
   const loadGuests = useCallback(async () => {
     try {
@@ -147,9 +168,22 @@ export const Guests = memo(() => {
           </h1>
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('guests_subtitle')}</p>
         </div>
-        <M3Button icon="add" onClick={handleOpenAddModal}>
-          {t('add_guest')}
-        </M3Button>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <MaterialIcon name="search" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              placeholder={t('search_placeholder')}
+              aria-label={t('search_placeholder')}
+              className="pl-9 pr-3 py-2 w-full sm:w-56 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+            />
+          </div>
+          <M3Button icon="add" onClick={handleOpenAddModal}>
+            {t('add_guest')}
+          </M3Button>
+        </div>
       </div>
 
       {loading ? (
@@ -169,10 +203,10 @@ export const Guests = memo(() => {
         </div>
       ) : (
         <M3Table headers={headers}>
-          {guests.length === 0 ? (
+          {filteredGuests.length === 0 ? (
             <tr><td colSpan={5} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_guests_found')}</td></tr>
           ) : (
-            guests.map((guest) => (
+            filteredGuests.map((guest) => (
               <GuestRow
                 key={guest.id}
                 guest={guest}

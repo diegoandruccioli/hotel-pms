@@ -80,6 +80,30 @@ const InvoiceRow = memo(({
 });
 InvoiceRow.displayName = 'InvoiceRow';
 
+const StatusFilterChip = memo(({ value, active, label, onClick }: {
+  value: InvoiceStatus | 'ALL';
+  active: boolean;
+  label: string;
+  onClick: (v: InvoiceStatus | 'ALL') => void;
+}) => {
+  const handleClick = useCallback(() => onClick(value), [onClick, value]);
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={handleClick}
+      className={`px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors ${
+        active
+          ? 'bg-primary text-on-primary border-primary'
+          : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
+      }`}
+    >
+      {label}
+    </button>
+  );
+});
+StatusFilterChip.displayName = 'StatusFilterChip';
+
 export const Billing = memo(() => {
   const { t, i18n } = useTranslation('common');
   const [invoices, setInvoices] = useState<InvoiceResponse[]>([]);
@@ -87,6 +111,7 @@ export const Billing = memo(() => {
   const [error, setError] = useState<string | null>(null);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceResponse | null>(null);
   const [detailTarget, setDetailTarget]   = useState<InvoiceResponse | null>(null);
+  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL');
 
   const loadInvoices = useCallback(async () => {
     try {
@@ -105,6 +130,15 @@ export const Billing = memo(() => {
   useEffect(() => {
     loadInvoices();
   }, [loadInvoices]);
+
+  const filteredInvoices = useMemo(
+    () => statusFilter === 'ALL' ? invoices : invoices.filter((inv) => inv.status === statusFilter),
+    [invoices, statusFilter],
+  );
+
+  const handleStatusFilterClick = useCallback((s: InvoiceStatus | 'ALL') => {
+    setStatusFilter(s);
+  }, []);
 
   const handlePaid = useCallback((updated: InvoiceResponse) => {
     setInvoices((prev) => prev.map((inv) => (inv.id === updated.id ? updated : inv)));
@@ -157,6 +191,18 @@ export const Billing = memo(() => {
         <M3Button icon="add">{t('create_invoice')}</M3Button>
       </div>
 
+      <div className="flex flex-wrap gap-2" role="group" aria-label={t('filter_status')}>
+        {(['ALL', 'ISSUED', 'PAID', 'CANCELLED'] as const).map((s) => (
+          <StatusFilterChip
+            key={s}
+            value={s}
+            active={statusFilter === s}
+            label={s === 'ALL' ? t('filter_all') : t(`invoice_status_${s}`, s)}
+            onClick={handleStatusFilterClick}
+          />
+        ))}
+      </div>
+
       {loading ? (
         <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">
           <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
@@ -178,14 +224,14 @@ export const Billing = memo(() => {
         </div>
       ) : (
         <M3Table headers={tableHeaders}>
-          {invoices.length === 0 ? (
+          {filteredInvoices.length === 0 ? (
             <tr>
               <td colSpan={5} className="py-8 text-center text-sm font-body text-on-surface-variant">
                 {t('no_invoices')}
               </td>
             </tr>
           ) : (
-            invoices.map((invoice) => (
+            filteredInvoices.map((invoice) => (
               <InvoiceRow
                 key={invoice.id}
                 invoice={invoice}
