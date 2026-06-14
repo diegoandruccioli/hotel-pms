@@ -3053,6 +3053,22 @@ rediretto a \texttt{/}. Tutti i 144 test rimangono verdi; lint zero warnings; Ty
 
 \paragraph{Riferimento} Commit: \commitref{ccfa431}{fix(security): T-FE-03 --- role-based route guard on ProtectedRoute}
 
+\paragraph{Estensione --- Pattern ``role-gated service call'' (T-FE-03b)}
+Una variante del medesimo pattern è stata individuata nel \texttt{dashboardService}:
+la funzione \texttt{getDashboardStats()} invocava incondizionatamente l'endpoint
+\texttt{/api/v1/reports/owner} (protetto da \texttt{@PreAuthorize("hasAnyRole('OWNER','ADMIN')")}),
+causando HTTP~403 per i ruoli \texttt{RECEPTIONIST} e \texttt{MANAGER}.
+La risposta di errore propagava all'intero Zustand store, rendendo la dashboard
+inutilizzabile per tutti i ruoli non privilegiati.
+A differenza della vulnerabilità T-FE-03 (accesso diretto alla route), qui la chiamata
+API non autorizzata avveniva in modo silenzioso, senza che l'utente potesse accorgersene.
+Il backend era correttamente protetto e non restituiva dati sensibili, ma il design
+configurava comunque una violazione OWASP~A01.
+Fix: il parametro \texttt{isOwnerOrAdmin: boolean} è propagato da \texttt{dashboardStore.fetchStats()}
+a \texttt{Dashboard.tsx}; la chiamata al billing report è omessa se \texttt{false},
+\texttt{pendingRevenue} ritorna \texttt{null}.
+Commit: \commitref{14a43bb}{fix(dashboard): gate owner report behind role + replace stats with daily KPIs}
+
 \subsection{Protezione Actuator Endpoints \threat{T-CFG-01}}
 
 \paragraph{Descrizione}
@@ -4931,6 +4947,21 @@ Pipeline CI esegue Trivy su ogni immagine Docker.
 CVE risolte: \texttt{CVE-2026-33870/33871} (Netty request smuggling + HTTP/2 DoS),
 \texttt{CVE-2025-41235/41253} (Spring Cloud Gateway header forwarding + EL injection).
 108 alert su immagini terze parti triaggiati con motivazione documentata.
+
+\paragraph{Aggiornamento dipendenze frontend (DEP-CVE-05)}
+L'analisi del security tab GitHub ha rilevato 7~CVE sulle dipendenze npm del frontend.
+Risolte con upgrade mirati senza breaking change (OWASP~A06:2025):
+\begin{itemize}
+  \item \texttt{react-router-dom} + \texttt{react-router} \texttt{7.13.1}~→~\texttt{7.17.0}:
+    \texttt{\#36} XSS via RSC redirect, \texttt{\#37} XSS via \texttt{Location} header,
+    \texttt{\#38} RCE via turbo-stream, \texttt{\#39} open redirect,
+    \texttt{\#40}/\texttt{\#41} DoS via \texttt{\_\_manifest} e single-fetch.
+  \item \texttt{esbuild} \texttt{0.27.3}~→~\texttt{0.28.1} (transitivo di Vite,
+    forzato via \texttt{npm overrides}): \texttt{CVE-2025-42577} arbitrary file
+    read tramite dev server su Windows.
+\end{itemize}
+Tutti i 344 test rimasti verdi; build e lint zero warning.
+Commit: \commitref{b1be3e8}{fix(deps): resolve 7 Dependabot CVEs --- react-router 7.17.0, esbuild 0.28.1}
 
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Appendice B --- Utilizzo dell'IA e Revisione Critica}
