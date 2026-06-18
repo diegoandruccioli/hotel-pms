@@ -3,7 +3,10 @@ server:
 
 application:
   config:
-    stay-service-url: http://stay-service:8084
+    # frontdesk-service consolidates the former inventory/reservation/stay
+    # services (ADR-001, backup/DECISIONS.md). HotelSettingsClient still
+    # reads from the stays-domain path (/api/v1/stays/settings) on it.
+    frontdesk-service-url: http://frontdesk-service:8081
 
 internal:
   hmac:

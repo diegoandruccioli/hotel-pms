@@ -9,10 +9,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import java.util.UUID;
 
 /**
- * OpenFeign client for communicating with the Stay service.
+ * OpenFeign client for communicating with the stays domain in frontdesk-service
+ * (formerly stay-service, see ADR-001 in backup/DECISIONS.md).
  */
 @FunctionalInterface
-@FeignClient(name = "stay-service", url = "${application.config.stay-service-url}")
+@FeignClient(name = "frontdesk-service-stays", url = "${application.config.frontdesk-service-url}")
 public interface StayClient {
 
     /**

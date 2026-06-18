@@ -3,7 +3,10 @@ server:
 
 application:
   config:
-    stay-service-url: http://stay-service:8084
+    # frontdesk-service consolidates the former inventory/reservation/stay
+    # services (ADR-001, backup/DECISIONS.md) — one URL now covers both the
+    # StayServiceClient and ReservationClient Feign clients in guest-service.
+    frontdesk-service-url: http://frontdesk-service:8081
     billing-service-url: http://billing-service:8085
 
 internal:

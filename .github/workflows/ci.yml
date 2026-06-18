@@ -138,17 +138,9 @@ jobs:
             dockerfile: guest-service/Dockerfile
             image: hotel-pms/guest-service
             context: "."
-          - service: inventory-service
-            dockerfile: inventory-service/Dockerfile
-            image: hotel-pms/inventory-service
-            context: "."
-          - service: reservation-service
-            dockerfile: reservation-service/Dockerfile
-            image: hotel-pms/reservation-service
-            context: "."
-          - service: stay-service
-            dockerfile: stay-service/Dockerfile
-            image: hotel-pms/stay-service
+          - service: frontdesk-service
+            dockerfile: frontdesk-service/Dockerfile
+            image: hotel-pms/frontdesk-service
             context: "."
           - service: billing-service
             dockerfile: billing-service/Dockerfile
