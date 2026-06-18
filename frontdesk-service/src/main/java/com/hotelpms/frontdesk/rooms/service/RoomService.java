@@ -18,12 +18,15 @@ import java.util.UUID;
 public interface RoomService {
 
     /**
-     * Creates a room.
+     * Creates a room scoped to the authenticated hotel.
      *
      * @param request the request
+     * @param hotelId the hotel UUID (from the authenticated user's JWT);
+     *                takes precedence over any {@code hotelId} present in the
+     *                request body (T-ROOM-01)
      * @return the response
      */
-    RoomResponse createRoom(RoomRequest request);
+    RoomResponse createRoom(RoomRequest request, UUID hotelId);
 
     /**
      * Gets a room by id scoped to the authenticated hotel.
@@ -35,12 +38,14 @@ public interface RoomService {
     RoomResponse getRoomById(UUID id, UUID hotelId);
 
     /**
-     * Gets a paginated list of all active rooms.
+     * Gets a paginated list of all active rooms belonging to the
+     * authenticated hotel.
      *
      * @param pageable the pagination and sorting parameters
+     * @param hotelId  the hotel UUID (from the authenticated user's JWT) (T-ROOM-01)
      * @return a page of room responses
      */
-    Page<RoomResponse> getAllRooms(Pageable pageable);
+    Page<RoomResponse> getAllRooms(Pageable pageable, UUID hotelId);
 
     /**
      * Updates a room scoped to the authenticated hotel.

@@ -41,6 +41,17 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
     Page<Room> findAllByActiveTrue(Pageable pageable);
 
     /**
+     * Returns a page of active rooms scoped to the given hotel (multi-tenancy).
+     * Used by {@code getAllRooms} so the listing endpoint never returns
+     * another hotel's rooms (T-ROOM-01, IDOR / cross-tenant data leak).
+     *
+     * @param hotelId  the hotel UUID extracted from the authenticated user's JWT
+     * @param pageable the pagination and sorting parameters
+     * @return a page of active rooms for that hotel
+     */
+    Page<Room> findAllByActiveTrueAndHotelId(UUID hotelId, Pageable pageable);
+
+    /**
      * Finds an active room by its UUID scoped to the given hotel.
      * Enforces multi-tenant isolation: a room from hotel A cannot be
      * accessed by a user authenticated to hotel B.

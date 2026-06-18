@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -104,7 +105,7 @@ class RoomControllerTest {
         final RoomRequest request =
                 new RoomRequest(HOTEL_ID, ROOM_NUMBER_101, roomTypeId, RoomStatus.CLEAN);
 
-        when(roomService.createRoom(any(RoomRequest.class))).thenReturn(roomResponse);
+        when(roomService.createRoom(any(RoomRequest.class), any(UUID.class))).thenReturn(roomResponse);
 
         mockMvc.perform(post(BASE_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -113,7 +114,23 @@ class RoomControllerTest {
                 .andExpect(jsonPath("$.id").value(roomId.toString()))
                 .andExpect(jsonPath(JSON_ROOM_NUMBER).value(ROOM_NUMBER_101));
 
-        verify(roomService).createRoom(any(RoomRequest.class));
+        verify(roomService).createRoom(any(RoomRequest.class), eq(HOTEL_ID));
+    }
+
+    @Test
+    void shouldCreateRoomUseAuthenticatedHotelIdNotRequestBody() throws Exception {
+        final UUID otherHotelId = UUID.randomUUID();
+        final RoomRequest crossTenantRequest =
+                new RoomRequest(otherHotelId, ROOM_NUMBER_101, roomTypeId, RoomStatus.CLEAN);
+
+        when(roomService.createRoom(any(RoomRequest.class), eq(HOTEL_ID))).thenReturn(roomResponse);
+
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(crossTenantRequest)))
+                .andExpect(status().isCreated());
+
+        verify(roomService).createRoom(any(RoomRequest.class), eq(HOTEL_ID));
     }
 
     @Test
@@ -139,7 +156,7 @@ class RoomControllerTest {
     void shouldGetAllRoomsReturn200() throws Exception {
         final Page<RoomResponse> page = new PageImpl<>(
                 List.of(roomResponse), PageRequest.of(0, 20), 1L);
-        when(roomService.getAllRooms(any(Pageable.class))).thenReturn(page);
+        when(roomService.getAllRooms(any(Pageable.class), any(UUID.class))).thenReturn(page);
 
         mockMvc.perform(get(BASE_URL))
                 .andExpect(status().isOk());

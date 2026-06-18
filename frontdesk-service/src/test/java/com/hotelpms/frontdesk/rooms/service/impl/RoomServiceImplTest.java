@@ -91,7 +91,7 @@ class RoomServiceImplTest {
         when(roomRepository.save(Objects.requireNonNull(room))).thenReturn(room);
         when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
 
-        final RoomResponse result = roomService.createRoom(request);
+        final RoomResponse result = roomService.createRoom(request, hotelId);
 
         assertNotNull(result);
         assertEquals(ROOM_101, result.roomNumber());
@@ -99,10 +99,26 @@ class RoomServiceImplTest {
     }
 
     @Test
+    void testCreateRoomIgnoresHotelIdFromRequestBody() {
+        final UUID requestHotelId = UUID.randomUUID();
+        final UUID authenticatedHotelId = UUID.randomUUID();
+        final RoomRequest crossTenantRequest = new RoomRequest(requestHotelId, ROOM_101, roomTypeId, RoomStatus.CLEAN);
+
+        when(roomTypeRepository.findById(Objects.requireNonNull(roomTypeId))).thenReturn(Optional.of(roomType));
+        when(roomMapper.toEntity(Objects.requireNonNull(crossTenantRequest))).thenReturn(room);
+        when(roomRepository.save(Objects.requireNonNull(room))).thenReturn(room);
+        when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
+
+        roomService.createRoom(crossTenantRequest, authenticatedHotelId);
+
+        assertEquals(authenticatedHotelId, room.getHotelId());
+    }
+
+    @Test
     void testCreateRoomRoomTypeNotFound() {
         when(roomTypeRepository.findById(Objects.requireNonNull(roomTypeId))).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundException.class, () -> roomService.createRoom(request));
+        assertThrows(NotFoundException.class, () -> roomService.createRoom(request, hotelId));
     }
 
     @Test
@@ -137,10 +153,10 @@ class RoomServiceImplTest {
         final List<Room> activeRooms = new ArrayList<>(List.of(room));
         final Page<Room> roomPage = new PageImpl<>(activeRooms, pageable, 1L);
 
-        when(roomRepository.findAllByActiveTrue(pageable)).thenReturn(roomPage);
+        when(roomRepository.findAllByActiveTrueAndHotelId(hotelId, pageable)).thenReturn(roomPage);
         when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
 
-        final Page<RoomResponse> result = roomService.getAllRooms(pageable);
+        final Page<RoomResponse> result = roomService.getAllRooms(pageable, hotelId);
 
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
@@ -152,9 +168,9 @@ class RoomServiceImplTest {
         final Pageable pageable = PageRequest.of(0, 20);
         final Page<Room> emptyPage = Page.empty(pageable);
 
-        when(roomRepository.findAllByActiveTrue(pageable)).thenReturn(emptyPage);
+        when(roomRepository.findAllByActiveTrueAndHotelId(hotelId, pageable)).thenReturn(emptyPage);
 
-        final Page<RoomResponse> result = roomService.getAllRooms(pageable);
+        final Page<RoomResponse> result = roomService.getAllRooms(pageable, hotelId);
 
         assertNotNull(result);
         assertEquals(0, result.getTotalElements());
@@ -184,6 +200,21 @@ class RoomServiceImplTest {
         assertEquals(ROOM_102, result.roomNumber());
         assertEquals(RoomStatus.DIRTY, result.status());
         verify(roomRepository).saveAndFlush(Objects.requireNonNull(room));
+    }
+
+    @Test
+    void testUpdateRoomIgnoresHotelIdFromRequestBody() {
+        final UUID requestHotelId = UUID.randomUUID();
+        final RoomRequest crossTenantRequest = new RoomRequest(requestHotelId, ROOM_102, roomTypeId, RoomStatus.DIRTY);
+
+        when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.of(room));
+        when(roomTypeRepository.findById(Objects.requireNonNull(roomTypeId))).thenReturn(Optional.of(roomType));
+        when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(room);
+        when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
+
+        roomService.updateRoom(roomId, hotelId, crossTenantRequest);
+
+        assertEquals(hotelId, room.getHotelId());
     }
 
     @Test

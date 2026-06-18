@@ -43,22 +43,28 @@ public class RoomServiceImpl implements RoomService {
     private final RoomMapper roomMapper;
 
     /**
-     * Creates a new room linked to an existing, active {@link RoomType}.
+     * Creates a new room linked to an existing, active {@link RoomType},
+     * scoped to the authenticated hotel.
      *
      * @param request the creation request; must not be {@code null}
+     * @param hotelId the hotel UUID from the authenticated user's JWT; always
+     *                wins over any {@code hotelId} present in the request body
+     *                (T-ROOM-01)
      * @return the persisted room as a response DTO
      * @throws NotFoundException if the referenced {@code RoomType} does not exist
      *                           or is soft-deleted
      */
     @Override
     @Transactional
-    public RoomResponse createRoom(final RoomRequest request) {
+    public RoomResponse createRoom(final RoomRequest request, final UUID hotelId) {
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
         final UUID roomTypeId = Objects.requireNonNull(request.roomTypeId(), ROOM_TYPE_ID_NULL_MSG);
         final RoomType roomType = roomTypeRepository.findById(roomTypeId)
                 .filter(RoomType::isActive)
                 .orElseThrow(() -> new NotFoundException(TYPE_NOT_FOUND_MSG + roomTypeId));
 
         final Room room = roomMapper.toEntity(request);
+        room.setHotelId(hotelId);
         room.setRoomType(roomType);
 
         final Room saved = roomRepository.save(room);
@@ -84,19 +90,22 @@ public class RoomServiceImpl implements RoomService {
     }
 
     /**
-     * Returns a paginated view of all active rooms.
+     * Returns a paginated view of all active rooms belonging to the
+     * authenticated hotel (T-ROOM-01).
      *
      * <p>
      * {@code Page.map()} delegates LIMIT/OFFSET and COUNT queries to the database,
      * avoiding full in-memory loading.
      *
      * @param pageable pagination and sorting parameters; must not be {@code null}
+     * @param hotelId  the hotel UUID from the authenticated user's JWT
      * @return a page of room response DTOs
      */
     @Override
     @Transactional(readOnly = true)
-    public Page<RoomResponse> getAllRooms(final Pageable pageable) {
-        return roomRepository.findAllByActiveTrue(pageable)
+    public Page<RoomResponse> getAllRooms(final Pageable pageable, final UUID hotelId) {
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
+        return roomRepository.findAllByActiveTrueAndHotelId(hotelId, pageable)
                 .map(roomMapper::toResponse);
     }
 
@@ -126,7 +135,10 @@ public class RoomServiceImpl implements RoomService {
         room.setRoomNumber(request.roomNumber());
         room.setStatus(request.status());
         room.setRoomType(roomType);
-        room.setHotelId(request.hotelId());
+        // hotelId always comes from the authenticated context (T-ROOM-01), never
+        // from the request body — otherwise a caller could move a room to a
+        // different hotel by simply changing this field.
+        room.setHotelId(hotelId);
 
         final Room saved = roomRepository.saveAndFlush(Objects.requireNonNull(room));
         return roomMapper.toResponse(saved);

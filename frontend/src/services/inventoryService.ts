@@ -43,15 +43,15 @@ export const inventoryService = {
   },
 
   createRoom: async (data: RoomRequest): Promise<RoomResponse> => {
-    // Hotel ID is required but often we mock it in single-tenant setups if not provided by auth
-    const payload = { ...data, hotelId: data.hotelId || '00000000-0000-0000-0000-000000000000' };
-    const response = await api.post<RoomResponse>(ROOMS_PATH, payload);
+    // hotelId is always derived server-side from the authenticated session
+    // (T-ROOM-01) — whatever is sent here is ignored, so there is nothing to
+    // fill in client-side.
+    const response = await api.post<RoomResponse>(ROOMS_PATH, data);
     return response.data;
   },
 
   updateRoom: async (id: string, data: RoomRequest): Promise<RoomResponse> => {
-    const payload = { ...data, hotelId: data.hotelId || '00000000-0000-0000-0000-000000000000' };
-    const response = await api.put<RoomResponse>(`${ROOMS_PATH}/${id}`, payload);
+    const response = await api.put<RoomResponse>(`${ROOMS_PATH}/${id}`, data);
     return response.data;
   },
 

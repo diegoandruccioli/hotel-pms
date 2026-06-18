@@ -41,7 +41,8 @@ public class RoomController {
     private final RoomService roomService;
 
     /**
-     * Creates a room.
+     * Creates a room, scoped to the caller's hotel (T-ROOM-01): any
+     * {@code hotelId} present in the request body is overridden.
      *
      * @param request the request
      * @return the response
@@ -49,7 +50,7 @@ public class RoomController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public ResponseEntity<RoomResponse> createRoom(@NonNull @Valid @RequestBody final RoomRequest request) {
-        final RoomResponse response = roomService.createRoom(request);
+        final RoomResponse response = roomService.createRoom(request, resolveHotelId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -65,9 +66,9 @@ public class RoomController {
     }
 
     /**
-     * Gets a paginated list of all active rooms.
-     * Supports standard Spring Data pagination query parameters:
-     * {@code ?page=0&size=20&sort=roomNumber,asc}
+     * Gets a paginated list of all active rooms belonging to the caller's
+     * hotel (T-ROOM-01). Supports standard Spring Data pagination query
+     * parameters: {@code ?page=0&size=20&sort=roomNumber,asc}
      * Defaults to page 0, 20 items per page, sorted by roomNumber ascending.
      *
      * @param pageable the pagination and sorting parameters, resolved from request
@@ -78,7 +79,7 @@ public class RoomController {
     public ResponseEntity<Page<RoomResponse>> getAllRooms(
             @PageableDefault(size = DEFAULT_PAGE_SIZE, sort = "roomNumber",
                     direction = Sort.Direction.ASC) final Pageable pageable) {
-        return ResponseEntity.ok(roomService.getAllRooms(pageable));
+        return ResponseEntity.ok(roomService.getAllRooms(pageable, resolveHotelId()));
     }
 
     /**
