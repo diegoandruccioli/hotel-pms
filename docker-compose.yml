@@ -43,7 +43,8 @@ services:
           memory: 256M
 
   # ----------------------------------------------------------
-  # Redis - for API Gateway Rate Limiting
+  # Redis - API Gateway rate limiting + internal HMAC anti-replay
+  # nonce store (T-GW-08, all 5 InternalAuthFilter validators)
   # ----------------------------------------------------------
   redis:
     image: redis:alpine
@@ -59,6 +60,7 @@ services:
       start_period: 5s
     networks:
       - gateway-network
+      - backend-network
     deploy:
       resources:
         limits:
@@ -593,6 +595,8 @@ volumes:
 # dmz-network:          Frontend + API Gateway (public-facing layer)
 # gateway-network:      API Gateway + Redis + Auth Service (rate limiting & session cache)
 # backend-network:      All microservices + Config Server + Prometheus/Zipkin (internal API mesh)
+#                        Redis also joins this network so all 5 InternalAuthFilter
+#                        validators can reach the HMAC anti-replay nonce store (T-GW-08)
 # db-network:           PostgreSQL + microservices only (transactional data, no external access)
 # observability-network: Loki, Grafana, Prometheus, Zipkin + services exposing metrics
 # ============================================================

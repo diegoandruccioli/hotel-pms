@@ -42,6 +42,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-security")
+    // Redis-backed nonce store for internal HMAC anti-replay (T-GW-08)
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.cloud:spring-cloud-starter-config")
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign") {
         exclude(group = "org.springframework.cloud", module = "spring-cloud-starter-netflix-eureka-client")
@@ -96,4 +98,11 @@ dependencyManagement {
 tasks.withType<Test> {
     useJUnitPlatform()
     systemProperty("net.bytebuddy.experimental", "true")
+}
+
+// SpotBugs: project-specific exclusions (Spring DI beans — EI_EXPOSE_REP2 not applicable)
+tasks.withType<com.github.spotbugs.snom.SpotBugsTask>().configureEach {
+    extraArgs.addAll(
+        listOf("-exclude", "${project.projectDir}/config/spotbugs/exclude.xml")
+    )
 }

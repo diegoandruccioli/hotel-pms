@@ -22,6 +22,7 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Reactive Authentication Filter for validating JWTs and applying headers.
@@ -33,11 +34,16 @@ import java.util.Set;
  * <li>Injects {@code X-Auth-User}, {@code X-Auth-Role}, and {@code X-Auth-Hotel} headers so
  * downstream services can identify the caller and enforce tenant isolation without re-parsing
  * the JWT.</li>
- * <li>Computes an {@code HMAC-SHA256} signature over {@code "username:role:hotelId"}
- * using the shared secret {@code internal.hmac.secret} and injects it as the
- * {@code X-Internal-Signature} header (T-GW-07: {@code hotelId} is included in the signed
- * payload so the tenant-isolation header {@code X-Auth-Hotel} cannot be tampered
- * independently of the identity headers on the internal network).</li>
+ * <li>Generates a fresh {@code X-Auth-Timestamp} (epoch millis) and
+ * {@code X-Auth-Nonce} (random UUID) per request, and computes an
+ * {@code HMAC-SHA256} signature over
+ * {@code "username:role:hotelId:timestamp:nonce"} using the shared secret
+ * {@code internal.hmac.secret}, injected as the {@code X-Internal-Signature}
+ * header (T-GW-07: {@code hotelId} is included in the signed payload so the
+ * tenant-isolation header {@code X-Auth-Hotel} cannot be tampered
+ * independently of the identity headers on the internal network; T-GW-08:
+ * {@code timestamp} and {@code nonce} prevent a captured header set from being
+ * replayed — downstream services reject stale timestamps and re-used nonces).</li>
  * </ol>
  *
  * <p>
@@ -53,6 +59,8 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
     private static final String HEADER_ROLE = "X-Auth-Role";
     private static final String HEADER_HOTEL = "X-Auth-Hotel";
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
+    private static final String HEADER_TIMESTAMP = "X-Auth-Timestamp";
+    private static final String HEADER_NONCE = "X-Auth-Nonce";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
 
     // -----------------------------------------------------------------------
@@ -151,7 +159,9 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                 return this.onError(exchange, "ACCESS_DENIED", HttpStatus.FORBIDDEN);
             }
 
-            final String signature = computeHmac(username, role, hotelId);
+            final String timestamp = String.valueOf(System.currentTimeMillis());
+            final String nonce = UUID.randomUUID().toString();
+            final String signature = computeHmac(username, role, hotelId, timestamp, nonce);
 
             return chain.filter(exchange.mutate()
                     .request(request.mutate()
@@ -160,40 +170,53 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                                 headers.remove(HEADER_ROLE);
                                 headers.remove(HEADER_HOTEL);
                                 headers.remove(HEADER_SIGNATURE);
+                                headers.remove(HEADER_TIMESTAMP);
+                                headers.remove(HEADER_NONCE);
                             })
                             .header(HEADER_USER, username)
                             .header(HEADER_ROLE, role)
                             .header(HEADER_HOTEL, hotelId)
                             .header(HEADER_SIGNATURE, signature)
+                            .header(HEADER_TIMESTAMP, timestamp)
+                            .header(HEADER_NONCE, nonce)
                             .build())
                     .build());
         };
     }
 
     /**
-     * Computes {@code HMAC-SHA256(secret, "username:role:hotelId")} and returns
-     * the result as a lowercase hex string.
+     * Computes {@code HMAC-SHA256(secret, "username:role:hotelId:timestamp:nonce")}
+     * and returns the result as a lowercase hex string.
      *
      * <p>Including {@code hotelId} in the signed payload ensures that downstream
      * services can verify the integrity of the tenant-isolation header
      * {@code X-Auth-Hotel} and not just the identity headers, closing a potential
-     * header-tampering vector on the internal network.
+     * header-tampering vector on the internal network (T-GW-07).
      *
-     * @param username the authenticated username extracted from the JWT
-     * @param role     the role extracted from the JWT
-     * @param hotelId  the hotel UUID extracted from the JWT {@code hotelId} claim
+     * <p>Including {@code timestamp} and a random {@code nonce} (T-GW-08) means a
+     * captured header set cannot be replayed indefinitely: downstream services
+     * reject signatures whose timestamp has fallen outside a short tolerance
+     * window, and reject any nonce they have already seen within that window.
+     *
+     * @param username  the authenticated username extracted from the JWT
+     * @param role      the role extracted from the JWT
+     * @param hotelId   the hotel UUID extracted from the JWT {@code hotelId} claim
+     * @param timestamp the epoch-millis timestamp generated for this request
+     * @param nonce     the random nonce generated for this request
      * @return hex-encoded HMAC digest
      * @throws IllegalStateException if the JVM does not support HmacSHA256 (should
      *                               never happen)
      */
-    private String computeHmac(final String username, final String role, final String hotelId) {
+    private String computeHmac(final String username, final String role, final String hotelId,
+            final String timestamp, final String nonce) {
         try {
             final Mac mac = Mac.getInstance(HMAC_ALGORITHM);
             final SecretKeySpec keySpec = new SecretKeySpec(
                     hmacSecret.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM);
             mac.init(keySpec);
             final byte[] digest = mac.doFinal(
-                    (username + ":" + role + ":" + hotelId).getBytes(StandardCharsets.UTF_8));
+                    (username + ":" + role + ":" + hotelId + ":" + timestamp + ":" + nonce)
+                            .getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("HMAC_SIGNATURE_FAILED", e);

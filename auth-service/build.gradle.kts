@@ -113,13 +113,18 @@ tasks.withType<Test> {
 
 // SpotBugs false-positive in JUnit tests: @BeforeEach-initialized fields are not seen
 // by SpotBugs as constructor-initialized, triggering NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR.
+//
+// EI_EXPOSE_REP2 on RedisNonceStore: the StringRedisTemplate field is a Spring-managed
+// singleton injected via constructor DI (T-GW-08 anti-replay nonce store) — a defensive
+// copy is not applicable for a shared Redis client bean.
 tasks.named("populateDefaultSpotBugsExcludes") {
     doLast {
         val f = file("${layout.buildDirectory.get()}/javaqa/spotbugs-excludes.xml")
         f.writeText(
             f.readText().replace(
                 "</FindBugsFilter>",
-                "    <Match>\n        <Bug pattern=\"NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR\"/>\n    </Match>\n</FindBugsFilter>"
+                "    <Match>\n        <Bug pattern=\"NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR\"/>\n    </Match>\n" +
+                    "    <Match>\n        <Class name=\"com.hotelpms.auth.security.RedisNonceStore\"/>\n        <Bug pattern=\"EI_EXPOSE_REP2\"/>\n    </Match>\n</FindBugsFilter>"
             )
         )
     }

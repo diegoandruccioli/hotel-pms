@@ -170,6 +170,35 @@ class AuthenticationFilterTest {
                                         .isEqualTo(TEST_HOTEL_ID);
                         assertThat(captured.get().getHeaders().getFirst("X-Internal-Signature"))
                                         .isNotBlank();
+                        assertThat(captured.get().getHeaders().getFirst("X-Auth-Timestamp"))
+                                        .isNotBlank();
+                        assertThat(captured.get().getHeaders().getFirst("X-Auth-Nonce"))
+                                        .isNotBlank();
+                }
+
+                @Test
+                @DisplayName("should generate a different X-Auth-Nonce on every request (T-GW-08 replay protection)")
+                void shouldGenerateDifferentNoncePerRequest() {
+                        final String token = buildJwt(ONE_HOUR_MS, "admin", "ADMIN");
+
+                        final AtomicReference<String> nonceA = new AtomicReference<>();
+                        final AtomicReference<String> nonceB = new AtomicReference<>();
+
+                        authenticationFilter.apply(config).filter(
+                                MockServerWebExchange.from(MockServerHttpRequest.get("/api/v1/guests")
+                                        .cookie(new HttpCookie("jwt", token)).build()),
+                                ex -> { nonceA.set(ex.getRequest().getHeaders().getFirst("X-Auth-Nonce")); return Mono.empty(); }
+                        ).block();
+
+                        authenticationFilter.apply(config).filter(
+                                MockServerWebExchange.from(MockServerHttpRequest.get("/api/v1/guests")
+                                        .cookie(new HttpCookie("jwt", token)).build()),
+                                ex -> { nonceB.set(ex.getRequest().getHeaders().getFirst("X-Auth-Nonce")); return Mono.empty(); }
+                        ).block();
+
+                        assertThat(nonceA.get()).isNotBlank();
+                        assertThat(nonceB.get()).isNotBlank();
+                        assertThat(nonceA.get()).isNotEqualTo(nonceB.get());
                 }
 
                 @Test
