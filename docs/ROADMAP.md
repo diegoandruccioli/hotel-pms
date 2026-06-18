@@ -18,7 +18,7 @@ mono-hotel Docker Compose. La roadmap descrive il percorso verso
 | Sicurezza | 8.5/10 | Argon2id, HMAC, RBAC doppio livello, GDPR |
 | Affidabilità | 8.0/10 | Circuit breaker, saga checkIn, @Version Invoice ✅ — manca solo backup DB |
 | Osservabilità | 7.5/10 | Zipkin + Prometheus + Loki — mancano alert rule |
-| Scalabilità | 6.5/10 | Microservizi corretti, GIN pg_trgm ✅ — SimpleDiscovery statico |
+| Scalabilità | 6.5/10 | Microservizi corretti, GIN pg_trgm ✅ — SimpleDiscovery statico, consolidamento frontdesk pianificato (7→6 servizi dominio, ADR-001) |
 | Qualità codice | 8.0/10 | 344/344 test, PMD zero — Testcontainers mancanti |
 | Operabilità | 6.5/10 | Docker Compose mono-host, restart:unless-stopped ✅ — no K8s, no backup |
 | Conformità normativa | 9.0/10 | Alloggiati SOAP nativo, GDPR — no SDI/fattura B2B |
@@ -47,7 +47,14 @@ Prerequisiti bloccanti per il primo hotel reale in produzione.
 | P6 | ~~GIN index + `pg_trgm` su `GuestRepository`~~ | ✅ **Fatto** | — | Flyway V7 `V7__add_trgm_search_indexes.sql`: 4 indici GIN su first_name/last_name/email/city |
 | P7 | Testcontainers su stay-service e billing-service | 🟡 Media | 3-5gg | Migration Flyway non testate da codice Java — regressioni DB invisibili a Mockito |
 | P8 | Credenziali Alloggiati PS configurabili da UI | 🟡 Media | 3-5gg | Attuale: richiede accesso `.env` + riavvio container per ogni hotel onboarding |
-| P9 | Dependabot auto-PR per aggiornamenti dipendenze | 🟢 Bassa | 30min | `.github/dependabot.yml` non presente — CVE latenti invisibili senza alert automatico |
+| P9 | ~~Dependabot auto-PR per aggiornamenti dipendenze~~ | ✅ **Fatto** | — | `.github/dependabot.yml` creato (gradle, npm, github-actions, docker × 8 directory); `dependabot_security_updates` abilitato via API; alert vulnerabilità già attivi |
+| P11 | Validazione frontend con Zod | 🟡 Media | 1-2gg | `frontend/package.json` non ha `zod`/`yup` nonostante CLAUDE.md lo richieda — validazione form a mano nei componenti. ADR-002 (criterio librerie mantenute) |
+| P10 | Refactor file grossi (SRP) — `StayServiceImpl`, `Stays.tsx`, `SettingsModal.tsx`, `AdminUsers.tsx`, `StayGuestFieldSection.tsx` | 🟢 Bassa | 2-4gg | `StayServiceImpl` orchestra check-in + invoice trigger + alloggiati trigger nello stesso metodo — estrarre orchestrator dedicato se cresce un altro side-effect. Page component frontend (440-497 righe) candidati a split in sotto-componenti se crescono ancora |
+| P12 | ~~Branch protection su `main`~~ | ✅ **Fatto** | — | Required status check: Backend + Frontend CI job (non i job matrix Trivy/CodeQL — nomi dinamici, fragili da pinnare); no force-push/delete; `enforce_admins=false` (owner unico, evita self-lockout) |
+| P13 | ~~CodeQL query suite `default` → `security-extended`~~ | ✅ **Fatto** | — | Default setup aggiornato via API (`query_suite=extended`), verificato con run completo su 3 linguaggi (java-kotlin, javascript-typescript, actions) |
+| P14 | Alloggiati Web SOAP client custom (RestTemplate + XML manuale) | 🟢 Bassa | valutare | `AlloggiatiWebSenderServiceImpl` costruisce a mano le envelope SOAP invece di usare uno stack SOAP standard (Spring-WS/CXF). ADR-002 si applica, ma giustificabile: solo 2 operazioni (GenerateToken/Send-Test) contro un WSDL Polizia di Stato non standard — un framework SOAP completo sarebbe overkill. Da rivalutare solo se il numero di operazioni crescesse |
+| P15 | Coverage frontend: soglia configurata abbassata a 63/50/58/66% (reale 67/55/63/70%) invece del 95% mandato da CLAUDE.md | 🟡 Alta | da pianificare | `vite.config.ts` ha `thresholds` ratchet-down per matchare la copertura esistente invece di alzare la copertura al target. Inoltre `test:coverage` non gira in CI (solo `npm run test`, senza `--coverage`) — la soglia, anche se fosse 95%, non verrebbe comunque verificata automaticamente. File più scoperti: `api.ts` (9.8%), `stayService.ts` (25.6%), `inventoryService.ts` (36%), `CalendarPlanning.tsx` (45%) |
+| E0bis | **Consolidamento `frontdesk-service`** (merge inventory+reservation+stay) — ADR-001 | 🟡 Alta | 2-4 sett | Bounded context coeso sul ciclo-vita camera (Room↔Reservation↔Stay), oggi su 3 DB senza FK reali con 3 round-trip Feign interni. Da 9 a 7 deployable. Prerequisito architetturale a E5 (K3s) — meno servizi da orchestrare nel cluster. Branch dedicato `feature/frontdesk-consolidation` |
 
 ---
 
@@ -69,6 +76,7 @@ Feature necessarie per la vendibilità del prodotto.
 | C9 | Grafana Tempo + OpenTelemetry (migrazione da Zipkin) | 🟢 Bassa | 3-5gg | Loki ✅ già presente — manca solo migrazione Zipkin → Tempo per distributed tracing |
 | C10 | TailwindCSS 3 → 4 | 🟢 Bassa | 1-2gg | Breaking changes CSS — pianificare con tempo dedicato (`backup/DECISIONS.md §7.1`) |
 | C11 | ~~CONTRIBUTING.md — guida contribuzione e onboarding dev~~ | ✅ **Fatto** | — | `CONTRIBUTING.md` presente nella root del repository |
+| C12 | Ricerca e paginazione server-side (Guests, Billing, Reservations) | 🟡 Media | 1-2gg | Frontend carica tutto in memoria e filtra con `useMemo`; inoffensivo sotto 500 record, problematico oltre. **Guests**: backend `/search?query=` già pronto — serve solo wiring frontend. **Billing**: aggiungere `@RequestParam status` a `InvoiceController` + `findByHotelIdAndStatus` nel repository. **Reservations**: split `getAllReservations` (dashboard/planning board) vs nuovo `searchReservations(query, page)` per la lista; aggiungere endpoint backend. |
 
 ---
 
@@ -83,9 +91,10 @@ Feature che abilitano la competizione con PMS commerciali.
 | E2 | Booking Engine + pagamento online (Stripe Checkout) | 🔴 Alta | 1-2 mesi | C1 (notification-service) | Risparmio commissione OTA 15-25% per prenotazione |
 | E3 | Fattura elettronica SDI/XML | 🔴 Alta | 1-2 mesi | Accreditamento AE | Obbligatorio per clientela business in Italia dal 2019 |
 | E4 | API pubblica documentata + webhook system | 🟡 Alta | 2-3 sett | Nessuna | Ecosistema ISV — senza, nessun partner può integrarsi |
-| E5 | Kubernetes migration | 🟡 Alta | 1-2 sett | Container già stateless e K8s-ready by design | Scaling orizzontale, rolling update, failover automatico |
+| E5 | Migrazione **K3s** (non K8s pieno) — vedi ADR-003 in `backup/DECISIONS.md` | 🟡 Alta | 1-2 sett | Container già stateless e K8s-ready by design; consolidamento frontdesk (E0bis) completato prima | Scaling orizzontale, rolling update, failover automatico, a costo ridotto (no control plane gestito). Trigger migrazione a K8s pieno (GKE Standard): soglia clienti (~140, breakeven Professional), soglia carico RPS/CPU, o necessità multi-region/HA (E6) |
 | E6 | PostgreSQL HA (replica + failover automatico) | 🟡 Alta | 1-2 sett | E5 (K8s) o Patroni | Single node attuale = SPOF per i dati |
 | E7 | Secrets → HashiCorp Vault o cloud KMS | 🟡 Alta | 2-3gg | E5 | Env var su disco non adeguato per server condivisi/prod |
+| E7bis | HMAC service-to-service → mTLS o OAuth2 client-credentials | 🟡 Media | 3-5gg | Nessuna | `InternalAuthFilter` firma `username:role:hotelId` con segreto condiviso fra tutti i servizi, senza nonce/timestamp anti-replay — stesso difetto strutturale di un HS256 condiviso. ADR-002 (criterio librerie mantenute) si applica qui |
 | E8 | Online check-in guest self-service | 🟡 Media | 1-2 mesi | C1 (notification-service) | Dati Alloggiati pre-compilati — riduce tempo al check-in |
 | E9 | Two-factor authentication (TOTP/FIDO2) | 🟡 Media | 1-2 sett | auth-service | GDPR Art. 32 — accesso ADMIN a PII senza 2FA è gap enterprise |
 | E10 | Spring Cloud Contract (consumer-driven contract testing) | 🟢 Media | 1 sett | Nessuna | Rileva breaking change tra microservizi prima del deploy |
