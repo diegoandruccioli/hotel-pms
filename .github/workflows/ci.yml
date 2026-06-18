@@ -183,7 +183,7 @@ jobs:
             ${{ matrix.context }}
 
       - name: Trivy vulnerability scan — ${{ matrix.service }}
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: "${{ matrix.image }}:ci"
           format: "table"
@@ -194,7 +194,7 @@ jobs:
 
       - name: Trivy SARIF scan — ${{ matrix.service }}
         if: always()
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: "${{ matrix.image }}:ci"
           format: "sarif"
@@ -212,7 +212,7 @@ jobs:
 
       - name: Trivy misconfig scan — ${{ matrix.service }}
         if: always()
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           scan-type: "config"
           scan-ref: "${{ matrix.dockerfile }}"
@@ -252,7 +252,7 @@ jobs:
           restore-keys: trivy-db-
 
       - name: Trivy scan — ${{ matrix.image }}
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: "${{ matrix.image }}"
           format: "table"
@@ -263,7 +263,7 @@ jobs:
 
       - name: Trivy SARIF scan — ${{ matrix.image }}
         if: always()
-        uses: aquasecurity/trivy-action@v0.35.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: "${{ matrix.image }}"
           format: "sarif"
@@ -316,7 +316,7 @@ jobs:
         run: npm ci
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       # All Playwright tests intercept every API call via page.route() before
       # it reaches the network — no backend service is needed at runtime.
