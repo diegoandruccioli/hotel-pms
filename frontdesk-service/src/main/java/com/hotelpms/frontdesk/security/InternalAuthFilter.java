@@ -119,19 +119,19 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
         }
 
         if (!isSignatureValid(username, role, hotelId, timestamp, nonce, signature)) {
-            LOG.warn("[InternalAuthFilter] HMAC signature mismatch for user={}", username);
+            LOG.warn("[InternalAuthFilter] HMAC signature mismatch for user={}", sanitizeForLog(username));
             rejectRequest(response, "Invalid internal request signature");
             return;
         }
 
         if (!isTimestampFresh(timestamp)) {
-            LOG.warn("[InternalAuthFilter] Stale or future-dated timestamp for user={}", username);
+            LOG.warn("[InternalAuthFilter] Stale or future-dated timestamp for user={}", sanitizeForLog(username));
             rejectRequest(response, "Stale or future-dated request signature");
             return;
         }
 
         if (!nonceStore.claim(nonce, NONCE_TTL_SECONDS)) {
-            LOG.warn("[InternalAuthFilter] Replayed nonce detected for user={}", username);
+            LOG.warn("[InternalAuthFilter] Replayed nonce detected for user={}", sanitizeForLog(username));
             rejectRequest(response, "Request signature already used");
             return;
         }
@@ -237,6 +237,18 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
         } catch (final NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("HMAC_SIGNATURE_FAILED", e);
         }
+    }
+
+    /**
+     * Strips CR/LF from a value before it is written to the log, so an
+     * unverified, attacker-controlled header cannot forge additional log
+     * entries (CWE-117 log injection).
+     *
+     * @param value the raw value to sanitize
+     * @return the value with carriage returns and line feeds replaced
+     */
+    private static String sanitizeForLog(final String value) {
+        return value.replaceAll("[\r\n]", "_");
     }
 
     private void rejectRequest(final HttpServletResponse response, final String message) throws IOException {
