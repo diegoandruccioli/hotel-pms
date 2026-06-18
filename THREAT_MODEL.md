@@ -111,6 +111,7 @@
 | T-STAY-01 | Elevation of Privilege | Check-in senza verifica stato prenotazione (es. CANCELLED) | ALTO | MEDIA | ✅ RISOLTO |
 | T-STAY-02 | Repudiation | Assenza di audit trail per operazioni check-in/check-out | ALTO | ALTA | ✅ RISOLTO |
 | T-STAY-03 | Information Disclosure | Report Alloggiati: trasmissione dati PS senza verifica firma/TLS | CRITICO | BASSA | ✅ RISOLTO |
+| T-STAY-04 | Elevation of Privilege | getAllStays/getStayById/checkOut/getStaysByReservationId senza scoping hotelId: un RECEPTIONIST poteva leggere o modificare (check-out) stay di qualsiasi hotel via lista paginata, UUID indovinato/enumerato, o reservationId cross-hotel | CRITICO | ALTA | ✅ RISOLTO |
 
 ### 4.6 billing-service
 
@@ -194,6 +195,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-RES-02 | hotel_id scope su tutte le query reservation (findByIdAndHotelId, findAllByHotelId); InternalAuthFilter propaga X-Auth-Hotel in auth.details; createReservation imposta hotelId dall'auth context | reservation-service/ReservationServiceImpl.java, ReservationRepository.java, InternalAuthFilter.java, FeignHeaderConfig.java | 3e93f49 | A01 | ✅ |
 | T-STAY-01 | Set.of("CONFIRMED","PARTIALLY_CHECKED_IN") come allowlist; checkIn() lancia IllegalStateException("INVALID_RESERVATION_STATUS") se stato non ammesso; log WARN [STAY] CHECK_IN_FAILED reason=INVALID_RESERVATION_STATUS; 4 test: shouldRejectCheckInWhenReservationIsCancelled/IsCheckedOut/IsNoShow + shouldAllowCheckInWhenPartiallyCheckedIn | stay-service/StayServiceImpl.java | 250edd0 | A04 | ✅ |
 | T-STAY-02 | Structured SLF4J audit log in StayServiceImpl: CHECK_IN_SUCCESS (stayId+reservationId+guestId+roomId), CHECK_IN_FAILED (reason=EXTERNAL_SERVICE_UNAVAILABLE), CHECK_OUT_SUCCESS (stayId+reservationId+roomId), CHECK_OUT_FAILED (reason=INVALID_STATUS e BILLING_NOT_PAID); prefisso [STAY], WARN per fallimenti, INFO per successi | stay-service/StayServiceImpl.java | f2cb417 | A09 | ✅ |
+| T-STAY-04 | Gap preesistente (non causato dal consolidamento ADR-001), trovato da review di sicurezza post-merge su PR #17. StayRepository: nuovi findByIdAndHotelId, findByHotelId(hotelId, Pageable), findAllByReservationIdAndHotelId. getAllStays/getStayById/checkOut/getStaysByReservationId ora richiedono hotelId (da StayController.extractHotelId(), stesso meccanismo già usato da checkIn) e ritornano 404 (no enumeration, pattern T-GST-01) per stay/reservation di altri hotel. findAllByReservationId interno (usato solo dalla saga updateReservationGuests con reservationId già fidato) lasciato invariato. 2 nuovi test (getAllStays/getStaysByReservationId non avevano copertura) + test esistenti aggiornati | frontdesk-service/stays/{repository/StayRepository.java, service/StayService.java, service/impl/StayServiceImpl.java, controller/StayController.java} | 92b8b49 | A01 | ✅ |
 | T-BILL-01 | hotel_id scope su tutte le query invoice/payment (findByIdAndHotelId, findByHotelId con Pageable, findFirstByReservationIdAndHotelIdOrderByIssueDateDesc); InternalAuthFilter legge X-Auth-Hotel e lo memorizza in auth.details; createInvoice imposta hotelId dall'auth context (ignora valore client); FeignHeaderConfig propaga X-Auth-Hotel | billing-service/InvoiceRepository.java, InvoiceServiceImpl.java, PaymentServiceImpl.java, InternalAuthFilter.java, FeignHeaderConfig.java | 4a44eea | A01 | ✅ |
 | T-FB-02 | Catalogo MenuItem server-side (V2 Flyway); OrderItemRequest accetta menuItemId+quantity, no unitPrice; service risolve prezzi da DB con buildItemsFromCatalog(); totalAmount ricalcolato server-side | fb-service/MenuItem.java, MenuItemRepository.java, V2__add_menu_items.sql, OrderItemRequest.java, RestaurantOrderServiceImpl.java | d7af61c | A04 | ✅ |
 | T-CFG-01 | Porta management separata (:8090, non pubblicata) + show-details: when-authorized su tutti i servizi | config-service/resources/config/*.yml, docker-compose.yml, prometheus.yml | b0cf898 | A05 | ✅ |
@@ -226,7 +228,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 
 | OWASP | Nome | Threats mappati |
 |-------|------|----------------|
-| A01 | Broken Access Control | T-GST-01, T-GST-03, T-RES-02, T-BILL-01, T-FB-01, T-FE-03, T-GW-05, T-GW-06, T-GW-07, T-GW-08, GAP-3 |
+| A01 | Broken Access Control | T-GST-01, T-GST-03, T-RES-02, T-BILL-01, T-FB-01, T-FE-03, T-GW-05, T-GW-06, T-GW-07, T-GW-08, T-STAY-04, GAP-3 |
 | A02 | Cryptographic Failures | T-AUTH-03, T-CFG-02, T-STAY-03 |
 | A03 | Injection | T-GST-02, T-RES-03, T-FE-01 |
 | A04 | Insecure Design | T-RES-01, T-STAY-01, T-FB-02, T-BILL-02, T-GST-04, T-GST-05 |
