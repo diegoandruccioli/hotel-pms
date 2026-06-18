@@ -32,6 +32,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -333,11 +337,11 @@ class StayServiceImplTest {
         final Stay stay = Objects.requireNonNull(savedStay);
         final StayResponse expectedResponse = Objects.requireNonNull(validResponse);
 
-        when(stayRepository.findById(id)).thenReturn(Optional.of(stay));
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(stay));
         when(stayMapper.toDto(stay)).thenReturn(expectedResponse);
 
         // Act
-        final StayResponse response = stayService.getStayById(id);
+        final StayResponse response = stayService.getStayById(id, hotelId);
 
         // Assert
         assertNotNull(response);
@@ -349,10 +353,51 @@ class StayServiceImplTest {
         // Arrange
         final UUID id = Objects.requireNonNull(stayId);
 
-        when(stayRepository.findById(id)).thenReturn(Optional.empty());
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThrows(NotFoundException.class, () -> stayService.getStayById(id));
+        assertThrows(NotFoundException.class, () -> stayService.getStayById(id, hotelId));
+    }
+
+    @Test
+    void shouldGetAllStaysScopedToHotelId() {
+        // Arrange
+        final Stay stay = Objects.requireNonNull(savedStay);
+        final StayResponse expectedResponse = Objects.requireNonNull(validResponse);
+        final Pageable pageable = PageRequest.of(0, 20);
+        final Page<Stay> stayPage = new PageImpl<>(List.of(stay), pageable, 1L);
+
+        when(stayRepository.findByHotelId(hotelId, pageable)).thenReturn(stayPage);
+        when(stayMapper.toDto(stay)).thenReturn(expectedResponse);
+
+        // Act
+        final Page<StayResponse> response = stayService.getAllStays(pageable, hotelId);
+
+        // Assert
+        assertEquals(1, response.getTotalElements());
+        assertEquals(expectedResponse, response.getContent().get(0));
+        verify(stayRepository, times(1)).findByHotelId(hotelId, pageable);
+    }
+
+    @Test
+    void shouldGetStaysByReservationIdScopedToHotelId() {
+        // Arrange
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final Stay stay = Objects.requireNonNull(savedStay);
+        final StayResponse expectedResponse = Objects.requireNonNull(validResponse);
+        final Pageable pageable = PageRequest.of(0, 20);
+
+        when(stayRepository.findAllByReservationIdAndHotelId(reservation, hotelId))
+                .thenReturn(List.of(stay));
+        when(stayMapper.toDto(stay)).thenReturn(expectedResponse);
+
+        // Act
+        final Page<StayResponse> response = stayService.getStaysByReservationId(reservation, hotelId, pageable);
+
+        // Assert
+        assertEquals(1, response.getTotalElements());
+        assertEquals(expectedResponse, response.getContent().get(0));
+        verify(stayRepository, times(1)).findAllByReservationIdAndHotelId(reservation, hotelId);
     }
 
     @Test
@@ -366,14 +411,14 @@ class StayServiceImplTest {
         final InvoiceStatusResponse paidInvoice = new InvoiceStatusResponse(
                 UUID.randomUUID(), reservationId, "PAID", BigDecimal.valueOf(200));
 
-        when(stayRepository.findById(id)).thenReturn(Optional.of(checkedInStay));
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(checkedInStay));
         when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
                 .thenReturn(paidInvoice);
         when(stayRepository.save(checkedInStay)).thenReturn(checkedInStay);
         when(stayMapper.toDto(checkedInStay)).thenReturn(validResponse);
 
         // Act
-        final StayResponse response = stayService.checkOut(id);
+        final StayResponse response = stayService.checkOut(id, hotelId);
 
         // Assert
         assertNotNull(response);
@@ -392,12 +437,12 @@ class StayServiceImplTest {
         final InvoiceStatusResponse unpaidInvoice = new InvoiceStatusResponse(
                 UUID.randomUUID(), reservationId, "ISSUED", BigDecimal.valueOf(200));
 
-        when(stayRepository.findById(id)).thenReturn(Optional.of(checkedInStay));
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(checkedInStay));
         when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
                 .thenReturn(unpaidInvoice);
 
         // Act & Assert
-        assertThrows(BillingNotPaidException.class, () -> stayService.checkOut(id));
+        assertThrows(BillingNotPaidException.class, () -> stayService.checkOut(id, hotelId));
     }
 
     @Test
@@ -409,10 +454,10 @@ class StayServiceImplTest {
                 .status(StayStatus.EXPECTED)
                 .build();
 
-        when(stayRepository.findById(id)).thenReturn(Optional.of(notCheckedInStay));
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(notCheckedInStay));
 
         // Act & Assert
-        assertThrows(IllegalStateException.class, () -> stayService.checkOut(id));
+        assertThrows(IllegalStateException.class, () -> stayService.checkOut(id, hotelId));
     }
 
     @Test

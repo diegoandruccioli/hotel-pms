@@ -30,36 +30,40 @@ public interface StayService {
      * Performs a guest check-out. Updates stay status, marks the room as DIRTY,
      * and verifies the billing folio is PAID.
      *
-     * @param stayId the ID of the stay to check out
+     * @param stayId  the ID of the stay to check out
+     * @param hotelId the authenticated hotel UUID; the stay must belong to it (T-STAY-04)
      * @return the updated stay response
      */
-    StayResponse checkOut(@NonNull UUID stayId);
+    StayResponse checkOut(@NonNull UUID stayId, @NonNull UUID hotelId);
 
     /**
-     * Gets a stay by its ID.
+     * Gets a stay by its ID, scoped to the authenticated hotel.
      *
-     * @param id the stay ID
+     * @param id      the stay ID
+     * @param hotelId the authenticated hotel UUID; the stay must belong to it (T-STAY-04)
      * @return the stay response
      */
-    StayResponse getStayById(@NonNull UUID id);
+    StayResponse getStayById(@NonNull UUID id, @NonNull UUID hotelId);
 
     /**
-     * Retrieves a paginated list of all stays.
+     * Retrieves a paginated list of all stays belonging to the authenticated hotel.
      * Supports standard Spring Data pagination query parameters.
      *
      * @param pageable the pagination and sorting parameters
+     * @param hotelId  the authenticated hotel UUID (T-STAY-04)
      * @return a page of stay responses
      */
-    Page<StayResponse> getAllStays(Pageable pageable);
+    Page<StayResponse> getAllStays(Pageable pageable, @NonNull UUID hotelId);
 
     /**
-     * Retrieves all stays for a given reservation.
+     * Retrieves all stays for a given reservation, scoped to the authenticated hotel.
      *
      * @param reservationId the reservation ID
+     * @param hotelId       the authenticated hotel UUID; the reservation must belong to it (T-STAY-04)
      * @param pageable      the pagination and sorting parameters
      * @return list of stay responses
      */
-    Page<StayResponse> getStaysByReservationId(@NonNull UUID reservationId, Pageable pageable);
+    Page<StayResponse> getStaysByReservationId(@NonNull UUID reservationId, @NonNull UUID hotelId, Pageable pageable);
 
     /**
      * Returns the most recent completed stay for a guest, for check-in form pre-filling.

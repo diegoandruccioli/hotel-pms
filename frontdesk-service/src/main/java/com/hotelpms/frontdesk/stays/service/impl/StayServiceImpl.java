@@ -128,10 +128,10 @@ public class StayServiceImpl implements StayService {
     /** {@inheritDoc} */
     @Override
     @Transactional
-    public StayResponse checkOut(@NonNull final UUID stayId) {
+    public StayResponse checkOut(@NonNull final UUID stayId, @NonNull final UUID hotelId) {
         log.info("Processing check-out for stay ID: {}", stayId);
 
-        final Stay stay = stayRepository.findById(stayId)
+        final Stay stay = stayRepository.findByIdAndHotelId(stayId, hotelId)
                 .orElseThrow(() -> new NotFoundException("STAY_NOT_FOUND"));
 
         if (stay.getStatus() != StayStatus.CHECKED_IN) {
@@ -167,9 +167,9 @@ public class StayServiceImpl implements StayService {
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
-    public StayResponse getStayById(@NonNull final UUID id) {
+    public StayResponse getStayById(@NonNull final UUID id, @NonNull final UUID hotelId) {
         log.debug("Fetching stay by ID: {}", id);
-        return stayRepository.findById(id)
+        return stayRepository.findByIdAndHotelId(id, hotelId)
                 .map(stayMapper::toDto)
                 .orElseThrow(() -> new NotFoundException("STAY_NOT_FOUND"));
     }
@@ -177,17 +177,18 @@ public class StayServiceImpl implements StayService {
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
-    public Page<StayResponse> getAllStays(final Pageable pageable) {
+    public Page<StayResponse> getAllStays(final Pageable pageable, @NonNull final UUID hotelId) {
         log.debug("Fetching paginated stays, page: {}, size: {}", pageable.getPageNumber(), pageable.getPageSize());
-        return stayRepository.findAll(pageable).map(stayMapper::toDto);
+        return stayRepository.findByHotelId(hotelId, pageable).map(stayMapper::toDto);
     }
 
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
-    public Page<StayResponse> getStaysByReservationId(@NonNull final UUID reservationId, final Pageable pageable) {
+    public Page<StayResponse> getStaysByReservationId(
+            @NonNull final UUID reservationId, @NonNull final UUID hotelId, final Pageable pageable) {
         log.debug("Fetching stays for reservationId: {}", reservationId);
-        final List<Stay> stays = stayRepository.findAllByReservationId(reservationId);
+        final List<Stay> stays = stayRepository.findAllByReservationIdAndHotelId(reservationId, hotelId);
         final List<StayResponse> content = stays.stream()
                 .map(stayMapper::toDto)
                 .toList();

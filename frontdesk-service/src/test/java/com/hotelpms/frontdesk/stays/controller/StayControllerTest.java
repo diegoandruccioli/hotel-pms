@@ -154,7 +154,7 @@ class StayControllerTest {
         final StayResponse checkedOut = new StayResponse(
                 stayId, hotelId, null, guestId, UUID.randomUUID(),
                 StayStatus.CHECKED_OUT, null, null, null, null, null, false, List.of(), null, null);
-        when(stayService.checkOut(stayId)).thenReturn(checkedOut);
+        when(stayService.checkOut(stayId, hotelId)).thenReturn(checkedOut);
 
         mockMvc.perform(put(BASE_URL + PATH_CHECKOUT, stayId))
                 .andExpect(status().isOk())
@@ -163,7 +163,7 @@ class StayControllerTest {
 
     @Test
     void shouldCheckOutReturn404WhenStayNotFound() throws Exception {
-        when(stayService.checkOut(stayId))
+        when(stayService.checkOut(stayId, hotelId))
                 .thenThrow(new NotFoundException("STAY_NOT_FOUND"));
 
         mockMvc.perform(put(BASE_URL + PATH_CHECKOUT, stayId))
@@ -172,7 +172,7 @@ class StayControllerTest {
 
     @Test
     void shouldCheckOutReturn409WhenBillingNotPaid() throws Exception {
-        when(stayService.checkOut(stayId))
+        when(stayService.checkOut(stayId, hotelId))
                 .thenThrow(new BillingNotPaidException("BILLING_NOT_PAID"));
 
         mockMvc.perform(put(BASE_URL + PATH_CHECKOUT, stayId))
@@ -181,7 +181,7 @@ class StayControllerTest {
 
     @Test
     void shouldGetStayByIdReturn200() throws Exception {
-        when(stayService.getStayById(stayId)).thenReturn(stayResponse);
+        when(stayService.getStayById(stayId, hotelId)).thenReturn(stayResponse);
 
         mockMvc.perform(get(BASE_URL + PATH_BY_ID, stayId))
                 .andExpect(status().isOk())
@@ -190,7 +190,7 @@ class StayControllerTest {
 
     @Test
     void shouldGetStayByIdReturn404WhenNotFound() throws Exception {
-        when(stayService.getStayById(stayId))
+        when(stayService.getStayById(stayId, hotelId))
                 .thenThrow(new NotFoundException("STAY_NOT_FOUND"));
 
         mockMvc.perform(get(BASE_URL + PATH_BY_ID, stayId))
@@ -201,7 +201,7 @@ class StayControllerTest {
     void shouldGetAllStaysReturn200() throws Exception {
         final Page<StayResponse> page = new PageImpl<>(
                 List.of(stayResponse), PageRequest.of(0, 20), 1L);
-        when(stayService.getAllStays(any(Pageable.class))).thenReturn(page);
+        when(stayService.getAllStays(any(Pageable.class), eq(hotelId))).thenReturn(page);
 
         mockMvc.perform(get(BASE_URL))
                 .andExpect(status().isOk());
@@ -212,7 +212,7 @@ class StayControllerTest {
         final UUID reservationId = UUID.randomUUID();
         final Page<StayResponse> page = new PageImpl<>(
                 List.of(stayResponse), PageRequest.of(0, 20), 1L);
-        when(stayService.getStaysByReservationId(eq(reservationId), any(Pageable.class)))
+        when(stayService.getStaysByReservationId(eq(reservationId), eq(hotelId), any(Pageable.class)))
                 .thenReturn(page);
 
         mockMvc.perform(get(BASE_URL).param(PARAM_RESERVATION, reservationId.toString()))

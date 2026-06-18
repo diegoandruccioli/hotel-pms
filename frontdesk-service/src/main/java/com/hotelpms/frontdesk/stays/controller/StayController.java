@@ -82,30 +82,32 @@ public class StayController {
 
     /**
      * Endpoint to check out a guest from a stay.
-     * Verifies billing is PAID and marks the room as DIRTY.
+     * Verifies billing is PAID and marks the room as DIRTY. Scoped to the
+     * caller's hotel (T-STAY-04): a stay belonging to another hotel returns 404.
      *
      * @param id the stay ID
      * @return the updated stay response
      */
     @PutMapping("/{id}/check-out")
     public StayResponse checkOut(@NonNull @PathVariable("id") final UUID id) {
-        return stayService.checkOut(id);
+        return stayService.checkOut(id, Objects.requireNonNull(extractHotelId()));
     }
 
     /**
-     * Endpoint to get a stay by its ID.
+     * Endpoint to get a stay by its ID, scoped to the caller's hotel
+     * (T-STAY-04): a stay belonging to another hotel returns 404.
      *
      * @param id the stay ID
      * @return the stay response
      */
     @GetMapping("/{id}")
     public StayResponse getStayById(@NonNull @PathVariable("id") final UUID id) {
-        return stayService.getStayById(id);
+        return stayService.getStayById(id, Objects.requireNonNull(extractHotelId()));
     }
 
     /**
-     * Retrieves a paginated list of all stays.
-     * Supports standard Spring Data pagination query parameters:
+     * Retrieves a paginated list of all stays belonging to the caller's hotel
+     * (T-STAY-04). Supports standard Spring Data pagination query parameters:
      * {@code ?page=0&size=20&sort=actualCheckInTime,desc}
      *
      * @param reservationId optional reservation ID to filter by
@@ -119,10 +121,11 @@ public class StayController {
                     sort = "actualCheckInTime",
                     direction = Sort.Direction.DESC)
             final Pageable pageable) {
+        final UUID hotelId = Objects.requireNonNull(extractHotelId());
         if (reservationId != null) {
-            return ResponseEntity.ok(stayService.getStaysByReservationId(reservationId, pageable));
+            return ResponseEntity.ok(stayService.getStaysByReservationId(reservationId, hotelId, pageable));
         }
-        return ResponseEntity.ok(stayService.getAllStays(pageable));
+        return ResponseEntity.ok(stayService.getAllStays(pageable, hotelId));
     }
 
     /**
