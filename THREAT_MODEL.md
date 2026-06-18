@@ -84,6 +84,7 @@
 | T-GW-04 | Spoofing | CORS misconfiguration: origini non ristrette | ALTO | MEDIA | ✅ RISOLTO |
 | T-GW-05 | Tampering | CSRF: mancanza protezione esplicita per operazioni mutanti via cookie | ALTO | MEDIA | ✅ RISOLTO |
 | T-GW-06 | Elevation of Privilege | X-Auth-Hotel non propagato: UserAccount senza hotel_id, JWT senza claim hotelId, AuthenticationFilter non inietta X-Auth-Hotel → isolamento multi-tenant IDOR non funzionante end-to-end | CRITICO | ALTA | ✅ RISOLTO |
+| T-GW-08 | Spoofing | HMAC interno (X-Internal-Signature) firma solo username:role:hotelId, senza timestamp/nonce: un set di header catturato (es. accesso alla rete Docker interna) resta una credenziale valida indefinitamente — nessuna protezione anti-replay | ALTO | BASSA | ✅ RISOLTO |
 
 ### 4.3 guest-service
 
@@ -178,6 +179,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | T-AUTH-05 | Structured SLF4J audit log (@Slf4j) in AuthServiceImpl e AuthController: REGISTER_SUCCESS, LOGIN_SUCCESS, LOGIN_FAILED (USER_NOT_FOUND / BAD_PASSWORD + counter), ACCOUNT_LOCKED (con expiry), LOGIN_BLOCKED, LOGOUT (username da JWT cookie) | auth-service/AuthServiceImpl.java, AuthController.java | ad441e9 | A09 | ✅ |
 | T-GW-01 | Verifica HMAC-SHA256 su X-Internal-Signature (InternalAuthFilter) | api-gateway + tutti i servizi | baseline (main) | A01 | ✅ |
 | T-GW-07 | Messaggio HMAC esteso da "username:role" a "username:role:hotelId": AuthenticationFilter.computeHmac aggiornato; tutti e 6 gli InternalAuthFilter aggiornati in isSignatureValid e computeHmac; nuovo test shouldProduceDifferentSignatureForDifferentHotelId verifica che la firma cambia al variare del tenant | api-gateway/AuthenticationFilter.java, guest/billing/reservation/fb/stay/inventory-service/InternalAuthFilter.java, AuthenticationFilterTest.java | 5bdc594 | A01 | ✅ |
+| T-GW-08 | Messaggio HMAC esteso da "username:role:hotelId" a "username:role:hotelId:timestamp:nonce": AuthenticationFilter genera timestamp (epoch millis) + nonce (UUID) random ad ogni richiesta, iniettati come X-Auth-Timestamp/X-Auth-Nonce. Tutti e 5 gli InternalAuthFilter (auth/billing/fb/frontdesk/guest) validano: (1) finestra di tolleranza 60s sul timestamp, (2) nonce non già reclamato tramite nuovo NonceStore backed by Redis (SETNX via StringRedisTemplate.opsForValue().setIfAbsent, TTL 120s). Redis esteso a backend-network (oltre a gateway-network) così tutti i validator lo raggiungono; auth-service riusa la dipendenza/config Redis già presente per i refresh token, gli altri 4 servizi l'hanno aggiunta su namespace separato (internal-auth:nonce:*). SpotBugs EI_EXPOSE_REP2 su RedisNonceStore sopresso (bean Spring singleton, stesso pattern già usato per AlloggiatiWebSenderServiceImpl). Nuovi test: 4 casi anti-replay in InternalAuthFilterTest (fb-service) — timestamp stale, timestamp futuro, replay esatto rifiutato, due nonce diversi sullo stesso payload entrambi accettati; AuthenticationFilterTest verifica generazione header e unicità nonce; StayControllerSecurityTest aggiornato al nuovo payload a 5 campi | api-gateway/AuthenticationFilter.java, auth/billing/fb/frontdesk/guest-service/security/InternalAuthFilter.java + NonceStore.java + RedisNonceStore.java + SecurityConfig.java, docker-compose.yml, config-service/config/{billing,fb,frontdesk,guest}-service.yml | 5dd8ed8 | A01 | ✅ |
 | T-FE-02 | Token JWT in httpOnly cookie (Secure + SameSite=Strict) | auth-service/AuthController.java | baseline (main) | A02 | ✅ |
 | T-GW-03 | SecurityHeadersFilter GlobalFilter: HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, CSP default-src 'none' su tutte le risposte del gateway | api-gateway/SecurityHeadersFilter.java | b901a9f | A05 | ✅ |
 | T-GW-04 | allowedHeaders wildcard rimosso: whitelist esplicita [Content-Type, X-CSRF-Token]; maxAge: 3600; allowedOrigins già vincolato a ${GW_CORS_ALLOWED_ORIGINS:http://localhost:5173} — mai wildcard; in produzione nginx proxies /api/ same-origin, CORS non necessario | config-service/config/api-gateway.yml | 73e2788 | A05 | ✅ |
@@ -224,7 +226,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 
 | OWASP | Nome | Threats mappati |
 |-------|------|----------------|
-| A01 | Broken Access Control | T-GST-01, T-GST-03, T-RES-02, T-BILL-01, T-FB-01, T-FE-03, T-GW-05, T-GW-06, T-GW-07, GAP-3 |
+| A01 | Broken Access Control | T-GST-01, T-GST-03, T-RES-02, T-BILL-01, T-FB-01, T-FE-03, T-GW-05, T-GW-06, T-GW-07, T-GW-08, GAP-3 |
 | A02 | Cryptographic Failures | T-AUTH-03, T-CFG-02, T-STAY-03 |
 | A03 | Injection | T-GST-02, T-RES-03, T-FE-01 |
 | A04 | Insecure Design | T-RES-01, T-STAY-01, T-FB-02, T-BILL-02, T-GST-04, T-GST-05 |

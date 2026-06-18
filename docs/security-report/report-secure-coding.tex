@@ -4915,6 +4915,18 @@ Verificato con \texttt{MessageDigest.isEqual} (constant-time) da ogni microservi
 Impedisce impersonation e tampering del tenant context.
 Commit: \commitref{b469e21}{fix(security): T-GW-07 --- HMAC inter-service tenant binding}
 
+\paragraph{T-GW-08 --- Anti-replay (timestamp + nonce) su HMAC inter-service}
+Il payload firmato T-GW-07 (\texttt{"user:role:hotelId"}) non includeva alcun elemento
+temporale: una firma catturata restava una credenziale valida indefinitamente, senza
+possibilità di revoca se non ruotando il segreto condiviso. Esteso a
+\texttt{"user:role:hotelId:timestamp:nonce"}: l'API Gateway genera timestamp
+(epoch millis) e nonce (UUID) casuali ad ogni richiesta, propagati come
+\texttt{X-Auth-Timestamp}/\texttt{X-Auth-Nonce}. Ogni \texttt{InternalAuthFilter} verifica
+una finestra di tolleranza di 60s sul timestamp e reclama il nonce su un
+\texttt{NonceStore} backed da Redis (\texttt{SETNX}, TTL 120s) — un secondo reclamo dello
+stesso nonce entro la finestra viene rifiutato come replay.
+Commit: \commitref{5dd8ed8}{feat(security): T-GW-08 --- timestamp+nonce anti-replay on internal HMAC auth}
+
 \paragraph{T-GW-06 --- Propagazione X-Auth-Hotel end-to-end}
 Aggiunto campo \texttt{hotelId} a \texttt{UserAccount} e claim JWT corrispondente.
 L'API Gateway inietta \texttt{X-Auth-Hotel} su ogni richiesta a valle.
