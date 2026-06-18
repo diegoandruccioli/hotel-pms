@@ -99,6 +99,8 @@ describe('PlanningBoard', () => {
     expect(screen.getByText('nav_rooms')).toBeInTheDocument();
   });
 
+  // Default 5000ms timeout is occasionally exceeded under --coverage (v8
+  // instrumentation overhead on top of axe's full DOM tree walk).
   it('passes axe accessibility check', async () => {
     const { container } = render(
       <PlanningBoard
@@ -109,5 +111,5 @@ describe('PlanningBoard', () => {
       />
     );
     expect(await axe(container)).toHaveNoViolations();
-  });
+  }, 15000);
 });
