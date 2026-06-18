@@ -30,8 +30,8 @@ repositories {
 
 ext {
     set("springCloudVersion", "2025.0.0")
-    // CVE-2026-42583/42584/42579/42587: fixed in Netty 4.1.133.Final — override Spring Boot BOM pin.
-    set("netty.version", "4.1.133.Final")
+    // CVE-2026-42583/42584/42579/42587: fixed in 4.1.133.Final; CVE-2026-47691/45674/45416/44249: fixed in 4.1.135.Final — override Spring Boot BOM pin.
+    set("netty.version", "4.1.135.Final")
     // CVE-2026-43512/43513/43515/41284/41293/42498: fixed in Tomcat 10.1.55 (2026-05-05).
     set("tomcat.version", "10.1.55")
 }
@@ -59,6 +59,11 @@ dependencyManagement {
         dependency("commons-io:commons-io:2.14.0")
         // CVE-2026-5598: fixed in BouncyCastle 1.84.
         dependency("org.bouncycastle:bcprov-jdk18on:1.84")
+        // CVE-2026-40981 (GCP Secrets Manager backend info disclosure, not used here, defense
+        // in depth) + CVE-2026-40982 CRITICAL (path traversal serving arbitrary files via crafted
+        // URL): Spring Cloud 2025.0.0 BOM pins spring-cloud-config-server 4.3.0, vulnerable through
+        // 4.3.2. Fixed in 4.3.3 — override regardless of BOM.
+        dependency("org.springframework.cloud:spring-cloud-config-server:4.3.3")
     }
 }
 
