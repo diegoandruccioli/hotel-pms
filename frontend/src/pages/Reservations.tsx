@@ -27,6 +27,9 @@ const getStatusTone = (status: string) => {
   }
 };
 
+const getStatusLabel = (status: string, t: TFunction) =>
+  t(`status_${status.toLowerCase()}`, status);
+
 interface ReservationRowProps {
   reservation: ReservationResponse;
   rooms: RoomResponse[];
@@ -85,7 +88,7 @@ const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, on
         </div>
       </M3TableCell>
       <M3TableCell>
-        <M3StatusChip label={reservation.status} tone={getStatusTone(reservation.status)} />
+        <M3StatusChip label={getStatusLabel(reservation.status, t)} tone={getStatusTone(reservation.status)} />
       </M3TableCell>
       <M3TableCell className="text-right">
         {reservation.status === 'CONFIRMED' && (

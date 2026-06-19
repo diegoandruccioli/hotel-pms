@@ -117,6 +117,8 @@
   "status_checked_in": "Checked-In",
   "status_checked_out": "Checked-Out",
   "status_cancelled": "Cancelled",
+  "status_partially_checked_in": "Partially Checked-In",
+  "status_no_show": "No-Show",
   "failed_load_data": "Failed to load calendar data",
   "failed_load_reservations": "Failed to load reservations",
   "reservation_rescheduled_success": "Reservation for \"{{name}}\" rescheduled successfully.",
