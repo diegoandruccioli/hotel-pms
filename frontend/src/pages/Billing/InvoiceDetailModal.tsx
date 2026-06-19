@@ -91,7 +91,10 @@ export const InvoiceDetailModal = memo(({ invoice, onClose }: Props) => {
           <div>
             <dt className="text-on-surface-variant text-xs">{t('status', { ns: 'common' })}</dt>
             <dd className="mt-0.5">
-              <M3StatusChip label={invoice.status} tone={statusTone(invoice.status)} />
+              <M3StatusChip
+                label={t(`invoice_status_${invoice.status}`, { ns: 'common', defaultValue: invoice.status })}
+                tone={statusTone(invoice.status)}
+              />
             </dd>
           </div>
         </dl>

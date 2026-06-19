@@ -60,7 +60,7 @@ describe('InvoiceDetailModal', () => {
 
   it('renders invoice status chip', () => {
     render(<InvoiceDetailModal invoice={BASE_INVOICE} onClose={onClose} />);
-    expect(screen.getByText('ISSUED')).toBeInTheDocument();
+    expect(screen.getByText('invoice_status_ISSUED')).toBeInTheDocument();
   });
 
   it('shows no_payments_yet when payments list is empty', () => {
@@ -81,7 +81,7 @@ describe('InvoiceDetailModal', () => {
 
   it('renders PAID status correctly', () => {
     render(<InvoiceDetailModal invoice={INVOICE_PAID} onClose={onClose} />);
-    expect(screen.getByText('PAID')).toBeInTheDocument();
+    expect(screen.getByText('invoice_status_PAID')).toBeInTheDocument();
   });
 
   it('renders download PDF button', () => {
