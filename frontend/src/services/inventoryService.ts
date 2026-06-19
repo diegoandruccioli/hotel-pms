@@ -56,9 +56,7 @@ export const inventoryService = {
   },
 
   updateRoomStatus: async (id: string, status: RoomStatus): Promise<RoomResponse> => {
-    const response = await api.patch<RoomResponse>(`${ROOMS_PATH}/${id}/status`, `"${status}"`, {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const response = await api.patch<RoomResponse>(`${ROOMS_PATH}/${id}/status`, { status });
     return response.data;
   },
 
