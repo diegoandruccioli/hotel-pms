@@ -2,7 +2,6 @@ package com.hotelpms.billing.dto;
 
 import com.hotelpms.billing.domain.PaymentMethod;
 import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
@@ -15,7 +14,8 @@ import java.math.BigDecimal;
  *
  * @param amount               the payment amount
  * @param paymentMethod        the method used for the payment
- * @param transactionReference external reference for the transaction
+ * @param transactionReference external reference for the transaction; optional —
+ *                             meaningful for card/transfer payments, not for cash
  */
 public record PaymentRequest(
         @NotNull(message = "Amount is required")
@@ -26,7 +26,6 @@ public record PaymentRequest(
 
         @NotNull(message = "Payment method is required") PaymentMethod paymentMethod,
 
-        @NotBlank(message = "Transaction reference is required")
         @Size(max = 100, message = "Transaction reference must not exceed 100 characters")
         @Pattern(regexp = "^[A-Za-z0-9\\-_/\\.]+$",
                 message = "Transaction reference contains invalid characters")

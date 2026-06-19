@@ -56,7 +56,6 @@ public class Payment {
     @Column(nullable = false)
     private PaymentMethod paymentMethod;
 
-    @Column(nullable = false)
     private String transactionReference;
 
     @ManyToOne(fetch = FetchType.LAZY)

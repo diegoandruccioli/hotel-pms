@@ -84,6 +84,19 @@ class PaymentControllerTest {
     }
 
     @Test
+    void shouldAddPaymentReturn201WhenTransactionReferenceIsAbsent() throws Exception {
+        final PaymentRequest request = new PaymentRequest(AMOUNT_100, PaymentMethod.CASH, null);
+        final PaymentResponse cashResponse = new PaymentResponse(
+                PAYMENT_ID, LocalDateTime.now(), AMOUNT_100, PaymentMethod.CASH, null, INVOICE_ID);
+        when(paymentService.addPayment(eq(INVOICE_ID), any(PaymentRequest.class))).thenReturn(cashResponse);
+
+        mockMvc.perform(post(BASE_URL, INVOICE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     void shouldAddPaymentReturn400WhenAmountIsNull() throws Exception {
         final String body = "{\"paymentMethod\":\"CREDIT_CARD\",\"transactionReference\":\"TXN-001\"}";
 
