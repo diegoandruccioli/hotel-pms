@@ -61,9 +61,10 @@ public class Stay {
     private UUID hotelId;
 
     /**
-     * The ID of the reservation associated with this stay.
+     * The ID of the reservation associated with this stay; {@code null} for
+     * walk-in stays, which have no prior reservation.
      */
-    @Column(name = "reservation_id", nullable = false)
+    @Column(name = "reservation_id")
     private UUID reservationId;
 
     /**

@@ -29,6 +29,18 @@ public interface BillingClient {
     InvoiceStatusResponse getLatestInvoiceByReservation(@PathVariable("reservationId") UUID reservationId);
 
     /**
+     * Retrieves an invoice by its own ID. Used during check-out for walk-in stays
+     * (no {@code reservationId}), which can only be looked up via the
+     * {@code invoiceId} stored on the {@code Stay} at check-in time.
+     *
+     * @param invoiceId the invoice UUID
+     * @return the invoice status response
+     */
+    @GetMapping("/api/v1/invoices/{invoiceId}")
+    @CircuitBreaker(name = "billingService", fallbackMethod = "getInvoiceByIdFallback")
+    InvoiceStatusResponse getInvoiceById(@PathVariable("invoiceId") UUID invoiceId);
+
+    /**
      * Creates an invoice folio in billing-service at check-in.
      *
      * @param request the stay invoice request
@@ -47,6 +59,17 @@ public interface BillingClient {
      */
     default InvoiceStatusResponse getLatestInvoiceFallback(final UUID reservationId, final Throwable throwable) {
         return new InvoiceStatusResponse(null, reservationId, "UNAVAILABLE", java.math.BigDecimal.ZERO);
+    }
+
+    /**
+     * Fallback for getInvoiceById.
+     *
+     * @param invoiceId the invoice id
+     * @param throwable the throwable
+     * @return a degraded response with status UNAVAILABLE
+     */
+    default InvoiceStatusResponse getInvoiceByIdFallback(final UUID invoiceId, final Throwable throwable) {
+        return new InvoiceStatusResponse(invoiceId, null, "UNAVAILABLE", java.math.BigDecimal.ZERO);
     }
 
     /**

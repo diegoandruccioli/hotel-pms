@@ -446,6 +446,49 @@ class StayServiceImplTest {
     }
 
     @Test
+    void shouldCheckOutWalkInStaySuccessfullyByInvoiceId() {
+        // Arrange — walk-in: no reservationId, invoice looked up by invoiceId instead
+        final UUID id = Objects.requireNonNull(stayId);
+        final UUID invoiceId = UUID.randomUUID();
+        final Stay checkedInStay = Objects.requireNonNull(savedStay);
+        checkedInStay.setRoomId(roomId);
+        checkedInStay.setReservationId(null);
+        checkedInStay.setInvoiceId(invoiceId);
+
+        final InvoiceStatusResponse paidInvoice = new InvoiceStatusResponse(
+                invoiceId, null, "PAID", BigDecimal.valueOf(80));
+
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(checkedInStay));
+        when(billingClient.getInvoiceById(invoiceId)).thenReturn(paidInvoice);
+        when(stayRepository.save(checkedInStay)).thenReturn(checkedInStay);
+        when(stayMapper.toDto(checkedInStay)).thenReturn(validResponse);
+
+        // Act
+        final StayResponse response = stayService.checkOut(id, hotelId);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(StayStatus.CHECKED_OUT, checkedInStay.getStatus());
+        verify(billingClient, times(0)).getLatestInvoiceByReservation(ArgumentMatchers.any());
+    }
+
+    @Test
+    void shouldThrowWhenCheckOutWalkInStayHasNoInvoiceId() {
+        // Arrange — walk-in whose invoice was never created (billing-service was
+        // down at check-in): no reservationId AND no invoiceId, nothing to verify
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay checkedInStay = Objects.requireNonNull(savedStay);
+        checkedInStay.setReservationId(null);
+        checkedInStay.setInvoiceId(null);
+
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(checkedInStay));
+
+        // Act & Assert
+        assertThrows(BillingNotPaidException.class, () -> stayService.checkOut(id, hotelId));
+        verifyNoInteractions(billingClient);
+    }
+
+    @Test
     void shouldThrowWhenCheckOutStayNotCheckedIn() {
         // Arrange
         final UUID id = Objects.requireNonNull(stayId);

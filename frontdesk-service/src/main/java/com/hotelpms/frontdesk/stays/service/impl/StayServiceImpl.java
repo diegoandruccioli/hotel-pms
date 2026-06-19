@@ -140,9 +140,9 @@ public class StayServiceImpl implements StayService {
             throw new IllegalStateException("INVALID_STAY_STATUS");
         }
 
-        // 1. Verify billing folio is PAID
-        log.debug("Verifying billing folio for reservation: {}", stay.getReservationId());
-        final InvoiceStatusResponse invoice = billingClient.getLatestInvoiceByReservation(stay.getReservationId());
+        // 1. Verify billing folio is PAID. Walk-in stays have no reservationId — the
+        // only way to find their invoice is the invoiceId stored on the Stay itself.
+        final InvoiceStatusResponse invoice = resolveInvoiceForCheckOut(stay);
         if (invoice == null || !PAID_STATUS.equalsIgnoreCase(invoice.status())) {
             log.warn("[STAY] CHECK_OUT_FAILED | stayId={} | reservationId={} | reason=BILLING_NOT_PAID",
                     stayId, stay.getReservationId());
@@ -162,6 +162,29 @@ public class StayServiceImpl implements StayService {
                 stayId, stay.getReservationId(), stay.getRoomId());
 
         return stayMapper.toDto(updatedStay);
+    }
+
+    /**
+     * Resolves the invoice to verify at check-out. Reservation-based stays are looked
+     * up by reservationId (existing, unchanged path); walk-in stays (reservationId is
+     * always {@code null} by definition) are looked up by the invoiceId stored on the
+     * Stay at check-in time. A walk-in whose invoice was never created (billing-service
+     * was unavailable at check-in) has no invoiceId to look up — returns {@code null},
+     * which the caller already treats as BILLING_NOT_PAID.
+     *
+     * @param stay the stay being checked out
+     * @return the invoice status response, or {@code null} if it cannot be resolved
+     */
+    private InvoiceStatusResponse resolveInvoiceForCheckOut(final Stay stay) {
+        log.debug("Verifying billing folio for stay: {} | reservationId={} | invoiceId={}",
+                stay.getId(), stay.getReservationId(), stay.getInvoiceId());
+        if (stay.getReservationId() != null) {
+            return billingClient.getLatestInvoiceByReservation(stay.getReservationId());
+        }
+        if (stay.getInvoiceId() != null) {
+            return billingClient.getInvoiceById(stay.getInvoiceId());
+        }
+        return null;
     }
 
     /** {@inheritDoc} */
