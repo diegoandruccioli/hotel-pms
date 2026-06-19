@@ -44,6 +44,16 @@ import java.util.Set;
  * been established). These endpoints are protected by other means (rate limiting,
  * account lockout — T-AUTH-02).
  *
+ * <p>{@code /api/v1/auth/refresh} is excluded for the same reason login/register
+ * are: it does not depend on this filter for protection. The refresh cookie is
+ * httpOnly, path-scoped to {@code /api/v1/auth}, and — like every session cookie
+ * in this app — {@code SameSite=Strict}, which already prevents the browser from
+ * attaching it to a cross-site request before this filter ever runs. Requiring a
+ * CSRF token here only re-introduces the problem this pattern exists to solve:
+ * if the {@code csrf_token} cookie itself has expired or been lost, refresh — the
+ * one endpoint that would re-issue it — becomes permanently unreachable, leaving
+ * a legitimate session stuck with no client-side recovery path.
+ *
  * <p>Implements threat <b>T-GW-05</b> from the project threat model (OWASP A01 —
  * Broken Access Control / Cross-Site Request Forgery).
  */
@@ -68,7 +78,8 @@ public class CsrfFilter implements GlobalFilter, Ordered {
      */
     private static final Set<String> EXCLUDED_PATHS = Set.of(
             "/api/v1/auth/login",
-            "/api/v1/auth/register");
+            "/api/v1/auth/register",
+            "/api/v1/auth/refresh");
 
     /**
      * Validates the Double Submit Cookie token on every mutating request.
