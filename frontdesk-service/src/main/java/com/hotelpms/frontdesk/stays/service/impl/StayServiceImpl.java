@@ -161,7 +161,34 @@ public class StayServiceImpl implements StayService {
         log.info("[STAY] CHECK_OUT_SUCCESS | stayId={} | reservationId={} | roomId={}",
                 stayId, stay.getReservationId(), stay.getRoomId());
 
+        updateReservationStatusAfterCheckOut(updatedStay.getReservationId());
+
         return stayMapper.toDto(updatedStay);
+    }
+
+    /**
+     * Reconciles the parent reservation's status once one of its stays checks out.
+     *
+     * <p>Mirrors {@link #updateReservationGuests}, but for the opposite direction of the
+     * lifecycle: a reservation only moves to {@code CHECKED_OUT} once every room on it has
+     * been checked out, so multi-room reservations don't flip early just because one guest
+     * left. No-op for walk-ins, which have no {@code reservationId}.
+     *
+     * @param reservationId the reservation owning the just-checked-out stay; may be {@code null}
+     */
+    private void updateReservationStatusAfterCheckOut(final UUID reservationId) {
+        if (reservationId == null) {
+            return;
+        }
+        final ReservationResponse reservation = reservationService.getReservationById(reservationId);
+        final int totalRooms = reservation.lineItems() == null ? 0 : reservation.lineItems().size();
+        final long checkedOutRooms = stayRepository.findAllByReservationId(reservationId).stream()
+                .filter(s -> s.getStatus() == StayStatus.CHECKED_OUT)
+                .count();
+
+        if (totalRooms > 0 && checkedOutRooms >= totalRooms) {
+            reservationService.updateStatusAndGuests(reservationId, ReservationStatus.CHECKED_OUT, null);
+        }
     }
 
     /**
