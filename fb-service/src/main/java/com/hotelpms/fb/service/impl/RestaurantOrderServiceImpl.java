@@ -150,7 +150,7 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
 
         final ChargeRequest chargeReq = new ChargeRequest(
                 CHARGE_TYPE_FB_ORDER,
-                "F&B " + orderId,
+                buildChargeDescription(savedOrder),
                 savedOrder.getTotalAmount(),
                 orderId);
         final ChargeResponse chargeResp = billingClient.addCharge(savedOrder.getStayId(), chargeReq);
@@ -162,6 +162,23 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
         }
 
         return orderMapper.toResponse(savedOrder);
+    }
+
+    /**
+     * Builds the customer-facing billing charge description for an F&amp;B order.
+     *
+     * <p>Lists the ordered items (e.g. "F&amp;B: 2x Cappuccino, 1x Croissant") so the invoice/PDF
+     * shown to staff and guests is readable. Falls back to the order ID only if the order
+     * somehow has no items, since the description must never be blank.
+     *
+     * @param order the confirmed order
+     * @return a human-readable description for the billing charge
+     */
+    private String buildChargeDescription(final RestaurantOrder order) {
+        final String items = order.getItems().stream()
+                .map(item -> item.getQuantity() + "x " + item.getItemName())
+                .collect(Collectors.joining(", "));
+        return StringUtils.hasText(items) ? "F&B: " + items : "F&B " + order.getId();
     }
 
     /**
