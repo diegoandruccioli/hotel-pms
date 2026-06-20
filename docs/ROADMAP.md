@@ -40,7 +40,7 @@ Prerequisiti bloccanti per il primo hotel reale in produzione.
 |---|---|---|---|---|
 | P1 | ~~`@Version` su `Invoice` + migration Flyway~~ | ✅ **Fatto** | — | Implementato: `Invoice.java` campo `@Version Long version`, Flyway V3 |
 | P2 | ~~`restart: unless-stopped` in docker-compose~~ | ✅ **Fatto** | — | Tutti i 16 container in `docker-compose.yml` già configurati |
-| P0 | **[PRIMO POST-ESAME]** Hardening porte Docker — compose dev/prod separati | 🔴 Critica | 2h | PostgreSQL (:5432), Redis (:6379), Prometheus (:9090), Zipkin (:9411), Loki (:3100), Grafana (:3000) e tutti i microservizi (:8081-8087) esposti sull'host. Fix: `docker-compose.prod.yml` con solo :80 (frontend) e :8080 (gateway) esposti; `docker-compose.yml` invariato per sviluppo. OWASP A05 — Security Misconfiguration |
+| P0 | ~~Hardening porte Docker — compose dev/prod separati~~ | ✅ **Fatto** | — | `docker-compose.prod.yml` creato: usa il merge-tag `!reset` per azzerare `ports` su Postgres/Redis/Prometheus/Zipkin/Loki/Grafana/config-server/tutti i backend — solo frontend (:80) e api-gateway (:8080) restano pubblicati sull'host. `docker-compose.yml` invariato (dev). Verificato con `docker compose ... config`. Uso: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`. OWASP A05 |
 | P3 | Backup PostgreSQL automatizzato (pg_dump cron) | 🔴 Critica | 4h | Data loss catastrofico su crash disco — tutti i dati hotel persi |
 | P4 | Prometheus alert rules (error rate, latency, restarts) | 🟡 Alta | 1-2gg | `prometheus.yml` ha solo scrape_configs — zero alerting rules configurate |
 | P5 | ~~Operations Runbook~~ | ✅ **Fatto** | — | `docs/OPERATIONS_RUNBOOK.md` creato con 10 procedure operative |
