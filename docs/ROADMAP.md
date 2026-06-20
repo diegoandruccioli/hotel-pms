@@ -18,7 +18,7 @@ mono-hotel Docker Compose. La roadmap descrive il percorso verso
 | Sicurezza | 8.5/10 | Argon2id, HMAC, RBAC doppio livello, GDPR |
 | Affidabilità | 8.0/10 | Circuit breaker, saga checkIn, @Version Invoice ✅ — manca solo backup DB |
 | Osservabilità | 7.5/10 | Zipkin + Prometheus + Loki — mancano alert rule |
-| Scalabilità | 6.5/10 | Microservizi corretti, GIN pg_trgm ✅ — SimpleDiscovery statico, consolidamento frontdesk pianificato (7→6 servizi dominio, ADR-001) |
+| Scalabilità | 7.0/10 | Microservizi corretti, GIN pg_trgm ✅, consolidamento frontdesk completato (9→7 servizi dominio, ADR-001) — SimpleDiscovery statico |
 | Qualità codice | 8.0/10 | 344/344 test, PMD zero — Testcontainers mancanti |
 | Operabilità | 6.5/10 | Docker Compose mono-host, restart:unless-stopped ✅ — no K8s, no backup |
 | Conformità normativa | 9.0/10 | Alloggiati SOAP nativo, GDPR — no SDI/fattura B2B |
@@ -54,7 +54,7 @@ Prerequisiti bloccanti per il primo hotel reale in produzione.
 | P13 | ~~CodeQL query suite `default` → `security-extended`~~ | ✅ **Fatto** | — | Default setup aggiornato via API (`query_suite=extended`), verificato con run completo su 3 linguaggi (java-kotlin, javascript-typescript, actions) |
 | P14 | Alloggiati Web SOAP client custom (RestTemplate + XML manuale) | 🟢 Bassa | valutare | `AlloggiatiWebSenderServiceImpl` costruisce a mano le envelope SOAP invece di usare uno stack SOAP standard (Spring-WS/CXF). ADR-002 si applica, ma giustificabile: solo 2 operazioni (GenerateToken/Send-Test) contro un WSDL Polizia di Stato non standard — un framework SOAP completo sarebbe overkill. Da rivalutare solo se il numero di operazioni crescesse |
 | P15 | Coverage frontend: soglia configurata abbassata a 63/50/58/66% (reale 67/55/63/70%) invece del 95% mandato da CLAUDE.md | 🟡 Alta | da pianificare | `vite.config.ts` ha `thresholds` ratchet-down per matchare la copertura esistente invece di alzare la copertura al target. Inoltre `test:coverage` non gira in CI (solo `npm run test`, senza `--coverage`) — la soglia, anche se fosse 95%, non verrebbe comunque verificata automaticamente. File più scoperti: `api.ts` (9.8%), `stayService.ts` (25.6%), `inventoryService.ts` (36%), `CalendarPlanning.tsx` (45%) |
-| E0bis | **Consolidamento `frontdesk-service`** (merge inventory+reservation+stay) — ADR-001 | 🟡 Alta | 2-4 sett | Bounded context coeso sul ciclo-vita camera (Room↔Reservation↔Stay), oggi su 3 DB senza FK reali con 3 round-trip Feign interni. Da 9 a 7 deployable. Prerequisito architetturale a E5 (K3s) — meno servizi da orchestrare nel cluster. Branch dedicato `feature/frontdesk-consolidation` |
+| E0bis | ~~**Consolidamento `frontdesk-service`** (merge inventory+reservation+stay) — ADR-001~~ | ✅ **Fatto** | — | Mergiato su `main`. Bounded context coeso sul ciclo-vita camera (Room↔Reservation↔Stay) ora in un solo servizio con FK reali (no più 3 round-trip Feign interni). Da 9 a 7 deployable. Verificato con smoke-test browser end-to-end (prenotazione→check-in→F&B→fattura→checkout) sul servizio consolidato, oltre a build/test automatici |
 
 ---
 
