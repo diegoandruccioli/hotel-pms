@@ -64,6 +64,8 @@ test.describe('Reservations', () => {
       const url = route.request().url();
       if (method === 'GET') {
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(resPage) });
+      } else if (method === 'PATCH' && url.includes('status-and-guests') && url.includes('res-002')) {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CANCELLED_RESERVATION) });
       } else if (method === 'PUT' && url.includes('res-002')) {
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CANCELLED_RESERVATION) });
       } else if (method === 'POST') {
@@ -138,11 +140,10 @@ test.describe('Reservations', () => {
     await expect(page.getByText('Anna Bianchi')).toBeVisible({ timeout: 10000 });
     // Cancel the second reservation (Anna Bianchi, PENDING) — aria-label="Cancel res-002"
     await page.getByRole('button', { name: /Cancel res-002/i }).click();
-    // Confirmation dialog opens. Both buttons say "Cancel" (t('cancel') and t('cancel_reservation')).
-    // The LAST button in the dialog is the primary confirm action.
+    // Confirmation dialog opens with a dismiss "Cancel" button and a primary "Confirm" button.
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 3000 });
-    await dialog.getByRole('button', { name: /^Cancel$/ }).last().click();
+    await dialog.getByRole('button', { name: /^Confirm$/ }).click();
     // After cancellation, the CANCELLED chip and/or toast appear — use .first() to avoid strict mode
     await expect(page.getByText(/cancelled/i).first()).toBeVisible({ timeout: 5000 });
   });
