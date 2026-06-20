@@ -54,6 +54,36 @@ CVE-2026-39825
 #   gosu: does not render HTML templates.
 #   Grafana: accepted upstream.
 CVE-2026-39826
+# CVE-2026-39823 — html/template: URL not escaped in meta content attribute (XSS),
+#   same family as CVE-2026-27142 above.
+#   gosu: does not render HTML templates.
+#   Grafana: fix requires rebuild with Go ≥ 1.26.3; accepted upstream.
+CVE-2026-39823
+# CVE-2026-42504 — mime: decoding a crafted MIME header with many invalid
+#   encoded-words can consume excessive CPU (DoS).
+#   gosu: does not decode MIME headers.
+#   Grafana: accepted upstream pending release with Go ≥ 1.26.4.
+CVE-2026-42504
+# ── postgres:15-alpine / redis:alpine — native library CVEs ─────────────────
+# These are CVEs in Alpine OS packages bundled with the official upstream
+# images, not in our application code. We do not pin a digest, so the next
+# `docker pull` of the same tag picks up the patched package once the
+# upstream image maintainers rebuild — no Dockerfile change needed on our
+# side. Documented here in the meantime per the same accepted-risk approach
+# used for the Go stdlib CVEs above.
+#
+# CVE-2026-6732 — libxml2: type confusion / crash when validating a crafted
+#   document against an XML Schema Definition (XSD) with an internal entity
+#   reference. PostgreSQL's xml type (xpath/xmlparse) does not invoke XSD
+#   schema validation (xmlSchemaValidateDoc) — that code path is not reachable
+#   through any SQL-exposed function.
+CVE-2026-6732
+# CVE-2026-45447 — OpenSSL libssl3: use-after-free in PKCS7_verify() when
+#   verifying a crafted PKCS#7/S-MIME signed message with an empty
+#   digestAlgorithms ASN.1 SET. Neither PostgreSQL's nor Redis's use of
+#   OpenSSL (TLS connection handshake only) calls PKCS7_verify() or any
+#   PKCS#7/S-MIME message-signing API.
+CVE-2026-45447
 # ── Spring Cloud Config ──────────────────────────────────────────────────────
 # CVE-2026-41002 — Spring Cloud Config Server TOCTOU on Git clone base dir.
 #   config-service is internal-only (not routed through API gateway, T-CFG-01).

@@ -39,8 +39,7 @@ describe('inventoryService', () => {
 
     expect(api.patch).toHaveBeenCalledWith(
       '/api/v1/rooms/1/status',
-      '"CLEAN"',
-      { headers: { 'Content-Type': 'application/json' } }
+      { status: 'CLEAN' }
     );
     expect(result).toEqual(mockResponse);
   });

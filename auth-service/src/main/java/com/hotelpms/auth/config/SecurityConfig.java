@@ -1,9 +1,12 @@
 package com.hotelpms.auth.config;
 
 import com.hotelpms.auth.security.InternalAuthFilter;
+import com.hotelpms.auth.security.NonceStore;
+import com.hotelpms.auth.security.RedisNonceStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -56,17 +59,31 @@ public class SecurityConfig {
     }
 
     /**
+     * Provides the nonce store used by {@link InternalAuthFilter} to detect
+     * replayed internal requests (T-GW-08).
+     *
+     * @param redisTemplate the shared Redis client, autoconfigured by
+     *                      {@code spring-boot-starter-data-redis}
+     * @return a Redis-backed {@link NonceStore}
+     */
+    @Bean
+    public NonceStore nonceStore(final StringRedisTemplate redisTemplate) {
+        return new RedisNonceStore(redisTemplate);
+    }
+
+    /**
      * Configures the main Spring Security filter chain.
      * Public auth endpoints are permit-all; the /users management paths require
      * HMAC-verified gateway headers via InternalAuthFilter.
      *
-     * @param http the {@link HttpSecurity} builder
+     * @param http       the {@link HttpSecurity} builder
+     * @param nonceStore the nonce store used for anti-replay checks (T-GW-08)
      * @return the configured {@link SecurityFilterChain}
      * @throws Exception if an error occurs during configuration
      */
     @Bean
     @SneakyThrows(Exception.class)
-    public SecurityFilterChain securityFilterChain(final HttpSecurity http) {
+    public SecurityFilterChain securityFilterChain(final HttpSecurity http, final NonceStore nonceStore) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
@@ -79,7 +96,7 @@ public class SecurityConfig {
                                 "/actuator/**")
                         .permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(new InternalAuthFilter(hmacSecret),
+                .addFilterBefore(new InternalAuthFilter(hmacSecret, nonceStore),
                         UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

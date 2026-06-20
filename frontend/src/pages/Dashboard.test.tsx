@@ -1,10 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { Dashboard } from './Dashboard';
 import { axe } from 'vitest-axe';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useAuthStore } from '../store/authStore';
+import { stayService } from '../services/stayService';
+
+vi.mock('../services/stayService', () => ({
+  stayService: { getAlloggiatiFailureSummary: vi.fn() },
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -40,6 +45,10 @@ const renderDashboard = () => render(<MemoryRouter><Dashboard /></MemoryRouter>)
 
 describe('Dashboard Component', () => {
   beforeEach(() => {
+    vi.mocked(stayService.getAlloggiatiFailureSummary).mockReset();
+    vi.mocked(stayService.getAlloggiatiFailureSummary).mockResolvedValue({
+      failedCount: 0, mostRecentFailureAt: null, mostRecentFailureReason: null,
+    });
     useDashboardStore.setState({
       stats: MOCK_STATS_ADMIN,
       isLoading: false,
@@ -113,6 +122,27 @@ describe('Dashboard Component', () => {
     });
     renderDashboard();
     expect(screen.queryByTestId('room-overview-grid')).not.toBeInTheDocument();
+  });
+
+  it('shows Alloggiati failure banner for ADMIN when failures exist', async () => {
+    vi.mocked(stayService.getAlloggiatiFailureSummary).mockResolvedValue({
+      failedCount: 2, mostRecentFailureAt: '2026-06-19T10:00:00', mostRecentFailureReason: 'PS portal down',
+    });
+    renderDashboard();
+    await waitFor(() => {
+      expect(screen.getByText('alloggiati_failure_banner_title')).toBeInTheDocument();
+    });
+  });
+
+  it('does not fetch or show Alloggiati failure banner for RECEPTIONIST', async () => {
+    useAuthStore.setState({
+      user: { sub: 'user2', username: 'reception', role: 'RECEPTIONIST' },
+      isAuthenticated: true,
+      isLoading: false,
+    });
+    renderDashboard();
+    expect(stayService.getAlloggiatiFailureSummary).not.toHaveBeenCalled();
+    expect(screen.queryByText('alloggiati_failure_banner_title')).not.toBeInTheDocument();
   });
 
   it('renders error state with retry button', () => {

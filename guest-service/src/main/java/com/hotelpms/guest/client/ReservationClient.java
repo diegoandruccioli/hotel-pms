@@ -8,15 +8,16 @@ import org.springframework.web.bind.annotation.PathVariable;
 import java.util.UUID;
 
 /**
- * Feign client for communicating with the Reservation Service.
+ * Feign client for communicating with the reservations domain in frontdesk-service
+ * (formerly reservation-service, see ADR-001 in backup/DECISIONS.md).
  */
-@FeignClient(name = "reservation-service", url = "${application.config.reservation-service-url:http://localhost:8083}")
+@FeignClient(name = "frontdesk-service-reservations",
+        url = "${application.config.frontdesk-service-url:http://localhost:8081}")
 @SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface ReservationClient {
 
     /**
      * Checks if a guest has active reservations before deletion.
-     * Note: Assume endpoint exists in reservation-service or will be implemented.
      *
      * @param guestId the ID of the guest
      * @return true if there are active reservations

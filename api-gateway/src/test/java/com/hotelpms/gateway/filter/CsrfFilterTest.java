@@ -103,6 +103,14 @@ class CsrfFilterTest {
                     MockServerHttpRequest.post("/api/v1/auth/register").build());
             assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.OK);
         }
+
+        @Test
+        @DisplayName("POST /api/v1/auth/refresh is excluded")
+        void refreshExcluded() {
+            final MockServerWebExchange exchange = run(
+                    MockServerHttpRequest.post("/api/v1/auth/refresh").build());
+            assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
     }
 
     // ── Missing or invalid token ──────────────────────────────────────────────

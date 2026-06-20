@@ -43,7 +43,8 @@ services:
           memory: 256M
 
   # ----------------------------------------------------------
-  # Redis - for API Gateway Rate Limiting
+  # Redis - API Gateway rate limiting + internal HMAC anti-replay
+  # nonce store (T-GW-08, all 5 InternalAuthFilter validators)
   # ----------------------------------------------------------
   redis:
     image: redis:alpine
@@ -59,6 +60,7 @@ services:
       start_period: 5s
     networks:
       - gateway-network
+      - backend-network
     deploy:
       resources:
         limits:
@@ -243,9 +245,7 @@ services:
       # Service URIs – override with K8s ClusterIP or external URLs
       - GW_AUTH_SERVICE_URI=http://auth-service:8087
       - GW_GUEST_SERVICE_URI=http://guest-service:8083
-      - GW_INVENTORY_SERVICE_URI=http://inventory-service:8081
-      - GW_RESERVATION_SERVICE_URI=http://reservation-service:8082
-      - GW_STAY_SERVICE_URI=http://stay-service:8084
+      - GW_FRONTDESK_SERVICE_URI=http://frontdesk-service:8081
       - GW_BILLING_SERVICE_URI=http://billing-service:8085
       - GW_FB_SERVICE_URI=http://fb-service:8086
       # CORS – override for production frontend URL
@@ -261,11 +261,7 @@ services:
         condition: service_healthy
       guest-service:
         condition: service_healthy
-      inventory-service:
-        condition: service_healthy
-      reservation-service:
-        condition: service_healthy
-      stay-service:
+      frontdesk-service:
         condition: service_healthy
       billing-service:
         condition: service_healthy
@@ -367,7 +363,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_guest
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
-      - APPLICATION_CONFIG_RESERVATION_SERVICE_URL=http://reservation-service:8082
+      - APPLICATION_CONFIG_FRONTDESK_SERVICE_URL=http://frontdesk-service:8081
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:
@@ -399,24 +395,27 @@ services:
           memory: 256M
 
   # ----------------------------------------------------------
-  # Stay Service
+  # Frontdesk Service (rooms + reservations + stays — consolidates the
+  # former inventory-service, reservation-service and stay-service;
+  # see ADR-001 in backup/DECISIONS.md)
   # ----------------------------------------------------------
-  stay-service:
+  frontdesk-service:
     build:
       context: .
-      dockerfile: stay-service/Dockerfile
-    image: hotel-pms/stay-service
-    container_name: stay-service
+      dockerfile: frontdesk-service/Dockerfile
+    image: hotel-pms/frontdesk-service
+    container_name: frontdesk-service
     restart: unless-stopped
     ports:
-      - "8084:8084"
+      - "8081:8081"
     environment:
-      - SPRING_PROFILES_ACTIVE=stay-service
+      - SPRING_PROFILES_ACTIVE=frontdesk-service
       - CONFIG_SERVER_URL=http://config-server:8888
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_stay
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_frontdesk
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - APPLICATION_CONFIG_GUEST_SERVICE_URL=http://guest-service:8083
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       # T-STAY-03: PS portal credentials — real values injected via .env in production
       # Obtain WsKey from: portal login -> account icon -> "Chiave Web Service"
@@ -424,7 +423,7 @@ services:
       - ALLOGGIATI_PASSWORD=${ALLOGGIATI_PASSWORD:-ci_placeholder_password}
       - ALLOGGIATI_WS_KEY=${ALLOGGIATI_WS_KEY:-ci_placeholder_wskey}
       - ALLOGGIATI_DRY_RUN=${ALLOGGIATI_DRY_RUN:-true}
-      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -521,108 +520,8 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_fb
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
-      - APPLICATION_CONFIG_STAY_SERVICE_URL=http://stay-service:8084
+      - APPLICATION_CONFIG_FRONTDESK_SERVICE_URL=http://frontdesk-service:8081
       - APPLICATION_CONFIG_BILLING_SERVICE_URL=http://billing-service:8085
-      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
-    depends_on:
-      postgres:
-        condition: service_healthy
-      config-server:
-        condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
-        ]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 300s
-    networks:
-      - backend-network
-      - db-network
-      - observability-network
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 512M
-        reservations:
-          cpus: "0.10"
-          memory: 256M
-
-  # ----------------------------------------------------------
-  # Inventory Service
-  # ----------------------------------------------------------
-  inventory-service:
-    build:
-      context: .
-      dockerfile: inventory-service/Dockerfile
-    image: hotel-pms/inventory-service
-    container_name: inventory-service
-    restart: unless-stopped
-    ports:
-      - "8081:8081"
-    environment:
-      - SPRING_PROFILES_ACTIVE=inventory-service
-      - CONFIG_SERVER_URL=http://config-server:8888
-      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_inventory
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
-      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
-    depends_on:
-      postgres:
-        condition: service_healthy
-      config-server:
-        condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
-        ]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 300s
-    networks:
-      - backend-network
-      - db-network
-      - observability-network
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 512M
-        reservations:
-          cpus: "0.10"
-          memory: 256M
-
-  # ----------------------------------------------------------
-  # Reservation Service
-  # ----------------------------------------------------------
-  reservation-service:
-    build:
-      context: .
-      dockerfile: reservation-service/Dockerfile
-    image: hotel-pms/reservation-service
-    container_name: reservation-service
-    restart: unless-stopped
-    ports:
-      - "8082:8082"
-    environment:
-      - SPRING_PROFILES_ACTIVE=reservation-service
-      - CONFIG_SERVER_URL=http://config-server:8888
-      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_reservation
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
-      - APPLICATION_CONFIG_GUEST_SERVICE_URL=http://guest-service:8083
-      - APPLICATION_CONFIG_INVENTORY_SERVICE_URL=http://inventory-service:8081
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:
@@ -669,7 +568,7 @@ services:
       api-gateway:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -T10 -q -O /dev/null http://localhost:80/ || exit 1"]
+      test: ["CMD-SHELL", "wget -T10 -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -696,6 +595,8 @@ volumes:
 # dmz-network:          Frontend + API Gateway (public-facing layer)
 # gateway-network:      API Gateway + Redis + Auth Service (rate limiting & session cache)
 # backend-network:      All microservices + Config Server + Prometheus/Zipkin (internal API mesh)
+#                        Redis also joins this network so all 5 InternalAuthFilter
+#                        validators can reach the HMAC anti-replay nonce store (T-GW-08)
 # db-network:           PostgreSQL + microservices only (transactional data, no external access)
 # observability-network: Loki, Grafana, Prometheus, Zipkin + services exposing metrics
 # ============================================================

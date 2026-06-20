@@ -50,4 +50,16 @@ describe('reservationService', () => {
     expect(api.put).toHaveBeenCalledWith('/api/v1/reservations/1', request);
     expect(result).toEqual(mockResponse);
   });
+
+  it('should cancel a reservation via the partial status-and-guests endpoint', async () => {
+    const mockResponse = { id: '1', status: 'CANCELLED' };
+    vi.mocked(api.patch).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await reservationService.cancelReservation('1');
+
+    expect(api.patch).toHaveBeenCalledWith(
+      '/api/v1/reservations/1/status-and-guests', { status: 'CANCELLED' },
+    );
+    expect(result).toEqual(mockResponse);
+  });
 });

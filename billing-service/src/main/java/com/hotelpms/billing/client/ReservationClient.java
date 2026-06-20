@@ -11,9 +11,10 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * Feign client for interacting with the reservation service.
+ * Feign client for interacting with the reservations domain in frontdesk-service
+ * (formerly reservation-service, see ADR-001 in backup/DECISIONS.md).
  */
-@FeignClient(name = "reservation-service", path = "/api/v1/reservations")
+@FeignClient(name = "frontdesk-service", path = "/api/v1/reservations")
 @SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface ReservationClient {
 

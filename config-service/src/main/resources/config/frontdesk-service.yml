@@ -1,0 +1,82 @@
+server:
+  port: 8081
+
+internal:
+  hmac:
+    secret: ${INTERNAL_HMAC_SECRET}
+
+spring:
+  data:
+    redis:
+      # Nonce store for internal HMAC anti-replay (T-GW-08). Same Redis
+      # instance used by api-gateway for rate limiting, on a separate
+      # key namespace (internal-auth:nonce:*).
+      host: ${INTERNAL_REDIS_HOST:redis}
+      port: ${INTERNAL_REDIS_PORT:6379}
+  cloud:
+    discovery:
+      client:
+        simple:
+          instances:
+            # Only guest-service and billing-service remain external Feign
+            # dependencies after the inventory/reservation/stay consolidation
+            # into frontdesk-service (ADR-001, backup/DECISIONS.md). The
+            # feign-hc5 PATCH-capable client is no longer needed either — the
+            # only PATCH calls were to the now-internal room/reservation APIs.
+            guest-service:
+              - serviceId: guest-service
+                host: guest-service
+                port: 8083
+                secure: false
+            billing-service:
+              - serviceId: billing-service
+                host: billing-service
+                port: 8085
+                secure: false
+
+# T-STAY-03: Alloggiati Web portal credentials and URL.
+# All values MUST be provided as environment variables — no defaults for credentials.
+# The RestTemplate bean uses the JVM default SSL context, enforcing TLS validation.
+#
+# SOAP service endpoint (discovered from WSDL at /service/Service.asmx?WSDL):
+#   - GenerateToken(Utente, Password, WsKey) -> token
+#   - Send(Utente, token, ElencoSchedine)    -> EsitoOperazioneServizio
+# The WsKey is generated in the portal under: account icon -> "Chiave Web Service".
+alloggiati:
+  web:
+    service-url: ${ALLOGGIATI_SERVICE_URL:https://alloggiatiweb.poliziadistato.it/service/Service.asmx}
+    username: ${ALLOGGIATI_USERNAME}
+    password: ${ALLOGGIATI_PASSWORD}
+    ws-key: ${ALLOGGIATI_WS_KEY}
+    # SOAP target namespace — default inferred from WSDL; override if portal rejects
+    ws-namespace: ${ALLOGGIATI_WS_NAMESPACE:http://alloggiatiweb.poliziadistato.it/PortaleAlloggiati/Service/}
+    # Set dry-run=true in all non-production environments: calls Test instead of Send
+    dry-run: ${ALLOGGIATI_DRY_RUN:true}
+
+management:
+  server:
+    port: 8090
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health,info"
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n"

@@ -2,10 +2,8 @@ rootProject.name = "hotel-pms"
 
 val projects = listOf(
     "config-service",
-    "inventory-service",
-    "reservation-service",
+    "frontdesk-service",
     "guest-service",
-    "stay-service",
     "billing-service",
     "fb-service",
     "auth-service",

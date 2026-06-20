@@ -18,6 +18,7 @@ import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.exception.NotFoundException;
 import com.hotelpms.billing.mapper.InvoiceChargeMapper;
 import com.hotelpms.billing.mapper.InvoiceMapper;
+import com.hotelpms.billing.repository.InvoiceChargeRepository;
 import com.hotelpms.billing.repository.InvoiceRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +61,9 @@ class InvoiceServiceImplTest {
 
         @Mock
         private InvoiceRepository invoiceRepository;
+
+        @Mock
+        private InvoiceChargeRepository invoiceChargeRepository;
 
         @Mock
         private InvoiceMapper invoiceMapper;
@@ -307,6 +311,8 @@ class InvoiceServiceImplTest {
                 when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId))
                                 .thenReturn(Optional.of(openInvoice));
                 when(invoiceRepository.save(openInvoice)).thenReturn(openInvoice);
+                when(invoiceChargeRepository.save(any(InvoiceCharge.class)))
+                                .thenAnswer(invocation -> invocation.getArgument(0));
                 when(invoiceChargeMapper.toResponse(any(InvoiceCharge.class))).thenReturn(expectedCharge);
 
                 // Act

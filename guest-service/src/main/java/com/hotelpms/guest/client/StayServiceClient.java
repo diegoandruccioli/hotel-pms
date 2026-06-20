@@ -11,12 +11,13 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Feign client for querying stay data from the stay-service.
+ * Feign client for querying stay data from the stays domain in frontdesk-service
+ * (formerly stay-service, see ADR-001 in backup/DECISIONS.md).
  * Used exclusively by the GDPR legal-hold guard (T-GST-05) to verify
  * the TULPS five-year retention obligation before anonymising a guest profile.
  */
-@FeignClient(name = "stay-service",
-        url = "${application.config.stay-service-url:http://localhost:8084}")
+@FeignClient(name = "frontdesk-service-stays",
+        url = "${application.config.frontdesk-service-url:http://localhost:8081}")
 public interface StayServiceClient {
 
     /**
@@ -25,7 +26,7 @@ public interface StayServiceClient {
      * @param guestId the guest UUID
      * @return last stay information
      */
-    @GetMapping("/api/v1/stays/guest/{guestId}/last-stay-date")
+    @GetMapping("/api/v1/stays/guest/{guestId}/last-date")
     @CircuitBreaker(name = "stayService", fallbackMethod = "lastStayDateFallback")
     GuestLastStayClientResponse getLastStayDate(@PathVariable("guestId") UUID guestId);
 

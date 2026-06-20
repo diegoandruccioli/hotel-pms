@@ -34,6 +34,7 @@ const mockStayResponse = (overrides: Partial<StayResponse> = {}): StayResponse =
   roomId: 'r1',
   status: 'CHECKED_IN',
   alloggiatiSent: false,
+  alloggiatiSendFailed: false,
   createdAt: '2026-01-01T00:00:00',
   updatedAt: '2026-01-01T00:00:00',
   ...overrides,

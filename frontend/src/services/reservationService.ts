@@ -26,7 +26,9 @@ export const reservationService = {
   },
 
   cancelReservation: async (id: string): Promise<ReservationResponse> => {
-    const response = await api.put<ReservationResponse>(`${BASE_PATH}/${id}`, { status: 'CANCELLED' });
+    const response = await api.patch<ReservationResponse>(
+      `${BASE_PATH}/${id}/status-and-guests`, { status: 'CANCELLED' },
+    );
     return response.data;
   },
 };

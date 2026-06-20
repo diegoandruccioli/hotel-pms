@@ -19,6 +19,7 @@ import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.exception.NotFoundException;
 import com.hotelpms.billing.mapper.InvoiceChargeMapper;
 import com.hotelpms.billing.mapper.InvoiceMapper;
+import com.hotelpms.billing.repository.InvoiceChargeRepository;
 import com.hotelpms.billing.repository.InvoiceRepository;
 import com.hotelpms.billing.service.InvoiceService;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +48,7 @@ import java.util.UUID;
 public class InvoiceServiceImpl implements InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
+    private final InvoiceChargeRepository invoiceChargeRepository;
     private final InvoiceMapper invoiceMapper;
     private final InvoiceChargeMapper invoiceChargeMapper;
     private final GuestClient guestClient;
@@ -140,13 +142,15 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .build();
 
         invoice.addCharge(charge);
+        final InvoiceCharge savedCharge = invoiceChargeRepository.save(charge);
+
         invoice.setTotalAmount(invoice.getTotalAmount().add(request.amount()));
         invoiceRepository.save(Objects.requireNonNull(invoice));
 
         log.info("Added {} charge of {} to invoice {} (new total: {})",
                 request.type(), request.amount(), invoice.getInvoiceNumber(), invoice.getTotalAmount());
 
-        return invoiceChargeMapper.toResponse(charge);
+        return invoiceChargeMapper.toResponse(savedCharge);
     }
 
     /** {@inheritDoc} */

@@ -30,8 +30,8 @@ repositories {
 
 ext {
     set("springCloudVersion", "2025.0.0")
-    // CVE-2026-42583/42584/42579/42587: fixed in Netty 4.1.133.Final — override Spring Boot BOM pin.
-    set("netty.version", "4.1.133.Final")
+    // CVE-2026-42583/42584/42579/42587: fixed in 4.1.133.Final; CVE-2026-47691/45674/45416/44249: fixed in 4.1.135.Final — override Spring Boot BOM pin.
+    set("netty.version", "4.1.135.Final")
     set("mapStructVersion", "1.6.3")
     // CVE-2026-43512/43513/43515/41284/41293/42498: fixed in Tomcat 10.1.55 (2026-05-05).
     set("tomcat.version", "10.1.55")
@@ -42,6 +42,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-security")
+    // Redis-backed nonce store for internal HMAC anti-replay (T-GW-08)
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.cloud:spring-cloud-starter-config")
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign") {
         exclude(group = "org.springframework.cloud", module = "spring-cloud-starter-netflix-eureka-client")
@@ -96,4 +98,11 @@ dependencyManagement {
 tasks.withType<Test> {
     useJUnitPlatform()
     systemProperty("net.bytebuddy.experimental", "true")
+}
+
+// SpotBugs: project-specific exclusions (Spring DI beans — EI_EXPOSE_REP2 not applicable)
+tasks.withType<com.github.spotbugs.snom.SpotBugsTask>().configureEach {
+    extraArgs.addAll(
+        listOf("-exclude", "${project.projectDir}/config/spotbugs/exclude.xml")
+    )
 }

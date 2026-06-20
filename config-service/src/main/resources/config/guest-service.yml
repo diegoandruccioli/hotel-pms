@@ -3,12 +3,24 @@ server:
 
 application:
   config:
-    stay-service-url: http://stay-service:8084
+    # frontdesk-service consolidates the former inventory/reservation/stay
+    # services (ADR-001, backup/DECISIONS.md) — one URL now covers both the
+    # StayServiceClient and ReservationClient Feign clients in guest-service.
+    frontdesk-service-url: http://frontdesk-service:8081
     billing-service-url: http://billing-service:8085
 
 internal:
   hmac:
     secret: ${INTERNAL_HMAC_SECRET}
+
+spring:
+  data:
+    redis:
+      # Nonce store for internal HMAC anti-replay (T-GW-08). Same Redis
+      # instance used by api-gateway for rate limiting, on a separate
+      # key namespace (internal-auth:nonce:*).
+      host: ${INTERNAL_REDIS_HOST:redis}
+      port: ${INTERNAL_REDIS_PORT:6379}
 
 management:
   server:

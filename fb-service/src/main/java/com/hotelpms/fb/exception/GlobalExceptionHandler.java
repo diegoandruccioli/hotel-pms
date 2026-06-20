@@ -3,6 +3,7 @@ package com.hotelpms.fb.exception;
 import feign.FeignException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -121,6 +122,22 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.toList());
         problemDetail.setProperty("errors", errors);
 
+        return problemDetail;
+    }
+
+    /**
+     * Handles malformed request bodies (invalid JSON, unparseable enum values, etc.).
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 400 status
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleHttpMessageNotReadableException(final HttpMessageNotReadableException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+                "INVALID_JSON_PAYLOAD");
+        problemDetail.setTitle("Request Validation Error");
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/bad-request")));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 

@@ -14,9 +14,7 @@ GITIGNORE="$ROOT/.gitignore"
 MARKER="INTERNAL_HMAC_SECRET"            # sentinel used for idempotency checks
 SERVICES=(
     "api-gateway"
-    "inventory-service"
-    "reservation-service"
-    "stay-service"
+    "frontdesk-service"
     "billing-service"
     "guest-service"
     "fb-service"

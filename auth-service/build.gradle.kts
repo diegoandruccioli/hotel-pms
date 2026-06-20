@@ -30,8 +30,8 @@ repositories {
 
 ext {
     set("springCloudVersion", "2025.0.0")
-    // CVE-2026-42583/42584/42579/42587: fixed in Netty 4.1.133.Final — override Spring Boot BOM pin.
-    set("netty.version", "4.1.133.Final")
+    // CVE-2026-42583/42584/42579/42587: fixed in 4.1.133.Final; CVE-2026-47691/45674/45416/44249: fixed in 4.1.135.Final — override Spring Boot BOM pin.
+    set("netty.version", "4.1.135.Final")
     set("mapStructVersion", "1.6.3")
     set("jjwtVersion", "0.11.5")
     // CVE-2026-43512/43513/43515/41284/41293/42498: fixed in Tomcat 10.1.55 (2026-05-05).
@@ -113,13 +113,18 @@ tasks.withType<Test> {
 
 // SpotBugs false-positive in JUnit tests: @BeforeEach-initialized fields are not seen
 // by SpotBugs as constructor-initialized, triggering NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR.
+//
+// EI_EXPOSE_REP2 on RedisNonceStore: the StringRedisTemplate field is a Spring-managed
+// singleton injected via constructor DI (T-GW-08 anti-replay nonce store) — a defensive
+// copy is not applicable for a shared Redis client bean.
 tasks.named("populateDefaultSpotBugsExcludes") {
     doLast {
         val f = file("${layout.buildDirectory.get()}/javaqa/spotbugs-excludes.xml")
         f.writeText(
             f.readText().replace(
                 "</FindBugsFilter>",
-                "    <Match>\n        <Bug pattern=\"NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR\"/>\n    </Match>\n</FindBugsFilter>"
+                "    <Match>\n        <Bug pattern=\"NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR\"/>\n    </Match>\n" +
+                    "    <Match>\n        <Class name=\"com.hotelpms.auth.security.RedisNonceStore\"/>\n        <Bug pattern=\"EI_EXPOSE_REP2\"/>\n    </Match>\n</FindBugsFilter>"
             )
         )
     }

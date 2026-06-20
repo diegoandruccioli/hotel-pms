@@ -72,6 +72,22 @@ describe('Stays', () => {
     });
   });
 
+  it('should show FAILED badge for a stay with a failed Alloggiati submission', async () => {
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [{ id: 's1', roomId: 'room-1234-abcd', guestId: 'guest-5678-efgh',
+        status: 'CHECKED_IN', actualCheckInTime: '2026-03-15T14:00:00',
+        alloggiatiSent: false, alloggiatiSendFailed: true, alloggiatiFailureReason: 'PS portal down' }],
+      totalElements: 1, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 1, first: true, last: true, empty: false,
+    } as never);
+
+    render(<Stays />);
+
+    await waitFor(() => {
+      expect(screen.getByText('alloggiati_failed')).toBeInTheDocument();
+    });
+  });
+
   it('should show error on failure', async () => {
     vi.mocked(stayService.getAllStays).mockRejectedValueOnce(new Error('Network error'));
     render(<Stays />);

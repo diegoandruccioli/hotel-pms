@@ -64,36 +64,12 @@ spring:
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
 
-        - id: inventory-service
-          uri: "${GW_INVENTORY_SERVICE_URI:http://inventory-service:8081}"
+        # frontdesk-service consolidates the former inventory/reservation/stay
+        # services into one deployable (ADR-001, backup/DECISIONS.md).
+        - id: frontdesk-service
+          uri: "${GW_FRONTDESK_SERVICE_URI:http://frontdesk-service:8081}"
           predicates:
-            - Path=/api/v1/rooms/**, /api/v1/room-types/**
-          filters:
-            - AuthenticationFilter
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 20
-                redis-rate-limiter.burstCapacity: 50
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@userKeyResolver}"
-
-        - id: reservation-service
-          uri: "${GW_RESERVATION_SERVICE_URI:http://reservation-service:8082}"
-          predicates:
-            - Path=/api/v1/reservations/**
-          filters:
-            - AuthenticationFilter
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 20
-                redis-rate-limiter.burstCapacity: 50
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@userKeyResolver}"
-
-        - id: stay-service
-          uri: "${GW_STAY_SERVICE_URI:http://stay-service:8084}"
-          predicates:
-            - Path=/api/v1/stays/**
+            - Path=/api/v1/rooms/**, /api/v1/room-types/**, /api/v1/reservations/**, /api/v1/stays/**
           filters:
             - AuthenticationFilter
             - name: RequestRateLimiter
@@ -136,19 +112,12 @@ spring:
           filters:
             - RewritePath=/auth-service/(?<remaining>.*), /${remaining}
 
-        - id: inventory-service-docs
-          uri: "${GW_INVENTORY_SERVICE_URI:http://inventory-service:8081}"
+        - id: frontdesk-service-docs
+          uri: "${GW_FRONTDESK_SERVICE_URI:http://frontdesk-service:8081}"
           predicates:
-            - Path=/inventory-service/v3/api-docs
+            - Path=/frontdesk-service/v3/api-docs
           filters:
-            - RewritePath=/inventory-service/(?<remaining>.*), /${remaining}
-
-        - id: reservation-service-docs
-          uri: "${GW_RESERVATION_SERVICE_URI:http://reservation-service:8082}"
-          predicates:
-            - Path=/reservation-service/v3/api-docs
-          filters:
-            - RewritePath=/reservation-service/(?<remaining>.*), /${remaining}
+            - RewritePath=/frontdesk-service/(?<remaining>.*), /${remaining}
 
         - id: guest-service-docs
           uri: "${GW_GUEST_SERVICE_URI:http://guest-service:8083}"
@@ -156,13 +125,6 @@ spring:
             - Path=/guest-service/v3/api-docs
           filters:
             - RewritePath=/guest-service/(?<remaining>.*), /${remaining}
-
-        - id: stay-service-docs
-          uri: "${GW_STAY_SERVICE_URI:http://stay-service:8084}"
-          predicates:
-            - Path=/stay-service/v3/api-docs
-          filters:
-            - RewritePath=/stay-service/(?<remaining>.*), /${remaining}
 
         - id: billing-service-docs
           uri: "${GW_BILLING_SERVICE_URI:http://billing-service:8085}"
@@ -186,14 +148,10 @@ springdoc:
     urls:
       - name: auth-service
         url: /auth-service/v3/api-docs
-      - name: inventory-service
-        url: /inventory-service/v3/api-docs
-      - name: reservation-service
-        url: /reservation-service/v3/api-docs
+      - name: frontdesk-service
+        url: /frontdesk-service/v3/api-docs
       - name: guest-service
         url: /guest-service/v3/api-docs
-      - name: stay-service
-        url: /stay-service/v3/api-docs
       - name: billing-service
         url: /billing-service/v3/api-docs
       - name: fb-service

@@ -6,11 +6,12 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
- * Feign client for fetching hotel profile settings from stay-service.
+ * Feign client for fetching hotel profile settings from the stays domain in
+ * frontdesk-service (formerly stay-service, see ADR-001 in backup/DECISIONS.md).
  * Used to populate hotel header data in generated PDF invoices.
  * The {@code X-Auth-Hotel} header is propagated automatically by {@link FeignHeaderConfig}.
  */
-@FeignClient(name = "stay-service-settings", url = "${application.config.stay-service-url}")
+@FeignClient(name = "frontdesk-service-settings", url = "${application.config.frontdesk-service-url}")
 @SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface HotelSettingsClient {
 

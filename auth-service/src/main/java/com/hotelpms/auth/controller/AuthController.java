@@ -42,6 +42,11 @@ public class AuthController {
     /**
      * Non-httpOnly cookie carrying the CSRF synchronization token (T-GW-05).
      * JavaScript must be able to read this value to echo it in the X-CSRF-Token header.
+     * Lifetime tracks {@code REFRESH_COOKIE_MAX_AGE} (the real session boundary), not
+     * {@code ACCESS_COOKIE_MAX_AGE}: the double-submit-cookie pattern's security
+     * property is unpredictability, not freshness, so there is no security reason to
+     * expire it every 15 minutes — doing so only forced spurious re-logins on any
+     * sustained workflow that outlived one access-token cycle.
      */
     private static final String CSRF_COOKIE_NAME = "csrf_token";
     private static final String COOKIE_PATH = "/";
@@ -74,7 +79,7 @@ public class AuthController {
                         createCookie(REFRESH_COOKIE_NAME, response.refreshToken(),
                                 REFRESH_COOKIE_MAX_AGE, REFRESH_COOKIE_PATH).toString())
                 .header(HttpHeaders.SET_COOKIE,
-                        createCsrfCookie(UUID.randomUUID().toString(), ACCESS_COOKIE_MAX_AGE).toString())
+                        createCsrfCookie(UUID.randomUUID().toString(), REFRESH_COOKIE_MAX_AGE).toString())
                 .build();
     }
 
@@ -100,7 +105,7 @@ public class AuthController {
                         createCookie(REFRESH_COOKIE_NAME, response.refreshToken(),
                                 REFRESH_COOKIE_MAX_AGE, REFRESH_COOKIE_PATH).toString())
                 .header(HttpHeaders.SET_COOKIE,
-                        createCsrfCookie(UUID.randomUUID().toString(), ACCESS_COOKIE_MAX_AGE).toString())
+                        createCsrfCookie(UUID.randomUUID().toString(), REFRESH_COOKIE_MAX_AGE).toString())
                 .body(body);
     }
 
@@ -129,7 +134,7 @@ public class AuthController {
                             createCookie(REFRESH_COOKIE_NAME, response.refreshToken(),
                                     REFRESH_COOKIE_MAX_AGE, REFRESH_COOKIE_PATH).toString())
                     .header(HttpHeaders.SET_COOKIE,
-                            createCsrfCookie(UUID.randomUUID().toString(), ACCESS_COOKIE_MAX_AGE).toString())
+                            createCsrfCookie(UUID.randomUUID().toString(), REFRESH_COOKIE_MAX_AGE).toString())
                     .build();
         } catch (final JwtException e) {
             log.warn("[AUTH] REFRESH_REJECTED | reason=INVALID_JWT | detail={}", e.getMessage());
@@ -210,7 +215,7 @@ public class AuthController {
                                     REFRESH_COOKIE_MAX_AGE, REFRESH_COOKIE_PATH).toString())
                     .header(HttpHeaders.SET_COOKIE,
                             createCsrfCookie(UUID.randomUUID().toString(),
-                                    ACCESS_COOKIE_MAX_AGE).toString())
+                                    REFRESH_COOKIE_MAX_AGE).toString())
                     .build();
         } catch (final JwtException | IllegalArgumentException e) {
             log.warn("[AUTH] CHANGE_PASSWORD_REJECTED | reason=INVALID_JWT | detail={}",

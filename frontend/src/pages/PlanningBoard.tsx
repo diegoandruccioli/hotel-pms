@@ -20,8 +20,8 @@ const ROW_HEIGHT = 64;
 
 const STATUS_COLORS: Record<string, string> = {
   CONFIRMED: 'bg-primary text-on-primary',
-  PENDING: 'bg-tertiary text-on-tertiary',
-  CHECKED_IN: 'bg-secondary text-on-secondary',
+  PENDING: 'bg-secondary text-on-secondary',
+  CHECKED_IN: 'bg-tertiary text-on-tertiary',
   CHECKED_OUT: 'bg-outline text-on-surface-variant',
   CANCELLED: 'bg-error text-on-error',
 };

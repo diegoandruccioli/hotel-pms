@@ -23,20 +23,10 @@ scrape_configs:
     static_configs:
       - targets: ["guest-service:8090"]
 
-  - job_name: "inventory-service"
+  - job_name: "frontdesk-service"
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["inventory-service:8090"]
-
-  - job_name: "reservation-service"
-    metrics_path: /actuator/prometheus
-    static_configs:
-      - targets: ["reservation-service:8090"]
-
-  - job_name: "stay-service"
-    metrics_path: /actuator/prometheus
-    static_configs:
-      - targets: ["stay-service:8090"]
+      - targets: ["frontdesk-service:8090"]
 
   - job_name: "billing-service"
     metrics_path: /actuator/prometheus

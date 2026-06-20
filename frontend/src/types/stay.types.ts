@@ -98,11 +98,22 @@ export interface StayResponse {
   createdAt: string;
   updatedAt: string;
   alloggiatiSent: boolean;
+  /** Whether the most recent Alloggiati Web submission attempt for this stay failed. */
+  alloggiatiSendFailed: boolean;
+  /** Error message from the most recent failed attempt; null once resolved. */
+  alloggiatiFailureReason?: string | null;
   guests?: StayGuestResponse[];
   /** Denormalized "Cognome Nome" set at check-in; null for legacy stays. */
   guestDisplayName?: string | null;
   /** Denormalized room number set at check-in; null for legacy stays. */
   roomNumber?: string | null;
+}
+
+/** Summary of unresolved Alloggiati Web submission failures for the caller's hotel. */
+export interface AlloggiatiFailureSummaryResponse {
+  failedCount: number;
+  mostRecentFailureAt?: string | null;
+  mostRecentFailureReason?: string | null;
 }
 
 export interface HotelSettingsRequest {

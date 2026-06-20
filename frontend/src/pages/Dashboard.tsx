@@ -1,11 +1,13 @@
-import { useEffect, useCallback, useMemo, memo } from 'react';
+import { useEffect, useCallback, useMemo, useState, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useDashboardStore } from '../store/dashboardStore';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Card } from '../components/m3/M3Card';
+import { stayService } from '../services/stayService';
 import type { RoomResponse, RoomStatus } from '../types/inventory.types';
+import type { AlloggiatiFailureSummaryResponse } from '../types/stay.types';
 
 const ROOM_GRID_STYLE = { gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))' } as const;
 
@@ -43,9 +45,18 @@ export const Dashboard = () => {
 
   const isOwnerOrAdmin = user?.role === 'OWNER' || user?.role === 'ADMIN';
 
+  const [alloggiatiFailures, setAlloggiatiFailures] = useState<AlloggiatiFailureSummaryResponse | null>(null);
+
   useEffect(() => {
     fetchStats(isOwnerOrAdmin);
   }, [fetchStats, isOwnerOrAdmin]);
+
+  useEffect(() => {
+    if (!isOwnerOrAdmin) return;
+    stayService.getAlloggiatiFailureSummary()
+      .then(setAlloggiatiFailures)
+      .catch(() => setAlloggiatiFailures(null));
+  }, [isOwnerOrAdmin]);
 
   const handleRefresh = useCallback(() => {
     fetchStats(isOwnerOrAdmin);
@@ -111,6 +122,27 @@ export const Dashboard = () => {
       <p className="mt-1 text-sm font-body text-on-surface-variant">
         {t('dashboard_subtitle')}
       </p>
+
+      {alloggiatiFailures && alloggiatiFailures.failedCount > 0 && (
+        <div
+          role="alert"
+          className="mt-4 flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container"
+        >
+          <MaterialIcon name="warning" size={20} className="flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-body font-medium">{t('alloggiati_failure_banner_title')}</p>
+            <p className="text-sm font-body">
+              {t('alloggiati_failure_banner_desc', { count: alloggiatiFailures.failedCount })}
+            </p>
+          </div>
+          <Link
+            to="/stays"
+            className="text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-error-container rounded"
+          >
+            {t('view_all')}
+          </Link>
+        </div>
+      )}
 
       {error ? (
         <div className="mt-8 flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container">

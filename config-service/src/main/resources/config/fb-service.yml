@@ -5,6 +5,15 @@ internal:
   hmac:
     secret: ${INTERNAL_HMAC_SECRET}
 
+spring:
+  data:
+    redis:
+      # Nonce store for internal HMAC anti-replay (T-GW-08). Same Redis
+      # instance used by api-gateway for rate limiting, on a separate
+      # key namespace (internal-auth:nonce:*).
+      host: ${INTERNAL_REDIS_HOST:redis}
+      port: ${INTERNAL_REDIS_PORT:6379}
+
 management:
   server:
     port: 8090
