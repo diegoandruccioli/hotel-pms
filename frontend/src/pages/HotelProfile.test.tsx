@@ -16,8 +16,9 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../services/stayService');
+const mockAddToast = vi.fn();
 vi.mock('../store/toastStore', () => ({
-  useToastStore: () => ({ addToast: vi.fn() }),
+  useToastStore: () => ({ addToast: mockAddToast }),
 }));
 
 const baseSettings: HotelSettingsResponse = {
@@ -111,6 +112,41 @@ describe('HotelProfile', () => {
         expect.objectContaining({ alloggiatiAutoSend: false }),
       );
     });
+  });
+
+  it('toggles alloggiatiAutoSend via the checkbox', async () => {
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+    const toggle = screen.getByRole('checkbox', { name: /label_alloggiati_auto_send/i });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(toggle).toBeChecked();
+  });
+
+  it('hides the logo preview image on load error', async () => {
+    vi.mocked(stayService.getHotelSettings).mockResolvedValue({ ...baseSettings, logoUrl: 'https://example.com/logo.png' });
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+    const img = screen.getByAltText('hotel logo preview') as HTMLImageElement;
+    fireEvent.error(img);
+    expect(img.style.display).toBe('none');
+  });
+
+  it('shows an error toast when loading settings fails', async () => {
+    vi.mocked(stayService.getHotelSettings).mockRejectedValue(new Error('boom'));
+    renderComponent();
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_profile_save', 'error'));
+  });
+
+  it('shows an error toast when saving settings fails', async () => {
+    vi.mocked(stayService.updateHotelSettings).mockRejectedValueOnce(new Error('boom'));
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /btn_save_profile/i }));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_profile_save', 'error'));
   });
 
   it('blocks save and shows an error when VAT number is malformed', async () => {

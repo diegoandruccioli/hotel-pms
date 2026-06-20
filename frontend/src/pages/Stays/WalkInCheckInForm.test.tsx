@@ -1,5 +1,5 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import userEvent from '@testing-library/user-event';
@@ -7,6 +7,10 @@ import { WalkInCheckInForm } from './WalkInCheckInForm';
 import { stayService } from '../../services/stayService';
 import { guestService } from '../../services/guestService';
 import type { StayResponse } from '../../types/stay.types';
+
+const ITALIA_STATO = { codice: '100000100', descrizione: 'ITALIA' };
+const FIANO_COMUNE = { codice: '412058036', descrizione: 'FIANO ROMANO', provincia: 'RM' };
+const PASOR_TIPDOC = { codice: 'PASOR', descrizione: 'PASSAPORTO ORDINARIO' };
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -192,6 +196,130 @@ describe('WalkInCheckInForm', () => {
     });
     expect(stayService.createStay).not.toHaveBeenCalled();
   });
+
+  it('submits successfully once all Alloggiati fields are filled, then navigates to /stays', async () => {
+    vi.mocked(guestService.searchGuests).mockResolvedValue([
+      { id: 'g1', firstName: 'Mario', lastName: 'Rossi', email: 'mario@test.com', createdAt: '2026-01-01T00:00:00', updatedAt: '2026-01-01T00:00:00', active: true },
+    ]);
+    vi.mocked(stayService.getLookupStati).mockResolvedValue([ITALIA_STATO]);
+    vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([PASOR_TIPDOC]);
+    vi.mocked(stayService.searchLookupComuni).mockResolvedValue([FIANO_COMUNE]);
+    vi.mocked(stayService.createStay).mockResolvedValue(mockStayResponse());
+
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<WalkInCheckInForm />} />
+          <Route path="/stays" element={<div>stays_page</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByLabelText(/walkin_label_room/i)).toBeInTheDocument());
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText(/walkin_label_room/i), 'r1');
+
+    const guestInput = screen.getByPlaceholderText('walkin_placeholder_guest');
+    await user.type(guestInput, 'Ma');
+    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /Mario/ }));
+
+    await user.type(screen.getByLabelText(/walkin_label_checkout_date/i), '2026-12-31');
+
+    fireEvent.change(screen.getByLabelText(/^label_gender/, { selector: 'select' }), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('label_date_of_birth'), { target: { value: '1990-01-01' } });
+
+    async function selectStato(label: string) {
+      const combo = screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' });
+      fireEvent.change(combo, { target: { value: 'ITA' } });
+      const option = await screen.findByRole('option', { name: /ITALIA/ });
+      fireEvent.mouseDown(option);
+    }
+    async function selectComune(label: string) {
+      const combo = screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' });
+      fireEvent.change(combo, { target: { value: 'FIA' } });
+      const option = await screen.findByRole('option', { name: /FIANO ROMANO/ });
+      fireEvent.mouseDown(option);
+    }
+
+    await selectStato('label_citizenship');
+    await selectStato('label_stato_nascita');
+    await selectComune('label_comune_nascita');
+    fireEvent.change(screen.getByLabelText(/^label_doc_type/, { selector: 'select' }), { target: { value: 'PASOR' } });
+    fireEvent.change(screen.getByLabelText('label_doc_number'), { target: { value: 'AB123456' } });
+    await selectStato('label_stato_rilascio_doc');
+    await selectComune('label_comune_rilascio_doc');
+
+    fireEvent.submit(document.querySelector('form')!);
+
+    await waitFor(() => {
+      expect(stayService.createStay).toHaveBeenCalledWith(expect.objectContaining({
+        guestId: 'g1',
+        roomId: 'r1',
+        status: 'CHECKED_IN',
+        expectedCheckOutDate: '2026-12-31',
+        guests: [expect.objectContaining({
+          firstName: 'Mario',
+          lastName: 'Rossi',
+          placeOfBirth: FIANO_COMUNE.codice,
+          documentType: 'PASOR',
+          documentNumber: 'AB123456',
+          documentPlaceOfIssue: FIANO_COMUNE.codice,
+          isPrimaryGuest: true,
+        })],
+      }));
+    });
+    await waitFor(() => expect(screen.getByText('stays_page')).toBeInTheDocument());
+  }, 15000);
+
+  it('shows err_checkin_failed when the createStay request rejects', async () => {
+    vi.mocked(guestService.searchGuests).mockResolvedValue([
+      { id: 'g1', firstName: 'Mario', lastName: 'Rossi', email: 'mario@test.com', createdAt: '2026-01-01T00:00:00', updatedAt: '2026-01-01T00:00:00', active: true },
+    ]);
+    vi.mocked(stayService.getLookupStati).mockResolvedValue([ITALIA_STATO]);
+    vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([PASOR_TIPDOC]);
+    vi.mocked(stayService.searchLookupComuni).mockResolvedValue([FIANO_COMUNE]);
+    vi.mocked(stayService.createStay).mockRejectedValue(new Error('boom'));
+
+    renderComponent();
+    await waitFor(() => expect(screen.getByLabelText(/walkin_label_room/i)).toBeInTheDocument());
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText(/walkin_label_room/i), 'r1');
+    const guestInput = screen.getByPlaceholderText('walkin_placeholder_guest');
+    await user.type(guestInput, 'Ma');
+    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /Mario/ }));
+    await user.type(screen.getByLabelText(/walkin_label_checkout_date/i), '2026-12-31');
+
+    fireEvent.change(screen.getByLabelText(/^label_gender/, { selector: 'select' }), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('label_date_of_birth'), { target: { value: '1990-01-01' } });
+
+    async function selectStato(label: string) {
+      const combo = screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' });
+      fireEvent.change(combo, { target: { value: 'ITA' } });
+      const option = await screen.findByRole('option', { name: /ITALIA/ });
+      fireEvent.mouseDown(option);
+    }
+    async function selectComune(label: string) {
+      const combo = screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' });
+      fireEvent.change(combo, { target: { value: 'FIA' } });
+      const option = await screen.findByRole('option', { name: /FIANO ROMANO/ });
+      fireEvent.mouseDown(option);
+    }
+
+    await selectStato('label_citizenship');
+    await selectStato('label_stato_nascita');
+    await selectComune('label_comune_nascita');
+    fireEvent.change(screen.getByLabelText(/^label_doc_type/, { selector: 'select' }), { target: { value: 'PASOR' } });
+    fireEvent.change(screen.getByLabelText('label_doc_number'), { target: { value: 'AB123456' } });
+    await selectStato('label_stato_rilascio_doc');
+    await selectComune('label_comune_rilascio_doc');
+
+    fireEvent.submit(document.querySelector('form')!);
+
+    expect(await screen.findByText('err_checkin_failed')).toBeInTheDocument();
+  }, 15000);
 
   it('adds and removes additional guest sections', async () => {
     renderComponent();

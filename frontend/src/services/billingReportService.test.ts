@@ -54,4 +54,31 @@ describe('billingReportService', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:http://test/123');
     appendChildSpy.mockRestore();
   });
+
+  it('uses a dash placeholder when issueDate is missing', () => {
+    const mockReport = {
+      startDate: '2026-01-01',
+      endDate: '2026-03-31',
+      totalRevenue: 500,
+      invoices: [
+        { invoiceNumber: 'INV-002', issueDate: undefined, totalAmount: 250, status: 'PENDING', guestId: 'g2' },
+      ],
+    };
+
+    const createObjectURL = vi.fn(() => 'blob:http://test/456');
+    const revokeObjectURL = vi.fn();
+    const clickFn = vi.fn();
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+
+    const appendChildSpy = vi.spyOn(document, 'createElement').mockReturnValue({
+      href: '',
+      download: '',
+      click: clickFn,
+    } as unknown as HTMLAnchorElement);
+
+    billingReportService.exportToCsv(mockReport as never);
+
+    expect(clickFn).toHaveBeenCalled();
+    appendChildSpy.mockRestore();
+  });
 });

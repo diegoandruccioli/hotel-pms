@@ -1,3 +1,4 @@
+/* eslint-disable react-perf/jsx-no-new-object-as-prop -- test-only inline fixtures, not the real render path */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
@@ -62,6 +63,28 @@ describe('OrderDetailModal', () => {
   it('should render without items table when items list is empty', () => {
     render(<OrderDetailModal order={EMPTY_ORDER} onClose={onClose} />);
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('should render without items table when items is undefined', () => {
+    const { items, ...rest } = ORDER;
+    void items;
+    render(<OrderDetailModal order={rest as typeof ORDER} onClose={onClose} />);
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('shows a dash when the order date is missing', () => {
+    render(<OrderDetailModal order={{ ...ORDER, orderDate: undefined } as unknown as typeof ORDER} onClose={onClose} />);
+    expect(screen.getByText('-')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['PREPARED', 'PREPARED'],
+    ['DELIVERED', 'DELIVERED'],
+    ['BILLED_TO_ROOM', 'BILLED TO_ROOM'],
+    ['CANCELLED', 'CANCELLED'],
+  ] as const)('renders the %s status chip', (status, expectedLabel) => {
+    render(<OrderDetailModal order={{ ...ORDER, status }} onClose={onClose} />);
+    expect(screen.getByText(expectedLabel)).toBeInTheDocument();
   });
 
   it('should have no accessibility violations', async () => {

@@ -26,6 +26,7 @@ vi.mock('../services/userService', () => ({
     createUser: vi.fn(),
     activateUser: vi.fn(),
     deactivateUser: vi.fn(),
+    resetUserPassword: vi.fn(),
   },
 }));
 
@@ -124,4 +125,177 @@ describe('AdminUsers', () => {
     await waitFor(() => screen.getByText('alice'));
     expect(await axe(container)).toHaveNoViolations();
   }, 30000);
+
+  it('shows an error toast when listUsers fails', async () => {
+    vi.mocked(userService.listUsers).mockRejectedValue(new Error('boom'));
+    render(<AdminUsers />);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_load_failed', 'error'));
+  });
+
+  it('shows the no_users message when the list is empty', async () => {
+    vi.mocked(userService.listUsers).mockResolvedValue([]);
+    render(<AdminUsers />);
+    await waitFor(() => expect(screen.getByText('no_users')).toBeInTheDocument());
+  });
+
+  it('shows an error toast when activate/deactivate fails', async () => {
+    vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
+    vi.mocked(userService.deactivateUser).mockRejectedValue(new Error('fail'));
+    render(<AdminUsers />);
+    await waitFor(() => screen.getByText('alice'));
+    fireEvent.click(screen.getByText('btn_deactivate'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_toggle_failed', 'error'));
+  });
+
+  describe('CreateUserModal', () => {
+    it('shows a validation error when required fields are missing', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([]);
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('btn_new_user'));
+      fireEvent.click(screen.getByText('btn_new_user'));
+
+      fireEvent.click(screen.getByText('btn_create'));
+      expect(await screen.findByText('err_all_fields_required')).toBeInTheDocument();
+      expect(userService.createUser).not.toHaveBeenCalled();
+    });
+
+    it('creates a user and shows a success toast', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([]);
+      const created = { ...USER_ACTIVE, id: 'u3', username: 'carol' };
+      vi.mocked(userService.createUser).mockResolvedValue(created as never);
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('btn_new_user'));
+      fireEvent.click(screen.getByText('btn_new_user'));
+
+      fireEvent.change(screen.getByLabelText('label_username'), { target: { value: 'carol' } });
+      fireEvent.change(screen.getByLabelText('label_email'), { target: { value: 'carol@hotel.com' } });
+      fireEvent.change(screen.getByLabelText('label_password'), { target: { value: 'Secret123!' } });
+      fireEvent.change(screen.getByLabelText('label_role'), { target: { value: 'OWNER' } });
+      fireEvent.click(screen.getByText('btn_create'));
+
+      await waitFor(() => expect(userService.createUser).toHaveBeenCalledWith({
+        username: 'carol', email: 'carol@hotel.com', password: 'Secret123!', role: 'OWNER',
+      }));
+      expect(mockAddToast).toHaveBeenCalledWith('toast_created', 'success');
+      expect(screen.queryByText('modal_create_title')).not.toBeInTheDocument();
+    });
+
+    it('shows an error when createUser fails', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([]);
+      vi.mocked(userService.createUser).mockRejectedValue(new Error('fail'));
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('btn_new_user'));
+      fireEvent.click(screen.getByText('btn_new_user'));
+
+      fireEvent.change(screen.getByLabelText('label_username'), { target: { value: 'carol' } });
+      fireEvent.change(screen.getByLabelText('label_email'), { target: { value: 'carol@hotel.com' } });
+      fireEvent.change(screen.getByLabelText('label_password'), { target: { value: 'Secret123!' } });
+      fireEvent.click(screen.getByText('btn_create'));
+
+      expect(await screen.findByText('err_create_failed')).toBeInTheDocument();
+    });
+
+    it('closes on Escape key', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([]);
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('btn_new_user'));
+      fireEvent.click(screen.getByText('btn_new_user'));
+      fireEvent.keyDown(screen.getByText('modal_create_title').closest('div')!, { key: 'Escape' });
+      expect(screen.queryByText('modal_create_title')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('ResetPasswordModal', () => {
+    it('opens via the reset-password button', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('alice'));
+      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      expect(screen.getByText('modal_reset_title')).toBeInTheDocument();
+    });
+
+    it('shows an error when the password is too short', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('alice'));
+      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+
+      fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: 'short' } });
+      fireEvent.click(screen.getByRole('button', { name: 'btn_reset_password' }));
+
+      expect(await screen.findByText('err_password_too_short')).toBeInTheDocument();
+      expect(userService.resetUserPassword).not.toHaveBeenCalled();
+    });
+
+    it('shows an error when the password is long but too weak', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('alice'));
+      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+
+      fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: 'aaaaaaaaaaaaaaaa' } });
+      fireEvent.click(screen.getByRole('button', { name: 'btn_reset_password' }));
+
+      expect(await screen.findByText('err_password_too_weak')).toBeInTheDocument();
+    });
+
+    it('shows an error when passwords do not match', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('alice'));
+      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+
+      fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: 'Secret123!!ABCDEF' } });
+      fireEvent.change(screen.getByLabelText('label_confirm_password'), { target: { value: 'Different123!!ABC' } });
+      fireEvent.click(screen.getByRole('button', { name: 'btn_reset_password' }));
+
+      expect(await screen.findByText('err_passwords_mismatch')).toBeInTheDocument();
+      expect(userService.resetUserPassword).not.toHaveBeenCalled();
+    });
+
+    it('resets the password successfully and shows a success toast', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
+      vi.mocked(userService.resetUserPassword).mockResolvedValue(undefined);
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('alice'));
+      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+
+      const strongPw = 'Secret123!!ABCDEF';
+      fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: strongPw } });
+      fireEvent.change(screen.getByLabelText('label_confirm_password'), { target: { value: strongPw } });
+      fireEvent.click(screen.getByRole('button', { name: 'btn_reset_password' }));
+
+      await waitFor(() => expect(userService.resetUserPassword).toHaveBeenCalledWith('u1', strongPw));
+      expect(mockAddToast).toHaveBeenCalledWith('toast_reset_success', 'success');
+      expect(screen.queryByText('modal_reset_title')).not.toBeInTheDocument();
+    });
+
+    it('shows an error when resetUserPassword fails', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
+      vi.mocked(userService.resetUserPassword).mockRejectedValue(new Error('fail'));
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('alice'));
+      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+
+      const strongPw = 'Secret123!!ABCDEF';
+      fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: strongPw } });
+      fireEvent.change(screen.getByLabelText('label_confirm_password'), { target: { value: strongPw } });
+      fireEvent.click(screen.getByRole('button', { name: 'btn_reset_password' }));
+
+      expect(await screen.findByText('err_reset_failed')).toBeInTheDocument();
+    });
+
+    it('closes via cancel and Escape', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('alice'));
+      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      fireEvent.click(screen.getByText('btn_cancel'));
+      expect(screen.queryByText('modal_reset_title')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      fireEvent.keyDown(screen.getByText('modal_reset_title').closest('div')!, { key: 'Escape' });
+      expect(screen.queryByText('modal_reset_title')).not.toBeInTheDocument();
+    });
+  });
 });

@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { Restaurant } from './Restaurant';
 import { fbService } from '../services/fbService';
+import type { MenuItemResponse } from '../types/fb.types';
 
 vi.mock('react-i18next', () => {
   const t = (key: string) => key;
@@ -13,7 +14,20 @@ vi.mock('react-i18next', () => {
 });
 
 vi.mock('../services/fbService', () => ({
-  fbService: { getAllOrders: vi.fn(), confirmOrder: vi.fn(), getMenuItems: vi.fn() },
+  fbService: {
+    getAllOrders: vi.fn(), confirmOrder: vi.fn(), getMenuItems: vi.fn(), deleteMenuItem: vi.fn(),
+  },
+}));
+
+const mockAddToast = vi.fn();
+vi.mock('../store/toastStore', () => ({
+  useToastStore: () => ({ addToast: mockAddToast }),
+}));
+
+let mockRole: string | undefined = undefined;
+vi.mock('../store/authStore', () => ({
+  useAuthStore: (selector: (s: { user: { role: string | undefined } | null }) => unknown) =>
+    selector({ user: mockRole ? { role: mockRole } : null }),
 }));
 
 vi.mock('./Restaurant/OrderFormModal', () => ({
@@ -28,6 +42,15 @@ vi.mock('./Restaurant/OrderDetailModal', () => ({
   OrderDetailModal: ({ onClose }: { onClose: () => void }) => (
     <div role="dialog" aria-label="order-detail">
       <button type="button" onClick={onClose}>close-detail</button>
+    </div>
+  ),
+}));
+
+vi.mock('./Restaurant/MenuFormModal', () => ({
+  MenuFormModal: ({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) => (
+    <div role="dialog" aria-label="menu-form">
+      <button type="button" onClick={onClose}>close-menu-form</button>
+      <button type="button" onClick={onSaved}>save-menu-form</button>
     </div>
   ),
 }));
@@ -48,8 +71,16 @@ const BILLED_ORDER = {
   status: 'BILLED_TO_ROOM',
 } as never;
 
+const MENU_ITEM: MenuItemResponse = {
+  id: 'mi1', name: 'Espresso', category: 'Generale', price: 2.5, available: true, description: null,
+};
+
 describe('Restaurant', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRole = undefined;
+    vi.mocked(fbService.getMenuItems).mockResolvedValue([]);
+  });
 
   it('should show loading spinner initially', () => {
     vi.mocked(fbService.getAllOrders).mockReturnValue(new Promise(() => {}));
@@ -186,6 +217,121 @@ describe('Restaurant', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'close-modal' }));
     expect(screen.queryByRole('dialog', { name: 'order-form' })).not.toBeInTheDocument();
+  });
+
+  it('does not render the menu management section for non-admin roles', async () => {
+    mockRole = 'RECEPTIONIST';
+    vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+    render(<Restaurant />);
+    await waitFor(() => expect(screen.getByText('no_orders')).toBeInTheDocument());
+    expect(screen.queryByText('menu_title')).not.toBeInTheDocument();
+    expect(fbService.getMenuItems).not.toHaveBeenCalled();
+  });
+
+  it('retries loading orders when try_again is clicked', async () => {
+    vi.mocked(fbService.getAllOrders).mockRejectedValueOnce(new Error('Network error'));
+    render(<Restaurant />);
+    await waitFor(() => expect(screen.getByText('error_loading_orders')).toBeInTheDocument());
+
+    vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+    fireEvent.click(screen.getByText('try_again'));
+    await waitFor(() => expect(screen.getByText('no_orders')).toBeInTheDocument());
+  });
+
+  describe('menu management (ADMIN/OWNER only)', () => {
+    beforeEach(() => {
+      mockRole = 'ADMIN';
+    });
+
+    it('renders the menu section with the empty-state message when there are no items', async () => {
+      vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+      render(<Restaurant />);
+      await waitFor(() => expect(screen.getByText('menu_title')).toBeInTheDocument());
+      expect(screen.getByText('menu_no_items')).toBeInTheDocument();
+    });
+
+    it('renders a menu item row with its name, category, price and availability', async () => {
+      vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+      vi.mocked(fbService.getMenuItems).mockResolvedValue([MENU_ITEM]);
+      render(<Restaurant />);
+      await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
+      expect(screen.getByText('Generale')).toBeInTheDocument();
+      expect(screen.getByText('menu_available_yes')).toBeInTheDocument();
+    });
+
+    it('shows menu_available_no for an unavailable item', async () => {
+      vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+      vi.mocked(fbService.getMenuItems).mockResolvedValue([{ ...MENU_ITEM, available: false } as never]);
+      render(<Restaurant />);
+      await waitFor(() => expect(screen.getByText('menu_available_no')).toBeInTheDocument());
+    });
+
+    it('opens the menu form to add a new item, then refreshes the list on save', async () => {
+      vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+      render(<Restaurant />);
+      await waitFor(() => expect(screen.getByText('menu_add_item')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('menu_add_item'));
+      expect(screen.getByRole('dialog', { name: 'menu-form' })).toBeInTheDocument();
+
+      vi.mocked(fbService.getMenuItems).mockResolvedValueOnce([MENU_ITEM]);
+      fireEvent.click(screen.getByText('save-menu-form'));
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'menu-form' })).not.toBeInTheDocument());
+      expect(fbService.getMenuItems).toHaveBeenCalled();
+    });
+
+    it('opens the menu form to edit an existing item', async () => {
+      vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+      vi.mocked(fbService.getMenuItems).mockResolvedValue([MENU_ITEM]);
+      render(<Restaurant />);
+      await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /menu_edit_item Espresso/ }));
+      expect(screen.getByRole('dialog', { name: 'menu-form' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('close-menu-form'));
+      expect(screen.queryByRole('dialog', { name: 'menu-form' })).not.toBeInTheDocument();
+    });
+
+    it('deletes a menu item after confirmation and shows a success toast', async () => {
+      vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+      vi.mocked(fbService.getMenuItems).mockResolvedValue([MENU_ITEM]);
+      vi.mocked(fbService.deleteMenuItem).mockResolvedValueOnce(undefined);
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      render(<Restaurant />);
+      await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+
+      await waitFor(() => expect(fbService.deleteMenuItem).toHaveBeenCalledWith('mi1'));
+      expect(mockAddToast).toHaveBeenCalledWith('menu_delete_success', 'success');
+    });
+
+    it('does not delete a menu item when the confirmation dialog is declined', async () => {
+      vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+      vi.mocked(fbService.getMenuItems).mockResolvedValue([MENU_ITEM]);
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      render(<Restaurant />);
+      await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+
+      expect(fbService.deleteMenuItem).not.toHaveBeenCalled();
+    });
+
+    it('shows an error toast when deleting a menu item fails', async () => {
+      vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+      vi.mocked(fbService.getMenuItems).mockResolvedValue([MENU_ITEM]);
+      vi.mocked(fbService.deleteMenuItem).mockRejectedValueOnce(new Error('boom'));
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      render(<Restaurant />);
+      await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('menu_delete_error', 'error'));
+    });
   });
 
   it('should have no accessibility violations', async () => {

@@ -58,4 +58,24 @@ describe('guestService', () => {
 
     expect(api.delete).toHaveBeenCalledWith('/api/v1/guests/1');
   });
+
+  it('should search guests with a query, URL-encoded and trimmed', async () => {
+    const mockGuests = [{ id: '1', firstName: 'Mario' }];
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { content: mockGuests } });
+
+    const result = await guestService.searchGuests('  mario rossi  ');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/guests/search?query=mario%20rossi');
+    expect(result).toEqual(mockGuests);
+  });
+
+  it('should fall back to the base listing when the search query is empty', async () => {
+    const mockGuests = [{ id: '1', firstName: 'Mario' }];
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { content: mockGuests } });
+
+    const result = await guestService.searchGuests('   ');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/guests');
+    expect(result).toEqual(mockGuests);
+  });
 });
