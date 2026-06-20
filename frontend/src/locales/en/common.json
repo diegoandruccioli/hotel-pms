@@ -73,7 +73,7 @@
   "no_active_stays": "No active stays found.",
   "action_checkout": "Check-out",
   "police_report_title": "Police Report / Alloggiati Web",
-  "police_report_desc": "Generate the daily arrival report in Italian Alloggiati Web format (pipe-delimited .txt). Select a date and click Generate to download the file.",
+  "police_report_desc": "Generate the daily arrival report in Italian Alloggiati Web format (fixed-width .txt). Select a date and click Generate to download the file.",
   "check_in_date": "Check-in Date",
   "generate_and_download": "Generate & Download",
   "failed_load_invoices": "Failed to load invoices",

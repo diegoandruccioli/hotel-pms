@@ -73,7 +73,7 @@
   "no_active_stays": "Nessun soggiorno attivo trovato.",
   "action_checkout": "Check-out",
   "police_report_title": "Schedine Alloggiati Web",
-  "police_report_desc": "Genera il report giornaliero arrivi nel formato italiano Alloggiati Web (txt separato da pipe). Seleziona una data per scaricare il file.",
+  "police_report_desc": "Genera il report giornaliero arrivi nel formato italiano Alloggiati Web (tracciato a larghezza fissa). Seleziona una data per scaricare il file.",
   "check_in_date": "Data di Arrivo",
   "generate_and_download": "Genera e Scarica",
   "failed_load_invoices": "Impossibile caricare le fatture",
