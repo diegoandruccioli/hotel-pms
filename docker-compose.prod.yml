@@ -1,0 +1,51 @@
+# ============================================================
+# Hotel PMS – Production port-hardening override
+# ============================================================
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Removes host port publishing for every service except the two
+# meant to be reachable from outside the host: frontend (:80) and
+# api-gateway (:8080). All other services (Postgres, Redis, Loki,
+# Grafana, Zipkin, Prometheus, config-server, and every backend
+# microservice) stay reachable on the internal compose networks —
+# inter-container DNS resolution does not depend on host port
+# publishing — but are no longer bound to the host's network
+# interface. OWASP A05 — Security Misconfiguration (ROADMAP P0).
+# ============================================================
+
+services:
+  postgres:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  loki:
+    ports: !reset []
+
+  grafana:
+    ports: !reset []
+
+  zipkin:
+    ports: !reset []
+
+  prometheus:
+    ports: !reset []
+
+  config-server:
+    ports: !reset []
+
+  auth-service:
+    ports: !reset []
+
+  guest-service:
+    ports: !reset []
+
+  frontdesk-service:
+    ports: !reset []
+
+  billing-service:
+    ports: !reset []
+
+  fb-service:
+    ports: !reset []
