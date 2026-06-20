@@ -188,7 +188,7 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
           </div>
 
           <div className="p-6 overflow-y-auto">
-            <form id="guest-form" onSubmit={handleSubmit} className="space-y-4">
+            <form id="guest-form" onSubmit={handleSubmit} noValidate className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="firstName" className="block text-sm font-medium font-body text-on-surface-variant mb-1">

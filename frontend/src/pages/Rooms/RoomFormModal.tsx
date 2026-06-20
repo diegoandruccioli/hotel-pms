@@ -99,7 +99,7 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
           </div>
 
           <div className="p-6 overflow-y-auto">
-            <form id="room-form" onSubmit={handleSubmit} className="space-y-4">
+            <form id="room-form" onSubmit={handleSubmit} noValidate className="space-y-4">
               
               <div className="grid grid-cols-2 gap-4">
                 <div>

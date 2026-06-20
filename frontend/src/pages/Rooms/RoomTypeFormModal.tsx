@@ -127,7 +127,7 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
           </div>
 
           <div className="p-6 overflow-y-auto">
-            <form id="room-type-form" onSubmit={handleSubmit} className="space-y-4">
+            <form id="room-type-form" onSubmit={handleSubmit} noValidate className="space-y-4">
               <div>
                 <label htmlFor="rtName" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                   {t('name')} *
