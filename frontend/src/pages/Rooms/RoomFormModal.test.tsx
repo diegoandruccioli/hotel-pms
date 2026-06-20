@@ -76,6 +76,15 @@ describe('RoomFormModal', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
   });
 
+  it('blocks submission and shows an error when room number is cleared', async () => {
+    render(<RoomFormModal room={ROOM} roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
+    fireEvent.change(screen.getByLabelText(/room_number/i), { target: { value: '' } });
+    fireEvent.submit(document.querySelector('form')!);
+
+    expect(await screen.findByText('common:err_required')).toBeInTheDocument();
+    expect(inventoryService.updateRoom).not.toHaveBeenCalled();
+  });
+
   it('renders room type options in select', () => {
     render(<RoomFormModal roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
     expect(screen.getByText('Single (Max 1 pax)')).toBeInTheDocument();

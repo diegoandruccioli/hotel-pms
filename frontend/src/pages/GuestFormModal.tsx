@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
 import { guestService } from '../services/guestService';
 import type { GuestResponseDTO, GuestRequestDTO } from '../types/guest.types';
 import { MaterialIcon } from '../components/MaterialIcon';
@@ -30,7 +31,20 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
   const addToast = useToastStore((s) => s.addToast);
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const guestSchema = useMemo(() => z.object({
+    firstName: z.string().trim().min(1, t('common:err_required')),
+    lastName: z.string().trim().min(1, t('common:err_required')),
+    email: z.union([z.string().trim().email(t('common:err_invalid_email')), z.literal('')]),
+    phoneNumber: z.string().trim(),
+    city: z.string(),
+    country: z.string(),
+  }).refine((data) => !!data.email || !!data.phoneNumber, {
+    message: t('err_email_or_phone'),
+    path: ['email'],
+  }), [t]);
+
   const { initPrefix, initNumber } = useMemo(() => {
     const initialPhone = guest?.phone || '';
     let prefix = '+39';
@@ -83,16 +97,33 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setFieldErrors({});
 
-    if (!(formData.email ?? '').trim() && !phoneNumber.trim()) {
-      addToast(t('err_email_or_phone'), 'error');
-      setLoading(false);
+    const result = guestSchema.safeParse({
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      email: formData.email ?? '',
+      phoneNumber: phoneNumber,
+      city: formData.city ?? '',
+      country: formData.country ?? '',
+    });
+
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0];
+        if (typeof field === 'string' && !errors[field]) {
+          errors[field] = issue.message;
+        }
+      }
+      setFieldErrors(errors);
       return;
     }
 
-    const finalPhone = phoneNumber.trim() ? `${phonePrefix} ${phoneNumber.trim()}` : undefined;
-    const finalEmail = (formData.email ?? '').trim() || undefined;
+    setLoading(true);
+
+    const finalPhone = result.data.phoneNumber ? `${phonePrefix} ${result.data.phoneNumber}` : undefined;
+    const finalEmail = result.data.email || undefined;
     const submitData = { ...formData, email: finalEmail, phone: finalPhone };
 
     try {
@@ -111,7 +142,7 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
     } finally {
       setLoading(false);
     }
-  }, [formData, phoneNumber, phonePrefix, guest, onSaved, addToast, t]);
+  }, [formData, phoneNumber, phonePrefix, guest, guestSchema, onSaved, addToast, t]);
 
   const handleDelete = useCallback(async () => {
     if (!guest) return;
@@ -163,13 +194,29 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
                   <label htmlFor="firstName" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                     {t('label_first_name')} *
                   </label>
-                  <input required type="text" id="firstName" name="firstName" value={formData.firstName} onChange={handleChange} className={inputClass} />
+                  <input
+                    type="text" id="firstName" name="firstName" value={formData.firstName} onChange={handleChange}
+                    className={inputClass}
+                    aria-invalid={!!fieldErrors.firstName}
+                    aria-describedby={fieldErrors.firstName ? 'firstName-error' : undefined}
+                  />
+                  {fieldErrors.firstName && (
+                    <p id="firstName-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.firstName}</p>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="lastName" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                     {t('label_last_name')} *
                   </label>
-                  <input required type="text" id="lastName" name="lastName" value={formData.lastName} onChange={handleChange} className={inputClass} />
+                  <input
+                    type="text" id="lastName" name="lastName" value={formData.lastName} onChange={handleChange}
+                    className={inputClass}
+                    aria-invalid={!!fieldErrors.lastName}
+                    aria-describedby={fieldErrors.lastName ? 'lastName-error' : undefined}
+                  />
+                  {fieldErrors.lastName && (
+                    <p id="lastName-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.lastName}</p>
+                  )}
                 </div>
               </div>
 
@@ -177,7 +224,15 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
                 <label htmlFor="email" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                   {t('label_email_hint')} *
                 </label>
-                <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} className={inputClass} />
+                <input
+                  type="email" id="email" name="email" value={formData.email} onChange={handleChange}
+                  className={inputClass}
+                  aria-invalid={!!fieldErrors.email}
+                  aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+                />
+                {fieldErrors.email && (
+                  <p id="email-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.email}</p>
+                )}
               </div>
 
               <div>

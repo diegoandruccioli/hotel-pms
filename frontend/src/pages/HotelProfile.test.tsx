@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
@@ -111,6 +111,17 @@ describe('HotelProfile', () => {
         expect.objectContaining({ alloggiatiAutoSend: false }),
       );
     });
+  });
+
+  it('blocks save and shows an error when VAT number is malformed', async () => {
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText(/label_vat_number/i), { target: { value: 'not-a-vat' } });
+    fireEvent.click(screen.getByRole('button', { name: /btn_save_profile/i }));
+
+    expect(await screen.findByText('common:err_invalid_vat')).toBeInTheDocument();
+    expect(stayService.updateHotelSettings).not.toHaveBeenCalled();
   });
 
   it('should have no accessibility violations', async () => {

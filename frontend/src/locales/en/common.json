@@ -269,5 +269,15 @@
   "pagination": "Pagination",
   "prev_page": "Previous",
   "next_page": "Next",
-  "page_x_of_y": "Page {{current}} of {{total}}"
+  "page_x_of_y": "Page {{current}} of {{total}}",
+
+  "err_required": "Required field",
+  "err_invalid_email": "Invalid email address",
+  "err_min_length": "Must be at least {{count}} characters",
+  "err_max_length": "Must not exceed {{count}} characters",
+  "err_must_be_positive": "Must be a positive number",
+  "err_invalid_number": "Must be a valid number",
+  "err_invalid_vat": "Invalid VAT number (11 digits required)",
+  "err_invalid_fiscal_code": "Invalid fiscal code",
+  "err_invalid_url": "Invalid URL"
 }

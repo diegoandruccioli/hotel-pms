@@ -82,6 +82,15 @@ describe('RoomTypeFormModal', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
   });
 
+  it('blocks submission and shows an error when max occupancy is zero', async () => {
+    render(<RoomTypeFormModal onClose={onClose} onSaved={onSaved} />);
+    fireEvent.change(screen.getByLabelText(/max_occupancy/i), { target: { value: '0' } });
+    fireEvent.submit(document.querySelector('form')!);
+
+    expect(await screen.findByText('common:err_must_be_positive')).toBeInTheDocument();
+    expect(inventoryService.createRoomType).not.toHaveBeenCalled();
+  });
+
   it('calls deleteRoomType and onSaved on confirm delete', async () => {
     vi.mocked(inventoryService.deleteRoomType).mockResolvedValue(undefined as never);
     render(<RoomTypeFormModal roomType={ROOM_TYPE} onClose={onClose} onSaved={onSaved} />);

@@ -1,5 +1,6 @@
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
 import { inventoryService } from '../../services/inventoryService';
 import type { RoomTypeRequest, RoomTypeResponse } from '../../types/inventory.types';
 import { MaterialIcon } from '../../components/MaterialIcon';
@@ -26,24 +27,51 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
     maxOccupancy: roomType?.maxOccupancy || 1,
     basePrice: roomType?.basePrice || 50.0,
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const roomTypeSchema = useMemo(() => z.object({
+    name: z.string().trim()
+      .min(1, t('common:err_required'))
+      .max(100, t('common:err_max_length', { count: 100 })),
+    maxOccupancy: z.number(t('common:err_invalid_number')).int().min(1, t('common:err_must_be_positive')),
+    basePrice: z.number(t('common:err_invalid_number')).positive(t('common:err_must_be_positive')),
+  }), [t]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ 
-      ...prev, 
-      [name]: name === 'maxOccupancy' || name === 'basePrice' ? Number(value) : value 
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'maxOccupancy' || name === 'basePrice' ? Number(value) : value
     }));
   }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    setFieldErrors({});
+
+    const result = roomTypeSchema.safeParse({
+      name: formData.name,
+      maxOccupancy: formData.maxOccupancy,
+      basePrice: formData.basePrice,
+    });
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0];
+        if (typeof field === 'string' && !errors[field]) errors[field] = issue.message;
+      }
+      setFieldErrors(errors);
+      return;
+    }
+
     setLoading(true);
+    const submitData = { ...formData, ...result.data };
     try {
       if (roomType) {
-        await inventoryService.updateRoomType(roomType.id, formData);
+        await inventoryService.updateRoomType(roomType.id, submitData);
         addToast(t('room_updated', { status: t('save') }), 'success');
       } else {
-        await inventoryService.createRoomType(formData);
+        await inventoryService.createRoomType(submitData);
         addToast(t('saving'), 'success'); // generic success
       }
       onSaved();
@@ -54,7 +82,7 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
     } finally {
       setLoading(false);
     }
-  }, [formData, roomType, onSaved, addToast, t]);
+  }, [formData, roomType, roomTypeSchema, onSaved, addToast, t]);
 
   const handleDelete = useCallback(async () => {
     if (!roomType) return;
@@ -105,14 +133,18 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
                   {t('name')} *
                 </label>
                 <input
-                  required
                   type="text"
                   id="rtName"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
                   className={inputClass}
+                  aria-invalid={!!fieldErrors.name}
+                  aria-describedby={fieldErrors.name ? 'rtName-error' : undefined}
                 />
+                {fieldErrors.name && (
+                  <p id="rtName-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.name}</p>
+                )}
               </div>
 
               <div>
@@ -135,7 +167,6 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
                     {t('max_occupancy')} *
                   </label>
                   <input
-                    required
                     type="number"
                     min="1"
                     id="rtMaxOccupancy"
@@ -143,14 +174,18 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
                     value={formData.maxOccupancy}
                     onChange={handleChange}
                     className={inputClass}
+                    aria-invalid={!!fieldErrors.maxOccupancy}
+                    aria-describedby={fieldErrors.maxOccupancy ? 'rtMaxOccupancy-error' : undefined}
                   />
+                  {fieldErrors.maxOccupancy && (
+                    <p id="rtMaxOccupancy-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.maxOccupancy}</p>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="rtBasePrice" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                     {t('base_price')} *
                   </label>
                   <input
-                    required
                     type="number"
                     min="0.01"
                     step="0.01"
@@ -159,7 +194,12 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
                     value={formData.basePrice}
                     onChange={handleChange}
                     className={inputClass}
+                    aria-invalid={!!fieldErrors.basePrice}
+                    aria-describedby={fieldErrors.basePrice ? 'rtBasePrice-error' : undefined}
                   />
+                  {fieldErrors.basePrice && (
+                    <p id="rtBasePrice-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.basePrice}</p>
+                  )}
                 </div>
               </div>
 

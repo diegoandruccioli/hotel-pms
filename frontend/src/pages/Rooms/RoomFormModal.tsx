@@ -1,5 +1,6 @@
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
 import { inventoryService } from '../../services/inventoryService';
 import type { RoomRequest, RoomResponse, RoomTypeResponse } from '../../types/inventory.types';
 import { MaterialIcon } from '../../components/MaterialIcon';
@@ -26,6 +27,14 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
     status: room?.status || 'CLEAN',
     hotelId: room?.hotelId || '',
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const roomSchema = useMemo(() => z.object({
+    roomNumber: z.string().trim()
+      .min(1, t('common:err_required'))
+      .max(10, t('common:err_max_length', { count: 10 })),
+    roomTypeId: z.string().trim().min(1, t('common:err_required')),
+  }), [t]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -34,13 +43,27 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    setFieldErrors({});
+
+    const result = roomSchema.safeParse({ roomNumber: formData.roomNumber, roomTypeId: formData.roomTypeId });
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0];
+        if (typeof field === 'string' && !errors[field]) errors[field] = issue.message;
+      }
+      setFieldErrors(errors);
+      return;
+    }
+
     setLoading(true);
+    const submitData = { ...formData, roomNumber: result.data.roomNumber, roomTypeId: result.data.roomTypeId };
     try {
       if (room) {
-        await inventoryService.updateRoom(room.id, formData);
+        await inventoryService.updateRoom(room.id, submitData);
         addToast(t('room_updated', { status: t('save') }), 'success');
       } else {
-        await inventoryService.createRoom(formData);
+        await inventoryService.createRoom(submitData);
         addToast(t('saving'), 'success');
       }
       onSaved();
@@ -51,7 +74,7 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
     } finally {
       setLoading(false);
     }
-  }, [formData, room, onSaved, addToast, t]);
+  }, [formData, room, roomSchema, onSaved, addToast, t]);
 
   const inputClass = "block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
 
@@ -84,7 +107,6 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
                     {t('room_number_col')} *
                   </label>
                   <input
-                    required
                     type="text"
                     id="roomNumber"
                     name="roomNumber"
@@ -92,7 +114,12 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
                     onChange={handleChange}
                     className={inputClass}
                     placeholder="101"
+                    aria-invalid={!!fieldErrors.roomNumber}
+                    aria-describedby={fieldErrors.roomNumber ? 'roomNumber-error' : undefined}
                   />
+                  {fieldErrors.roomNumber && (
+                    <p id="roomNumber-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.roomNumber}</p>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="roomStatus" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
@@ -117,12 +144,13 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
                   {t('room_type')} *
                 </label>
                 <select
-                  required
                   id="roomTypeId"
                   name="roomTypeId"
                   value={formData.roomTypeId}
                   onChange={handleChange}
                   className={inputClass}
+                  aria-invalid={!!fieldErrors.roomTypeId}
+                  aria-describedby={fieldErrors.roomTypeId ? 'roomTypeId-error' : undefined}
                 >
                   <option value="" disabled>{t('select_placeholder')}</option>
                   {roomTypes.map(rt => (
@@ -131,6 +159,9 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
                     </option>
                   ))}
                 </select>
+                {fieldErrors.roomTypeId && (
+                  <p id="roomTypeId-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.roomTypeId}</p>
+                )}
               </div>
 
             </form>
