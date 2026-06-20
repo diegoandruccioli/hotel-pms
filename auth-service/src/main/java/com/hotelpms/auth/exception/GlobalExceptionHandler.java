@@ -2,6 +2,7 @@ package com.hotelpms.auth.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -118,6 +119,22 @@ public class GlobalExceptionHandler {
         detail.setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/conflict")));
         detail.setProperty(TIMESTAMP, Instant.now());
         return detail;
+    }
+
+    /**
+     * Handles malformed request bodies (invalid JSON, unparseable enum values, etc.).
+     *
+     * @param ex the exception
+     * @return the problem detail mapping
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleHttpMessageNotReadableException(final HttpMessageNotReadableException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+                "INVALID_JSON_PAYLOAD");
+        problemDetail.setTitle("Bad Request");
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/bad-request")));
+        problemDetail.setProperty(TIMESTAMP, Instant.now());
+        return problemDetail;
     }
 
     /**
