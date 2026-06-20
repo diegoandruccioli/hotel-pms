@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.stays.service;
 
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
@@ -8,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -96,4 +98,23 @@ public interface StayService {
      * @return list of stay summaries, most recent first
      */
     List<StaySummaryResponse> getStayHistoryForGuest(@NonNull UUID guestId, @NonNull UUID hotelId);
+
+    /**
+     * Marks every stay checked in on {@code date} for {@code hotelId} as successfully sent
+     * to the Alloggiati Web portal, clearing any prior failure state. Called after a
+     * successful manual "Invia a Questura" submission.
+     *
+     * @param date    the check-in date that was just (re-)submitted
+     * @param hotelId the hotel UUID (tenant isolation)
+     */
+    void markAlloggiatiSentForDate(@NonNull LocalDate date, @NonNull UUID hotelId);
+
+    /**
+     * Returns a summary of unresolved Alloggiati Web submission failures for a hotel,
+     * for the Dashboard alert banner.
+     *
+     * @param hotelId the hotel UUID (tenant isolation)
+     * @return the failure summary
+     */
+    AlloggiatiFailureSummaryResponse getAlloggiatiFailureSummary(@NonNull UUID hotelId);
 }

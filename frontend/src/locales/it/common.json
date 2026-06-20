@@ -217,6 +217,10 @@
   "alloggiati_column": "Portale PS",
   "alloggiati_sent": "Inviato alla PS",
   "alloggiati_not_sent": "Non inviato",
+  "alloggiati_failed": "Invio fallito",
+  "alloggiati_failure_banner_title": "Invio Alloggiati non riuscito",
+  "alloggiati_failure_banner_desc_one": "1 soggiorno non è stato segnalato al Portale Alloggiati Web — verifica e reinvia da Soggiorni.",
+  "alloggiati_failure_banner_desc_other": "{{count}} soggiorni non sono stati segnalati al Portale Alloggiati Web — verifica e reinvia da Soggiorni.",
   "download_json_export": "Scarica Esportazione JSON",
   "alloggiati_json_downloaded": "Esportazione JSON del {{date}} scaricata.",
 

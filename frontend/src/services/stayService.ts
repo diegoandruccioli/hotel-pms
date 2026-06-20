@@ -1,6 +1,7 @@
 import api from './api';
 import type {
   AlloggiatiComune,
+  AlloggiatiFailureSummaryResponse,
   AlloggiatiStato,
   AlloggiatiTipdoc,
   AvailableRoom,
@@ -99,6 +100,13 @@ export const stayService = {
 
   getLookupTipdoc: async (): Promise<AlloggiatiTipdoc[]> => {
     const response = await api.get<AlloggiatiTipdoc[]>(`${BASE_PATH}/lookup/tipdoc`);
+    return response.data;
+  },
+
+  getAlloggiatiFailureSummary: async (): Promise<AlloggiatiFailureSummaryResponse> => {
+    const response = await api.get<AlloggiatiFailureSummaryResponse>(
+      `${BASE_PATH}/reports/alloggiati/failures/summary`,
+    );
     return response.data;
   },
 

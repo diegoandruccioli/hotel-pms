@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.stays.controller;
 
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
 import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
@@ -49,6 +50,7 @@ import java.util.UUID;
 public class StayController {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final String ROLE_ADMIN_OR_OWNER = "hasAnyRole('ADMIN', 'OWNER')";
 
     private final StayService stayService;
     private final AlloggiatiReportService alloggiatiReportService;
@@ -152,7 +154,7 @@ public class StayController {
      * @param date the check-in date in YYYY-MM-DD format
      * @return the downloadable fixed-width text report
      */
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     @GetMapping("/reports/alloggiati")
     @SuppressWarnings("PMD.LooseCoupling")
     public ResponseEntity<byte[]> downloadAlloggiatiReport(
@@ -178,7 +180,7 @@ public class StayController {
      * @param date the check-in date in YYYY-MM-DD format
      * @return the downloadable JSON array of guest arrival records
      */
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     @GetMapping("/reports/alloggiati/json")
     @SuppressWarnings("PMD.LooseCoupling")
     public ResponseEntity<List<AlloggiatiRowDto>> downloadAlloggiatiJson(
@@ -200,12 +202,26 @@ public class StayController {
      * @param date the check-in date in YYYY-MM-DD format
      * @return 200 OK on successful transmission
      */
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     @PostMapping("/reports/alloggiati/submit")
     public ResponseEntity<Void> submitAlloggiatiReport(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
-        alloggiatiWebSenderService.submitReport(date, Objects.requireNonNull(extractHotelId()));
+        final UUID hotelId = Objects.requireNonNull(extractHotelId());
+        alloggiatiWebSenderService.submitReport(date, hotelId);
+        stayService.markAlloggiatiSentForDate(date, hotelId);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Returns a summary of unresolved Alloggiati Web submission failures for the
+     * caller's hotel, used to drive the Dashboard alert banner.
+     *
+     * @return the failure summary
+     */
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
+    @GetMapping("/reports/alloggiati/failures/summary")
+    public ResponseEntity<AlloggiatiFailureSummaryResponse> getAlloggiatiFailureSummary() {
+        return ResponseEntity.ok(stayService.getAlloggiatiFailureSummary(Objects.requireNonNull(extractHotelId())));
     }
 
     /**

@@ -75,10 +75,18 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
         />
       </M3TableCell>
       <M3TableCell>
-        <M3StatusChip
-          label={stay.alloggiatiSent ? t('alloggiati_sent') : t('alloggiati_not_sent')}
-          tone={stay.alloggiatiSent ? 'success' : 'neutral'}
-        />
+        <span title={stay.alloggiatiSendFailed ? stay.alloggiatiFailureReason ?? undefined : undefined}>
+          <M3StatusChip
+            label={
+              stay.alloggiatiSent
+                ? t('alloggiati_sent')
+                : stay.alloggiatiSendFailed
+                  ? t('alloggiati_failed')
+                  : t('alloggiati_not_sent')
+            }
+            tone={stay.alloggiatiSent ? 'success' : stay.alloggiatiSendFailed ? 'error' : 'neutral'}
+          />
+        </span>
       </M3TableCell>
       <M3TableCell className="text-right">
         {stay.status === 'CHECKED_IN' && (

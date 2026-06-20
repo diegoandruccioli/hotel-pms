@@ -17,6 +17,7 @@ import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomService;
 import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
@@ -38,6 +39,7 @@ import org.springframework.lang.NonNull;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -60,6 +62,7 @@ public class StayServiceImpl implements StayService {
     private static final String PAID_STATUS = "PAID";
     private static final Set<ReservationStatus> CHECKIN_ALLOWED_STATUSES =
             Set.of(ReservationStatus.CONFIRMED, ReservationStatus.PARTIALLY_CHECKED_IN);
+    private static final int MAX_FAILURE_REASON_LENGTH = 500;
 
     private final StayRepository stayRepository;
     private final StayMapper stayMapper;
@@ -345,12 +348,73 @@ public class StayServiceImpl implements StayService {
         try {
             alloggiatiWebSenderService.submitReport(checkInDate, stay.getHotelId());
             stay.setAlloggiatiSent(true);
+            stay.setAlloggiatiSendFailed(false);
+            stay.setAlloggiatiFailureReason(null);
             stayRepository.save(stay);
             log.info("[STAY] ALLOGGIATI_SENT | stayId={} | date={}", stay.getId(), checkInDate);
         } catch (final ExternalServiceException ex) {
             log.error("[STAY] ALLOGGIATI_SEND_FAILED | stayId={} | date={} | reason={}",
                     stay.getId(), checkInDate, ex.getMessage());
+            stay.setAlloggiatiSendFailed(true);
+            stay.setAlloggiatiFailureReason(truncateFailureReason(ex.getMessage()));
+            stayRepository.save(stay);
         }
+    }
+
+    /**
+     * Truncates an Alloggiati failure message to fit the
+     * {@code stays.alloggiati_failure_reason} column ({@value #MAX_FAILURE_REASON_LENGTH} chars).
+     *
+     * @param message the raw exception message; may be null
+     * @return a column-safe string, never longer than the column limit
+     */
+    private static String truncateFailureReason(final String message) {
+        if (message == null) {
+            return null;
+        }
+        return message.length() > MAX_FAILURE_REASON_LENGTH
+                ? message.substring(0, MAX_FAILURE_REASON_LENGTH)
+                : message;
+    }
+
+    /**
+     * Marks every stay checked in on {@code date} for {@code hotelId} as successfully sent,
+     * clearing any prior failure state. Called after a successful manual
+     * "Invia a Questura" submission ({@code POST /reports/alloggiati/submit}), which today
+     * is the only recovery path for a failed automatic send — without this, the per-stay
+     * badge would keep showing FAILED forever even after staff successfully resubmitted
+     * the day's report by hand.
+     *
+     * @param date    the check-in date that was just (re-)submitted
+     * @param hotelId the hotel UUID (tenant isolation)
+     */
+    @Override
+    @Transactional
+    public void markAlloggiatiSentForDate(@NonNull final LocalDate date, @NonNull final UUID hotelId) {
+        final LocalDateTime start = date.atStartOfDay();
+        final LocalDateTime end = date.plusDays(1).atStartOfDay();
+        final List<Stay> stays = stayRepository.findByActualCheckInTimeBetweenAndHotelId(start, end, hotelId);
+        for (final Stay stay : stays) {
+            stay.setAlloggiatiSent(true);
+            stay.setAlloggiatiSendFailed(false);
+            stay.setAlloggiatiFailureReason(null);
+        }
+        stayRepository.saveAll(stays);
+        log.info("[STAY] ALLOGGIATI_MANUAL_SUBMIT_RECORDED | date={} | hotelId={} | staysUpdated={}",
+                date, hotelId, stays.size());
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public AlloggiatiFailureSummaryResponse getAlloggiatiFailureSummary(@NonNull final UUID hotelId) {
+        final List<Stay> failed = stayRepository.findByHotelIdAndAlloggiatiSendFailedTrue(hotelId);
+        final Optional<Stay> mostRecent = failed.stream()
+                .max(Comparator.comparing(Stay::getActualCheckInTime));
+        return new AlloggiatiFailureSummaryResponse(
+                failed.size(),
+                mostRecent.map(Stay::getActualCheckInTime).orElse(null),
+                mostRecent.map(Stay::getAlloggiatiFailureReason).orElse(null));
     }
 
     private void markRoomOccupied(final Stay stay) {

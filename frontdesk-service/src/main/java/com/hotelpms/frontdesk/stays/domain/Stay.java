@@ -148,6 +148,23 @@ public class Stay {
     private boolean alloggiatiSent;
 
     /**
+     * Whether the most recent Alloggiati Web submission attempt for this stay failed.
+     * Cleared (set back to {@code false}) as soon as a later attempt succeeds — this is
+     * the signal that drives the FAILED state of the per-stay badge and the Dashboard
+     * alert banner, distinct from "never attempted" ({@code alloggiatiSent=false} and
+     * this field also {@code false}, e.g. auto-send disabled for the hotel).
+     */
+    @Column(name = "alloggiati_send_failed", nullable = false)
+    private boolean alloggiatiSendFailed;
+
+    /**
+     * The error message from the most recent failed Alloggiati Web submission attempt,
+     * for display in the Dashboard alert banner. {@code null} once the failure is resolved.
+     */
+    @Column(name = "alloggiati_failure_reason")
+    private String alloggiatiFailureReason;
+
+    /**
      * Expected check-out date sourced from the reservation at check-in time.
      * Used to calculate the {@code permanenza} (number of nights) in the Alloggiati tracciato.
      * May be {@code null} for stays created before this feature was introduced.

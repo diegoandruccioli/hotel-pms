@@ -19,11 +19,13 @@ import java.util.UUID;
  * @param actualCheckOutTime the actual check out time
  * @param createdAt          the creation timestamp
  * @param updatedAt          the last update timestamp
- * @param invoiceId          the billing invoice folio UUID opened at check-in (may be null)
- * @param alloggiatiSent     whether the Alloggiati report was submitted to the PS portal
- * @param guests             the list of guests
- * @param guestDisplayName   denormalized primary guest "Cognome Nome", null for legacy stays
- * @param roomNumber         denormalized room number, null for legacy stays
+ * @param invoiceId               the billing invoice folio UUID opened at check-in (may be null)
+ * @param alloggiatiSent          whether the Alloggiati report was submitted to the PS portal
+ * @param alloggiatiSendFailed    whether the most recent Alloggiati submission attempt failed
+ * @param alloggiatiFailureReason the error from the most recent failed attempt, or null
+ * @param guests                  the list of guests
+ * @param guestDisplayName        denormalized primary guest "Cognome Nome", null for legacy stays
+ * @param roomNumber              denormalized room number, null for legacy stays
  */
 public record StayResponse(
                 UUID id,
@@ -38,6 +40,8 @@ public record StayResponse(
                 LocalDateTime updatedAt,
                 UUID invoiceId,
                 boolean alloggiatiSent,
+                boolean alloggiatiSendFailed,
+                String alloggiatiFailureReason,
                 List<StayGuestResponse> guests,
                 String guestDisplayName,
                 String roomNumber) {

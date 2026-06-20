@@ -93,6 +93,15 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
     List<Stay> findByActualCheckInTimeBetweenAndHotelId(LocalDateTime start, LocalDateTime end, UUID hotelId);
 
     /**
+     * Finds all stays for a hotel with an unresolved failed Alloggiati Web submission.
+     * Drives the Dashboard alert banner and the per-stay FAILED badge state.
+     *
+     * @param hotelId the hotel UUID (tenant isolation)
+     * @return list of stays whose most recent submission attempt failed
+     */
+    List<Stay> findByHotelIdAndAlloggiatiSendFailedTrue(UUID hotelId);
+
+    /**
      * Finds the most recent stay for a guest with the given status,
      * ordered by actual check-in time descending.
      * Used to pre-fill the check-in form for returning guests, after the

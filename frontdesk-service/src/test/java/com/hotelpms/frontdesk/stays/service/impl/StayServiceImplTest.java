@@ -49,6 +49,7 @@ import java.util.Objects;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.mockito.ArgumentMatchers;
@@ -77,6 +78,7 @@ class StayServiceImplTest {
     private static final String GUEST_EMAIL = "john@example.com";
     private static final String ROOM_NUMBER_101 = "101";
     private static final String ROOM_NOT_FOUND = "ROOM_NOT_FOUND";
+    private static final String PS_PORTAL_DOWN = "PS portal down";
     private static final String PAID_STATUS = "PAID";
 
     @Mock
@@ -139,7 +141,7 @@ class StayServiceImplTest {
 
         validResponse = new StayResponse(stayId, null, reservationId, guestId, roomId,
                 StayStatus.CHECKED_IN, savedStay.getActualCheckInTime(), null,
-                LocalDateTime.now(), LocalDateTime.now(), null, false, new ArrayList<>(), null, null);
+                LocalDateTime.now(), LocalDateTime.now(), null, false, false, null, new ArrayList<>(), null, null);
     }
 
     private ReservationResponse reservationResponse(
@@ -762,7 +764,7 @@ class StayServiceImplTest {
         when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(stayWithHotel);
         when(hotelSettingsService.getOrCreate(stayHotelId))
                 .thenReturn(new HotelSettingsResponse(stayHotelId, true, null, null, null, null, null));
-        doThrow(new ExternalServiceException("PS portal down", null))
+        doThrow(new ExternalServiceException(PS_PORTAL_DOWN, null))
                 .when(alloggiatiWebSenderService)
                 .submitReport(ArgumentMatchers.any(LocalDate.class), ArgumentMatchers.any(UUID.class));
         when(stayMapper.toDto(stayWithHotel)).thenReturn(Objects.requireNonNull(validResponse));
@@ -771,6 +773,72 @@ class StayServiceImplTest {
 
         assertNotNull(response);
         assertFalse(stayWithHotel.isAlloggiatiSent());
+        assertTrue(stayWithHotel.isAlloggiatiSendFailed());
+        assertEquals(PS_PORTAL_DOWN, stayWithHotel.getAlloggiatiFailureReason());
+    }
+
+    @Test
+    void shouldMarkStaysAsSentForDateAfterManualSubmit() {
+        final UUID date1HotelId = Objects.requireNonNull(hotelId);
+        final LocalDate date = LocalDate.now();
+        final Stay previouslyFailed = Stay.builder()
+                .id(UUID.randomUUID())
+                .hotelId(date1HotelId)
+                .alloggiatiSent(false)
+                .alloggiatiSendFailed(true)
+                .alloggiatiFailureReason(PS_PORTAL_DOWN)
+                .build();
+
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(
+                ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.eq(date1HotelId)))
+                .thenReturn(List.of(previouslyFailed));
+
+        stayService.markAlloggiatiSentForDate(date, date1HotelId);
+
+        assertTrue(previouslyFailed.isAlloggiatiSent());
+        assertFalse(previouslyFailed.isAlloggiatiSendFailed());
+        assertNull(previouslyFailed.getAlloggiatiFailureReason());
+        verify(stayRepository, times(1)).saveAll(List.of(previouslyFailed));
+    }
+
+    @Test
+    void shouldSummarizeAlloggiatiFailures() {
+        final UUID summaryHotelId = Objects.requireNonNull(hotelId);
+        final LocalDateTime now = LocalDateTime.now();
+        final Stay olderFailure = Stay.builder()
+                .id(UUID.randomUUID())
+                .actualCheckInTime(now.minusDays(1))
+                .alloggiatiSendFailed(true)
+                .alloggiatiFailureReason("Token expired")
+                .build();
+        final Stay newerFailure = Stay.builder()
+                .id(UUID.randomUUID())
+                .actualCheckInTime(now)
+                .alloggiatiSendFailed(true)
+                .alloggiatiFailureReason(PS_PORTAL_DOWN)
+                .build();
+
+        when(stayRepository.findByHotelIdAndAlloggiatiSendFailedTrue(summaryHotelId))
+                .thenReturn(List.of(olderFailure, newerFailure));
+
+        final var summary = stayService.getAlloggiatiFailureSummary(summaryHotelId);
+
+        assertEquals(2, summary.failedCount());
+        assertEquals(newerFailure.getActualCheckInTime(), summary.mostRecentFailureAt());
+        assertEquals(PS_PORTAL_DOWN, summary.mostRecentFailureReason());
+    }
+
+    @Test
+    void shouldReturnZeroFailuresWhenNoneExist() {
+        final UUID noFailuresHotelId = Objects.requireNonNull(hotelId);
+        when(stayRepository.findByHotelIdAndAlloggiatiSendFailedTrue(noFailuresHotelId))
+                .thenReturn(List.of());
+
+        final var summary = stayService.getAlloggiatiFailureSummary(noFailuresHotelId);
+
+        assertEquals(0, summary.failedCount());
+        assertNull(summary.mostRecentFailureAt());
+        assertNull(summary.mostRecentFailureReason());
     }
 
     @Test
