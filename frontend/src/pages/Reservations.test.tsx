@@ -170,7 +170,7 @@ describe('Reservations', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: /cancel_reservation res-1/ })).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /cancel_reservation res-1/ }));
-    fireEvent.click(screen.getAllByRole('button', { name: 'cancel_reservation' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => {
       expect(reservationService.cancelReservation).toHaveBeenCalledWith('res-1');

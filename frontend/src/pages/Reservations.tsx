@@ -312,7 +312,7 @@ export const Reservations = () => {
               {t('cancel')}
             </M3Button>
             <M3Button type="button" onClick={handleCancelConfirm} loading={cancelling}>
-              {t('cancel_reservation')}
+              {t('confirm')}
             </M3Button>
           </div>
         </M3Dialog>
