@@ -10,6 +10,7 @@ import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { M3Card } from '../components/m3/M3Card';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 const getTodayString = () => {
   const now = new Date();
@@ -31,7 +32,7 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
   checkingOut: string | null;
   formatDate: (d?: string) => string;
   getStatusTone: (s: StayStatus) => "success" | "neutral" | "info";
-  t: (k: string) => string;
+  t: TFunction;
   onGuestClick: (guestDisplayName: string) => void;
 }) => {
   const handleCheckOut = useCallback(() => {
@@ -68,7 +69,10 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
         </div>
       </M3TableCell>
       <M3TableCell>
-        <M3StatusChip label={stay.status.replace('_', ' ')} tone={getStatusTone(stay.status)} />
+        <M3StatusChip
+          label={t(`status_${stay.status.toLowerCase()}`, stay.status.replace('_', ' '))}
+          tone={getStatusTone(stay.status)}
+        />
       </M3TableCell>
       <M3TableCell>
         <M3StatusChip
