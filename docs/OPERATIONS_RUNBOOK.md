@@ -131,7 +131,7 @@ Se **tutti** gli account ADMIN sono stati disattivati e nessun utente può fare 
 
 ```bash
 # 1. Connettersi al container PostgreSQL
-docker exec -it postgres psql -U postgres -d hotel_auth
+docker exec -it hotel_postgres psql -U postgres -d hotel_auth
 
 # 2. Verificare gli account esistenti
 SELECT id, username, email, active, role FROM user_account WHERE role = 'ADMIN';
@@ -153,29 +153,44 @@ Al prossimo login l'admin sarà costretto a cambiare la password (`mustChangePas
 
 ---
 
-## 5. Backup manuale del database
+## 5. Backup del database
 
-Eseguire prima di ogni aggiornamento del sistema o operazione rischiosa.
+Un container `db-backup` (servizio `hotel_db_backup`) esegue `pg_dumpall`
+automaticamente ogni 24h, comprime il dump e mantiene gli ultimi 14 giorni
+(retention configurabile via `BACKUP_RETENTION_DAYS`/`BACKUP_INTERVAL_SECONDS`
+in `docker-compose.yml`). I dump finiscono nel volume `postgres_backups`.
+
+```bash
+# Elenca i backup automatici disponibili
+docker exec hotel_db_backup ls -lh /backups
+
+# Copia un backup fuori dal container (es. su NAS/S3 esterno)
+docker cp hotel_db_backup:/backups/hotel-pms-YYYYMMDD-HHMMSS.sql.gz .
+```
+
+Conservare periodicamente una copia in una posizione esterna al server
+(S3, NAS, ecc.) — il volume Docker da solo non protegge da un crash disco.
+
+### Backup manuale (prima di un aggiornamento o operazione rischiosa)
 
 ```bash
 # Backup di tutti i database hotel in un singolo file
-docker exec postgres pg_dumpall -U postgres > "backup-$(date +%Y%m%d-%H%M).sql"
+docker exec hotel_postgres pg_dumpall -U postgres > "backup-$(date +%Y%m%d-%H%M).sql"
 
-# Oppure backup del singolo DB (es. hotel_stay)
-docker exec postgres pg_dump -U postgres hotel_stay > "hotel_stay-$(date +%Y%m%d-%H%M).sql"
+# Oppure backup del singolo DB (es. hotel_frontdesk)
+docker exec hotel_postgres pg_dump -U postgres hotel_frontdesk > "hotel_frontdesk-$(date +%Y%m%d-%H%M).sql"
 
 # Verifica che il file sia stato creato e non sia vuoto
 ls -lh backup-*.sql
 ```
 
-Conservare i backup in una posizione esterna al server (S3, NAS, ecc.).
-Un backup automatizzato schedulato è in roadmap — vedi `docs/ROADMAP.md §P3`.
-
 ### Restore da backup
 
 ```bash
 # ATTENZIONE: sovrascrive tutti i dati esistenti
-docker exec -i postgres psql -U postgres < backup-YYYYMMDD-HHMM.sql
+gunzip -c hotel-pms-YYYYMMDD-HHMMSS.sql.gz | docker exec -i hotel_postgres psql -U postgres
+# oppure, da un backup manuale non compresso:
+docker exec -i hotel_postgres psql -U postgres < backup-YYYYMMDD-HHMM.sql
 ```
 
 ---
@@ -188,8 +203,8 @@ Se una migration ha rotto il DB e il servizio non si avvia:
 # 1. Identificare la migration problematica
 docker compose logs <servizio> | grep -i "flyway\|migration\|V[0-9]"
 
-# 2. Connettersi al DB del servizio (es. hotel_stay)
-docker exec -it postgres psql -U postgres -d hotel_stay
+# 2. Connettersi al DB del servizio (es. hotel_frontdesk)
+docker exec -it hotel_postgres psql -U postgres -d hotel_frontdesk
 
 # 3. Vedere lo stato delle migration
 SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 10;
@@ -240,7 +255,7 @@ curl -s -b /tmp/cookies.txt -X POST \
 
 ```bash
 # 1. Backup PRIMA dell'aggiornamento
-docker exec postgres pg_dumpall -U postgres > "backup-pre-update-$(date +%Y%m%d).sql"
+docker exec hotel_postgres pg_dumpall -U postgres > "backup-pre-update-$(date +%Y%m%d).sql"
 
 # 2. Pull dell'ultima versione del codice
 git pull origin main
@@ -273,7 +288,7 @@ docker compose logs --tail=200 | grep -E "ERROR|FATAL|Exception"
 curl -s http://localhost:8080/actuator/health
 
 # Step 4: connettività DB
-docker exec postgres psql -U postgres -c "SELECT 1" 2>&1
+docker exec hotel_postgres psql -U postgres -c "SELECT 1" 2>&1
 
 # Step 5: connettività Redis
 docker exec redis redis-cli ping
