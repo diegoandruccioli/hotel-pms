@@ -268,6 +268,18 @@ describe('ReservationForm', () => {
       expect(await screen.findByText('msg_valid_dates')).toBeInTheDocument();
     });
 
+    it('shows msg_valid_dates when checkout date is not after checkin date', async () => {
+      renderNew();
+      await waitFor(() => screen.getByText('new_reservation'));
+      fireEvent.click(screen.getByText('Select Guest'));
+      fireEvent.click(screen.getByText('Toggle Room r1'));
+      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-04-05' } });
+      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-04-01' } });
+      submitForm();
+      expect(await screen.findByText('msg_valid_dates')).toBeInTheDocument();
+      expect(reservationService.createReservation).not.toHaveBeenCalled();
+    });
+
     it('clears the selected guest via onClearGuest', async () => {
       renderNew();
       await waitFor(() => screen.getByText('new_reservation'));

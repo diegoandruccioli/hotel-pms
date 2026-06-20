@@ -197,6 +197,34 @@ describe('WalkInCheckInForm', () => {
     expect(stayService.createStay).not.toHaveBeenCalled();
   });
 
+  it('blocks submit when removing the primary guest leaves no primary set', async () => {
+    vi.mocked(guestService.searchGuests).mockResolvedValue([
+      { id: 'g1', firstName: 'Mario', lastName: 'Rossi', email: 'mario@test.com', createdAt: '2026-01-01T00:00:00', updatedAt: '2026-01-01T00:00:00', active: true },
+    ]);
+    const { container } = renderComponent();
+    await waitFor(() => expect(screen.getByLabelText(/walkin_label_room/i)).toBeInTheDocument());
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText(/walkin_label_room/i), 'r1');
+    const guestInput = screen.getByPlaceholderText('walkin_placeholder_guest');
+    await user.type(guestInput, 'Ma');
+    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /Mario/ }));
+    await user.type(screen.getByLabelText(/walkin_label_checkout_date/i), '2026-12-31');
+
+    // Add a second guest, then remove the original primary one — leaves zero primaries.
+    await user.click(screen.getByRole('button', { name: 'btn_add_guest' }));
+    const removeButtons = screen.getAllByRole('button', { name: 'btn_remove' });
+    await user.click(removeButtons[0]);
+
+    fireEvent.submit(container.querySelector('form')!);
+
+    await waitFor(() => {
+      expect(screen.getByText('err_primary_guest_required')).toBeInTheDocument();
+    });
+    expect(stayService.createStay).not.toHaveBeenCalled();
+  });
+
   it('submits successfully once all Alloggiati fields are filled, then navigates to /stays', async () => {
     vi.mocked(guestService.searchGuests).mockResolvedValue([
       { id: 'g1', firstName: 'Mario', lastName: 'Rossi', email: 'mario@test.com', createdAt: '2026-01-01T00:00:00', updatedAt: '2026-01-01T00:00:00', active: true },

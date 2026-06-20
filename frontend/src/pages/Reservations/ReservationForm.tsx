@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { z } from 'zod';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Card } from '../../components/m3/M3Card';
@@ -39,6 +40,15 @@ export const ReservationForm = () => {
   const [expectedGuests, setExpectedGuests] = useState<number | string>(1);
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
   const [status, setStatus] = useState<string>('CONFIRMED');
+
+  const reservationSchema = useMemo(() => z.object({
+    checkInDate: z.string().min(1, t('msg_valid_dates')),
+    checkOutDate: z.string().min(1, t('msg_valid_dates')),
+    expectedGuests: z.coerce.number().int().positive(t('err_must_be_positive')),
+  }).refine(
+    (data) => new Date(data.checkOutDate).getTime() > new Date(data.checkInDate).getTime(),
+    { message: t('msg_valid_dates'), path: ['checkOutDate'] },
+  ), [t]);
 
   const loadInitialData = useCallback(async () => {
     try {
@@ -101,8 +111,10 @@ export const ReservationForm = () => {
       setError(t('msg_select_room'));
       return;
     }
-    if (!checkInDate || !checkOutDate) {
-      setError(t('msg_valid_dates'));
+
+    const parsed = reservationSchema.safeParse({ checkInDate, checkOutDate, expectedGuests });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? t('msg_valid_dates'));
       return;
     }
 
@@ -131,10 +143,10 @@ export const ReservationForm = () => {
 
       const request: ReservationRequest = {
         guestId: selectedGuest.id,
-        checkInDate,
-        checkOutDate,
+        checkInDate: parsed.data.checkInDate,
+        checkOutDate: parsed.data.checkOutDate,
         status: status,
-        expectedGuests: Number(expectedGuests) || 1,
+        expectedGuests: parsed.data.expectedGuests,
         lineItems: selectedRoomIds.map(roomId => {
           const room = rooms.find(r => r.id === roomId);
           return {
@@ -160,7 +172,7 @@ export const ReservationForm = () => {
     } finally {
       setLoading(false);
     }
-  }, [isView, selectedGuest, selectedRoomIds, checkInDate, checkOutDate, status, expectedGuests, rooms, allReservations, id, t, navigate]);
+  }, [isView, selectedGuest, selectedRoomIds, checkInDate, checkOutDate, status, expectedGuests, rooms, allReservations, id, t, navigate, reservationSchema]);
 
   const toggleRoomSelection = useCallback((roomId: string) => {
     if (isView) return;
@@ -192,7 +204,7 @@ export const ReservationForm = () => {
   }
 
   return (
-    <form onSubmit={handleSubmitReservation} className="space-y-6 max-w-4xl mx-auto pb-10">
+    <form onSubmit={handleSubmitReservation} noValidate className="space-y-6 max-w-4xl mx-auto pb-10">
       <div className="flex items-center gap-4 border-b border-outline-variant pb-4">
         <button
           type="button"

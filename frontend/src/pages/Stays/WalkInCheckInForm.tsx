@@ -11,7 +11,7 @@ import { GuestFieldSection } from './StayGuestFieldSection';
 import {
   emptyGuest,
   TYPES_WITHOUT_DOC,
-  CODICE_ITALIA,
+  validateAlloggiatiGuests,
 } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
 
@@ -140,31 +140,10 @@ export function WalkInCheckInForm() {
       if (!selectedGuest)   { setError(t('walkin_err_guest_required')); return; }
       if (!expectedCheckOutDate) { setError(t('walkin_err_checkout_required')); return; }
 
-      // Per-guest Alloggiati validation
-      for (const [idx, g] of guests.entries()) {
-        const num = idx + 1;
-        const gHasDoc = !TYPES_WITHOUT_DOC.includes(g.travellerType as TravellerType);
-        const isItalianBorn = g._statoDiNascita === CODICE_ITALIA;
-        const isItalianDocIssue = g._statoRilascioDoc === CODICE_ITALIA;
-
-        if (!g._statoDiNascita) {
-          setError(t('err_stato_nascita_required', { number: num }));
-          return;
-        }
-        if (isItalianBorn && !g.placeOfBirth) {
-          setError(t('err_comune_nascita_required', { number: num }));
-          return;
-        }
-        if (gHasDoc) {
-          if (!g._statoRilascioDoc) {
-            setError(t('err_stato_rilascio_required', { number: num }));
-            return;
-          }
-          if (isItalianDocIssue && !g.documentPlaceOfIssue) {
-            setError(t('err_comune_rilascio_required', { number: num }));
-            return;
-          }
-        }
+      const issue = validateAlloggiatiGuests(guests, t);
+      if (issue) {
+        setError(issue);
+        return;
       }
 
       setLoading(true);
