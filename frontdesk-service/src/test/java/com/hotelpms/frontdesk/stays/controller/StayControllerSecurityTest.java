@@ -73,6 +73,7 @@ class StayControllerSecurityTest {
 
     private static final String PATH_SUBMIT = "/api/v1/stays/reports/alloggiati/submit";
     private static final String PATH_JSON = "/api/v1/stays/reports/alloggiati/json";
+    private static final String PATH_TXT = "/api/v1/stays/reports/alloggiati";
     private static final String PARAM_DATE = "date";
     private static final String TEST_DATE = "2026-05-17";
 
@@ -127,7 +128,7 @@ class StayControllerSecurityTest {
 
     @Test
     void submitAlloggiatiReportReturns200ForAdmin() throws Exception {
-        doNothing().when(alloggiatiWebSenderService).submitReport(any());
+        doNothing().when(alloggiatiWebSenderService).submitReport(any(), any());
 
         mockMvc.perform(withAuthHeaders(post(PATH_SUBMIT).param(PARAM_DATE, TEST_DATE),
                         USER_ADMIN, ROLE_ADMIN, TEST_HOTEL_ID))
@@ -145,12 +146,36 @@ class StayControllerSecurityTest {
 
     @Test
     void downloadAlloggiatiJsonReturns200ForOwner() throws Exception {
-        when(alloggiatiReportService.generateJsonReport(any())).thenReturn(List.of(
+        when(alloggiatiReportService.generateJsonReport(any(), any())).thenReturn(List.of(
                 new AlloggiatiRowDto("16", "17/05/2026", 1, "Rossi", "Mario",
                         "1", "01/01/1980", "", "", STATO_CODE, STATO_CODE, "PASSE", "AB123", STATO_CODE)));
 
         mockMvc.perform(withAuthHeaders(get(PATH_JSON).param(PARAM_DATE, TEST_DATE),
                         USER_OWNER, ROLE_OWNER, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    // ──────────────────────────────── txt export ───────────────────────────
+
+    /**
+     * Regression test for the IDOR/missing-authorization fix: this endpoint had
+     * no {@code @PreAuthorize} at all before the fix, so any authenticated user
+     * of any role could download every hotel's guest PII for a given date.
+     */
+    @Test
+    void downloadAlloggiatiTxtReturns403ForReceptionist() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(PATH_TXT).param(PARAM_DATE, TEST_DATE),
+                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void downloadAlloggiatiTxtReturns200ForAdmin() throws Exception {
+        when(alloggiatiReportService.generateReport(any(), any()))
+                .thenReturn("16        17/05/2026" + "01" + "Rossi");
+
+        mockMvc.perform(withAuthHeaders(get(PATH_TXT).param(PARAM_DATE, TEST_DATE),
+                        USER_ADMIN, ROLE_ADMIN, TEST_HOTEL_ID))
                 .andExpect(status().isOk());
     }
 

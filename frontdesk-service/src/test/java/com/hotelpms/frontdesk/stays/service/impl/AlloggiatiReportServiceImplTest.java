@@ -109,11 +109,13 @@ class AlloggiatiReportServiceImplTest {
 
     private LocalDate reportDate;
     private LocalDate checkOutDate;
+    private UUID hotelId;
 
     @BeforeEach
     void setUp() {
         reportDate = LocalDate.of(YEAR, MONTH, DAY);
         checkOutDate = reportDate.plusDays(NIGHTS_TO_CHECKOUT);
+        hotelId = UUID.randomUUID();
     }
 
     // -----------------------------------------------------------------------
@@ -213,12 +215,12 @@ class AlloggiatiReportServiceImplTest {
     @Test
     void shouldGenerateSingleOspiteRecord168Chars() {
         final StayGuest guest = guestItalian(TravellerType.OSPITE_SINGOLO, true);
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stayWith(guest)));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stayWith(guest)));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         assertNotNull(report);
         assertEquals(EXPECTED_RECORD_LEN, report.length(),
@@ -231,12 +233,12 @@ class AlloggiatiReportServiceImplTest {
     @Test
     void shouldNotHaveTrailingCrlfOnLastRecord() {
         final StayGuest guest = guestItalian(TravellerType.OSPITE_SINGOLO, true);
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stayWith(guest)));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stayWith(guest)));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         assertTrue(!report.endsWith(CRLF), "Last record must NOT be followed by CRLF");
     }
@@ -245,13 +247,13 @@ class AlloggiatiReportServiceImplTest {
     void shouldHaveCrlfBetweenRecordsButNotAfterLast() {
         final StayGuest capo = guestItalian(TravellerType.CAPOFAMIGLIA, true);
         final StayGuest familiare = guestFamiliare();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any()))
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(capo, familiare)));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         final String[] lines = report.split(CRLF, -1);
         assertEquals(2, lines.length, "Two records separated by one CRLF → 2 elements");
@@ -262,9 +264,9 @@ class AlloggiatiReportServiceImplTest {
 
     @Test
     void shouldGenerateEmptyReportWhenNoCheckIns() {
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of());
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         assertNotNull(report);
         assertTrue(report.isEmpty(), "No check-ins → empty report");
@@ -283,13 +285,13 @@ class AlloggiatiReportServiceImplTest {
             final StayGuest g = guestForeign(TravellerType.OSPITE_SINGOLO);
             stays.add(stayWith(g));
         }
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(stays);
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(stays);
         when(lookupService.findComuneByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
         assertThrows(AlloggiatiRowLimitExceededException.class,
-                () -> service.generateReport(reportDate),
+                () -> service.generateReport(reportDate, hotelId),
                 "Should throw when row count exceeds " + AlloggiatiReportServiceImpl.MAX_ROWS_PER_FILE);
     }
 
@@ -299,12 +301,12 @@ class AlloggiatiReportServiceImplTest {
         for (int i = 0; i < AlloggiatiReportServiceImpl.MAX_ROWS_PER_FILE; i++) {
             stays.add(stayWith(guestForeign(TravellerType.OSPITE_SINGOLO)));
         }
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(stays);
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(stays);
         when(lookupService.findComuneByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        assertDoesNotThrow(() -> service.generateReport(reportDate),
+        assertDoesNotThrow(() -> service.generateReport(reportDate, hotelId),
                 "Exactly 1000 rows should not throw");
     }
 
@@ -316,13 +318,13 @@ class AlloggiatiReportServiceImplTest {
     void shouldOrderCapofamigliaBeforeFamiliare() {
         final StayGuest capo = guestItalian(TravellerType.CAPOFAMIGLIA, true);
         final StayGuest familiare = guestFamiliare();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any()))
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(familiare, capo))); // reversed in input list
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         final String[] lines = report.split(CRLF, -1);
         assertEquals(2, lines.length, "Expected 2 records");
@@ -334,13 +336,13 @@ class AlloggiatiReportServiceImplTest {
     void shouldOrderCapogruppoBeforeMembroGruppo() {
         final StayGuest capo = guestItalian(TravellerType.CAPOGRUPPO, true);
         final StayGuest membro = guestMembroGruppo();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any()))
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(membro, capo))); // reversed in input list
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         final String[] lines = report.split(CRLF, -1);
         assertEquals(2, lines.length, "Expected 2 records");
@@ -356,13 +358,13 @@ class AlloggiatiReportServiceImplTest {
     void shouldBlankDocumentFieldsForFamiliare() {
         final StayGuest capo = guestItalian(TravellerType.CAPOFAMIGLIA, true);
         final StayGuest familiare = guestFamiliare();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any()))
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(capo, familiare)));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         final String[] lines = report.split(CRLF, -1);
         final String familiareLine = lines[1];
@@ -378,13 +380,13 @@ class AlloggiatiReportServiceImplTest {
     void shouldBlankDocumentFieldsForMembroGruppo() {
         final StayGuest capo = guestItalian(TravellerType.CAPOGRUPPO, true);
         final StayGuest membro = guestMembroGruppo();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any()))
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(capo, membro)));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         final String[] lines = report.split(CRLF, -1);
         final String membroLine = lines[1];
@@ -401,12 +403,12 @@ class AlloggiatiReportServiceImplTest {
     @Test
     void shouldUseBirthStatoCodeForForeignBornGuest() {
         final StayGuest guest = guestForeign(TravellerType.OSPITE_SINGOLO);
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stayWith(guest)));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stayWith(guest)));
         when(lookupService.findComuneByCodice(CODICE_GERMANIA)).thenReturn(Optional.empty());
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         assertEquals(BLANK_9, report.substring(POS_COMUNE_NASCITA_START, POS_COMUNE_NASCITA_END),
                 "comuneNascita must be blank for foreign-born");
@@ -419,12 +421,12 @@ class AlloggiatiReportServiceImplTest {
     @Test
     void shouldSetStatoNascitaToItalyForItalianBorn() {
         final StayGuest guest = guestItalian(TravellerType.OSPITE_SINGOLO, true);
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stayWith(guest)));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stayWith(guest)));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         assertEquals(CODICE_ITALIA, report.substring(POS_STATO_NASCITA_START, POS_STATO_NASCITA_END));
         assertEquals(PROVINCIA_ROMA, report.substring(POS_PROVINCIA_NASCITA_START, POS_PROVINCIA_NASCITA_END));
@@ -446,12 +448,12 @@ class AlloggiatiReportServiceImplTest {
                 .expectedCheckOutDate(null)
                 .build();
         stay.getGuests().add(guest);
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stay));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stay));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         assertEquals("01", report.substring(POS_PERMANENZA_START, POS_PERMANENZA_END));
     }
@@ -468,12 +470,12 @@ class AlloggiatiReportServiceImplTest {
                 .expectedCheckOutDate(reportDate.plusDays(NIGHTS_OVER_LIMIT))
                 .build();
         stay.getGuests().add(guest);
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stay));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stay));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         assertEquals("30", report.substring(POS_PERMANENZA_START, POS_PERMANENZA_END),
                 "Permanenza must be clamped to 30");
@@ -490,9 +492,9 @@ class AlloggiatiReportServiceImplTest {
                 .status(StayStatus.CHECKED_IN)
                 .actualCheckInTime(LocalDateTime.of(YEAR, MONTH, DAY, CHECKIN_HOUR, 0))
                 .build();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(emptyStay));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(emptyStay));
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         assertTrue(report.isEmpty(), "Stay with no guests must be skipped");
     }
@@ -500,22 +502,22 @@ class AlloggiatiReportServiceImplTest {
     @Test
     void shouldThrowWhenFamiliareHasNoCapofamiglia() {
         final StayGuest familiare = guestFamiliare(); // no CAPOFAMIGLIA in stay
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any()))
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(familiare)));
 
         final AlloggiatiValidationException ex = assertThrows(AlloggiatiValidationException.class,
-                () -> service.generateReport(reportDate));
+                () -> service.generateReport(reportDate, hotelId));
         assertTrue(ex.getMessage().contains("ALLOGGIATI_FAMILIARE_WITHOUT_CAPO"));
     }
 
     @Test
     void shouldThrowWhenMembroGruppoHasNoCapogruppo() {
         final StayGuest membro = guestMembroGruppo();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any()))
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(membro)));
 
         final AlloggiatiValidationException ex = assertThrows(AlloggiatiValidationException.class,
-                () -> service.generateReport(reportDate));
+                () -> service.generateReport(reportDate, hotelId));
         assertTrue(ex.getMessage().contains("ALLOGGIATI_MEMBRO_WITHOUT_CAPO"));
     }
 
@@ -523,11 +525,11 @@ class AlloggiatiReportServiceImplTest {
     void shouldThrowWhenMultipleCapofamigliaInSameStay() {
         final StayGuest capo1 = guestItalian(TravellerType.CAPOFAMIGLIA, true);
         final StayGuest capo2 = guestItalian(TravellerType.CAPOFAMIGLIA, false);
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any()))
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(capo1, capo2)));
 
         final AlloggiatiValidationException ex = assertThrows(AlloggiatiValidationException.class,
-                () -> service.generateReport(reportDate));
+                () -> service.generateReport(reportDate, hotelId));
         assertTrue(ex.getMessage().contains("ALLOGGIATI_MULTIPLE_CAPOFAMIGLIA"));
     }
 
@@ -543,10 +545,10 @@ class AlloggiatiReportServiceImplTest {
                 .expectedCheckOutDate(reportDate.minusDays(1)) // checkOut before arrival
                 .build();
         stay.getGuests().add(guest);
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stay));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stay));
 
         final AlloggiatiValidationException ex = assertThrows(AlloggiatiValidationException.class,
-                () -> service.generateReport(reportDate));
+                () -> service.generateReport(reportDate, hotelId));
         assertTrue(ex.getMessage().contains("ALLOGGIATI_INVALID_DATES"));
     }
 
@@ -571,12 +573,12 @@ class AlloggiatiReportServiceImplTest {
                 .isPrimaryGuest(true)
                 .travellerType(TravellerType.OSPITE_SINGOLO)
                 .build();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stayWith(guest)));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stayWith(guest)));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         assertEquals(EXPECTED_RECORD_LEN, report.length(), "Record must still be 168 chars after truncation");
         assertEquals("A".repeat(LEN_COGNOME_MAX), report.substring(POS_COGNOME_START, POS_COGNOME_END),
@@ -599,12 +601,12 @@ class AlloggiatiReportServiceImplTest {
                 .isPrimaryGuest(true)
                 .travellerType(TravellerType.OSPITE_SINGOLO)
                 .build();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stayWith(guest)));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stayWith(guest)));
         when(lookupService.findComuneByCodice(CODICE_GERMANIA)).thenReturn(Optional.empty());
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final List<AlloggiatiRowDto> rows = service.generateJsonReport(reportDate);
+        final List<AlloggiatiRowDto> rows = service.generateJsonReport(reportDate, hotelId);
 
         assertEquals(1, rows.size());
         assertEquals("Ångström", rows.get(0).cognome(),
@@ -628,12 +630,12 @@ class AlloggiatiReportServiceImplTest {
                 .isPrimaryGuest(true)
                 .travellerType(TravellerType.OSPITE_SINGOLO)
                 .build();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stayWith(guest)));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stayWith(guest)));
         when(lookupService.findComuneByCodice(CODICE_GERMANIA)).thenReturn(Optional.empty());
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = assertDoesNotThrow(() -> service.generateReport(reportDate),
+        final String report = assertDoesNotThrow(() -> service.generateReport(reportDate, hotelId),
                 "Null dateOfBirth must not throw");
 
         assertEquals(EXPECTED_RECORD_LEN, report.length());
@@ -650,14 +652,14 @@ class AlloggiatiReportServiceImplTest {
     void shouldGenerateMultipleStaysInSameExport() {
         final StayGuest italian = guestItalian(TravellerType.OSPITE_SINGOLO, true);
         final StayGuest foreign = guestForeign(TravellerType.OSPITE_SINGOLO);
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any()))
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(italian), stayWith(foreign)));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findComuneByCodice(CODICE_GERMANIA)).thenReturn(Optional.empty());
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         final String[] lines = report.split(CRLF, -1);
         assertEquals(2, lines.length, "Two stays with one guest each → 2 records");
@@ -672,12 +674,12 @@ class AlloggiatiReportServiceImplTest {
     @Test
     void e2eOspiteSingoloItaliano() {
         final StayGuest guest = guestItalian(TravellerType.OSPITE_SINGOLO, true);
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stayWith(guest)));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stayWith(guest)));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         // TIPALLOG=16, statoNascita=100000100, comuneNascita=058091000, provincia=RM
         assertEquals(TIPALLOG_16, report.substring(POS_TIPALLOG_START, POS_TIPALLOG_END));
@@ -698,13 +700,13 @@ class AlloggiatiReportServiceImplTest {
                 .placeOfBirth(CODICE_ROMA).citizenship(CODICE_ITALIA)
                 .documentType(null).documentNumber(null).documentPlaceOfIssue(null)
                 .isPrimaryGuest(false).travellerType(TravellerType.FAMILIARE).build();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any()))
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(fam1, capo, fam2))); // capo in middle
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
         final String[] lines = report.split(CRLF, -1);
 
         assertEquals(3, lines.length, "3 guests → 3 records");
@@ -724,13 +726,13 @@ class AlloggiatiReportServiceImplTest {
                 .placeOfBirth(CODICE_ROMA).citizenship(CODICE_ITALIA)
                 .documentType(null).documentNumber(null).documentPlaceOfIssue(null)
                 .isPrimaryGuest(false).travellerType(TravellerType.MEMBRO_GRUPPO).build();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any()))
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(m1, m2, capo)));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
         final String[] lines = report.split(CRLF, -1);
 
         assertEquals(3, lines.length, "3 guests → 3 records");
@@ -742,12 +744,12 @@ class AlloggiatiReportServiceImplTest {
     @Test
     void e2eOspiteEsteroConDocumentoEstero() {
         final StayGuest guest = guestForeign(TravellerType.OSPITE_SINGOLO);
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stayWith(guest)));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stayWith(guest)));
         when(lookupService.findComuneByCodice(CODICE_GERMANIA)).thenReturn(Optional.empty());
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
 
         assertEquals(EXPECTED_RECORD_LEN, report.length());
         // comuneNascita and provinciaNascita blank, statoNascita = Germany
@@ -771,14 +773,14 @@ class AlloggiatiReportServiceImplTest {
                 .documentType(CODICE_TIPDOC_PASS).documentNumber("FR1234567")
                 .documentPlaceOfIssue(CODICE_FRANCIA)
                 .isPrimaryGuest(true).travellerType(TravellerType.OSPITE_SINGOLO).build();
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any()))
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(italian), stayWith(french)));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findComuneByCodice(CODICE_FRANCIA)).thenReturn(Optional.empty());
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final String report = service.generateReport(reportDate);
+        final String report = service.generateReport(reportDate, hotelId);
         final String[] lines = report.split(CRLF, -1);
 
         assertEquals(2, lines.length);
@@ -798,12 +800,12 @@ class AlloggiatiReportServiceImplTest {
     @Test
     void shouldGenerateJsonReportWithCorrectFields() {
         final StayGuest guest = guestItalian(TravellerType.OSPITE_SINGOLO, true);
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of(stayWith(guest)));
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stayWith(guest)));
         when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
         when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
         when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
 
-        final List<AlloggiatiRowDto> rows = service.generateJsonReport(reportDate);
+        final List<AlloggiatiRowDto> rows = service.generateJsonReport(reportDate, hotelId);
 
         assertNotNull(rows);
         assertEquals(1, rows.size());
@@ -819,14 +821,14 @@ class AlloggiatiReportServiceImplTest {
         assertEquals(CODICE_TIPDOC_PASS, r.tipoDocumento());
         assertEquals(DOC_NUMBER, r.numeroDocumento());
         assertEquals(NIGHTS_TO_CHECKOUT, r.permanenza());
-        verify(stayRepository, times(1)).findByActualCheckInTimeBetween(any(), any());
+        verify(stayRepository, times(1)).findByActualCheckInTimeBetweenAndHotelId(any(), any(), any());
     }
 
     @Test
     void shouldGenerateEmptyJsonReportWhenNoCheckIns() {
-        when(stayRepository.findByActualCheckInTimeBetween(any(), any())).thenReturn(List.of());
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of());
 
-        final List<AlloggiatiRowDto> rows = service.generateJsonReport(reportDate);
+        final List<AlloggiatiRowDto> rows = service.generateJsonReport(reportDate, hotelId);
 
         assertNotNull(rows);
         assertTrue(rows.isEmpty());

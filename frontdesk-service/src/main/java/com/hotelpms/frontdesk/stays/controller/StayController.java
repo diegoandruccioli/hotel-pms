@@ -147,16 +147,17 @@ public class StayController {
 
     /**
      * Generates and downloads the Italian Alloggiati Web police report for all
-     * guests who checked in on the given date.
+     * guests who checked in on the given date, scoped to the caller's hotel.
      *
      * @param date the check-in date in YYYY-MM-DD format
-     * @return the downloadable pipe-delimited text report
+     * @return the downloadable fixed-width text report
      */
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     @GetMapping("/reports/alloggiati")
     @SuppressWarnings("PMD.LooseCoupling")
     public ResponseEntity<byte[]> downloadAlloggiatiReport(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
-        final String content = alloggiatiReportService.generateReport(date);
+        final String content = alloggiatiReportService.generateReport(date, Objects.requireNonNull(extractHotelId()));
         final byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
 
         final HttpHeaders headers = new HttpHeaders();
@@ -182,7 +183,8 @@ public class StayController {
     @SuppressWarnings("PMD.LooseCoupling")
     public ResponseEntity<List<AlloggiatiRowDto>> downloadAlloggiatiJson(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
-        final List<AlloggiatiRowDto> rows = alloggiatiReportService.generateJsonReport(date);
+        final List<AlloggiatiRowDto> rows =
+                alloggiatiReportService.generateJsonReport(date, Objects.requireNonNull(extractHotelId()));
         final HttpHeaders headers = new HttpHeaders();
         headers.setContentDisposition(
                 ContentDisposition.attachment()
@@ -202,7 +204,7 @@ public class StayController {
     @PostMapping("/reports/alloggiati/submit")
     public ResponseEntity<Void> submitAlloggiatiReport(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
-        alloggiatiWebSenderService.submitReport(date);
+        alloggiatiWebSenderService.submitReport(date, Objects.requireNonNull(extractHotelId()));
         return ResponseEntity.ok().build();
     }
 

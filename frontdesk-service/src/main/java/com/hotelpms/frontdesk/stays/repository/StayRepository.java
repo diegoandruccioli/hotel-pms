@@ -79,14 +79,18 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
     List<Stay> findAllByReservationIdAndHotelId(UUID reservationId, UUID hotelId);
 
     /**
-     * Finds all stays where actual check-in time falls within the given window.
-     * Used by the Alloggiati Web police report to extract daily arrivals.
+     * Finds all stays for a hotel where actual check-in time falls within the given
+     * window. Used by the Alloggiati Web police report to extract daily arrivals,
+     * scoped to the caller's hotel (IDOR/cross-tenant fix — this report is submitted
+     * to an external government portal under a single hotel's PS credentials, so an
+     * unscoped query would mix other hotels' guest PII into that submission).
      *
-     * @param start beginning of the time window (inclusive)
-     * @param end   end of the time window (exclusive)
-     * @return list of matching stays
+     * @param start   beginning of the time window (inclusive)
+     * @param end     end of the time window (exclusive)
+     * @param hotelId the hotel UUID (tenant isolation)
+     * @return list of matching stays within that hotel
      */
-    List<Stay> findByActualCheckInTimeBetween(LocalDateTime start, LocalDateTime end);
+    List<Stay> findByActualCheckInTimeBetweenAndHotelId(LocalDateTime start, LocalDateTime end, UUID hotelId);
 
     /**
      * Finds the most recent stay for a guest with the given status,

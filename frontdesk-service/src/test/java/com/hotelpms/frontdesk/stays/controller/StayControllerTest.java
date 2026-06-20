@@ -240,7 +240,7 @@ class StayControllerTest {
 
     @Test
     void shouldDownloadAlloggiatiTxtReturn200WithContentDisposition() throws Exception {
-        when(alloggiatiReportService.generateReport(any(LocalDate.class)))
+        when(alloggiatiReportService.generateReport(any(LocalDate.class), eq(hotelId)))
                 .thenReturn("16|01/05/2026|1|Rossi|Mario|1|01/01/1980||||Z000|Z000|PASSE|AB12345|Z000");
 
         mockMvc.perform(get(BASE_URL + PATH_REPORT_TXT)
@@ -256,7 +256,7 @@ class StayControllerTest {
         final AlloggiatiRowDto row = new AlloggiatiRowDto(
                 "16", "01/05/2026", 1, "Rossi", "Mario", "1",
                 "01/01/1980", "", "", STATO_CODE, STATO_CODE, "PASSE", "AB12345", STATO_CODE);
-        when(alloggiatiReportService.generateJsonReport(any(LocalDate.class)))
+        when(alloggiatiReportService.generateJsonReport(any(LocalDate.class), eq(hotelId)))
                 .thenReturn(List.of(row));
 
         mockMvc.perform(get(BASE_URL + PATH_REPORT_JSON)
@@ -267,7 +267,7 @@ class StayControllerTest {
 
     @Test
     void shouldSubmitAlloggiatiReportReturn200() throws Exception {
-        doNothing().when(alloggiatiWebSenderService).submitReport(any(LocalDate.class));
+        doNothing().when(alloggiatiWebSenderService).submitReport(any(LocalDate.class), eq(hotelId));
 
         mockMvc.perform(post(BASE_URL + PATH_REPORT_SUBMIT)
                         .param(PARAM_DATE, TEST_DATE))

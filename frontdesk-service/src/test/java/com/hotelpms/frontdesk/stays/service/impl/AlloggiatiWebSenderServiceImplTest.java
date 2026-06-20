@@ -96,12 +96,14 @@ class AlloggiatiWebSenderServiceImplTest {
     private MockRestServiceServer server;
     private RestTemplate restTemplate;
     private LocalDate reportDate;
+    private java.util.UUID hotelId;
 
     @BeforeEach
     void setUp() {
         restTemplate = new RestTemplate();
         server = MockRestServiceServer.createServer(restTemplate);
         reportDate = LocalDate.of(YEAR, MONTH, DAY);
+        hotelId = java.util.UUID.randomUUID();
     }
 
     private AlloggiatiWebSenderServiceImpl buildService(final boolean dryRun) {
@@ -126,7 +128,7 @@ class AlloggiatiWebSenderServiceImplTest {
     @Test
     void shouldCallGenerateTokenThenSend() {
         final AlloggiatiWebSenderServiceImpl service = buildService(false);
-        when(alloggiatiReportService.generateReport(reportDate)).thenReturn(SAMPLE_RECORD);
+        when(alloggiatiReportService.generateReport(reportDate, hotelId)).thenReturn(SAMPLE_RECORD);
 
         server.expect(requestTo(SERVICE_URL))
                 .andExpect(method(java.util.Objects.requireNonNull(HttpMethod.POST)))
@@ -140,16 +142,16 @@ class AlloggiatiWebSenderServiceImplTest {
                 .andExpect(content().string(containsString("<Send")))
                 .andRespond(withSuccess(SEND_SUCCESS_RESPONSE, org.springframework.http.MediaType.TEXT_XML));
 
-        service.submitReport(reportDate);
+        service.submitReport(reportDate, hotelId);
 
         server.verify();
-        verify(alloggiatiReportService).generateReport(reportDate);
+        verify(alloggiatiReportService).generateReport(reportDate, hotelId);
     }
 
     @Test
     void shouldCallTestInsteadOfSendInDryRunMode() {
         final AlloggiatiWebSenderServiceImpl service = buildService(true);
-        when(alloggiatiReportService.generateReport(reportDate)).thenReturn(SAMPLE_RECORD);
+        when(alloggiatiReportService.generateReport(reportDate, hotelId)).thenReturn(SAMPLE_RECORD);
 
         server.expect(requestTo(SERVICE_URL))
                 .andExpect(content().string(containsString("<GenerateToken")))
@@ -162,7 +164,7 @@ class AlloggiatiWebSenderServiceImplTest {
                         SEND_SUCCESS_RESPONSE.replace("Send", "Test"),
                         org.springframework.http.MediaType.TEXT_XML));
 
-        service.submitReport(reportDate);
+        service.submitReport(reportDate, hotelId);
 
         server.verify();
     }
@@ -170,7 +172,7 @@ class AlloggiatiWebSenderServiceImplTest {
     @Test
     void shouldIncludeSoapContentTypeHeader() {
         final AlloggiatiWebSenderServiceImpl service = buildService(false);
-        when(alloggiatiReportService.generateReport(reportDate)).thenReturn(SAMPLE_RECORD);
+        when(alloggiatiReportService.generateReport(reportDate, hotelId)).thenReturn(SAMPLE_RECORD);
 
         server.expect(requestTo(SERVICE_URL))
                 .andExpect(header(HttpHeaders.CONTENT_TYPE, containsString("text/xml")))
@@ -180,13 +182,13 @@ class AlloggiatiWebSenderServiceImplTest {
                 .andExpect(header(HttpHeaders.CONTENT_TYPE, containsString("text/xml")))
                 .andRespond(withSuccess(SEND_SUCCESS_RESPONSE, org.springframework.http.MediaType.TEXT_XML));
 
-        service.submitReport(reportDate);
+        service.submitReport(reportDate, hotelId);
     }
 
     @Test
     void shouldIncludeWsKeyInGenerateTokenBody() {
         final AlloggiatiWebSenderServiceImpl service = buildService(false);
-        when(alloggiatiReportService.generateReport(reportDate)).thenReturn(SAMPLE_RECORD);
+        when(alloggiatiReportService.generateReport(reportDate, hotelId)).thenReturn(SAMPLE_RECORD);
 
         server.expect(requestTo(SERVICE_URL))
                 .andExpect(content().string(containsString("<WsKey>")))
@@ -196,25 +198,25 @@ class AlloggiatiWebSenderServiceImplTest {
         server.expect(requestTo(SERVICE_URL))
                 .andRespond(withSuccess(SEND_SUCCESS_RESPONSE, org.springframework.http.MediaType.TEXT_XML));
 
-        service.submitReport(reportDate);
+        service.submitReport(reportDate, hotelId);
         server.verify();
     }
 
     @Test
     void shouldThrowExternalServiceExceptionOnTokenGenerationFailure() {
         final AlloggiatiWebSenderServiceImpl service = buildService(false);
-        when(alloggiatiReportService.generateReport(reportDate)).thenReturn(SAMPLE_RECORD);
+        when(alloggiatiReportService.generateReport(reportDate, hotelId)).thenReturn(SAMPLE_RECORD);
 
         server.expect(requestTo(SERVICE_URL))
                 .andRespond(withServerError());
 
-        assertThrows(ExternalServiceException.class, () -> service.submitReport(reportDate));
+        assertThrows(ExternalServiceException.class, () -> service.submitReport(reportDate, hotelId));
     }
 
     @Test
     void shouldThrowExternalServiceExceptionWhenSendReturnsEsitoFalse() {
         final AlloggiatiWebSenderServiceImpl service = buildService(false);
-        when(alloggiatiReportService.generateReport(reportDate)).thenReturn(SAMPLE_RECORD);
+        when(alloggiatiReportService.generateReport(reportDate, hotelId)).thenReturn(SAMPLE_RECORD);
 
         server.expect(requestTo(SERVICE_URL))
                 .andRespond(withSuccess(TOKEN_RESPONSE, org.springframework.http.MediaType.TEXT_XML));
@@ -222,16 +224,16 @@ class AlloggiatiWebSenderServiceImplTest {
         server.expect(requestTo(SERVICE_URL))
                 .andRespond(withSuccess(SEND_FAILURE_RESPONSE, org.springframework.http.MediaType.TEXT_XML));
 
-        assertThrows(ExternalServiceException.class, () -> service.submitReport(reportDate));
+        assertThrows(ExternalServiceException.class, () -> service.submitReport(reportDate, hotelId));
     }
 
     @Test
     void shouldSkipSubmissionForEmptyReport() {
         final AlloggiatiWebSenderServiceImpl service = buildService(false);
-        when(alloggiatiReportService.generateReport(reportDate)).thenReturn("");
+        when(alloggiatiReportService.generateReport(reportDate, hotelId)).thenReturn("");
 
         // No HTTP calls expected — server.verify() would fail if any calls were made
-        service.submitReport(reportDate);
+        service.submitReport(reportDate, hotelId);
 
         server.verify();
     }
@@ -239,7 +241,7 @@ class AlloggiatiWebSenderServiceImplTest {
     @Test
     void shouldIncludeRecordInElencoSchedine() {
         final AlloggiatiWebSenderServiceImpl service = buildService(false);
-        when(alloggiatiReportService.generateReport(reportDate)).thenReturn(SAMPLE_RECORD);
+        when(alloggiatiReportService.generateReport(reportDate, hotelId)).thenReturn(SAMPLE_RECORD);
 
         server.expect(requestTo(SERVICE_URL))
                 .andRespond(withSuccess(TOKEN_RESPONSE, org.springframework.http.MediaType.TEXT_XML));
@@ -249,7 +251,7 @@ class AlloggiatiWebSenderServiceImplTest {
                 .andExpect(content().string(containsString("Rossi")))
                 .andRespond(withSuccess(SEND_SUCCESS_RESPONSE, org.springframework.http.MediaType.TEXT_XML));
 
-        service.submitReport(reportDate);
+        service.submitReport(reportDate, hotelId);
         server.verify();
     }
 }

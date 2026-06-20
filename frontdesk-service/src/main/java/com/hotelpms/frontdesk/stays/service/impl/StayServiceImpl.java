@@ -343,7 +343,7 @@ public class StayServiceImpl implements StayService {
         }
         final LocalDate checkInDate = stay.getActualCheckInTime().toLocalDate();
         try {
-            alloggiatiWebSenderService.submitReport(checkInDate);
+            alloggiatiWebSenderService.submitReport(checkInDate, stay.getHotelId());
             stay.setAlloggiatiSent(true);
             stayRepository.save(stay);
             log.info("[STAY] ALLOGGIATI_SENT | stayId={} | date={}", stay.getId(), checkInDate);

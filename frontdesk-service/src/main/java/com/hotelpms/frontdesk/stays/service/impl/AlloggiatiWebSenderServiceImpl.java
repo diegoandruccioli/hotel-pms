@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Submits the Alloggiati Web report to the Polizia di Stato SOAP service.
@@ -115,10 +116,11 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
 
     /** {@inheritDoc} */
     @Override
-    public void submitReport(final LocalDate date) {
-        log.info("{} ALLOGGIATI_SUBMISSION_START | date={} | dryRun={}", LOG_PREFIX, date, dryRun);
+    public void submitReport(final LocalDate date, final UUID hotelId) {
+        log.info("{} ALLOGGIATI_SUBMISSION_START | date={} | hotelId={} | dryRun={}",
+                LOG_PREFIX, date, hotelId, dryRun);
 
-        final String report = alloggiatiReportService.generateReport(date);
+        final String report = alloggiatiReportService.generateReport(date, hotelId);
         if (report.isBlank()) {
             log.info("{} ALLOGGIATI_SUBMISSION_SKIPPED | date={} | reason=EMPTY_REPORT",
                     LOG_PREFIX, date);

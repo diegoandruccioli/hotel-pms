@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Generates the Italian Alloggiati Web police report (tracciato 168 caratteri).
@@ -78,9 +79,9 @@ public class AlloggiatiReportServiceImpl implements AlloggiatiReportService {
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
-    public String generateReport(final LocalDate date) {
-        log.info("Generating Alloggiati Web report (168-char tracciato) for date: {}", date);
-        final List<AlloggiatiRowDto> rows = buildRows(date);
+    public String generateReport(final LocalDate date, final UUID hotelId) {
+        log.info("Generating Alloggiati Web report (168-char tracciato) for date: {} hotelId: {}", date, hotelId);
+        final List<AlloggiatiRowDto> rows = buildRows(date, hotelId);
         log.info("Built {} guest rows for report on {}", rows.size(), date);
 
         if (rows.size() > MAX_ROWS_PER_FILE) {
@@ -102,9 +103,9 @@ public class AlloggiatiReportServiceImpl implements AlloggiatiReportService {
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
-    public List<AlloggiatiRowDto> generateJsonReport(final LocalDate date) {
-        log.info("Generating Alloggiati JSON export for date: {}", date);
-        final List<AlloggiatiRowDto> rows = buildRows(date);
+    public List<AlloggiatiRowDto> generateJsonReport(final LocalDate date, final UUID hotelId) {
+        log.info("Generating Alloggiati JSON export for date: {} hotelId: {}", date, hotelId);
+        final List<AlloggiatiRowDto> rows = buildRows(date, hotelId);
         log.info("Built {} guest rows for JSON export on {}", rows.size(), date);
         return rows;
     }
@@ -113,10 +114,10 @@ public class AlloggiatiReportServiceImpl implements AlloggiatiReportService {
     // Core row-building logic
     // -----------------------------------------------------------------------
 
-    private List<AlloggiatiRowDto> buildRows(final LocalDate date) {
+    private List<AlloggiatiRowDto> buildRows(final LocalDate date, final UUID hotelId) {
         final LocalDateTime start = date.atStartOfDay();
         final LocalDateTime end = date.plusDays(1).atStartOfDay();
-        final List<Stay> checkIns = stayRepository.findByActualCheckInTimeBetween(start, end);
+        final List<Stay> checkIns = stayRepository.findByActualCheckInTimeBetweenAndHotelId(start, end, hotelId);
         final List<AlloggiatiRowDto> rows = new ArrayList<>();
 
         for (final Stay stay : checkIns) {

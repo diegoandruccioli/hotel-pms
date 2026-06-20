@@ -696,7 +696,7 @@ class StayServiceImplTest {
         stayService.checkIn(request);
 
         final LocalDate expectedDate = stayWithHotel.getActualCheckInTime().toLocalDate();
-        verify(alloggiatiWebSenderService, times(1)).submitReport(expectedDate);
+        verify(alloggiatiWebSenderService, times(1)).submitReport(expectedDate, stayHotelId);
         assertTrue(stayWithHotel.isAlloggiatiSent());
     }
 
@@ -764,7 +764,7 @@ class StayServiceImplTest {
                 .thenReturn(new HotelSettingsResponse(stayHotelId, true, null, null, null, null, null));
         doThrow(new ExternalServiceException("PS portal down", null))
                 .when(alloggiatiWebSenderService)
-                .submitReport(ArgumentMatchers.any(LocalDate.class));
+                .submitReport(ArgumentMatchers.any(LocalDate.class), ArgumentMatchers.any(UUID.class));
         when(stayMapper.toDto(stayWithHotel)).thenReturn(Objects.requireNonNull(validResponse));
 
         final StayResponse response = stayService.checkIn(request);
