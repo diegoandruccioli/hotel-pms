@@ -247,10 +247,10 @@
   "delete_guest_failed": "Impossibile eliminare l'ospite. Riprova.",
   "guest_deleted_success": "Ospite eliminato con successo.",
 
-  "cancel_reservation": "Annulla",
-  "cancel_reservation_confirm": "Sei sicuro di voler annullare questa prenotazione? L'azione non può essere annullata.",
-  "reservation_cancelled_success": "Prenotazione annullata con successo.",
-  "cancel_reservation_failed": "Impossibile annullare la prenotazione. Riprova.",
+  "delete_reservation": "Elimina",
+  "delete_reservation_confirm": "Sei sicuro di voler eliminare questa prenotazione? L'azione non può essere annullata.",
+  "reservation_deleted_success": "Prenotazione eliminata con successo.",
+  "delete_reservation_failed": "Impossibile eliminare la prenotazione. Riprova.",
 
   "alloggiati_submit": "Invia a Questura",
   "alloggiati_submit_confirm": "Inviare la lista Alloggiati del {{date}} al portale della Polizia di Stato?",

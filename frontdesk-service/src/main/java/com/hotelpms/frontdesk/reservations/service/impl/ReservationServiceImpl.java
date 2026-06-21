@@ -3,6 +3,7 @@ package com.hotelpms.frontdesk.reservations.service.impl;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.exception.BadRequestException;
+import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.reservations.domain.Reservation;
@@ -38,6 +39,8 @@ public class ReservationServiceImpl implements ReservationService {
     private static final String HOTEL_ID_NOT_NULL_MSG = "Hotel ID cannot be null";
     private static final List<ReservationStatus> TERMINAL_STATUSES =
             List.of(ReservationStatus.CHECKED_OUT, ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW);
+    private static final List<ReservationStatus> DELETABLE_STATUSES =
+            List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
 
     private final ReservationRepository reservationRepository;
     private final ReservationMapper reservationMapper;
@@ -143,6 +146,9 @@ public class ReservationServiceImpl implements ReservationService {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
         final UUID hotelId = resolveHotelId();
         final Reservation reservation = findReservationByIdAndHotelOrThrow(id, hotelId);
+        if (!DELETABLE_STATUSES.contains(reservation.getStatus())) {
+            throw new ConflictException("RESERVATION_NOT_DELETABLE");
+        }
         reservationRepository.delete(Objects.requireNonNull(reservation));
     }
 

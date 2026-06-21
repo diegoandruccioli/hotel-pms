@@ -51,15 +51,11 @@ describe('reservationService', () => {
     expect(result).toEqual(mockResponse);
   });
 
-  it('should cancel a reservation via the partial status-and-guests endpoint', async () => {
-    const mockResponse = { id: '1', status: 'CANCELLED' };
-    vi.mocked(api.patch).mockResolvedValueOnce({ data: mockResponse });
+  it('should delete a reservation', async () => {
+    vi.mocked(api.delete).mockResolvedValueOnce({ data: undefined });
 
-    const result = await reservationService.cancelReservation('1');
+    await reservationService.deleteReservation('1');
 
-    expect(api.patch).toHaveBeenCalledWith(
-      '/api/v1/reservations/1/status-and-guests', { status: 'CANCELLED' },
-    );
-    expect(result).toEqual(mockResponse);
+    expect(api.delete).toHaveBeenCalledWith('/api/v1/reservations/1');
   });
 });

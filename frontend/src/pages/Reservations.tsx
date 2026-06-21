@@ -14,7 +14,7 @@ import type { RoomResponse } from '../types/inventory.types';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 
-const CANCELLABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
+const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 
 const getStatusTone = (status: string) => {
   switch (status.toUpperCase()) {
@@ -36,11 +36,11 @@ interface ReservationRowProps {
   onCheckIn: (reservationId: string, roomId: string, expectedGuests: number, guestId: string) => void;
   onView: (reservationId: string) => void;
   onEdit: (reservationId: string) => void;
-  onCancel?: (id: string) => void;
+  onDelete?: (id: string) => void;
   t: TFunction;
 }
 
-const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, onCancel, t }: ReservationRowProps) => {
+const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, onDelete, t }: ReservationRowProps) => {
   const roomNumbers = useMemo(() => {
     return reservation.lineItems?.filter(li => li.active !== false).map(li => {
       const room = rooms.find(r => r.id === li.roomId);
@@ -65,9 +65,9 @@ const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, on
     onEdit(reservation.id);
   }, [onEdit, reservation.id]);
 
-  const handleCancelClick = useCallback(() => {
-    onCancel?.(reservation.id);
-  }, [onCancel, reservation.id]);
+  const handleDeleteClick = useCallback(() => {
+    onDelete?.(reservation.id);
+  }, [onDelete, reservation.id]);
 
   return (
     <M3TableRow>
@@ -112,14 +112,14 @@ const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, on
         >
           {t('edit')}
         </button>
-        {onCancel && CANCELLABLE_STATUSES.has(reservation.status) && (
+        {onDelete && DELETABLE_STATUSES.has(reservation.status) && (
           <button
             type="button"
-            aria-label={`${t('cancel_reservation')} ${reservation.id}`}
-            onClick={handleCancelClick}
+            aria-label={`${t('delete_reservation')} ${reservation.id}`}
+            onClick={handleDeleteClick}
             className="text-error hover:text-error/80 font-medium text-sm ml-4"
           >
-            {t('cancel_reservation')}
+            {t('delete_reservation')}
           </button>
         )}
       </M3TableCell>
@@ -140,8 +140,8 @@ export const Reservations = () => {
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reservationToCancel, setReservationToCancel] = useState<string | null>(null);
-  const [cancelling, setCancelling] = useState(false);
+  const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
@@ -201,30 +201,28 @@ export const Reservations = () => {
     navigate(`/reservations/edit/${reservationId}`);
   }, [navigate]);
 
-  const handleCancelRequest = useCallback((id: string) => {
-    setReservationToCancel(id);
+  const handleDeleteRequest = useCallback((id: string) => {
+    setReservationToDelete(id);
   }, []);
 
-  const handleCancelDialogClose = useCallback(() => {
-    setReservationToCancel(null);
+  const handleDeleteDialogClose = useCallback(() => {
+    setReservationToDelete(null);
   }, []);
 
-  const handleCancelConfirm = useCallback(async () => {
-    if (!reservationToCancel) return;
-    setCancelling(true);
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!reservationToDelete) return;
+    setDeleting(true);
     try {
-      await reservationService.cancelReservation(reservationToCancel);
-      setReservations((prev) =>
-        prev.map((r) => r.id === reservationToCancel ? { ...r, status: 'CANCELLED' } : r),
-      );
-      addToast(t('reservation_cancelled_success'), 'success');
+      await reservationService.deleteReservation(reservationToDelete);
+      setReservations((prev) => prev.filter((r) => r.id !== reservationToDelete));
+      addToast(t('reservation_deleted_success'), 'success');
     } catch {
-      addToast(t('cancel_reservation_failed'), 'error');
+      addToast(t('delete_reservation_failed'), 'error');
     } finally {
-      setCancelling(false);
-      setReservationToCancel(null);
+      setDeleting(false);
+      setReservationToDelete(null);
     }
-  }, [reservationToCancel, addToast, t]);
+  }, [reservationToDelete, addToast, t]);
 
   const tableHeaders = useMemo(() => [
     t('guest_name'), 
@@ -292,26 +290,26 @@ export const Reservations = () => {
                 onCheckIn={handleCheckIn}
                 onView={handleView}
                 onEdit={handleEdit}
-                onCancel={isAdminOrOwner ? handleCancelRequest : undefined}
+                onDelete={isAdminOrOwner ? handleDeleteRequest : undefined}
                 t={t}
               />
             ))
           )}
         </M3Table>
       )}
-      {reservationToCancel && (
+      {reservationToDelete && (
         <M3Dialog
           open
-          title={t('cancel_reservation')}
-          titleId="confirm-cancel-reservation-dialog"
-          onClose={handleCancelDialogClose}
+          title={t('delete_reservation')}
+          titleId="confirm-delete-reservation-dialog"
+          onClose={handleDeleteDialogClose}
         >
-          <p className="text-sm font-body text-on-surface">{t('cancel_reservation_confirm')}</p>
+          <p className="text-sm font-body text-on-surface">{t('delete_reservation_confirm')}</p>
           <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={handleCancelDialogClose} disabled={cancelling}>
+            <M3Button type="button" variant="outlined" onClick={handleDeleteDialogClose} disabled={deleting}>
               {t('cancel')}
             </M3Button>
-            <M3Button type="button" onClick={handleCancelConfirm} loading={cancelling}>
+            <M3Button type="button" onClick={handleDeleteConfirm} loading={deleting}>
               {t('confirm')}
             </M3Button>
           </div>

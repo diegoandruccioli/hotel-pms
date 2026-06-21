@@ -23,7 +23,7 @@ vi.mock('react-i18next', () => {
 });
 
 vi.mock('../services/reservationService', () => ({
-  reservationService: { getAllReservations: vi.fn(), cancelReservation: vi.fn() },
+  reservationService: { getAllReservations: vi.fn(), deleteReservation: vi.fn() },
 }));
 
 vi.mock('../services/inventoryService', () => ({
@@ -126,56 +126,69 @@ describe('Reservations', () => {
     });
   });
 
-  it('should not show cancel button for non-admin users', async () => {
+  it('should not show delete button for non-admin users', async () => {
     vi.mocked(reservationService.getAllReservations).mockResolvedValue([CONFIRMED_RESERVATION] as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /cancel_reservation res-1/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /delete_reservation res-1/ })).not.toBeInTheDocument();
   });
 
-  it('should show cancel button for ADMIN on CONFIRMED reservation', async () => {
+  it('should show delete button for ADMIN on CONFIRMED reservation', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
     vi.mocked(reservationService.getAllReservations).mockResolvedValue([CONFIRMED_RESERVATION] as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /cancel_reservation res-1/ })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: /delete_reservation res-1/ })).toBeInTheDocument());
   });
 
-  it('should not show cancel button on CANCELLED reservation', async () => {
+  it('should not show delete button on CANCELLED reservation', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
     vi.mocked(reservationService.getAllReservations).mockResolvedValue([CANCELLED_RESERVATION] as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /cancel_reservation res-2/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /delete_reservation res-2/ })).not.toBeInTheDocument();
   });
 
-  it('should open confirmation dialog when cancel button is clicked', async () => {
+  it('should open confirmation dialog when delete button is clicked', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
     vi.mocked(reservationService.getAllReservations).mockResolvedValue([CONFIRMED_RESERVATION] as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /cancel_reservation res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /cancel_reservation res-1/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /delete_reservation res-1/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /delete_reservation res-1/ }));
 
-    expect(screen.getByText('cancel_reservation_confirm')).toBeInTheDocument();
+    expect(screen.getByText('delete_reservation_confirm')).toBeInTheDocument();
   });
 
-  it('should call cancelReservation and show toast on confirm', async () => {
+  it('should call deleteReservation and show toast on confirm', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
     vi.mocked(reservationService.getAllReservations).mockResolvedValue([CONFIRMED_RESERVATION] as never);
-    vi.mocked(reservationService.cancelReservation).mockResolvedValueOnce({} as never);
+    vi.mocked(reservationService.deleteReservation).mockResolvedValueOnce(undefined as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /cancel_reservation res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /cancel_reservation res-1/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /delete_reservation res-1/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /delete_reservation res-1/ }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => {
-      expect(reservationService.cancelReservation).toHaveBeenCalledWith('res-1');
-      expect(mockAddToast).toHaveBeenCalledWith('reservation_cancelled_success', 'success');
+      expect(reservationService.deleteReservation).toHaveBeenCalledWith('res-1');
+      expect(mockAddToast).toHaveBeenCalledWith('reservation_deleted_success', 'success');
     });
+  });
+
+  it('should remove the reservation from the list after successful delete', async () => {
+    vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
+    vi.mocked(reservationService.getAllReservations).mockResolvedValue([CONFIRMED_RESERVATION] as never);
+    vi.mocked(reservationService.deleteReservation).mockResolvedValueOnce(undefined as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /delete_reservation res-1/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
+
+    await waitFor(() => expect(screen.queryByText('John Doe')).not.toBeInTheDocument());
   });
 
   it('should filter reservations by guest name on search input', async () => {

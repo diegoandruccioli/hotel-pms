@@ -9,6 +9,7 @@ import com.hotelpms.frontdesk.reservations.dto.ReservationLineItemRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
 import com.hotelpms.frontdesk.exception.BadRequestException;
+import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.reservations.mapper.ReservationMapper;
@@ -326,6 +327,16 @@ class ReservationServiceImplTest {
 
         verify(reservationRepository, times(1)).findByIdAndHotelId(reservationId, HOTEL_ID);
         verify(reservationRepository, times(1)).delete(entity);
+    }
+
+    @Test
+    void testDeleteReservationThrowsConflictWhenAlreadyCheckedIn() {
+        entity.setStatus(ReservationStatus.CHECKED_IN);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        assertThrows(ConflictException.class, () -> reservationService.deleteReservation(reservationId));
+
+        verify(reservationRepository, never()).delete(any());
     }
 
     @Test

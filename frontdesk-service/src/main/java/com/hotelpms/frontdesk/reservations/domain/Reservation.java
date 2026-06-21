@@ -41,7 +41,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
-@SQLDelete(sql = "UPDATE reservations SET active = false WHERE id = ?")
+@SQLDelete(sql = "UPDATE reservations SET active = false, version = version + 1 WHERE id = ? AND version = ?")
 @SQLRestriction("active = true")
 public class Reservation {
 
