@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
 import type { InvoiceResponse } from '../../types/billing.types';
@@ -7,13 +7,8 @@ import { billingService } from '../../services/billingService';
 
 vi.mock('../../services/billingService', () => ({
   billingService: {
-    downloadPdf: vi.fn().mockResolvedValue(undefined),
+    downloadPdf: vi.fn(),
   },
-}));
-
-const mockAddToast = vi.fn();
-vi.mock('../../store/toastStore', () => ({
-  useToastStore: () => ({ addToast: mockAddToast }),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -94,34 +89,10 @@ describe('InvoiceDetailModal', () => {
     expect(screen.getByRole('button', { name: /download_pdf/i })).toBeInTheDocument();
   });
 
-  it('calls billingService.downloadPdf on button click', async () => {
+  it('calls billingService.downloadPdf on button click', () => {
     render(<InvoiceDetailModal invoice={BASE_INVOICE} onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /download_pdf/i }));
-    await waitFor(() => {
-      expect(billingService.downloadPdf).toHaveBeenCalledWith('inv1', 'INV-001');
-    });
-  });
-
-  it('disables button while downloading', async () => {
-    let resolve!: () => void;
-    vi.mocked(billingService.downloadPdf).mockImplementationOnce(
-      () => new Promise<void>((res) => { resolve = res; }),
-    );
-    render(<InvoiceDetailModal invoice={BASE_INVOICE} onClose={onClose} />);
-    fireEvent.click(screen.getByRole('button', { name: /download_pdf/i }));
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /pdf_downloading/i })).toBeDisabled();
-    });
-    resolve();
-  });
-
-  it('shows an error toast when the PDF download fails', async () => {
-    vi.mocked(billingService.downloadPdf).mockRejectedValueOnce(new Error('boom'));
-    render(<InvoiceDetailModal invoice={BASE_INVOICE} onClose={onClose} />);
-    fireEvent.click(screen.getByRole('button', { name: /download_pdf/i }));
-    await waitFor(() => {
-      expect(mockAddToast).toHaveBeenCalledWith('err_pdf_download', 'error');
-    });
+    expect(billingService.downloadPdf).toHaveBeenCalledWith('inv1');
   });
 
   it('passes axe accessibility check', async () => {

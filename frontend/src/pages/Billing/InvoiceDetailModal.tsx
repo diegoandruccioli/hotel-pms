@@ -1,11 +1,10 @@
-import { useCallback, memo, useState } from 'react';
+import { useCallback, memo } from 'react';
 import { billingService } from '../../services/billingService';
 
 const ICON_STYLE: React.CSSProperties = { fontSize: 18 };
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3StatusChip } from '../../components/m3/M3StatusChip';
-import { useToastStore } from '../../store/toastStore';
 import type { InvoiceResponse, InvoiceStatus, PaymentMethod, ChargeType } from '../../types/billing.types';
 
 interface Props {
@@ -35,19 +34,10 @@ const chargeTypeIcon: Record<ChargeType, string> = {
 
 export const InvoiceDetailModal = memo(({ invoice, onClose }: Props) => {
   const { t, i18n } = useTranslation(['billing', 'common']);
-  const { addToast } = useToastStore();
-  const [downloading, setDownloading] = useState(false);
 
-  const handleDownloadPdf = useCallback(async () => {
-    setDownloading(true);
-    try {
-      await billingService.downloadPdf(invoice.id, invoice.invoiceNumber);
-    } catch {
-      addToast(t('err_pdf_download', { ns: 'billing' }), 'error');
-    } finally {
-      setDownloading(false);
-    }
-  }, [invoice.id, invoice.invoiceNumber, addToast, t]);
+  const handleDownloadPdf = useCallback(() => {
+    billingService.downloadPdf(invoice.id);
+  }, [invoice.id]);
 
   const formatCurrency = useCallback(
     (val: number) =>
@@ -175,16 +165,12 @@ export const InvoiceDetailModal = memo(({ invoice, onClose }: Props) => {
         <button
           type="button"
           onClick={handleDownloadPdf}
-          disabled={downloading}
-          aria-busy={downloading}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-medium hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px]"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-medium hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-h-[40px]"
         >
           <span className="material-symbols-outlined" style={ICON_STYLE} aria-hidden="true">
             download
           </span>
-          {downloading
-            ? t('pdf_downloading', { ns: 'billing' })
-            : t('download_pdf', { ns: 'billing' })}
+          {t('download_pdf', { ns: 'billing' })}
         </button>
       </div>
     </M3Dialog>

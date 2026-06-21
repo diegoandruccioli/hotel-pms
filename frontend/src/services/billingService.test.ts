@@ -51,27 +51,26 @@ describe('billingService', () => {
     expect(result).toEqual(mockInvoices);
   });
 
-  it('should download the invoice PDF as a blob', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: 'pdf-bytes' });
-
-    const createObjectURL = vi.fn(() => 'blob:http://test/pdf');
-    const revokeObjectURL = vi.fn();
-    const clickFn = vi.fn();
-    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
-    const link = { href: '', download: '', click: clickFn } as unknown as HTMLAnchorElement;
-    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(link);
+  it('should trigger the invoice PDF download via a hidden iframe', () => {
+    vi.useFakeTimers();
+    const iframe = { style: {} as CSSStyleDeclaration, src: '' } as HTMLIFrameElement;
+    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(iframe);
     const appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((n) => n);
     const removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((n) => n);
 
-    await billingService.downloadPdf('inv1', 'INV-001');
+    billingService.downloadPdf('inv1');
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/invoices/inv1/pdf', { responseType: 'blob' });
-    expect(createObjectURL).toHaveBeenCalled();
-    expect(link.download).toBe('INV-001.pdf');
-    expect(clickFn).toHaveBeenCalled();
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:http://test/pdf');
+    expect(iframe.src).toBe('/api/v1/invoices/inv1/pdf');
+    expect(iframe.style.display).toBe('none');
+    expect(appendChildSpy).toHaveBeenCalledWith(iframe);
+    expect(removeChildSpy).not.toHaveBeenCalled();
+
+    vi.runAllTimers();
+    expect(removeChildSpy).toHaveBeenCalledWith(iframe);
+
     createElementSpy.mockRestore();
     appendChildSpy.mockRestore();
     removeChildSpy.mockRestore();
+    vi.useRealTimers();
   });
 });

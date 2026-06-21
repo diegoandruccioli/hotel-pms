@@ -3,6 +3,7 @@ import type { InvoiceRequest, InvoiceResponse, PaymentRequest, PaymentResponse }
 import type { SpringPage } from '../types/page.types';
 
 const BASE_PATH = '/api/v1/invoices';
+const IFRAME_CLEANUP_DELAY_MS = 10000;
 
 export const billingService = {
   createInvoice: async (data: InvoiceRequest): Promise<InvoiceResponse> => {
@@ -25,17 +26,23 @@ export const billingService = {
     return response.data.content;
   },
 
-  downloadPdf: async (invoiceId: string, invoiceNumber: string): Promise<void> => {
-    const response = await api.get(`${BASE_PATH}/${invoiceId}/pdf`, {
-      responseType: 'blob',
-    });
-    const url = URL.createObjectURL(new Blob([response.data as BlobPart], { type: 'application/pdf' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${invoiceNumber}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  /**
+   * Triggers the browser's native download for the invoice PDF via a hidden iframe.
+   *
+   * Deliberately NOT fetch+Blob+synthetic-<a>-click: that pattern was verified end-to-end
+   * (network 200, valid PDF bytes, anchor configured correctly, click() invoked) yet
+   * produced no visible file save in real Chrome — a known failure mode for synthetic
+   * clicks on blob: URLs (silently dropped by some browsers/extensions, no JS-visible
+   * error). A hidden iframe pointed straight at the endpoint relies on the server's
+   * `Content-Disposition: attachment` header to trigger the OS-level native download,
+   * the same mechanism as a real <a href> click — and keeps any non-download error
+   * response (e.g. a 500) contained inside the iframe instead of navigating the SPA away.
+   */
+  downloadPdf: (invoiceId: string): void => {
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = `${BASE_PATH}/${invoiceId}/pdf`;
+    document.body.appendChild(iframe);
+    setTimeout(() => document.body.removeChild(iframe), IFRAME_CLEANUP_DELAY_MS);
   },
 };
