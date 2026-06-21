@@ -123,6 +123,11 @@ export interface HotelSettingsRequest {
   vatNumber?: string;
   fiscalCode?: string;
   logoUrl?: string;
+  alloggiatiUsername?: string;
+  /** Write-only: blank/undefined leaves the currently stored password unchanged. */
+  alloggiatiPassword?: string;
+  /** Write-only: blank/undefined leaves the currently stored WsKey unchanged. */
+  alloggiatiWsKey?: string;
 }
 
 export interface HotelSettingsResponse {
@@ -133,4 +138,6 @@ export interface HotelSettingsResponse {
   vatNumber?: string | null;
   fiscalCode?: string | null;
   logoUrl?: string | null;
+  alloggiatiUsername?: string | null;
+  alloggiatiCredentialsConfigured: boolean;
 }

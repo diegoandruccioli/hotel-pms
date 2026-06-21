@@ -7,10 +7,16 @@ import { HotelProfile } from './HotelProfile';
 import { stayService } from '../services/stayService';
 import type { HotelSettingsResponse } from '../types/stay.types';
 
+// `t`/`i18n` must be module-level stable references: HotelProfile's settings-load
+// useEffect depends on `t`, so an inline arrow recreated on every useTranslation()
+// call would give `t` a new identity every render, silently re-firing the fetch
+// (and resetting form state) after every interaction in this file.
+const stableT = (key: string) => key;
+const stableI18n = { language: 'en' };
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
-    i18n: { language: 'en' },
+    t: stableT,
+    i18n: stableI18n,
   }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
@@ -29,6 +35,8 @@ const baseSettings: HotelSettingsResponse = {
   vatNumber: '12345678901',
   fiscalCode: 'ABCDEF12G34H567I',
   logoUrl: '',
+  alloggiatiUsername: null,
+  alloggiatiCredentialsConfigured: false,
 };
 
 const renderComponent = () =>
@@ -147,6 +155,69 @@ describe('HotelProfile', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /btn_save_profile/i }));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_profile_save', 'error'));
+  });
+
+  it('renders Alloggiati credential fields, all blank, when none are configured', async () => {
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+    expect(screen.getByLabelText(/label_alloggiati_username/i)).toHaveValue('');
+    expect(screen.getByLabelText(/label_alloggiati_password/i)).toHaveValue('');
+    expect(screen.getByLabelText(/label_alloggiati_ws_key/i)).toHaveValue('');
+    expect(screen.getByText('status_alloggiati_credentials_not_configured')).toBeInTheDocument();
+  });
+
+  it('pre-fills the username but never the password/WsKey when credentials are configured', async () => {
+    vi.mocked(stayService.getHotelSettings).mockResolvedValue({
+      ...baseSettings,
+      alloggiatiUsername: 'hotelUser',
+      alloggiatiCredentialsConfigured: true,
+    });
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+    expect(screen.getByLabelText(/label_alloggiati_username/i)).toHaveValue('hotelUser');
+    expect(screen.getByLabelText(/label_alloggiati_password/i)).toHaveValue('');
+    expect(screen.getByLabelText(/label_alloggiati_ws_key/i)).toHaveValue('');
+    expect(screen.getByText('status_alloggiati_credentials_configured')).toBeInTheDocument();
+  });
+
+  it('uses password-type inputs for the secret fields', async () => {
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+    expect(screen.getByLabelText(/label_alloggiati_password/i)).toHaveAttribute('type', 'password');
+    expect(screen.getByLabelText(/label_alloggiati_ws_key/i)).toHaveAttribute('type', 'password');
+  });
+
+  it('saves the entered username/password/WsKey and clears the secret fields afterwards', async () => {
+    vi.mocked(stayService.updateHotelSettings).mockResolvedValue({
+      ...baseSettings,
+      alloggiatiUsername: 'newUser',
+      alloggiatiCredentialsConfigured: true,
+    });
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText(/label_alloggiati_username/i), 'newUser');
+    await user.type(screen.getByLabelText(/label_alloggiati_password/i), 'newPass');
+    await user.type(screen.getByLabelText(/label_alloggiati_ws_key/i), 'newKey');
+    await user.click(screen.getByRole('button', { name: /btn_save_profile/i }));
+
+    await waitFor(() => {
+      expect(stayService.updateHotelSettings).toHaveBeenCalledWith(expect.objectContaining({
+        alloggiatiUsername: 'newUser',
+        alloggiatiPassword: 'newPass',
+        alloggiatiWsKey: 'newKey',
+      }));
+    });
+
+    await waitFor(() => expect(screen.getByLabelText(/label_alloggiati_password/i)).toHaveValue(''));
+    expect(screen.getByLabelText(/label_alloggiati_ws_key/i)).toHaveValue('');
+    await waitFor(() => {
+      expect(screen.getByText('status_alloggiati_credentials_configured')).toBeInTheDocument();
+    });
   });
 
   it('blocks save and shows an error when VAT number is malformed', async () => {

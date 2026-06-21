@@ -23,19 +23,24 @@ interface ProfileFieldProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   required?: boolean;
   error?: string;
+  type?: 'text' | 'password';
+  autoComplete?: string;
 }
 
-const ProfileField = memo(({ id, label, value, placeholder, onChange, required, error }: ProfileFieldProps) => (
+const ProfileField = memo(({
+  id, label, value, placeholder, onChange, required, error, type = 'text', autoComplete,
+}: ProfileFieldProps) => (
   <div>
     <label htmlFor={id} className="block text-sm font-medium text-on-surface mb-1">
       {label}{required && <span aria-hidden="true"> *</span>}
     </label>
     <input
       id={id}
-      type="text"
+      type={type}
       value={value}
       placeholder={placeholder}
       onChange={onChange}
+      autoComplete={autoComplete}
       className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
       aria-invalid={!!error}
       aria-describedby={error ? `${id}-error` : undefined}
@@ -62,7 +67,11 @@ export function HotelProfile() {
     vatNumber: '',
     fiscalCode: '',
     logoUrl: '',
+    alloggiatiUsername: '',
+    alloggiatiPassword: '',
+    alloggiatiWsKey: '',
   });
+  const [credentialsConfigured, setCredentialsConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -88,7 +97,13 @@ export function HotelProfile() {
           vatNumber: s.vatNumber ?? '',
           fiscalCode: s.fiscalCode ?? '',
           logoUrl: s.logoUrl ?? '',
+          // Password/WsKey are write-only — the API never returns them, so the
+          // fields always start blank regardless of whether credentials exist.
+          alloggiatiUsername: s.alloggiatiUsername ?? '',
+          alloggiatiPassword: '',
+          alloggiatiWsKey: '',
         });
+        setCredentialsConfigured(s.alloggiatiCredentialsConfigured);
       })
       .catch(() => addToast(t('err_profile_save'), 'error'))
       .finally(() => setLoading(false));
@@ -127,7 +142,9 @@ export function HotelProfile() {
 
     setSaving(true);
     try {
-      await stayService.updateHotelSettings({ ...form, ...result.data });
+      const updated = await stayService.updateHotelSettings({ ...form, ...result.data });
+      setForm((prev) => ({ ...prev, alloggiatiPassword: '', alloggiatiWsKey: '' }));
+      setCredentialsConfigured(updated.alloggiatiCredentialsConfigured);
       addToast(t('toast_profile_saved'), 'success');
     } catch {
       addToast(t('err_profile_save'), 'error');
@@ -226,6 +243,55 @@ export function HotelProfile() {
             </label>
             <p className="text-xs text-on-surface-variant mt-0.5">{t('hint_alloggiati_auto_send')}</p>
           </div>
+        </div>
+      </M3Card>
+
+      <M3Card className="p-6 space-y-4">
+        <div>
+          <h2 className="text-base font-semibold text-on-surface">{t('section_title_alloggiati_credentials')}</h2>
+          <p className="text-xs text-on-surface-variant mt-0.5">{t('hint_alloggiati_credentials')}</p>
+        </div>
+
+        <p
+          className={`text-sm font-medium ${credentialsConfigured ? 'text-primary' : 'text-on-surface-variant'}`}
+        >
+          {credentialsConfigured
+            ? t('status_alloggiati_credentials_configured')
+            : t('status_alloggiati_credentials_not_configured')}
+        </p>
+
+        <ProfileField
+          id="profile-alloggiati-username"
+          label={t('label_alloggiati_username')}
+          value={form.alloggiatiUsername ?? ''}
+          placeholder={t('placeholder_alloggiati_username')}
+          onChange={handleChange('alloggiatiUsername')}
+          autoComplete="off"
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <ProfileField
+            id="profile-alloggiati-password"
+            label={t('label_alloggiati_password')}
+            value={form.alloggiatiPassword ?? ''}
+            placeholder={credentialsConfigured
+              ? t('placeholder_alloggiati_credential_configured')
+              : t('placeholder_alloggiati_credential_unconfigured')}
+            onChange={handleChange('alloggiatiPassword')}
+            type="password"
+            autoComplete="new-password"
+          />
+          <ProfileField
+            id="profile-alloggiati-ws-key"
+            label={t('label_alloggiati_ws_key')}
+            value={form.alloggiatiWsKey ?? ''}
+            placeholder={credentialsConfigured
+              ? t('placeholder_alloggiati_credential_configured')
+              : t('placeholder_alloggiati_credential_unconfigured')}
+            onChange={handleChange('alloggiatiWsKey')}
+            type="password"
+            autoComplete="new-password"
+          />
         </div>
       </M3Card>
 
