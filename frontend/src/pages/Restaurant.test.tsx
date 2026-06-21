@@ -58,6 +58,7 @@ vi.mock('./Restaurant/MenuFormModal', () => ({
 const PENDING_ORDER = {
   id: 'order-12345678',
   stayId: 'stay-12345678',
+  roomNumber: '101',
   orderDate: '2026-03-15',
   totalAmount: 75,
   status: 'PENDING',
@@ -66,6 +67,7 @@ const PENDING_ORDER = {
 const BILLED_ORDER = {
   id: 'billed-12345678',
   stayId: 'stay-12345678',
+  roomNumber: '205',
   orderDate: '2026-03-15',
   totalAmount: 30,
   status: 'BILLED_TO_ROOM',
@@ -94,7 +96,7 @@ describe('Restaurant', () => {
     render(<Restaurant />);
 
     await waitFor(() => {
-      expect(screen.getByText('order-12...')).toBeInTheDocument();
+      expect(screen.getByText('101')).toBeInTheDocument();
     });
   });
 
@@ -130,7 +132,7 @@ describe('Restaurant', () => {
     render(<Restaurant />);
 
     await waitFor(() => {
-      expect(screen.getByText('billed-1...')).toBeInTheDocument();
+      expect(screen.getByText('205')).toBeInTheDocument();
     });
     expect(screen.queryByRole('button', { name: /confirm_order/ })).not.toBeInTheDocument();
   });

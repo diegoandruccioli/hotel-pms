@@ -16,6 +16,7 @@ vi.mock('focus-trap-react', () => ({
 const ORDER = {
   id: 'order-uuid-1234',
   stayId: 'stay-uuid-5678',
+  roomNumber: '101',
   orderDate: '2026-04-28T10:00:00',
   totalAmount: 17.5,
   status: 'PENDING' as const,

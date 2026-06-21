@@ -13,6 +13,7 @@ import java.util.UUID;
  *
  * @param id          the ID of the order
  * @param stayId      the ID of the stay this order is associated with
+ * @param roomNumber  the room the order is charged to, denormalized at creation time
  * @param orderDate   the date and time the order was placed
  * @param totalAmount the total amount of the order
  * @param status      the status of the order
@@ -24,6 +25,7 @@ import java.util.UUID;
 public record RestaurantOrderResponse(
                 UUID id,
                 UUID stayId,
+                String roomNumber,
                 LocalDateTime orderDate,
                 BigDecimal totalAmount,
                 OrderStatus status,
@@ -36,6 +38,7 @@ public record RestaurantOrderResponse(
          *
          * @param id          the order ID
          * @param stayId      the stay ID
+         * @param roomNumber  the room number
          * @param orderDate   the order date
          * @param totalAmount the total amount
          * @param status      the status

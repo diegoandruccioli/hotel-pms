@@ -49,6 +49,7 @@ import static org.mockito.Mockito.when;
 class RestaurantOrderServiceImplTest {
 
     private static final String STATUS_CHECKED_IN = "CHECKED_IN";
+    private static final String ROOM_NUMBER = "101";
     private static final String AMOUNT_30 = "30.00";
     private static final String AMOUNT_15 = "15.00";
     private static final String AMOUNT_8 = "8.00";
@@ -125,7 +126,7 @@ class RestaurantOrderServiceImplTest {
     @Test
     void shouldCreateOrderSuccessfully() {
         // Arrange
-        when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN));
+        when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN, ROOM_NUMBER));
         when(orderMapper.toEntity(request)).thenReturn(order);
         when(menuItemRepository.findByIdAndHotelId(menuItemId, hotelId)).thenReturn(Optional.of(menuItem));
         when(orderRepository.save(Objects.requireNonNull(order))).thenReturn(order);
@@ -142,12 +143,13 @@ class RestaurantOrderServiceImplTest {
         verify(stayClient).getStayById(stayId);
         verify(menuItemRepository).findByIdAndHotelId(menuItemId, hotelId);
         verify(orderRepository).save(Objects.requireNonNull(order));
+        assertEquals(ROOM_NUMBER, order.getRoomNumber());
     }
 
     @Test
     void shouldSetHotelIdFromSecurityContextOnCreate() {
         // Arrange: verify hotel_id is set server-side from SecurityContext (T-FB-01)
-        when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN));
+        when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN, ROOM_NUMBER));
         when(orderMapper.toEntity(request)).thenReturn(order);
         when(menuItemRepository.findByIdAndHotelId(menuItemId, hotelId)).thenReturn(Optional.of(menuItem));
         when(orderRepository.save(Objects.requireNonNull(order))).thenReturn(order);
@@ -163,7 +165,7 @@ class RestaurantOrderServiceImplTest {
     @Test
     void shouldUsePriceFromCatalogNotFromClient() {
         // Arrange: server-side price is 15.00; client has no way to override it
-        when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN));
+        when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN, ROOM_NUMBER));
         when(orderMapper.toEntity(request)).thenReturn(order);
 
         final MenuItem expensiveItem = MenuItem.builder()
@@ -187,7 +189,7 @@ class RestaurantOrderServiceImplTest {
     @Test
     void shouldThrowExceptionWhenMenuItemNotFound() {
         // Arrange: menu item UUID does not exist in the catalog
-        when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN));
+        when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, STATUS_CHECKED_IN, ROOM_NUMBER));
         when(orderMapper.toEntity(request)).thenReturn(order);
         when(menuItemRepository.findByIdAndHotelId(menuItemId, hotelId)).thenReturn(Optional.empty());
 
@@ -203,7 +205,7 @@ class RestaurantOrderServiceImplTest {
     @Test
     void shouldThrowExceptionWhenStayUnknown() {
         // Arrange
-        when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, "UNKNOWN"));
+        when(stayClient.getStayById(stayId)).thenReturn(new StayResponse(stayId, "UNKNOWN", ROOM_NUMBER));
 
         // Act & Assert
         final StayNotFoundException exception = assertThrows(StayNotFoundException.class,

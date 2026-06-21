@@ -65,8 +65,9 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
         log.info("Creating order for stay: {} hotel: {}", request.stayId(), hotelId);
 
         // Verify the stay is valid and active
+        final StayResponse stayResponse;
         try {
-            final StayResponse stayResponse = stayClient.getStayById(request.stayId());
+            stayResponse = stayClient.getStayById(request.stayId());
             if ("UNKNOWN".equals(stayResponse.status())) {
                 throw new StayNotFoundException("STAY_NOT_FOUND");
             }
@@ -80,6 +81,9 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
         order.setHotelId(hotelId);   // T-FB-01: set server-side, never from client
         order.setOrderDate(LocalDateTime.now());
         order.setStatus(OrderStatus.PENDING);
+        // Denormalized at creation time so the order keeps showing the correct
+        // room even after the guest checks out or the room changes stay.
+        order.setRoomNumber(stayResponse.roomNumber());
 
         // Resolve items with server-side prices from the catalog (T-FB-02 mitigation)
         final List<OrderItem> items = buildItemsFromCatalog(request.items(), order, hotelId);

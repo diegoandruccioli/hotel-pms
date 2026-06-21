@@ -93,12 +93,7 @@ const OrderRow = memo(({ order, confirmingId, onConfirm, onView, formatCurrency,
 
   return (
     <M3TableRow key={order.id}>
-      <M3TableCell className="font-medium">
-        <span className="truncate block max-w-[120px]" title={order.id}>{order.id.substring(0, 8)}...</span>
-      </M3TableCell>
-      <M3TableCell className="text-on-surface-variant">
-        <span className="truncate block max-w-[120px]" title={order.stayId}>{order.stayId.substring(0, 8)}...</span>
-      </M3TableCell>
+      <M3TableCell className="font-medium">{order.roomNumber ?? '—'}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(order.orderDate)}</M3TableCell>
       <M3TableCell className="font-medium">{formatCurrency(order.totalAmount)}</M3TableCell>
       <M3TableCell>
@@ -233,8 +228,7 @@ export const Restaurant = memo(() => {
   }, [i18n.language]);
 
   const tableHeaders = useMemo(() => [
-    t('order_id'),
-    t('stay_id'),
+    t('room_label'),
     t('date'),
     t('total_amount'),
     t('status'),

@@ -56,6 +56,14 @@ public class RestaurantOrder {
     private UUID stayId;
 
     /**
+     * Denormalized room number, copied from the stay at order-creation time so the
+     * order always shows the room it was charged to even after the guest checks
+     * out or the room is later reassigned to a different stay.
+     */
+    @Column(name = "room_number")
+    private String roomNumber;
+
+    /**
      * Hotel scope for multi-tenant isolation (T-FB-01).
      * Set server-side from the {@code X-Auth-Hotel} JWT claim injected by the gateway;
      * never accepted from the client.

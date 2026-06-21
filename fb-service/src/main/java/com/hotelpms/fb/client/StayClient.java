@@ -37,6 +37,6 @@ public interface StayClient {
         // Return a default response or null depending on business requirements.
         // For F&B, we might need to know if the service is down so we can handle it
         // gracefully.
-        return new StayResponse(id, "UNKNOWN");
+        return new StayResponse(id, "UNKNOWN", null);
     }
 }
