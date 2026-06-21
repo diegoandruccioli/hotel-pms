@@ -1,6 +1,9 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
+import com.hotelpms.frontdesk.stays.domain.HotelSettings;
+import com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository;
+import com.hotelpms.frontdesk.stays.security.AlloggiatiCredentialEncryptor;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiReportService;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
 import lombok.extern.slf4j.Slf4j;
@@ -41,7 +44,11 @@ import java.util.UUID;
  * <h3>Security (T-STAY-03)</h3>
  * The injected {@link RestOperations} uses the JVM default SSL context; no custom
  * TrustManager is installed, ensuring full TLS chain validation on every request.
- * Credentials are read from environment variables and never hardcoded.
+ * Credentials are never hardcoded: each hotel may configure its own PS portal
+ * username/password/WsKey (encrypted at rest, see {@link AlloggiatiCredentialEncryptor}),
+ * resolved fresh on every {@link #submitReport}; a hotel that has not configured
+ * its own credentials falls back to the global {@code alloggiati.web.*} environment
+ * variables (single-hotel pilot behavior, unchanged).
  *
  * <h3>SOAP namespace note</h3>
  * The service namespace is configurable via {@code alloggiati.web.ws-namespace}.
@@ -76,10 +83,12 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
 
     private final AlloggiatiReportService alloggiatiReportService;
     private final RestOperations restOperations;
+    private final HotelSettingsRepository hotelSettingsRepository;
+    private final AlloggiatiCredentialEncryptor credentialEncryptor;
     private final String serviceUrl;
-    private final String username;
-    private final String password;
-    private final String wsKey;
+    private final String defaultUsername;
+    private final String defaultPassword;
+    private final String defaultWsKey;
     private final String wsNamespace;
     private final boolean dryRun;
 
@@ -88,30 +97,53 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
      *
      * @param alloggiatiReportService generates the 168-char tracciato
      * @param restOperations          TLS-validating HTTP client (JVM truststore)
+     * @param hotelSettingsRepository resolves per-hotel credential overrides
+     * @param credentialEncryptor     decrypts per-hotel password/WsKey at submission time
      * @param serviceUrl              SOAP endpoint URL ({@code alloggiati.web.service-url})
-     * @param username                PS portal username ({@code alloggiati.web.username})
-     * @param password                PS portal password ({@code alloggiati.web.password})
-     * @param wsKey                   Web Service Key ({@code alloggiati.web.ws-key})
+     * @param defaultUsername         fallback PS portal username ({@code alloggiati.web.username})
+     * @param defaultPassword         fallback PS portal password ({@code alloggiati.web.password})
+     * @param defaultWsKey            fallback Web Service Key ({@code alloggiati.web.ws-key})
      * @param wsNamespace             SOAP target namespace ({@code alloggiati.web.ws-namespace})
      * @param dryRun                  when {@code true} calls Test instead of Send
      */
     public AlloggiatiWebSenderServiceImpl(
             final AlloggiatiReportService alloggiatiReportService,
             @Qualifier("alloggiatiRestTemplate") final RestOperations restOperations,
+            final HotelSettingsRepository hotelSettingsRepository,
+            final AlloggiatiCredentialEncryptor credentialEncryptor,
             @Value("${alloggiati.web.service-url}") final String serviceUrl,
-            @Value("${alloggiati.web.username}") final String username,
-            @Value("${alloggiati.web.password}") final String password,
-            @Value("${alloggiati.web.ws-key}") final String wsKey,
+            @Value("${alloggiati.web.username}") final String defaultUsername,
+            @Value("${alloggiati.web.password}") final String defaultPassword,
+            @Value("${alloggiati.web.ws-key}") final String defaultWsKey,
             @Value("${alloggiati.web.ws-namespace:" + DEFAULT_WS_NAMESPACE + "}") final String wsNamespace,
             @Value("${alloggiati.web.dry-run:false}") final boolean dryRun) {
         this.alloggiatiReportService = alloggiatiReportService;
         this.restOperations = restOperations;
+        this.hotelSettingsRepository = hotelSettingsRepository;
+        this.credentialEncryptor = credentialEncryptor;
         this.serviceUrl = serviceUrl;
-        this.username = username;
-        this.password = password;
-        this.wsKey = wsKey;
+        this.defaultUsername = defaultUsername;
+        this.defaultPassword = defaultPassword;
+        this.defaultWsKey = defaultWsKey;
         this.wsNamespace = wsNamespace;
         this.dryRun = dryRun;
+    }
+
+    /**
+     * Resolves the Alloggiati Web credentials to use for the given hotel: its own,
+     * if fully configured, otherwise the global fallback.
+     *
+     * @param hotelId the hotel UUID
+     * @return the credentials to use for this submission
+     */
+    private AlloggiatiCredentials resolveCredentials(final UUID hotelId) {
+        return hotelSettingsRepository.findById(hotelId)
+                .filter(HotelSettings::hasAlloggiatiCredentials)
+                .map(settings -> new AlloggiatiCredentials(
+                        settings.getAlloggiatiUsername(),
+                        credentialEncryptor.decrypt(settings.getAlloggiatiPasswordEncrypted()),
+                        credentialEncryptor.decrypt(settings.getAlloggiatiWsKeyEncrypted())))
+                .orElseGet(() -> new AlloggiatiCredentials(defaultUsername, defaultPassword, defaultWsKey));
     }
 
     /** {@inheritDoc} */
@@ -130,8 +162,9 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
         final List<String> records = splitRecords(report);
         log.info("{} ALLOGGIATI_SUBMISSION_RECORDS | date={} | count={}", LOG_PREFIX, date, records.size());
 
-        final String token = generateToken();
-        sendSchedule(token, records, date);
+        final AlloggiatiCredentials credentials = resolveCredentials(hotelId);
+        final String token = generateToken(credentials);
+        sendSchedule(token, records, date, credentials);
     }
 
     // -----------------------------------------------------------------------
@@ -141,11 +174,12 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
     /**
      * Calls {@code GenerateToken} on the SOAP service and returns the session token.
      *
+     * @param credentials the resolved Alloggiati Web credentials for this submission
      * @return the authentication token string
      * @throws ExternalServiceException if the token cannot be obtained
      */
-    private String generateToken() {
-        final String body = buildGenerateTokenBody();
+    private String generateToken(final AlloggiatiCredentials credentials) {
+        final String body = buildGenerateTokenBody(credentials);
         final String response = callSoap(body, SOAP_ACTION_GENERATE_TOKEN);
         final String token = extractXmlText(response, "token");
         if (token == null || token.isBlank()) {
@@ -158,14 +192,15 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
     /**
      * Builds the SOAP envelope for {@code GenerateToken}.
      *
+     * @param credentials the resolved Alloggiati Web credentials for this submission
      * @return SOAP request body as a string
      */
-    private String buildGenerateTokenBody() {
+    private String buildGenerateTokenBody(final AlloggiatiCredentials credentials) {
         return SOAP_ENVELOPE_OPEN
                 + "<GenerateToken xmlns=" + DQUOTE + wsNamespace + DQUOTE_GT
-                + "<Utente>" + xmlEscape(username) + "</Utente>"
-                + "<Password>" + xmlEscape(password) + "</Password>"
-                + "<WsKey>" + xmlEscape(wsKey) + "</WsKey>"
+                + "<Utente>" + xmlEscape(credentials.username()) + "</Utente>"
+                + "<Password>" + xmlEscape(credentials.password()) + "</Password>"
+                + "<WsKey>" + xmlEscape(credentials.wsKey()) + "</WsKey>"
                 + "</GenerateToken>"
                 + SOAP_ENVELOPE_CLOSE;
     }
@@ -177,15 +212,18 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
     /**
      * Calls {@code Send} (or {@code Test} in dry-run mode) with the guest records.
      *
-     * @param token   session token from {@link #generateToken()}
-     * @param records individual 168-char guest records
-     * @param date    the check-in date (for logging)
+     * @param token       session token from {@link #generateToken}
+     * @param records     individual 168-char guest records
+     * @param date        the check-in date (for logging)
+     * @param credentials the resolved Alloggiati Web credentials for this submission
      * @throws ExternalServiceException if the portal returns an error
      */
-    private void sendSchedule(final String token, final List<String> records, final LocalDate date) {
+    private void sendSchedule(
+            final String token, final List<String> records, final LocalDate date,
+            final AlloggiatiCredentials credentials) {
         final String operation = dryRun ? "Test" : "Send";
         final String soapAction = dryRun ? SOAP_ACTION_TEST : SOAP_ACTION_SEND;
-        final String body = buildSendBody(operation, token, records);
+        final String body = buildSendBody(operation, token, records, credentials);
 
         final String response = callSoap(body, soapAction);
         final String esito = extractXmlText(response, "esito");
@@ -206,16 +244,19 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
     /**
      * Builds the SOAP envelope for {@code Send} or {@code Test}.
      *
-     * @param operation "Send" or "Test"
-     * @param token     the authentication token
-     * @param records   the 168-char guest records
+     * @param operation   "Send" or "Test"
+     * @param token       the authentication token
+     * @param records     the 168-char guest records
+     * @param credentials the resolved Alloggiati Web credentials for this submission
      * @return SOAP request body as a string
      */
-    private String buildSendBody(final String operation, final String token, final List<String> records) {
+    private String buildSendBody(
+            final String operation, final String token, final List<String> records,
+            final AlloggiatiCredentials credentials) {
         final StringBuilder sb = new StringBuilder(SEND_BODY_INITIAL_CAPACITY);
         sb.append(SOAP_ENVELOPE_OPEN)
           .append('<').append(operation).append(" xmlns=").append(DQUOTE).append(wsNamespace).append(DQUOTE_GT)
-          .append("<Utente>").append(xmlEscape(username)).append("</Utente><token>")
+          .append("<Utente>").append(xmlEscape(credentials.username())).append("</Utente><token>")
           .append(xmlEscape(token)).append("</token><ElencoSchedine>");
         for (final String record : records) {
             sb.append("<string xmlns=").append(DQUOTE).append(ARRAY_NS).append(DQUOTE_GT)
@@ -317,5 +358,16 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;")
                 .replace("'", "&apos;");
+    }
+
+    /**
+     * Resolved Alloggiati Web credentials for a single {@link #submitReport} call —
+     * either the hotel's own (decrypted) or the global fallback.
+     *
+     * @param username the PS portal username to use for this submission
+     * @param password the PS portal password to use for this submission
+     * @param wsKey    the Web Service Key to use for this submission
+     */
+    private record AlloggiatiCredentials(String username, String password, String wsKey) {
     }
 }

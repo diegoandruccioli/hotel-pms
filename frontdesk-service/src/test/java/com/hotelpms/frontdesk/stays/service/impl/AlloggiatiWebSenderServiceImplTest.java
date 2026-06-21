@@ -1,6 +1,9 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
+import com.hotelpms.frontdesk.stays.domain.HotelSettings;
+import com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository;
+import com.hotelpms.frontdesk.stays.security.AlloggiatiCredentialEncryptor;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiReportService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +16,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -53,6 +57,7 @@ class AlloggiatiWebSenderServiceImplTest {
     private static final String SOAP_ACTION_HEADER = "SOAPAction";
     private static final String SOAP_ENV_PREFIX =
             "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">";
+    private static final String HOTEL_USERNAME = "hotelUser";
 
     // A realistic 168-char tracciato record (used to verify record content in payload)
     private static final String SAMPLE_RECORD =
@@ -93,6 +98,12 @@ class AlloggiatiWebSenderServiceImplTest {
     @Mock
     private AlloggiatiReportService alloggiatiReportService;
 
+    @Mock
+    private HotelSettingsRepository hotelSettingsRepository;
+
+    @Mock
+    private AlloggiatiCredentialEncryptor alloggiatiCredentialEncryptor;
+
     private MockRestServiceServer server;
     private RestTemplate restTemplate;
     private LocalDate reportDate;
@@ -110,6 +121,8 @@ class AlloggiatiWebSenderServiceImplTest {
         return new AlloggiatiWebSenderServiceImpl(
                 alloggiatiReportService,
                 restTemplate,
+                hotelSettingsRepository,
+                alloggiatiCredentialEncryptor,
                 SERVICE_URL, USERNAME, PASSWORD, WS_KEY, WS_NAMESPACE, dryRun);
     }
 
@@ -249,6 +262,60 @@ class AlloggiatiWebSenderServiceImplTest {
         server.expect(requestTo(SERVICE_URL))
                 .andExpect(content().string(containsString("<ElencoSchedine>")))
                 .andExpect(content().string(containsString("Rossi")))
+                .andRespond(withSuccess(SEND_SUCCESS_RESPONSE, org.springframework.http.MediaType.TEXT_XML));
+
+        service.submitReport(reportDate, hotelId);
+        server.verify();
+    }
+
+    // -----------------------------------------------------------------------
+    // Per-hotel credential resolution (P8)
+    // -----------------------------------------------------------------------
+
+    @Test
+    void shouldUseHotelSpecificCredentialsWhenFullyConfigured() {
+        final AlloggiatiWebSenderServiceImpl service = buildService(false);
+        when(alloggiatiReportService.generateReport(reportDate, hotelId)).thenReturn(SAMPLE_RECORD);
+
+        final HotelSettings settings = new HotelSettings();
+        settings.setHotelId(hotelId);
+        settings.setAlloggiatiUsername(HOTEL_USERNAME);
+        settings.setAlloggiatiPasswordEncrypted("enc-pass");
+        settings.setAlloggiatiWsKeyEncrypted("enc-key");
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settings));
+        when(alloggiatiCredentialEncryptor.decrypt("enc-pass")).thenReturn("hotelPass");
+        when(alloggiatiCredentialEncryptor.decrypt("enc-key")).thenReturn("hotelKey");
+
+        server.expect(requestTo(SERVICE_URL))
+                .andExpect(content().string(containsString(HOTEL_USERNAME)))
+                .andExpect(content().string(containsString("hotelKey")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString(USERNAME))))
+                .andRespond(withSuccess(TOKEN_RESPONSE, org.springframework.http.MediaType.TEXT_XML));
+
+        server.expect(requestTo(SERVICE_URL))
+                .andExpect(content().string(containsString(HOTEL_USERNAME)))
+                .andRespond(withSuccess(SEND_SUCCESS_RESPONSE, org.springframework.http.MediaType.TEXT_XML));
+
+        service.submitReport(reportDate, hotelId);
+        server.verify();
+    }
+
+    @Test
+    void shouldFallBackToDefaultCredentialsWhenHotelHasNotFullyConfiguredItsOwn() {
+        final AlloggiatiWebSenderServiceImpl service = buildService(false);
+        when(alloggiatiReportService.generateReport(reportDate, hotelId)).thenReturn(SAMPLE_RECORD);
+
+        // Username set, but no password/WsKey yet — hasAlloggiatiCredentials() is false.
+        final HotelSettings settings = new HotelSettings();
+        settings.setHotelId(hotelId);
+        settings.setAlloggiatiUsername(HOTEL_USERNAME);
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settings));
+
+        server.expect(requestTo(SERVICE_URL))
+                .andExpect(content().string(containsString(USERNAME)))
+                .andRespond(withSuccess(TOKEN_RESPONSE, org.springframework.http.MediaType.TEXT_XML));
+
+        server.expect(requestTo(SERVICE_URL))
                 .andRespond(withSuccess(SEND_SUCCESS_RESPONSE, org.springframework.http.MediaType.TEXT_XML));
 
         service.submitReport(reportDate, hotelId);

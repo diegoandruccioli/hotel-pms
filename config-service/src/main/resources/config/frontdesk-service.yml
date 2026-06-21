@@ -52,6 +52,12 @@ alloggiati:
     ws-namespace: ${ALLOGGIATI_WS_NAMESPACE:http://alloggiatiweb.poliziadistato.it/PortaleAlloggiati/Service/}
     # Set dry-run=true in all non-production environments: calls Test instead of Send
     dry-run: ${ALLOGGIATI_DRY_RUN:true}
+  credentials:
+    # Encrypts per-hotel Alloggiati Web password/WsKey at rest in hotel_settings
+    # (AlloggiatiCredentialEncryptor, AES-256-GCM via Spring Security Crypto).
+    # encryption-salt MUST be hex-encoded (e.g. `openssl rand -hex 16`).
+    encryption-key: ${ALLOGGIATI_CREDENTIALS_ENCRYPTION_KEY}
+    encryption-salt: ${ALLOGGIATI_CREDENTIALS_ENCRYPTION_SALT}
 
 management:
   server:

@@ -692,7 +692,7 @@ class StayServiceImplTest {
         when(stayMapper.toEntity(request)).thenReturn(new Stay());
         when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(stayWithHotel);
         when(hotelSettingsService.getOrCreate(stayHotelId))
-                .thenReturn(new HotelSettingsResponse(stayHotelId, true, null, null, null, null, null));
+                .thenReturn(new HotelSettingsResponse(stayHotelId, true, null, null, null, null, null, null, false));
         when(stayMapper.toDto(stayWithHotel)).thenReturn(Objects.requireNonNull(validResponse));
 
         stayService.checkIn(request);
@@ -728,7 +728,7 @@ class StayServiceImplTest {
         when(stayMapper.toEntity(request)).thenReturn(new Stay());
         when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(stayWithHotel);
         when(hotelSettingsService.getOrCreate(stayHotelId))
-                .thenReturn(new HotelSettingsResponse(stayHotelId, false, null, null, null, null, null));
+                .thenReturn(new HotelSettingsResponse(stayHotelId, false, null, null, null, null, null, null, false));
         when(stayMapper.toDto(stayWithHotel)).thenReturn(Objects.requireNonNull(validResponse));
 
         stayService.checkIn(request);
@@ -763,7 +763,7 @@ class StayServiceImplTest {
         when(stayMapper.toEntity(request)).thenReturn(new Stay());
         when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(stayWithHotel);
         when(hotelSettingsService.getOrCreate(stayHotelId))
-                .thenReturn(new HotelSettingsResponse(stayHotelId, true, null, null, null, null, null));
+                .thenReturn(new HotelSettingsResponse(stayHotelId, true, null, null, null, null, null, null, false));
         doThrow(new ExternalServiceException(PS_PORTAL_DOWN, null))
                 .when(alloggiatiWebSenderService)
                 .submitReport(ArgumentMatchers.any(LocalDate.class), ArgumentMatchers.any(UUID.class));

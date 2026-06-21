@@ -32,6 +32,7 @@ public class HotelSettings {
     private static final int LEN_ADDRESS = 200;
     private static final int LEN_FISCAL = 20;
     private static final int LEN_LOGO_URL = 500;
+    private static final int LEN_ALLOGGIATI_USERNAME = 100;
 
     /** The hotel this settings row belongs to (primary key). */
     @Id
@@ -65,6 +66,29 @@ public class HotelSettings {
     @Column(name = "logo_url", length = LEN_LOGO_URL)
     private String logoUrl;
 
+    /**
+     * Per-hotel Alloggiati Web portal username. Not a secret on its own (a portal
+     * login name), so it is stored and returned in plain text.
+     */
+    @Column(name = "alloggiati_username", length = LEN_ALLOGGIATI_USERNAME)
+    private String alloggiatiUsername;
+
+    /**
+     * Per-hotel Alloggiati Web portal password, AES-GCM encrypted via
+     * {@link com.hotelpms.frontdesk.stays.security.AlloggiatiCredentialEncryptor}.
+     * Never exposed in any response DTO.
+     */
+    @Column(name = "alloggiati_password_encrypted")
+    private String alloggiatiPasswordEncrypted;
+
+    /**
+     * Per-hotel Alloggiati Web WsKey, AES-GCM encrypted via
+     * {@link com.hotelpms.frontdesk.stays.security.AlloggiatiCredentialEncryptor}.
+     * Never exposed in any response DTO.
+     */
+    @Column(name = "alloggiati_ws_key_encrypted")
+    private String alloggiatiWsKeyEncrypted;
+
     /** The timestamp when the record was created. */
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -74,4 +98,21 @@ public class HotelSettings {
     @LastModifiedDate
     @Column(name = "updated_at", insertable = false)
     private LocalDateTime updatedAt;
+
+    /**
+     * Whether this hotel has fully configured its own Alloggiati Web credentials
+     * (username + password + WsKey all present), as opposed to relying on the
+     * global instance-wide fallback credentials.
+     *
+     * @return {@code true} if all three fields are non-blank
+     */
+    public boolean hasAlloggiatiCredentials() {
+        return isNotBlank(alloggiatiUsername)
+                && isNotBlank(alloggiatiPasswordEncrypted)
+                && isNotBlank(alloggiatiWsKeyEncrypted);
+    }
+
+    private static boolean isNotBlank(final String value) {
+        return value != null && !value.isBlank();
+    }
 }

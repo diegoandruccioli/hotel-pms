@@ -4,6 +4,7 @@ import com.hotelpms.frontdesk.stays.domain.HotelSettings;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsRequest;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
 import com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository;
+import com.hotelpms.frontdesk.stays.security.AlloggiatiCredentialEncryptor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -26,8 +27,15 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class HotelSettingsServiceImplTest {
 
+    private static final String HOTEL_USERNAME = "hotelUser";
+    private static final String ENCRYPTED_PASSWORD = "enc-pass";
+    private static final String ENCRYPTED_WS_KEY = "enc-key";
+
     @Mock
     private HotelSettingsRepository hotelSettingsRepository;
+
+    @Mock
+    private AlloggiatiCredentialEncryptor alloggiatiCredentialEncryptor;
 
     @InjectMocks
     private HotelSettingsServiceImpl hotelSettingsService;
@@ -80,8 +88,8 @@ class HotelSettingsServiceImplTest {
         when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
         when(hotelSettingsRepository.save(existing)).thenReturn(existing);
 
-        final HotelSettingsResponse result =
-                hotelSettingsService.update(hotelId, new HotelSettingsRequest(true, null, null, null, null, null));
+        final HotelSettingsResponse result = hotelSettingsService.update(
+                hotelId, new HotelSettingsRequest(true, null, null, null, null, null, null, null, null));
 
         assertNotNull(result);
         assertTrue(Objects.requireNonNull(result).alloggiatiAutoSend());
@@ -102,11 +110,54 @@ class HotelSettingsServiceImplTest {
         when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
         when(hotelSettingsRepository.save(Objects.requireNonNull(expectedArg))).thenReturn(Objects.requireNonNull(created));
 
-        final HotelSettingsResponse result =
-                hotelSettingsService.update(hotelId, new HotelSettingsRequest(true, null, null, null, null, null));
+        final HotelSettingsResponse result = hotelSettingsService.update(
+                hotelId, new HotelSettingsRequest(true, null, null, null, null, null, null, null, null));
 
         assertNotNull(result);
         assertTrue(result.alloggiatiAutoSend());
         verify(hotelSettingsRepository, times(1)).save(Objects.requireNonNull(expectedArg));
+    }
+
+    @Test
+    void shouldEncryptAndStoreAlloggiatiCredentialsWhenProvided() {
+        final UUID hotelId = UUID.randomUUID();
+        final HotelSettings existing = new HotelSettings();
+        existing.setHotelId(hotelId);
+
+        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.save(existing)).thenReturn(existing);
+        when(alloggiatiCredentialEncryptor.encrypt("plainPass")).thenReturn(ENCRYPTED_PASSWORD);
+        when(alloggiatiCredentialEncryptor.encrypt("plainKey")).thenReturn(ENCRYPTED_WS_KEY);
+
+        final HotelSettingsResponse result = hotelSettingsService.update(hotelId, new HotelSettingsRequest(
+                false, null, null, null, null, null, HOTEL_USERNAME, "plainPass", "plainKey"));
+
+        assertEquals(HOTEL_USERNAME, existing.getAlloggiatiUsername());
+        assertEquals(ENCRYPTED_PASSWORD, existing.getAlloggiatiPasswordEncrypted());
+        assertEquals(ENCRYPTED_WS_KEY, existing.getAlloggiatiWsKeyEncrypted());
+        assertTrue(result.alloggiatiCredentialsConfigured());
+    }
+
+    @Test
+    void shouldKeepExistingEncryptedCredentialsWhenPasswordAndWsKeyAreBlankOnUpdate() {
+        final UUID hotelId = UUID.randomUUID();
+        final HotelSettings existing = new HotelSettings();
+        existing.setHotelId(hotelId);
+        existing.setAlloggiatiUsername(HOTEL_USERNAME);
+        existing.setAlloggiatiPasswordEncrypted(ENCRYPTED_PASSWORD);
+        existing.setAlloggiatiWsKeyEncrypted(ENCRYPTED_WS_KEY);
+
+        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.save(existing)).thenReturn(existing);
+
+        // Admin only updates hotelName — password/WsKey fields are left blank in the
+        // UI (write-only), so the previously stored encrypted values must survive.
+        final HotelSettingsResponse result = hotelSettingsService.update(hotelId, new HotelSettingsRequest(
+                false, "New Name", null, null, null, null, HOTEL_USERNAME, "", ""));
+
+        assertEquals(ENCRYPTED_PASSWORD, existing.getAlloggiatiPasswordEncrypted());
+        assertEquals(ENCRYPTED_WS_KEY, existing.getAlloggiatiWsKeyEncrypted());
+        assertTrue(result.alloggiatiCredentialsConfigured());
+        verify(alloggiatiCredentialEncryptor, times(0)).encrypt(org.mockito.ArgumentMatchers.any());
     }
 }

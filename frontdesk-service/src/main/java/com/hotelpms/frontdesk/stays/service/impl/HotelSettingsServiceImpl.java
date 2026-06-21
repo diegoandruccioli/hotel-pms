@@ -4,6 +4,7 @@ import com.hotelpms.frontdesk.stays.domain.HotelSettings;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsRequest;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
 import com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository;
+import com.hotelpms.frontdesk.stays.security.AlloggiatiCredentialEncryptor;
 import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.util.UUID;
 public class HotelSettingsServiceImpl implements HotelSettingsService {
 
     private final HotelSettingsRepository hotelSettingsRepository;
+    private final AlloggiatiCredentialEncryptor alloggiatiCredentialEncryptor;
 
     /** {@inheritDoc} */
     @Override
@@ -42,6 +44,13 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
         settings.setVatNumber(request.vatNumber());
         settings.setFiscalCode(request.fiscalCode());
         settings.setLogoUrl(request.logoUrl());
+        settings.setAlloggiatiUsername(request.alloggiatiUsername());
+        if (request.alloggiatiPassword() != null && !request.alloggiatiPassword().isBlank()) {
+            settings.setAlloggiatiPasswordEncrypted(alloggiatiCredentialEncryptor.encrypt(request.alloggiatiPassword()));
+        }
+        if (request.alloggiatiWsKey() != null && !request.alloggiatiWsKey().isBlank()) {
+            settings.setAlloggiatiWsKeyEncrypted(alloggiatiCredentialEncryptor.encrypt(request.alloggiatiWsKey()));
+        }
         return toResponse(hotelSettingsRepository.save(settings));
     }
 
@@ -63,6 +72,8 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
                 entity.getAddress(),
                 entity.getVatNumber(),
                 entity.getFiscalCode(),
-                entity.getLogoUrl());
+                entity.getLogoUrl(),
+                entity.getAlloggiatiUsername(),
+                entity.hasAlloggiatiCredentials());
     }
 }

@@ -467,6 +467,9 @@ services:
       - ALLOGGIATI_PASSWORD=${ALLOGGIATI_PASSWORD:-ci_placeholder_password}
       - ALLOGGIATI_WS_KEY=${ALLOGGIATI_WS_KEY:-ci_placeholder_wskey}
       - ALLOGGIATI_DRY_RUN=${ALLOGGIATI_DRY_RUN:-true}
+      # Encrypts per-hotel Alloggiati credentials at rest (P8) — salt MUST be hex.
+      - ALLOGGIATI_CREDENTIALS_ENCRYPTION_KEY=${ALLOGGIATI_CREDENTIALS_ENCRYPTION_KEY:-ci_placeholder_encryption_key}
+      - ALLOGGIATI_CREDENTIALS_ENCRYPTION_SALT=${ALLOGGIATI_CREDENTIALS_ENCRYPTION_SALT:-deadbeefdeadbeefdeadbeefdeadbeef}
       - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
