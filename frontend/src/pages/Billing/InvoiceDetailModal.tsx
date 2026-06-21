@@ -5,6 +5,7 @@ const ICON_STYLE: React.CSSProperties = { fontSize: 18 };
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3StatusChip } from '../../components/m3/M3StatusChip';
+import { useToastStore } from '../../store/toastStore';
 import type { InvoiceResponse, InvoiceStatus, PaymentMethod, ChargeType } from '../../types/billing.types';
 
 interface Props {
@@ -34,16 +35,19 @@ const chargeTypeIcon: Record<ChargeType, string> = {
 
 export const InvoiceDetailModal = memo(({ invoice, onClose }: Props) => {
   const { t, i18n } = useTranslation(['billing', 'common']);
+  const { addToast } = useToastStore();
   const [downloading, setDownloading] = useState(false);
 
   const handleDownloadPdf = useCallback(async () => {
     setDownloading(true);
     try {
       await billingService.downloadPdf(invoice.id, invoice.invoiceNumber);
+    } catch {
+      addToast(t('err_pdf_download', { ns: 'billing' }), 'error');
     } finally {
       setDownloading(false);
     }
-  }, [invoice.id, invoice.invoiceNumber]);
+  }, [invoice.id, invoice.invoiceNumber, addToast, t]);
 
   const formatCurrency = useCallback(
     (val: number) =>

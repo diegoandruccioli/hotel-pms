@@ -11,6 +11,11 @@ vi.mock('../../services/billingService', () => ({
   },
 }));
 
+const mockAddToast = vi.fn();
+vi.mock('../../store/toastStore', () => ({
+  useToastStore: () => ({ addToast: mockAddToast }),
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
@@ -108,6 +113,15 @@ describe('InvoiceDetailModal', () => {
       expect(screen.getByRole('button', { name: /pdf_downloading/i })).toBeDisabled();
     });
     resolve();
+  });
+
+  it('shows an error toast when the PDF download fails', async () => {
+    vi.mocked(billingService.downloadPdf).mockRejectedValueOnce(new Error('boom'));
+    render(<InvoiceDetailModal invoice={BASE_INVOICE} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: /download_pdf/i }));
+    await waitFor(() => {
+      expect(mockAddToast).toHaveBeenCalledWith('err_pdf_download', 'error');
+    });
   });
 
   it('passes axe accessibility check', async () => {

@@ -22,5 +22,6 @@
   "charge_type_room_service": "Room Service",
   "charge_type_other": "Altro Addebito",
   "download_pdf": "Scarica PDF",
-  "pdf_downloading": "Download in corso…"
+  "pdf_downloading": "Download in corso…",
+  "err_pdf_download": "Impossibile scaricare il PDF della fattura. Riprova."
 }

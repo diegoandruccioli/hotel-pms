@@ -22,5 +22,6 @@
   "charge_type_room_service": "Room Service",
   "charge_type_other": "Other Charge",
   "download_pdf": "Download PDF",
-  "pdf_downloading": "Downloading…"
+  "pdf_downloading": "Downloading…",
+  "err_pdf_download": "Failed to download the invoice PDF. Please try again."
 }
