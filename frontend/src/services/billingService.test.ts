@@ -9,17 +9,6 @@ describe('billingService', () => {
     vi.clearAllMocks();
   });
 
-  it('should create an invoice', async () => {
-    const request = { reservationId: 'r1', guestId: 'g1', totalAmount: 200 };
-    const mockResponse = { id: 'inv1', ...request, status: 'ISSUED' };
-    vi.mocked(api.post).mockResolvedValueOnce({ data: mockResponse });
-
-    const result = await billingService.createInvoice(request as never);
-
-    expect(api.post).toHaveBeenCalledWith('/api/v1/invoices', request);
-    expect(result).toEqual(mockResponse);
-  });
-
   it('should fetch invoice by id', async () => {
     const mock = { id: 'inv1', status: 'ISSUED' };
     vi.mocked(api.get).mockResolvedValueOnce({ data: mock });

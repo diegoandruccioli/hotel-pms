@@ -1,20 +1,14 @@
 package com.hotelpms.billing.service.impl;
 
-import com.hotelpms.billing.client.GuestClient;
-import com.hotelpms.billing.client.ReservationClient;
-import com.hotelpms.billing.client.dto.GuestResponse;
-import com.hotelpms.billing.client.dto.ReservationResponse;
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceCharge;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
-import com.hotelpms.billing.dto.InvoiceRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
-import com.hotelpms.billing.exception.BillingValidationException;
 import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.exception.NotFoundException;
 import com.hotelpms.billing.mapper.InvoiceChargeMapper;
@@ -51,44 +45,6 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final InvoiceChargeRepository invoiceChargeRepository;
     private final InvoiceMapper invoiceMapper;
     private final InvoiceChargeMapper invoiceChargeMapper;
-    private final GuestClient guestClient;
-    private final ReservationClient reservationClient;
-
-    /** {@inheritDoc} */
-    @Override
-    @Transactional
-    public InvoiceResponse createInvoice(@NonNull final InvoiceRequest request) {
-        log.info("Creating invoice for reservation {} and guest {}", request.reservationId(), request.guestId());
-
-        final GuestResponse guest = guestClient.getGuestById(request.guestId());
-        if (guest == null || guest.id() == null) {
-            throw new BillingValidationException("INVALID_GUEST_DETAILS");
-        }
-
-        final ReservationResponse reservation = reservationClient.getReservationById(request.reservationId());
-        if (reservation == null || reservation.id() == null) {
-            throw new BillingValidationException("INVALID_RESERVATION_DETAILS");
-        }
-
-        if (!reservation.guestId().equals(request.guestId())) {
-            throw new BillingValidationException("GUEST_MISMATCH");
-        }
-
-        if (request.totalAmount().compareTo(reservation.totalPrice()) != 0) {
-            log.warn("Invoice amount {} differs from reservation amount {}", request.totalAmount(),
-                    reservation.totalPrice());
-        }
-
-        final Invoice invoice = invoiceMapper.toEntity(request);
-        invoice.setIssueDate(LocalDateTime.now());
-        invoice.setInvoiceNumber(generateInvoiceNumber());
-        invoice.setHotelId(resolveHotelId());
-
-        final Invoice savedInvoice = invoiceRepository.save(Objects.requireNonNull(invoice));
-        log.info("Successfully created Invoice {}", savedInvoice.getInvoiceNumber());
-
-        return invoiceMapper.toResponse(savedInvoice);
-    }
 
     /** {@inheritDoc} */
     @Override

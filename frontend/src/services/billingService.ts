@@ -1,16 +1,11 @@
 import api from './api';
-import type { InvoiceRequest, InvoiceResponse, PaymentRequest, PaymentResponse } from '../types/billing.types';
+import type { InvoiceResponse, PaymentRequest, PaymentResponse } from '../types/billing.types';
 import type { SpringPage } from '../types/page.types';
 
 const BASE_PATH = '/api/v1/invoices';
 const IFRAME_CLEANUP_DELAY_MS = 10000;
 
 export const billingService = {
-  createInvoice: async (data: InvoiceRequest): Promise<InvoiceResponse> => {
-    const response = await api.post<InvoiceResponse>(BASE_PATH, data);
-    return response.data;
-  },
-
   getInvoiceById: async (id: string): Promise<InvoiceResponse> => {
     const response = await api.get<InvoiceResponse>(`${BASE_PATH}/${id}`);
     return response.data;

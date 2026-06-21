@@ -120,7 +120,7 @@ Il campo `alloggiatiAutoSend` è nello stato React (riga 49) e viene incluso nel
 
 **Severità:** MEDIA  
 **Fix richiesto:** Verificare con `./gradlew :billing-service:test jacocoTestReport`. Se sotto 95%, aggiungere test per:
-- `InvoiceServiceImplTest` — createInvoice, addCharge, totalAmount update
+- `InvoiceServiceImplTest` — addCharge, totalAmount update
 - `PaymentServiceImplTest` — processPayment, overpayment guard
 - `PaymentControllerTest`
 

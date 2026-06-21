@@ -32,13 +32,6 @@ export interface PaymentResponse {
   invoiceId: string;
 }
 
-export interface InvoiceRequest {
-  reservationId: string;
-  guestId: string;
-  totalAmount: number;
-  status: InvoiceStatus;
-}
-
 export interface InvoiceResponse {
   id: string;
   invoiceNumber: string;

@@ -78,7 +78,6 @@
   "generate_and_download": "Generate & Download",
   "failed_load_invoices": "Failed to load invoices",
   "billing_subtitle": "Manage guest billing, process payments, and view invoices.",
-  "create_invoice": "Create Invoice",
   "error_loading_invoices": "Error loading invoices",
   "total_amount": "Total Amount",
   "no_invoices": "No invoices found.",

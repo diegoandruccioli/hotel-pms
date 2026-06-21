@@ -78,7 +78,6 @@
   "generate_and_download": "Genera e Scarica",
   "failed_load_invoices": "Impossibile caricare le fatture",
   "billing_subtitle": "Gestisci fatturazione e registra pagamenti ospiti.",
-  "create_invoice": "Crea Fattura",
   "error_loading_invoices": "Errore nel caricamento delle fatture",
   "total_amount": "Importo Totale",
   "no_invoices": "Nessuna fattura trovata.",

@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import type { InvoiceResponse, InvoiceStatus } from '../types/billing.types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { billingService } from '../services/billingService';
@@ -188,7 +187,6 @@ export const Billing = memo(() => {
           </h1>
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('billing_subtitle')}</p>
         </div>
-        <M3Button icon="add">{t('create_invoice')}</M3Button>
       </div>
 
       <div className="flex flex-wrap gap-2" role="group" aria-label={t('filter_status')}>

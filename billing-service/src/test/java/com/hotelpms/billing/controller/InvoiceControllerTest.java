@@ -7,7 +7,6 @@ import com.hotelpms.billing.domain.ChargeType;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
-import com.hotelpms.billing.dto.InvoiceRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.GlobalExceptionHandler;
@@ -96,30 +95,6 @@ class InvoiceControllerTest {
                 AMOUNT_100, InvoiceStatus.ISSUED,
                 RESERVATION_ID, GUEST_ID, null,
                 List.of(), List.of());
-    }
-
-    @Test
-    void shouldCreateInvoiceReturn201() throws Exception {
-        final InvoiceRequest request = new InvoiceRequest(
-                HOTEL_ID, RESERVATION_ID, GUEST_ID, AMOUNT_100, InvoiceStatus.ISSUED, null);
-        when(invoiceService.createInvoice(any(InvoiceRequest.class))).thenReturn(invoiceResponse);
-
-        mockMvc.perform(post(BASE_URL)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath(JSON_ID).value(INVOICE_ID.toString()))
-                .andExpect(jsonPath("$.status").value("ISSUED"));
-    }
-
-    @Test
-    void shouldCreateInvoiceReturn400WhenReservationIdMissing() throws Exception {
-        final String body = "{\"guestId\":\"" + GUEST_ID + "\",\"totalAmount\":100,\"status\":\"ISSUED\"}";
-
-        mockMvc.perform(post(BASE_URL)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest());
     }
 
     @Test

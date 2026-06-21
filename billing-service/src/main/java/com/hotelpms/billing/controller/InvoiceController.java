@@ -3,7 +3,6 @@ package com.hotelpms.billing.controller;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
-import com.hotelpms.billing.dto.InvoiceRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
@@ -49,19 +48,6 @@ public class InvoiceController {
 
     private final InvoiceService invoiceService;
     private final PdfInvoiceService pdfInvoiceService;
-
-    /**
-     * Creates a new invoice.
-     * 
-     * @param request the invoice creation request
-     * @return the created invoice response
-     */
-    @PostMapping
-    public ResponseEntity<InvoiceResponse> createInvoice(@NonNull @Valid @RequestBody final InvoiceRequest request) {
-        log.info("REST request to create an invoice");
-        final InvoiceResponse response = invoiceService.createInvoice(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
 
     /**
      * Retrieves an invoice by its ID.

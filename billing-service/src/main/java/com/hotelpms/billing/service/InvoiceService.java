@@ -3,7 +3,6 @@ package com.hotelpms.billing.service;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
-import com.hotelpms.billing.dto.InvoiceRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
@@ -18,14 +17,6 @@ import java.util.UUID;
  * Service interface for managing Invoices.
  */
 public interface InvoiceService {
-
-    /**
-     * Creates an invoice after validating with reservation and guest services.
-     *
-     * @param request the invoice creation request
-     * @return the created invoice response
-     */
-    InvoiceResponse createInvoice(@NonNull InvoiceRequest request);
 
     /**
      * Creates an invoice linked to a hotel stay, called by stay-service at check-in.
