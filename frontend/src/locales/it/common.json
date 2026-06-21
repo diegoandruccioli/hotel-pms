@@ -224,7 +224,9 @@
   "alloggiati_json_downloaded": "Esportazione JSON del {{date}} scaricata.",
 
   "order_form_title": "Nuova Comanda",
-  "stay_id_label": "ID Soggiorno",
+  "room_label": "Camera",
+  "loading_rooms": "Caricamento camere occupate…",
+  "placeholder_room": "Seleziona una camera",
   "select_menu_items": "Seleziona Articoli Menu",
   "order_total_preview": "Totale Stimato",
   "order_created_success": "Comanda creata con successo.",
@@ -233,7 +235,7 @@
   "no_menu_available": "Nessun articolo nel menu.",
   "decrease_quantity": "Diminuisci quantità di",
   "increase_quantity": "Aumenta quantità di",
-  "err_stay_id_required": "L'ID soggiorno è obbligatorio.",
+  "err_room_required": "La camera è obbligatoria.",
   "create_order": "Crea Comanda",
   "quantity": "Quantità",
 

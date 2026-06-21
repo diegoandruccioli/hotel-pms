@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { OrderFormModal } from './OrderFormModal';
 import { fbService } from '../../services/fbService';
+import { stayService } from '../../services/stayService';
 import { useToastStore } from '../../store/toastStore';
 
 vi.mock('react-i18next', () => ({
@@ -12,6 +13,10 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../services/fbService', () => ({
   fbService: { getMenuItems: vi.fn(), createOrder: vi.fn() },
+}));
+
+vi.mock('../../services/stayService', () => ({
+  stayService: { getAllStays: vi.fn() },
 }));
 
 vi.mock('../../store/toastStore', () => ({
@@ -27,6 +32,12 @@ const MENU_ITEMS = [
   { id: 'item-uuid-2', name: 'Cappuccino', price: 3.0, category: 'Bar', description: null, available: true },
 ];
 
+const ACTIVE_STAY = {
+  id: 'stay-uuid-1', reservationId: 'r1', guestId: 'g1', roomId: 'room1', status: 'CHECKED_IN' as const,
+  createdAt: '2026-01-01', updatedAt: '2026-01-01', alloggiatiSent: false, alloggiatiSendFailed: false,
+  roomNumber: '101', guestDisplayName: 'Rossi Mario',
+};
+
 describe('OrderFormModal', () => {
   const onClose = vi.fn();
   const onCreated = vi.fn();
@@ -35,6 +46,7 @@ describe('OrderFormModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useToastStore).mockReturnValue(mockAddToast);
+    vi.mocked(stayService.getAllStays).mockResolvedValue({ content: [ACTIVE_STAY] } as never);
   });
 
   it('should load and display menu items', async () => {
@@ -63,8 +75,8 @@ describe('OrderFormModal', () => {
 
     await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText('stay_id_label'), {
-      target: { value: 'test-stay-id' },
+    fireEvent.change(screen.getByLabelText(/room_label/i), {
+      target: { value: 'stay-uuid-1' },
     });
 
     fireEvent.click(
@@ -75,7 +87,7 @@ describe('OrderFormModal', () => {
 
     await waitFor(() => {
       expect(fbService.createOrder).toHaveBeenCalledWith({
-        stayId: 'test-stay-id',
+        stayId: 'stay-uuid-1',
         items: [{ menuItemId: 'item-uuid-1', quantity: 1 }],
       });
     });
@@ -89,8 +101,8 @@ describe('OrderFormModal', () => {
 
     await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText('stay_id_label'), {
-      target: { value: 'test-stay-id' },
+    fireEvent.change(screen.getByLabelText(/room_label/i), {
+      target: { value: 'stay-uuid-1' },
     });
 
     fireEvent.click(screen.getByRole('button', { name: /create_order/ }));
@@ -101,7 +113,7 @@ describe('OrderFormModal', () => {
     expect(fbService.createOrder).not.toHaveBeenCalled();
   });
 
-  it('should show validation error when stay id is empty', async () => {
+  it('should show validation error when no room is selected', async () => {
     vi.mocked(fbService.getMenuItems).mockResolvedValueOnce(MENU_ITEMS);
     render(<OrderFormModal onClose={onClose} onCreated={onCreated} />);
 
@@ -114,9 +126,17 @@ describe('OrderFormModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /create_order/ }));
 
     await waitFor(() => {
-      expect(screen.getByText('err_stay_id_required')).toBeInTheDocument();
+      expect(screen.getByText('err_room_required')).toBeInTheDocument();
     });
     expect(fbService.createOrder).not.toHaveBeenCalled();
+  });
+
+  it('should show empty state when no rooms are currently occupied', async () => {
+    vi.mocked(fbService.getMenuItems).mockResolvedValueOnce(MENU_ITEMS);
+    vi.mocked(stayService.getAllStays).mockResolvedValue({ content: [] } as never);
+    render(<OrderFormModal onClose={onClose} onCreated={onCreated} />);
+
+    await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
   });
 
   it('should show error toast when createOrder fails', async () => {
@@ -126,8 +146,8 @@ describe('OrderFormModal', () => {
 
     await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText('stay_id_label'), {
-      target: { value: 'test-stay-id' },
+    fireEvent.change(screen.getByLabelText(/room_label/i), {
+      target: { value: 'stay-uuid-1' },
     });
 
     fireEvent.click(

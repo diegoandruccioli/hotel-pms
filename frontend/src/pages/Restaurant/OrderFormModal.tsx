@@ -2,11 +2,14 @@ import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3Button } from '../../components/m3/M3Button';
-import { M3TextField } from '../../components/m3/M3TextField';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { fbService } from '../../services/fbService';
+import { stayService } from '../../services/stayService';
 import { useToastStore } from '../../store/toastStore';
 import type { MenuItemResponse } from '../../types/fb.types';
+import type { StayResponse } from '../../types/stay.types';
+
+const ACTIVE_STAYS_PAGE_SIZE = 500;
 
 interface Props {
   onClose: () => void;
@@ -76,6 +79,8 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
   const addToast = useToastStore((s) => s.addToast);
 
   const [stayId, setStayId] = useState('');
+  const [activeStays, setActiveStays] = useState<StayResponse[]>([]);
+  const [staysLoading, setStaysLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<MenuItemResponse[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
@@ -90,13 +95,21 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
       .finally(() => setLoadingMenu(false));
   }, []);
 
+  useEffect(() => {
+    stayService
+      .getAllStays(0, ACTIVE_STAYS_PAGE_SIZE)
+      .then((page) => setActiveStays(page.content.filter((s) => s.status === 'CHECKED_IN')))
+      .catch(() => setActiveStays([]))
+      .finally(() => setStaysLoading(false));
+  }, []);
+
   const formatCurrency = useCallback(
     (val: number) =>
       new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(val),
     [i18n.language],
   );
 
-  const handleStayIdChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStayIdChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setStayId(e.target.value);
     setStayIdError('');
   }, []);
@@ -132,7 +145,7 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
       e.preventDefault();
       const trimmedStayId = stayId.trim();
       if (!trimmedStayId) {
-        setStayIdError(t('err_stay_id_required'));
+        setStayIdError(t('err_room_required'));
         return;
       }
       const items = Object.entries(quantities)
@@ -165,14 +178,36 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
       onClose={onClose}
     >
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-        <M3TextField
-          label={t('stay_id_label')}
-          type="text"
-          value={stayId}
-          onChange={handleStayIdChange}
-          required
-          errorText={stayIdError || undefined}
-        />
+        <div>
+          <label htmlFor="order-room" className="block text-sm font-medium text-on-surface mb-1">
+            {t('room_label')} <span aria-hidden="true">*</span>
+          </label>
+          {staysLoading ? (
+            <p className="text-sm text-on-surface-variant" role="status">{t('loading_rooms')}</p>
+          ) : activeStays.length === 0 ? (
+            <p className="text-sm text-error" role="alert">{t('no_active_stays')}</p>
+          ) : (
+            <select
+              id="order-room"
+              value={stayId}
+              onChange={handleStayIdChange}
+              required
+              className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+              aria-invalid={!!stayIdError}
+              aria-describedby={stayIdError ? 'order-room-error' : undefined}
+            >
+              <option value="">{t('placeholder_room')}</option>
+              {activeStays.map((stay) => (
+                <option key={stay.id} value={stay.id}>
+                  {stay.roomNumber}{stay.guestDisplayName ? ` — ${stay.guestDisplayName}` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+          {stayIdError && (
+            <p id="order-room-error" role="alert" className="mt-1 text-sm text-error">{stayIdError}</p>
+          )}
+        </div>
 
         <div>
           <p className="text-sm font-medium font-body text-on-surface mb-3" id="menu-items-label">

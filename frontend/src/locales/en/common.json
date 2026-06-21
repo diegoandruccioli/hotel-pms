@@ -224,7 +224,9 @@
   "alloggiati_json_downloaded": "JSON export for {{date}} downloaded.",
 
   "order_form_title": "New Restaurant Order",
-  "stay_id_label": "Stay ID",
+  "room_label": "Room",
+  "loading_rooms": "Loading occupied rooms…",
+  "placeholder_room": "Select a room",
   "select_menu_items": "Select Menu Items",
   "order_total_preview": "Estimated Total",
   "order_created_success": "Order created successfully.",
@@ -233,7 +235,7 @@
   "no_menu_available": "No menu items available.",
   "decrease_quantity": "Decrease quantity of",
   "increase_quantity": "Increase quantity of",
-  "err_stay_id_required": "Stay ID is required.",
+  "err_room_required": "Room is required.",
   "create_order": "Create Order",
   "quantity": "Quantity",
 
