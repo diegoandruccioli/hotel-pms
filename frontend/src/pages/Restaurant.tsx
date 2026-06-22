@@ -94,6 +94,7 @@ const OrderRow = memo(({ order, confirmingId, onConfirm, onView, formatCurrency,
   return (
     <M3TableRow key={order.id}>
       <M3TableCell className="font-medium">{order.roomNumber ?? '—'}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant">{order.guestDisplayName ?? '—'}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(order.orderDate)}</M3TableCell>
       <M3TableCell className="font-medium">{formatCurrency(order.totalAmount)}</M3TableCell>
       <M3TableCell>
@@ -229,6 +230,7 @@ export const Restaurant = memo(() => {
 
   const tableHeaders = useMemo(() => [
     t('room_label'),
+    t('guest_name'),
     t('date'),
     t('total_amount'),
     t('status'),

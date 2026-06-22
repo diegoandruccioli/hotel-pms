@@ -64,6 +64,13 @@ public class RestaurantOrder {
     private String roomNumber;
 
     /**
+     * Denormalized "Cognome Nome" of the primary guest, copied from the stay at
+     * order-creation time for the same reason as {@link #roomNumber}.
+     */
+    @Column(name = "guest_display_name")
+    private String guestDisplayName;
+
+    /**
      * Hotel scope for multi-tenant isolation (T-FB-01).
      * Set server-side from the {@code X-Auth-Hotel} JWT claim injected by the gateway;
      * never accepted from the client.

@@ -82,8 +82,9 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
         order.setOrderDate(LocalDateTime.now());
         order.setStatus(OrderStatus.PENDING);
         // Denormalized at creation time so the order keeps showing the correct
-        // room even after the guest checks out or the room changes stay.
+        // room/guest even after the guest checks out or the room changes stay.
         order.setRoomNumber(stayResponse.roomNumber());
+        order.setGuestDisplayName(stayResponse.guestDisplayName());
 
         // Resolve items with server-side prices from the catalog (T-FB-02 mitigation)
         final List<OrderItem> items = buildItemsFromCatalog(request.items(), order, hotelId);

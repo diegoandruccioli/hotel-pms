@@ -38,6 +38,7 @@ export interface RestaurantOrderResponse {
   id: string; // UUID
   stayId: string;
   roomNumber: string | null;
+  guestDisplayName: string | null;
   orderDate: string; // ISO DateTime
   totalAmount: number;
   status: OrderStatus;

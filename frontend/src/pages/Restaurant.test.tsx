@@ -59,6 +59,7 @@ const PENDING_ORDER = {
   id: 'order-12345678',
   stayId: 'stay-12345678',
   roomNumber: '101',
+  guestDisplayName: 'Rossi Mario',
   orderDate: '2026-03-15',
   totalAmount: 75,
   status: 'PENDING',
@@ -68,6 +69,7 @@ const BILLED_ORDER = {
   id: 'billed-12345678',
   stayId: 'stay-12345678',
   roomNumber: '205',
+  guestDisplayName: 'Bianchi Anna',
   orderDate: '2026-03-15',
   totalAmount: 30,
   status: 'BILLED_TO_ROOM',
@@ -97,6 +99,7 @@ describe('Restaurant', () => {
 
     await waitFor(() => {
       expect(screen.getByText('101')).toBeInTheDocument();
+      expect(screen.getByText('Rossi Mario')).toBeInTheDocument();
     });
   });
 

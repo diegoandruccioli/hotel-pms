@@ -11,21 +11,23 @@ import java.util.UUID;
 /**
  * DTO for a restaurant order response.
  *
- * @param id          the ID of the order
- * @param stayId      the ID of the stay this order is associated with
- * @param roomNumber  the room the order is charged to, denormalized at creation time
- * @param orderDate   the date and time the order was placed
- * @param totalAmount the total amount of the order
- * @param status      the status of the order
- * @param items       the items included in the order
- * @param createdAt   the creation timestamp
- * @param updatedAt   the last update timestamp
+ * @param id                the ID of the order
+ * @param stayId            the ID of the stay this order is associated with
+ * @param roomNumber        the room the order is charged to, denormalized at creation time
+ * @param guestDisplayName  the primary guest's "Cognome Nome", denormalized at creation time
+ * @param orderDate         the date and time the order was placed
+ * @param totalAmount       the total amount of the order
+ * @param status            the status of the order
+ * @param items             the items included in the order
+ * @param createdAt         the creation timestamp
+ * @param updatedAt         the last update timestamp
  */
 @Builder
 public record RestaurantOrderResponse(
                 UUID id,
                 UUID stayId,
                 String roomNumber,
+                String guestDisplayName,
                 LocalDateTime orderDate,
                 BigDecimal totalAmount,
                 OrderStatus status,
@@ -36,15 +38,16 @@ public record RestaurantOrderResponse(
         /**
          * Compact constructor to ensure defensive copying of the items list.
          *
-         * @param id          the order ID
-         * @param stayId      the stay ID
-         * @param roomNumber  the room number
-         * @param orderDate   the order date
-         * @param totalAmount the total amount
-         * @param status      the status
-         * @param items       the items
-         * @param createdAt   the creation time
-         * @param updatedAt   the update time
+         * @param id                the order ID
+         * @param stayId            the stay ID
+         * @param roomNumber        the room number
+         * @param guestDisplayName  the guest display name
+         * @param orderDate         the order date
+         * @param totalAmount       the total amount
+         * @param status            the status
+         * @param items             the items
+         * @param createdAt         the creation time
+         * @param updatedAt         the update time
          */
         public RestaurantOrderResponse {
                 items = items == null ? null : List.copyOf(items);
