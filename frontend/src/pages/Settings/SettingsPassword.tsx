@@ -26,7 +26,7 @@ export const SettingsPassword = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleBack = useCallback(() => navigate('/settings'), [navigate]);
+  const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const handleCurrentPasswordChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => setCurrentPassword(e.target.value),

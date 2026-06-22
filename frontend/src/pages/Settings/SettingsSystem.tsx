@@ -18,7 +18,7 @@ export const SettingsSystem = () => {
     stayService.getHotelSettings().then(setHotelSettings).catch(() => undefined);
   }, []);
 
-  const handleBack = useCallback(() => navigate('/settings'), [navigate]);
+  const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const handleAlloggiatiToggle = useCallback(async () => {
     if (!hotelSettings) return;

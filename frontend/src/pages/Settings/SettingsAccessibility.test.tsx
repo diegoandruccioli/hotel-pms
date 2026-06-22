@@ -32,10 +32,10 @@ describe('SettingsAccessibility', () => {
     } as never);
   });
 
-  it('navigates to the settings hub when the back button is clicked', () => {
+  it('navigates back in history when the back button is clicked', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'back' }));
-    expect(mockNavigate).toHaveBeenCalledWith('/settings');
+    expect(mockNavigate).toHaveBeenCalledWith(-1);
   });
 
   it('renders the 3 font size options', () => {

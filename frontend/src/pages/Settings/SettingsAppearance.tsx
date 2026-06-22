@@ -70,7 +70,7 @@ export const SettingsAppearance = () => {
   const { theme, setTheme } = useThemeStore();
   const { setLanguage } = useSettingsStore();
 
-  const handleBack = useCallback(() => navigate('/settings'), [navigate]);
+  const handleBack = useCallback(() => navigate(-1), [navigate]);
   const handleThemeChange = useCallback((v: ThemeValue) => setTheme(v), [setTheme]);
   const handleLanguageChange = useCallback((lang: string) => setLanguage(lang), [setLanguage]);
 

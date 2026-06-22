@@ -11,7 +11,7 @@ export const SettingsProfile = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
-  const handleBack = useCallback(() => navigate('/settings'), [navigate]);
+  const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const roleLabel = user?.role ? t(`role_${user.role.toLowerCase()}`) : '';
   const userInitial = user?.username?.charAt(0).toUpperCase() ?? '?';

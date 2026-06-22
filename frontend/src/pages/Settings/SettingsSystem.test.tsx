@@ -32,11 +32,11 @@ describe('SettingsSystem', () => {
     vi.clearAllMocks();
   });
 
-  it('navigates to the settings hub when the back button is clicked', async () => {
+  it('navigates back in history when the back button is clicked', async () => {
     vi.mocked(stayService.getHotelSettings).mockResolvedValue(SETTINGS);
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'back' }));
-    expect(mockNavigate).toHaveBeenCalledWith('/settings');
+    expect(mockNavigate).toHaveBeenCalledWith(-1);
   });
 
   it('loads hotel settings and reflects the current alloggiatiAutoSend value', async () => {

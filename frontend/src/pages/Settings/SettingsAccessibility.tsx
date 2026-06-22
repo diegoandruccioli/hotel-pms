@@ -18,7 +18,7 @@ export const SettingsAccessibility = () => {
   const navigate = useNavigate();
   const { contrast, fontScale, setContrast, setFontScale } = useSettingsStore();
 
-  const handleBack = useCallback(() => navigate('/settings'), [navigate]);
+  const handleBack = useCallback(() => navigate(-1), [navigate]);
   const handleFontChange = useCallback((v: FontScale) => setFontScale(v), [setFontScale]);
   const handleContrastToggle = useCallback(() => {
     setContrast(contrast === 'high' ? 'normal' : 'high');

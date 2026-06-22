@@ -39,10 +39,10 @@ describe('SettingsProfile', () => {
     expect(screen.getByText('A')).toBeInTheDocument();
   });
 
-  it('navigates to the settings hub when the back button is clicked', () => {
+  it('navigates back in history when the back button is clicked', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'back' }));
-    expect(mockNavigate).toHaveBeenCalledWith('/settings');
+    expect(mockNavigate).toHaveBeenCalledWith(-1);
   });
 
   it('should have no accessibility violations', async () => {

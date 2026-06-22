@@ -50,10 +50,10 @@ describe('SettingsPassword', () => {
     expect(screen.queryByText('must_change_password_banner')).not.toBeInTheDocument();
   });
 
-  it('navigates to the settings hub when the back button is clicked', () => {
+  it('navigates back in history when the back button is clicked', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'back' }));
-    expect(mockNavigate).toHaveBeenCalledWith('/settings');
+    expect(mockNavigate).toHaveBeenCalledWith(-1);
   });
 
   it('submit button disabled when fields empty', () => {
