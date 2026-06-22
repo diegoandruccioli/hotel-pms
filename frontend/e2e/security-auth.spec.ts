@@ -144,7 +144,7 @@ test.describe('Security – Authentication Attack Paths', () => {
     await expect(page.locator('[data-testid="login-form"]')).toBeVisible();
 
     await page.getByRole('textbox', { name: /username/i }).fill('admin');
-    await page.getByLabel(/password/i).fill('wrongpassword');
+    await page.getByRole('textbox', { name: /password/i }).fill('wrongpassword');
     await page.locator('[data-testid="login-submit"]').click();
 
     // A generic error must be shown — no wording that reveals lock/attempt details

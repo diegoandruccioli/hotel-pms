@@ -84,14 +84,23 @@ describe('Profile', () => {
     expect(authService.changePassword).not.toHaveBeenCalled();
   });
 
-  it('shows validation error when new password too short', async () => {
+  it('shows validation error when new password does not meet requirements', async () => {
     renderProfile();
     fireEvent.change(screen.getByLabelText('current_password'), { target: { value: 'oldPass1' } });
     fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'short' } });
     fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'short' } });
     fireEvent.click(screen.getByRole('button', { name: 'change_password' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('password_too_short');
+    expect(await screen.findByRole('alert')).toHaveTextContent('password_requirements_not_met');
     expect(authService.changePassword).not.toHaveBeenCalled();
+  });
+
+  it('shows the live password requirements checklist next to the new password field', () => {
+    renderProfile();
+    expect(screen.getByLabelText('password_requirements')).toBeInTheDocument();
+    expect(screen.getByText('password_req_length')).toBeInTheDocument();
+    expect(screen.getByText('password_req_uppercase')).toBeInTheDocument();
+    expect(screen.getByText('password_req_digits')).toBeInTheDocument();
+    expect(screen.getByText('password_req_special')).toBeInTheDocument();
   });
 
   it('calls changePassword and logs out on success', async () => {

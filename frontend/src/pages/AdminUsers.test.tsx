@@ -195,6 +195,22 @@ describe('AdminUsers', () => {
       expect(await screen.findByText('err_create_failed')).toBeInTheDocument();
     });
 
+    it('toggles password visibility in the create user form', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([]);
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('btn_new_user'));
+      fireEvent.click(screen.getByText('btn_new_user'));
+
+      const input = screen.getByLabelText('label_password');
+      expect(input).toHaveAttribute('type', 'password');
+
+      fireEvent.click(screen.getByLabelText('show_password'));
+      expect(input).toHaveAttribute('type', 'text');
+
+      fireEvent.click(screen.getByLabelText('hide_password'));
+      expect(input).toHaveAttribute('type', 'password');
+    });
+
     it('closes on Escape key', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([]);
       render(<AdminUsers />);
@@ -212,6 +228,26 @@ describe('AdminUsers', () => {
       await waitFor(() => screen.getByText('alice'));
       fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
       expect(screen.getByText('modal_reset_title')).toBeInTheDocument();
+    });
+
+    it('toggles password visibility independently for new and confirm fields', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('alice'));
+      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+
+      const newPwInput = screen.getByLabelText('label_new_password');
+      const confirmPwInput = screen.getByLabelText('label_confirm_password');
+      expect(newPwInput).toHaveAttribute('type', 'password');
+      expect(confirmPwInput).toHaveAttribute('type', 'password');
+
+      const [showNewToggle, showConfirmToggle] = screen.getAllByLabelText('show_password');
+      fireEvent.click(showNewToggle);
+      expect(newPwInput).toHaveAttribute('type', 'text');
+      expect(confirmPwInput).toHaveAttribute('type', 'password');
+
+      fireEvent.click(showConfirmToggle);
+      expect(confirmPwInput).toHaveAttribute('type', 'text');
     });
 
     it('shows an error when the password is too short', async () => {

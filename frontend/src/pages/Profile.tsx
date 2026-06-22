@@ -8,6 +8,8 @@ import { M3Card } from '../components/m3/M3Card';
 import { M3Button } from '../components/m3/M3Button';
 import { M3TextField } from '../components/m3/M3TextField';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PasswordRequirementsChecklist } from '../components/PasswordRequirementsChecklist';
+import { isPasswordValid } from '../utils/passwordPolicy';
 
 export const Profile = () => {
   const { t } = useTranslation('common');
@@ -46,8 +48,8 @@ export const Profile = () => {
       setError(t('passwords_dont_match'));
       return;
     }
-    if (newPassword.length < 16) {
-      setError(t('password_too_short'));
+    if (!isPasswordValid(newPassword)) {
+      setError(t('password_requirements_not_met'));
       return;
     }
 
@@ -155,6 +157,7 @@ export const Profile = () => {
             required
             autoComplete="new-password"
           />
+          <PasswordRequirementsChecklist password={newPassword} />
           <div className="flex justify-end pt-2">
             <M3Button
               type="submit"

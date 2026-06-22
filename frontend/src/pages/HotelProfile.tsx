@@ -6,6 +6,7 @@ import type { HotelSettingsResponse, HotelSettingsRequest } from '../types/stay.
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3Card } from '../components/m3/M3Card';
+import { PasswordVisibilityToggle } from '../components/m3/PasswordVisibilityToggle';
 import { useToastStore } from '../store/toastStore';
 
 const VAT_NUMBER_REGEX = /^\d{11}$/;
@@ -29,27 +30,43 @@ interface ProfileFieldProps {
 
 const ProfileField = memo(({
   id, label, value, placeholder, onChange, required, error, type = 'text', autoComplete,
-}: ProfileFieldProps) => (
-  <div>
-    <label htmlFor={id} className="block text-sm font-medium text-on-surface mb-1">
-      {label}{required && <span aria-hidden="true"> *</span>}
-    </label>
-    <input
-      id={id}
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={onChange}
-      autoComplete={autoComplete}
-      className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
-      aria-invalid={!!error}
-      aria-describedby={error ? `${id}-error` : undefined}
-    />
-    {error && (
-      <p id={`${id}-error`} role="alert" className="mt-1 text-sm text-error">{error}</p>
-    )}
-  </div>
-));
+}: ProfileFieldProps) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const toggleShowPassword = useCallback(() => setShowPassword((prev) => !prev), []);
+  const isPasswordField = type === 'password';
+
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-on-surface mb-1">
+        {label}{required && <span aria-hidden="true"> *</span>}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          type={isPasswordField && showPassword ? 'text' : type}
+          value={value}
+          placeholder={placeholder}
+          onChange={onChange}
+          autoComplete={autoComplete}
+          className={`w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface
+            focus:outline-none focus:ring-2 focus:ring-primary ${isPasswordField ? 'pr-12' : ''}`}
+          aria-invalid={!!error}
+          aria-describedby={error ? `${id}-error` : undefined}
+        />
+        {isPasswordField && (
+          <PasswordVisibilityToggle
+            visible={showPassword}
+            onToggle={toggleShowPassword}
+            className="absolute right-1 top-1/2 -translate-y-1/2"
+          />
+        )}
+      </div>
+      {error && (
+        <p id={`${id}-error`} role="alert" className="mt-1 text-sm text-error">{error}</p>
+      )}
+    </div>
+  );
+});
 ProfileField.displayName = 'ProfileField';
 
 // -----------------------------------------------------------------------

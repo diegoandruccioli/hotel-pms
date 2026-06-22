@@ -4,6 +4,7 @@ import { userService } from '../services/userService';
 import type { UserResponse, CreateUserRequest } from '../types/user.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
+import { PasswordVisibilityToggle } from '../components/m3/PasswordVisibilityToggle';
 import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
 import type { Role } from '../types/auth.types';
@@ -24,6 +25,9 @@ const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProps) => {
   const [form, setForm] = useState<CreateUserRequest>(INITIAL_FORM);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const toggleShowPassword = useCallback(() => setShowPassword((prev) => !prev), []);
 
   const handleUsername = useCallback((e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, username: e.target.value })), []);
@@ -86,8 +90,15 @@ const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProps) => {
           <label htmlFor="new-password" className="block text-sm font-medium text-on-surface mb-1">
             {t('label_password')}
           </label>
-          <input id="new-password" type="password" value={form.password} onChange={handlePassword}
-            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          <div className="relative">
+            <input id="new-password" type={showPassword ? 'text' : 'password'} value={form.password} onChange={handlePassword}
+              className="w-full rounded-md border border-outline bg-surface px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            <PasswordVisibilityToggle
+              visible={showPassword}
+              onToggle={toggleShowPassword}
+              className="absolute right-1 top-1/2 -translate-y-1/2"
+            />
+          </div>
         </div>
         <div>
           <label htmlFor="new-role" className="block text-sm font-medium text-on-surface mb-1">
@@ -137,9 +148,13 @@ const ResetPasswordModal = memo(({ user, onClose, onSuccess }: ResetPasswordModa
   const [confirmPw, setConfirmPw] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   const handleNewPw = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setNewPw(e.target.value), []);
   const handleConfirmPw = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setConfirmPw(e.target.value), []);
+  const toggleShowNewPw = useCallback(() => setShowNewPw((prev) => !prev), []);
+  const toggleShowConfirmPw = useCallback(() => setShowConfirmPw((prev) => !prev), []);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
@@ -177,15 +192,29 @@ const ResetPasswordModal = memo(({ user, onClose, onSuccess }: ResetPasswordModa
           <label htmlFor="reset-new-pw" className="block text-sm font-medium text-on-surface mb-1">
             {t('label_new_password')}
           </label>
-          <input id="reset-new-pw" type="password" value={newPw} onChange={handleNewPw}
-            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          <div className="relative">
+            <input id="reset-new-pw" type={showNewPw ? 'text' : 'password'} value={newPw} onChange={handleNewPw}
+              className="w-full rounded-md border border-outline bg-surface px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            <PasswordVisibilityToggle
+              visible={showNewPw}
+              onToggle={toggleShowNewPw}
+              className="absolute right-1 top-1/2 -translate-y-1/2"
+            />
+          </div>
         </div>
         <div>
           <label htmlFor="reset-confirm-pw" className="block text-sm font-medium text-on-surface mb-1">
             {t('label_confirm_password')}
           </label>
-          <input id="reset-confirm-pw" type="password" value={confirmPw} onChange={handleConfirmPw}
-            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          <div className="relative">
+            <input id="reset-confirm-pw" type={showConfirmPw ? 'text' : 'password'} value={confirmPw} onChange={handleConfirmPw}
+              className="w-full rounded-md border border-outline bg-surface px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            <PasswordVisibilityToggle
+              visible={showConfirmPw}
+              onToggle={toggleShowConfirmPw}
+              className="absolute right-1 top-1/2 -translate-y-1/2"
+            />
+          </div>
         </div>
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
         <div className="flex justify-end gap-3 pt-2">

@@ -190,6 +190,22 @@ describe('HotelProfile', () => {
     expect(screen.getByLabelText(/label_alloggiati_ws_key/i)).toHaveAttribute('type', 'password');
   });
 
+  it('toggles visibility independently for the password and WS key fields', async () => {
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+    const passwordInput = screen.getByLabelText(/label_alloggiati_password/i);
+    const wsKeyInput = screen.getByLabelText(/label_alloggiati_ws_key/i);
+    const [showPasswordToggle, showWsKeyToggle] = screen.getAllByLabelText('show_password');
+
+    fireEvent.click(showPasswordToggle);
+    expect(passwordInput).toHaveAttribute('type', 'text');
+    expect(wsKeyInput).toHaveAttribute('type', 'password');
+
+    fireEvent.click(showWsKeyToggle);
+    expect(wsKeyInput).toHaveAttribute('type', 'text');
+  });
+
   it('saves the entered username/password/WsKey and clears the secret fields afterwards', async () => {
     vi.mocked(stayService.updateHotelSettings).mockResolvedValue({
       ...baseSettings,

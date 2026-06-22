@@ -97,7 +97,7 @@ test.describe('Authentication – Happy Path', () => {
     //   The inputs already have id="username" and id="password" in the DOM.
     // -----------------------------------------------------------------------
     await page.getByRole('textbox', { name: /username/i }).fill(LOGIN_CREDENTIALS.username);
-    await page.getByLabel(/password/i).fill(LOGIN_CREDENTIALS.password);
+    await page.getByRole('textbox', { name: /password/i }).fill(LOGIN_CREDENTIALS.password);
 
     // -----------------------------------------------------------------------
     // PHASE 4 – Submit the form and wait for the POST /login response.
@@ -149,7 +149,7 @@ test.describe('Authentication – Happy Path', () => {
 
     // Stable ARIA selectors – locale independent
     await expect(page.getByRole('textbox', { name: /username/i })).toBeVisible();
-    await expect(page.getByLabel(/password/i)).toBeVisible();
+    await expect(page.getByRole('textbox', { name: /password/i })).toBeVisible();
     await expect(page.locator('[data-testid="login-submit"]')).toBeEnabled();
   });
 });

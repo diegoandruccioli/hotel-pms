@@ -1,4 +1,5 @@
 import { useState, useId, useCallback } from 'react';
+import { PasswordVisibilityToggle } from './PasswordVisibilityToggle';
 
 interface M3TextFieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'id'> {
   label: string;
@@ -17,13 +18,18 @@ export const M3TextField = ({
   className = '',
   onFocus,
   onBlur,
+  type,
   ...rest
 }: M3TextFieldProps) => {
   const id = useId();
   const [focused, setFocused] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const isPasswordField = type === 'password';
   const hasValue = !!rest.value && String(rest.value).length > 0;
-  const isFloating = focused || hasValue || rest.type === 'date';
+  const isFloating = focused || hasValue || type === 'date';
   const hasError = !!errorText;
+
+  const toggleShowPassword = useCallback(() => setShowPassword((prev) => !prev), []);
 
   const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     setFocused(true);
@@ -56,6 +62,7 @@ export const M3TextField = ({
 
         <input
           id={id}
+          type={isPasswordField && showPassword ? 'text' : type}
           className={`peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface placeholder-transparent
             focus:outline-none ${leadingIcon ? 'pl-2' : ''}`}
           placeholder={label}
@@ -65,6 +72,10 @@ export const M3TextField = ({
           aria-describedby={errorText ? `${id}-error` : supportingText ? `${id}-support` : undefined}
           {...rest}
         />
+
+        {isPasswordField && (
+          <PasswordVisibilityToggle visible={showPassword} onToggle={toggleShowPassword} className="mr-1" />
+        )}
 
         {/* Floating Label */}
         <label
