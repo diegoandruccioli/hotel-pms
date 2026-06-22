@@ -265,6 +265,9 @@
   "search_placeholder": "Search",
   "filter_all": "All",
   "filter_status": "Filter by status",
+  "sort_by": "Sort by",
+  "sort_dir_asc": "Ascending order",
+  "sort_dir_desc": "Descending order",
   "status_expected": "Expected",
 
   "pagination": "Pagination",

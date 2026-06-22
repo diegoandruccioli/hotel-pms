@@ -208,6 +208,49 @@ describe('Reservations', () => {
     }, { timeout: 500 });
   });
 
+  it('sorts by check-in date descending by default', async () => {
+    vi.mocked(reservationService.getAllReservations).mockResolvedValue([
+      { ...CONFIRMED_RESERVATION, id: 'res-early', guestFullName: 'Early Guest', checkInDate: '2026-01-01', checkOutDate: '2026-01-05' },
+      { ...CONFIRMED_RESERVATION, id: 'res-late', guestFullName: 'Late Guest', checkInDate: '2026-06-01', checkOutDate: '2026-06-05' },
+    ] as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByText('Late Guest')).toBeInTheDocument());
+    const rows = screen.getAllByText(/Guest$/);
+    expect(rows[0]).toHaveTextContent('Late Guest');
+    expect(rows[1]).toHaveTextContent('Early Guest');
+  });
+
+  it('re-sorts by check-out date when the sort field is changed', async () => {
+    vi.mocked(reservationService.getAllReservations).mockResolvedValue([
+      { ...CONFIRMED_RESERVATION, id: 'res-early', guestFullName: 'Early Guest', checkInDate: '2026-06-01', checkOutDate: '2026-01-05' },
+      { ...CONFIRMED_RESERVATION, id: 'res-late', guestFullName: 'Late Guest', checkInDate: '2026-01-01', checkOutDate: '2026-06-05' },
+    ] as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByText('Early Guest')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('sort_by'), { target: { value: 'checkOutDate' } });
+
+    const rows = screen.getAllByText(/Guest$/);
+    expect(rows[0]).toHaveTextContent('Late Guest');
+    expect(rows[1]).toHaveTextContent('Early Guest');
+  });
+
+  it('reverses sort order when the direction toggle is clicked', async () => {
+    vi.mocked(reservationService.getAllReservations).mockResolvedValue([
+      { ...CONFIRMED_RESERVATION, id: 'res-early', guestFullName: 'Early Guest', checkInDate: '2026-01-01', checkOutDate: '2026-01-05' },
+      { ...CONFIRMED_RESERVATION, id: 'res-late', guestFullName: 'Late Guest', checkInDate: '2026-06-01', checkOutDate: '2026-06-05' },
+    ] as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByText('Late Guest')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'sort_dir_desc' }));
+
+    const rows = screen.getAllByText(/Guest$/);
+    expect(rows[0]).toHaveTextContent('Early Guest');
+    expect(rows[1]).toHaveTextContent('Late Guest');
+  });
+
   it('should navigate to check-in when check-in button is clicked on CONFIRMED reservation', async () => {
     vi.mocked(reservationService.getAllReservations).mockResolvedValue([CONFIRMED_RESERVATION] as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);

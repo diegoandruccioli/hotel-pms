@@ -265,6 +265,9 @@
   "search_placeholder": "Cerca",
   "filter_all": "Tutti",
   "filter_status": "Filtra per stato",
+  "sort_by": "Ordina per",
+  "sort_dir_asc": "Ordine crescente",
+  "sort_dir_desc": "Ordine decrescente",
   "status_expected": "In Arrivo",
 
   "pagination": "Paginazione",

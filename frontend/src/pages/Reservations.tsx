@@ -16,6 +16,9 @@ import { useToastStore } from '../store/toastStore';
 
 const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 
+type SortField = 'checkInDate' | 'checkOutDate' | 'status';
+type SortDir = 'asc' | 'desc';
+
 const getStatusTone = (status: string) => {
   switch (status.toUpperCase()) {
     case 'CONFIRMED': return 'success' as const;
@@ -144,6 +147,8 @@ export const Reservations = () => {
   const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sortField, setSortField] = useState<SortField>('checkInDate');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -154,12 +159,25 @@ export const Reservations = () => {
     setSearchQuery(e.target.value);
   }, []);
 
+  const handleSortFieldChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSortField(e.target.value as SortField);
+  }, []);
+
+  const toggleSortDir = useCallback(() => {
+    setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+  }, []);
+
   const filteredReservations = useMemo(() => {
     const active = reservations.filter((r) => r.active !== false);
-    if (!debouncedSearch.trim()) return active;
-    const q = debouncedSearch.toLowerCase();
-    return active.filter((r) => r.guestFullName?.toLowerCase().includes(q));
-  }, [reservations, debouncedSearch]);
+    const searched = !debouncedSearch.trim()
+      ? active
+      : active.filter((r) => r.guestFullName?.toLowerCase().includes(debouncedSearch.toLowerCase()));
+    const sorted = [...searched].sort((a, b) => {
+      const cmp = a[sortField].localeCompare(b[sortField]);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [reservations, debouncedSearch, sortField, sortDir]);
 
   const loadReservations = useCallback(async () => {
     try {
@@ -255,6 +273,27 @@ export const Reservations = () => {
               aria-label={t('search_placeholder')}
               className="pl-9 pr-3 py-2 w-full sm:w-56 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
             />
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="reservations-sort-field" className="sr-only">{t('sort_by')}</label>
+            <select
+              id="reservations-sort-field"
+              value={sortField}
+              onChange={handleSortFieldChange}
+              className="pl-3 pr-8 py-2 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+            >
+              <option value="checkInDate">{t('check_in')}</option>
+              <option value="checkOutDate">{t('check_out')}</option>
+              <option value="status">{t('status')}</option>
+            </select>
+            <button
+              type="button"
+              onClick={toggleSortDir}
+              aria-label={sortDir === 'asc' ? t('sort_dir_asc') : t('sort_dir_desc')}
+              className="flex items-center justify-center w-10 h-10 rounded-shape-full border border-outline text-on-surface-variant hover:bg-primary/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
+            >
+              <MaterialIcon name={sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'} size={20} />
+            </button>
           </div>
           <M3Button data-testid="new-reservation-btn" icon="add" onClick={handleNewReservation}>
             {t('new_reservation')}
