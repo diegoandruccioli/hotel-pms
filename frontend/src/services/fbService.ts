@@ -17,7 +17,7 @@ export const fbService = {
   },
 
   getAllOrders: async (): Promise<RestaurantOrderResponse[]> => {
-    const response = await api.get<SpringPage<RestaurantOrderResponse>>(BASE_PATH);
+    const response = await api.get<SpringPage<RestaurantOrderResponse>>(`${BASE_PATH}?size=500`);
     return response.data.content;
   },
 

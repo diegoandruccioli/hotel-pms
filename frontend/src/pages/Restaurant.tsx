@@ -16,6 +16,9 @@ import { MenuFormModal } from './Restaurant/MenuFormModal';
 
 const CONFIRMABLE_STATUSES = new Set<string>(['PENDING', 'PREPARED']);
 
+type OrderSortField = 'orderDate' | 'roomNumber' | 'guestDisplayName';
+type SortDir = 'asc' | 'desc';
+
 interface MenuItemRowProps {
   mi: MenuItemResponse;
   deletingMenuId: string | null;
@@ -147,6 +150,9 @@ export const Restaurant = memo(() => {
   const [menuFormTarget, setMenuFormTarget] = useState<MenuItemResponse | 'new' | null>(null);
   const [deletingMenuId, setDeletingMenuId] = useState<string | null>(null);
 
+  const [sortField, setSortField] = useState<OrderSortField>('orderDate');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
   const loadOrders = useCallback(async () => {
     try {
       setLoading(true);
@@ -214,6 +220,22 @@ export const Restaurant = memo(() => {
 
   const handleOrderCreated = useCallback(async () => { await loadOrders(); }, [loadOrders]);
 
+  const handleSortFieldChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSortField(e.target.value as OrderSortField);
+  }, []);
+
+  const toggleSortDir = useCallback(() => {
+    setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+  }, []);
+
+  const sortedOrders = useMemo(() => {
+    const sorted = [...orders].sort((a, b) => {
+      const cmp = (a[sortField] ?? '').localeCompare(b[sortField] ?? '');
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [orders, sortField, sortDir]);
+
   const handleOpenOrderModal = useCallback(() => setIsOrderModalOpen(true), []);
   const handleCloseOrderModal = useCallback(() => setIsOrderModalOpen(false), []);
   const handleViewOrder = useCallback((order: RestaurantOrderResponse) => setSelectedOrder(order), []);
@@ -247,7 +269,30 @@ export const Restaurant = memo(() => {
           </h1>
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('restaurant_subtitle')}</p>
         </div>
-        <M3Button icon="add" onClick={handleOpenOrderModal}>{t('new_order')}</M3Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label htmlFor="orders-sort-field" className="sr-only">{t('sort_by')}</label>
+            <select
+              id="orders-sort-field"
+              value={sortField}
+              onChange={handleSortFieldChange}
+              className="pl-3 pr-8 py-2 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+            >
+              <option value="orderDate">{t('date')}</option>
+              <option value="roomNumber">{t('room_label')}</option>
+              <option value="guestDisplayName">{t('guest_name')}</option>
+            </select>
+            <button
+              type="button"
+              onClick={toggleSortDir}
+              aria-label={sortDir === 'asc' ? t('sort_dir_asc') : t('sort_dir_desc')}
+              className="flex items-center justify-center w-10 h-10 rounded-shape-full border border-outline text-on-surface-variant hover:bg-primary/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
+            >
+              <MaterialIcon name={sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'} size={20} />
+            </button>
+          </div>
+          <M3Button icon="add" onClick={handleOpenOrderModal}>{t('new_order')}</M3Button>
+        </div>
       </div>
 
       {loading ? (
@@ -267,10 +312,10 @@ export const Restaurant = memo(() => {
         </div>
       ) : (
         <M3Table headers={tableHeaders}>
-          {orders.length === 0 ? (
+          {sortedOrders.length === 0 ? (
             <tr><td colSpan={6} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_orders')}</td></tr>
           ) : (
-            orders.map((order) => (
+            sortedOrders.map((order) => (
               <OrderRow
                 key={order.id}
                 order={order}

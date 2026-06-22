@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { Restaurant } from './Restaurant';
 import { fbService } from '../services/fbService';
-import type { MenuItemResponse } from '../types/fb.types';
+import type { MenuItemResponse, RestaurantOrderResponse } from '../types/fb.types';
 
 vi.mock('react-i18next', () => {
   const t = (key: string) => key;
@@ -55,7 +55,7 @@ vi.mock('./Restaurant/MenuFormModal', () => ({
   ),
 }));
 
-const PENDING_ORDER = {
+const PENDING_ORDER: RestaurantOrderResponse = {
   id: 'order-12345678',
   stayId: 'stay-12345678',
   roomNumber: '101',
@@ -63,9 +63,12 @@ const PENDING_ORDER = {
   orderDate: '2026-03-15',
   totalAmount: 75,
   status: 'PENDING',
-} as never;
+  items: [],
+  createdAt: '2026-03-15',
+  updatedAt: '2026-03-15',
+};
 
-const BILLED_ORDER = {
+const BILLED_ORDER: RestaurantOrderResponse = {
   id: 'billed-12345678',
   stayId: 'stay-12345678',
   roomNumber: '205',
@@ -73,7 +76,10 @@ const BILLED_ORDER = {
   orderDate: '2026-03-15',
   totalAmount: 30,
   status: 'BILLED_TO_ROOM',
-} as never;
+  items: [],
+  createdAt: '2026-03-15',
+  updatedAt: '2026-03-15',
+};
 
 const MENU_ITEM: MenuItemResponse = {
   id: 'mi1', name: 'Espresso', category: 'Generale', price: 2.5, available: true, description: null,
@@ -241,6 +247,49 @@ describe('Restaurant', () => {
     vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
     fireEvent.click(screen.getByText('try_again'));
     await waitFor(() => expect(screen.getByText('no_orders')).toBeInTheDocument());
+  });
+
+  it('sorts orders by date descending by default', async () => {
+    vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([
+      { ...PENDING_ORDER, id: 'order-old', roomNumber: '101', guestDisplayName: 'Old Guest', orderDate: '2026-01-01T10:00:00' },
+      { ...PENDING_ORDER, id: 'order-new', roomNumber: '205', guestDisplayName: 'New Guest', orderDate: '2026-06-01T10:00:00' },
+    ]);
+    render(<Restaurant />);
+
+    await waitFor(() => expect(screen.getByText('New Guest')).toBeInTheDocument());
+    const rows = screen.getAllByText(/Guest$/);
+    expect(rows[0]).toHaveTextContent('New Guest');
+    expect(rows[1]).toHaveTextContent('Old Guest');
+  });
+
+  it('re-sorts by room number when the sort field is changed', async () => {
+    vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([
+      { ...PENDING_ORDER, id: 'order-101', roomNumber: '101', guestDisplayName: 'Room Low' },
+      { ...PENDING_ORDER, id: 'order-205', roomNumber: '205', guestDisplayName: 'Room High' },
+    ]);
+    render(<Restaurant />);
+
+    await waitFor(() => expect(screen.getByText('Room Low')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('sort_by'), { target: { value: 'roomNumber' } });
+
+    const rows = screen.getAllByText(/^Room /);
+    expect(rows[0]).toHaveTextContent('Room High');
+    expect(rows[1]).toHaveTextContent('Room Low');
+  });
+
+  it('reverses sort order when the direction toggle is clicked', async () => {
+    vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([
+      { ...PENDING_ORDER, id: 'order-old', roomNumber: '101', guestDisplayName: 'Old Guest', orderDate: '2026-01-01T10:00:00' },
+      { ...PENDING_ORDER, id: 'order-new', roomNumber: '205', guestDisplayName: 'New Guest', orderDate: '2026-06-01T10:00:00' },
+    ]);
+    render(<Restaurant />);
+
+    await waitFor(() => expect(screen.getByText('New Guest')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'sort_dir_desc' }));
+
+    const rows = screen.getAllByText(/Guest$/);
+    expect(rows[0]).toHaveTextContent('Old Guest');
+    expect(rows[1]).toHaveTextContent('New Guest');
   });
 
   describe('menu management (ADMIN/OWNER only)', () => {

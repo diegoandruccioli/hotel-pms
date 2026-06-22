@@ -36,7 +36,7 @@ describe('fbService', () => {
 
     const result = await fbService.getAllOrders();
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/fb/orders');
+    expect(api.get).toHaveBeenCalledWith('/api/v1/fb/orders?size=500');
     expect(result).toEqual(mockOrders);
   });
 
