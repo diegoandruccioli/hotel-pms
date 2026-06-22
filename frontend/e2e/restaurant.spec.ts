@@ -12,6 +12,8 @@ const MOCK_ORDERS = [
   {
     id: 'ord-001-uuid',
     stayId: 'stay-001',
+    roomNumber: '101',
+    guestDisplayName: 'Mario Rossi',
     orderDate: '2026-06-13T10:00:00',
     totalAmount: 17.00,
     status: 'PENDING',
@@ -23,6 +25,8 @@ const MOCK_ORDERS = [
   {
     id: 'ord-002-uuid',
     stayId: 'stay-002',
+    roomNumber: '205',
+    guestDisplayName: 'Anna Bianchi',
     orderDate: '2026-06-13T11:00:00',
     totalAmount: 7.00,
     status: 'BILLED_TO_ROOM',
@@ -35,6 +39,8 @@ const MOCK_ORDERS = [
 const NEW_ORDER = {
   id: 'ord-003-uuid',
   stayId: 'stay-001',
+  roomNumber: '101',
+  guestDisplayName: 'Mario Rossi',
   orderDate: new Date().toISOString(),
   totalAmount: 14.50,
   status: 'PENDING',
@@ -111,13 +117,13 @@ test.describe('Restaurant / F&B', () => {
   test('renders restaurant page with orders table', async ({ page }) => {
     await page.goto('/restaurant');
     await expect(page.getByRole('heading', { name: /restaurant|ristorante/i })).toBeVisible({ timeout: 10000 });
-    // First order row should be visible (shows truncated UUID)
-    await expect(page.getByText('ord-001')).toBeVisible({ timeout: 5000 });
+    // First order row should be visible (shows guest name)
+    await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 5000 });
   });
 
   test('shows order statuses', async ({ page }) => {
     await page.goto('/restaurant');
-    await expect(page.getByText('ord-001')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
     // PENDING status chip
     await expect(page.getByText(/pending/i)).toBeVisible();
     // BILLED_TO_ROOM status chip
@@ -126,14 +132,14 @@ test.describe('Restaurant / F&B', () => {
 
   test('shows confirm button for PENDING orders', async ({ page }) => {
     await page.goto('/restaurant');
-    await expect(page.getByText('ord-001')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
     // PENDING order should have a Confirm button
     await expect(page.getByRole('button', { name: /confirm|conferma/i })).toBeVisible();
   });
 
   test('confirms a PENDING order', async ({ page }) => {
     await page.goto('/restaurant');
-    await expect(page.getByText('ord-001')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
 
     // Click confirm on the first PENDING order
     await page.getByRole('button', { name: /confirm|conferma/i }).first().click();

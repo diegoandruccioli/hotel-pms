@@ -64,8 +64,8 @@ test.describe('Reservations', () => {
       const url = route.request().url();
       if (method === 'GET') {
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(resPage) });
-      } else if (method === 'PATCH' && url.includes('status-and-guests') && url.includes('res-002')) {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CANCELLED_RESERVATION) });
+      } else if (method === 'DELETE' && url.includes('res-002')) {
+        await route.fulfill({ status: 204 });
       } else if (method === 'PUT' && url.includes('res-002')) {
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CANCELLED_RESERVATION) });
       } else if (method === 'POST') {
@@ -127,25 +127,25 @@ test.describe('Reservations', () => {
     await expect(page).toHaveURL(/\/stays\/check-in\//);
   });
 
-  test('shows cancel button for CONFIRMED and PENDING reservations', async ({ page }) => {
+  test('shows delete button for CONFIRMED and PENDING reservations', async ({ page }) => {
     await page.goto('/reservations');
     await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
-    // Cancel buttons have aria-label="Cancel <reservationId>" (cancel_reservation key → "Cancel")
-    const cancelButtons = page.getByRole('button', { name: /^Cancel res-/i });
-    await expect(cancelButtons).toHaveCount(2);
+    // Delete buttons have aria-label="Delete <reservationId>" (delete_reservation key → "Delete")
+    const deleteButtons = page.getByRole('button', { name: /^Delete res-/i });
+    await expect(deleteButtons).toHaveCount(2);
   });
 
-  test('cancels reservation and updates status', async ({ page }) => {
+  test('deletes reservation and removes it from the list', async ({ page }) => {
     await page.goto('/reservations');
     await expect(page.getByText('Anna Bianchi')).toBeVisible({ timeout: 10000 });
-    // Cancel the second reservation (Anna Bianchi, PENDING) — aria-label="Cancel res-002"
-    await page.getByRole('button', { name: /Cancel res-002/i }).click();
+    // Delete the second reservation (Anna Bianchi, PENDING) — aria-label="Delete res-002"
+    await page.getByRole('button', { name: /Delete res-002/i }).click();
     // Confirmation dialog opens with a dismiss "Cancel" button and a primary "Confirm" button.
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 3000 });
     await dialog.getByRole('button', { name: /^Confirm$/ }).click();
-    // After cancellation, the CANCELLED chip and/or toast appear — use .first() to avoid strict mode
-    await expect(page.getByText(/cancelled/i).first()).toBeVisible({ timeout: 5000 });
+    // After deletion the row is removed from the list entirely (hard delete, not a status change)
+    await expect(page.getByText('Anna Bianchi')).not.toBeVisible({ timeout: 5000 });
   });
 
   test('navigates to new reservation form', async ({ page }) => {
