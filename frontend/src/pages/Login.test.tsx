@@ -5,6 +5,12 @@ import { BrowserRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { authService } from '../services/authService';
 
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => mockNavigate };
+});
+
 vi.mock('../services/authService', () => ({
   authService: {
     login: vi.fn(),
@@ -69,6 +75,29 @@ describe('Login Component', () => {
     
     await waitFor(() => {
       expect(authService.fetchMe).toHaveBeenCalled();
+    });
+  });
+
+  it('redirects to the change-password settings page when mustChangePassword is true', async () => {
+    vi.mocked(authService.login).mockResolvedValueOnce({ mustChangePassword: true });
+    vi.mocked(authService.fetchMe).mockResolvedValueOnce({
+      sub: 'user',
+      username: 'testuser',
+      role: 'ADMIN',
+    });
+
+    render(
+      <BrowserRouter>
+        <Login />
+      </BrowserRouter>
+    );
+
+    fireEvent.change(screen.getByLabelText('username'), { target: { value: 'testuser' } });
+    fireEvent.change(screen.getByLabelText('password'), { target: { value: 'password123' } });
+    fireEvent.click(screen.getByTestId('login-submit'));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/settings/password', { state: { mustChangePassword: true } });
     });
   });
 

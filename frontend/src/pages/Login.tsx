@@ -28,7 +28,7 @@ export const Login = memo(() => {
       const user = await authService.fetchMe();
       login(user);
       if (loginResult.mustChangePassword) {
-        navigate('/profile', { state: { mustChangePassword: true } });
+        navigate('/settings/password', { state: { mustChangePassword: true } });
       } else {
         navigate('/');
       }

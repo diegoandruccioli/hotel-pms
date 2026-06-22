@@ -1,22 +1,23 @@
 import { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuthStore } from '../store/authStore';
-import { useToastStore } from '../store/toastStore';
-import { authService } from '../services/authService';
-import { M3Card } from '../components/m3/M3Card';
-import { M3Button } from '../components/m3/M3Button';
-import { M3TextField } from '../components/m3/M3TextField';
-import { MaterialIcon } from '../components/MaterialIcon';
-import { PasswordRequirementsChecklist } from '../components/PasswordRequirementsChecklist';
-import { isPasswordValid } from '../utils/passwordPolicy';
+import { useAuthStore } from '../../store/authStore';
+import { useToastStore } from '../../store/toastStore';
+import { authService } from '../../services/authService';
+import { M3Card } from '../../components/m3/M3Card';
+import { M3Button } from '../../components/m3/M3Button';
+import { M3TextField } from '../../components/m3/M3TextField';
+import { MaterialIcon } from '../../components/MaterialIcon';
+import { SettingsPageHeader } from '../../components/SettingsPageHeader';
+import { PasswordRequirementsChecklist } from '../../components/PasswordRequirementsChecklist';
+import { isPasswordValid } from '../../utils/passwordPolicy';
 
-export const Profile = () => {
+export const SettingsPassword = () => {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
   const location = useLocation();
   const mustChangePassword = (location.state as { mustChangePassword?: boolean } | null)?.mustChangePassword === true;
-  const { user, logout } = useAuthStore();
+  const { logout } = useAuthStore();
   const { addToast } = useToastStore();
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -25,7 +26,7 @@ export const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleBack = useCallback(() => { navigate(-1); }, [navigate]);
+  const handleBack = useCallback(() => navigate('/settings'), [navigate]);
 
   const handleCurrentPasswordChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => setCurrentPassword(e.target.value),
@@ -67,47 +68,10 @@ export const Profile = () => {
     }
   }, [currentPassword, newPassword, confirmPassword, t, addToast, logout, navigate]);
 
-  const roleLabel = user?.role ? t(`role_${user.role.toLowerCase()}`) : '';
-  const userInitial = user?.username?.charAt(0).toUpperCase() ?? '?';
-
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-10">
-      <div className="flex items-center gap-4 border-b border-outline-variant pb-4">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="p-2 rounded-full hover:bg-surface-variant transition-colors text-on-surface-variant"
-          aria-label={t('back')}
-        >
-          <MaterialIcon name="arrow_back" />
-        </button>
-        <div>
-          <h1 className="text-2xl font-display font-bold text-on-surface">{t('my_profile')}</h1>
-          <p className="text-sm text-on-surface-variant mt-1">{t('profile_subtitle')}</p>
-        </div>
-      </div>
+      <SettingsPageHeader icon="lock" title={t('section_change_password')} onBack={handleBack} />
 
-      {/* Account Info */}
-      <M3Card className="p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <MaterialIcon name="person" className="text-primary" />
-          <h2 className="text-lg font-medium text-on-surface">{t('section_account_info')}</h2>
-        </div>
-        <div className="flex items-center gap-4">
-          <div
-            className="flex items-center justify-center w-16 h-16 rounded-shape-full bg-primary text-on-primary text-2xl font-display font-bold"
-            aria-hidden="true"
-          >
-            {userInitial}
-          </div>
-          <div>
-            <p className="text-base font-semibold text-on-surface">{user?.username}</p>
-            <p className="text-sm text-on-surface-variant capitalize">{roleLabel}</p>
-          </div>
-        </div>
-      </M3Card>
-
-      {/* Must-change-password banner */}
       {mustChangePassword && (
         <div role="alert" className="flex items-start gap-3 rounded-2xl bg-warning-container text-on-warning-container px-4 py-3 text-sm font-medium">
           <MaterialIcon name="warning" size={18} className="mt-0.5 flex-shrink-0" />
@@ -115,13 +79,7 @@ export const Profile = () => {
         </div>
       )}
 
-      {/* Change Password */}
       <M3Card className="p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <MaterialIcon name="lock" className="text-primary" />
-          <h2 className="text-lg font-medium text-on-surface">{t('section_change_password')}</h2>
-        </div>
-
         {error && (
           <div
             role="alert"

@@ -5,7 +5,6 @@ import { ToastContainer } from '../components/Toast';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { UserMenu } from '../components/UserMenu';
-import { SettingsModal } from '../components/SettingsModal';
 import * as FocusTrapModule from 'focus-trap-react';
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
 
@@ -115,16 +114,13 @@ export const MainLayout = () => {
 
   const [drawerOpen, setDrawerOpen]     = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleLogout   = useCallback(() => { logout(); navigate('/login'); }, [logout, navigate]);
   const openDrawer     = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer    = useCallback(() => setDrawerOpen(false), []);
   const toggleUserMenu = useCallback(() => setUserMenuOpen((v) => !v), []);
   const closeUserMenu  = useCallback(() => setUserMenuOpen(false), []);
-  const openProfile    = useCallback(() => navigate('/profile'), [navigate]);
-  const openSettings   = useCallback(() => setSettingsOpen(true), []);
-  const closeSettings  = useCallback(() => setSettingsOpen(false), []);
+  const openSettings   = useCallback(() => navigate('/settings'), [navigate]);
 
   const isOwnerOrAdmin = user?.role === 'OWNER' || user?.role === 'ADMIN';
   const username       = user?.username ?? t('guest');
@@ -248,7 +244,6 @@ export const MainLayout = () => {
             open={userMenuOpen}
             onToggle={toggleUserMenu}
             onClose={closeUserMenu}
-            onOpenProfile={openProfile}
             onOpenSettings={openSettings}
             onLogout={handleLogout}
           />
@@ -263,9 +258,6 @@ export const MainLayout = () => {
           </div>
         </main>
       </div>
-
-      {/* Settings Modal */}
-      <SettingsModal open={settingsOpen} onClose={closeSettings} />
 
       {/* Global Toast Notifications */}
       <ToastContainer />

@@ -77,6 +77,12 @@ async function mockDashboardApis(page: import('@playwright/test').Page): Promise
   await page.route('**/api/v1/reports/owner**', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_REPORT) }),
   );
+  // Dashboard fires this in a separate effect (admin/owner only) — unmocked, it 401s against
+  // the real backend and the global axios interceptor's silent-refresh-then-logout kicks in,
+  // hard-redirecting to /login mid-test (T-DASH-E2E flake root cause, fixed 2026-06-22).
+  await page.route('**/api/v1/stays/reports/alloggiati/failures/summary', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ failedCount: 0 }) }),
+  );
 }
 
 test.describe('Dashboard', () => {

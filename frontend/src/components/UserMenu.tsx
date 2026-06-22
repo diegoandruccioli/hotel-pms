@@ -12,7 +12,6 @@ interface UserMenuProps {
   /** Toggle or close the dropdown */
   onToggle: () => void;
   onClose: () => void;
-  onOpenProfile: () => void;
   onOpenSettings: () => void;
   onLogout: () => void;
 }
@@ -63,7 +62,6 @@ export const UserMenu = ({
   open,
   onToggle,
   onClose,
-  onOpenProfile,
   onOpenSettings,
   onLogout,
 }: UserMenuProps) => {
@@ -98,11 +96,6 @@ export const UserMenu = ({
   }, [open, onClose]);
 
   // Stable handlers for sub-components
-  const handleProfileClick = useCallback(() => {
-    onClose();
-    onOpenProfile();
-  }, [onClose, onOpenProfile]);
-
   const handleSettingsClick = useCallback(() => {
     onClose();
     onOpenSettings();
@@ -180,11 +173,6 @@ export const UserMenu = ({
             <p className="text-xs text-on-surface-variant truncate capitalize">{roleLabel}</p>
           </div>
 
-          <UserMenuItem
-            label={t('my_profile')}
-            icon="person"
-            onClick={handleProfileClick}
-          />
           <UserMenuItem
             label={t('settings')}
             icon="settings"

@@ -1,5 +1,12 @@
 {
   "settings": "Settings",
+  "settings_subtitle": "Manage your account and app preferences.",
+  "settings_appearance_language_title": "Appearance & language",
+  "settings_hub_profile_desc": "Username, role and account information",
+  "settings_hub_password_desc": "Update your sign-in password",
+  "settings_hub_accessibility_desc": "Text size and contrast",
+  "settings_hub_appearance_desc": "Colour theme and interface language",
+  "settings_hub_system_desc": "Property-wide configuration",
   "settings_section_appearance": "Appearance",
   "settings_section_typography": "Text Size",
   "settings_section_accessibility": "Accessibility",
