@@ -260,13 +260,15 @@ describe('WalkInCheckInForm', () => {
     async function selectStato(label: string) {
       const combo = screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' });
       fireEvent.change(combo, { target: { value: 'ITA' } });
-      const option = await screen.findByRole('option', { name: /ITALIA/ });
+      // 300ms real debounce in ComuneAutocomplete (AUTOCOMPLETE_DEBOUNCE_MS) leaves too
+      // little margin against the 1000ms findByRole default under full-suite CPU load.
+      const option = await screen.findByRole('option', { name: /ITALIA/ }, { timeout: 5000 });
       fireEvent.mouseDown(option);
     }
     async function selectComune(label: string) {
       const combo = screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' });
       fireEvent.change(combo, { target: { value: 'FIA' } });
-      const option = await screen.findByRole('option', { name: /FIANO ROMANO/ });
+      const option = await screen.findByRole('option', { name: /FIANO ROMANO/ }, { timeout: 5000 });
       fireEvent.mouseDown(option);
     }
 
@@ -326,13 +328,15 @@ describe('WalkInCheckInForm', () => {
     async function selectStato(label: string) {
       const combo = screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' });
       fireEvent.change(combo, { target: { value: 'ITA' } });
-      const option = await screen.findByRole('option', { name: /ITALIA/ });
+      // 300ms real debounce in ComuneAutocomplete (AUTOCOMPLETE_DEBOUNCE_MS) leaves too
+      // little margin against the 1000ms findByRole default under full-suite CPU load.
+      const option = await screen.findByRole('option', { name: /ITALIA/ }, { timeout: 5000 });
       fireEvent.mouseDown(option);
     }
     async function selectComune(label: string) {
       const combo = screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' });
       fireEvent.change(combo, { target: { value: 'FIA' } });
-      const option = await screen.findByRole('option', { name: /FIANO ROMANO/ });
+      const option = await screen.findByRole('option', { name: /FIANO ROMANO/ }, { timeout: 5000 });
       fireEvent.mouseDown(option);
     }
 
@@ -346,7 +350,7 @@ describe('WalkInCheckInForm', () => {
 
     fireEvent.submit(document.querySelector('form')!);
 
-    expect(await screen.findByText('err_checkin_failed')).toBeInTheDocument();
+    expect(await screen.findByText('err_checkin_failed', {}, { timeout: 5000 })).toBeInTheDocument();
   }, 15000);
 
   it('adds and removes additional guest sections', async () => {

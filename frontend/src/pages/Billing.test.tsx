@@ -160,12 +160,15 @@ describe('Billing', () => {
 
     await user.click(screen.getByText('confirm_payment'));
 
+    // Real userEvent keystroke timing through clear+type+click can eat into the 1000ms
+    // default under full-suite CPU load; widen the margin for this assertion.
     await waitFor(() =>
       expect(billingService.processPayment).toHaveBeenCalledWith('inv-1', {
         amount: 150,
         paymentMethod: 'CASH',
         transactionReference: undefined,
       }),
+      { timeout: 5000 },
     );
   });
 
