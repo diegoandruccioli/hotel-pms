@@ -77,6 +77,11 @@ test.describe('Authentication – Happy Path', () => {
       route.fulfill({ status: 200, contentType: 'application/json',
         body: JSON.stringify({ content: [], totalElements: 1, totalPages: 1, number: 0, size: 100 }) })
     );
+    // Registered after the broader **/rooms** mock above so it takes priority
+    // (Playwright matches the most-recently-registered route first).
+    await page.route('**/api/v1/rooms/availability**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+    );
     await page.route('**/api/v1/reports/owner**', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json',
         body: JSON.stringify({ invoices: [], startDate: '2000-01-01', endDate: '2099-12-31' }) })

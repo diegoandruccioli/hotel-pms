@@ -24,7 +24,10 @@ const MOCK_RESERVATIONS = [
 ];
 
 const MOCK_STAYS = [
-  { id: 'stay-1', guestId: 'g-1', roomId: 'rm-2', status: 'CHECKED_IN' },
+  {
+    id: 'stay-1', guestId: 'g-1', roomId: 'rm-2', status: 'CHECKED_IN',
+    guests: [{ id: 'g-1' }, { id: 'g-2' }],
+  },
 ];
 
 const MOCK_REPORT = {
@@ -74,6 +77,13 @@ async function mockDashboardApis(page: import('@playwright/test').Page): Promise
       body: JSON.stringify({ content: MOCK_ROOMS, totalElements: MOCK_ROOMS.length, totalPages: 1, number: 0, size: 100 }),
     }),
   );
+  // Registered after the broader **/rooms** mock above so it takes priority
+  // (Playwright matches the most-recently-registered route first). Unmocked, this
+  // 401s against the real backend the same way the alloggiati-failures call below
+  // did (T-DASH-E2E) — hard-redirecting to /login mid-test.
+  await page.route('**/api/v1/rooms/availability**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) }),
+  );
   await page.route('**/api/v1/reports/owner**', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_REPORT) }),
   );
@@ -100,16 +110,16 @@ test.describe('Dashboard', () => {
     await page.goto('/');
     await expect(page.getByTestId('stats-grid')).toBeVisible({ timeout: 10000 });
     // All stat card labels should be present (verify by translation keys rendered as text)
-    await expect(page.getByText(/total guests|ospiti totali/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/guests in house|ospiti in struttura/i)).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/today.*(arrivals|check.in)|arrivi/i)).toBeVisible();
   });
 
-  test('shows total guests count after stats load', async ({ page }) => {
+  test('shows guests-in-house count after stats load', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('stats-grid')).toBeVisible({ timeout: 10000 });
-    // Find the dl card labelled "Total Guests" and assert the dd shows "2"
-    // Uses dt/dd structure from Dashboard component
-    const guestsDl = page.locator('dl').filter({ hasText: /Total Guests/i });
+    // Find the dl card labelled "Guests In House" and assert the dd shows "2"
+    // (MOCK_STAYS has 1 CHECKED_IN stay with 2 guests) — dt/dd structure from Dashboard component
+    const guestsDl = page.locator('dl').filter({ hasText: /Guests In House/i });
     await expect(guestsDl.locator('dd')).toContainText('2', { timeout: 10000 });
   });
 
