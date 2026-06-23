@@ -9,7 +9,7 @@ vi.mock('../services/dashboardService', () => ({
 }));
 
 const MOCK_STATS_OWNER = {
-  totalGuests: 150,
+  guestsInHouse: 150,
   todayArrivals: 3,
   todayDepartures: 2,
   currentStays: 10,
@@ -19,7 +19,7 @@ const MOCK_STATS_OWNER = {
 };
 
 const MOCK_STATS_RECEPTIONIST = {
-  totalGuests: 50,
+  guestsInHouse: 50,
   todayArrivals: 1,
   todayDepartures: 0,
   currentStays: 4,

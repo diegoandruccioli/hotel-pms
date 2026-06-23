@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
+/* eslint-disable react-perf/jsx-no-new-array-as-prop -- test-only render helper, not the real perf-sensitive render path */
 import { MemoryRouter } from 'react-router-dom';
 
 const mockNavigate = vi.hoisted(() => vi.fn());
@@ -274,5 +275,36 @@ describe('Reservations', () => {
     await waitFor(() => expect(screen.getByText('no_reservations_found')).toBeInTheDocument());
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+
+  it('hides past reservations when the "upcoming only" filter is toggled on', async () => {
+    vi.mocked(reservationService.getAllReservations).mockResolvedValue([
+      { ...CONFIRMED_RESERVATION, id: 'res-past', guestFullName: 'Past Guest', checkInDate: '2000-01-01', checkOutDate: '2000-01-05' },
+      { ...CONFIRMED_RESERVATION, id: 'res-future', guestFullName: 'Future Guest', checkInDate: '2099-01-01', checkOutDate: '2099-01-05' },
+    ] as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText('Past Guest')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'reservations_upcoming_filter' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Past Guest')).not.toBeInTheDocument();
+      expect(screen.getByText('Future Guest')).toBeInTheDocument();
+    });
+  });
+
+  it('applies upcomingOnly, sortField and sortDir from navigation state on initial load', async () => {
+    vi.mocked(reservationService.getAllReservations).mockResolvedValueOnce([
+      { ...CONFIRMED_RESERVATION, id: 'res-past', guestFullName: 'Past Guest', checkInDate: '2000-01-01', checkOutDate: '2000-01-05' },
+      { ...CONFIRMED_RESERVATION, id: 'res-future', guestFullName: 'Future Guest', checkInDate: '2099-01-01', checkOutDate: '2099-01-05' },
+    ] as never);
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/reservations', state: { upcomingOnly: true, sortField: 'checkInDate', sortDir: 'asc' } }]}>
+        <Reservations />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByText('Future Guest')).toBeInTheDocument());
+    expect(screen.queryByText('Past Guest')).not.toBeInTheDocument();
   });
 });

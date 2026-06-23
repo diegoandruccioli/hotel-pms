@@ -36,6 +36,7 @@ interface StatCardConfig {
   icon: string;
   containerClass: string;
   href: string;
+  state?: Record<string, unknown>;
 }
 
 export const Dashboard = () => {
@@ -64,11 +65,12 @@ export const Dashboard = () => {
 
   const universalStats = useMemo<StatCardConfig[]>(() => [
     {
-      nameKey: 'stat_total_guests',
-      stat: stats ? stats.totalGuests.toLocaleString() : '0',
+      nameKey: 'stat_guests_in_house',
+      stat: stats ? stats.guestsInHouse.toLocaleString() : '0',
       icon: 'group',
       containerClass: 'bg-primary-container text-on-primary-container',
-      href: '/guests',
+      href: '/stays',
+      state: { statusFilter: 'CHECKED_IN' },
     },
     {
       nameKey: 'stat_today_checkins',
@@ -76,6 +78,7 @@ export const Dashboard = () => {
       icon: 'login',
       containerClass: 'bg-tertiary-container text-on-tertiary-container',
       href: '/reservations',
+      state: { upcomingOnly: true, sortField: 'checkInDate', sortDir: 'asc' },
     },
     {
       nameKey: 'stat_today_checkouts',
@@ -83,6 +86,7 @@ export const Dashboard = () => {
       icon: 'logout',
       containerClass: 'bg-secondary-container text-on-secondary-container',
       href: '/stays',
+      state: { statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc' },
     },
     {
       nameKey: 'stat_available_rooms',
@@ -90,6 +94,7 @@ export const Dashboard = () => {
       icon: 'meeting_room',
       containerClass: 'bg-surface-container-highest text-on-surface',
       href: '/rooms',
+      state: { availableToday: true },
     },
   ], [stats]);
 
@@ -181,6 +186,7 @@ export const Dashboard = () => {
                 <div className="bg-surface-container-low px-5 py-3">
                   <Link
                     to={item.href}
+                    state={item.state}
                     className="text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
                   >
                     {t('view_all')}

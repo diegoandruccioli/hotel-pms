@@ -20,6 +20,18 @@ describe('inventoryService', () => {
     expect(result).toEqual(mockRooms);
   });
 
+  it('should fetch available rooms for a date range', async () => {
+    const mockRooms = [{ id: '1', roomNumber: '101', status: 'CLEAN' }];
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockRooms });
+
+    const result = await inventoryService.getAvailableRooms('2026-06-23', '2026-06-24');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/rooms/availability', {
+      params: { checkInDate: '2026-06-23', checkOutDate: '2026-06-24' },
+    });
+    expect(result).toEqual(mockRooms);
+  });
+
   it('should fetch room by id', async () => {
     const mockRoom = { id: '1', roomNumber: '101' };
     vi.mocked(api.get).mockResolvedValueOnce({ data: mockRoom });

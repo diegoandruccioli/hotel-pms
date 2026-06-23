@@ -3,9 +3,12 @@ package com.hotelpms.frontdesk.reservations.service;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
 import com.hotelpms.frontdesk.reservations.dto.ReservationRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
+import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -72,4 +75,17 @@ public interface ReservationService {
      * @return true if a non-terminal reservation exists for this guest
      */
     boolean hasActiveReservations(UUID guestId);
+
+    /**
+     * Returns the rooms that are both housekeeping-{@code CLEAN} and free of
+     * any overlapping reservation for the given date range, scoped to the
+     * authenticated hotel. {@code checkIn}/{@code checkOut} use the same
+     * exclusive-checkout-day convention as reservation booking (a stay ending
+     * on day X does not block a new stay starting on day X).
+     *
+     * @param checkIn  the check-in date (inclusive)
+     * @param checkOut the check-out date (exclusive); must be after {@code checkIn}
+     * @return the rooms available for that range, ordered by room number
+     */
+    List<RoomResponse> getAvailableRooms(LocalDate checkIn, LocalDate checkOut);
 }

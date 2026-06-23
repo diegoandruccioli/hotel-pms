@@ -30,6 +30,7 @@ vi.mock('../store/toastStore', () => ({
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/rooms', state: null, search: '', hash: '', key: 'test' }),
 }));
 
 describe('Rooms', () => {

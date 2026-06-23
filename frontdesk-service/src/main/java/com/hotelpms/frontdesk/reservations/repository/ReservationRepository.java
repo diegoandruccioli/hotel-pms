@@ -97,6 +97,37 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
     );
 
     /**
+     * Finds the room IDs (from a candidate set) that have an overlapping
+     * reservation in the given date range. Read-only — unlike {@link
+     * #findOverlappingReservations} and {@link #findOverlappingReservationsForNew},
+     * this does not take a {@code PESSIMISTIC_WRITE} lock: it backs a plain
+     * availability lookup (e.g. the dashboard "available rooms" view), not a
+     * booking write path, and must not block concurrent reservation writes.
+     *
+     * @param roomIds  candidate room IDs to check
+     * @param checkIn  check-in date
+     * @param checkOut check-out date
+     * @return distinct room IDs, among {@code roomIds}, that are booked for some
+     *         part of the given range
+     */
+    @Query("""
+            SELECT DISTINCT li.roomId FROM Reservation r
+            JOIN r.lineItems li
+            WHERE r.active = true
+            AND r.status NOT IN (com.hotelpms.frontdesk.reservations.domain.ReservationStatus.CANCELLED,
+                                 com.hotelpms.frontdesk.reservations.domain.ReservationStatus.NO_SHOW)
+            AND li.roomId IN :roomIds
+            AND li.active = true
+            AND r.checkInDate < :checkOut
+            AND r.checkOutDate > :checkIn
+            """)
+    List<UUID> findOverlappingRoomIds(
+            @Param("roomIds") List<UUID> roomIds,
+            @Param("checkIn") LocalDate checkIn,
+            @Param("checkOut") LocalDate checkOut
+    );
+
+    /**
      * Checks whether a guest has any reservation in this hotel whose status is not
      * in the given (terminal) set. Used by the guest-service GDPR Art. 17 erasure
      * legal-hold guard (T-GST-05) to block deletion while a booking is still live.

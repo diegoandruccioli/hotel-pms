@@ -42,6 +42,18 @@ export const inventoryService = {
     return response.data;
   },
 
+  /**
+   * Rooms that are housekeeping-CLEAN and free of any overlapping
+   * reservation for the given range. `checkOutDate` is exclusive, same
+   * convention as reservation booking (a 1-night stay uses tomorrow).
+   */
+  getAvailableRooms: async (checkInDate: string, checkOutDate: string): Promise<RoomResponse[]> => {
+    const response = await api.get<RoomResponse[]>(`${ROOMS_PATH}/availability`, {
+      params: { checkInDate, checkOutDate },
+    });
+    return response.data;
+  },
+
   createRoom: async (data: RoomRequest): Promise<RoomResponse> => {
     // hotelId is always derived server-side from the authenticated session
     // (T-ROOM-01) — whatever is sent here is ignored, so there is nothing to

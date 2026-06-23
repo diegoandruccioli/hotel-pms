@@ -29,6 +29,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -285,5 +286,27 @@ class RoomServiceImplTest {
         when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class, () -> roomService.deleteRoom(roomId, hotelId));
+    }
+
+    @Test
+    void testFindCleanRoomsSuccess() {
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatus(hotelId, RoomStatus.CLEAN))
+                .thenReturn(List.of(room));
+        when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
+
+        final List<RoomResponse> result = roomService.findCleanRooms(hotelId);
+
+        assertEquals(1, result.size());
+        assertEquals(ROOM_101, result.get(0).roomNumber());
+    }
+
+    @Test
+    void testFindCleanRoomsEmpty() {
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatus(hotelId, RoomStatus.CLEAN))
+                .thenReturn(List.of());
+
+        final List<RoomResponse> result = roomService.findCleanRooms(hotelId);
+
+        assertTrue(result.isEmpty());
     }
 }

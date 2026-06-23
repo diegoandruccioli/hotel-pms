@@ -32,7 +32,7 @@ const MOCK_ROOMS: RoomResponse[] = [
 ];
 
 const MOCK_STATS_ADMIN = {
-  totalGuests: 200,
+  guestsInHouse: 200,
   todayArrivals: 5,
   todayDepartures: 3,
   currentStays: 12,

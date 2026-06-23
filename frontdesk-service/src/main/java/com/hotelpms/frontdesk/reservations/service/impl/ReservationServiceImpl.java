@@ -24,8 +24,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -180,6 +182,31 @@ public class ReservationServiceImpl implements ReservationService {
         Objects.requireNonNull(guestId, "Guest ID cannot be null");
         final UUID hotelId = resolveHotelId();
         return reservationRepository.existsByGuestIdAndHotelIdAndStatusNotIn(guestId, hotelId, TERMINAL_STATUSES);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<RoomResponse> getAvailableRooms(final LocalDate checkIn, final LocalDate checkOut) {
+        Objects.requireNonNull(checkIn, "Check-in date cannot be null");
+        Objects.requireNonNull(checkOut, "Check-out date cannot be null");
+        if (!checkOut.isAfter(checkIn)) {
+            throw new BadRequestException("CHECKOUT_MUST_BE_AFTER_CHECKIN");
+        }
+
+        final UUID hotelId = resolveHotelId();
+        final List<RoomResponse> cleanRooms = roomService.findCleanRooms(hotelId);
+        if (cleanRooms.isEmpty()) {
+            return cleanRooms;
+        }
+
+        final List<UUID> roomIds = cleanRooms.stream().map(RoomResponse::id).toList();
+        final Set<UUID> bookedRoomIds = Set.copyOf(
+                reservationRepository.findOverlappingRoomIds(roomIds, checkIn, checkOut));
+
+        return cleanRooms.stream()
+                .filter(room -> !bookedRoomIds.contains(room.id()))
+                .toList();
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.rooms.controller;
 
+import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.dto.RoomRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import com.hotelpms.frontdesk.rooms.dto.RoomStatusRequest;
@@ -10,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
@@ -23,9 +25,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -39,6 +44,7 @@ public class RoomController {
     private static final int DEFAULT_PAGE_SIZE = 20;
 
     private final RoomService roomService;
+    private final ReservationService reservationService;
 
     /**
      * Creates a room, scoped to the caller's hotel (T-ROOM-01): any
@@ -80,6 +86,23 @@ public class RoomController {
             @PageableDefault(size = DEFAULT_PAGE_SIZE, sort = "roomNumber",
                     direction = Sort.Direction.ASC) final Pageable pageable) {
         return ResponseEntity.ok(roomService.getAllRooms(pageable, resolveHotelId()));
+    }
+
+    /**
+     * Lists the rooms available for a given date range: housekeeping-{@code
+     * CLEAN} and free of any overlapping reservation, scoped to the caller's
+     * hotel. {@code checkOutDate} follows the same exclusive-day convention
+     * as reservation booking.
+     *
+     * @param checkInDate  the check-in date (inclusive)
+     * @param checkOutDate the check-out date (exclusive); must be after {@code checkInDate}
+     * @return the available rooms for that range
+     */
+    @GetMapping("/availability")
+    public ResponseEntity<List<RoomResponse>> getAvailableRooms(
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate checkInDate,
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate checkOutDate) {
+        return ResponseEntity.ok(reservationService.getAvailableRooms(checkInDate, checkOutDate));
     }
 
     /**

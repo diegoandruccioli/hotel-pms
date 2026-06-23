@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { stayService } from '../services/stayService';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
@@ -16,6 +16,15 @@ const getTodayString = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
+
+type StaySortField = 'actualCheckInTime' | 'expectedCheckOutDate' | 'status';
+type SortDir = 'asc' | 'desc';
+
+interface StaysNavState {
+  statusFilter?: StayStatus | 'ALL';
+  sortField?: StaySortField;
+  sortDir?: SortDir;
+}
 
 const getStatusTone = (status: StayStatus) => {
   switch (status) {
@@ -62,6 +71,7 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
       </M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(stay.actualCheckInTime)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(stay.actualCheckOutTime)}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant">{stay.expectedCheckOutDate ?? '-'}</M3TableCell>
       <M3TableCell>
         <div className="font-medium flex items-center gap-1.5 text-on-surface">
           <MaterialIcon name="group" size={18} />
@@ -134,6 +144,8 @@ StayStatusChip.displayName = 'StayStatusChip';
 export const Stays = memo(() => {
   const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
+  const location = useLocation();
+  const navState = location.state as StaysNavState | null;
   const [stays, setStays] = useState<StayResponse[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -142,7 +154,9 @@ export const Stays = memo(() => {
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StayStatus | 'ALL'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<StayStatus | 'ALL'>(() => navState?.statusFilter ?? 'ALL');
+  const [sortField, setSortField] = useState<StaySortField>(() => navState?.sortField ?? 'actualCheckInTime');
+  const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? 'desc');
   const [alloggiatiDate, setAlloggiatiDate] = useState(getTodayString());
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [downloadingJson, setDownloadingJson] = useState(false);
@@ -164,6 +178,14 @@ export const Stays = memo(() => {
     setStatusFilter(s);
   }, []);
 
+  const handleSortFieldChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSortField(e.target.value as StaySortField);
+  }, []);
+
+  const toggleSortDir = useCallback(() => {
+    setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+  }, []);
+
   const filteredStays = useMemo(() => {
     let result = stays;
     if (statusFilter !== 'ALL') {
@@ -177,8 +199,12 @@ export const Stays = memo(() => {
           s.guestDisplayName?.toLowerCase().includes(q),
       );
     }
-    return result;
-  }, [stays, statusFilter, debouncedSearch]);
+    const sorted = [...result].sort((a, b) => {
+      const cmp = (a[sortField] ?? '').localeCompare(b[sortField] ?? '');
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [stays, statusFilter, debouncedSearch, sortField, sortDir]);
 
   const loadStays = useCallback(async () => {
     try {
@@ -276,6 +302,7 @@ export const Stays = memo(() => {
     t('guest_id'),
     t('check_in'),
     t('check_out'),
+    t('expected_checkout_col'),
     t('guests'),
     t('status'),
     t('alloggiati_column'),
@@ -325,6 +352,27 @@ export const Stays = memo(() => {
             />
           ))}
         </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor="stays-sort-field" className="sr-only">{t('sort_by')}</label>
+          <select
+            id="stays-sort-field"
+            value={sortField}
+            onChange={handleSortFieldChange}
+            className="pl-3 pr-8 py-2 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+          >
+            <option value="actualCheckInTime">{t('check_in')}</option>
+            <option value="expectedCheckOutDate">{t('expected_checkout_col')}</option>
+            <option value="status">{t('status')}</option>
+          </select>
+          <button
+            type="button"
+            onClick={toggleSortDir}
+            aria-label={sortDir === 'asc' ? t('sort_dir_asc') : t('sort_dir_desc')}
+            className="flex items-center justify-center w-10 h-10 rounded-shape-full border border-outline text-on-surface-variant hover:bg-primary/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
+          >
+            <MaterialIcon name={sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'} size={20} />
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -345,7 +393,7 @@ export const Stays = memo(() => {
       ) : (
         <M3Table headers={headers}>
           {filteredStays.length === 0 ? (
-            <tr><td colSpan={8} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_active_stays')}</td></tr>
+            <tr><td colSpan={9} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_active_stays')}</td></tr>
           ) : (
             filteredStays.map((stay) => (
               <StayRow

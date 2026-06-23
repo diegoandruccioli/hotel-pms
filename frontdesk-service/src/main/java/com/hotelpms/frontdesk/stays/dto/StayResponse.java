@@ -2,6 +2,7 @@ package com.hotelpms.frontdesk.stays.dto;
 
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -26,6 +27,8 @@ import java.util.UUID;
  * @param guests                  the list of guests
  * @param guestDisplayName        denormalized primary guest "Cognome Nome", null for legacy stays
  * @param roomNumber              denormalized room number, null for legacy stays
+ * @param expectedCheckOutDate    expected check-out date sourced from the reservation (or the
+ *                                walk-in request) at check-in time; null for legacy stays
  */
 public record StayResponse(
                 UUID id,
@@ -44,7 +47,8 @@ public record StayResponse(
                 String alloggiatiFailureReason,
                 List<StayGuestResponse> guests,
                 String guestDisplayName,
-                String roomNumber) {
+                String roomNumber,
+                LocalDate expectedCheckOutDate) {
     /**
      * Compact constructor to ensure defensive copying of the guests list.
      */

@@ -107,6 +107,8 @@ export interface StayResponse {
   guestDisplayName?: string | null;
   /** Denormalized room number set at check-in; null for legacy stays. */
   roomNumber?: string | null;
+  /** Expected check-out date sourced from the reservation (or walk-in request) at check-in; null for legacy stays. */
+  expectedCheckOutDate?: string | null;
 }
 
 /** Summary of unresolved Alloggiati Web submission failures for the caller's hotel. */

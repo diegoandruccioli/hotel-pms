@@ -1,11 +1,13 @@
 package com.hotelpms.frontdesk.rooms.repository;
 
 import com.hotelpms.frontdesk.rooms.domain.Room;
+import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -61,4 +63,17 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
      * @return the optional room
      */
     Optional<Room> findByIdAndActiveTrueAndHotelId(UUID id, UUID hotelId);
+
+    /**
+     * Finds all active rooms for a hotel with a given housekeeping status,
+     * unpaginated. Used as the candidate pool for date-scoped availability
+     * checks (status alone is not date-aware, see {@code ReservationService
+     * #getAvailableRooms}), where the full set must be intersected against
+     * reservation overlaps rather than paged.
+     *
+     * @param hotelId the hotel UUID extracted from the authenticated user's JWT
+     * @param status  the housekeeping status to filter by
+     * @return active rooms for that hotel and status
+     */
+    List<Room> findAllByActiveTrueAndHotelIdAndStatus(UUID hotelId, RoomStatus status);
 }

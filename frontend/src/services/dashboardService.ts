@@ -1,4 +1,3 @@
-import { guestService } from './guestService';
 import { reservationService } from './reservationService';
 import { stayService } from './stayService';
 import { inventoryService } from './inventoryService';
@@ -6,7 +5,8 @@ import { billingReportService } from './billingReportService';
 import type { RoomResponse } from '../types/inventory.types';
 
 export interface DashboardStats {
-  totalGuests: number;
+  /** Guests checked in right now (sum of guests across CHECKED_IN stays), not the lifetime guest directory size. */
+  guestsInHouse: number;
   todayArrivals: number;
   todayDepartures: number;
   currentStays: number;
@@ -21,15 +21,21 @@ const getTodayDateString = (): string => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
+const getTomorrowDateString = (): string => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+};
+
 export const dashboardService = {
   getDashboardStats: async (isOwnerOrAdmin: boolean): Promise<DashboardStats> => {
     const today = getTodayDateString();
 
-    const [guests, reservations, stays, roomsPage] = await Promise.all([
-      guestService.getAllGuests(),
+    const [reservations, stays, roomsPage, availableRoomsToday] = await Promise.all([
       reservationService.getAllReservations(),
-      stayService.getAllStays(),
+      stayService.getAllStays(0, 500),
       inventoryService.getAllRooms(),
+      inventoryService.getAvailableRooms(today, getTomorrowDateString()),
     ]).catch((error: unknown) => {
       console.error('Error fetching dashboard data:', error);
       throw error;
@@ -44,10 +50,12 @@ export const dashboardService = {
         (r.status === 'CONFIRMED' || r.status === 'CHECKED_IN' || r.status === 'PENDING'),
     ).length;
 
-    const currentStays = stays.content.filter(s => s.status === 'CHECKED_IN').length;
+    const checkedInStays = stays.content.filter(s => s.status === 'CHECKED_IN');
+    const currentStays = checkedInStays.length;
+    const guestsInHouse = checkedInStays.reduce((sum, s) => sum + (s.guests?.length ?? 0), 0);
 
     const rooms: RoomResponse[] = roomsPage.content ?? [];
-    const availableRooms = rooms.filter(r => r.status === 'CLEAN').length;
+    const availableRooms = availableRoomsToday.length;
 
     let pendingRevenue: number | null = null;
     if (isOwnerOrAdmin) {
@@ -62,7 +70,7 @@ export const dashboardService = {
     }
 
     return {
-      totalGuests: guests.length,
+      guestsInHouse,
       todayArrivals,
       todayDepartures,
       currentStays,

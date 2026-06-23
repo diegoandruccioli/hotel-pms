@@ -6,6 +6,7 @@ import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -74,4 +75,15 @@ public interface RoomService {
      * @param hotelId the hotel UUID (from the authenticated user's JWT)
      */
     void deleteRoom(UUID id, UUID hotelId);
+
+    /**
+     * Returns every active, {@code CLEAN} room belonging to the authenticated
+     * hotel, unpaginated. {@code CLEAN} is the housekeeping precondition for
+     * sellability; date-specific availability (no overlapping reservation) is
+     * layered on top by the caller.
+     *
+     * @param hotelId the hotel UUID (from the authenticated user's JWT)
+     * @return the clean rooms for that hotel
+     */
+    List<RoomResponse> findCleanRooms(UUID hotelId);
 }

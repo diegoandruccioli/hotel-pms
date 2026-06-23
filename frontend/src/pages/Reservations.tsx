@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { reservationService } from '../services/reservationService';
 import type { ReservationResponse } from '../types/reservation.types';
 import { MaterialIcon } from '../components/MaterialIcon';
@@ -18,6 +18,17 @@ const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 
 type SortField = 'checkInDate' | 'checkOutDate' | 'status';
 type SortDir = 'asc' | 'desc';
+
+interface ReservationsNavState {
+  upcomingOnly?: boolean;
+  sortField?: SortField;
+  sortDir?: SortDir;
+}
+
+const getTodayString = (): string => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
 
 const getStatusTone = (status: string) => {
   switch (status.toUpperCase()) {
@@ -135,6 +146,8 @@ ReservationRow.displayName = 'ReservationRow';
 export const Reservations = () => {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
+  const location = useLocation();
+  const navState = location.state as ReservationsNavState | null;
   const addToast = useToastStore((s) => s.addToast);
   const role = useAuthStore((s) => s.user?.role);
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
@@ -147,8 +160,9 @@ export const Reservations = () => {
   const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sortField, setSortField] = useState<SortField>('checkInDate');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [sortField, setSortField] = useState<SortField>(() => navState?.sortField ?? 'checkInDate');
+  const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? 'desc');
+  const [upcomingOnly, setUpcomingOnly] = useState(() => navState?.upcomingOnly ?? false);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -167,17 +181,22 @@ export const Reservations = () => {
     setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
   }, []);
 
+  const toggleUpcomingOnly = useCallback(() => {
+    setUpcomingOnly((prev) => !prev);
+  }, []);
+
   const filteredReservations = useMemo(() => {
     const active = reservations.filter((r) => r.active !== false);
+    const upcoming = !upcomingOnly ? active : active.filter((r) => r.checkInDate >= getTodayString());
     const searched = !debouncedSearch.trim()
-      ? active
-      : active.filter((r) => r.guestFullName?.toLowerCase().includes(debouncedSearch.toLowerCase()));
+      ? upcoming
+      : upcoming.filter((r) => r.guestFullName?.toLowerCase().includes(debouncedSearch.toLowerCase()));
     const sorted = [...searched].sort((a, b) => {
       const cmp = a[sortField].localeCompare(b[sortField]);
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return sorted;
-  }, [reservations, debouncedSearch, sortField, sortDir]);
+  }, [reservations, debouncedSearch, sortField, sortDir, upcomingOnly]);
 
   const loadReservations = useCallback(async () => {
     try {
@@ -274,6 +293,18 @@ export const Reservations = () => {
               className="pl-9 pr-3 py-2 w-full sm:w-56 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
             />
           </div>
+          <button
+            type="button"
+            aria-pressed={upcomingOnly}
+            onClick={toggleUpcomingOnly}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors ${
+              upcomingOnly
+                ? 'bg-primary text-on-primary border-primary'
+                : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
+            }`}
+          >
+            {t('reservations_upcoming_filter')}
+          </button>
           <div className="flex items-center gap-2">
             <label htmlFor="reservations-sort-field" className="sr-only">{t('sort_by')}</label>
             <select
@@ -319,7 +350,11 @@ export const Reservations = () => {
       ) : (
         <M3Table headers={tableHeaders}>
           {filteredReservations.length === 0 ? (
-            <tr><td colSpan={6} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_reservations_found')}</td></tr>
+            <tr>
+              <td colSpan={6} className="py-8 text-center text-sm font-body text-on-surface-variant">
+                {upcomingOnly ? t('no_upcoming_reservations_found') : t('no_reservations_found')}
+              </td>
+            </tr>
           ) : (
             filteredReservations.map((reservation) => (
               <ReservationRow

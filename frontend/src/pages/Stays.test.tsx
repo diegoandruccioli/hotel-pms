@@ -27,13 +27,16 @@ vi.mock('../store/toastStore', () => ({
 }));
 
 const mockNavigate = vi.hoisted(() => vi.fn());
+const mockLocationState = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+  useLocation: () => ({ pathname: '/stays', state: mockLocationState.current, search: '', hash: '', key: 'test' }),
 }));
 
 describe('Stays', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLocationState.current = null;
     vi.mocked(useAuthStore).mockImplementation((selector: unknown) =>
       (selector as (s: { user: null }) => unknown)({ user: null })
     );
@@ -211,5 +214,57 @@ describe('Stays', () => {
     render(<Stays />);
     await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
     expect(screen.getByText('download_json_export')).toBeInTheDocument();
+  });
+
+  it('renders the expected check-out date column', async () => {
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [
+        { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'John Doe',
+          status: 'CHECKED_IN', expectedCheckOutDate: '2026-07-01' },
+      ],
+      totalElements: 1, totalPages: 1, number: 0, size: 20, numberOfElements: 1, first: true, last: true, empty: false,
+    } as never);
+    render(<Stays />);
+    await waitFor(() => expect(screen.getByText('2026-07-01')).toBeInTheDocument());
+  });
+
+  it('sorts by expected check-out date when the sort field is changed', async () => {
+    vi.mocked(stayService.getAllStays).mockResolvedValue({
+      content: [
+        { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'A',
+          status: 'CHECKED_IN', expectedCheckOutDate: '2026-07-05' },
+        { id: 's2', roomId: 'r2', roomNumber: '202', guestId: 'g2', guestDisplayName: 'B',
+          status: 'CHECKED_IN', expectedCheckOutDate: '2026-07-01' },
+      ],
+      totalElements: 2, totalPages: 1, number: 0, size: 20, numberOfElements: 2, first: true, last: true, empty: false,
+    } as never);
+    render(<Stays />);
+    await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('sort_by'), { target: { value: 'expectedCheckOutDate' } });
+    fireEvent.click(screen.getByRole('button', { name: 'sort_dir_desc' })); // default dir is desc; this click flips to asc
+
+    await waitFor(() => {
+      const rows = screen.getAllByRole('row').slice(1);
+      expect(rows[0]).toHaveTextContent('202');
+      expect(rows[1]).toHaveTextContent('101');
+    });
+  });
+
+  it('applies statusFilter, sortField and sortDir from navigation state on initial load', async () => {
+    mockLocationState.current = { statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc' };
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [
+        { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'A',
+          status: 'CHECKED_IN', expectedCheckOutDate: '2026-07-05' },
+        { id: 's2', roomId: 'r2', roomNumber: '202', guestId: 'g2', guestDisplayName: 'B',
+          status: 'EXPECTED', expectedCheckOutDate: '2026-07-01' },
+      ],
+      totalElements: 2, totalPages: 1, number: 0, size: 20, numberOfElements: 2, first: true, last: true, empty: false,
+    } as never);
+    render(<Stays />);
+
+    await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
+    expect(screen.queryByText('202')).not.toBeInTheDocument(); // filtered out: EXPECTED != CHECKED_IN
   });
 });

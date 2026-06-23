@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inventoryService } from '../../services/inventoryService';
 import type { RoomResponse, RoomTypeResponse } from '../../types/inventory.types';
@@ -8,6 +9,21 @@ import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
 import { M3StatusChip } from '../../components/m3/M3StatusChip';
 import { useToastStore } from '../../store/toastStore';
 import { RoomFormModal } from './RoomFormModal';
+
+const getTodayString = (): string => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
+const getTomorrowString = (): string => {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+};
+
+interface RoomListNavState {
+  availableToday?: boolean;
+}
 
 const getStatusTone = (status: string) => {
   switch (status) {
@@ -45,12 +61,16 @@ const RoomRow = memo(({ room, onEdit, t }: {
 
 export const RoomList = memo(() => {
   const { t } = useTranslation('common');
+  const location = useLocation();
   const addToast = useToastStore((s) => s.addToast);
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [roomTypes, setRoomTypes] = useState<RoomTypeResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+  const [availableOnly, setAvailableOnly] = useState(
+    () => ((location.state as RoomListNavState | null)?.availableToday ?? false),
+  );
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<RoomResponse | undefined>();
 
@@ -58,12 +78,13 @@ export const RoomList = memo(() => {
     try {
       setLoading(true);
       setError(null);
-      // Fetch both rooms and room types in parallel
       const [roomsData, typesData] = await Promise.all([
-        inventoryService.getAllRooms(),
+        availableOnly
+          ? inventoryService.getAvailableRooms(getTodayString(), getTomorrowString())
+          : inventoryService.getAllRooms().then((page) => page.content),
         inventoryService.getAllRoomTypes(),
       ]);
-      setRooms(roomsData.content);
+      setRooms(roomsData);
       setRoomTypes(typesData);
     } catch (err: unknown) {
       const e = err as {response?: {data?: {detail?: string}}, message?: string};
@@ -73,11 +94,15 @@ export const RoomList = memo(() => {
     } finally {
       setLoading(false);
     }
-  }, [addToast, t]);
+  }, [addToast, t, availableOnly]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const toggleAvailableOnly = useCallback(() => {
+    setAvailableOnly((prev) => !prev);
+  }, []);
 
   const openAddModal = useCallback(() => {
     setEditingRoom(undefined);
@@ -107,11 +132,25 @@ export const RoomList = memo(() => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap justify-between items-center gap-3">
         <h2 className="text-xl font-display font-medium text-on-surface">{t('tab_rooms')}</h2>
-        <M3Button icon="add" onClick={openAddModal} disabled={roomTypes.length === 0}>
-          {t('add_room')}
-        </M3Button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            aria-pressed={availableOnly}
+            onClick={toggleAvailableOnly}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors ${
+              availableOnly
+                ? 'bg-primary text-on-primary border-primary'
+                : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
+            }`}
+          >
+            {t('rooms_available_today_filter')}
+          </button>
+          <M3Button icon="add" onClick={openAddModal} disabled={roomTypes.length === 0}>
+            {t('add_room')}
+          </M3Button>
+        </div>
       </div>
 
       {roomTypes.length === 0 && !loading && !error && (
@@ -138,7 +177,11 @@ export const RoomList = memo(() => {
       ) : (
         <M3Table headers={headers}>
           {rooms.length === 0 ? (
-            <tr><td colSpan={4} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_rooms_found')}</td></tr>
+            <tr>
+              <td colSpan={4} className="py-8 text-center text-sm font-body text-on-surface-variant">
+                {availableOnly ? t('no_rooms_available_today') : t('no_rooms_found')}
+              </td>
+            </tr>
           ) : (
             rooms.map((room) => (
               <RoomRow key={room.id} room={room} onEdit={openEditModal} t={t} />

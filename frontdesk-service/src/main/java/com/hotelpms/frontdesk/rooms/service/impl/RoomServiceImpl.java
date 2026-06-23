@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -187,5 +188,21 @@ public class RoomServiceImpl implements RoomService {
                 .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
 
         roomRepository.delete(Objects.requireNonNull(room));
+    }
+
+    /**
+     * Returns every active, {@code CLEAN} room belonging to the authenticated
+     * hotel, unpaginated.
+     *
+     * @param hotelId the hotel UUID from the authenticated user's JWT; must not be {@code null}
+     * @return the clean rooms for that hotel, mapped to response DTOs
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<RoomResponse> findCleanRooms(final UUID hotelId) {
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
+        return roomRepository.findAllByActiveTrueAndHotelIdAndStatus(hotelId, RoomStatus.CLEAN).stream()
+                .map(roomMapper::toResponse)
+                .toList();
     }
 }

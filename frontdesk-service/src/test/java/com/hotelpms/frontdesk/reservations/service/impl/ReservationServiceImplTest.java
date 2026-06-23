@@ -534,4 +534,60 @@ class ReservationServiceImplTest {
         final Reservation matched = any(Reservation.class);
         return matched != null ? matched : Objects.requireNonNull(ANY_RESERVATION);
     }
+
+    @Test
+    void shouldReturnAllCleanRoomsWhenNoneAreBooked() {
+        final UUID room1 = Objects.requireNonNull(UUID.randomUUID());
+        final UUID room2 = Objects.requireNonNull(UUID.randomUUID());
+        final LocalDate checkIn = LocalDate.now();
+        final LocalDate checkOut = checkIn.plusDays(1);
+
+        when(roomService.findCleanRooms(HOTEL_ID)).thenReturn(List.of(activeRoom(room1), activeRoom(room2)));
+        when(reservationRepository.findOverlappingRoomIds(List.of(room1, room2), checkIn, checkOut))
+                .thenReturn(List.of());
+
+        final List<RoomResponse> result = reservationService.getAvailableRooms(checkIn, checkOut);
+
+        assertEquals(2, result.size());
+    }
+
+    @Test
+    void shouldExcludeRoomsWithOverlappingReservation() {
+        final UUID freeRoom = Objects.requireNonNull(UUID.randomUUID());
+        final UUID bookedRoom = Objects.requireNonNull(UUID.randomUUID());
+        final LocalDate checkIn = LocalDate.now();
+        final LocalDate checkOut = checkIn.plusDays(1);
+
+        when(roomService.findCleanRooms(HOTEL_ID)).thenReturn(List.of(activeRoom(freeRoom), activeRoom(bookedRoom)));
+        when(reservationRepository.findOverlappingRoomIds(List.of(freeRoom, bookedRoom), checkIn, checkOut))
+                .thenReturn(List.of(bookedRoom));
+
+        final List<RoomResponse> result = reservationService.getAvailableRooms(checkIn, checkOut);
+
+        assertEquals(1, result.size());
+        assertEquals(freeRoom, result.get(0).id());
+    }
+
+    @Test
+    void shouldSkipOverlapQueryWhenNoCleanRoomsExist() {
+        final LocalDate checkIn = LocalDate.now();
+        final LocalDate checkOut = checkIn.plusDays(1);
+
+        when(roomService.findCleanRooms(HOTEL_ID)).thenReturn(List.of());
+
+        final List<RoomResponse> result = reservationService.getAvailableRooms(checkIn, checkOut);
+
+        assertTrue(result.isEmpty());
+        verify(reservationRepository, never()).findOverlappingRoomIds(any(), any(), any());
+    }
+
+    @Test
+    void shouldRejectAvailabilityQueryWhenCheckOutNotAfterCheckIn() {
+        final LocalDate sameDay = LocalDate.now();
+
+        final BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> reservationService.getAvailableRooms(sameDay, sameDay));
+        assertEquals(ERR_CHECKOUT_AFTER_CHECKIN, ex.getMessage());
+        verify(roomService, never()).findCleanRooms(any());
+    }
 }

@@ -3,6 +3,8 @@ package com.hotelpms.frontdesk.rooms.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.hotelpms.frontdesk.exception.BadRequestException;
+import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.dto.RoomRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
@@ -29,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -58,6 +61,9 @@ class RoomControllerTest {
 
     @Mock
     private RoomService roomService;
+
+    @Mock
+    private ReservationService reservationService;
 
     @InjectMocks
     private RoomController roomController;
@@ -213,4 +219,32 @@ class RoomControllerTest {
 
         verify(roomService).deleteRoom(any(UUID.class), any(UUID.class));
     }
+
+    @Test
+    void shouldGetAvailableRoomsReturn200() throws Exception {
+        final LocalDate checkIn = LocalDate.now();
+        final LocalDate checkOut = checkIn.plusDays(1);
+        when(reservationService.getAvailableRooms(checkIn, checkOut)).thenReturn(List.of(roomResponse));
+
+        mockMvc.perform(get(BASE_URL + "/availability")
+                        .param("checkInDate", checkIn.toString())
+                        .param("checkOutDate", checkOut.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].roomNumber").value(ROOM_NUMBER_101));
+
+        verify(reservationService).getAvailableRooms(checkIn, checkOut);
+    }
+
+    @Test
+    void shouldGetAvailableRoomsReturn400WhenCheckOutNotAfterCheckIn() throws Exception {
+        final LocalDate sameDay = LocalDate.now();
+        when(reservationService.getAvailableRooms(sameDay, sameDay))
+                .thenThrow(new BadRequestException("CHECKOUT_MUST_BE_AFTER_CHECKIN"));
+
+        mockMvc.perform(get(BASE_URL + "/availability")
+                        .param("checkInDate", sameDay.toString())
+                        .param("checkOutDate", sameDay.toString()))
+                .andExpect(status().isBadRequest());
+    }
+
 }
