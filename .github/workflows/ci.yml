@@ -37,7 +37,7 @@ jobs:
           distribution: temurin
 
       - name: Cache Gradle packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.gradle/caches
@@ -169,7 +169,7 @@ jobs:
           path: .
 
       - name: Cache Trivy DB
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/trivy
           key: trivy-db-${{ github.run_id }}
@@ -245,7 +245,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Cache Trivy DB
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/trivy
           key: trivy-db-${{ github.run_id }}
