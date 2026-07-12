@@ -9,6 +9,7 @@ import com.hotelpms.billing.repository.InvoiceRepository;
 import com.hotelpms.billing.service.OwnerReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,8 +41,8 @@ public class OwnerReportServiceImpl implements OwnerReportService {
                 final List<Invoice> invoices = invoiceRepository.findByIssueDateBetween(start, end);
 
                 final BigDecimal totalRevenue = invoices.stream()
-                                .map(Invoice::getTotalAmount)
-                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                                .map((@NonNull Invoice inv) -> inv.getTotalAmount())
+                                .reduce(BigDecimal.ZERO, (@NonNull BigDecimal a, @NonNull BigDecimal b) -> a.add(b));
 
                 final long totalInvoices = invoices.size();
                 final long paidInvoices = invoices.stream()

@@ -44,6 +44,7 @@ import static org.mockito.Mockito.when;
  * Unit tests for InvoiceServiceImpl using JUnit 5 and Mockito.
  */
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class InvoiceServiceImplTest {
 
         private static final String SIMPLE_DRINK = "Coffee";
@@ -126,7 +127,6 @@ class InvoiceServiceImplTest {
         // ---------------------------------------------------------------
 
         @Test
-        @SuppressWarnings("null")
         @DisplayName("Should create invoice for stay with totalAmount=0 and status=ISSUED")
         void shouldCreateInvoiceForStaySuccessfully() {
                 // Arrange

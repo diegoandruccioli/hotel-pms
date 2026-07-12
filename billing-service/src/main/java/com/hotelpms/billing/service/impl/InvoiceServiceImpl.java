@@ -98,7 +98,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .build();
 
         invoice.addCharge(charge);
-        final InvoiceCharge savedCharge = invoiceChargeRepository.save(charge);
+        final InvoiceCharge savedCharge = invoiceChargeRepository.save(Objects.requireNonNull(charge));
 
         invoice.setTotalAmount(invoice.getTotalAmount().add(request.amount()));
         invoiceRepository.save(Objects.requireNonNull(invoice));

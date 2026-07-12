@@ -59,8 +59,8 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         final BigDecimal currentTotalPaid = invoice.getPayments().stream()
-                .map(Payment::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .map((@NonNull Payment p) -> p.getAmount())
+                .reduce(BigDecimal.ZERO, (@NonNull BigDecimal a, @NonNull BigDecimal b) -> a.add(b));
 
         final BigDecimal balanceDue = invoice.getTotalAmount().subtract(currentTotalPaid);
 

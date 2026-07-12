@@ -52,6 +52,7 @@ public class SecurityConfig {
      */
     @Bean
     @SneakyThrows(Exception.class)
+    @SuppressWarnings("null")
     public SecurityFilterChain securityFilterChain(final HttpSecurity http, final NonceStore nonceStore) {
         http
                 .csrf(org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer::disable)

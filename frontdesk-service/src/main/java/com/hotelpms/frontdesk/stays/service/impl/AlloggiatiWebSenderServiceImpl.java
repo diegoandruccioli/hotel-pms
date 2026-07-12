@@ -9,6 +9,7 @@ import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.NonNull;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -136,9 +137,9 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
      * @param hotelId the hotel UUID
      * @return the credentials to use for this submission
      */
-    private AlloggiatiCredentials resolveCredentials(final UUID hotelId) {
+    private AlloggiatiCredentials resolveCredentials(@NonNull final UUID hotelId) {
         return hotelSettingsRepository.findById(hotelId)
-                .filter(HotelSettings::hasAlloggiatiCredentials)
+                .filter((@NonNull HotelSettings hs) -> hs.hasAlloggiatiCredentials())
                 .map(settings -> new AlloggiatiCredentials(
                         settings.getAlloggiatiUsername(),
                         credentialEncryptor.decrypt(settings.getAlloggiatiPasswordEncrypted()),
@@ -162,7 +163,7 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
         final List<String> records = splitRecords(report);
         log.info("{} ALLOGGIATI_SUBMISSION_RECORDS | date={} | count={}", LOG_PREFIX, date, records.size());
 
-        final AlloggiatiCredentials credentials = resolveCredentials(hotelId);
+        final AlloggiatiCredentials credentials = resolveCredentials(Objects.requireNonNull(hotelId));
         final String token = generateToken(credentials);
         sendSchedule(token, records, date, credentials);
     }

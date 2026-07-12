@@ -32,6 +32,7 @@ public class SecurityConfig {
      */
     @Bean
     @SneakyThrows(Exception.class)
+    @SuppressWarnings("null")
     public SecurityFilterChain filterChain(final HttpSecurity http) {
         http
             .csrf(AbstractHttpConfigurer::disable)

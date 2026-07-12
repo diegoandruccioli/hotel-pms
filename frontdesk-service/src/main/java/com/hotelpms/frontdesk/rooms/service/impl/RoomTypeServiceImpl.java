@@ -10,6 +10,7 @@ import com.hotelpms.frontdesk.rooms.service.RoomTypeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,7 +69,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     public RoomTypeResponse getRoomTypeById(final UUID id) {
         Objects.requireNonNull(id, ROOM_TYPE_ID_NULL_MSG);
         final RoomType roomType = roomTypeRepository.findById(id)
-                .filter(RoomType::isActive)
+                .filter((@NonNull RoomType rt) -> rt.isActive())
                 .orElseThrow(() -> new NotFoundException(NOT_FOUND_MSG + id));
         return roomTypeMapper.toResponse(roomType);
     }
@@ -85,7 +86,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     @Cacheable(value = CACHE_NAME, key = "'all'")
     public List<RoomTypeResponse> getAllRoomTypes() {
         return roomTypeRepository.findAll().stream()
-                .filter(RoomType::isActive)
+                .filter((@NonNull RoomType rt) -> rt.isActive())
                 .map(roomTypeMapper::toResponse)
                 .toList();
     }
@@ -105,7 +106,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     public RoomTypeResponse updateRoomType(final UUID id, final RoomTypeRequest request) {
         Objects.requireNonNull(id, ROOM_TYPE_ID_NULL_MSG);
         final RoomType roomType = roomTypeRepository.findById(id)
-                .filter(RoomType::isActive)
+                .filter((@NonNull RoomType rt) -> rt.isActive())
                 .orElseThrow(() -> new NotFoundException(NOT_FOUND_MSG + id));
 
         roomType.setName(request.name());
@@ -128,7 +129,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     public void deleteRoomType(final UUID id) {
         Objects.requireNonNull(id, ROOM_TYPE_ID_NULL_MSG);
         final RoomType roomType = roomTypeRepository.findById(id)
-                .filter(RoomType::isActive)
+                .filter((@NonNull RoomType rt) -> rt.isActive())
                 .orElseThrow(() -> new NotFoundException(NOT_FOUND_MSG + id));
 
         roomTypeRepository.delete(Objects.requireNonNull(roomType)); // Triggers the @SQLDelete soft delete

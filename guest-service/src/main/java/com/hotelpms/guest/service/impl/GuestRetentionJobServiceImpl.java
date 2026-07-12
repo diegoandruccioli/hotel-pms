@@ -11,6 +11,7 @@ import com.hotelpms.guest.repository.GuestRepository;
 import com.hotelpms.guest.repository.GuestPrivacySettingsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,7 +80,7 @@ public class GuestRetentionJobServiceImpl {
                 LOG_PREFIX, candidates.size(), conservativeCutoff);
 
         final Map<UUID, List<Guest>> byHotel = candidates.stream()
-                .collect(Collectors.groupingBy(Guest::getHotelId));
+                .collect(Collectors.groupingBy((@NonNull Guest g) -> g.getHotelId()));
 
         int anonymised = 0;
         for (final Map.Entry<UUID, List<Guest>> entry : byHotel.entrySet()) {

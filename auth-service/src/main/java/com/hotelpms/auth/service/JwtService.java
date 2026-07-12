@@ -7,6 +7,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -129,7 +130,7 @@ public class JwtService {
      * @return the extracted username
      */
     public String extractUsername(final String token) {
-        return extractClaim(token, Claims::getSubject);
+        return extractClaim(token, (@NonNull Claims c) -> c.getSubject());
     }
 
     /**
@@ -139,7 +140,7 @@ public class JwtService {
      * @return the JTI value, or {@code null} if absent
      */
     public String extractJti(final String token) {
-        return extractClaim(token, Claims::getId);
+        return extractClaim(token, (@NonNull Claims c) -> c.getId());
     }
 
     /**
@@ -192,7 +193,7 @@ public class JwtService {
     }
 
     private boolean isTokenExpired(final String token) {
-        return extractClaim(token, Claims::getExpiration).before(Date.from(Instant.now()));
+        return extractClaim(token, (@NonNull Claims c) -> c.getExpiration()).before(Date.from(Instant.now()));
     }
 
     private String buildToken(final Map<String, Object> extraClaims, final String subject,

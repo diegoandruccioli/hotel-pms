@@ -39,6 +39,7 @@ import org.springframework.lang.NonNull;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -399,7 +400,7 @@ public class StayServiceImpl implements StayService {
             stay.setAlloggiatiSendFailed(false);
             stay.setAlloggiatiFailureReason(null);
         }
-        stayRepository.saveAll(stays);
+        stayRepository.saveAll(Objects.requireNonNull(stays));
         log.info("[STAY] ALLOGGIATI_MANUAL_SUBMIT_RECORDED | date={} | hotelId={} | staysUpdated={}",
                 date, hotelId, stays.size());
     }
@@ -410,11 +411,11 @@ public class StayServiceImpl implements StayService {
     public AlloggiatiFailureSummaryResponse getAlloggiatiFailureSummary(@NonNull final UUID hotelId) {
         final List<Stay> failed = stayRepository.findByHotelIdAndAlloggiatiSendFailedTrue(hotelId);
         final Optional<Stay> mostRecent = failed.stream()
-                .max(Comparator.comparing(Stay::getActualCheckInTime));
+                .max(Comparator.comparing((@NonNull Stay s) -> s.getActualCheckInTime()));
         return new AlloggiatiFailureSummaryResponse(
                 failed.size(),
-                mostRecent.map(Stay::getActualCheckInTime).orElse(null),
-                mostRecent.map(Stay::getAlloggiatiFailureReason).orElse(null));
+                mostRecent.map((@NonNull Stay s) -> s.getActualCheckInTime()).orElse(null),
+                mostRecent.map((@NonNull Stay s) -> s.getAlloggiatiFailureReason()).orElse(null));
     }
 
     private void markRoomOccupied(final Stay stay) {

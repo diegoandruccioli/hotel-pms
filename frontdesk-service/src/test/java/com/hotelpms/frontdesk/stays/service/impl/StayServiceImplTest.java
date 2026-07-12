@@ -71,6 +71,7 @@ import static org.mockito.Mockito.when;
  * Feign ({@link GuestClient} / {@link BillingClient}).
  */
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class StayServiceImplTest {
 
     private static final String GUEST_FIRST_NAME = "John";
@@ -947,7 +948,6 @@ class StayServiceImplTest {
      * @return a Mockito argument matcher of the requested type
      */
     @NonNull
-    @SuppressWarnings("null")
     private static <T> T anyNonNull(final Class<T> type) {
         return ArgumentMatchers.any(type);
     }

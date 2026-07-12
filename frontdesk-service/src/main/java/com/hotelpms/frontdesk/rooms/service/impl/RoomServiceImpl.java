@@ -13,6 +13,7 @@ import com.hotelpms.frontdesk.rooms.service.RoomService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,7 +62,7 @@ public class RoomServiceImpl implements RoomService {
         Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
         final UUID roomTypeId = Objects.requireNonNull(request.roomTypeId(), ROOM_TYPE_ID_NULL_MSG);
         final RoomType roomType = roomTypeRepository.findById(roomTypeId)
-                .filter(RoomType::isActive)
+                .filter((@NonNull RoomType rt) -> rt.isActive())
                 .orElseThrow(() -> new NotFoundException(TYPE_NOT_FOUND_MSG + roomTypeId));
 
         final Room room = roomMapper.toEntity(request);
@@ -130,7 +131,7 @@ public class RoomServiceImpl implements RoomService {
 
         final UUID roomTypeId = Objects.requireNonNull(request.roomTypeId(), ROOM_TYPE_ID_NULL_MSG);
         final RoomType roomType = roomTypeRepository.findById(roomTypeId)
-                .filter(RoomType::isActive)
+                .filter((@NonNull RoomType rt) -> rt.isActive())
                 .orElseThrow(() -> new NotFoundException(TYPE_NOT_FOUND_MSG + roomTypeId));
 
         room.setRoomNumber(request.roomNumber());

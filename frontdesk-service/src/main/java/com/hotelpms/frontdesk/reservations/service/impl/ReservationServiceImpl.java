@@ -19,6 +19,7 @@ import com.hotelpms.frontdesk.rooms.service.RoomService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -95,7 +96,7 @@ public class ReservationServiceImpl implements ReservationService {
         final Page<Reservation> reservationPage = reservationRepository.findAllByHotelId(hotelId, safePageable);
 
         final List<UUID> guestIds = reservationPage.getContent().stream()
-                .map(Reservation::getGuestId)
+                .map((@NonNull Reservation r) -> r.getGuestId())
                 .distinct()
                 .toList();
 
@@ -105,7 +106,7 @@ public class ReservationServiceImpl implements ReservationService {
 
         final java.util.Map<UUID, String> guestNameMap = guestClient.getGuestsBatch(guestIds).stream()
                 .collect(java.util.stream.Collectors.toMap(
-                        GuestResponse::id,
+                        (@NonNull GuestResponse gr) -> gr.id(),
                         g -> g.firstName() + " " + g.lastName()
                 ));
 
@@ -200,7 +201,7 @@ public class ReservationServiceImpl implements ReservationService {
             return cleanRooms;
         }
 
-        final List<UUID> roomIds = cleanRooms.stream().map(RoomResponse::id).toList();
+        final List<UUID> roomIds = cleanRooms.stream().map((@NonNull RoomResponse rr) -> rr.id()).toList();
         final Set<UUID> bookedRoomIds = Set.copyOf(
                 reservationRepository.findOverlappingRoomIds(roomIds, checkIn, checkOut));
 
@@ -361,7 +362,7 @@ public class ReservationServiceImpl implements ReservationService {
         }
 
         final List<UUID> roomIds = request.lineItems().stream()
-                .map(ReservationLineItemRequest::roomId)
+                .map((@NonNull ReservationLineItemRequest li) -> li.roomId())
                 .toList();
 
         final List<Reservation> overlaps;

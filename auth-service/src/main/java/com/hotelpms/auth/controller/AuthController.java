@@ -245,7 +245,7 @@ public class AuthController {
             }
 
             final boolean mustChange = userRepository.findByUsername(username)
-                    .map(com.hotelpms.auth.domain.UserAccount::isMustChangePassword)
+                    .map((@NonNull com.hotelpms.auth.domain.UserAccount u) -> u.isMustChangePassword())
                     .orElse(false);
             final Map<String, Object> meBody = new LinkedHashMap<>();
             meBody.put("sub", username);

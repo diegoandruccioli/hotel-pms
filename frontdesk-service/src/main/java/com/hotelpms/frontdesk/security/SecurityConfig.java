@@ -55,7 +55,7 @@ public class SecurityConfig {
      * @throws Exception if configuration fails
      */
     @Bean
-    @SuppressWarnings("PMD.SignatureDeclareThrowsException")
+    @SuppressWarnings({"PMD.SignatureDeclareThrowsException", "null"})
     public SecurityFilterChain securityFilterChain(final HttpSecurity http, final NonceStore nonceStore)
             throws Exception {
         http

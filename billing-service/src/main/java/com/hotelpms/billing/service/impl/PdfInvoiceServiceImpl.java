@@ -17,6 +17,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -124,8 +125,8 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
         drawHorizontalLine(cs, y);
         y -= SECTION_GAP;
         final BigDecimal paid = invoice.payments().stream()
-                .map(PaymentResponse::amount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .map((@NonNull PaymentResponse pr) -> pr.amount())
+                .reduce(BigDecimal.ZERO, (@NonNull BigDecimal a, @NonNull BigDecimal b) -> a.add(b));
         drawTotals(cs, invoice.totalAmount(), paid, bold, regular, y);
     }
 

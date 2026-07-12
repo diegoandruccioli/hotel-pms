@@ -10,6 +10,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -289,6 +290,7 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
+    @NonNull
     private static URI errorType(final String slug) {
         return Objects.requireNonNull(URI.create(ERRORS_BASE_URI + slug));
     }
