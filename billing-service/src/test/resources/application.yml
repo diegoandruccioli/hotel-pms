@@ -10,3 +10,9 @@ spring:
 internal:
   hmac:
     secret: test-hmac-secret-minimum-32-characters-for-unit-tests
+
+# HotelSettingsClient uses url="${application.config.frontdesk-service-url}".
+# Without this property Feign registration throws URISyntaxException at context load time.
+application:
+  config:
+    frontdesk-service-url: http://localhost:8084
