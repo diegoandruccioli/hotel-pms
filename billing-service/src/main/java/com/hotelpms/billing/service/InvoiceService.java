@@ -1,6 +1,7 @@
 package com.hotelpms.billing.service;
 
 import com.hotelpms.billing.domain.DocumentType;
+import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
@@ -97,4 +98,15 @@ public interface InvoiceService {
      * @return the updated invoice response
      */
     InvoiceResponse updateDocumentType(@NonNull UUID invoiceId, @NonNull DocumentType documentType);
+
+    /**
+     * Updates the SDI transmission status of a FATTURA invoice.
+     * Only invoices with documentType=FATTURA can have an SDI status.
+     * Rejected for CANCELLED invoices and for RICEVUTA document types.
+     *
+     * @param invoiceId the invoice UUID
+     * @param sdiStatus the new SDI status
+     * @return the updated invoice response
+     */
+    InvoiceResponse updateSdiStatus(@NonNull UUID invoiceId, @NonNull SdiStatus sdiStatus);
 }

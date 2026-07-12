@@ -37,6 +37,7 @@ const ISSUED_INVOICE: InvoiceResponse = {
   totalAmount: 150,
   status: 'ISSUED',
   documentType: 'FATTURA',
+  sdiStatus: 'NOT_SENT' as const,
   reservationId: 'res-1',
   guestId: 'guest-1',
   payments: [],

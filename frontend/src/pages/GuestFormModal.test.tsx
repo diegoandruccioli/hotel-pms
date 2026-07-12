@@ -26,6 +26,12 @@ vi.mock('focus-trap-react', () => ({
     createElement(Fragment, null, children),
 }));
 
+const GUEST_WITH_FISCAL = {
+  id: 'g2', firstName: 'Mario', lastName: 'Rossi', email: 'mario@test.com',
+  fiscalCode: 'RSSMRA74D22A001Q', active: true,
+  createdAt: '2026-01-01T00:00:00', updatedAt: '2026-01-01T00:00:00',
+};
+
 describe('GuestFormModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -120,12 +126,7 @@ describe('GuestFormModal', () => {
     });
 
     it('is expanded by default when guest has fiscal data', () => {
-      const guestWithFiscal = {
-        id: 'g2', firstName: 'Mario', lastName: 'Rossi', email: 'mario@test.com',
-        fiscalCode: 'RSSMRA74D22A001Q', active: true,
-        createdAt: '2026-01-01T00:00:00', updatedAt: '2026-01-01T00:00:00',
-      };
-      render(<GuestFormModal guest={guestWithFiscal} onClose={vi.fn()} onSaved={vi.fn()} />);
+      render(<GuestFormModal guest={GUEST_WITH_FISCAL} onClose={vi.fn()} onSaved={vi.fn()} />);
       expect(screen.getByLabelText(/label_fiscal_code/i)).toBeInTheDocument();
       expect((screen.getByLabelText(/label_fiscal_code/i) as HTMLInputElement).value).toBe('RSSMRA74D22A001Q');
     });

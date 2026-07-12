@@ -6,7 +6,9 @@ import com.hotelpms.billing.dto.DocumentTypeRequest;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
+import com.hotelpms.billing.dto.SdiStatusRequest;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
+import com.hotelpms.billing.service.FatturaPAService;
 import com.hotelpms.billing.service.InvoiceService;
 import com.hotelpms.billing.service.PdfInvoiceService;
 import jakarta.validation.Valid;
@@ -47,9 +49,12 @@ public class InvoiceController {
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final String PDF_FILENAME_PREFIX = "fattura-";
     private static final String PDF_EXTENSION = ".pdf";
+    private static final String XML_FILENAME_PREFIX = "fatturaPA-";
+    private static final String XML_EXTENSION = ".xml";
 
     private final InvoiceService invoiceService;
     private final PdfInvoiceService pdfInvoiceService;
+    private final FatturaPAService fatturaPAService;
 
     /**
      * Retrieves an invoice by its ID.
@@ -191,6 +196,42 @@ public class InvoiceController {
             @NonNull @Valid @RequestBody final DocumentTypeRequest request) {
         log.info("REST request to set document type {} on invoice {}", request.documentType(), id);
         final InvoiceResponse response = invoiceService.updateDocumentType(id, request.documentType());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Generates a FatturaPA FPR12 XML document for the given FATTURA invoice.
+     * Returns 409 if the invoice is CANCELLED or has documentType=RICEVUTA.
+     *
+     * @param id the invoice UUID
+     * @return UTF-8 encoded XML bytes with {@code Content-Disposition: attachment} header
+     */
+    @GetMapping(value = "/{id}/fatturaPA", produces = "application/xml;charset=UTF-8")
+    public ResponseEntity<byte[]> getFatturaPAXml(@NonNull @PathVariable final UUID id) {
+        log.info("REST request to generate FatturaPA XML for invoice {}", id);
+        final byte[] xml = fatturaPAService.generateXml(id);
+        final ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(XML_FILENAME_PREFIX + id + XML_EXTENSION)
+                .build();
+        return ResponseEntity.ok()
+                .headers(h -> h.setContentDisposition(disposition))
+                .body(xml);
+    }
+
+    /**
+     * Updates the SDI transmission status for a FATTURA invoice.
+     * Returns 409 if the invoice is CANCELLED or has documentType=RICEVUTA.
+     *
+     * @param id      the invoice UUID
+     * @param request the new SDI status
+     * @return the updated invoice response
+     */
+    @PatchMapping("/{id}/sdi-status")
+    public ResponseEntity<InvoiceResponse> updateSdiStatus(
+            @NonNull @PathVariable final UUID id,
+            @NonNull @Valid @RequestBody final SdiStatusRequest request) {
+        log.info("REST request to set SDI status {} on invoice {}", request.sdiStatus(), id);
+        final InvoiceResponse response = invoiceService.updateSdiStatus(id, request.sdiStatus());
         return ResponseEntity.ok(response);
     }
 

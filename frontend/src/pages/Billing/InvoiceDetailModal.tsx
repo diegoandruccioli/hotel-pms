@@ -6,7 +6,7 @@ const ICON_STYLE: React.CSSProperties = { fontSize: 18 };
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3StatusChip } from '../../components/m3/M3StatusChip';
-import type { DocumentType, InvoiceResponse, InvoiceStatus, PaymentMethod, ChargeType } from '../../types/billing.types';
+import type { DocumentType, InvoiceResponse, InvoiceStatus, PaymentMethod, ChargeType, SdiStatus } from '../../types/billing.types';
 
 interface Props {
   invoice: InvoiceResponse;
@@ -34,6 +34,13 @@ const chargeTypeIcon: Record<ChargeType, string> = {
   OTHER: 'add_circle',
 };
 
+const sdiStatusTone = (s: SdiStatus) => {
+  if (s === 'ACCEPTED') return 'success' as const;
+  if (s === 'REJECTED') return 'error' as const;
+  if (s === 'SENT') return 'warning' as const;
+  return 'neutral' as const;
+};
+
 export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) => {
   const { t, i18n } = useTranslation(['billing', 'common']);
   const addToast = useToastStore((s) => s.addToast);
@@ -41,6 +48,10 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
 
   const handleDownloadPdf = useCallback(() => {
     billingService.downloadPdf(invoice.id);
+  }, [invoice.id]);
+
+  const handleDownloadFatturaPAXml = useCallback(() => {
+    billingService.downloadFatturaPAXml(invoice.id);
   }, [invoice.id]);
 
   const handleToggleDocumentType = useCallback(async () => {
@@ -57,6 +68,11 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
       setSwitchingType(false);
     }
   }, [invoice.id, invoice.documentType, onUpdated, addToast, t]);
+
+  const handleToggleDocumentTypeVoid = useCallback(
+    () => { void handleToggleDocumentType(); },
+    [handleToggleDocumentType],
+  );
 
   const formatCurrency = useCallback(
     (val: number) =>
@@ -93,13 +109,35 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
             </span>
             <button
               type="button"
-              onClick={() => { void handleToggleDocumentType(); }}
+              onClick={handleToggleDocumentTypeVoid}
               disabled={switchingType}
               className="text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded min-h-[40px] px-2"
             >
               {invoice.documentType === 'FATTURA'
                 ? t('switch_to_ricevuta', { ns: 'billing' })
                 : t('switch_to_fattura', { ns: 'billing' })}
+            </button>
+          </div>
+        )}
+        {/* SDI status + XML download (FATTURA only, non-CANCELLED) */}
+        {invoice.status !== 'CANCELLED' && invoice.documentType === 'FATTURA' && (
+          <div className="flex items-center justify-between px-3 py-2 rounded-shape-xs bg-surface-container border border-outline-variant/40">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
+                {t('sdi_status_label', { ns: 'billing' })}
+              </span>
+              <M3StatusChip
+                label={t(`sdi_status_${invoice.sdiStatus.toLowerCase()}`, { ns: 'billing' })}
+                tone={sdiStatusTone(invoice.sdiStatus)}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleDownloadFatturaPAXml}
+              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded min-h-[40px] px-2"
+            >
+              <span className="material-symbols-outlined" style={ICON_STYLE} aria-hidden="true">download</span>
+              {t('download_fattura_pa', { ns: 'billing' })}
             </button>
           </div>
         )}

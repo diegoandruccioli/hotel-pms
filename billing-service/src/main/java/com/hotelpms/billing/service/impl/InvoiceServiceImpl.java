@@ -3,6 +3,7 @@ package com.hotelpms.billing.service.impl;
 import com.hotelpms.billing.domain.ChargeType;
 import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.Invoice;
+import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.domain.InvoiceCharge;
 import com.hotelpms.billing.domain.InvoiceSequence;
 import com.hotelpms.billing.domain.InvoiceStatus;
@@ -181,6 +182,26 @@ public class InvoiceServiceImpl implements InvoiceService {
             throw new InvoiceConflictException("CANNOT_UPDATE_CANCELLED_INVOICE");
         }
         invoice.setDocumentType(documentType);
+        final Invoice saved = invoiceRepository.save(Objects.requireNonNull(invoice));
+        return invoiceMapper.toResponse(Objects.requireNonNull(saved));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public InvoiceResponse updateSdiStatus(@NonNull final UUID invoiceId,
+                                            @NonNull final SdiStatus sdiStatus) {
+        log.info("Updating SDI status for invoice {} to {}", invoiceId, sdiStatus);
+        final UUID hotelId = resolveHotelId();
+        final Invoice invoice = invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)
+                .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
+        if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
+            throw new InvoiceConflictException("CANNOT_UPDATE_CANCELLED_INVOICE");
+        }
+        if (invoice.getDocumentType() != DocumentType.FATTURA) {
+            throw new InvoiceConflictException("SDI_ONLY_VALID_FOR_FATTURA");
+        }
+        invoice.setSdiStatus(sdiStatus);
         final Invoice saved = invoiceRepository.save(Objects.requireNonNull(invoice));
         return invoiceMapper.toResponse(Objects.requireNonNull(saved));
     }

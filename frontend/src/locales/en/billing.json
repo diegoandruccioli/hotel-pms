@@ -26,5 +26,12 @@
   "document_type_ricevuta": "Receipt",
   "switch_to_ricevuta": "Convert to Receipt",
   "switch_to_fattura": "Convert to Invoice",
-  "document_type_updated": "Document type updated"
+  "document_type_updated": "Document type updated",
+  "sdi_status_not_sent": "Not Sent",
+  "sdi_status_sent": "Sent",
+  "sdi_status_accepted": "Accepted",
+  "sdi_status_rejected": "Rejected",
+  "download_fattura_pa": "Download FatturaPA XML",
+  "sdi_status_label": "SDI Status",
+  "sdi_status_updated": "SDI status updated"
 }

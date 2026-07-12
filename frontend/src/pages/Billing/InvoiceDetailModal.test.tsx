@@ -8,6 +8,7 @@ import { billingService } from '../../services/billingService';
 vi.mock('../../services/billingService', () => ({
   billingService: {
     downloadPdf: vi.fn(),
+    downloadFatturaPAXml: vi.fn(),
     updateDocumentType: vi.fn(),
   },
 }));
@@ -35,8 +36,8 @@ vi.mock('../../components/m3/M3StatusChip', () => ({
 
 const BASE_INVOICE: InvoiceResponse = {
   id: 'inv1', invoiceNumber: 'INV-001', issueDate: '2026-01-01T10:00:00',
-  totalAmount: 250, status: 'ISSUED', documentType: 'FATTURA', reservationId: 'res1',
-  guestId: 'g1', stayId: 's1', payments: [], charges: [],
+  totalAmount: 250, status: 'ISSUED', documentType: 'FATTURA', sdiStatus: 'NOT_SENT',
+  reservationId: 'res1', guestId: 'g1', stayId: 's1', payments: [], charges: [],
 };
 
 const INVOICE_WITH_PAYMENT: InvoiceResponse = {
@@ -54,6 +55,8 @@ const INVOICE_WITH_CHARGE: InvoiceResponse = {
 };
 
 const INVOICE_PAID: InvoiceResponse = { ...BASE_INVOICE, charges: [], status: 'PAID' };
+const INVOICE_CANCELLED: InvoiceResponse = { ...BASE_INVOICE, status: 'CANCELLED' };
+const INVOICE_RICEVUTA: InvoiceResponse = { ...BASE_INVOICE, documentType: 'RICEVUTA' };
 
 describe('InvoiceDetailModal', () => {
   const onClose = vi.fn();
@@ -109,8 +112,7 @@ describe('InvoiceDetailModal', () => {
   });
 
   it('hides document type toggle for cancelled invoices', () => {
-    const cancelled: InvoiceResponse = { ...BASE_INVOICE, status: 'CANCELLED' };
-    render(<InvoiceDetailModal invoice={cancelled} onClose={onClose} />);
+    render(<InvoiceDetailModal invoice={INVOICE_CANCELLED} onClose={onClose} />);
     expect(screen.queryByRole('button', { name: /switch_to/i })).not.toBeInTheDocument();
   });
 
@@ -136,6 +138,33 @@ describe('InvoiceDetailModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /switch_to_ricevuta/i }));
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('CANNOT_UPDATE_CANCELLED_INVOICE', 'error'));
+  });
+
+  it('shows SDI status chip for FATTURA non-cancelled invoice', () => {
+    render(<InvoiceDetailModal invoice={BASE_INVOICE} onClose={onClose} />);
+    expect(screen.getByText('sdi_status_label')).toBeInTheDocument();
+    expect(screen.getByText('sdi_status_not_sent')).toBeInTheDocument();
+  });
+
+  it('shows download FatturaPA button for FATTURA non-cancelled invoice', () => {
+    render(<InvoiceDetailModal invoice={BASE_INVOICE} onClose={onClose} />);
+    expect(screen.getByRole('button', { name: /download_fattura_pa/i })).toBeInTheDocument();
+  });
+
+  it('calls downloadFatturaPAXml when button clicked', () => {
+    render(<InvoiceDetailModal invoice={BASE_INVOICE} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: /download_fattura_pa/i }));
+    expect(billingService.downloadFatturaPAXml).toHaveBeenCalledWith('inv1');
+  });
+
+  it('hides SDI section for RICEVUTA invoices', () => {
+    render(<InvoiceDetailModal invoice={INVOICE_RICEVUTA} onClose={onClose} />);
+    expect(screen.queryByText('sdi_status_label')).not.toBeInTheDocument();
+  });
+
+  it('hides SDI section for CANCELLED invoices', () => {
+    render(<InvoiceDetailModal invoice={INVOICE_CANCELLED} onClose={onClose} />);
+    expect(screen.queryByText('sdi_status_label')).not.toBeInTheDocument();
   });
 
   it('passes axe accessibility check', async () => {
