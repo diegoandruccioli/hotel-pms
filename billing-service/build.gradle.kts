@@ -81,6 +81,9 @@ dependencies {
     testImplementation("net.bytebuddy:byte-buddy-agent:1.15.11")
     testImplementation("org.mockito:mockito-core:5.15.2")
     testImplementation("org.mockito:mockito-junit-jupiter:5.15.2")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
