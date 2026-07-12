@@ -32,6 +32,9 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
   const [loading, setLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [showFiscalSection, setShowFiscalSection] = useState(
+    !!(guest?.fiscalCode || guest?.vatNumber || guest?.companyName || guest?.sdiCode || guest?.pecEmail)
+  );
 
   const guestSchema = useMemo(() => z.object({
     firstName: z.string().trim().min(1, t('common:err_required')),
@@ -73,6 +76,11 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
     phone: '', // Will be merged on submit
     city: guest?.city || '',
     country: guest?.country || '',
+    fiscalCode: guest?.fiscalCode || '',
+    vatNumber: guest?.vatNumber || '',
+    companyName: guest?.companyName || '',
+    sdiCode: guest?.sdiCode || '',
+    pecEmail: guest?.pecEmail || '',
   });
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,6 +171,7 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
 
   const openDeleteConfirm = useCallback(() => setShowDeleteConfirm(true), []);
   const closeDeleteConfirm = useCallback(() => setShowDeleteConfirm(false), []);
+  const toggleFiscalSection = useCallback(() => setShowFiscalSection(prev => !prev), []);
 
   const inputClass = "block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
   const selectClass = "shrink-0 w-24 rounded-shape-xs border border-outline px-2 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
@@ -273,6 +282,57 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
                   </label>
                   <input type="text" id="country" name="country" value={formData.country} onChange={handleChange} className={inputClass} />
                 </div>
+              </div>
+
+              <div className="border border-outline-variant/40 rounded-shape-xs">
+                <button
+                  type="button"
+                  onClick={toggleFiscalSection}
+                  aria-expanded={showFiscalSection}
+                  aria-controls="fiscal-section"
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium font-body text-on-surface-variant hover:bg-surface-container-highest/50 rounded-shape-xs transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-none"
+                >
+                  <span>{t('section_fiscal_data')}</span>
+                  <MaterialIcon name={showFiscalSection ? 'expand_less' : 'expand_more'} size={18} />
+                </button>
+                {showFiscalSection && (
+                  <div id="fiscal-section" className="px-3 pb-3 pt-1 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="fiscalCode" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                          {t('label_fiscal_code')}
+                        </label>
+                        <input type="text" id="fiscalCode" name="fiscalCode" value={formData.fiscalCode ?? ''} onChange={handleChange} className={inputClass} />
+                      </div>
+                      <div>
+                        <label htmlFor="vatNumber" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                          {t('label_vat_number')}
+                        </label>
+                        <input type="text" id="vatNumber" name="vatNumber" value={formData.vatNumber ?? ''} onChange={handleChange} className={inputClass} />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="companyName" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                        {t('label_company_name')}
+                      </label>
+                      <input type="text" id="companyName" name="companyName" value={formData.companyName ?? ''} onChange={handleChange} className={inputClass} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="sdiCode" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                          {t('label_sdi_code')}
+                        </label>
+                        <input type="text" id="sdiCode" name="sdiCode" value={formData.sdiCode ?? ''} onChange={handleChange} className={inputClass} />
+                      </div>
+                      <div>
+                        <label htmlFor="pecEmail" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                          {t('label_pec_email')}
+                        </label>
+                        <input type="email" id="pecEmail" name="pecEmail" value={formData.pecEmail ?? ''} onChange={handleChange} className={inputClass} />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </form>
           </div>

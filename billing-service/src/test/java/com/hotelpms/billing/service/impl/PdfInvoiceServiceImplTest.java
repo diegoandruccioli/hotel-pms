@@ -41,6 +41,7 @@ class PdfInvoiceServiceImplTest {
     private static final int ISSUE_DAY = 14;
     private static final int ISSUE_HOUR = 10;
     private static final int PDF_MAGIC_BYTES_LEN = 5;
+    private static final String PDF_MAGIC = "%PDF-";
     private static final BigDecimal AMOUNT_50 = BigDecimal.valueOf(50);
     private static final BigDecimal AMOUNT_100 = BigDecimal.valueOf(100);
     private static final BigDecimal VAT_RATE_10 = new BigDecimal("0.10");
@@ -61,7 +62,8 @@ class PdfInvoiceServiceImplTest {
         final HotelSettingsResponse hotelSettings = new HotelSettingsResponse(
                 HOTEL_ID, "Hotel Bella Vista", "Via Roma 1, Milano",
                 "01234567890", "BLLVST80A01F205X", null);
-        final GuestResponse guest = new GuestResponse(GUEST_ID, "Mario", "Rossi", "mario@example.com");
+        final GuestResponse guest = new GuestResponse(GUEST_ID, "Mario", "Rossi", "mario@example.com",
+                null, null, null, null, null);
         when(hotelSettingsClient.getSettings()).thenReturn(hotelSettings);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
     }
@@ -75,7 +77,7 @@ class PdfInvoiceServiceImplTest {
 
         assertThat(pdf).isNotNull().isNotEmpty();
         // PDF magic number: %PDF-
-        assertThat(new String(pdf, 0, PDF_MAGIC_BYTES_LEN, StandardCharsets.ISO_8859_1)).isEqualTo("%PDF-");
+        assertThat(new String(pdf, 0, PDF_MAGIC_BYTES_LEN, StandardCharsets.ISO_8859_1)).isEqualTo(PDF_MAGIC);
     }
 
     @Test
@@ -92,6 +94,20 @@ class PdfInvoiceServiceImplTest {
         final byte[] pdf = pdfInvoiceService.generateInvoicePdf(INVOICE_ID);
 
         assertThat(pdf).isNotNull().isNotEmpty();
+    }
+
+    @Test
+    void shouldReturnPdfWithFiscalDataInIntestatorio() {
+        final GuestResponse fiscalGuest = new GuestResponse(GUEST_ID, "Mario", "Rossi", "mario@example.com",
+                "RSSMRA74D22A001Q", "01234567890", "Hotel Srl", "ABCDE12", "mario@pec.it");
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(fiscalGuest);
+        final InvoiceResponse invoice = buildInvoice(List.of(), List.of());
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+
+        final byte[] pdf = pdfInvoiceService.generateInvoicePdf(INVOICE_ID);
+
+        assertThat(pdf).isNotNull().isNotEmpty();
+        assertThat(new String(pdf, 0, PDF_MAGIC_BYTES_LEN, StandardCharsets.ISO_8859_1)).isEqualTo(PDF_MAGIC);
     }
 
     @Test
@@ -151,7 +167,7 @@ class PdfInvoiceServiceImplTest {
         final byte[] pdf = pdfInvoiceService.generateInvoicePdf(INVOICE_ID);
 
         assertThat(pdf).isNotNull().isNotEmpty();
-        assertThat(new String(pdf, 0, PDF_MAGIC_BYTES_LEN, StandardCharsets.ISO_8859_1)).isEqualTo("%PDF-");
+        assertThat(new String(pdf, 0, PDF_MAGIC_BYTES_LEN, StandardCharsets.ISO_8859_1)).isEqualTo(PDF_MAGIC);
     }
 
     private InvoiceResponse buildInvoice(final List<ChargeResponse> charges,

@@ -22,6 +22,11 @@ export interface GuestRequestDTO {
   address?: string;
   city?: string;
   country?: string;
+  fiscalCode?: string;
+  vatNumber?: string;
+  companyName?: string;
+  sdiCode?: string;
+  pecEmail?: string;
 }
 
 export interface GuestResponseDTO {
@@ -33,6 +38,11 @@ export interface GuestResponseDTO {
   address?: string;
   city?: string;
   country?: string;
+  fiscalCode?: string;
+  vatNumber?: string;
+  companyName?: string;
+  sdiCode?: string;
+  pecEmail?: string;
   identityDocuments?: IdentityDocumentResponseDTO[];
   createdAt: string;
   updatedAt: string;

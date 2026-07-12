@@ -1,5 +1,12 @@
 {
+  "add_guest": "Nuovo Ospite",
   "edit_guest": "Modifica Ospite",
+  "section_fiscal_data": "Dati fiscali",
+  "label_fiscal_code": "Codice Fiscale",
+  "label_vat_number": "Partita IVA",
+  "label_company_name": "Ragione sociale",
+  "label_sdi_code": "Codice SDI",
+  "label_pec_email": "PEC",
   "label_first_name": "Nome",
   "label_last_name": "Cognome",
   "label_country": "Nazione",

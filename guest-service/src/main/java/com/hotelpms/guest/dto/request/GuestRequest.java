@@ -20,7 +20,12 @@ import java.time.LocalDate;
  * @param address     The street address of the guest.
  * @param city        The city of the guest.
  * @param country     The country of the guest.
- * @param dateOfBirth The date of birth of the guest.
+ * @param dateOfBirth  The date of birth of the guest.
+ * @param fiscalCode   Italian Codice Fiscale or equivalent (optional).
+ * @param vatNumber    Partita IVA / VAT number (optional).
+ * @param companyName  Company / legal entity name (optional).
+ * @param sdiCode      SDI/Destinatario code for electronic invoicing (optional).
+ * @param pecEmail     PEC email for electronic invoicing (optional).
  */
 public record GuestRequest(
         @NotBlank
@@ -44,7 +49,21 @@ public record GuestRequest(
         @Size(max = ValidationConstants.MAX_LOCATION_LENGTH)
         @Pattern(regexp = ValidationConstants.LOCATION_PATTERN)
         String country,
-        @Past LocalDate dateOfBirth) {
+        @Past LocalDate dateOfBirth,
+        @Size(max = ValidationConstants.MAX_FISCAL_CODE_LENGTH)
+        @Pattern(regexp = ValidationConstants.FISCAL_CODE_PATTERN)
+        String fiscalCode,
+        @Size(max = ValidationConstants.MAX_VAT_NUMBER_LENGTH)
+        @Pattern(regexp = ValidationConstants.VAT_NUMBER_PATTERN)
+        String vatNumber,
+        @Size(max = ValidationConstants.MAX_COMPANY_NAME_LENGTH)
+        @Pattern(regexp = ValidationConstants.TEXT_SAFE_PATTERN)
+        String companyName,
+        @Size(max = ValidationConstants.MAX_SDI_CODE_LENGTH)
+        @Pattern(regexp = ValidationConstants.SDI_CODE_PATTERN)
+        String sdiCode,
+        @Email @Size(max = ValidationConstants.MAX_EMAIL_LENGTH)
+        String pecEmail) {
 
     /**
      * Validates that at least one of email or phone is provided.

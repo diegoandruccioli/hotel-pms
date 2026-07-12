@@ -123,7 +123,8 @@ class GuestServiceImplTest {
                 TEST_ADDRESS,
                 TEST_CITY,
                 TEST_COUNTRY,
-                null);
+                null,
+                null, null, null, null, null);
 
         guestResponse = new GuestResponse(
                 guestId,
@@ -135,6 +136,7 @@ class GuestServiceImplTest {
                 TEST_CITY,
                 TEST_COUNTRY,
                 null,
+                null, null, null, null, null,
                 Collections.emptyList(),
                 null,
                 guest.getCreatedAt(),

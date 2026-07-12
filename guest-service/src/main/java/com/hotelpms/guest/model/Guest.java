@@ -48,6 +48,10 @@ public class Guest {
     private static final int MAX_PHONE_LENGTH = 20;
     private static final int MAX_ADDRESS_LENGTH = 255;
     private static final int MAX_LOCATION_LENGTH = 50;
+    private static final int MAX_FISCAL_CODE_LENGTH = 16;
+    private static final int MAX_VAT_NUMBER_LENGTH = 20;
+    private static final int MAX_COMPANY_NAME_LENGTH = 200;
+    private static final int MAX_SDI_CODE_LENGTH = 7;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -80,6 +84,21 @@ public class Guest {
 
     @Column(length = MAX_LOCATION_LENGTH)
     private String country;
+
+    @Column(name = "fiscal_code", length = MAX_FISCAL_CODE_LENGTH)
+    private String fiscalCode;
+
+    @Column(name = "vat_number", length = MAX_VAT_NUMBER_LENGTH)
+    private String vatNumber;
+
+    @Column(name = "company_name", length = MAX_COMPANY_NAME_LENGTH)
+    private String companyName;
+
+    @Column(name = "sdi_code", length = MAX_SDI_CODE_LENGTH)
+    private String sdiCode;
+
+    @Column(name = "pec_email", length = MAX_EMAIL_LENGTH)
+    private String pecEmail;
 
     @Builder.Default
     @OneToMany(mappedBy = "guest", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

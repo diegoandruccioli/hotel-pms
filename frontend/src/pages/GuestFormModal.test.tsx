@@ -102,6 +102,35 @@ describe('GuestFormModal', () => {
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('EMAIL_ALREADY_EXISTS', 'error'));
   });
 
+  describe('fiscal section', () => {
+    it('is collapsed by default in add mode', () => {
+      render(<GuestFormModal onClose={vi.fn()} onSaved={vi.fn()} />);
+      expect(screen.queryByLabelText(/label_fiscal_code/i)).not.toBeInTheDocument();
+    });
+
+    it('expands and collapses when toggle button is clicked', () => {
+      render(<GuestFormModal onClose={vi.fn()} onSaved={vi.fn()} />);
+      const toggle = screen.getByRole('button', { name: /section_fiscal_data/i });
+
+      fireEvent.click(toggle);
+      expect(screen.getByLabelText(/label_fiscal_code/i)).toBeInTheDocument();
+
+      fireEvent.click(toggle);
+      expect(screen.queryByLabelText(/label_fiscal_code/i)).not.toBeInTheDocument();
+    });
+
+    it('is expanded by default when guest has fiscal data', () => {
+      const guestWithFiscal = {
+        id: 'g2', firstName: 'Mario', lastName: 'Rossi', email: 'mario@test.com',
+        fiscalCode: 'RSSMRA74D22A001Q', active: true,
+        createdAt: '2026-01-01T00:00:00', updatedAt: '2026-01-01T00:00:00',
+      };
+      render(<GuestFormModal guest={guestWithFiscal} onClose={vi.fn()} onSaved={vi.fn()} />);
+      expect(screen.getByLabelText(/label_fiscal_code/i)).toBeInTheDocument();
+      expect((screen.getByLabelText(/label_fiscal_code/i) as HTMLInputElement).value).toBe('RSSMRA74D22A001Q');
+    });
+  });
+
   describe('edit mode', () => {
     const EXISTING_GUEST = {
       id: 'g1', firstName: 'Luigi', lastName: 'Verdi', email: 'luigi@test.com',

@@ -177,13 +177,44 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
         drawText(cs, bold, FONT_SIZE_SECTION, MARGIN, y, "Data:");
         drawText(cs, regular, FONT_SIZE_SECTION, MARGIN + LABEL_VALUE_OFFSET, y, dateStr);
 
+        // Right column: company name (if any) then personal name, then fiscal details
+        float rightY = y;
         final String guestName = guest.firstName() + " " + guest.lastName();
-        drawText(cs, regular, FONT_SIZE_SECTION, LABEL_X_RIGHT, y, guestName);
-        y -= LINE_HEIGHT;
+        final boolean hasCompany = guest.companyName() != null && !guest.companyName().isBlank();
+        drawText(cs, regular, FONT_SIZE_SECTION, LABEL_X_RIGHT, rightY,
+                hasCompany ? guest.companyName() : guestName);
+        rightY -= LINE_HEIGHT;
+        if (hasCompany) {
+            drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, rightY, guestName);
+            rightY -= LINE_HEIGHT;
+        }
+        rightY = drawFiscalDetails(cs, guest, regular, rightY);
 
+        y -= LINE_HEIGHT;
         drawText(cs, bold, FONT_SIZE_SECTION, MARGIN, y, "Stato:");
         drawText(cs, regular, FONT_SIZE_SECTION, MARGIN + LABEL_VALUE_OFFSET, y, invoice.status().name());
-        return y - LINE_HEIGHT - RULE_OFFSET;
+
+        return Math.min(y - LINE_HEIGHT, rightY) - RULE_OFFSET;
+    }
+
+    private float drawFiscalDetails(final PDPageContentStream cs,
+                                     final GuestResponse guest,
+                                     final PDType1Font regular,
+                                     final float startY) throws IOException {
+        float rightY = startY;
+        if (guest.fiscalCode() != null && !guest.fiscalCode().isBlank()) {
+            drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, rightY, "C.F.: " + guest.fiscalCode());
+            rightY -= LINE_HEIGHT;
+        }
+        if (guest.vatNumber() != null && !guest.vatNumber().isBlank()) {
+            drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, rightY, "P.IVA: " + guest.vatNumber());
+            rightY -= LINE_HEIGHT;
+        }
+        if (guest.pecEmail() != null && !guest.pecEmail().isBlank()) {
+            drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, rightY, "PEC: " + guest.pecEmail());
+            rightY -= LINE_HEIGHT;
+        }
+        return rightY;
     }
 
     private float drawChargesSection(final PDPageContentStream cs,

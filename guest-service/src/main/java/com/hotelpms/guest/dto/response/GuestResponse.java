@@ -17,6 +17,11 @@ import java.util.UUID;
  * @param city              The city of the guest.
  * @param country           The country of the guest.
  * @param dateOfBirth       The date of birth of the guest.
+ * @param fiscalCode        Italian Codice Fiscale (optional).
+ * @param vatNumber         Partita IVA / VAT number (optional).
+ * @param companyName       Company / legal entity name (optional).
+ * @param sdiCode           SDI/Destinatario code (optional).
+ * @param pecEmail          PEC email (optional).
  * @param identityDocuments The list of identity documents belonging to the
  *                          guest.
  * @param gdprConsentDate   The date GDPR consent was recorded.
@@ -34,6 +39,11 @@ public record GuestResponse(
         String city,
         String country,
         LocalDate dateOfBirth,
+        String fiscalCode,
+        String vatNumber,
+        String companyName,
+        String sdiCode,
+        String pecEmail,
         List<IdentityDocumentResponseDTO> identityDocuments,
         LocalDate gdprConsentDate,
         LocalDateTime createdAt,

@@ -1,5 +1,12 @@
 {
+  "add_guest": "New Guest",
   "edit_guest": "Edit Guest",
+  "section_fiscal_data": "Fiscal data",
+  "label_fiscal_code": "Fiscal Code",
+  "label_vat_number": "VAT Number",
+  "label_company_name": "Company Name",
+  "label_sdi_code": "SDI Code",
+  "label_pec_email": "PEC Email",
   "label_first_name": "First Name",
   "label_last_name": "Last Name",
   "label_country": "Country",
