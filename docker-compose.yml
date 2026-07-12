@@ -202,6 +202,35 @@ services:
           memory: 256M
 
   # ----------------------------------------------------------
+  # Alertmanager - Alert routing and notification (ROADMAP P4)
+  # Alerts visible at http://localhost:9093.
+  # Configure email in docker/alertmanager/alertmanager.yml.
+  # ----------------------------------------------------------
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: hotel_alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--log.level=info"
+    networks:
+      - observability-network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 64M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+
+  # ----------------------------------------------------------
   # Prometheus - Metrics and Monitoring
   # ----------------------------------------------------------
   prometheus:
@@ -212,9 +241,12 @@ services:
       - "9090:9090"
     volumes:
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./docker/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml
     depends_on:
       config-server:
         condition: service_healthy
+      alertmanager:
+        condition: service_started
     networks:
       - observability-network
       - backend-network
@@ -636,6 +668,7 @@ volumes:
   postgres_backups:
   loki_data:
   grafana_data:
+  alertmanager_data:
 
 # ============================================================
 # Network Segmentation – Defense in Depth

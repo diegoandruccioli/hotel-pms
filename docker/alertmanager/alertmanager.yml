@@ -1,0 +1,47 @@
+global:
+  resolve_timeout: 5m
+
+# ----------------------------------------------------------------
+# Routing tree
+# Default receiver: null (alerts visible in Alertmanager UI at
+# http://localhost:9093 but no notifications sent).
+# Change receiver on the critical route to 'email-ops' once SMTP
+# is configured below.
+# ----------------------------------------------------------------
+route:
+  group_by: ['alertname', 'job']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'null'
+  routes:
+    - matchers:
+        - severity = critical
+      receiver: 'null'        # change to 'email-ops' to enable email
+      continue: false
+
+receivers:
+  - name: 'null'
+
+  # Uncomment and fill in to enable email notifications for critical alerts.
+  # Restart alertmanager after editing this file.
+  #
+  # - name: 'email-ops'
+  #   email_configs:
+  #     - smarthost: 'smtp.gmail.com:587'   # or your SMTP relay
+  #       from: 'noreply@yourhotel.com'
+  #       to: 'ops@yourhotel.com'
+  #       auth_username: 'noreply@yourhotel.com'
+  #       auth_password: 'YOUR_APP_PASSWORD'  # Gmail: App Password, not account password
+  #       send_resolved: true
+  #       headers:
+  #         Subject: '[{{ .Status | toUpper }}] Hotel PMS – {{ .GroupLabels.alertname }}'
+
+# Suppress warning-severity alerts when a critical alert fires for
+# the same service, to avoid alert storms.
+inhibit_rules:
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
+    equal: ['alertname', 'job']

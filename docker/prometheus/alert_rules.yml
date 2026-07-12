@@ -1,0 +1,117 @@
+groups:
+
+  # ----------------------------------------------------------------
+  # Availability — service reachability and HTTP error rate
+  # ----------------------------------------------------------------
+  - name: hotel_pms_availability
+    interval: 30s
+    rules:
+
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is DOWN"
+          description: >
+            Prometheus cannot scrape {{ $labels.job }} ({{ $labels.instance }}).
+            The service has been unreachable for more than 1 minute.
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum by (job) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            /
+            sum by (job) (rate(http_server_requests_seconds_count[5m]))
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High 5xx error rate on {{ $labels.job }}"
+          description: >
+            5xx error rate has exceeded 5% for more than 2 minutes on {{ $labels.job }}.
+            Current value: {{ $value | humanizePercentage }}.
+
+      # Requires management.metrics.distribution.percentiles-histogram.http.server.requests=true
+      # (configured in shared config/application.yml)
+      - alert: HighLatencyP99
+        expr: |
+          histogram_quantile(0.99,
+            sum by (job, le) (
+              rate(http_server_requests_seconds_bucket[5m])
+            )
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High P99 latency on {{ $labels.job }}"
+          description: >
+            P99 HTTP request latency exceeds 2 s for 5+ minutes on {{ $labels.job }}.
+            Current P99: {{ $value | humanizeDuration }}.
+
+  # ----------------------------------------------------------------
+  # JVM — heap and GC pressure
+  # ----------------------------------------------------------------
+  - name: hotel_pms_jvm
+    interval: 60s
+    rules:
+
+      - alert: JvmHeapHigh
+        expr: |
+          (
+            jvm_memory_used_bytes{area="heap"}
+            /
+            jvm_memory_max_bytes{area="heap"}
+          ) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High JVM heap usage on {{ $labels.job }}"
+          description: >
+            JVM heap usage exceeds 85% for 5+ minutes on {{ $labels.job }}.
+            Current usage: {{ $value | humanizePercentage }}.
+
+  # ----------------------------------------------------------------
+  # Resilience4j — circuit breakers
+  # ----------------------------------------------------------------
+  - name: hotel_pms_resilience
+    interval: 30s
+    rules:
+
+      - alert: CircuitBreakerOpen
+        expr: resilience4j_circuitbreaker_state{state="open"} == 1
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Circuit breaker OPEN on {{ $labels.job }}"
+          description: >
+            Circuit breaker '{{ $labels.name }}' is OPEN on {{ $labels.job }}.
+            All downstream calls through this breaker are currently failing fast.
+
+  # ----------------------------------------------------------------
+  # Database — HikariCP connection pool
+  # ----------------------------------------------------------------
+  - name: hotel_pms_database
+    interval: 30s
+    rules:
+
+      - alert: DbConnectionPoolNearExhaustion
+        expr: |
+          (
+            hikaricp_connections_active
+            /
+            hikaricp_connections_max
+          ) > 0.90
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DB connection pool near exhaustion on {{ $labels.job }}"
+          description: >
+            HikariCP active connections exceed 90% of the pool max for 2+ minutes
+            on {{ $labels.job }}. Current utilisation: {{ $value | humanizePercentage }}.
