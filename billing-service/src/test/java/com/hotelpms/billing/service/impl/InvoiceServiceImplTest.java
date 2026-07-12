@@ -3,6 +3,8 @@ package com.hotelpms.billing.service.impl;
 import com.hotelpms.billing.domain.ChargeType;
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceCharge;
+import com.hotelpms.billing.domain.InvoiceSequence;
+import com.hotelpms.billing.domain.InvoiceSequenceId;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
@@ -14,6 +16,7 @@ import com.hotelpms.billing.mapper.InvoiceChargeMapper;
 import com.hotelpms.billing.mapper.InvoiceMapper;
 import com.hotelpms.billing.repository.InvoiceChargeRepository;
 import com.hotelpms.billing.repository.InvoiceRepository;
+import com.hotelpms.billing.repository.InvoiceSequenceRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +29,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -35,8 +39,12 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.notNull;
+import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,6 +62,9 @@ class InvoiceServiceImplTest {
 
         @Mock
         private InvoiceChargeRepository invoiceChargeRepository;
+
+        @Mock
+        private InvoiceSequenceRepository sequenceRepository;
 
         @Mock
         private InvoiceMapper invoiceMapper;
@@ -127,40 +138,37 @@ class InvoiceServiceImplTest {
         // ---------------------------------------------------------------
 
         @Test
-        @DisplayName("Should create invoice for stay with totalAmount=0 and status=ISSUED")
+        @DisplayName("Should create invoice for stay with totalAmount=0, status=ISSUED and sequential number")
         void shouldCreateInvoiceForStaySuccessfully() {
                 // Arrange
                 final UUID stayId = UUID.randomUUID();
                 final StayInvoiceRequest stayRequest = new StayInvoiceRequest(stayId, guestId, reservationId);
 
-                final Invoice savedInvoice = Invoice.builder()
-                                .id(UUID.randomUUID())
-                                .stayId(stayId)
-                                .guestId(guestId)
-                                .reservationId(reservationId)
-                                .hotelId(hotelId)
-                                .totalAmount(BigDecimal.ZERO)
-                                .status(InvoiceStatus.ISSUED)
-                                .issueDate(LocalDateTime.now())
-                                .invoiceNumber("INV-ABCD1234")
-                                .build();
-
-                final InvoiceResponse expectedResponse = new InvoiceResponse(
-                                savedInvoice.getId(), hotelId, "INV-ABCD1234", LocalDateTime.now(),
-                                BigDecimal.ZERO, InvoiceStatus.ISSUED, reservationId, guestId, stayId,
-                                List.of(), List.of());
+                final String expectedYear = String.valueOf(LocalDate.now().getYear());
 
                 when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
-                when(invoiceRepository.save(notNull())).thenReturn(savedInvoice);
-                when(invoiceMapper.toResponse(savedInvoice)).thenReturn(expectedResponse);
+                when(sequenceRepository.findByHotelIdAndYearForUpdate(eq(hotelId), anyInt()))
+                                .thenReturn(Optional.empty());
+                when(invoiceRepository.save(notNull())).thenAnswer(inv -> inv.getArgument(0));
+                when(invoiceMapper.toResponse(any(Invoice.class))).thenAnswer(inv -> {
+                        final Invoice i = inv.getArgument(0);
+                        return new InvoiceResponse(i.getId(), hotelId, i.getInvoiceNumber(),
+                                        LocalDateTime.now(), BigDecimal.ZERO, InvoiceStatus.ISSUED,
+                                        reservationId, guestId, stayId, List.of(), List.of());
+                });
 
                 // Act
                 final InvoiceResponse result = invoiceService.createInvoiceForStay(stayRequest);
 
-                // Assert
+                // Assert — formato YYYY/NNNN e primo numero della sequenza
                 assertNotNull(result);
                 assertEquals(stayId, result.stayId());
                 assertEquals(0, BigDecimal.ZERO.compareTo(result.totalAmount()));
+                assertTrue(result.invoiceNumber().matches("\\d{4}/\\d{4}"),
+                                "Invoice number must match YYYY/NNNN format");
+                assertTrue(result.invoiceNumber().startsWith(expectedYear + "/"),
+                                "Invoice number must start with current year");
+                assertEquals(expectedYear + "/0001", result.invoiceNumber());
                 verify(invoiceRepository).save(notNull());
         }
 
@@ -277,5 +285,76 @@ class InvoiceServiceImplTest {
                 // Act & Assert
                 assertThrows(NotFoundException.class,
                                 () -> invoiceService.addCharge(Objects.requireNonNull(foreignStayId), chargeRequest));
+        }
+
+        // ---------------------------------------------------------------
+        // generateInvoiceNumber — numerazione progressiva
+        // ---------------------------------------------------------------
+
+        @Test
+        @DisplayName("Should generate YYYY/0001 when no sequence exists for hotel+year (first invoice)")
+        void shouldGenerateFirstInvoiceNumberWhenNoSequenceExists() {
+                // Arrange
+                final UUID stayId = UUID.randomUUID();
+                final StayInvoiceRequest request = new StayInvoiceRequest(stayId, guestId, reservationId);
+                final int currentYear = LocalDate.now().getYear();
+
+                when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
+                when(sequenceRepository.findByHotelIdAndYearForUpdate(eq(hotelId), eq(currentYear)))
+                                .thenReturn(Optional.empty());
+                when(invoiceRepository.save(notNull())).thenAnswer(inv -> inv.getArgument(0));
+                when(invoiceMapper.toResponse(any(Invoice.class))).thenAnswer(inv -> {
+                        final Invoice i = inv.getArgument(0);
+                        return new InvoiceResponse(i.getId(), hotelId, i.getInvoiceNumber(),
+                                        LocalDateTime.now(), BigDecimal.ZERO, InvoiceStatus.ISSUED,
+                                        reservationId, guestId, stayId, List.of(), List.of());
+                });
+
+                // Act
+                final InvoiceResponse result = invoiceService.createInvoiceForStay(request);
+
+                // Assert — primo numero dell'anno
+                assertEquals(currentYear + "/0001", result.invoiceNumber());
+
+                // Verifica che la sequenza sia stata salvata con lastSeq=1
+                final ArgumentCaptor<InvoiceSequence> seqCaptor =
+                                ArgumentCaptor.forClass(InvoiceSequence.class);
+                verify(sequenceRepository).save(seqCaptor.capture());
+                assertEquals(1L, seqCaptor.getValue().getLastSeq());
+                assertEquals(hotelId, seqCaptor.getValue().getId().getHotelId());
+                assertEquals(currentYear, seqCaptor.getValue().getId().getYear());
+        }
+
+        @Test
+        @DisplayName("Should produce YYYY/0006 when existing sequence has lastSeq=5")
+        void shouldIncrementExistingSequence() {
+                // Arrange
+                final UUID stayId = UUID.randomUUID();
+                final StayInvoiceRequest request = new StayInvoiceRequest(stayId, guestId, reservationId);
+                final int currentYear = LocalDate.now().getYear();
+
+                final long seqBefore = 5L;
+                final InvoiceSequence existingSeq = InvoiceSequence.builder()
+                                .id(new InvoiceSequenceId(hotelId, currentYear))
+                                .lastSeq(seqBefore)
+                                .build();
+
+                when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
+                when(sequenceRepository.findByHotelIdAndYearForUpdate(eq(hotelId), eq(currentYear)))
+                                .thenReturn(Optional.of(existingSeq));
+                when(invoiceRepository.save(notNull())).thenAnswer(inv -> inv.getArgument(0));
+                when(invoiceMapper.toResponse(any(Invoice.class))).thenAnswer(inv -> {
+                        final Invoice i = inv.getArgument(0);
+                        return new InvoiceResponse(i.getId(), hotelId, i.getInvoiceNumber(),
+                                        LocalDateTime.now(), BigDecimal.ZERO, InvoiceStatus.ISSUED,
+                                        reservationId, guestId, stayId, List.of(), List.of());
+                });
+
+                // Act
+                final InvoiceResponse result = invoiceService.createInvoiceForStay(request);
+
+                // Assert — sequenza incrementata da seqBefore a seqBefore+1
+                assertEquals(currentYear + "/000" + (seqBefore + 1), result.invoiceNumber());
+                assertEquals(seqBefore + 1, existingSeq.getLastSeq());
         }
 }

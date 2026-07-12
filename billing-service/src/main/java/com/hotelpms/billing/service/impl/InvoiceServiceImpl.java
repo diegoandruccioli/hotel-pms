@@ -2,6 +2,7 @@ package com.hotelpms.billing.service.impl;
 
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceCharge;
+import com.hotelpms.billing.domain.InvoiceSequence;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
@@ -15,6 +16,7 @@ import com.hotelpms.billing.mapper.InvoiceChargeMapper;
 import com.hotelpms.billing.mapper.InvoiceMapper;
 import com.hotelpms.billing.repository.InvoiceChargeRepository;
 import com.hotelpms.billing.repository.InvoiceRepository;
+import com.hotelpms.billing.repository.InvoiceSequenceRepository;
 import com.hotelpms.billing.service.InvoiceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -43,6 +46,7 @@ public class InvoiceServiceImpl implements InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
     private final InvoiceChargeRepository invoiceChargeRepository;
+    private final InvoiceSequenceRepository sequenceRepository;
     private final InvoiceMapper invoiceMapper;
     private final InvoiceChargeMapper invoiceChargeMapper;
 
@@ -67,7 +71,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .totalAmount(BigDecimal.ZERO)
                 .status(InvoiceStatus.ISSUED)
                 .issueDate(LocalDateTime.now())
-                .invoiceNumber(generateInvoiceNumber())
+                .invoiceNumber(generateInvoiceNumber(hotelId))
                 .build();
 
         final Invoice savedInvoice = invoiceRepository.save(Objects.requireNonNull(invoice));
@@ -160,12 +164,22 @@ public class InvoiceServiceImpl implements InvoiceService {
     }
 
     /**
-     * Generates a unique, human-readable invoice number.
+     * Genera il numero fattura progressivo per anno solare nel formato {@code YYYY/NNNN}.
+     * Acquisisce un lock pessimistico sulla riga (hotelId, year) per garantire
+     * unicità e assenza di gap anche sotto carico concorrente.
+     * Deve essere invocato nell'ambito di un contesto {@code @Transactional} attivo.
      *
-     * @return invoice number in the format {@code INV-XXXXXXXX}
+     * @param hotelId hotel tenant
+     * @return numero fattura nel formato {@code 2026/0001}
      */
-    private String generateInvoiceNumber() {
-        return "INV-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT);
+    private String generateInvoiceNumber(final UUID hotelId) {
+        final int year = LocalDate.now().getYear();
+        final InvoiceSequence seq = sequenceRepository
+                .findByHotelIdAndYearForUpdate(hotelId, year)
+                .orElseGet(() -> InvoiceSequence.startFor(hotelId, year));
+        seq.setLastSeq(seq.getLastSeq() + 1);
+        sequenceRepository.save(seq);
+        return String.format("%d/%04d", year, seq.getLastSeq());
     }
 
     @Override
