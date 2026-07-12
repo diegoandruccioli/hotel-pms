@@ -13,7 +13,7 @@ export type ChargeType = 'FB_ORDER' | 'ROOM_NIGHT' | 'EXTRA';
 
 export interface ChargeResponse {
   id: string;
-  invoiceId: string;
+  invoiceId?: string;
   type: ChargeType;
   description?: string;
   amount: number;
