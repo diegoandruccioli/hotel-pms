@@ -215,7 +215,8 @@ class InvoiceServiceImplTest {
 
                 final ChargeResponse expectedCharge = new ChargeResponse(
                                 UUID.randomUUID(), openInvoice.getId(), ChargeType.FB_ORDER,
-                                "Espresso x2, Tiramisù x1", chargeAmount, orderId, LocalDateTime.now());
+                                "Espresso x2, Tiramisù x1", chargeAmount, new BigDecimal("0.10"),
+                                orderId, LocalDateTime.now());
 
                 when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId))
                                 .thenReturn(Optional.of(openInvoice));
@@ -323,6 +324,77 @@ class InvoiceServiceImplTest {
                 assertEquals(1L, seqCaptor.getValue().getLastSeq());
                 assertEquals(hotelId, seqCaptor.getValue().getId().getHotelId());
                 assertEquals(currentYear, seqCaptor.getValue().getId().getYear());
+        }
+
+        // ---------------------------------------------------------------
+        // vatRateFor — aliquote IVA per tipo addebito (E12)
+        // ---------------------------------------------------------------
+
+        @Test
+        @DisplayName("Should set vatRate=0.10 for FB_ORDER charge")
+        void shouldSetVatRateOnFbOrderCharge() {
+                // Arrange
+                final UUID stayId = UUID.randomUUID();
+                final BigDecimal chargeAmount = BigDecimal.valueOf(11);
+                final ChargeRequest chargeRequest = new ChargeRequest(
+                                ChargeType.FB_ORDER, SIMPLE_DRINK, chargeAmount, null);
+                final Invoice openInvoice = Invoice.builder()
+                                .id(UUID.randomUUID()).stayId(stayId).hotelId(hotelId)
+                                .totalAmount(BigDecimal.ZERO).status(InvoiceStatus.ISSUED)
+                                .invoiceNumber("INV-TEST").build();
+                when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId))
+                                .thenReturn(Optional.of(openInvoice));
+                when(invoiceRepository.save(openInvoice)).thenReturn(openInvoice);
+                when(invoiceChargeRepository.save(any(InvoiceCharge.class)))
+                                .thenAnswer(inv -> inv.getArgument(0));
+                when(invoiceChargeMapper.toResponse(any(InvoiceCharge.class)))
+                                .thenAnswer(inv -> {
+                                        final InvoiceCharge c = inv.getArgument(0);
+                                        return new ChargeResponse(UUID.randomUUID(), openInvoice.getId(),
+                                                        c.getType(), c.getDescription(), c.getAmount(),
+                                                        c.getVatRate(), c.getReferenceId(), null);
+                                });
+
+                // Act
+                invoiceService.addCharge(Objects.requireNonNull(stayId), chargeRequest);
+
+                // Assert — vatRate 10% salvato sulla riga
+                final ArgumentCaptor<InvoiceCharge> captor = ArgumentCaptor.forClass(InvoiceCharge.class);
+                verify(invoiceChargeRepository).save(captor.capture());
+                assertEquals(0, new BigDecimal("0.10").compareTo(captor.getValue().getVatRate()));
+        }
+
+        @Test
+        @DisplayName("Should set vatRate=0.22 for EXTRA charge")
+        void shouldSetHigherVatRateForExtraCharge() {
+                // Arrange
+                final UUID stayId = UUID.randomUUID();
+                final ChargeRequest chargeRequest = new ChargeRequest(
+                                ChargeType.EXTRA, "Minibar", BigDecimal.TEN, null);
+                final Invoice openInvoice = Invoice.builder()
+                                .id(UUID.randomUUID()).stayId(stayId).hotelId(hotelId)
+                                .totalAmount(BigDecimal.ZERO).status(InvoiceStatus.ISSUED)
+                                .invoiceNumber("INV-TEST").build();
+                when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId))
+                                .thenReturn(Optional.of(openInvoice));
+                when(invoiceRepository.save(openInvoice)).thenReturn(openInvoice);
+                when(invoiceChargeRepository.save(any(InvoiceCharge.class)))
+                                .thenAnswer(inv -> inv.getArgument(0));
+                when(invoiceChargeMapper.toResponse(any(InvoiceCharge.class)))
+                                .thenAnswer(inv -> {
+                                        final InvoiceCharge c = inv.getArgument(0);
+                                        return new ChargeResponse(UUID.randomUUID(), openInvoice.getId(),
+                                                        c.getType(), c.getDescription(), c.getAmount(),
+                                                        c.getVatRate(), c.getReferenceId(), null);
+                                });
+
+                // Act
+                invoiceService.addCharge(Objects.requireNonNull(stayId), chargeRequest);
+
+                // Assert — vatRate 22% per EXTRA
+                final ArgumentCaptor<InvoiceCharge> captor = ArgumentCaptor.forClass(InvoiceCharge.class);
+                verify(invoiceChargeRepository).save(captor.capture());
+                assertEquals(0, new BigDecimal("0.22").compareTo(captor.getValue().getVatRate()));
         }
 
         @Test

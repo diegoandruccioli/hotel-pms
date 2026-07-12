@@ -23,8 +23,11 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 /**
@@ -57,6 +60,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
     // Charges table column X positions
     private static final float COL_TYPE_X = MARGIN;
     private static final float COL_DESC_X = MARGIN + 90f;
+    private static final float COL_VAT_X = RIGHT_EDGE - 100f;
     private static final float COL_AMT_X = RIGHT_EDGE;
 
     // Payments table column X positions
@@ -68,7 +72,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
     private static final float LABEL_X_RIGHT = RIGHT_EDGE - 120f;
     private static final float LABEL_VALUE_OFFSET = 70f;
 
-    private static final int MAX_CHARGE_DESC_LEN = 38;
+    private static final int MAX_CHARGE_DESC_LEN = 32;
     private static final int MAX_PAYMENT_REF_LEN = 15;
 
     private static final String EMPTY_VALUE = "---";
@@ -127,7 +131,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
         final BigDecimal paid = invoice.payments().stream()
                 .map((@NonNull PaymentResponse pr) -> pr.amount())
                 .reduce(BigDecimal.ZERO, (@NonNull BigDecimal a, @NonNull BigDecimal b) -> a.add(b));
-        drawTotals(cs, invoice.totalAmount(), paid, bold, regular, y);
+        drawTotals(cs, invoice.totalAmount(), paid, invoice.charges(), bold, regular, y);
     }
 
     private float drawHotelHeader(final PDPageContentStream cs,
@@ -193,6 +197,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
 
         drawText(cs, bold, FONT_SIZE_SMALL, COL_TYPE_X, y, "Tipo");
         drawText(cs, bold, FONT_SIZE_SMALL, COL_DESC_X, y, "Descrizione");
+        drawRightAlignedText(cs, bold, FONT_SIZE_SMALL, COL_VAT_X, y, "%IVA");
         drawRightAlignedText(cs, bold, FONT_SIZE_SMALL, COL_AMT_X, y, "Importo");
         y -= LINE_HEIGHT;
 
@@ -200,8 +205,11 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
         for (final ChargeResponse charge : rows) {
             final String typeName = formatChargeType(charge.type().name());
             final String desc = charge.description() != null ? charge.description() : EMPTY_VALUE;
+            final String vatLabel = charge.vatRate() != null
+                    ? vatRateToLabel(charge.vatRate()) : EMPTY_VALUE;
             drawText(cs, regular, FONT_SIZE_BODY, COL_TYPE_X, y, typeName);
             drawText(cs, regular, FONT_SIZE_BODY, COL_DESC_X, y, truncate(desc, MAX_CHARGE_DESC_LEN));
+            drawRightAlignedText(cs, regular, FONT_SIZE_BODY, COL_VAT_X, y, vatLabel);
             drawRightAlignedText(cs, regular, FONT_SIZE_BODY, COL_AMT_X, y,
                     formatAmount(charge.amount()));
             y -= LINE_HEIGHT;
@@ -252,17 +260,58 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
     private void drawTotals(final PDPageContentStream cs,
                              final BigDecimal total,
                              final BigDecimal paid,
+                             final List<ChargeResponse> charges,
                              final PDType1Font bold,
                              final PDType1Font regular,
                              final float startY) throws IOException {
         float y = startY;
+        final Map<BigDecimal, BigDecimal[]> vatBreakdown = computeVatBreakdown(charges);
+        for (final Map.Entry<BigDecimal, BigDecimal[]> entry : vatBreakdown.entrySet()) {
+            final BigDecimal taxable = entry.getValue()[0];
+            final BigDecimal vat = entry.getValue()[1];
+            final String rateLabel = vatRateToLabel(entry.getKey());
+            drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, y, "Imponibile " + rateLabel + ":");
+            drawRightAlignedText(cs, regular, FONT_SIZE_BODY, RIGHT_EDGE, y, formatAmount(taxable));
+            y -= LINE_HEIGHT;
+            drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, y, "IVA " + rateLabel + ":");
+            drawRightAlignedText(cs, regular, FONT_SIZE_BODY, RIGHT_EDGE, y, formatAmount(vat));
+            y -= LINE_HEIGHT;
+        }
+        if (!vatBreakdown.isEmpty()) {
+            drawHorizontalLine(cs, y);
+            y -= LINE_HEIGHT;
+        }
         drawText(cs, bold, FONT_SIZE_SECTION, LABEL_X_RIGHT, y, "TOTALE:");
         drawRightAlignedText(cs, bold, FONT_SIZE_SECTION, RIGHT_EDGE, y, formatAmount(total));
         y -= LINE_HEIGHT;
-
         final BigDecimal due = total.subtract(paid);
         drawText(cs, regular, FONT_SIZE_SECTION, LABEL_X_RIGHT, y, "Da pagare:");
         drawRightAlignedText(cs, regular, FONT_SIZE_SECTION, RIGHT_EDGE, y, formatAmount(due));
+    }
+
+    private static Map<BigDecimal, BigDecimal[]> computeVatBreakdown(final List<ChargeResponse> charges) {
+        final Map<BigDecimal, BigDecimal[]> breakdown = new TreeMap<>();
+        if (charges == null) {
+            return breakdown;
+        }
+        for (final ChargeResponse charge : charges) {
+            if (charge.vatRate() == null || charge.amount() == null) {
+                continue;
+            }
+            final BigDecimal rate = charge.vatRate();
+            final BigDecimal amount = charge.amount();
+            final BigDecimal taxable = amount.divide(BigDecimal.ONE.add(rate), 2, RoundingMode.HALF_UP);
+            final BigDecimal vat = amount.subtract(taxable);
+            final BigDecimal[] group = breakdown.computeIfAbsent(rate,
+                    k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
+            group[0] = group[0].add(taxable);
+            group[1] = group[1].add(vat);
+        }
+        return breakdown;
+    }
+
+    private static String vatRateToLabel(final BigDecimal rate) {
+        return rate.movePointRight(2).stripTrailingZeros().toPlainString() + "%";
     }
 
     private void drawHorizontalLine(final PDPageContentStream cs, final float y) throws IOException {

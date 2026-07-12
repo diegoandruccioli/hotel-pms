@@ -14,6 +14,7 @@ import java.util.UUID;
  * @param type        the charge category (ROOM_NIGHT, FB_ORDER, EXTRA)
  * @param description human-readable description of the charge
  * @param amount      the charge amount
+ * @param vatRate     the VAT rate applied (e.g. 0.10 = 10%, 0.22 = 22%)
  * @param referenceId optional cross-service reference (order UUID, stay UUID, etc.)
  * @param createdAt   the timestamp when the charge was recorded
  */
@@ -23,6 +24,7 @@ public record ChargeResponse(
         ChargeType type,
         String description,
         BigDecimal amount,
+        BigDecimal vatRate,
         UUID referenceId,
         LocalDateTime createdAt) {
 }

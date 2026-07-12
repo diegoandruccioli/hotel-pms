@@ -1,5 +1,6 @@
 package com.hotelpms.billing.service.impl;
 
+import com.hotelpms.billing.domain.ChargeType;
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceCharge;
 import com.hotelpms.billing.domain.InvoiceSequence;
@@ -98,6 +99,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .type(request.type())
                 .description(request.description())
                 .amount(request.amount())
+                .vatRate(vatRateFor(request.type()))
                 .referenceId(request.referenceId())
                 .build();
 
@@ -161,6 +163,13 @@ public class InvoiceServiceImpl implements InvoiceService {
             throw new IllegalStateException("MISSING_HOTEL_CONTEXT");
         }
         return UUID.fromString(hotelIdStr);
+    }
+
+    private static BigDecimal vatRateFor(final ChargeType type) {
+        return switch (type) {
+            case ROOM_NIGHT, FB_ORDER -> new BigDecimal("0.10");
+            case EXTRA -> new BigDecimal("0.22");
+        };
     }
 
     /**

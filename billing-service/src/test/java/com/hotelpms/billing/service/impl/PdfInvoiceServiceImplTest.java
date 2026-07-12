@@ -43,6 +43,8 @@ class PdfInvoiceServiceImplTest {
     private static final int PDF_MAGIC_BYTES_LEN = 5;
     private static final BigDecimal AMOUNT_50 = BigDecimal.valueOf(50);
     private static final BigDecimal AMOUNT_100 = BigDecimal.valueOf(100);
+    private static final BigDecimal VAT_RATE_10 = new BigDecimal("0.10");
+    private static final BigDecimal VAT_RATE_22 = new BigDecimal("0.22");
 
     @Mock
     private InvoiceService invoiceService;
@@ -80,7 +82,7 @@ class PdfInvoiceServiceImplTest {
     void shouldReturnPdfWithChargesAndPayments() {
         final ChargeResponse charge = new ChargeResponse(
                 UUID.randomUUID(), INVOICE_ID, ChargeType.FB_ORDER,
-                "Cena ristorante", AMOUNT_50, null, LocalDateTime.now());
+                "Cena ristorante", AMOUNT_50, VAT_RATE_10, null, LocalDateTime.now());
         final PaymentResponse payment = new PaymentResponse(
                 UUID.randomUUID(), LocalDateTime.now(), AMOUNT_150,
                 PaymentMethod.CASH, "TXN-001", INVOICE_ID);
@@ -123,17 +125,33 @@ class PdfInvoiceServiceImplTest {
     void shouldReturnPdfWithMultipleCharges() {
         final List<ChargeResponse> charges = List.of(
                 new ChargeResponse(UUID.randomUUID(), INVOICE_ID, ChargeType.ROOM_NIGHT,
-                        "Camera doppia — 3 notti", AMOUNT_100, null, LocalDateTime.now()),
+                        "Camera doppia — 3 notti", AMOUNT_100, VAT_RATE_10, null, LocalDateTime.now()),
                 new ChargeResponse(UUID.randomUUID(), INVOICE_ID, ChargeType.FB_ORDER,
-                        "Colazione", AMOUNT_50, null, LocalDateTime.now()),
+                        "Colazione", AMOUNT_50, VAT_RATE_10, null, LocalDateTime.now()),
                 new ChargeResponse(UUID.randomUUID(), INVOICE_ID, ChargeType.EXTRA,
-                        "Parcheggio", BigDecimal.TEN, null, LocalDateTime.now()));
+                        "Parcheggio", BigDecimal.TEN, VAT_RATE_22, null, LocalDateTime.now()));
         final InvoiceResponse invoice = buildInvoice(charges, List.of());
         when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
 
         final byte[] pdf = pdfInvoiceService.generateInvoicePdf(INVOICE_ID);
 
         assertThat(pdf).isNotNull().isNotEmpty();
+    }
+
+    @Test
+    void shouldReturnPdfWithVatBreakdownForMixedRates() {
+        final List<ChargeResponse> charges = List.of(
+                new ChargeResponse(UUID.randomUUID(), INVOICE_ID, ChargeType.ROOM_NIGHT,
+                        "Camera doppia", AMOUNT_100, VAT_RATE_10, null, LocalDateTime.now()),
+                new ChargeResponse(UUID.randomUUID(), INVOICE_ID, ChargeType.EXTRA,
+                        "Minibar", BigDecimal.TEN, VAT_RATE_22, null, LocalDateTime.now()));
+        final InvoiceResponse invoice = buildInvoice(charges, List.of());
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+
+        final byte[] pdf = pdfInvoiceService.generateInvoicePdf(INVOICE_ID);
+
+        assertThat(pdf).isNotNull().isNotEmpty();
+        assertThat(new String(pdf, 0, PDF_MAGIC_BYTES_LEN, StandardCharsets.ISO_8859_1)).isEqualTo("%PDF-");
     }
 
     private InvoiceResponse buildInvoice(final List<ChargeResponse> charges,

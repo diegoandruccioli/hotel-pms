@@ -56,6 +56,9 @@ public class InvoiceCharge {
     @Column(nullable = false)
     private BigDecimal amount;
 
+    @Column(name = "vat_rate", nullable = false)
+    private BigDecimal vatRate;
+
     @Column(name = "reference_id")
     private UUID referenceId;
 
