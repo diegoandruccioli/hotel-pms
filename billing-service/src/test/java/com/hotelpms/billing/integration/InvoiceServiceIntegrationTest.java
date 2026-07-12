@@ -1,5 +1,7 @@
 package com.hotelpms.billing.integration;
 
+import com.hotelpms.billing.client.GuestClient;
+import com.hotelpms.billing.client.HotelSettingsClient;
 import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.domain.SdiStatus;
@@ -69,6 +71,12 @@ class InvoiceServiceIntegrationTest {
 
     @MockitoBean
     private StringRedisTemplate stringRedisTemplate;
+
+    @MockitoBean
+    private GuestClient guestClient;
+
+    @MockitoBean
+    private HotelSettingsClient hotelSettingsClient;
 
     @Autowired
     private InvoiceService invoiceService;
