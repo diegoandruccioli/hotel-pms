@@ -13,6 +13,9 @@ import com.hotelpms.billing.service.InvoiceService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,6 +25,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
+
+import com.hotelpms.billing.domain.PaymentMethod;
+import com.hotelpms.billing.dto.PaymentResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -74,6 +81,11 @@ class FatturaPAServiceImplTest {
         assertThat(xmlStr).contains("EUR");
         assertThat(xmlStr).contains("Hotel Test");
         assertThat(xmlStr).contains("ABC1234");
+        // invoice total must appear in the fallback line (no charges → use totalAmount)
+        assertThat(xmlStr).contains("100.00"); // imponibile of 110.00 at 10% VAT
+        // no payments → default MP05 with the full invoice amount
+        assertThat(xmlStr).contains("<ModalitaPagamento>MP05</ModalitaPagamento>");
+        assertThat(xmlStr).contains("<ImportoPagamento>110.00</ImportoPagamento>");
     }
 
     @Test
@@ -118,6 +130,38 @@ class FatturaPAServiceImplTest {
 
         assertThatThrownBy(() -> service.generateXml(INVOICE_ID))
                 .isInstanceOf(InvoiceConflictException.class);
+    }
+
+    static Stream<Arguments> paymentMethodCodiceProvider() {
+        return Stream.of(
+                Arguments.of(PaymentMethod.CASH, "MP01"),
+                Arguments.of(PaymentMethod.CREDIT_CARD, "MP08"),
+                Arguments.of(PaymentMethod.DEBIT_CARD, "MP08"),
+                Arguments.of(PaymentMethod.BANK_TRANSFER, "MP05"),
+                Arguments.of(PaymentMethod.CHECK, "MP02")
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("paymentMethodCodiceProvider")
+    void shouldMapPaymentMethodToCorrectMPCode(final PaymentMethod method, final String expectedCode) {
+        final BigDecimal amnt = new BigDecimal("100.00");
+        final PaymentResponse payment = new PaymentResponse(
+                UUID.randomUUID(), LocalDateTime.of(ISSUE_YEAR, 1, ISSUE_DAY, 10, 0),
+                amnt, method, null, INVOICE_ID);
+        final InvoiceResponse invoice = new InvoiceResponse(
+                INVOICE_ID, HOTEL_ID, "2026/0001",
+                LocalDateTime.of(ISSUE_YEAR, 1, ISSUE_DAY, 10, 0),
+                amnt, InvoiceStatus.ISSUED,
+                RES_ID, GUEST_ID, null,
+                DocumentType.FATTURA, SdiStatus.NOT_SENT, List.of(payment), List.of());
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+        when(hotelSettingsClient.getSettings()).thenReturn(hotel);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
+
+        final String xmlStr = new String(service.generateXml(INVOICE_ID), StandardCharsets.UTF_8);
+
+        assertThat(xmlStr).contains("<ModalitaPagamento>" + expectedCode + "</ModalitaPagamento>");
     }
 
     private InvoiceResponse fattura(final InvoiceStatus status, final DocumentType docType) {

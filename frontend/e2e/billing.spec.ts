@@ -4,17 +4,18 @@ const MOCK_USER = { username: 'admin', role: 'ADMIN', sub: 'admin', mustChangePa
 
 const MOCK_INVOICE = {
   id: 'inv-001',
-  stayId: 'stay-001',
   hotelId: 'h-001',
-  reservationId: 'res-001',
-  guestFullName: 'Mario Rossi',
-  status: 'PENDING',
+  invoiceNumber: '2026/0001',
+  issueDate: '2026-04-01T10:00:00',
   totalAmount: 320.00,
-  paidAmount: 0,
-  issueDate: '2026-04-01',
-  lineItems: [
-    { id: 'li-1', description: 'Room 101 × 4 nights', amount: 320.00 },
-  ],
+  status: 'ISSUED',
+  reservationId: 'res-001',
+  guestId: 'guest-001',
+  stayId: 'stay-001',
+  documentType: 'FATTURA',
+  sdiStatus: 'NOT_SENT',
+  payments: [],
+  charges: [],
 };
 
 test.describe('Billing flow', () => {
@@ -55,7 +56,18 @@ test.describe('Billing flow', () => {
   test('renders billing list with an invoice', async ({ page }) => {
     await page.goto('/billing');
     await expect(page.locator('table')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('PENDING', { exact: true })).toBeVisible();
+    await expect(page.getByText('2026/0001')).toBeVisible();
+  });
+
+  test('invoice detail modal shows SDI section for FATTURA', async ({ page }) => {
+    await page.route('**/api/v1/invoices/inv-001/fatturaPA', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/xml', body: '<FatturaElettronica/>' }),
+    );
+    await page.goto('/billing');
+    await expect(page.locator('table')).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: /View/i }).first().click();
+    await expect(page.getByText('SDI Status')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByRole('button', { name: /Download FatturaPA XML/i })).toBeVisible();
   });
 
   test('passes accessibility audit on billing page', async ({ page }) => {

@@ -211,7 +211,7 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
     private Element buildBody(final Document doc, final InvoiceResponse invoice) {
         final Element body = doc.createElement("FatturaElettronicaBody");
         body.appendChild(buildDatiGenerali(doc, invoice));
-        body.appendChild(buildDatiBeniServizi(doc, invoice.charges()));
+        body.appendChild(buildDatiBeniServizi(doc, invoice.charges(), invoice.totalAmount()));
         body.appendChild(buildDatiPagamento(doc, invoice.payments(), invoice.totalAmount()));
         return body;
     }
@@ -229,14 +229,17 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
         return datiGenerali;
     }
 
-    private Element buildDatiBeniServizi(final Document doc, final List<ChargeResponse> charges) {
+    private Element buildDatiBeniServizi(final Document doc, final List<ChargeResponse> charges,
+                                          final BigDecimal totalAmount) {
         final Element datiBeniServizi = doc.createElement("DatiBeniServizi");
 
         if (charges == null || charges.isEmpty()) {
+            final BigDecimal fallbackAmount = totalAmount != null ? totalAmount : BigDecimal.ZERO;
             datiBeniServizi.appendChild(buildDettaglioLinea(doc, 1, "Soggiorno",
-                    BigDecimal.ZERO, DEFAULT_VAT_RATE));
-            final Element riepilogo = buildDatiRiepilogo(doc, DEFAULT_VAT_RATE,
-                    BigDecimal.ZERO, BigDecimal.ZERO);
+                    fallbackAmount, DEFAULT_VAT_RATE));
+            final BigDecimal imponibile = imponibile(fallbackAmount, DEFAULT_VAT_RATE);
+            final BigDecimal imposta = fallbackAmount.subtract(imponibile);
+            final Element riepilogo = buildDatiRiepilogo(doc, DEFAULT_VAT_RATE, imponibile, imposta);
             datiBeniServizi.appendChild(riepilogo);
             return datiBeniServizi;
         }
@@ -376,8 +379,9 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
         }
         return switch (method) {
             case CASH -> "MP01";
-            case CREDIT_CARD -> "MP08";
-            case TRANSFER -> DEFAULT_MP;
+            case CREDIT_CARD, DEBIT_CARD -> "MP08";
+            case BANK_TRANSFER -> DEFAULT_MP;
+            case CHECK -> "MP02";
         };
     }
 }
