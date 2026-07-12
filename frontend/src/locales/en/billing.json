@@ -21,5 +21,10 @@
   "charge_type_fb_order": "F&B Order",
   "charge_type_room_service": "Room Service",
   "charge_type_other": "Other Charge",
-  "download_pdf": "Download PDF"
+  "download_pdf": "Download PDF",
+  "document_type_fattura": "Invoice",
+  "document_type_ricevuta": "Receipt",
+  "switch_to_ricevuta": "Convert to Receipt",
+  "switch_to_fattura": "Convert to Invoice",
+  "document_type_updated": "Document type updated"
 }

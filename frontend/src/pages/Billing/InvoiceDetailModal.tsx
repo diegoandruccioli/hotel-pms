@@ -1,15 +1,17 @@
-import { useCallback, memo } from 'react';
+import { useCallback, memo, useState } from 'react';
 import { billingService } from '../../services/billingService';
+import { useToastStore } from '../../store/toastStore';
 
 const ICON_STYLE: React.CSSProperties = { fontSize: 18 };
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3StatusChip } from '../../components/m3/M3StatusChip';
-import type { InvoiceResponse, InvoiceStatus, PaymentMethod, ChargeType } from '../../types/billing.types';
+import type { DocumentType, InvoiceResponse, InvoiceStatus, PaymentMethod, ChargeType } from '../../types/billing.types';
 
 interface Props {
   invoice: InvoiceResponse;
   onClose: () => void;
+  onUpdated?: (updated: InvoiceResponse) => void;
 }
 
 const statusTone = (s: InvoiceStatus) => {
@@ -32,12 +34,29 @@ const chargeTypeIcon: Record<ChargeType, string> = {
   OTHER: 'add_circle',
 };
 
-export const InvoiceDetailModal = memo(({ invoice, onClose }: Props) => {
+export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) => {
   const { t, i18n } = useTranslation(['billing', 'common']);
+  const addToast = useToastStore((s) => s.addToast);
+  const [switchingType, setSwitchingType] = useState(false);
 
   const handleDownloadPdf = useCallback(() => {
     billingService.downloadPdf(invoice.id);
   }, [invoice.id]);
+
+  const handleToggleDocumentType = useCallback(async () => {
+    const next: DocumentType = invoice.documentType === 'FATTURA' ? 'RICEVUTA' : 'FATTURA';
+    setSwitchingType(true);
+    try {
+      const updated = await billingService.updateDocumentType(invoice.id, next);
+      onUpdated?.(updated);
+      addToast(t('document_type_updated', { ns: 'billing' }), 'success');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
+      addToast(e.response?.data?.detail ?? e.message ?? t('toast_error', { ns: 'common' }), 'error');
+    } finally {
+      setSwitchingType(false);
+    }
+  }, [invoice.id, invoice.documentType, onUpdated, addToast, t]);
 
   const formatCurrency = useCallback(
     (val: number) =>
@@ -66,6 +85,24 @@ export const InvoiceDetailModal = memo(({ invoice, onClose }: Props) => {
       onClose={onClose}
     >
       <div className="space-y-6 text-sm font-body">
+        {/* Document type toggle */}
+        {invoice.status !== 'CANCELLED' && (
+          <div className="flex items-center justify-between px-3 py-2 rounded-shape-xs bg-surface-container border border-outline-variant/40">
+            <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
+              {t(`document_type_${invoice.documentType?.toLowerCase() ?? 'fattura'}`, { ns: 'billing' })}
+            </span>
+            <button
+              type="button"
+              onClick={() => { void handleToggleDocumentType(); }}
+              disabled={switchingType}
+              className="text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded min-h-[40px] px-2"
+            >
+              {invoice.documentType === 'FATTURA'
+                ? t('switch_to_ricevuta', { ns: 'billing' })
+                : t('switch_to_fattura', { ns: 'billing' })}
+            </button>
+          </div>
+        )}
         {/* Header summary */}
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
           <div>

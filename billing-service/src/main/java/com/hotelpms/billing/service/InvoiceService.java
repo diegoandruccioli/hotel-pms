@@ -1,5 +1,6 @@
 package com.hotelpms.billing.service;
 
+import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
@@ -86,4 +87,14 @@ public interface InvoiceService {
      * @return list of invoice summaries, most recent first
      */
     List<InvoiceSummaryResponse> getInvoiceHistoryForGuest(@NonNull UUID guestId, @NonNull UUID hotelId);
+
+    /**
+     * Switches an invoice between fiscal (FATTURA) and non-fiscal (RICEVUTA) type.
+     * Rejected for CANCELLED invoices.
+     *
+     * @param invoiceId    the invoice UUID
+     * @param documentType the new document type
+     * @return the updated invoice response
+     */
+    InvoiceResponse updateDocumentType(@NonNull UUID invoiceId, @NonNull DocumentType documentType);
 }

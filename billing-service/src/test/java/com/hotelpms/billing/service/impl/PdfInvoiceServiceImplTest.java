@@ -5,6 +5,7 @@ import com.hotelpms.billing.client.HotelSettingsClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.client.dto.HotelSettingsResponse;
 import com.hotelpms.billing.domain.ChargeType;
+import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.domain.PaymentMethod;
 import com.hotelpms.billing.dto.ChargeResponse;
@@ -129,7 +130,7 @@ class PdfInvoiceServiceImplTest {
                 INVOICE_ID, HOTEL_ID, "INV-001", null,
                 AMOUNT_150, InvoiceStatus.ISSUED,
                 RESERVATION_ID, GUEST_ID, null,
-                List.of(), List.of());
+                null, List.of(), List.of());
         when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
 
         final byte[] pdf = pdfInvoiceService.generateInvoicePdf(INVOICE_ID);
@@ -170,6 +171,22 @@ class PdfInvoiceServiceImplTest {
         assertThat(new String(pdf, 0, PDF_MAGIC_BYTES_LEN, StandardCharsets.ISO_8859_1)).isEqualTo(PDF_MAGIC);
     }
 
+    @Test
+    void shouldReturnPdfWithRicevutaTitleWhenDocumentTypeIsRicevuta() {
+        final InvoiceResponse ricevuta = new InvoiceResponse(
+                INVOICE_ID, HOTEL_ID, "RIC-TEST-001",
+                LocalDateTime.of(ISSUE_YEAR, ISSUE_MONTH, ISSUE_DAY, ISSUE_HOUR, 0),
+                AMOUNT_150, InvoiceStatus.PAID,
+                RESERVATION_ID, GUEST_ID, null,
+                DocumentType.RICEVUTA, List.of(), List.of());
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(ricevuta);
+
+        final byte[] pdf = pdfInvoiceService.generateInvoicePdf(INVOICE_ID);
+
+        assertThat(pdf).isNotNull().isNotEmpty();
+        assertThat(new String(pdf, 0, PDF_MAGIC_BYTES_LEN, StandardCharsets.ISO_8859_1)).isEqualTo(PDF_MAGIC);
+    }
+
     private InvoiceResponse buildInvoice(final List<ChargeResponse> charges,
                                           final List<PaymentResponse> payments) {
         return new InvoiceResponse(
@@ -177,6 +194,6 @@ class PdfInvoiceServiceImplTest {
                 LocalDateTime.of(ISSUE_YEAR, ISSUE_MONTH, ISSUE_DAY, ISSUE_HOUR, 0),
                 AMOUNT_150, InvoiceStatus.PAID,
                 RESERVATION_ID, GUEST_ID, null,
-                payments, charges);
+                DocumentType.FATTURA, payments, charges);
     }
 }

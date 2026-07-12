@@ -1,6 +1,7 @@
 package com.hotelpms.billing.service.impl;
 
 import com.hotelpms.billing.domain.ChargeType;
+import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceCharge;
 import com.hotelpms.billing.domain.InvoiceSequence;
@@ -105,7 +106,7 @@ class InvoiceServiceImplTest {
                 invoice.setId(invoiceId);
                 final InvoiceResponse expectedResponse = new InvoiceResponse(invoiceId, hotelId, "INV-123", null,
                                 BigDecimal.TEN, InvoiceStatus.ISSUED, reservationId, guestId, null,
-                                List.of(), List.of());
+                                null, List.of(), List.of());
 
                 when(invoiceRepository.findByIdAndHotelId(Objects.requireNonNull(invoiceId), hotelId))
                                 .thenReturn(Optional.of(invoice));
@@ -154,7 +155,7 @@ class InvoiceServiceImplTest {
                         final Invoice i = inv.getArgument(0);
                         return new InvoiceResponse(i.getId(), hotelId, i.getInvoiceNumber(),
                                         LocalDateTime.now(), BigDecimal.ZERO, InvoiceStatus.ISSUED,
-                                        reservationId, guestId, stayId, List.of(), List.of());
+                                        reservationId, guestId, stayId, null, List.of(), List.of());
                 });
 
                 // Act
@@ -308,7 +309,7 @@ class InvoiceServiceImplTest {
                         final Invoice i = inv.getArgument(0);
                         return new InvoiceResponse(i.getId(), hotelId, i.getInvoiceNumber(),
                                         LocalDateTime.now(), BigDecimal.ZERO, InvoiceStatus.ISSUED,
-                                        reservationId, guestId, stayId, List.of(), List.of());
+                                        reservationId, guestId, stayId, null, List.of(), List.of());
                 });
 
                 // Act
@@ -419,7 +420,7 @@ class InvoiceServiceImplTest {
                         final Invoice i = inv.getArgument(0);
                         return new InvoiceResponse(i.getId(), hotelId, i.getInvoiceNumber(),
                                         LocalDateTime.now(), BigDecimal.ZERO, InvoiceStatus.ISSUED,
-                                        reservationId, guestId, stayId, List.of(), List.of());
+                                        reservationId, guestId, stayId, null, List.of(), List.of());
                 });
 
                 // Act
@@ -428,5 +429,52 @@ class InvoiceServiceImplTest {
                 // Assert — sequenza incrementata da seqBefore a seqBefore+1
                 assertEquals(currentYear + "/000" + (seqBefore + 1), result.invoiceNumber());
                 assertEquals(seqBefore + 1, existingSeq.getLastSeq());
+        }
+
+        // ---------------------------------------------------------------
+        // updateDocumentType (Verticale 4)
+        // ---------------------------------------------------------------
+
+        @Test
+        @DisplayName("Should switch invoice document type from FATTURA to RICEVUTA")
+        void shouldUpdateDocumentTypeToRicevuta() {
+                // Arrange
+                final UUID invoiceId = UUID.randomUUID();
+                final Invoice invoice = new Invoice();
+                invoice.setId(invoiceId);
+                invoice.setStatus(InvoiceStatus.ISSUED);
+                final InvoiceResponse expected = new InvoiceResponse(invoiceId, hotelId, "INV-123", null,
+                                BigDecimal.TEN, InvoiceStatus.ISSUED, reservationId, guestId, null,
+                                DocumentType.RICEVUTA, List.of(), List.of());
+
+                when(invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)).thenReturn(Optional.of(invoice));
+                when(invoiceRepository.save(any(Invoice.class))).thenReturn(invoice);
+                when(invoiceMapper.toResponse(invoice)).thenReturn(expected);
+
+                // Act
+                final InvoiceResponse result = invoiceService.updateDocumentType(invoiceId, DocumentType.RICEVUTA);
+
+                // Assert
+                assertNotNull(result);
+                assertEquals(DocumentType.RICEVUTA, result.documentType());
+                final ArgumentCaptor<Invoice> captor = ArgumentCaptor.forClass(Invoice.class);
+                verify(invoiceRepository).save(captor.capture());
+                assertEquals(DocumentType.RICEVUTA, captor.getValue().getDocumentType());
+        }
+
+        @Test
+        @DisplayName("Should throw ConflictException when updating document type on CANCELLED invoice")
+        void shouldThrowWhenUpdatingCancelledInvoice() {
+                // Arrange
+                final UUID invoiceId = UUID.randomUUID();
+                final Invoice invoice = new Invoice();
+                invoice.setId(invoiceId);
+                invoice.setStatus(InvoiceStatus.CANCELLED);
+
+                when(invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)).thenReturn(Optional.of(invoice));
+
+                // Act & Assert
+                assertThrows(InvoiceConflictException.class,
+                                () -> invoiceService.updateDocumentType(invoiceId, DocumentType.RICEVUTA));
         }
 }

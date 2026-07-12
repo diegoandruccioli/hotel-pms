@@ -4,6 +4,7 @@ import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.client.HotelSettingsClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.client.dto.HotelSettingsResponse;
+import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.PaymentResponse;
@@ -114,9 +115,11 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
                               final GuestResponse guest) throws IOException {
         final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
         final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+        final DocumentType docType = invoice.documentType() != null
+                ? invoice.documentType() : DocumentType.FATTURA;
 
         float y = TOP_Y;
-        y = drawHotelHeader(cs, hotel, bold, regular, y);
+        y = drawHotelHeader(cs, hotel, docType, bold, regular, y);
         drawHorizontalLine(cs, y);
         y -= SECTION_GAP;
         y = drawInvoiceMeta(cs, invoice, guest, bold, regular, y);
@@ -131,18 +134,21 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
         final BigDecimal paid = invoice.payments().stream()
                 .map((@NonNull PaymentResponse pr) -> pr.amount())
                 .reduce(BigDecimal.ZERO, (@NonNull BigDecimal a, @NonNull BigDecimal b) -> a.add(b));
-        drawTotals(cs, invoice.totalAmount(), paid, invoice.charges(), bold, regular, y);
+        drawTotals(cs, invoice.totalAmount(), paid, invoice.charges(),
+                docType == DocumentType.FATTURA, bold, regular, y);
     }
 
     private float drawHotelHeader(final PDPageContentStream cs,
                                    final HotelSettingsResponse hotel,
+                                   final DocumentType documentType,
                                    final PDType1Font bold,
                                    final PDType1Font regular,
                                    final float startY) throws IOException {
         float y = startY;
         final String name = hotel.hotelName() != null ? hotel.hotelName() : "Hotel";
+        final String docTitle = documentType == DocumentType.FATTURA ? "FATTURA" : "RICEVUTA";
         drawText(cs, bold, FONT_SIZE_TITLE, MARGIN, y, name);
-        drawRightAlignedText(cs, bold, FONT_SIZE_TITLE, RIGHT_EDGE, y, "FATTURA");
+        drawRightAlignedText(cs, bold, FONT_SIZE_TITLE, RIGHT_EDGE, y, docTitle);
         y -= LINE_HEIGHT + 2f;
 
         if (hotel.address() != null && !hotel.address().isBlank()) {
@@ -292,25 +298,28 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
                              final BigDecimal total,
                              final BigDecimal paid,
                              final List<ChargeResponse> charges,
+                             final boolean showVatBreakdown,
                              final PDType1Font bold,
                              final PDType1Font regular,
                              final float startY) throws IOException {
         float y = startY;
-        final Map<BigDecimal, BigDecimal[]> vatBreakdown = computeVatBreakdown(charges);
-        for (final Map.Entry<BigDecimal, BigDecimal[]> entry : vatBreakdown.entrySet()) {
-            final BigDecimal taxable = entry.getValue()[0];
-            final BigDecimal vat = entry.getValue()[1];
-            final String rateLabel = vatRateToLabel(entry.getKey());
-            drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, y, "Imponibile " + rateLabel + ":");
-            drawRightAlignedText(cs, regular, FONT_SIZE_BODY, RIGHT_EDGE, y, formatAmount(taxable));
-            y -= LINE_HEIGHT;
-            drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, y, "IVA " + rateLabel + ":");
-            drawRightAlignedText(cs, regular, FONT_SIZE_BODY, RIGHT_EDGE, y, formatAmount(vat));
-            y -= LINE_HEIGHT;
-        }
-        if (!vatBreakdown.isEmpty()) {
-            drawHorizontalLine(cs, y);
-            y -= LINE_HEIGHT;
+        if (showVatBreakdown) {
+            final Map<BigDecimal, BigDecimal[]> vatBreakdown = computeVatBreakdown(charges);
+            for (final Map.Entry<BigDecimal, BigDecimal[]> entry : vatBreakdown.entrySet()) {
+                final BigDecimal taxable = entry.getValue()[0];
+                final BigDecimal vat = entry.getValue()[1];
+                final String rateLabel = vatRateToLabel(entry.getKey());
+                drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, y, "Imponibile " + rateLabel + ":");
+                drawRightAlignedText(cs, regular, FONT_SIZE_BODY, RIGHT_EDGE, y, formatAmount(taxable));
+                y -= LINE_HEIGHT;
+                drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, y, "IVA " + rateLabel + ":");
+                drawRightAlignedText(cs, regular, FONT_SIZE_BODY, RIGHT_EDGE, y, formatAmount(vat));
+                y -= LINE_HEIGHT;
+            }
+            if (!vatBreakdown.isEmpty()) {
+                drawHorizontalLine(cs, y);
+                y -= LINE_HEIGHT;
+            }
         }
         drawText(cs, bold, FONT_SIZE_SECTION, LABEL_X_RIGHT, y, "TOTALE:");
         drawRightAlignedText(cs, bold, FONT_SIZE_SECTION, RIGHT_EDGE, y, formatAmount(total));

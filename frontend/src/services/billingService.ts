@@ -1,5 +1,5 @@
 import api from './api';
-import type { InvoiceResponse, PaymentRequest, PaymentResponse } from '../types/billing.types';
+import type { DocumentType, InvoiceResponse, PaymentRequest, PaymentResponse } from '../types/billing.types';
 import type { SpringPage } from '../types/page.types';
 
 const BASE_PATH = '/api/v1/invoices';
@@ -19,6 +19,11 @@ export const billingService = {
   getAllInvoices: async (): Promise<InvoiceResponse[]> => {
     const response = await api.get<SpringPage<InvoiceResponse>>(BASE_PATH);
     return response.data.content;
+  },
+
+  updateDocumentType: async (invoiceId: string, documentType: DocumentType): Promise<InvoiceResponse> => {
+    const response = await api.patch<InvoiceResponse>(`${BASE_PATH}/${invoiceId}/document-type`, { documentType });
+    return response.data;
   },
 
   /**

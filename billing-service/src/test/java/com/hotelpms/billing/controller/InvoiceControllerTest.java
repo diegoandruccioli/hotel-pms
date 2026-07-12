@@ -4,9 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.hotelpms.billing.domain.ChargeType;
+import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
+import com.hotelpms.billing.dto.DocumentTypeRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.GlobalExceptionHandler;
@@ -37,6 +39,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -61,6 +64,8 @@ class InvoiceControllerTest {
     private static final String JSON_ID = "$.id";
 
     private static final String PATH_PDF = "/{id}/pdf";
+    private static final String PATH_DOCUMENT_TYPE = "/{id}/document-type";
+    private static final String INV_NUMBER = "INV-001";
 
     @Mock
     private InvoiceService invoiceService;
@@ -91,10 +96,10 @@ class InvoiceControllerTest {
                 .build();
 
         invoiceResponse = new InvoiceResponse(
-                INVOICE_ID, HOTEL_ID, "INV-001", null,
+                INVOICE_ID, HOTEL_ID, INV_NUMBER, null,
                 AMOUNT_100, InvoiceStatus.ISSUED,
                 RESERVATION_ID, GUEST_ID, null,
-                List.of(), List.of());
+                null, List.of(), List.of());
     }
 
     @Test
@@ -104,7 +109,7 @@ class InvoiceControllerTest {
         mockMvc.perform(get(BASE_URL + PATH_BY_ID, INVOICE_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_ID).value(INVOICE_ID.toString()))
-                .andExpect(jsonPath("$.invoiceNumber").value("INV-001"));
+                .andExpect(jsonPath("$.invoiceNumber").value(INV_NUMBER));
     }
 
     @Test
@@ -142,7 +147,7 @@ class InvoiceControllerTest {
                 INVOICE_ID, HOTEL_ID, "INV-002", null,
                 BigDecimal.ZERO, InvoiceStatus.ISSUED,
                 RESERVATION_ID, GUEST_ID, STAY_ID,
-                List.of(), List.of());
+                null, List.of(), List.of());
         when(invoiceService.createInvoiceForStay(any(StayInvoiceRequest.class))).thenReturn(stayInvoice);
 
         mockMvc.perform(post(BASE_URL + PATH_STAY)
@@ -173,6 +178,23 @@ class InvoiceControllerTest {
         mockMvc.perform(get(BASE_URL + PATH_PDF, INVOICE_ID)
                         .accept(MediaType.APPLICATION_PDF))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldUpdateDocumentTypeReturn200() throws Exception {
+        final DocumentTypeRequest request = new DocumentTypeRequest(DocumentType.RICEVUTA);
+        final InvoiceResponse updated = new InvoiceResponse(
+                INVOICE_ID, HOTEL_ID, INV_NUMBER, null,
+                AMOUNT_100, InvoiceStatus.ISSUED,
+                RESERVATION_ID, GUEST_ID, null,
+                DocumentType.RICEVUTA, List.of(), List.of());
+        when(invoiceService.updateDocumentType(eq(INVOICE_ID), eq(DocumentType.RICEVUTA))).thenReturn(updated);
+
+        mockMvc.perform(patch(BASE_URL + PATH_DOCUMENT_TYPE, INVOICE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documentType").value("RICEVUTA"));
     }
 
     @Test

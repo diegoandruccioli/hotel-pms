@@ -26,8 +26,8 @@ vi.mock('../../components/m3/M3Dialog', () => ({
 
 const INVOICE = {
   id: 'inv1', invoiceNumber: 'INV-001', issueDate: '2026-01-01T00:00:00',
-  totalAmount: 150, status: 'ISSUED' as const, reservationId: 'res1',
-  guestId: 'g1', stayId: 's1', payments: [], charges: [],
+  totalAmount: 150, status: 'ISSUED' as const, documentType: 'FATTURA' as const,
+  reservationId: 'res1', guestId: 'g1', stayId: 's1', payments: [], charges: [],
 };
 
 const PAYMENT_RESPONSE = {

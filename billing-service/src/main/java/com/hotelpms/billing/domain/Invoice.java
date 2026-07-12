@@ -77,6 +77,11 @@ public class Invoice {
     @Column(nullable = false)
     private InvoiceStatus status;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "document_type", nullable = false)
+    private DocumentType documentType = DocumentType.FATTURA;
+
     @Column(nullable = false)
     private UUID reservationId;
 

@@ -36,6 +36,7 @@ const ISSUED_INVOICE: InvoiceResponse = {
   issueDate: '2026-04-01T10:00:00',
   totalAmount: 150,
   status: 'ISSUED',
+  documentType: 'FATTURA',
   reservationId: 'res-1',
   guestId: 'guest-1',
   payments: [],

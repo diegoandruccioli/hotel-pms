@@ -1,6 +1,7 @@
 package com.hotelpms.billing.service.impl;
 
 import com.hotelpms.billing.domain.ChargeType;
+import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceCharge;
 import com.hotelpms.billing.domain.InvoiceSequence;
@@ -44,6 +45,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class InvoiceServiceImpl implements InvoiceService {
+
+    private static final String INVOICE_NOT_FOUND = "INVOICE_NOT_FOUND";
 
     private final InvoiceRepository invoiceRepository;
     private final InvoiceChargeRepository invoiceChargeRepository;
@@ -122,7 +125,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         log.info("Fetching invoice with id {}", id);
         final UUID hotelId = resolveHotelId();
         final Invoice invoice = invoiceRepository.findByIdAndHotelId(id, hotelId)
-                .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND"));
+                .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
         return invoiceMapper.toResponse(invoice);
     }
 
@@ -134,7 +137,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         final UUID hotelId = resolveHotelId();
         final Invoice invoice = invoiceRepository
                 .findFirstByReservationIdAndHotelIdOrderByIssueDateDesc(reservationId, hotelId)
-                .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND"));
+                .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
         return invoiceMapper.toResponse(invoice);
     }
 
@@ -163,6 +166,23 @@ public class InvoiceServiceImpl implements InvoiceService {
             throw new IllegalStateException("MISSING_HOTEL_CONTEXT");
         }
         return UUID.fromString(hotelIdStr);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public InvoiceResponse updateDocumentType(@NonNull final UUID invoiceId,
+                                               @NonNull final DocumentType documentType) {
+        log.info("Updating document type for invoice {} to {}", invoiceId, documentType);
+        final UUID hotelId = resolveHotelId();
+        final Invoice invoice = invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)
+                .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
+        if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
+            throw new InvoiceConflictException("CANNOT_UPDATE_CANCELLED_INVOICE");
+        }
+        invoice.setDocumentType(documentType);
+        final Invoice saved = invoiceRepository.save(Objects.requireNonNull(invoice));
+        return invoiceMapper.toResponse(Objects.requireNonNull(saved));
     }
 
     private static BigDecimal vatRateFor(final ChargeType type) {

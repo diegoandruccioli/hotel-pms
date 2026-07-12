@@ -78,10 +78,10 @@ describe('OwnerDashboard', () => {
     totalInvoices: 4,
     paidInvoices: 3,
     invoices: [
-      { id: 'i1', invoiceNumber: 'INV-1', issueDate: '2026-06-01', totalAmount: 100, status: 'PAID', reservationId: 'r1', guestId: 'g1', payments: [] },
-      { id: 'i2', invoiceNumber: 'INV-2', issueDate: '2026-06-02', totalAmount: 200, status: 'ISSUED', reservationId: 'r2', guestId: 'g2', payments: [] },
-      { id: 'i3', invoiceNumber: 'INV-3', issueDate: '2026-06-03', totalAmount: 50, status: 'CANCELLED', reservationId: 'r3', guestId: 'g3', payments: [] },
-      { id: 'i4', invoiceNumber: 'INV-4', issueDate: undefined as unknown as string, totalAmount: 884.5, status: 'DRAFT' as never, reservationId: 'r4', guestId: 'g4', payments: [] },
+      { id: 'i1', invoiceNumber: 'INV-1', issueDate: '2026-06-01', totalAmount: 100, status: 'PAID', documentType: 'FATTURA' as const, reservationId: 'r1', guestId: 'g1', payments: [] },
+      { id: 'i2', invoiceNumber: 'INV-2', issueDate: '2026-06-02', totalAmount: 200, status: 'ISSUED', documentType: 'FATTURA' as const, reservationId: 'r2', guestId: 'g2', payments: [] },
+      { id: 'i3', invoiceNumber: 'INV-3', issueDate: '2026-06-03', totalAmount: 50, status: 'CANCELLED', documentType: 'FATTURA' as const, reservationId: 'r3', guestId: 'g3', payments: [] },
+      { id: 'i4', invoiceNumber: 'INV-4', issueDate: undefined as unknown as string, totalAmount: 884.5, status: 'DRAFT' as never, documentType: 'FATTURA' as const, reservationId: 'r4', guestId: 'g4', payments: [] },
     ],
   };
 

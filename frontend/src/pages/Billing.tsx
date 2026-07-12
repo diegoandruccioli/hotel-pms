@@ -147,6 +147,10 @@ export const Billing = memo(() => {
   const handleOpenPayment = useCallback((inv: InvoiceResponse) => setPaymentTarget(inv), []);
   const handleCloseDetail  = useCallback(() => setDetailTarget(null), []);
   const handleClosePayment = useCallback(() => setPaymentTarget(null), []);
+  const handleInvoiceUpdated = useCallback((updated: InvoiceResponse) => {
+    setInvoices((prev) => prev.map((inv) => (inv.id === updated.id ? updated : inv)));
+    setDetailTarget(updated);
+  }, []);
 
   const formatCurrency = useCallback(
     (amount: number) =>
@@ -258,6 +262,7 @@ export const Billing = memo(() => {
         <InvoiceDetailModal
           invoice={detailTarget}
           onClose={handleCloseDetail}
+          onUpdated={handleInvoiceUpdated}
         />
       )}
     </div>

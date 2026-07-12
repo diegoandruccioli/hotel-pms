@@ -1,4 +1,5 @@
 export type InvoiceStatus = 'ISSUED' | 'PAID' | 'CANCELLED';
+export type DocumentType = 'FATTURA' | 'RICEVUTA';
 
 export type PaymentMethod =
   | 'CASH'
@@ -38,6 +39,7 @@ export interface InvoiceResponse {
   issueDate: string;
   totalAmount: number;
   status: InvoiceStatus;
+  documentType: DocumentType;
   reservationId: string;
   guestId: string;
   stayId?: string;

@@ -2,6 +2,7 @@ package com.hotelpms.billing.controller;
 
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
+import com.hotelpms.billing.dto.DocumentTypeRequest;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
@@ -23,6 +24,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -173,6 +175,23 @@ public class InvoiceController {
         return ResponseEntity.ok()
                 .headers(h -> h.setContentDisposition(disposition))
                 .body(pdf);
+    }
+
+    /**
+     * Switches an invoice between fiscal (FATTURA) and non-fiscal (RICEVUTA) document type.
+     * Returns 409 if the invoice is CANCELLED.
+     *
+     * @param id      the invoice UUID
+     * @param request the new document type
+     * @return the updated invoice response
+     */
+    @PatchMapping("/{id}/document-type")
+    public ResponseEntity<InvoiceResponse> updateDocumentType(
+            @NonNull @PathVariable final UUID id,
+            @NonNull @Valid @RequestBody final DocumentTypeRequest request) {
+        log.info("REST request to set document type {} on invoice {}", request.documentType(), id);
+        final InvoiceResponse response = invoiceService.updateDocumentType(id, request.documentType());
+        return ResponseEntity.ok(response);
     }
 
     private UUID extractHotelId() {
