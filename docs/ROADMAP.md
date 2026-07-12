@@ -66,8 +66,8 @@ Feature necessarie per la vendibilità del prodotto.
 | # | Implementazione | Priorità | Effort | Impatto |
 |---|---|---|---|---|
 | C1 | Email/SMS conferme prenotazione (notification-service) | 🔴 Critica | 1-2 sett | Standard minimo assoluto — senza non vendibile |
-| C2 | Numerazione fattura sequenziale certificata | 🔴 Critica | 4h + Flyway | `generateInvoiceNumber()` usa UUID random (`INV-XXXXXXXX`) — non valido D.P.R. 633/72 |
-| C3 | IVA disaggregata nella fattura PDF | 🔴 Alta | 2-4h | PDF attuale non valido per nota spese B2B |
+| C2 | ~~Numerazione fattura sequenziale certificata~~ | ✅ **Fatto** | — | `InvoiceSequence` + lock pessimistico PESSIMISTIC_WRITE; formato `YYYY/NNNN` per hotel+anno; Flyway V5; constraint unico su (hotel_id, invoice_number) |
+| C3 | ~~IVA disaggregata nella fattura PDF~~ | ✅ **Fatto** | — | `computeVatBreakdown` raggruppa charges per aliquota; PDF mostra righe `Imponibile X%` + `IVA X%` solo per FATTURA; Flyway V6 aggiunge `vat_rate` su `invoice_charges` |
 | C4 | Report KPI avanzati (RevPAR, ADR, GOPPAR, Occupancy) | 🟡 Alta | 1-2 sett | Dashboard ha KPI operativi base (arrivi/partenze/camere) — mancano RevPAR/ADR/GOPPAR |
 | C5 | Mobile PWA (responsive ottimizzato) | 🟡 Alta | 2-4 sett | 70% già fatto — housekeeping e front desk usano telefono |
 | C6 | Wizard onboarding primo avvio | 🟡 Media | 1 sett | Sequenza configurazione non guidata — rischio errori setup |

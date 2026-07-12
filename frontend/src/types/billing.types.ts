@@ -9,14 +9,17 @@ export type PaymentMethod =
   | 'BANK_TRANSFER'
   | 'CHECK';
 
-export type ChargeType = 'FB_ORDER' | 'ROOM_SERVICE' | 'OTHER';
+export type ChargeType = 'FB_ORDER' | 'ROOM_NIGHT' | 'EXTRA';
 
 export interface ChargeResponse {
   id: string;
+  invoiceId: string;
   type: ChargeType;
   description?: string;
   amount: number;
+  vatRate?: number;
   referenceId?: string;
+  createdAt?: string;
 }
 
 export interface PaymentRequest {

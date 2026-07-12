@@ -30,8 +30,8 @@ const methodIcon: Record<PaymentMethod, string> = {
 
 const chargeTypeIcon: Record<ChargeType, string> = {
   FB_ORDER: 'restaurant',
-  ROOM_SERVICE: 'room_service',
-  OTHER: 'add_circle',
+  ROOM_NIGHT: 'bed',
+  EXTRA: 'add_circle',
 };
 
 const sdiStatusTone = (s: SdiStatus) => {
