@@ -17,9 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -42,7 +40,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>{@code @DataJpaTest} loads only JPA/Flyway/transaction infrastructure — no Feign,
  * no Security filter chain, no Redis — so no mocks are needed for those concerns.
- * Flyway applies all V1–V9 migrations at context startup; each test rolls back
+ * {@code BillingApplication}'s {@code @EnableJpaAuditing} is processed by the slice
+ * bootstrapper, so {@code Invoice}'s {@code @CreatedDate}/{@code @LastModifiedDate} fields
+ * are populated. Flyway applies all migrations at context startup; each test rolls back
  * via the implicit {@code @Transactional} provided by {@code @DataJpaTest}.
  */
 @DataJpaTest
@@ -54,7 +54,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         "spring.flyway.enabled=true"
 })
 @Import({
-        InvoiceServiceIntegrationTest.AuditingTestConfig.class,
         InvoiceServiceImpl.class,
         InvoiceMapperImpl.class,
         InvoiceChargeMapperImpl.class,
@@ -155,13 +154,4 @@ class InvoiceServiceIntegrationTest {
         assertEquals(4, suffix.length(), "Suffix must be exactly 4 digits (zero-padded)");
     }
 
-    /**
-     * Enables JPA auditing for the test slice context.
-     * {@code BillingApplication} carries {@code @EnableJpaAuditing} in production;
-     * {@code @DataJpaTest} does not load the main class, so this config restores it.
-     */
-    @TestConfiguration
-    @EnableJpaAuditing
-    static class AuditingTestConfig {
-    }
 }
