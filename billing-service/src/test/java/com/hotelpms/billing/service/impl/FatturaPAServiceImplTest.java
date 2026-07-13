@@ -20,6 +20,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.lang.NonNull;
+
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -37,10 +39,10 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class FatturaPAServiceImplTest {
 
-    private static final UUID INVOICE_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
-    private static final UUID HOTEL_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
-    private static final UUID GUEST_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
-    private static final UUID RES_ID = UUID.fromString("00000000-0000-0000-0000-000000000004");
+    @NonNull private static final UUID INVOICE_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    @NonNull private static final UUID HOTEL_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    @NonNull private static final UUID GUEST_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
+    @NonNull private static final UUID RES_ID = UUID.fromString("00000000-0000-0000-0000-000000000004");
     private static final int ISSUE_YEAR = 2026;
     private static final int ISSUE_DAY = 15;
 
