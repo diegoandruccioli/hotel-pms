@@ -35,6 +35,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
         properties = {
                 "spring.cloud.config.enabled=false",
                 "spring.config.import=optional:configserver:",
+                "CONFIG_SERVER_PASSWORD=ci-test-placeholder-only",
+                "INTERNAL_HMAC_SECRET=test-integration-secret-only",
                 "internal.hmac.secret=test-integration-secret-only",
                 "management.tracing.enabled=false",
                 "spring.jpa.hibernate.ddl-auto=validate",
