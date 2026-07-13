@@ -44,7 +44,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 )
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional
-@SuppressWarnings("null")
 class RoomTypeServiceIntegrationTest {
 
     @Container

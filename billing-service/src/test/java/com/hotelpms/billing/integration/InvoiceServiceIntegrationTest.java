@@ -59,7 +59,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         InvoiceChargeMapperImpl.class,
         PaymentMapperImpl.class
 })
-@SuppressWarnings("null")
 class InvoiceServiceIntegrationTest {
 
     @Container
