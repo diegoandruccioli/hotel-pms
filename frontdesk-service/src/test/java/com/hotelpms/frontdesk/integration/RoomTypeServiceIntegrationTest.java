@@ -5,6 +5,8 @@ import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.rooms.dto.RoomTypeRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomTypeResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomTypeService;
+import com.hotelpms.frontdesk.stays.security.AlloggiatiCredentialEncryptor;
+import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,11 +40,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
                 "CONFIG_SERVER_PASSWORD=ci-test-placeholder-only",
                 "INTERNAL_HMAC_SECRET=test-integration-secret-only",
                 "internal.hmac.secret=test-integration-secret-only",
-                "alloggiati.web.username=ci-test",
-                "alloggiati.web.password=ci-test",
-                "alloggiati.web.ws-key=ci-test",
-                "alloggiati.credentials.encryption-key=ci-test-key",
-                "alloggiati.credentials.encryption-salt=deadbeefdeadbeefdeadbeefdeadbeef",
                 "management.tracing.enabled=false",
                 "spring.jpa.hibernate.ddl-auto=validate",
                 "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect",
@@ -76,6 +73,12 @@ class RoomTypeServiceIntegrationTest {
 
     @MockitoBean
     private BillingClient billingClient;
+
+    @MockitoBean
+    private AlloggiatiWebSenderService alloggiatiWebSenderService;
+
+    @MockitoBean
+    private AlloggiatiCredentialEncryptor alloggiatiCredentialEncryptor;
 
     @Autowired
     private RoomTypeService roomTypeService;
