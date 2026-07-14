@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
                 "INTERNAL_HMAC_SECRET=test-integration-secret-only",
                 "internal.hmac.secret=test-integration-secret-only",
                 "management.tracing.enabled=false",
+                "management.health.redis.enabled=false",
                 "spring.jpa.hibernate.ddl-auto=validate",
                 "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect",
                 "spring.cache.type=none"
