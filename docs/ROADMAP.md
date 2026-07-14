@@ -1,13 +1,13 @@
 # Roadmap — Hotel PMS
 
-**Versione:** 1.1 — 2026-06-13  
+**Versione:** 1.2 — 2026-07-14  
 **Branch:** `main`
 
 Questo documento raccoglie le implementazioni future pianificate,
 organizzate per priorità e orizzonte temporale. Lo stato attuale
-del sistema è **Pilot-ready → Pre-production** su installazione
+del sistema è **Production-ready** su installazione
 mono-hotel Docker Compose. La roadmap descrive il percorso verso
-**Production-ready** e poi verso **Enterprise SaaS**.
+**Enterprise SaaS**.
 
 ---
 
@@ -15,14 +15,14 @@ mono-hotel Docker Compose. La roadmap descrive il percorso verso
 
 | Dimensione | Livello | Note |
 |---|---|---|
-| Sicurezza | 8.5/10 | Argon2id, HMAC, RBAC doppio livello, GDPR |
-| Affidabilità | 8.0/10 | Circuit breaker, saga checkIn, @Version Invoice ✅ — manca solo backup DB |
-| Osservabilità | 7.5/10 | Zipkin + Prometheus + Loki — mancano alert rule |
-| Scalabilità | 7.0/10 | Microservizi corretti, GIN pg_trgm ✅, consolidamento frontdesk completato (9→7 servizi dominio, ADR-001) — SimpleDiscovery statico |
-| Qualità codice | 8.0/10 | 344/344 test, PMD zero — Testcontainers mancanti |
-| Operabilità | 6.5/10 | Docker Compose mono-host, restart:unless-stopped ✅ — no K8s, no backup |
-| Conformità normativa | 9.0/10 | Alloggiati SOAP nativo, GDPR — no SDI/fattura B2B |
-| UX e funzionalità | 7.5/10 | Flussi core completi, room-status grid dashboard ✅ — no mobile, no email |
+| Sicurezza | 9.0/10 | Argon2id, HMAC anti-replay nonce+timestamp (E7bis ✅), RBAC doppio livello, GDPR, CodeQL extended (P13 ✅) — gap residui: 2FA (E9), rate limiting per-utente (E14) |
+| Affidabilità | 8.5/10 | Circuit breaker, saga checkIn, `@Version` Invoice, backup pg_dump 24h retain 14gg (P3 ✅) — no K8s HA (SPOF singolo host) |
+| Osservabilità | 8.5/10 | Zipkin + Prometheus + Loki + Alertmanager con 6 alert rule (P4 ✅) + Runbook (P5 ✅) — Zipkin → Tempo rimane C9 opzionale |
+| Scalabilità | 7.0/10 | 7 servizi, GIN pg_trgm, frontdesk consolidato (ADR-001 ✅), Dependabot (P9 ✅) — SimpleDiscovery statico, no K8s (E5) |
+| Qualità codice | 9.0/10 | PMD zero, Testcontainers billing+frontdesk (P7 ✅), coverage gate 90/80/88/92% (P15 ✅), Zod validation (P11 ✅), SRP refactor (P10 ✅) |
+| Operabilità | 7.5/10 | Docker Compose prod hardening (P0 ✅), backup automatizzato (P3 ✅), alert+runbook (P4/P5 ✅), branch protection+CodeQL (P12/P13 ✅) — no K8s, no secrets manager |
+| Conformità normativa | 9.5/10 | Alloggiati SOAP nativo, GDPR, numerazione fattura YYYY/NNNN (C2 ✅), IVA disaggregata (C3 ✅), dati fiscali ospite (E12 parz. ✅), generazione XML FatturaPA FPR12+SDI tracking (E3 parz. ✅) — accreditamento SDI e audit log immutabile (E13) ancora aperti |
+| UX e funzionalità | 8.0/10 | Flussi core completi (prenotazione→check-in→F&B→fattura→checkout), dashboard KPI+room-grid, sort/filter, WCAG 2.2 AA, settings multi-pagina, verticale billing (C2/C3/FatturaPA) — no mobile, no email (C1 blocca vendibilità) |
 
 **Punto di forza unico rispetto ai competitor:**
 Implementazione Alloggiati PS nativa (SOAP, DRY_RUN, auto-send,
