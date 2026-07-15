@@ -20,6 +20,14 @@ import java.util.UUID;
  * @param alloggiatiCredentialsConfigured whether this hotel has its own Alloggiati Web
  *                                        credentials (username + password + WsKey all set),
  *                                        as opposed to falling back to the global ones
+ * @param sendReservationConfirmedEmail   whether the guest is emailed when a reservation is created
+ * @param sendCheckoutEmail               whether the guest is emailed a stay summary at check-out
+ * @param emailSubjectReservationConfirmed custom subject line for the reservation-confirmed
+ *                                        email, or {@code null} if using the default
+ * @param emailSubjectCheckout            custom subject line for the checkout email,
+ *                                        or {@code null} if using the default
+ * @param emailGreetingText               greeting/signature line appended to every
+ *                                        transactional email footer, or {@code null} if unset
  */
 public record HotelSettingsResponse(
         UUID hotelId,
@@ -30,5 +38,10 @@ public record HotelSettingsResponse(
         String fiscalCode,
         String logoUrl,
         String alloggiatiUsername,
-        boolean alloggiatiCredentialsConfigured) {
+        boolean alloggiatiCredentialsConfigured,
+        boolean sendReservationConfirmedEmail,
+        boolean sendCheckoutEmail,
+        String emailSubjectReservationConfirmed,
+        String emailSubjectCheckout,
+        String emailGreetingText) {
 }

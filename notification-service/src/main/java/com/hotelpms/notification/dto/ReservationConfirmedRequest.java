@@ -19,6 +19,9 @@ import java.time.LocalDate;
  * @param nights        number of nights
  * @param reservationId the reservation UUID as string (for reference in the email)
  * @param locale        BCP-47 language tag used to select the template ("it" or "en")
+ * @param customSubject optional per-hotel subject override; blank/null uses the default
+ * @param greetingText  optional per-hotel greeting/signature line for the email footer
+ * @param logoUrl       optional per-hotel logo image URL rendered in the email header
  */
 public record ReservationConfirmedRequest(
         @NotBlank @Email String guestEmail,
@@ -29,5 +32,8 @@ public record ReservationConfirmedRequest(
         @NotNull LocalDate checkOutDate,
         @Positive int nights,
         String reservationId,
-        String locale) {
+        String locale,
+        String customSubject,
+        String greetingText,
+        String logoUrl) {
 }

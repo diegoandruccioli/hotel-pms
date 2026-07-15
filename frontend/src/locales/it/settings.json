@@ -30,5 +30,16 @@
 
   "settings_section_system": "Sistema",
   "alloggiati_auto_send_label": "Invio automatico alloggiati",
-  "alloggiati_auto_send_desc": "Invia automaticamente il report alloggiati al portale della Polizia di Stato ad ogni check-in"
+  "alloggiati_auto_send_desc": "Invia automaticamente il report alloggiati al portale della Polizia di Stato ad ogni check-in",
+
+  "settings_section_email_notifications": "Notifiche email",
+  "email_reservation_confirmed_label": "Email conferma prenotazione",
+  "email_reservation_confirmed_desc": "Invia un'email all'ospite quando viene creata una prenotazione",
+  "email_checkout_label": "Email riepilogo check-out",
+  "email_checkout_desc": "Invia un'email all'ospite con riepilogo soggiorno e fattura al check-out",
+  "email_subject_label": "Oggetto personalizzato",
+  "email_subject_placeholder": "Lascia vuoto per usare l'oggetto predefinito",
+  "email_greeting_label": "Testo di saluto/firma",
+  "email_greeting_desc": "Aggiunto in fondo a ogni email inviata agli ospiti (es. \"Vi aspettiamo, il team di Hotel Bella Vista\")",
+  "email_greeting_placeholder": "Es. Vi aspettiamo, il team di Hotel Bella Vista"
 }

@@ -46,6 +46,8 @@ class NotificationServiceImplTest {
     private static final String LOCALE_EN = "en";
     private static final String ROOM_GENERIC = "Room";
     private static final String CURRENCY_EUR = "EUR";
+    private static final String ROOM_NUMBER_101 = "101";
+    private static final String SUBJECT_READ_ERROR = "Could not read subject";
 
     @Mock
     private JavaMailSender mailSender;
@@ -68,7 +70,8 @@ class NotificationServiceImplTest {
     void sendReservationConfirmedCallsCorrectTemplate() {
         final ReservationConfirmedRequest req = new ReservationConfirmedRequest(
                 GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, "Superior Room",
-                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 5), 4, "RES-001", LOCALE_IT);
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 5), 4, "RES-001", LOCALE_IT,
+                null, null, null);
 
         service.sendReservationConfirmed(req);
 
@@ -80,7 +83,8 @@ class NotificationServiceImplTest {
     void sendReservationConfirmedEnglishLocaleUsesEnTemplate() {
         final ReservationConfirmedRequest req = new ReservationConfirmedRequest(
                 GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, "Deluxe Room",
-                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 3), 2, "RES-002", LOCALE_EN);
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 3), 2, "RES-002", LOCALE_EN,
+                null, null, null);
 
         service.sendReservationConfirmed(req);
 
@@ -90,7 +94,7 @@ class NotificationServiceImplTest {
     @Test
     void sendCheckinCallsCorrectTemplate() {
         final CheckinNotificationRequest req = new CheckinNotificationRequest(
-                GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, "101",
+                GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, ROOM_NUMBER_101,
                 LocalDate.of(2026, 8, 5), LOCALE_IT);
 
         service.sendCheckin(req);
@@ -102,11 +106,12 @@ class NotificationServiceImplTest {
     @Test
     void sendCheckoutCallsCorrectTemplate() {
         final CheckoutNotificationRequest req = new CheckoutNotificationRequest(
-                GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, "101",
+                GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, ROOM_NUMBER_101,
                 LocalDateTime.of(2026, 8, 1, 14, 0),
                 LocalDateTime.of(2026, 8, 5, 11, 0),
                 List.of(new InvoiceLineItemDto("Room charge", BigDecimal.valueOf(400))),
-                BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT);
+                BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT,
+                null, null, null);
 
         service.sendCheckout(req);
 
@@ -120,7 +125,8 @@ class NotificationServiceImplTest {
                 GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, "202",
                 LocalDateTime.of(2026, 8, 1, 14, 0),
                 LocalDateTime.of(2026, 8, 5, 11, 0),
-                List.of(), BigDecimal.valueOf(200), CURRENCY_EUR, LOCALE_EN);
+                List.of(), BigDecimal.valueOf(200), CURRENCY_EUR, LOCALE_EN,
+                null, null, null);
 
         service.sendCheckout(req);
 
@@ -131,7 +137,8 @@ class NotificationServiceImplTest {
     void unknownLocaleFallsBackToItalianTemplate() {
         final ReservationConfirmedRequest req = new ReservationConfirmedRequest(
                 GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, ROOM_GENERIC,
-                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), 2, "RES-003", "fr");
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), 2, "RES-003", "fr",
+                null, null, null);
 
         service.sendReservationConfirmed(req);
 
@@ -145,7 +152,8 @@ class NotificationServiceImplTest {
 
         final ReservationConfirmedRequest req = new ReservationConfirmedRequest(
                 GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, ROOM_GENERIC,
-                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), 2, "RES-004", LOCALE_IT);
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 3), 2, "RES-004", LOCALE_IT,
+                null, null, null);
 
         assertThrows(org.springframework.mail.MailSendException.class,
                 () -> service.sendReservationConfirmed(req));
@@ -156,7 +164,8 @@ class NotificationServiceImplTest {
         final ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
         final ReservationConfirmedRequest req = new ReservationConfirmedRequest(
                 GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, ROOM_GENERIC,
-                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 4), 3, "RES-005", LOCALE_EN);
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 4), 3, "RES-005", LOCALE_EN,
+                null, null, null);
 
         service.sendReservationConfirmed(req);
 
@@ -166,7 +175,48 @@ class NotificationServiceImplTest {
             assertTrue(sent.getSubject().contains(HOTEL_NAME),
                     "Subject should contain hotel name but was: " + sent.getSubject());
         } catch (final jakarta.mail.MessagingException e) {
-            throw new AssertionError("Could not read subject", e);
+            throw new AssertionError(SUBJECT_READ_ERROR, e);
+        }
+    }
+
+    @Test
+    void sendReservationConfirmedCustomSubjectOverridesDefault() {
+        final ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        final ReservationConfirmedRequest req = new ReservationConfirmedRequest(
+                GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, ROOM_GENERIC,
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 4), 3, "RES-006", LOCALE_IT,
+                "Il tuo soggiorno ti aspetta!", null, null);
+
+        service.sendReservationConfirmed(req);
+
+        verify(mailSender).send(captor.capture());
+        final MimeMessage sent = captor.getValue();
+        try {
+            org.junit.jupiter.api.Assertions.assertEquals("Il tuo soggiorno ti aspetta!", sent.getSubject());
+        } catch (final jakarta.mail.MessagingException e) {
+            throw new AssertionError(SUBJECT_READ_ERROR, e);
+        }
+    }
+
+    @Test
+    void sendCheckoutBlankCustomSubjectFallsBackToDefault() {
+        final ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        final CheckoutNotificationRequest req = new CheckoutNotificationRequest(
+                GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, ROOM_NUMBER_101,
+                LocalDateTime.of(2026, 8, 1, 14, 0),
+                LocalDateTime.of(2026, 8, 5, 11, 0),
+                List.of(), BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT,
+                "   ", null, null);
+
+        service.sendCheckout(req);
+
+        verify(mailSender).send(captor.capture());
+        final MimeMessage sent = captor.getValue();
+        try {
+            assertTrue(sent.getSubject().startsWith("Riepilogo soggiorno e fattura"),
+                    "Blank custom subject should fall back to default but was: " + sent.getSubject());
+        } catch (final jakarta.mail.MessagingException e) {
+            throw new AssertionError(SUBJECT_READ_ERROR, e);
         }
     }
 }

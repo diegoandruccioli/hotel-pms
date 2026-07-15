@@ -62,7 +62,7 @@ public class NotificationServiceImpl implements NotificationService {
         ctx.setVariable(TEMPLATE_VAR_REQUEST, request);
         final String html = templateEngine.process(template, ctx);
         final String subject = buildSubject("Conferma prenotazione", "Booking confirmation", request.locale(),
-                request.hotelName());
+                request.hotelName(), request.customSubject());
         sendHtmlEmail(request.guestEmail(), subject, html);
         log.info("[NOTIFY] reservation-confirmed sent | to={}", EmailMasker.mask(request.guestEmail()));
     }
@@ -75,7 +75,7 @@ public class NotificationServiceImpl implements NotificationService {
         ctx.setVariable(TEMPLATE_VAR_REQUEST, request);
         final String html = templateEngine.process(template, ctx);
         final String subject = buildSubject("Benvenuto al check-in", "Welcome — Check-in confirmed",
-                request.locale(), request.hotelName());
+                request.locale(), request.hotelName(), null);
         sendHtmlEmail(request.guestEmail(), subject, html);
         log.info("[NOTIFY] checkin sent | to={}", EmailMasker.mask(request.guestEmail()));
     }
@@ -88,7 +88,7 @@ public class NotificationServiceImpl implements NotificationService {
         ctx.setVariable(TEMPLATE_VAR_REQUEST, request);
         final String html = templateEngine.process(template, ctx);
         final String subject = buildSubject("Riepilogo soggiorno e fattura", "Stay summary and invoice",
-                request.locale(), request.hotelName());
+                request.locale(), request.hotelName(), request.customSubject());
         sendHtmlEmail(request.guestEmail(), subject, html);
         log.info("[NOTIFY] checkout sent | to={}", EmailMasker.mask(request.guestEmail()));
     }
@@ -125,16 +125,21 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     /**
-     * Builds the email subject line with optional hotel name suffix.
+     * Builds the email subject line, preferring a per-hotel custom subject when set,
+     * otherwise falling back to the default IT/EN subject with an optional hotel name suffix.
      *
-     * @param italian   Italian subject
-     * @param english   English subject
-     * @param locale    requested locale
-     * @param hotelName hotel name to append (may be null)
+     * @param italian       Italian default subject
+     * @param english       English default subject
+     * @param locale        requested locale
+     * @param hotelName     hotel name to append to the default subject (may be null)
+     * @param customSubject per-hotel subject override; used verbatim when non-blank
      * @return the full subject string
      */
     private static String buildSubject(final String italian, final String english,
-            final String locale, final String hotelName) {
+            final String locale, final String hotelName, final String customSubject) {
+        if (customSubject != null && !customSubject.isBlank()) {
+            return customSubject.trim();
+        }
         final String base = ENGLISH_LOCALE.equals(locale) ? english : italian;
         return (hotelName != null && !hotelName.isBlank()) ? base + " — " + hotelName : base;
     }

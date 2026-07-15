@@ -76,6 +76,7 @@ class ReservationServiceImplTest {
     private static final String GUEST_LAST_NAME = "Guest";
     private static final String GUEST_EMAIL = "test@example.com";
     private static final String FULL_NAME = "Test Guest";
+    private static final String HOTEL_NAME_TEST = "Hotel Test";
 
     @Mock
     private ReservationRepository reservationRepository;
@@ -168,7 +169,8 @@ class ReservationServiceImplTest {
         when(reservationRepository.save(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
-                new HotelSettingsResponse(HOTEL_ID, false, "Hotel Test", null, null, null, null, null, false));
+                new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null));
 
         final ReservationResponse result = reservationService.createReservation(request);
 
@@ -177,6 +179,26 @@ class ReservationServiceImplTest {
         verify(guestClient, times(1)).getGuestById(GUEST_ID);
         verify(roomService, times(1)).getRoomById(roomId, HOTEL_ID);
         verify(reservationRepository, times(1)).save(entity);
+        verify(notificationClient, times(1)).sendReservationConfirmed(any());
+    }
+
+    @Test
+    void testCreateReservationSkipsEmailWhenDisabledByHotelSettings() {
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(reservationMapper.toEntity(request)).thenReturn(entity);
+        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationMapper.toResponse(entity)).thenReturn(response);
+        when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
+                new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        false, true, null, null, null));
+
+        final ReservationResponse result = reservationService.createReservation(request);
+
+        assertNotNull(result);
+        verify(notificationClient, never()).sendReservationConfirmed(any());
     }
 
     @Test
@@ -201,7 +223,8 @@ class ReservationServiceImplTest {
                 .thenReturn(entityWithNullStatus);
         when(reservationMapper.toResponse(entityWithNullStatus)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
-                new HotelSettingsResponse(HOTEL_ID, false, "Hotel Test", null, null, null, null, null, false));
+                new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null));
 
         reservationService.createReservation(requestWithNullStatus);
 

@@ -454,8 +454,11 @@ public class StayServiceImpl implements StayService {
 
     private void sendCheckoutEmailIfPossible(final Stay stay, final InvoiceStatusResponse invoice) {
         try {
+            final HotelSettingsResponse settings = hotelSettingsService.getOrCreate(stay.getHotelId());
+            if (!settings.sendCheckoutEmail()) {
+                return;
+            }
             final GuestResponse guest = guestClient.getGuestById(stay.getGuestId());
-            final String hotelName = hotelSettingsService.getOrCreate(stay.getHotelId()).hotelName();
             final List<NotificationChargeLineDto> lines;
             final String currency;
             if (invoice.id() != null) {
@@ -473,14 +476,17 @@ public class StayServiceImpl implements StayService {
             notificationClient.sendCheckout(new NotificationCheckoutRequest(
                     guest.email(),
                     guest.firstName() + " " + guest.lastName(),
-                    hotelName,
+                    settings.hotelName(),
                     stay.getRoomNumber(),
                     stay.getActualCheckInTime(),
                     stay.getActualCheckOutTime(),
                     lines,
                     invoice.totalAmount(),
                     currency,
-                    "it"));
+                    "it",
+                    settings.emailSubjectCheckout(),
+                    settings.emailGreetingText(),
+                    settings.logoUrl()));
         } catch (final feign.FeignException | DataAccessException ex) {
             log.warn("[STAY] CHECKOUT_EMAIL_SKIPPED | stayId={} | reason={}", stay.getId(), ex.getMessage());
         }

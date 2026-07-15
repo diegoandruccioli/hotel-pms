@@ -33,6 +33,8 @@ public class HotelSettings {
     private static final int LEN_FISCAL = 20;
     private static final int LEN_LOGO_URL = 500;
     private static final int LEN_ALLOGGIATI_USERNAME = 100;
+    private static final int LEN_EMAIL_SUBJECT = 200;
+    private static final int LEN_EMAIL_GREETING = 300;
 
     /** The hotel this settings row belongs to (primary key). */
     @Id
@@ -88,6 +90,43 @@ public class HotelSettings {
      */
     @Column(name = "alloggiati_ws_key_encrypted")
     private String alloggiatiWsKeyEncrypted;
+
+    /**
+     * When {@code true} (default), a confirmation email is sent to the guest when a
+     * reservation is created.
+     */
+    @Column(name = "send_reservation_confirmed_email", nullable = false)
+    @Builder.Default
+    private boolean sendReservationConfirmedEmail = true;
+
+    /**
+     * When {@code true} (default), a stay-summary email with invoice detail is sent
+     * to the guest at check-out.
+     */
+    @Column(name = "send_checkout_email", nullable = false)
+    @Builder.Default
+    private boolean sendCheckoutEmail = true;
+
+    /**
+     * Optional per-hotel override of the reservation-confirmed email subject line.
+     * When blank/null, notification-service falls back to its default IT/EN subject.
+     */
+    @Column(name = "email_subject_reservation_confirmed", length = LEN_EMAIL_SUBJECT)
+    private String emailSubjectReservationConfirmed;
+
+    /**
+     * Optional per-hotel override of the checkout email subject line.
+     * When blank/null, notification-service falls back to its default IT/EN subject.
+     */
+    @Column(name = "email_subject_checkout", length = LEN_EMAIL_SUBJECT)
+    private String emailSubjectCheckout;
+
+    /**
+     * Optional per-hotel greeting/signature line appended to the footer of every
+     * transactional email (e.g. "Vi aspettiamo, il team di Hotel Bella Vista").
+     */
+    @Column(name = "email_greeting_text", length = LEN_EMAIL_GREETING)
+    private String emailGreetingText;
 
     /** The timestamp when the record was created. */
     @CreatedDate

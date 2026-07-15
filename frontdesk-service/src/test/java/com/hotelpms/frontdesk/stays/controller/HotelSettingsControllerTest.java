@@ -76,7 +76,8 @@ class HotelSettingsControllerTest {
                 .build();
 
         settingsResponse = new HotelSettingsResponse(
-                hotelId, false, HOTEL_NAME, HOTEL_ADDRESS, null, null, null, null, false);
+                hotelId, false, HOTEL_NAME, HOTEL_ADDRESS, null, null, null, null, false,
+                true, true, null, null, null);
     }
 
     @AfterEach
@@ -96,9 +97,11 @@ class HotelSettingsControllerTest {
     @Test
     void shouldUpdateSettingsReturn200() throws Exception {
         final HotelSettingsRequest request = new HotelSettingsRequest(
-                true, HOTEL_NAME, HOTEL_ADDRESS, null, null, null, null, null, null);
+                true, HOTEL_NAME, HOTEL_ADDRESS, null, null, null, null, null, null,
+                null, null, null, null, null);
         final HotelSettingsResponse updated = new HotelSettingsResponse(
-                hotelId, true, HOTEL_NAME, HOTEL_ADDRESS, null, null, null, null, false);
+                hotelId, true, HOTEL_NAME, HOTEL_ADDRESS, null, null, null, null, false,
+                true, true, null, null, null);
         when(hotelSettingsService.update(eq(hotelId), any(HotelSettingsRequest.class)))
                 .thenReturn(updated);
 
@@ -113,7 +116,8 @@ class HotelSettingsControllerTest {
     @Test
     void shouldUpdateSettingsReturn200WithAutoSendFalse() throws Exception {
         final HotelSettingsRequest request = new HotelSettingsRequest(
-                false, HOTEL_NAME, null, null, null, null, null, null, null);
+                false, HOTEL_NAME, null, null, null, null, null, null, null,
+                null, null, null, null, null);
         when(hotelSettingsService.update(eq(hotelId), any(HotelSettingsRequest.class)))
                 .thenReturn(settingsResponse);
 

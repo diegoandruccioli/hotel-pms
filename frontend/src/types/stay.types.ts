@@ -119,7 +119,8 @@ export interface AlloggiatiFailureSummaryResponse {
 }
 
 export interface HotelSettingsRequest {
-  alloggiatiAutoSend: boolean;
+  /** Undefined = leave unchanged (partial-patch semantics on every field here). */
+  alloggiatiAutoSend?: boolean;
   hotelName?: string;
   address?: string;
   vatNumber?: string;
@@ -130,6 +131,16 @@ export interface HotelSettingsRequest {
   alloggiatiPassword?: string;
   /** Write-only: blank/undefined leaves the currently stored WsKey unchanged. */
   alloggiatiWsKey?: string;
+  /** Undefined = leave unchanged. Whether the guest is emailed on reservation creation. */
+  sendReservationConfirmedEmail?: boolean;
+  /** Undefined = leave unchanged. Whether the guest is emailed a summary at check-out. */
+  sendCheckoutEmail?: boolean;
+  /** Custom subject line for the reservation-confirmed email; blank/undefined = default. */
+  emailSubjectReservationConfirmed?: string;
+  /** Custom subject line for the checkout email; blank/undefined = default. */
+  emailSubjectCheckout?: string;
+  /** Greeting/signature line appended to every transactional email footer. */
+  emailGreetingText?: string;
 }
 
 export interface HotelSettingsResponse {
@@ -142,4 +153,9 @@ export interface HotelSettingsResponse {
   logoUrl?: string | null;
   alloggiatiUsername?: string | null;
   alloggiatiCredentialsConfigured: boolean;
+  sendReservationConfirmedEmail: boolean;
+  sendCheckoutEmail: boolean;
+  emailSubjectReservationConfirmed?: string | null;
+  emailSubjectCheckout?: string | null;
+  emailGreetingText?: string | null;
 }

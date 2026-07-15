@@ -14,6 +14,9 @@ import java.time.LocalDate;
  * @param nights        number of nights
  * @param reservationId human-readable reservation reference
  * @param locale        BCP 47 locale tag (e.g. "it", "en")
+ * @param customSubject optional per-hotel subject override; blank/null uses the default
+ * @param greetingText  optional per-hotel greeting/signature line for the email footer
+ * @param logoUrl       optional per-hotel logo image URL rendered in the email header
  */
 public record NotificationReservationRequest(
         String guestEmail,
@@ -24,5 +27,8 @@ public record NotificationReservationRequest(
         LocalDate checkOutDate,
         int nights,
         String reservationId,
-        String locale) {
+        String locale,
+        String customSubject,
+        String greetingText,
+        String logoUrl) {
 }

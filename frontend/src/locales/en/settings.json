@@ -30,5 +30,16 @@
 
   "settings_section_system": "System",
   "alloggiati_auto_send_label": "Auto-send Alloggiati",
-  "alloggiati_auto_send_desc": "Automatically submit the Alloggiati report to the Polizia di Stato portal at each check-in"
+  "alloggiati_auto_send_desc": "Automatically submit the Alloggiati report to the Polizia di Stato portal at each check-in",
+
+  "settings_section_email_notifications": "Email notifications",
+  "email_reservation_confirmed_label": "Reservation confirmation email",
+  "email_reservation_confirmed_desc": "Email the guest when a reservation is created",
+  "email_checkout_label": "Check-out summary email",
+  "email_checkout_desc": "Email the guest a stay summary and invoice at check-out",
+  "email_subject_label": "Custom subject",
+  "email_subject_placeholder": "Leave blank to use the default subject",
+  "email_greeting_label": "Greeting/signature text",
+  "email_greeting_desc": "Appended to the footer of every email sent to guests (e.g. \"We look forward to welcoming you, the team at Hotel Bella Vista\")",
+  "email_greeting_placeholder": "E.g. We look forward to welcoming you, the team at Hotel Bella Vista"
 }

@@ -21,6 +21,9 @@ import java.util.List;
  * @param totalAmount     total invoice amount
  * @param currency        ISO 4217 currency code (e.g. "EUR")
  * @param locale          BCP-47 language tag used to select the template ("it" or "en")
+ * @param customSubject   optional per-hotel subject override; blank/null uses the default
+ * @param greetingText    optional per-hotel greeting/signature line for the email footer
+ * @param logoUrl         optional per-hotel logo image URL rendered in the email header
  */
 public record CheckoutNotificationRequest(
         @NotBlank @Email String guestEmail,
@@ -32,7 +35,10 @@ public record CheckoutNotificationRequest(
         List<InvoiceLineItemDto> lines,
         BigDecimal totalAmount,
         String currency,
-        String locale) {
+        String locale,
+        String customSubject,
+        String greetingText,
+        String logoUrl) {
 
     /**
      * Compact constructor — defensive copy of the charge lines list.

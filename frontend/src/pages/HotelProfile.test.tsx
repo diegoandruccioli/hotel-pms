@@ -37,6 +37,8 @@ const baseSettings: HotelSettingsResponse = {
   logoUrl: '',
   alloggiatiUsername: null,
   alloggiatiCredentialsConfigured: false,
+  sendReservationConfirmedEmail: true,
+  sendCheckoutEmail: true,
 };
 
 const renderComponent = () =>

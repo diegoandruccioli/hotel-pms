@@ -66,7 +66,8 @@ class NotificationControllerTest {
     void reservationConfirmedValidRequestReturns204() throws Exception {
         final ReservationConfirmedRequest req = new ReservationConfirmedRequest(
                 GUEST_EMAIL, "John Doe", HOTEL_NAME, "Superior Room",
-                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 5), 4, "RES-001", LOCALE_IT);
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 5), 4, "RES-001", LOCALE_IT,
+                null, null, null);
 
         mockMvc.perform(post(BASE_URL + "/reservation-confirmed")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -80,7 +81,8 @@ class NotificationControllerTest {
     void reservationConfirmedMissingEmailReturns400() throws Exception {
         final ReservationConfirmedRequest req = new ReservationConfirmedRequest(
                 null, "John Doe", HOTEL_NAME, "Room",
-                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 5), 4, "RES-001", LOCALE_IT);
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 5), 4, "RES-001", LOCALE_IT,
+                null, null, null);
 
         mockMvc.perform(post(BASE_URL + "/reservation-confirmed")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -109,7 +111,8 @@ class NotificationControllerTest {
                 LocalDateTime.of(2026, 8, 1, 14, 0),
                 LocalDateTime.of(2026, 8, 5, 11, 0),
                 List.of(new InvoiceLineItemDto("Room charge", BigDecimal.valueOf(400))),
-                BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT);
+                BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT,
+                null, null, null);
 
         mockMvc.perform(post(BASE_URL + "/checkout")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -125,7 +128,8 @@ class NotificationControllerTest {
                 null, GUEST_NAME, HOTEL_NAME, ROOM_NUMBER,
                 LocalDateTime.of(2026, 8, 1, 14, 0),
                 LocalDateTime.of(2026, 8, 5, 11, 0),
-                List.of(), BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT);
+                List.of(), BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT,
+                null, null, null);
 
         mockMvc.perform(post(BASE_URL + "/checkout")
                         .contentType(MediaType.APPLICATION_JSON)

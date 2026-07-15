@@ -89,7 +89,8 @@ class HotelSettingsServiceImplTest {
         when(hotelSettingsRepository.save(existing)).thenReturn(existing);
 
         final HotelSettingsResponse result = hotelSettingsService.update(
-                hotelId, new HotelSettingsRequest(true, null, null, null, null, null, null, null, null));
+                hotelId, new HotelSettingsRequest(true, null, null, null, null, null, null, null, null,
+                        null, null, null, null, null));
 
         assertNotNull(result);
         assertTrue(Objects.requireNonNull(result).alloggiatiAutoSend());
@@ -111,7 +112,8 @@ class HotelSettingsServiceImplTest {
         when(hotelSettingsRepository.save(Objects.requireNonNull(expectedArg))).thenReturn(Objects.requireNonNull(created));
 
         final HotelSettingsResponse result = hotelSettingsService.update(
-                hotelId, new HotelSettingsRequest(true, null, null, null, null, null, null, null, null));
+                hotelId, new HotelSettingsRequest(true, null, null, null, null, null, null, null, null,
+                        null, null, null, null, null));
 
         assertNotNull(result);
         assertTrue(result.alloggiatiAutoSend());
@@ -130,7 +132,8 @@ class HotelSettingsServiceImplTest {
         when(alloggiatiCredentialEncryptor.encrypt("plainKey")).thenReturn(ENCRYPTED_WS_KEY);
 
         final HotelSettingsResponse result = hotelSettingsService.update(hotelId, new HotelSettingsRequest(
-                false, null, null, null, null, null, HOTEL_USERNAME, "plainPass", "plainKey"));
+                false, null, null, null, null, null, HOTEL_USERNAME, "plainPass", "plainKey",
+                null, null, null, null, null));
 
         assertEquals(HOTEL_USERNAME, existing.getAlloggiatiUsername());
         assertEquals(ENCRYPTED_PASSWORD, existing.getAlloggiatiPasswordEncrypted());
@@ -153,11 +156,60 @@ class HotelSettingsServiceImplTest {
         // Admin only updates hotelName — password/WsKey fields are left blank in the
         // UI (write-only), so the previously stored encrypted values must survive.
         final HotelSettingsResponse result = hotelSettingsService.update(hotelId, new HotelSettingsRequest(
-                false, "New Name", null, null, null, null, HOTEL_USERNAME, "", ""));
+                false, "New Name", null, null, null, null, HOTEL_USERNAME, "", "",
+                null, null, null, null, null));
 
         assertEquals(ENCRYPTED_PASSWORD, existing.getAlloggiatiPasswordEncrypted());
         assertEquals(ENCRYPTED_WS_KEY, existing.getAlloggiatiWsKeyEncrypted());
         assertTrue(result.alloggiatiCredentialsConfigured());
         verify(alloggiatiCredentialEncryptor, times(0)).encrypt(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void shouldNotWipeOtherFieldsWhenPatchingOnlyOneBooleanToggle() {
+        // Regression test: a partial update sending only a single toggle (the pattern
+        // used by SettingsSystem.tsx) must never null out the rest of the hotel
+        // profile — null fields in the request mean "unchanged", not "clear".
+        final UUID hotelId = UUID.randomUUID();
+        final HotelSettings existing = new HotelSettings();
+        existing.setHotelId(hotelId);
+        existing.setHotelName("Hotel Bella Vista");
+        existing.setAddress("Via Roma 12");
+        existing.setAlloggiatiAutoSend(false);
+
+        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.save(existing)).thenReturn(existing);
+
+        // Only alloggiatiAutoSend is set; every other field (including the new email
+        // toggles) is null/absent, mirroring a single-switch PUT from the frontend.
+        final HotelSettingsResponse result = hotelSettingsService.update(
+                hotelId, new HotelSettingsRequest(true, null, null, null, null, null, null, null, null,
+                        null, null, null, null, null));
+
+        assertTrue(result.alloggiatiAutoSend());
+        assertEquals("Hotel Bella Vista", result.hotelName());
+        assertEquals("Via Roma 12", result.address());
+        assertTrue(result.sendReservationConfirmedEmail());
+        assertTrue(result.sendCheckoutEmail());
+    }
+
+    @Test
+    void shouldApplyEmailNotificationSettingsOnUpdate() {
+        final UUID hotelId = UUID.randomUUID();
+        final HotelSettings existing = new HotelSettings();
+        existing.setHotelId(hotelId);
+
+        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.save(existing)).thenReturn(existing);
+
+        final HotelSettingsResponse result = hotelSettingsService.update(hotelId, new HotelSettingsRequest(
+                null, null, null, null, null, null, null, null, null,
+                false, false, "Oggetto custom", "Oggetto checkout custom", "A presto!"));
+
+        assertFalse(result.sendReservationConfirmedEmail());
+        assertFalse(result.sendCheckoutEmail());
+        assertEquals("Oggetto custom", result.emailSubjectReservationConfirmed());
+        assertEquals("Oggetto checkout custom", result.emailSubjectCheckout());
+        assertEquals("A presto!", result.emailGreetingText());
     }
 }

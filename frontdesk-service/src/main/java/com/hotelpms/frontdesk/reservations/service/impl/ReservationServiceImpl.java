@@ -381,6 +381,9 @@ public class ReservationServiceImpl implements ReservationService {
             final java.util.Map<UUID, String> roomNumbers) {
         try {
             final HotelSettingsResponse settings = hotelSettingsService.getOrCreate(hotelId);
+            if (!settings.sendReservationConfirmedEmail()) {
+                return;
+            }
             final int nights = (int) request.checkInDate().until(request.checkOutDate(), ChronoUnit.DAYS);
             final String roomDetails = request.lineItems() != null && !request.lineItems().isEmpty()
                     ? request.lineItems().stream()
@@ -396,7 +399,10 @@ public class ReservationServiceImpl implements ReservationService {
                     request.checkOutDate(),
                     nights,
                     reservationId.toString(),
-                    "it"));
+                    "it",
+                    settings.emailSubjectReservationConfirmed(),
+                    settings.emailGreetingText(),
+                    settings.logoUrl()));
         } catch (final DataAccessException | NotFoundException ex) {
             log.warn("[RESERVATION] CONFIRMED_EMAIL_SKIPPED | reservationId={} | reason={}",
                     reservationId, ex.getMessage());

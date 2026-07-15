@@ -108,7 +108,8 @@ class NotificationControllerIntegrationTest {
                 List.of(new InvoiceLineItemDto("Room nights", BigDecimal.valueOf(320))),
                 BigDecimal.valueOf(320),
                 "EUR",
-                "en");
+                "en",
+                null, null, null);
 
         mockMvc.perform(post(BASE_URL + "/checkout")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -134,7 +135,8 @@ class NotificationControllerIntegrationTest {
                 LocalDate.of(2026, 9, 14),
                 4,
                 "RES-XYZ",
-                "it");
+                "it",
+                null, null, null);
 
         mockMvc.perform(post(BASE_URL + "/reservation-confirmed")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -152,7 +154,8 @@ class NotificationControllerIntegrationTest {
     void endpointMissingHmacHeadersReturns401() throws Exception {
         final ReservationConfirmedRequest req = new ReservationConfirmedRequest(
                 GUEST_EMAIL, "John Doe", "Hotel", "Room",
-                LocalDate.now(), LocalDate.now().plusDays(2), 2, "RES-000", "it");
+                LocalDate.now(), LocalDate.now().plusDays(2), 2, "RES-000", "it",
+                null, null, null);
 
         mockMvc.perform(post(BASE_URL + "/reservation-confirmed")
                         .contentType(MediaType.APPLICATION_JSON)
