@@ -632,6 +632,62 @@ services:
           memory: 256M
 
   # ----------------------------------------------------------
+  # Notification Service (C1 — transactional email via SMTP)
+  # Stateless: no DB. Uses Redis only for HMAC anti-replay nonce
+  # store (InternalAuthFilter, T-GW-08).
+  # ----------------------------------------------------------
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    image: hotel-pms/notification-service
+    container_name: notification-service
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      - SPRING_PROFILES_ACTIVE=notification-service
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
+      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      # SMTP — override in production with real relay credentials
+      - SMTP_HOST=${SMTP_HOST:-localhost}
+      - SMTP_PORT=${SMTP_PORT:-25}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_AUTH=${SMTP_AUTH:-false}
+      - SMTP_STARTTLS=${SMTP_STARTTLS:-false}
+      - NOTIFICATION_FROM_ADDRESS=${NOTIFICATION_FROM_ADDRESS:-noreply@hotelpms.local}
+      - NOTIFICATION_FROM_NAME=${NOTIFICATION_FROM_NAME:-Hotel PMS}
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+    depends_on:
+      redis:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+    networks:
+      - backend-network
+      - observability-network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ----------------------------------------------------------
   # Frontend (Nginx static build)
   # ----------------------------------------------------------
   frontend:

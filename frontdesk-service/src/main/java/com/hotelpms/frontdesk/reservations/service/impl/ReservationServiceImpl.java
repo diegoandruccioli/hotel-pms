@@ -1,7 +1,9 @@
 package com.hotelpms.frontdesk.reservations.service.impl;
 
 import com.hotelpms.frontdesk.client.GuestClient;
+import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
+import com.hotelpms.frontdesk.client.dto.NotificationReservationRequest;
 import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
@@ -16,7 +18,11 @@ import com.hotelpms.frontdesk.reservations.repository.ReservationRepository;
 import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomService;
+import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
+import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
@@ -26,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -36,6 +43,7 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ReservationServiceImpl implements ReservationService {
 
     private static final String ID_NOT_NULL_MSG = "Reservation ID cannot be null";
@@ -49,6 +57,8 @@ public class ReservationServiceImpl implements ReservationService {
     private final ReservationMapper reservationMapper;
     private final RoomService roomService;
     private final GuestClient guestClient;
+    private final HotelSettingsService hotelSettingsService;
+    private final NotificationClient notificationClient;
 
     /** {@inheritDoc} */
     @Override
@@ -57,7 +67,7 @@ public class ReservationServiceImpl implements ReservationService {
         verifyDateRange(request);
         final UUID hotelId = resolveHotelId();
         final GuestResponse guest = verifyGuestExists(request.guestId());
-        verifyRoomsAvailability(request.lineItems(), hotelId);
+        final java.util.Map<UUID, String> roomNumbers = verifyRoomsAvailability(request.lineItems(), hotelId);
         verifyNoOverlappingReservations(null, request);
 
         final Reservation reservation = reservationMapper.toEntity(request);
@@ -73,6 +83,7 @@ public class ReservationServiceImpl implements ReservationService {
         }
 
         final Reservation savedReservation = reservationRepository.save(Objects.requireNonNull(reservation));
+        sendReservationConfirmedEmailIfPossible(savedReservation.getId(), hotelId, guest, request, roomNumbers);
         return enrichWithGuestName(reservationMapper.toResponse(savedReservation), guest);
     }
 
@@ -319,21 +330,27 @@ public class ReservationServiceImpl implements ReservationService {
      *
      * @param lineItems the requested reservation line items
      * @param hotelId   the authenticated hotel, for multi-tenant room scoping
+     * @return a map of roomId to roomNumber for each verified room, reused by the
+     *         reservation-confirmed email to avoid a second lookup
      * @throws NotFoundException        when a room does not exist for this hotel
      * @throws ExternalServiceException when a room exists but is inactive
      *                                  (soft-deleted)
      */
-    private void verifyRoomsAvailability(final List<ReservationLineItemRequest> lineItems, final UUID hotelId) {
+    private java.util.Map<UUID, String> verifyRoomsAvailability(
+            final List<ReservationLineItemRequest> lineItems, final UUID hotelId) {
         if (lineItems == null || lineItems.isEmpty()) {
-            return;
+            return java.util.Map.of();
         }
 
+        final java.util.Map<UUID, String> roomNumbers = new java.util.HashMap<>();
         for (final ReservationLineItemRequest item : lineItems) {
             final RoomResponse room = roomService.getRoomById(item.roomId(), hotelId);
             if (!room.active()) {
                 throw new ExternalServiceException("ROOM_UNAVAILABLE");
             }
+            roomNumbers.put(item.roomId(), room.roomNumber());
         }
+        return roomNumbers;
     }
 
     /**
@@ -353,6 +370,36 @@ public class ReservationServiceImpl implements ReservationService {
                 && request.checkOutDate() != null
                 && !request.checkOutDate().isAfter(request.checkInDate())) {
             throw new BadRequestException("CHECKOUT_MUST_BE_AFTER_CHECKIN");
+        }
+    }
+
+    private void sendReservationConfirmedEmailIfPossible(
+            final UUID reservationId,
+            final UUID hotelId,
+            final GuestResponse guest,
+            final ReservationRequest request,
+            final java.util.Map<UUID, String> roomNumbers) {
+        try {
+            final HotelSettingsResponse settings = hotelSettingsService.getOrCreate(hotelId);
+            final int nights = (int) request.checkInDate().until(request.checkOutDate(), ChronoUnit.DAYS);
+            final String roomDetails = request.lineItems() != null && !request.lineItems().isEmpty()
+                    ? request.lineItems().stream()
+                            .map(li -> roomNumbers.getOrDefault(li.roomId(), li.roomId().toString()))
+                            .collect(java.util.stream.Collectors.joining(", "))
+                    : "";
+            notificationClient.sendReservationConfirmed(new NotificationReservationRequest(
+                    guest.email(),
+                    guest.firstName() + " " + guest.lastName(),
+                    settings.hotelName(),
+                    roomDetails,
+                    request.checkInDate(),
+                    request.checkOutDate(),
+                    nights,
+                    reservationId.toString(),
+                    "it"));
+        } catch (final DataAccessException | NotFoundException ex) {
+            log.warn("[RESERVATION] CONFIRMED_EMAIL_SKIPPED | reservationId={} | reason={}",
+                    reservationId, ex.getMessage());
         }
     }
 

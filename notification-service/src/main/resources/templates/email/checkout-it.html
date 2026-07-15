@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Riepilogo soggiorno e fattura</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:24px 0;">
+  <tr>
+    <td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
+
+        <tr>
+          <td style="background-color:#1a237e;padding:28px 32px;">
+            <p style="margin:0;color:#ffffff;font-size:22px;font-weight:bold;" th:text="${req.hotelName != null ? req.hotelName : 'Hotel PMS'}">Hotel PMS</p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:32px;">
+            <p style="margin:0 0 16px;font-size:16px;color:#212121;">
+              Gentile <strong th:text="${req.guestName}">Ospite</strong>,
+            </p>
+            <p style="margin:0 0 24px;font-size:15px;color:#424242;">
+              Il tuo check-out è avvenuto correttamente. Grazie per aver soggiornato da noi.
+            </p>
+
+            <!-- Stay summary -->
+            <table width="100%" cellpadding="0" cellspacing="0"
+                   style="background-color:#f3f4f6;border-radius:6px;padding:20px;margin-bottom:24px;">
+              <tr>
+                <td style="padding:4px 0;">
+                  <span style="color:#616161;font-size:13px;">Camera</span><br>
+                  <strong style="font-size:14px;color:#212121;" th:text="${req.roomNumber}">—</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0;">
+                  <span style="color:#616161;font-size:13px;">Check-in</span><br>
+                  <strong style="font-size:14px;color:#212121;"
+                          th:text="${#temporals.format(req.actualCheckIn,'dd/MM/yyyy HH:mm')}">—</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0;">
+                  <span style="color:#616161;font-size:13px;">Check-out</span><br>
+                  <strong style="font-size:14px;color:#212121;"
+                          th:text="${#temporals.format(req.actualCheckOut,'dd/MM/yyyy HH:mm')}">—</strong>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Invoice lines (shown only when charges are available) -->
+            <div th:if="${req.lines != null and not #lists.isEmpty(req.lines)}">
+              <p style="margin:0 0 8px;font-size:14px;font-weight:bold;color:#212121;">Dettaglio addebiti</p>
+              <table width="100%" cellpadding="6" cellspacing="0"
+                     style="border-collapse:collapse;margin-bottom:16px;">
+                <thead>
+                  <tr style="background-color:#e8eaf6;">
+                    <th style="text-align:left;font-size:12px;color:#424242;border-bottom:1px solid #c5cae9;">Descrizione</th>
+                    <th style="text-align:right;font-size:12px;color:#424242;border-bottom:1px solid #c5cae9;">Importo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr th:each="line : ${req.lines}">
+                    <td style="font-size:13px;color:#424242;border-bottom:1px solid #f0f0f0;"
+                        th:text="${line.description}">—</td>
+                    <td style="font-size:13px;color:#424242;text-align:right;border-bottom:1px solid #f0f0f0;"
+                        th:text="${#numbers.formatDecimal(line.amount,1,'COMMA',2,'POINT')} + ' ' + (req.currency != null ? req.currency : 'EUR')">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Total -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+              <tr>
+                <td style="font-size:15px;font-weight:bold;color:#212121;">Totale</td>
+                <td style="font-size:15px;font-weight:bold;color:#1a237e;text-align:right;"
+                    th:text="${req.totalAmount != null ? #numbers.formatDecimal(req.totalAmount,1,'COMMA',2,'POINT') + ' ' + (req.currency != null ? req.currency : 'EUR') : '—'}">—</td>
+              </tr>
+            </table>
+
+            <p style="margin:0;font-size:14px;color:#616161;">
+              Speriamo di rivederti presto. Per richieste o chiarimenti sulla fattura contatta la reception.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background-color:#f5f5f5;padding:16px 32px;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#9e9e9e;">
+              Email automatica — si prega di non rispondere a questo messaggio.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

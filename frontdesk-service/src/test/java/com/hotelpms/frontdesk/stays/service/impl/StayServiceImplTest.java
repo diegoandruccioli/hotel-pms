@@ -2,8 +2,10 @@ package com.hotelpms.frontdesk.stays.service.impl;
 
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.GuestClient;
+import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
+import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
@@ -81,6 +83,11 @@ class StayServiceImplTest {
     private static final String ROOM_NOT_FOUND = "ROOM_NOT_FOUND";
     private static final String PS_PORTAL_DOWN = "PS portal down";
     private static final String PAID_STATUS = "PAID";
+    private static final String HOTEL_NAME_TEST = "Hotel Test";
+    private static final String INVOICE_NUMBER_TEST = "2026/0001";
+    private static final String CURRENCY_EUR = "EUR";
+    private static final BigDecimal INVOICE_TOTAL_200 = BigDecimal.valueOf(200);
+    private static final BigDecimal INVOICE_TOTAL_80 = BigDecimal.valueOf(80);
 
     @Mock
     private StayRepository stayRepository;
@@ -105,6 +112,9 @@ class StayServiceImplTest {
 
     @Mock
     private HotelSettingsService hotelSettingsService;
+
+    @Mock
+    private NotificationClient notificationClient;
 
     @InjectMocks
     private StayServiceImpl stayService;
@@ -412,9 +422,11 @@ class StayServiceImplTest {
         final Stay checkedInStay = Objects.requireNonNull(savedStay);
         checkedInStay.setRoomId(roomId);
         checkedInStay.setReservationId(reservationId);
+        checkedInStay.setHotelId(hotelId);
 
+        final UUID invoiceId = UUID.randomUUID();
         final InvoiceStatusResponse paidInvoice = new InvoiceStatusResponse(
-                UUID.randomUUID(), reservationId, PAID_STATUS, BigDecimal.valueOf(200));
+                invoiceId, reservationId, PAID_STATUS, BigDecimal.valueOf(200));
         final ReservationLineItemResponse lineItem =
                 new ReservationLineItemResponse(UUID.randomUUID(), roomId, BigDecimal.TEN, true, null, null);
 
@@ -426,6 +438,13 @@ class StayServiceImplTest {
         when(reservationService.getReservationById(reservationId))
                 .thenReturn(reservationResponse(ReservationStatus.CHECKED_IN, List.of(lineItem)));
         when(stayRepository.findAllByReservationId(reservationId)).thenReturn(List.of(checkedInStay));
+        when(guestClient.getGuestById(guestId))
+                .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false));
+        when(billingClient.getInvoiceForEmail(invoiceId))
+                .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, PAID_STATUS,
+                        INVOICE_TOTAL_200, CURRENCY_EUR, List.of()));
 
         // Act
         final StayResponse response = stayService.checkOut(id, hotelId);
@@ -434,7 +453,7 @@ class StayServiceImplTest {
         assertNotNull(response);
         assertEquals(StayStatus.CHECKED_OUT, checkedInStay.getStatus());
         assertNotNull(checkedInStay.getActualCheckOutTime());
-        verify(roomService, times(1)).updateRoomStatus(Objects.requireNonNull(roomId), null, RoomStatus.DIRTY);
+        verify(roomService, times(1)).updateRoomStatus(Objects.requireNonNull(roomId), hotelId, RoomStatus.DIRTY);
         verify(reservationService, times(1))
                 .updateStatusAndGuests(reservationId, ReservationStatus.CHECKED_OUT, null);
     }
@@ -446,9 +465,11 @@ class StayServiceImplTest {
         final Stay checkedInStay = Objects.requireNonNull(savedStay);
         checkedInStay.setRoomId(roomId);
         checkedInStay.setReservationId(reservationId);
+        checkedInStay.setHotelId(hotelId);
 
+        final UUID invoiceId = UUID.randomUUID();
         final InvoiceStatusResponse paidInvoice = new InvoiceStatusResponse(
-                UUID.randomUUID(), reservationId, PAID_STATUS, BigDecimal.valueOf(200));
+                invoiceId, reservationId, PAID_STATUS, BigDecimal.valueOf(200));
         final ReservationLineItemResponse lineItem1 =
                 new ReservationLineItemResponse(UUID.randomUUID(), roomId, BigDecimal.TEN, true, null, null);
         final ReservationLineItemResponse lineItem2 =
@@ -469,6 +490,13 @@ class StayServiceImplTest {
                 .thenReturn(reservationResponse(ReservationStatus.CHECKED_IN, List.of(lineItem1, lineItem2)));
         when(stayRepository.findAllByReservationId(reservationId))
                 .thenReturn(List.of(checkedInStay, stillCheckedInStay));
+        when(guestClient.getGuestById(guestId))
+                .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false));
+        when(billingClient.getInvoiceForEmail(invoiceId))
+                .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, PAID_STATUS,
+                        INVOICE_TOTAL_200, CURRENCY_EUR, List.of()));
 
         // Act
         stayService.checkOut(id, hotelId);
@@ -505,6 +533,7 @@ class StayServiceImplTest {
         checkedInStay.setRoomId(roomId);
         checkedInStay.setReservationId(null);
         checkedInStay.setInvoiceId(invoiceId);
+        checkedInStay.setHotelId(hotelId);
 
         final InvoiceStatusResponse paidInvoice = new InvoiceStatusResponse(
                 invoiceId, null, PAID_STATUS, BigDecimal.valueOf(80));
@@ -513,6 +542,13 @@ class StayServiceImplTest {
         when(billingClient.getInvoiceById(invoiceId)).thenReturn(paidInvoice);
         when(stayRepository.save(checkedInStay)).thenReturn(checkedInStay);
         when(stayMapper.toDto(checkedInStay)).thenReturn(validResponse);
+        when(guestClient.getGuestById(guestId))
+                .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false));
+        when(billingClient.getInvoiceForEmail(invoiceId))
+                .thenReturn(new InvoiceForEmailResponse(invoiceId, null, INVOICE_NUMBER_TEST, PAID_STATUS,
+                        INVOICE_TOTAL_80, CURRENCY_EUR, List.of()));
 
         // Act
         final StayResponse response = stayService.checkOut(id, hotelId);

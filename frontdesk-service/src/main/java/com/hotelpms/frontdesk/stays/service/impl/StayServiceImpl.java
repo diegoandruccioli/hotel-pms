@@ -2,9 +2,14 @@ package com.hotelpms.frontdesk.stays.service.impl;
 
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.GuestClient;
+import com.hotelpms.frontdesk.client.NotificationClient;
+import com.hotelpms.frontdesk.client.dto.ChargeLineDto;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
+import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
+import com.hotelpms.frontdesk.client.dto.NotificationChargeLineDto;
+import com.hotelpms.frontdesk.client.dto.NotificationCheckoutRequest;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
@@ -30,6 +35,7 @@ import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import com.hotelpms.frontdesk.stays.service.StayService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -73,6 +79,7 @@ public class StayServiceImpl implements StayService {
     private final BillingClient billingClient;
     private final AlloggiatiWebSenderService alloggiatiWebSenderService;
     private final HotelSettingsService hotelSettingsService;
+    private final NotificationClient notificationClient;
 
     /** {@inheritDoc} */
     @Override
@@ -166,6 +173,7 @@ public class StayServiceImpl implements StayService {
                 stayId, stay.getReservationId(), stay.getRoomId());
 
         updateReservationStatusAfterCheckOut(updatedStay.getReservationId());
+        sendCheckoutEmailIfPossible(updatedStay, invoice);
 
         return stayMapper.toDto(updatedStay);
     }
@@ -441,6 +449,40 @@ public class StayServiceImpl implements StayService {
         } else {
             log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason=BILLING_SERVICE_UNAVAILABLE",
                     stay.getId());
+        }
+    }
+
+    private void sendCheckoutEmailIfPossible(final Stay stay, final InvoiceStatusResponse invoice) {
+        try {
+            final GuestResponse guest = guestClient.getGuestById(stay.getGuestId());
+            final String hotelName = hotelSettingsService.getOrCreate(stay.getHotelId()).hotelName();
+            final List<NotificationChargeLineDto> lines;
+            final String currency;
+            if (invoice.id() != null) {
+                final InvoiceForEmailResponse detail = billingClient.getInvoiceForEmail(invoice.id());
+                lines = detail.charges() != null
+                        ? detail.charges().stream()
+                                .map((ChargeLineDto c) -> new NotificationChargeLineDto(c.description(), c.amount()))
+                                .toList()
+                        : List.of();
+                currency = detail.currency() != null ? detail.currency() : "EUR";
+            } else {
+                lines = List.of();
+                currency = "EUR";
+            }
+            notificationClient.sendCheckout(new NotificationCheckoutRequest(
+                    guest.email(),
+                    guest.firstName() + " " + guest.lastName(),
+                    hotelName,
+                    stay.getRoomNumber(),
+                    stay.getActualCheckInTime(),
+                    stay.getActualCheckOutTime(),
+                    lines,
+                    invoice.totalAmount(),
+                    currency,
+                    "it"));
+        } catch (final feign.FeignException | DataAccessException ex) {
+            log.warn("[STAY] CHECKOUT_EMAIL_SKIPPED | stayId={} | reason={}", stay.getId(), ex.getMessage());
         }
     }
 

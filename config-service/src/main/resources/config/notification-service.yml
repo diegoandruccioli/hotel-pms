@@ -1,0 +1,57 @@
+server:
+  port: 8088
+
+notification:
+  from-address: ${NOTIFICATION_FROM_ADDRESS:noreply@hotelpms.local}
+  from-name: ${NOTIFICATION_FROM_NAME:Hotel PMS}
+
+internal:
+  hmac:
+    secret: ${INTERNAL_HMAC_SECRET}
+
+spring:
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:25}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:false}
+          starttls:
+            enable: ${SMTP_STARTTLS:false}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+  data:
+    redis:
+      # Nonce store for internal HMAC anti-replay (T-GW-08). Same Redis
+      # instance used by api-gateway for rate limiting, on a separate
+      # key namespace (internal-auth:nonce:*).
+      host: ${INTERNAL_REDIS_HOST:redis}
+      port: ${INTERNAL_REDIS_PORT:6379}
+
+management:
+  server:
+    port: 8090
+  endpoints:
+    web:
+      exposure:
+        include: "prometheus,health,info"
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans

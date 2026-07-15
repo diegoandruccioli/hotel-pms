@@ -33,6 +33,11 @@ spring:
                 host: billing-service
                 port: 8085
                 secure: false
+            notification-service:
+              - serviceId: notification-service
+                host: notification-service
+                port: 8088
+                secure: false
 
 # T-STAY-03: Alloggiati Web portal credentials and URL.
 # All values MUST be provided as environment variables — no defaults for credentials.
@@ -82,6 +87,17 @@ management:
   zipkin:
     tracing:
       endpoint: http://zipkin:9411/api/v2/spans
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      notificationService:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
 
 logging:
   pattern:

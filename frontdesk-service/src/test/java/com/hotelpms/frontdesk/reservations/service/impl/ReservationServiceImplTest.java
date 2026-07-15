@@ -1,7 +1,10 @@
 package com.hotelpms.frontdesk.reservations.service.impl;
 
 import com.hotelpms.frontdesk.client.GuestClient;
+import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
+import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
+import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import com.hotelpms.frontdesk.reservations.domain.Reservation;
 import com.hotelpms.frontdesk.reservations.domain.ReservationLineItem;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
@@ -86,6 +89,12 @@ class ReservationServiceImplTest {
     @Mock
     private GuestClient guestClient;
 
+    @Mock
+    private HotelSettingsService hotelSettingsService;
+
+    @Mock
+    private NotificationClient notificationClient;
+
     @InjectMocks
     private ReservationServiceImpl reservationService;
 
@@ -126,7 +135,7 @@ class ReservationServiceImplTest {
         lineItemEntity.setRoomId(roomId);
         lineItemEntity.setPrice(BigDecimal.valueOf(100));
 
-        entity = new Reservation();
+        entity = Reservation.builder().id(reservationId).build();
         entity.setGuestId(GUEST_ID);
         entity.setExpectedGuests(EXPECTED_GUESTS);
         entity.setCheckInDate(LocalDate.now().plusDays(1));
@@ -158,6 +167,8 @@ class ReservationServiceImplTest {
         when(reservationMapper.toEntity(request)).thenReturn(entity);
         when(reservationRepository.save(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
+        when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
+                new HotelSettingsResponse(HOTEL_ID, false, "Hotel Test", null, null, null, null, null, false));
 
         final ReservationResponse result = reservationService.createReservation(request);
 
@@ -178,7 +189,7 @@ class ReservationServiceImplTest {
                 null,
                 List.of(new ReservationLineItemRequest(roomId, BigDecimal.valueOf(100))));
 
-        final Reservation entityWithNullStatus = new Reservation();
+        final Reservation entityWithNullStatus = Reservation.builder().id(UUID.randomUUID()).build();
         entityWithNullStatus.setGuestId(GUEST_ID);
 
         final GuestResponse mockGuestResponse =
@@ -189,6 +200,8 @@ class ReservationServiceImplTest {
         when(reservationRepository.save(anyReservation()))
                 .thenReturn(entityWithNullStatus);
         when(reservationMapper.toResponse(entityWithNullStatus)).thenReturn(response);
+        when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
+                new HotelSettingsResponse(HOTEL_ID, false, "Hotel Test", null, null, null, null, null, false));
 
         reservationService.createReservation(requestWithNullStatus);
 

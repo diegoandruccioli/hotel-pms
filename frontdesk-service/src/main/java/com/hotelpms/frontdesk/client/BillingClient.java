@@ -1,6 +1,7 @@
 package com.hotelpms.frontdesk.client;
 
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
+import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.util.Collections;
 import java.util.UUID;
 
 /**
@@ -19,13 +21,23 @@ import java.util.UUID;
 public interface BillingClient {
 
     /**
+     * Status placeholder returned by fallback methods when billing-service is unreachable.
+     */
+    String STATUS_UNAVAILABLE = "UNAVAILABLE";
+
+    /**
+     * Resilience4j circuit breaker instance name shared by all methods of this client.
+     */
+    String CB_BILLING_SERVICE = "billingService";
+
+    /**
      * Retrieves the most recent invoice for a reservation.
      *
      * @param reservationId the reservation UUID
      * @return the invoice status response
      */
     @GetMapping("/api/v1/invoices/reservation/{reservationId}/latest")
-    @CircuitBreaker(name = "billingService", fallbackMethod = "getLatestInvoiceFallback")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "getLatestInvoiceFallback")
     InvoiceStatusResponse getLatestInvoiceByReservation(@PathVariable("reservationId") UUID reservationId);
 
     /**
@@ -37,8 +49,20 @@ public interface BillingClient {
      * @return the invoice status response
      */
     @GetMapping("/api/v1/invoices/{invoiceId}")
-    @CircuitBreaker(name = "billingService", fallbackMethod = "getInvoiceByIdFallback")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "getInvoiceByIdFallback")
     InvoiceStatusResponse getInvoiceById(@PathVariable("invoiceId") UUID invoiceId);
+
+    /**
+     * Retrieves an invoice with full charge lines for use in checkout summary emails.
+     * Calls the same endpoint as {@link #getInvoiceById} but deserialises the richer
+     * {@link InvoiceForEmailResponse} projection (Jackson ignores unknown fields).
+     *
+     * @param invoiceId the invoice UUID
+     * @return invoice with charge lines, or a degraded response when the circuit is open
+     */
+    @GetMapping("/api/v1/invoices/{invoiceId}")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "getInvoiceForEmailFallback")
+    InvoiceForEmailResponse getInvoiceForEmail(@PathVariable("invoiceId") UUID invoiceId);
 
     /**
      * Creates an invoice folio in billing-service at check-in.
@@ -47,7 +71,7 @@ public interface BillingClient {
      * @return the created invoice response, or {@code null} when the fallback fires
      */
     @PostMapping("/api/v1/invoices/stay")
-    @CircuitBreaker(name = "billingService", fallbackMethod = "createInvoiceForStayFallback")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "createInvoiceForStayFallback")
     InvoiceCreatedResponse createInvoiceForStay(@RequestBody StayInvoiceRequest request);
 
     /**
@@ -58,7 +82,7 @@ public interface BillingClient {
      * @return a degraded response with status UNAVAILABLE
      */
     default InvoiceStatusResponse getLatestInvoiceFallback(final UUID reservationId, final Throwable throwable) {
-        return new InvoiceStatusResponse(null, reservationId, "UNAVAILABLE", java.math.BigDecimal.ZERO);
+        return new InvoiceStatusResponse(null, reservationId, STATUS_UNAVAILABLE, java.math.BigDecimal.ZERO);
     }
 
     /**
@@ -69,7 +93,21 @@ public interface BillingClient {
      * @return a degraded response with status UNAVAILABLE
      */
     default InvoiceStatusResponse getInvoiceByIdFallback(final UUID invoiceId, final Throwable throwable) {
-        return new InvoiceStatusResponse(invoiceId, null, "UNAVAILABLE", java.math.BigDecimal.ZERO);
+        return new InvoiceStatusResponse(invoiceId, null, STATUS_UNAVAILABLE, java.math.BigDecimal.ZERO);
+    }
+
+    /**
+     * Fallback for getInvoiceForEmail — returns a minimal response so checkout email
+     * can still be sent without charge line detail.
+     *
+     * @param invoiceId the invoice id
+     * @param throwable the cause
+     * @return degraded response with no charges
+     */
+    default InvoiceForEmailResponse getInvoiceForEmailFallback(
+            final UUID invoiceId, final Throwable throwable) {
+        return new InvoiceForEmailResponse(invoiceId, null, null, STATUS_UNAVAILABLE,
+                java.math.BigDecimal.ZERO, "EUR", Collections.emptyList());
     }
 
     /**

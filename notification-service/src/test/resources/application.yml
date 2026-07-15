@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: notification-service
+  config:
+    import: "optional:configserver:"
+  cloud:
+    config:
+      enabled: false
+
+internal:
+  hmac:
+    secret: test-hmac-secret-minimum-32-characters-for-unit-tests

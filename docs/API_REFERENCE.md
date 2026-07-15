@@ -266,6 +266,22 @@ PATCH  /api/v1/auth/users/{id}/activate             Riattiva account
 PATCH  /api/v1/auth/users/{id}/reset-password       Reset password (ADMIN/OWNER)
 ```
 
+### 4.11 Notifiche email transazionali (notification-service, solo interno)
+
+Non esposti tramite API Gateway — chiamati via OpenFeign da reservation-service/stay-service
+(frontdesk-service) con `@CircuitBreaker` (fallback: log WARN, nessun blocco della transazione
+business). Autenticazione: header `X-Internal-Signature` HMAC-SHA256 obbligatorio, stesso pattern
+di FeignHeaderConfig. Risposta `204 No Content` su successo, `500` su errore SMTP.
+
+```
+POST   /internal/notifications/reservation-confirmed   Email conferma prenotazione
+POST   /internal/notifications/checkin                 Email di benvenuto al check-in
+POST   /internal/notifications/checkout                Email riepilogo con righe fattura al check-out
+```
+
+Template HTML Thymeleaf it/en (default `it` se `locale` mancante/sconosciuta). Indirizzo email
+mascherato nei log (`a***@example.com`) — mai in chiaro (GDPR/CWE-359).
+
 ---
 
 ## 5. Paginazione

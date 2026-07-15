@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conferma prenotazione</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:24px 0;">
+  <tr>
+    <td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background-color:#1a237e;padding:28px 32px;">
+            <p style="margin:0;color:#ffffff;font-size:22px;font-weight:bold;" th:text="${req.hotelName != null ? req.hotelName : 'Hotel PMS'}">Hotel PMS</p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:32px;">
+            <p style="margin:0 0 16px;font-size:16px;color:#212121;">
+              Gentile <strong th:text="${req.guestName}">Ospite</strong>,
+            </p>
+            <p style="margin:0 0 24px;font-size:15px;color:#424242;">
+              La tua prenotazione è stata confermata. Di seguito trovi il riepilogo.
+            </p>
+
+            <!-- Booking summary box -->
+            <table width="100%" cellpadding="0" cellspacing="0"
+                   style="background-color:#f3f4f6;border-radius:6px;padding:20px;margin-bottom:24px;">
+              <tr>
+                <td style="padding:4px 0;">
+                  <span style="color:#616161;font-size:13px;">Numero prenotazione</span><br>
+                  <strong style="font-size:14px;color:#212121;" th:text="${req.reservationId}">—</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0;">
+                  <span style="color:#616161;font-size:13px;">Camera</span><br>
+                  <strong style="font-size:14px;color:#212121;" th:text="${req.roomDetails}">—</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0;">
+                  <span style="color:#616161;font-size:13px;">Check-in</span><br>
+                  <strong style="font-size:14px;color:#212121;"
+                          th:text="${#temporals.format(req.checkInDate,'dd/MM/yyyy')}">—</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0;">
+                  <span style="color:#616161;font-size:13px;">Check-out</span><br>
+                  <strong style="font-size:14px;color:#212121;"
+                          th:text="${#temporals.format(req.checkOutDate,'dd/MM/yyyy')}">—</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0;">
+                  <span style="color:#616161;font-size:13px;">Notti</span><br>
+                  <strong style="font-size:14px;color:#212121;" th:text="${req.nights}">—</strong>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0;font-size:14px;color:#616161;">
+              Per qualsiasi esigenza siamo a tua disposizione.
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background-color:#f5f5f5;padding:16px 32px;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#9e9e9e;">
+              Email automatica — si prega di non rispondere a questo messaggio.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

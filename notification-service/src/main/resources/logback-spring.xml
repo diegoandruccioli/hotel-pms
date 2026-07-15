@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+  <springProperty scope="context" name="appName"
+                  source="spring.application.name"
+                  defaultValue="notification-service"/>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <springProfile name="notification-service">
+    <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+      <http>
+        <url>${LOKI_URL:-http://loki:3100}/loki/api/v1/push</url>
+      </http>
+      <format>
+        <label>
+          <pattern>service=${appName},level=%level</pattern>
+        </label>
+        <message>
+          <pattern>[%level] [%thread] %logger{36} | %msg%n%ex</pattern>
+        </message>
+        <sortByTime>true</sortByTime>
+      </format>
+    </appender>
+
+    <appender name="LOKI_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+      <appender-ref ref="LOKI"/>
+      <queueSize>512</queueSize>
+      <discardingThreshold>0</discardingThreshold>
+      <neverBlock>true</neverBlock>
+    </appender>
+
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+      <appender-ref ref="LOKI_ASYNC"/>
+    </root>
+  </springProfile>
+
+  <springProfile name="!notification-service">
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+    </root>
+  </springProfile>
+</configuration>
