@@ -30,7 +30,7 @@ public final class RedisNonceStore implements NonceStore {
     public boolean claim(final String nonce, final long ttlSeconds) {
         final Boolean result = redisTemplate
                 .opsForValue()
-                .setIfAbsent(KEY_PREFIX + nonce, "1", Duration.ofSeconds(ttlSeconds));
+                .setIfAbsent(KEY_PREFIX + nonce, "1", java.util.Objects.requireNonNull(Duration.ofSeconds(ttlSeconds)));
         return Boolean.TRUE.equals(result);
     }
 }

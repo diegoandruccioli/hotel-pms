@@ -105,9 +105,9 @@ public class NotificationServiceImpl implements NotificationService {
             final MimeMessage message = mailSender.createMimeMessage();
             final MimeMessageHelper helper = new MimeMessageHelper(message, true, CHARSET);
             helper.setFrom(new InternetAddress(fromAddress, fromName, CHARSET));
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(html, true);
+            helper.setTo(java.util.Objects.requireNonNull(to));
+            helper.setSubject(java.util.Objects.requireNonNull(subject));
+            helper.setText(java.util.Objects.requireNonNull(html), true);
             mailSender.send(message);
         } catch (final MessagingException | UnsupportedEncodingException e) {
             throw new IllegalStateException("EMAIL_SEND_FAILED: " + e.getMessage(), e);
