@@ -69,6 +69,26 @@ describe('stayService', () => {
     expect(api.put).toHaveBeenCalledWith('/api/v1/stays/1/check-out', {});
     expect(result).toEqual(mockResponse);
   });
+
+  it('should retry invoice creation', async () => {
+    const mockResponse = { id: '1', invoiceCreationFailed: false };
+    vi.mocked(api.post).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.retryInvoiceCreation('1');
+
+    expect(api.post).toHaveBeenCalledWith('/api/v1/stays/1/invoice/retry', {});
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should retry checkout email', async () => {
+    const mockResponse = { id: '1', checkoutEmailFailed: false };
+    vi.mocked(api.post).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.retryCheckoutEmail('1');
+
+    expect(api.post).toHaveBeenCalledWith('/api/v1/stays/1/checkout-email/retry', {});
+    expect(result).toEqual(mockResponse);
+  });
 });
 
 describe('stayService — settings, lookups, downloads', () => {

@@ -14,7 +14,13 @@ vi.mock('react-i18next', () => {
 });
 
 vi.mock('../services/stayService', () => ({
-  stayService: { getAllStays: vi.fn(), downloadAlloggiatiJson: vi.fn(), downloadAlloggiatiReport: vi.fn() },
+  stayService: {
+    getAllStays: vi.fn(),
+    downloadAlloggiatiJson: vi.fn(),
+    downloadAlloggiatiReport: vi.fn(),
+    retryInvoiceCreation: vi.fn(),
+    retryCheckoutEmail: vi.fn(),
+  },
 }));
 
 vi.mock('../store/authStore', () => ({
@@ -97,6 +103,51 @@ describe('Stays', () => {
 
     await waitFor(() => {
       expect(screen.getByText('error_loading_stays')).toBeInTheDocument();
+    });
+  });
+
+  it('should show invoice-failed badge and retry, clearing the flag on success', async () => {
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [{ id: 's1', roomId: 'room-1234-abcd', guestId: 'guest-5678-efgh',
+        status: 'CHECKED_IN', actualCheckInTime: '2026-03-15T14:00:00',
+        invoiceCreationFailed: true, invoiceCreationFailureReason: 'BILLING_SERVICE_UNAVAILABLE' }],
+      totalElements: 1, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 1, first: true, last: true, empty: false,
+    } as never);
+    vi.mocked(stayService.retryInvoiceCreation).mockResolvedValueOnce({
+      id: 's1', roomId: 'room-1234-abcd', guestId: 'guest-5678-efgh',
+      status: 'CHECKED_IN', invoiceCreationFailed: false, invoiceCreationFailureReason: null,
+    } as never);
+
+    render(<Stays />);
+    await waitFor(() => expect(screen.getByText('invoice_creation_failed')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'retry_invoice_creation' }));
+
+    await waitFor(() => {
+      expect(stayService.retryInvoiceCreation).toHaveBeenCalledWith('s1');
+      expect(screen.queryByText('invoice_creation_failed')).not.toBeInTheDocument();
+    });
+  });
+
+  it('should show checkout-email-failed badge and retry on failure keeps the badge', async () => {
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [{ id: 's1', roomId: 'room-1234-abcd', guestId: 'guest-5678-efgh',
+        status: 'CHECKED_OUT', actualCheckInTime: '2026-03-15T14:00:00',
+        checkoutEmailFailed: true, checkoutEmailFailureReason: 'NOTIFICATION_SERVICE_UNAVAILABLE' }],
+      totalElements: 1, totalPages: 1, number: 0, size: 20,
+      numberOfElements: 1, first: true, last: true, empty: false,
+    } as never);
+    vi.mocked(stayService.retryCheckoutEmail).mockRejectedValueOnce(new Error('still down'));
+
+    render(<Stays />);
+    await waitFor(() => expect(screen.getByText('checkout_email_failed')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'retry_checkout_email' }));
+
+    await waitFor(() => {
+      expect(stayService.retryCheckoutEmail).toHaveBeenCalledWith('s1');
+      expect(screen.getByText('checkout_email_failed')).toBeInTheDocument();
     });
   });
 

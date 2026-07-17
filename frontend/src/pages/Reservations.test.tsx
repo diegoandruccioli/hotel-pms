@@ -24,7 +24,11 @@ vi.mock('react-i18next', () => {
 });
 
 vi.mock('../services/reservationService', () => ({
-  reservationService: { getAllReservations: vi.fn(), deleteReservation: vi.fn() },
+  reservationService: {
+    getAllReservations: vi.fn(),
+    deleteReservation: vi.fn(),
+    retryConfirmationEmail: vi.fn(),
+  },
 }));
 
 vi.mock('../services/inventoryService', () => ({
@@ -124,6 +128,42 @@ describe('Reservations', () => {
 
     await waitFor(() => {
       expect(screen.getByText('error_loading_reservations')).toBeInTheDocument();
+    });
+  });
+
+  it('should show confirmation-email-failed badge and retry, clearing the flag on success', async () => {
+    vi.mocked(reservationService.getAllReservations).mockResolvedValueOnce([
+      { ...CONFIRMED_RESERVATION, confirmationEmailFailed: true,
+        confirmationEmailFailureReason: 'NOTIFICATION_SERVICE_UNAVAILABLE' },
+    ] as never);
+    vi.mocked(reservationService.retryConfirmationEmail).mockResolvedValueOnce({
+      ...CONFIRMED_RESERVATION, confirmationEmailFailed: false, confirmationEmailFailureReason: null,
+    } as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByText('confirmation_email_failed')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'retry_confirmation_email' }));
+
+    await waitFor(() => {
+      expect(reservationService.retryConfirmationEmail).toHaveBeenCalledWith('res-1');
+      expect(screen.queryByText('confirmation_email_failed')).not.toBeInTheDocument();
+    });
+  });
+
+  it('should keep the confirmation-email-failed badge when retry fails', async () => {
+    vi.mocked(reservationService.getAllReservations).mockResolvedValueOnce([
+      { ...CONFIRMED_RESERVATION, confirmationEmailFailed: true,
+        confirmationEmailFailureReason: 'NOTIFICATION_SERVICE_UNAVAILABLE' },
+    ] as never);
+    vi.mocked(reservationService.retryConfirmationEmail).mockRejectedValueOnce(new Error('still down'));
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByText('confirmation_email_failed')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'retry_confirmation_email' }));
+
+    await waitFor(() => {
+      expect(reservationService.retryConfirmationEmail).toHaveBeenCalledWith('res-1');
+      expect(screen.getByText('confirmation_email_failed')).toBeInTheDocument();
     });
   });
 

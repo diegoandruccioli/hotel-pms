@@ -58,4 +58,14 @@ describe('reservationService', () => {
 
     expect(api.delete).toHaveBeenCalledWith('/api/v1/reservations/1');
   });
+
+  it('should retry confirmation email', async () => {
+    const mockResponse = { id: '1', confirmationEmailFailed: false };
+    vi.mocked(api.post).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await reservationService.retryConfirmationEmail('1');
+
+    expect(api.post).toHaveBeenCalledWith('/api/v1/reservations/1/confirmation-email/retry', {});
+    expect(result).toEqual(mockResponse);
+  });
 });
