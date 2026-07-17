@@ -50,6 +50,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -108,7 +109,7 @@ class ReservationServiceImplTest {
 
     @NonNull
     private ReservationResponse response = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null, 0, 0,
-            LocalDate.now(), LocalDate.now(), STATUS_CONFIRMED, null, true, null, null);
+            LocalDate.now(), LocalDate.now(), STATUS_CONFIRMED, null, true, null, null, false, null);
 
     @NonNull
     private final UUID reservationId = Objects.requireNonNull(UUID.randomUUID());
@@ -148,7 +149,7 @@ class ReservationServiceImplTest {
 
         response = new ReservationResponse(reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 0,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                STATUS_CONFIRMED, null, true, null, null);
+                STATUS_CONFIRMED, null, true, null, null, false, null);
     }
 
     private static RoomResponse activeRoom(final UUID room) {
@@ -171,15 +172,67 @@ class ReservationServiceImplTest {
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
                         true, true, null, null, null));
+        when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
 
         final ReservationResponse result = reservationService.createReservation(request);
 
         assertNotNull(result);
         assertEquals(GUEST_ID, result.guestId());
+        assertFalse(entity.isConfirmationEmailFailed());
         verify(guestClient, times(1)).getGuestById(GUEST_ID);
         verify(roomService, times(1)).getRoomById(roomId, HOTEL_ID);
-        verify(reservationRepository, times(1)).save(entity);
+        verify(reservationRepository, times(2)).save(entity);
         verify(notificationClient, times(1)).sendReservationConfirmed(any());
+    }
+
+    @Test
+    void testCreateReservationMarksEmailFailedWhenNotificationServiceUnavailable() {
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(reservationMapper.toEntity(request)).thenReturn(entity);
+        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationMapper.toResponse(entity)).thenReturn(response);
+        when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
+                new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null));
+        when(notificationClient.sendReservationConfirmed(any())).thenReturn(false);
+
+        reservationService.createReservation(request);
+
+        assertTrue(entity.isConfirmationEmailFailed());
+        assertEquals("NOTIFICATION_SERVICE_UNAVAILABLE", entity.getConfirmationEmailFailureReason());
+    }
+
+    @Test
+    void testRetryConfirmationEmailClearsFailedFlag() {
+        entity.setConfirmationEmailFailed(true);
+        entity.setConfirmationEmailFailureReason("NOTIFICATION_SERVICE_UNAVAILABLE");
+
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
+                new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null));
+        when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
+        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationMapper.toResponse(entity)).thenReturn(response);
+
+        final ReservationResponse result = reservationService.retryConfirmationEmail(reservationId);
+
+        assertNotNull(result);
+        assertFalse(entity.isConfirmationEmailFailed());
+        assertNull(entity.getConfirmationEmailFailureReason());
+    }
+
+    @Test
+    void testRetryConfirmationEmailThrowsWhenReservationNotFound() {
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> reservationService.retryConfirmationEmail(reservationId));
     }
 
     @Test
@@ -213,6 +266,8 @@ class ReservationServiceImplTest {
 
         final Reservation entityWithNullStatus = Reservation.builder().id(UUID.randomUUID()).build();
         entityWithNullStatus.setGuestId(GUEST_ID);
+        entityWithNullStatus.setCheckInDate(LocalDate.now().plusDays(1));
+        entityWithNullStatus.setCheckOutDate(LocalDate.now().plusDays(3));
 
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
@@ -406,7 +461,7 @@ class ReservationServiceImplTest {
         final ReservationResponse checkedInResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 2,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.CHECKED_IN, null, true, null, null);
+                ReservationStatus.CHECKED_IN, null, true, null, null, false, null);
 
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         when(reservationRepository.save(entity)).thenReturn(entity);
@@ -429,7 +484,7 @@ class ReservationServiceImplTest {
         final ReservationResponse cancelledResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 0,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.CANCELLED, null, true, null, null);
+                ReservationStatus.CANCELLED, null, true, null, null, false, null);
 
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         when(reservationRepository.save(entity)).thenReturn(entity);

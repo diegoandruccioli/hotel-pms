@@ -37,6 +37,16 @@ export const stayService = {
     return response.data;
   },
 
+  retryInvoiceCreation: async (id: string): Promise<StayResponse> => {
+    const response = await api.post<StayResponse>(`${BASE_PATH}/${id}/invoice/retry`, {});
+    return response.data;
+  },
+
+  retryCheckoutEmail: async (id: string): Promise<StayResponse> => {
+    const response = await api.post<StayResponse>(`${BASE_PATH}/${id}/checkout-email/retry`, {});
+    return response.data;
+  },
+
   getHotelSettings: async (): Promise<HotelSettingsResponse> => {
     const response = await api.get<HotelSettingsResponse>(`${BASE_PATH}/settings`);
     return response.data;

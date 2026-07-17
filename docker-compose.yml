@@ -8,6 +8,17 @@
 #   • Removed stale EUREKA_CLIENT_ENABLED flags (Eureka is being removed)
 #   • Network Segmentation: 5 isolated networks (dmz, gateway, backend, db, observability)
 # ============================================================
+#
+# Dev profiles: loki/grafana/zipkin/alertmanager/prometheus (profile
+# "observability") and db-backup (profile "backup") are opt-in — a plain
+# `docker compose up -d` now starts only the 11 core services (domain
+# services + postgres/redis/config-server/frontend), for faster iterative
+# dev (rebuild/restart a single service without relaunching the full stack).
+# Add them back with:
+#   docker compose --profile observability --profile backup up -d
+# start.ps1/start.sh/start.bat pass both profiles explicitly, so the
+# documented one-click "start everything" bootstrap is unchanged.
+# ============================================================
 
 services:
   # ----------------------------------------------------------
@@ -50,6 +61,7 @@ services:
     image: postgres:15-alpine
     container_name: hotel_db_backup
     restart: unless-stopped
+    profiles: ["backup"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -121,6 +133,7 @@ services:
     image: grafana/loki:2.9.0
     container_name: hotel_loki
     restart: unless-stopped
+    profiles: ["observability"]
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/config.yaml
@@ -151,6 +164,7 @@ services:
     image: grafana/grafana:11.5.0
     container_name: hotel_grafana
     restart: unless-stopped
+    profiles: ["observability"]
     ports:
       - "3000:3000"
     environment:
@@ -181,6 +195,7 @@ services:
     image: openzipkin/zipkin
     container_name: hotel_zipkin
     restart: unless-stopped
+    profiles: ["observability"]
     ports:
       - "9411:9411"
     healthcheck:
@@ -210,6 +225,7 @@ services:
     image: prom/alertmanager:v0.27.0
     container_name: hotel_alertmanager
     restart: unless-stopped
+    profiles: ["observability"]
     ports:
       - "9093:9093"
     volumes:
@@ -237,6 +253,7 @@ services:
     image: prom/prometheus
     container_name: hotel_prometheus
     restart: unless-stopped
+    profiles: ["observability"]
     ports:
       - "9090:9090"
     volumes:

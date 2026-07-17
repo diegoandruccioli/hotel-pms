@@ -83,7 +83,7 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
         if (request.emailGreetingText() != null) {
             settings.setEmailGreetingText(request.emailGreetingText());
         }
-        return toResponse(hotelSettingsRepository.save(settings));
+        return toResponse(hotelSettingsRepository.save(Objects.requireNonNull(settings)));
     }
 
     private HotelSettings createDefault(final UUID hotelId) {

@@ -254,6 +254,32 @@ public class StayController {
                 stayService.getStayHistoryForGuest(guestId, Objects.requireNonNull(hotelId)));
     }
 
+    /**
+     * Retries billing-invoice creation for a stay whose check-in-time attempt failed.
+     * Scoped to the caller's hotel (T-STAY-04): a stay belonging to another hotel
+     * returns 404.
+     *
+     * @param id the stay ID
+     * @return the updated stay response
+     */
+    @PostMapping("/{id}/invoice/retry")
+    public StayResponse retryInvoiceCreation(@NonNull @PathVariable("id") final UUID id) {
+        return stayService.retryInvoiceCreation(id, Objects.requireNonNull(extractHotelId()));
+    }
+
+    /**
+     * Retries the checkout summary email for a checked-out stay whose original
+     * attempt failed. Scoped to the caller's hotel (T-STAY-04): a stay belonging
+     * to another hotel returns 404.
+     *
+     * @param id the stay ID
+     * @return the updated stay response
+     */
+    @PostMapping("/{id}/checkout-email/retry")
+    public StayResponse retryCheckoutEmail(@NonNull @PathVariable("id") final UUID id) {
+        return stayService.retryCheckoutEmail(id, Objects.requireNonNull(extractHotelId()));
+    }
+
     private UUID extractHotelId() {
         final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getDetails() instanceof String hotelIdStr) || hotelIdStr.isBlank()) {

@@ -51,10 +51,14 @@ interface ReservationRowProps {
   onView: (reservationId: string) => void;
   onEdit: (reservationId: string) => void;
   onDelete?: (id: string) => void;
+  onRetryConfirmationEmail: (id: string) => void;
+  retryingEmail: string | null;
   t: TFunction;
 }
 
-const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, onDelete, t }: ReservationRowProps) => {
+const ReservationRow = memo(({
+  reservation, rooms, onCheckIn, onView, onEdit, onDelete, onRetryConfirmationEmail, retryingEmail, t,
+}: ReservationRowProps) => {
   const roomNumbers = useMemo(() => {
     return reservation.lineItems?.filter(li => li.active !== false).map(li => {
       const room = rooms.find(r => r.id === li.roomId);
@@ -83,6 +87,10 @@ const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, on
     onDelete?.(reservation.id);
   }, [onDelete, reservation.id]);
 
+  const handleRetryConfirmationEmail = useCallback(() => {
+    onRetryConfirmationEmail(reservation.id);
+  }, [onRetryConfirmationEmail, reservation.id]);
+
   return (
     <M3TableRow>
       <M3TableCell className="font-medium">{reservation.guestFullName}</M3TableCell>
@@ -102,7 +110,26 @@ const ReservationRow = memo(({ reservation, rooms, onCheckIn, onView, onEdit, on
         </div>
       </M3TableCell>
       <M3TableCell>
-        <M3StatusChip label={getStatusLabel(reservation.status, t)} tone={getStatusTone(reservation.status)} />
+        <div className="flex flex-col items-start gap-1">
+          <M3StatusChip label={getStatusLabel(reservation.status, t)} tone={getStatusTone(reservation.status)} />
+          {reservation.confirmationEmailFailed && (
+            <span
+              className="inline-flex items-center gap-1"
+              title={reservation.confirmationEmailFailureReason ?? undefined}
+            >
+              <M3StatusChip label={t('confirmation_email_failed')} tone="error" />
+              <button
+                type="button"
+                onClick={handleRetryConfirmationEmail}
+                disabled={retryingEmail === reservation.id}
+                aria-label={t('retry_confirmation_email')}
+                className="flex items-center justify-center w-6 h-6 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+              >
+                <MaterialIcon name={retryingEmail === reservation.id ? 'progress_activity' : 'refresh'} size={16} />
+              </button>
+            </span>
+          )}
+        </div>
       </M3TableCell>
       <M3TableCell className="text-right">
         {reservation.status === 'CONFIRMED' && (
@@ -163,6 +190,7 @@ export const Reservations = () => {
   const [sortField, setSortField] = useState<SortField>(() => navState?.sortField ?? 'checkInDate');
   const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? 'desc');
   const [upcomingOnly, setUpcomingOnly] = useState(() => navState?.upcomingOnly ?? false);
+  const [retryingEmail, setRetryingEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -215,6 +243,20 @@ export const Reservations = () => {
       setLoading(false);
     }
   }, [t]);
+
+  const handleRetryConfirmationEmail = useCallback(async (id: string) => {
+    setRetryingEmail(id);
+    try {
+      const updated = await reservationService.retryConfirmationEmail(id);
+      setReservations((prev) => prev.map((r) => (r.id === id ? updated : r)));
+      addToast(t('confirmation_email_retry_success'), 'success');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('confirmation_email_retry_failed');
+      addToast(message, 'error');
+    } finally {
+      setRetryingEmail(null);
+    }
+  }, [addToast, t]);
 
   useEffect(() => {
     loadReservations();
@@ -365,6 +407,8 @@ export const Reservations = () => {
                 onView={handleView}
                 onEdit={handleEdit}
                 onDelete={isAdminOrOwner ? handleDeleteRequest : undefined}
+                onRetryConfirmationEmail={handleRetryConfirmationEmail}
+                retryingEmail={retryingEmail}
                 t={t}
               />
             ))

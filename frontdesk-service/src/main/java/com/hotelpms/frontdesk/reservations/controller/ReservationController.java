@@ -132,4 +132,16 @@ public class ReservationController {
     public boolean hasActiveReservations(@NonNull @PathVariable final UUID guestId) {
         return reservationService.hasActiveReservations(guestId);
     }
+
+    /**
+     * Retries the reservation-confirmed email for a reservation whose original
+     * attempt failed.
+     *
+     * @param id the reservation ID
+     * @return the updated reservation response
+     */
+    @PostMapping("/{id}/confirmation-email/retry")
+    public ReservationResponse retryConfirmationEmail(@NonNull @PathVariable final UUID id) {
+        return reservationService.retryConfirmationEmail(id);
+    }
 }

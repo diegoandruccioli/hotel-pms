@@ -29,6 +29,10 @@ import java.util.UUID;
  * @param roomNumber              denormalized room number, null for legacy stays
  * @param expectedCheckOutDate    expected check-out date sourced from the reservation (or the
  *                                walk-in request) at check-in time; null for legacy stays
+ * @param invoiceCreationFailed         whether the most recent invoice-creation attempt at check-in failed
+ * @param invoiceCreationFailureReason  the reason from the most recent failed attempt, or null
+ * @param checkoutEmailFailed           whether the most recent checkout email attempt failed
+ * @param checkoutEmailFailureReason    the reason from the most recent failed attempt, or null
  */
 public record StayResponse(
                 UUID id,
@@ -48,7 +52,11 @@ public record StayResponse(
                 List<StayGuestResponse> guests,
                 String guestDisplayName,
                 String roomNumber,
-                LocalDate expectedCheckOutDate) {
+                LocalDate expectedCheckOutDate,
+                boolean invoiceCreationFailed,
+                String invoiceCreationFailureReason,
+                boolean checkoutEmailFailed,
+                String checkoutEmailFailureReason) {
     /**
      * Compact constructor to ensure defensive copying of the guests list.
      */

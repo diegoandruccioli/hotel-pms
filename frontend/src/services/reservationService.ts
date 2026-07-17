@@ -28,4 +28,9 @@ export const reservationService = {
   deleteReservation: async (id: string): Promise<void> => {
     await api.delete(`${BASE_PATH}/${id}`);
   },
+
+  retryConfirmationEmail: async (id: string): Promise<ReservationResponse> => {
+    const response = await api.post<ReservationResponse>(`${BASE_PATH}/${id}/confirmation-email/retry`, {});
+    return response.data;
+  },
 };

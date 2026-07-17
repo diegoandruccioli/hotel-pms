@@ -31,10 +31,17 @@ const getStatusTone = (status: StayStatus) => {
   }
 };
 
-const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone, t, onGuestClick }: {
+const StayRow = memo(({
+  stay, onCheckOut, checkingOut, onRetryInvoice, retryingInvoice, onRetryCheckoutEmail, retryingEmail,
+  formatDate, getStatusTone, t, onGuestClick,
+}: {
   stay: StayResponse;
   onCheckOut: (s: StayResponse) => void;
   checkingOut: string | null;
+  onRetryInvoice: (s: StayResponse) => void;
+  retryingInvoice: string | null;
+  onRetryCheckoutEmail: (s: StayResponse) => void;
+  retryingEmail: string | null;
   formatDate: (d?: string) => string;
   getStatusTone: (s: StayStatus) => "success" | "neutral" | "info";
   t: TFunction;
@@ -43,6 +50,14 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
   const handleCheckOut = useCallback(() => {
     onCheckOut(stay);
   }, [onCheckOut, stay]);
+
+  const handleRetryInvoice = useCallback(() => {
+    onRetryInvoice(stay);
+  }, [onRetryInvoice, stay]);
+
+  const handleRetryCheckoutEmail = useCallback(() => {
+    onRetryCheckoutEmail(stay);
+  }, [onRetryCheckoutEmail, stay]);
 
   const handleGuestNameClick = useCallback(() => {
     onGuestClick(stay.guestDisplayName ?? stay.guestId);
@@ -81,18 +96,48 @@ const StayRow = memo(({ stay, onCheckOut, checkingOut, formatDate, getStatusTone
         />
       </M3TableCell>
       <M3TableCell>
-        <span title={stay.alloggiatiSendFailed ? stay.alloggiatiFailureReason ?? undefined : undefined}>
-          <M3StatusChip
-            label={
-              stay.alloggiatiSent
-                ? t('alloggiati_sent')
-                : stay.alloggiatiSendFailed
-                  ? t('alloggiati_failed')
-                  : t('alloggiati_not_sent')
-            }
-            tone={stay.alloggiatiSent ? 'success' : stay.alloggiatiSendFailed ? 'error' : 'neutral'}
-          />
-        </span>
+        <div className="flex flex-col items-start gap-1">
+          <span title={stay.alloggiatiSendFailed ? stay.alloggiatiFailureReason ?? undefined : undefined}>
+            <M3StatusChip
+              label={
+                stay.alloggiatiSent
+                  ? t('alloggiati_sent')
+                  : stay.alloggiatiSendFailed
+                    ? t('alloggiati_failed')
+                    : t('alloggiati_not_sent')
+              }
+              tone={stay.alloggiatiSent ? 'success' : stay.alloggiatiSendFailed ? 'error' : 'neutral'}
+            />
+          </span>
+          {stay.invoiceCreationFailed && (
+            <span className="inline-flex items-center gap-1" title={stay.invoiceCreationFailureReason ?? undefined}>
+              <M3StatusChip label={t('invoice_creation_failed')} tone="error" />
+              <button
+                type="button"
+                onClick={handleRetryInvoice}
+                disabled={retryingInvoice === stay.id}
+                aria-label={t('retry_invoice_creation')}
+                className="flex items-center justify-center w-6 h-6 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+              >
+                <MaterialIcon name={retryingInvoice === stay.id ? 'progress_activity' : 'refresh'} size={16} />
+              </button>
+            </span>
+          )}
+          {stay.checkoutEmailFailed && (
+            <span className="inline-flex items-center gap-1" title={stay.checkoutEmailFailureReason ?? undefined}>
+              <M3StatusChip label={t('checkout_email_failed')} tone="error" />
+              <button
+                type="button"
+                onClick={handleRetryCheckoutEmail}
+                disabled={retryingEmail === stay.id}
+                aria-label={t('retry_checkout_email')}
+                className="flex items-center justify-center w-6 h-6 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+              >
+                <MaterialIcon name={retryingEmail === stay.id ? 'progress_activity' : 'refresh'} size={16} />
+              </button>
+            </span>
+          )}
+        </div>
       </M3TableCell>
       <M3TableCell className="text-right">
         {stay.status === 'CHECKED_IN' && (
@@ -148,6 +193,8 @@ export const Stays = memo(() => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
+  const [retryingInvoice, setRetryingInvoice] = useState<string | null>(null);
+  const [retryingEmail, setRetryingEmail] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StayStatus | 'ALL'>(() => navState?.statusFilter ?? 'ALL');
@@ -228,6 +275,34 @@ export const Stays = memo(() => {
       addToast(message, 'error');
     } finally {
       setCheckingOut(null);
+    }
+  }, [addToast, t]);
+
+  const handleRetryInvoice = useCallback(async (stay: StayResponse) => {
+    setRetryingInvoice(stay.id);
+    try {
+      const updated = await stayService.retryInvoiceCreation(stay.id);
+      setStays((prev) => prev.map((s) => (s.id === stay.id ? updated : s)));
+      addToast(t('invoice_retry_success'), 'success');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('invoice_retry_failed');
+      addToast(message, 'error');
+    } finally {
+      setRetryingInvoice(null);
+    }
+  }, [addToast, t]);
+
+  const handleRetryCheckoutEmail = useCallback(async (stay: StayResponse) => {
+    setRetryingEmail(stay.id);
+    try {
+      const updated = await stayService.retryCheckoutEmail(stay.id);
+      setStays((prev) => prev.map((s) => (s.id === stay.id ? updated : s)));
+      addToast(t('checkout_email_retry_success'), 'success');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : t('checkout_email_retry_failed');
+      addToast(message, 'error');
+    } finally {
+      setRetryingEmail(null);
     }
   }, [addToast, t]);
 
@@ -348,6 +423,10 @@ export const Stays = memo(() => {
                 stay={stay}
                 onCheckOut={handleCheckOut}
                 checkingOut={checkingOut}
+                onRetryInvoice={handleRetryInvoice}
+                retryingInvoice={retryingInvoice}
+                onRetryCheckoutEmail={handleRetryCheckoutEmail}
+                retryingEmail={retryingEmail}
                 formatDate={formatDate}
                 getStatusTone={getStatusTone}
                 t={t}

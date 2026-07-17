@@ -21,6 +21,8 @@ import java.util.UUID;
  * @param active       is active
  * @param createdAt    creation time
  * @param updatedAt    update time
+ * @param confirmationEmailFailed       whether the most recent reservation-confirmed email attempt failed
+ * @param confirmationEmailFailureReason the error from the most recent failed attempt, or null
  */
 @SuppressWarnings({ "EI_EXPOSE_REP", "EI_EXPOSE_REP2" })
 public record ReservationResponse(
@@ -35,7 +37,9 @@ public record ReservationResponse(
                 List<ReservationLineItemResponse> lineItems,
                 boolean active,
                 LocalDateTime createdAt,
-                LocalDateTime updatedAt) {
+                LocalDateTime updatedAt,
+                boolean confirmationEmailFailed,
+                String confirmationEmailFailureReason) {
 
         /**
          * Compact constructor.

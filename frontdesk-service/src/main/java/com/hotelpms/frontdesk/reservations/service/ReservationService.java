@@ -88,4 +88,14 @@ public interface ReservationService {
      * @return the rooms available for that range, ordered by room number
      */
     List<RoomResponse> getAvailableRooms(LocalDate checkIn, LocalDate checkOut);
+
+    /**
+     * Retries the reservation-confirmed email for a reservation whose original attempt
+     * failed (notification-service was unavailable). Clears {@code confirmationEmailFailed}
+     * on success. Scoped to the authenticated hotel.
+     *
+     * @param id the reservation ID
+     * @return the updated reservation response
+     */
+    ReservationResponse retryConfirmationEmail(UUID id);
 }

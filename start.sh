@@ -78,7 +78,7 @@ cleanup() {
         echo ""
         log_info "Shutting down Docker containers..."
         cd "$SCRIPT_DIR"
-        docker compose down 2>/dev/null || true
+        docker compose down --remove-orphans 2>/dev/null || true
         log_ok "Containers stopped. Goodbye!"
     fi
 
@@ -299,7 +299,7 @@ log_step "4/8" "Starting Docker infrastructure"
 if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
     die ".env file not found — HMAC setup may have failed silently."
 fi
-docker compose --env-file .env up -d --build
+docker compose --env-file .env --profile observability --profile backup up -d --build
 COMPOSE_STARTED=1
 log_ok "All containers are starting."
 

@@ -67,6 +67,9 @@ import java.util.UUID;
 public class StayServiceImpl implements StayService {
 
     private static final String PAID_STATUS = "PAID";
+    private static final String BILLING_SERVICE_UNAVAILABLE_REASON = "BILLING_SERVICE_UNAVAILABLE";
+    private static final String NOTIFICATION_SERVICE_UNAVAILABLE_REASON = "NOTIFICATION_SERVICE_UNAVAILABLE";
+    private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
     private static final Set<ReservationStatus> CHECKIN_ALLOWED_STATUSES =
             Set.of(ReservationStatus.CONFIRMED, ReservationStatus.PARTIALLY_CHECKED_IN);
     private static final int MAX_FAILURE_REASON_LENGTH = 500;
@@ -143,7 +146,7 @@ public class StayServiceImpl implements StayService {
         log.info("Processing check-out for stay ID: {}", stayId);
 
         final Stay stay = stayRepository.findByIdAndHotelId(stayId, hotelId)
-                .orElseThrow(() -> new NotFoundException("STAY_NOT_FOUND"));
+                .orElseThrow(() -> new NotFoundException(STAY_NOT_FOUND_MSG));
 
         if (stay.getStatus() != StayStatus.CHECKED_IN) {
             log.warn("[STAY] CHECK_OUT_FAILED | stayId={} | reason=INVALID_STATUS | currentStatus={}",
@@ -233,7 +236,7 @@ public class StayServiceImpl implements StayService {
         log.debug("Fetching stay by ID: {}", id);
         return stayRepository.findByIdAndHotelId(id, hotelId)
                 .map(stayMapper::toDto)
-                .orElseThrow(() -> new NotFoundException("STAY_NOT_FOUND"));
+                .orElseThrow(() -> new NotFoundException(STAY_NOT_FOUND_MSG));
     }
 
     /** {@inheritDoc} */
@@ -415,6 +418,33 @@ public class StayServiceImpl implements StayService {
 
     /** {@inheritDoc} */
     @Override
+    @Transactional
+    public StayResponse retryInvoiceCreation(@NonNull final UUID stayId, @NonNull final UUID hotelId) {
+        final Stay stay = stayRepository.findByIdAndHotelId(stayId, hotelId)
+                .orElseThrow(() -> new NotFoundException(STAY_NOT_FOUND_MSG));
+        openInvoiceForStay(stay);
+        return stayMapper.toDto(stay);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public StayResponse retryCheckoutEmail(@NonNull final UUID stayId, @NonNull final UUID hotelId) {
+        final Stay stay = stayRepository.findByIdAndHotelId(stayId, hotelId)
+                .orElseThrow(() -> new NotFoundException(STAY_NOT_FOUND_MSG));
+        if (stay.getStatus() != StayStatus.CHECKED_OUT) {
+            throw new IllegalStateException("INVALID_STAY_STATUS");
+        }
+        final InvoiceStatusResponse invoice = resolveInvoiceForCheckOut(stay);
+        if (invoice == null) {
+            throw new NotFoundException("INVOICE_NOT_FOUND");
+        }
+        sendCheckoutEmailIfPossible(stay, invoice);
+        return stayMapper.toDto(stay);
+    }
+
+    /** {@inheritDoc} */
+    @Override
     @Transactional(readOnly = true)
     public AlloggiatiFailureSummaryResponse getAlloggiatiFailureSummary(@NonNull final UUID hotelId) {
         final List<Stay> failed = stayRepository.findByHotelIdAndAlloggiatiSendFailedTrue(hotelId);
@@ -444,9 +474,14 @@ public class StayServiceImpl implements StayService {
         final InvoiceCreatedResponse invoiceResp = billingClient.createInvoiceForStay(invoiceReq);
         if (invoiceResp != null && invoiceResp.id() != null) {
             stay.setInvoiceId(invoiceResp.id());
+            stay.setInvoiceCreationFailed(false);
+            stay.setInvoiceCreationFailureReason(null);
             stayRepository.save(stay);
             log.info("[STAY] INVOICE_CREATED | stayId={} | invoiceId={}", stay.getId(), invoiceResp.id());
         } else {
+            stay.setInvoiceCreationFailed(true);
+            stay.setInvoiceCreationFailureReason(BILLING_SERVICE_UNAVAILABLE_REASON);
+            stayRepository.save(stay);
             log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason=BILLING_SERVICE_UNAVAILABLE",
                     stay.getId());
         }
@@ -473,7 +508,7 @@ public class StayServiceImpl implements StayService {
                 lines = List.of();
                 currency = "EUR";
             }
-            notificationClient.sendCheckout(new NotificationCheckoutRequest(
+            final boolean sent = notificationClient.sendCheckout(new NotificationCheckoutRequest(
                     guest.email(),
                     guest.firstName() + " " + guest.lastName(),
                     settings.hotelName(),
@@ -487,8 +522,14 @@ public class StayServiceImpl implements StayService {
                     settings.emailSubjectCheckout(),
                     settings.emailGreetingText(),
                     settings.logoUrl()));
+            stay.setCheckoutEmailFailed(!sent);
+            stay.setCheckoutEmailFailureReason(sent ? null : NOTIFICATION_SERVICE_UNAVAILABLE_REASON);
+            stayRepository.save(stay);
         } catch (final feign.FeignException | DataAccessException ex) {
             log.warn("[STAY] CHECKOUT_EMAIL_SKIPPED | stayId={} | reason={}", stay.getId(), ex.getMessage());
+            stay.setCheckoutEmailFailed(true);
+            stay.setCheckoutEmailFailureReason(truncateFailureReason(ex.getMessage()));
+            stayRepository.save(stay);
         }
     }
 

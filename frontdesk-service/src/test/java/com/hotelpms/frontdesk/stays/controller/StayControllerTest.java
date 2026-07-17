@@ -68,6 +68,7 @@ class StayControllerTest {
     private static final String JSON_STATUS = "$.status";
     private static final String TEST_DATE = "2026-05-01";
     private static final String STATO_CODE = "Z000";
+    private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
 
     @Mock
     private StayService stayService;
@@ -109,7 +110,8 @@ class StayControllerTest {
 
         stayResponse = new StayResponse(
                 stayId, hotelId, null, guestId, UUID.randomUUID(),
-                StayStatus.CHECKED_IN, null, null, null, null, null, false, false, null, List.of(), null, null, null);
+                StayStatus.CHECKED_IN, null, null, null, null, null, false, false, null, List.of(), null, null, null,
+                false, null, false, null);
 
         final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 "admin", "", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
@@ -153,7 +155,8 @@ class StayControllerTest {
     void shouldCheckOutReturn200() throws Exception {
         final StayResponse checkedOut = new StayResponse(
                 stayId, hotelId, null, guestId, UUID.randomUUID(),
-                StayStatus.CHECKED_OUT, null, null, null, null, null, false, false, null, List.of(), null, null, null);
+                StayStatus.CHECKED_OUT, null, null, null, null, null, false, false, null, List.of(), null, null, null,
+                false, null, false, null);
         when(stayService.checkOut(stayId, hotelId)).thenReturn(checkedOut);
 
         mockMvc.perform(put(BASE_URL + PATH_CHECKOUT, stayId))
@@ -164,7 +167,7 @@ class StayControllerTest {
     @Test
     void shouldCheckOutReturn404WhenStayNotFound() throws Exception {
         when(stayService.checkOut(stayId, hotelId))
-                .thenThrow(new NotFoundException("STAY_NOT_FOUND"));
+                .thenThrow(new NotFoundException(STAY_NOT_FOUND_MSG));
 
         mockMvc.perform(put(BASE_URL + PATH_CHECKOUT, stayId))
                 .andExpect(status().isNotFound());
@@ -191,7 +194,7 @@ class StayControllerTest {
     @Test
     void shouldGetStayByIdReturn404WhenNotFound() throws Exception {
         when(stayService.getStayById(stayId, hotelId))
-                .thenThrow(new NotFoundException("STAY_NOT_FOUND"));
+                .thenThrow(new NotFoundException(STAY_NOT_FOUND_MSG));
 
         mockMvc.perform(get(BASE_URL + PATH_BY_ID, stayId))
                 .andExpect(status().isNotFound());
@@ -272,5 +275,32 @@ class StayControllerTest {
         mockMvc.perform(post(BASE_URL + PATH_REPORT_SUBMIT)
                         .param(PARAM_DATE, TEST_DATE))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldRetryInvoiceCreationReturn200() throws Exception {
+        when(stayService.retryInvoiceCreation(stayId, hotelId)).thenReturn(stayResponse);
+
+        mockMvc.perform(post(BASE_URL + "/{id}/invoice/retry", stayId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_ID).value(stayId.toString()));
+    }
+
+    @Test
+    void shouldRetryInvoiceCreationReturn404WhenStayNotFound() throws Exception {
+        when(stayService.retryInvoiceCreation(stayId, hotelId))
+                .thenThrow(new NotFoundException(STAY_NOT_FOUND_MSG));
+
+        mockMvc.perform(post(BASE_URL + "/{id}/invoice/retry", stayId))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldRetryCheckoutEmailReturn200() throws Exception {
+        when(stayService.retryCheckoutEmail(stayId, hotelId)).thenReturn(stayResponse);
+
+        mockMvc.perform(post(BASE_URL + "/{id}/checkout-email/retry", stayId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_ID).value(stayId.toString()));
     }
 }

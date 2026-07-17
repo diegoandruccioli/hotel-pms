@@ -109,6 +109,14 @@ export interface StayResponse {
   roomNumber?: string | null;
   /** Expected check-out date sourced from the reservation (or walk-in request) at check-in; null for legacy stays. */
   expectedCheckOutDate?: string | null;
+  /** Whether the most recent billing-invoice-creation attempt at check-in failed. */
+  invoiceCreationFailed: boolean;
+  /** Error message from the most recent failed invoice-creation attempt; null once resolved. */
+  invoiceCreationFailureReason?: string | null;
+  /** Whether the most recent checkout summary email attempt failed. */
+  checkoutEmailFailed: boolean;
+  /** Error message from the most recent failed checkout email attempt; null once resolved. */
+  checkoutEmailFailureReason?: string | null;
 }
 
 /** Summary of unresolved Alloggiati Web submission failures for the caller's hotel. */

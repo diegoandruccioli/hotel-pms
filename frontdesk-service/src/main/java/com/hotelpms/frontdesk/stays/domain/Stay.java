@@ -165,6 +165,36 @@ public class Stay {
     private String alloggiatiFailureReason;
 
     /**
+     * Whether the most recent billing-invoice-creation attempt at check-in failed
+     * (billing-service circuit breaker open or call failed). Mirrors
+     * {@link #alloggiatiSendFailed} — cleared as soon as a retry succeeds.
+     */
+    @Column(name = "invoice_creation_failed", nullable = false)
+    private boolean invoiceCreationFailed;
+
+    /**
+     * The reason for the most recent failed invoice-creation attempt, for staff
+     * visibility. {@code null} once resolved.
+     */
+    @Column(name = "invoice_creation_failure_reason")
+    private String invoiceCreationFailureReason;
+
+    /**
+     * Whether the most recent checkout summary email attempt failed
+     * (notification-service circuit breaker open or call failed). Mirrors
+     * {@link #alloggiatiSendFailed} — cleared as soon as a retry succeeds.
+     */
+    @Column(name = "checkout_email_failed", nullable = false)
+    private boolean checkoutEmailFailed;
+
+    /**
+     * The reason for the most recent failed checkout email attempt, for staff
+     * visibility. {@code null} once resolved.
+     */
+    @Column(name = "checkout_email_failure_reason")
+    private String checkoutEmailFailureReason;
+
+    /**
      * Expected check-out date sourced from the reservation at check-in time.
      * Used to calculate the {@code permanenza} (number of nights) in the Alloggiati tracciato.
      * May be {@code null} for stays created before this feature was introduced.

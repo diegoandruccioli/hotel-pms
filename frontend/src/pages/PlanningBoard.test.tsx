@@ -29,7 +29,7 @@ const RESERVATION: ReservationResponse = {
   id: 'res1', guestId: 'g1', guestFullName: 'John Doe', expectedGuests: 2, actualGuests: 0,
   checkInDate: '2026-05-01', checkOutDate: '2026-05-05', status: 'CONFIRMED',
   lineItems: [{ id: 'li1', roomId: 'r1', price: 50, active: true, createdAt: '', updatedAt: '' }],
-  active: true, createdAt: '', updatedAt: '',
+  active: true, createdAt: '', updatedAt: '', confirmationEmailFailed: false,
 };
 
 const CURRENT_DATE = new Date('2026-05-07');

@@ -274,7 +274,7 @@ function Invoke-Cleanup {
         # Best-effort: do not treat a non-zero exit as fatal during cleanup.
         $prev = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
-        docker compose down 2>$null
+        docker compose down --remove-orphans 2>$null
         $ErrorActionPreference = $prev
         Write-Log '[OK]   Containers stopped. Goodbye!' -Color Green
     }
@@ -341,7 +341,7 @@ try {
         if (-not (Test-Path $envFile)) {
             Stop-WithError ".env file not found at $envFile -- HMAC setup may have failed silently."
         }
-        Invoke-Native 'docker compose up' { docker compose --env-file $envFile up -d --build } -AllowStderr
+        Invoke-Native 'docker compose up' { docker compose --env-file $envFile --profile observability --profile backup up -d --build } -AllowStderr
         $script:ComposeStarted = $true
         Write-Success 'All containers are starting.'
 

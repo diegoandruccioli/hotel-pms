@@ -89,7 +89,7 @@ class ReservationControllerTest {
         response = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, 2, 0,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.CONFIRMED, null, true, null, null);
+                ReservationStatus.CONFIRMED, null, true, null, null, false, null);
     }
 
     @Test
@@ -168,7 +168,7 @@ class ReservationControllerTest {
         final ReservationResponse checkedInResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, 2, 2,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.CHECKED_IN, null, true, null, null);
+                ReservationStatus.CHECKED_IN, null, true, null, null, false, null);
 
         when(reservationService.updateStatusAndGuests(
                 any(UUID.class), any(ReservationStatus.class), any(Integer.class)))
@@ -207,6 +207,24 @@ class ReservationControllerTest {
         mockMvc.perform(get(BASE_URL + "/guest/{guestId}/active", GUEST_ID))
                 .andExpect(status().isOk())
                 .andExpect(content().string("false"));
+    }
+
+    @Test
+    void shouldRetryConfirmationEmailReturn200() throws Exception {
+        when(reservationService.retryConfirmationEmail(reservationId)).thenReturn(response);
+
+        mockMvc.perform(post(BASE_URL + "/{id}/confirmation-email/retry", reservationId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_ID).value(reservationId.toString()));
+    }
+
+    @Test
+    void shouldRetryConfirmationEmailReturn404WhenReservationNotFound() throws Exception {
+        when(reservationService.retryConfirmationEmail(reservationId))
+                .thenThrow(new NotFoundException("RESERVATION_NOT_FOUND"));
+
+        mockMvc.perform(post(BASE_URL + "/{id}/confirmation-email/retry", reservationId))
+                .andExpect(status().isNotFound());
     }
 
     private ReservationRequest buildValidRequest() {

@@ -186,7 +186,7 @@ if not exist "%~dp0.env" (
     goto FATAL
 )
 
-docker compose --env-file .env up -d --build
+docker compose --env-file .env --profile observability --profile backup up -d --build
 if !ERRORLEVEL! neq 0 (
     set "FATAL_MSG=docker compose up failed with exit code !ERRORLEVEL!."
     goto FATAL
@@ -324,7 +324,7 @@ goto CLEANUP
         echo.
         call :LOG_INFO "Shutting down Docker containers..."
         cd /d "%~dp0"
-        docker compose down >nul 2>&1
+        docker compose down --remove-orphans >nul 2>&1
         call :LOG_OK "Containers stopped."
     )
 
@@ -344,7 +344,7 @@ goto CLEANUP
         echo.
         call :LOG_INFO "Shutting down Docker containers..."
         cd /d "%~dp0"
-        docker compose down >nul 2>&1
+        docker compose down --remove-orphans >nul 2>&1
         call :LOG_OK "Containers stopped. Goodbye!"
     )
     echo.

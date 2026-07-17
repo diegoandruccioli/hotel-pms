@@ -9,6 +9,7 @@ import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.reservations.domain.Reservation;
+import com.hotelpms.frontdesk.reservations.domain.ReservationLineItem;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
 import com.hotelpms.frontdesk.reservations.dto.ReservationLineItemRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationRequest;
@@ -52,6 +53,8 @@ public class ReservationServiceImpl implements ReservationService {
             List.of(ReservationStatus.CHECKED_OUT, ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW);
     private static final List<ReservationStatus> DELETABLE_STATUSES =
             List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
+    private static final String NOTIFICATION_SERVICE_UNAVAILABLE_REASON = "NOTIFICATION_SERVICE_UNAVAILABLE";
+    private static final int MAX_FAILURE_REASON_LENGTH = 500;
 
     private final ReservationRepository reservationRepository;
     private final ReservationMapper reservationMapper;
@@ -83,7 +86,7 @@ public class ReservationServiceImpl implements ReservationService {
         }
 
         final Reservation savedReservation = reservationRepository.save(Objects.requireNonNull(reservation));
-        sendReservationConfirmedEmailIfPossible(savedReservation.getId(), hotelId, guest, request, roomNumbers);
+        sendReservationConfirmedEmail(savedReservation, hotelId, guest, roomNumbers);
         return enrichWithGuestName(reservationMapper.toResponse(savedReservation), guest);
     }
 
@@ -185,6 +188,25 @@ public class ReservationServiceImpl implements ReservationService {
         final Reservation saved = reservationRepository.save(Objects.requireNonNull(reservation));
         final GuestResponse guest = guestClient.getGuestById(saved.getGuestId());
         return enrichWithGuestName(reservationMapper.toResponse(saved), guest);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public ReservationResponse retryConfirmationEmail(final UUID id) {
+        Objects.requireNonNull(id, ID_NOT_NULL_MSG);
+        final UUID hotelId = resolveHotelId();
+        final Reservation reservation = findReservationByIdAndHotelOrThrow(id, hotelId);
+        final GuestResponse guest = guestClient.getGuestById(reservation.getGuestId());
+        final java.util.Map<UUID, String> roomNumbers = new java.util.HashMap<>();
+        if (reservation.getLineItems() != null) {
+            for (final ReservationLineItem lineItem : reservation.getLineItems()) {
+                final RoomResponse room = roomService.getRoomById(lineItem.getRoomId(), hotelId);
+                roomNumbers.put(lineItem.getRoomId(), room.roomNumber());
+            }
+        }
+        sendReservationConfirmedEmail(reservation, hotelId, guest, roomNumbers);
+        return enrichWithGuestName(reservationMapper.toResponse(reservation), guest);
     }
 
     /** {@inheritDoc} */
@@ -312,7 +334,9 @@ public class ReservationServiceImpl implements ReservationService {
                 response.lineItems(),
                 response.active(),
                 response.createdAt(),
-                response.updatedAt()
+                response.updatedAt(),
+                response.confirmationEmailFailed(),
+                response.confirmationEmailFailureReason()
         );
     }
 
@@ -373,40 +397,54 @@ public class ReservationServiceImpl implements ReservationService {
         }
     }
 
-    private void sendReservationConfirmedEmailIfPossible(
-            final UUID reservationId,
+    private void sendReservationConfirmedEmail(
+            final Reservation reservation,
             final UUID hotelId,
             final GuestResponse guest,
-            final ReservationRequest request,
             final java.util.Map<UUID, String> roomNumbers) {
         try {
             final HotelSettingsResponse settings = hotelSettingsService.getOrCreate(hotelId);
             if (!settings.sendReservationConfirmedEmail()) {
                 return;
             }
-            final int nights = (int) request.checkInDate().until(request.checkOutDate(), ChronoUnit.DAYS);
-            final String roomDetails = request.lineItems() != null && !request.lineItems().isEmpty()
-                    ? request.lineItems().stream()
-                            .map(li -> roomNumbers.getOrDefault(li.roomId(), li.roomId().toString()))
+            final int nights = (int) reservation.getCheckInDate().until(reservation.getCheckOutDate(), ChronoUnit.DAYS);
+            final String roomDetails = reservation.getLineItems() != null && !reservation.getLineItems().isEmpty()
+                    ? reservation.getLineItems().stream()
+                            .map(li -> roomNumbers.getOrDefault(li.getRoomId(), li.getRoomId().toString()))
                             .collect(java.util.stream.Collectors.joining(", "))
                     : "";
-            notificationClient.sendReservationConfirmed(new NotificationReservationRequest(
+            final boolean sent = notificationClient.sendReservationConfirmed(new NotificationReservationRequest(
                     guest.email(),
                     guest.firstName() + " " + guest.lastName(),
                     settings.hotelName(),
                     roomDetails,
-                    request.checkInDate(),
-                    request.checkOutDate(),
+                    reservation.getCheckInDate(),
+                    reservation.getCheckOutDate(),
                     nights,
-                    reservationId.toString(),
+                    reservation.getId().toString(),
                     "it",
                     settings.emailSubjectReservationConfirmed(),
                     settings.emailGreetingText(),
                     settings.logoUrl()));
+            reservation.setConfirmationEmailFailed(!sent);
+            reservation.setConfirmationEmailFailureReason(sent ? null : NOTIFICATION_SERVICE_UNAVAILABLE_REASON);
+            reservationRepository.save(reservation);
         } catch (final DataAccessException | NotFoundException ex) {
             log.warn("[RESERVATION] CONFIRMED_EMAIL_SKIPPED | reservationId={} | reason={}",
-                    reservationId, ex.getMessage());
+                    reservation.getId(), ex.getMessage());
+            reservation.setConfirmationEmailFailed(true);
+            reservation.setConfirmationEmailFailureReason(truncateFailureReason(ex.getMessage()));
+            reservationRepository.save(reservation);
         }
+    }
+
+    private static String truncateFailureReason(final String message) {
+        if (message == null) {
+            return null;
+        }
+        return message.length() > MAX_FAILURE_REASON_LENGTH
+                ? message.substring(0, MAX_FAILURE_REASON_LENGTH)
+                : message;
     }
 
     private void verifyNoOverlappingReservations(final UUID excludeId, final ReservationRequest request) {

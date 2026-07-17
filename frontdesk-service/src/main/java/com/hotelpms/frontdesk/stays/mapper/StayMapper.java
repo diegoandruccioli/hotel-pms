@@ -36,6 +36,10 @@ public interface StayMapper {
     @Mapping(target = "alloggiatiSent", ignore = true)
     @Mapping(target = "alloggiatiSendFailed", ignore = true)
     @Mapping(target = "alloggiatiFailureReason", ignore = true)
+    @Mapping(target = "invoiceCreationFailed", ignore = true)
+    @Mapping(target = "invoiceCreationFailureReason", ignore = true)
+    @Mapping(target = "checkoutEmailFailed", ignore = true)
+    @Mapping(target = "checkoutEmailFailureReason", ignore = true)
     @Mapping(target = "guestDisplayName", ignore = true)
     @Mapping(target = "roomNumber", ignore = true)
     Stay toEntity(StayRequest request);
@@ -54,6 +58,10 @@ public interface StayMapper {
     @Mapping(target = "alloggiatiSent", ignore = true)
     @Mapping(target = "alloggiatiSendFailed", ignore = true)
     @Mapping(target = "alloggiatiFailureReason", ignore = true)
+    @Mapping(target = "invoiceCreationFailed", ignore = true)
+    @Mapping(target = "invoiceCreationFailureReason", ignore = true)
+    @Mapping(target = "checkoutEmailFailed", ignore = true)
+    @Mapping(target = "checkoutEmailFailureReason", ignore = true)
     @Mapping(target = "guestDisplayName", ignore = true)
     @Mapping(target = "roomNumber", ignore = true)
     void updateEntityFromDto(StayRequest request, @MappingTarget Stay stay);

@@ -34,4 +34,8 @@ export interface ReservationResponse {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Whether the most recent reservation-confirmed email attempt failed. */
+  confirmationEmailFailed: boolean;
+  /** Error message from the most recent failed attempt; null once resolved. */
+  confirmationEmailFailureReason?: string | null;
 }

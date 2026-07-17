@@ -139,6 +139,7 @@ const mockReservation = (overrides: Partial<ReservationResponse> = {}): Reservat
   active: true,
   createdAt: '2026-01-01T00:00:00',
   updatedAt: '2026-01-01T00:00:00',
+  confirmationEmailFailed: false,
   ...overrides,
 });
 

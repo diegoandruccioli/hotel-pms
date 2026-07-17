@@ -154,13 +154,13 @@ class StayServiceImplTest {
         validResponse = new StayResponse(stayId, null, reservationId, guestId, roomId,
                 StayStatus.CHECKED_IN, savedStay.getActualCheckInTime(), null,
                 LocalDateTime.now(), LocalDateTime.now(), null, false, false, null, new ArrayList<>(), null, null,
-                null);
+                null, false, null, false, null);
     }
 
     private ReservationResponse reservationResponse(
             final ReservationStatus status, final List<ReservationLineItemResponse> lineItems) {
         return new ReservationResponse(reservationId, guestId, null, 2, 0,
-                LocalDate.now(), LocalDate.now().plusDays(3), status, lineItems, true, null, null);
+                LocalDate.now(), LocalDate.now().plusDays(3), status, lineItems, true, null, null, false, null);
     }
 
     private RoomResponse room() {
@@ -447,6 +447,7 @@ class StayServiceImplTest {
         when(billingClient.getInvoiceForEmail(invoiceId))
                 .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, PAID_STATUS,
                         INVOICE_TOTAL_200, CURRENCY_EUR, List.of()));
+        when(notificationClient.sendCheckout(ArgumentMatchers.any())).thenReturn(true);
 
         // Act
         final StayResponse response = stayService.checkOut(id, hotelId);
@@ -455,10 +456,52 @@ class StayServiceImplTest {
         assertNotNull(response);
         assertEquals(StayStatus.CHECKED_OUT, checkedInStay.getStatus());
         assertNotNull(checkedInStay.getActualCheckOutTime());
+        assertFalse(checkedInStay.isCheckoutEmailFailed());
         verify(roomService, times(1)).updateRoomStatus(Objects.requireNonNull(roomId), hotelId, RoomStatus.DIRTY);
         verify(reservationService, times(1))
                 .updateStatusAndGuests(reservationId, ReservationStatus.CHECKED_OUT, null);
         verify(notificationClient, times(1)).sendCheckout(ArgumentMatchers.any());
+    }
+
+    @Test
+    void shouldMarkCheckoutEmailFailedWhenNotificationServiceUnavailable() {
+        // Arrange
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay checkedInStay = Objects.requireNonNull(savedStay);
+        checkedInStay.setRoomId(roomId);
+        checkedInStay.setReservationId(reservationId);
+        checkedInStay.setHotelId(hotelId);
+
+        final UUID invoiceId = UUID.randomUUID();
+        final InvoiceStatusResponse paidInvoice = new InvoiceStatusResponse(
+                invoiceId, reservationId, PAID_STATUS, BigDecimal.valueOf(200));
+        final ReservationLineItemResponse lineItem =
+                new ReservationLineItemResponse(UUID.randomUUID(), roomId, BigDecimal.TEN, true, null, null);
+
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(checkedInStay));
+        when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
+                .thenReturn(paidInvoice);
+        when(stayRepository.save(checkedInStay)).thenReturn(checkedInStay);
+        when(stayMapper.toDto(checkedInStay)).thenReturn(validResponse);
+        when(reservationService.getReservationById(reservationId))
+                .thenReturn(reservationResponse(ReservationStatus.CHECKED_IN, List.of(lineItem)));
+        when(stayRepository.findAllByReservationId(reservationId)).thenReturn(List.of(checkedInStay));
+        when(guestClient.getGuestById(guestId))
+                .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null));
+        when(billingClient.getInvoiceForEmail(invoiceId))
+                .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, PAID_STATUS,
+                        INVOICE_TOTAL_200, CURRENCY_EUR, List.of()));
+        when(notificationClient.sendCheckout(ArgumentMatchers.any())).thenReturn(false);
+
+        // Act
+        stayService.checkOut(id, hotelId);
+
+        // Assert
+        assertTrue(checkedInStay.isCheckoutEmailFailed());
+        assertEquals("NOTIFICATION_SERVICE_UNAVAILABLE", checkedInStay.getCheckoutEmailFailureReason());
     }
 
     @Test
@@ -742,7 +785,115 @@ class StayServiceImplTest {
         // Assert
         verify(billingClient, times(1)).createInvoiceForStay(anyNonNull(StayInvoiceRequest.class));
         assertEquals(invoiceId, saved.getInvoiceId());
+        assertFalse(saved.isInvoiceCreationFailed());
         verify(stayRepository, times(2)).save(anyNonNull(Stay.class));
+    }
+
+    @Test
+    void shouldMarkInvoiceCreationFailedWhenBillingServiceUnavailable() {
+        // Arrange — circuit-breaker fallback returns null (BillingClient.createInvoiceForStayFallback)
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+        final Stay saved = Objects.requireNonNull(savedStay);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationService.getReservationById(reservation))
+                .thenReturn(reservationResponse(ReservationStatus.CONFIRMED, null));
+        when(roomService.getRoomById(room, hotelId)).thenReturn(room());
+
+        final Stay unmappedStay = new Stay();
+        when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(saved);
+        when(billingClient.createInvoiceForStay(anyNonNull(StayInvoiceRequest.class))).thenReturn(null);
+        when(stayMapper.toDto(saved)).thenReturn(Objects.requireNonNull(validResponse));
+
+        // Act
+        stayService.checkIn(request);
+
+        // Assert — check-in still succeeds (non-blocking), but the failure is now durable
+        assertNull(saved.getInvoiceId());
+        assertTrue(saved.isInvoiceCreationFailed());
+        assertEquals("BILLING_SERVICE_UNAVAILABLE", saved.getInvoiceCreationFailureReason());
+    }
+
+    @Test
+    void shouldRetryInvoiceCreationAndClearFailedFlag() {
+        // Arrange
+        final Stay stay = Objects.requireNonNull(savedStay);
+        stay.setHotelId(hotelId);
+        stay.setInvoiceCreationFailed(true);
+        stay.setInvoiceCreationFailureReason("BILLING_SERVICE_UNAVAILABLE");
+
+        final UUID invoiceId = UUID.randomUUID();
+        when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
+        when(billingClient.createInvoiceForStay(anyNonNull(StayInvoiceRequest.class)))
+                .thenReturn(new InvoiceCreatedResponse(invoiceId));
+        when(stayRepository.save(stay)).thenReturn(stay);
+        when(stayMapper.toDto(stay)).thenReturn(Objects.requireNonNull(validResponse));
+
+        // Act
+        final StayResponse response = stayService.retryInvoiceCreation(stayId, hotelId);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(invoiceId, stay.getInvoiceId());
+        assertFalse(stay.isInvoiceCreationFailed());
+        assertNull(stay.getInvoiceCreationFailureReason());
+    }
+
+    @Test
+    void shouldThrowNotFoundWhenRetryingInvoiceForUnknownStay() {
+        when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> stayService.retryInvoiceCreation(stayId, hotelId));
+    }
+
+    @Test
+    void shouldRetryCheckoutEmailAndClearFailedFlag() {
+        // Arrange
+        final Stay stay = Objects.requireNonNull(savedStay);
+        stay.setHotelId(hotelId);
+        stay.setStatus(StayStatus.CHECKED_OUT);
+        stay.setInvoiceId(UUID.randomUUID());
+        stay.setCheckoutEmailFailed(true);
+        stay.setCheckoutEmailFailureReason("NOTIFICATION_SERVICE_UNAVAILABLE");
+
+        final InvoiceStatusResponse paidInvoice = new InvoiceStatusResponse(
+                stay.getInvoiceId(), reservationId, PAID_STATUS, BigDecimal.valueOf(200));
+
+        when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
+        when(billingClient.getLatestInvoiceByReservation(reservationId)).thenReturn(paidInvoice);
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null));
+        when(guestClient.getGuestById(guestId))
+                .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(billingClient.getInvoiceForEmail(stay.getInvoiceId()))
+                .thenReturn(new InvoiceForEmailResponse(stay.getInvoiceId(), reservationId, INVOICE_NUMBER_TEST,
+                        PAID_STATUS, INVOICE_TOTAL_200, CURRENCY_EUR, List.of()));
+        when(notificationClient.sendCheckout(ArgumentMatchers.any())).thenReturn(true);
+        when(stayRepository.save(stay)).thenReturn(stay);
+        when(stayMapper.toDto(stay)).thenReturn(Objects.requireNonNull(validResponse));
+
+        // Act
+        final StayResponse response = stayService.retryCheckoutEmail(stayId, hotelId);
+
+        // Assert
+        assertNotNull(response);
+        assertFalse(stay.isCheckoutEmailFailed());
+        assertNull(stay.getCheckoutEmailFailureReason());
+    }
+
+    @Test
+    void shouldRejectCheckoutEmailRetryWhenStayNotCheckedOut() {
+        final Stay stay = Objects.requireNonNull(savedStay);
+        stay.setHotelId(hotelId);
+        stay.setStatus(StayStatus.CHECKED_IN);
+        when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
+
+        assertThrows(IllegalStateException.class, () -> stayService.retryCheckoutEmail(stayId, hotelId));
     }
 
     @Test

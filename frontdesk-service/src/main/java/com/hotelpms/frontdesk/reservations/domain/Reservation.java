@@ -91,6 +91,22 @@ public class Reservation {
     @Builder.Default
     private boolean active = true;
 
+    /**
+     * Whether the most recent reservation-confirmed email attempt failed
+     * (notification-service circuit breaker open or call failed). Mirrors the
+     * Alloggiati failure-tracking pattern in {@code Stay} — cleared as soon as
+     * a retry succeeds.
+     */
+    @Column(name = "confirmation_email_failed", nullable = false)
+    private boolean confirmationEmailFailed;
+
+    /**
+     * The reason for the most recent failed confirmation email attempt, for
+     * staff visibility. {@code null} once resolved.
+     */
+    @Column(name = "confirmation_email_failure_reason")
+    private String confirmationEmailFailureReason;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

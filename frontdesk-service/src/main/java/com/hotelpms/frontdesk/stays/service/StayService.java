@@ -117,4 +117,25 @@ public interface StayService {
      * @return the failure summary
      */
     AlloggiatiFailureSummaryResponse getAlloggiatiFailureSummary(@NonNull UUID hotelId);
+
+    /**
+     * Retries billing-invoice creation for a stay whose check-in-time attempt failed
+     * (billing-service was unavailable). Clears {@code invoiceCreationFailed} on success.
+     *
+     * @param stayId  the stay ID
+     * @param hotelId the authenticated hotel UUID; the stay must belong to it (T-STAY-04)
+     * @return the updated stay response
+     */
+    StayResponse retryInvoiceCreation(@NonNull UUID stayId, @NonNull UUID hotelId);
+
+    /**
+     * Retries the checkout summary email for a checked-out stay whose original attempt
+     * failed (notification-service was unavailable). Clears {@code checkoutEmailFailed}
+     * on success.
+     *
+     * @param stayId  the stay ID
+     * @param hotelId the authenticated hotel UUID; the stay must belong to it (T-STAY-04)
+     * @return the updated stay response
+     */
+    StayResponse retryCheckoutEmail(@NonNull UUID stayId, @NonNull UUID hotelId);
 }
