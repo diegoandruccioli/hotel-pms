@@ -1,16 +1,25 @@
 # ============================================================
 # Hotel PMS – Production port-hardening override
 # ============================================================
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#          --profile observability --profile backup up -d
+# The --profile flags are required here: docker-compose.yml gates
+# loki/grafana/zipkin/alertmanager/prometheus ("observability") and
+# db-backup ("backup") behind opt-in profiles for a leaner dev default.
+# An override file only changes settings for services already selected —
+# it does NOT re-enable a profile-gated service. Omitting these flags in
+# production would silently drop monitoring/backup, not just harden ports.
 #
 # Removes host port publishing for every service except the two
 # meant to be reachable from outside the host: frontend (:80) and
 # api-gateway (:8080). All other services (Postgres, Redis, Loki,
-# Grafana, Zipkin, Prometheus, config-server, and every backend
-# microservice) stay reachable on the internal compose networks —
-# inter-container DNS resolution does not depend on host port
-# publishing — but are no longer bound to the host's network
-# interface. OWASP A05 — Security Misconfiguration (ROADMAP P0).
+# Grafana, Zipkin, Alertmanager, Prometheus, config-server, and every
+# backend microservice incl. notification-service) stay reachable on
+# the internal compose networks — inter-container DNS resolution does
+# not depend on host port publishing — but are no longer bound to the
+# host's network interface. OWASP A05 — Security Misconfiguration
+# (ROADMAP P0). New services (e.g. Alertmanager/P4, notification-service/C1)
+# must be added here too, or they leak onto the host in "production".
 # ============================================================
 
 services:
@@ -48,4 +57,10 @@ services:
     ports: !reset []
 
   fb-service:
+    ports: !reset []
+
+  notification-service:
+    ports: !reset []
+
+  alertmanager:
     ports: !reset []
