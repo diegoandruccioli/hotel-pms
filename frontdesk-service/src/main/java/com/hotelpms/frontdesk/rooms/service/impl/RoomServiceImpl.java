@@ -61,7 +61,7 @@ public class RoomServiceImpl implements RoomService {
     public RoomResponse createRoom(final RoomRequest request, final UUID hotelId) {
         Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
         final UUID roomTypeId = Objects.requireNonNull(request.roomTypeId(), ROOM_TYPE_ID_NULL_MSG);
-        final RoomType roomType = roomTypeRepository.findById(roomTypeId)
+        final RoomType roomType = roomTypeRepository.findByIdAndHotelId(roomTypeId, hotelId)
                 .filter((@NonNull RoomType rt) -> rt.isActive())
                 .orElseThrow(() -> new NotFoundException(TYPE_NOT_FOUND_MSG + roomTypeId));
 
@@ -130,7 +130,7 @@ public class RoomServiceImpl implements RoomService {
                 .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
 
         final UUID roomTypeId = Objects.requireNonNull(request.roomTypeId(), ROOM_TYPE_ID_NULL_MSG);
-        final RoomType roomType = roomTypeRepository.findById(roomTypeId)
+        final RoomType roomType = roomTypeRepository.findByIdAndHotelId(roomTypeId, hotelId)
                 .filter((@NonNull RoomType rt) -> rt.isActive())
                 .orElseThrow(() -> new NotFoundException(TYPE_NOT_FOUND_MSG + roomTypeId));
 

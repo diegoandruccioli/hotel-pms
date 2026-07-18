@@ -3929,6 +3929,91 @@ in precedenza, coerente con come il gap sia passato inosservato.
 \paragraph{Riferimento} Commit: \commitref{6e5bc0e}{fix(security): T-STAY-06 --- cross-tenant data leak on check-in pre-fill}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{IDOR e Tampering Cross-Tenant sul Catalogo Room Type \threat{T-ROOM-02}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+La tabella \texttt{room\_types} risale alla baseline V1, precedente alla convenzione
+\texttt{hotel\_id} adottata per l'isolamento multi-tenant, ed era rimasta priva della
+colonna. Il gap era stato inizialmente registrato in GAP-6 come limite architetturale
+accettato (``catalogo tipologie camera globale, non per-hotel''); un approfondimento
+successivo ha invece dimostrato che si trattava di un IDOR reale e sfruttabile: qualunque
+ADMIN/OWNER autenticato di un hotel, noto un UUID di room-type di un hotel diverso,
+poteva leggerlo, modificarne prezzo/nome/capienza o cancellarlo (soft-delete) --- non
+solo un filtro di lettura mancante, ma superficie di scrittura cross-tenant. Il vincolo
+\texttt{UNIQUE(name)} globale impediva inoltre a due hotel indipendenti di usare entrambi
+lo stesso nome di tipologia (es. ``Deluxe''). Stessa classe di T-BILL-04/T-STAY-06,
+trovato con lo stesso metodo (verifica dei gap noti della regola ArchUnit di GAP-6).
+Classificato OWASP A01 --- Broken Access Control.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- RoomTypeServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: nessun hotelId, room_types senza colonna hotel_id
+public RoomTypeResponse getRoomTypeById(UUID id) {
+    RoomType roomType = roomTypeRepository.findById(id)
+        .orElseThrow(() -> new NotFoundException("ROOM_TYPE_NOT_FOUND"));
+    return roomTypeMapper.toResponse(roomType);  // di QUALSIASI hotel
+}
+
+public RoomTypeResponse updateRoomType(UUID id, RoomTypeRequest request) {
+    RoomType roomType = roomTypeRepository.findById(id)
+        .orElseThrow(() -> new NotFoundException("ROOM_TYPE_NOT_FOUND"));
+    // scrive su una room-type di un hotel arbitrario
+    roomType.setName(request.name());
+    roomType.setBasePrice(request.basePrice());
+    return roomTypeMapper.toResponse(roomTypeRepository.saveAndFlush(roomType));
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Flyway V7 aggiunge \texttt{hotel\_id UUID NOT NULL} a \texttt{room\_types} (backfill
+al placeholder esistente, poi \texttt{NOT NULL}) e sostituisce \texttt{UNIQUE(name)}
+con \texttt{UNIQUE(hotel\_id, name)}. \texttt{RoomTypeRepository} guadagna
+\texttt{findByIdAndHotelId}/\texttt{findAllByHotelId}; tutti i 5 metodi di
+\texttt{RoomTypeService} richiedono ora \texttt{hotelId}, risolto da
+\texttt{RoomTypeController.resolveHotelId()} (stesso pattern di \texttt{RoomController}),
+mai dal client. Le chiavi della cache Spring sono state ri-namespaced per hotelId
+(\texttt{\#hotelId + ':' + \#id} e \texttt{\#hotelId}) per evitare cache poisoning
+cross-tenant. Fix connesso individuato nello stesso giro: \texttt{RoomServiceImpl}
+chiamava \texttt{roomTypeRepository.findById(roomTypeId)} non scoped in \texttt{createRoom}/
+\texttt{updateRoom} --- un consumer del repository, non catturato dalla regola ArchUnit
+di GAP-6 che analizza solo i metodi dichiarati sul repository stesso, non i call-site dei
+suoi metodi ereditati. Sostituito con \texttt{findByIdAndHotelId}. \texttt{RoomTypeRepository}
+aggiunto ai \texttt{TENANT\_ROOT\_REPOSITORIES} di \texttt{TenantIsolationArchTest}.
+
+\begin{securebox}[title={Codice Sicuro --- RoomTypeServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: hotelId propagato dal controller, mai dal client
+public RoomTypeResponse getRoomTypeById(UUID id, UUID hotelId) {
+    RoomType roomType = roomTypeRepository.findByIdAndHotelId(id, hotelId)
+        .orElseThrow(() -> new NotFoundException("ROOM_TYPE_NOT_FOUND"));
+    return roomTypeMapper.toResponse(roomType);
+}
+
+public RoomTypeResponse updateRoomType(UUID id, UUID hotelId, RoomTypeRequest request) {
+    RoomType roomType = roomTypeRepository.findByIdAndHotelId(id, hotelId)
+        .orElseThrow(() -> new NotFoundException("ROOM_TYPE_NOT_FOUND"));
+    roomType.setName(request.name());
+    roomType.setBasePrice(request.basePrice());
+    return roomTypeMapper.toResponse(roomTypeRepository.saveAndFlush(roomType));
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+\texttt{RoomTypeServiceImplTest} estesa con 2 regressioni cross-hotel
+(\texttt{testGetRoomTypeByIdBelongsToDifferentHotelReturnsNotFound},
+\texttt{testUpdateRoomTypeBelongsToDifferentHotelReturnsNotFound});
+\texttt{RoomTypeControllerTest} estesa con \texttt{SecurityContext} hotel-scoped
+(pattern \texttt{RoomControllerTest}); nuovo \texttt{RoomTypeServiceIntegrationTest}
+contro PostgreSQL reale (Testcontainers) valida la migration V7 end-to-end: due hotel
+possono usare lo stesso nome di room-type, e nessuno dei tre metodi
+(get/update/delete) espone o modifica una room-type di un hotel diverso.
+
+\paragraph{Riferimento} Commit: \commitref{PENDING\_COMMIT\_HASH}{fix(security): T-ROOM-02 --- cross-tenant IDOR and tampering on room types}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}
 % ─────────────────────────────────────────────────────────────────────────────
 

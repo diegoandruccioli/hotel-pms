@@ -46,7 +46,15 @@ public class RoomType {
     @Setter(AccessLevel.NONE)
     private UUID id;
 
-    @Column(nullable = false, unique = true, length = MAX_NAME_LENGTH)
+    /**
+     * The hotel this room type belongs to (multi-tenancy, T-ROOM-02).
+     * Uniqueness of {@link #name} is enforced per-hotel (see
+     * {@code uq_room_types_hotel_id_name}), not globally.
+     */
+    @Column(name = "hotel_id", nullable = false)
+    private UUID hotelId;
+
+    @Column(nullable = false, length = MAX_NAME_LENGTH)
     private String name;
 
     @Column(length = MAX_DESC_LENGTH)

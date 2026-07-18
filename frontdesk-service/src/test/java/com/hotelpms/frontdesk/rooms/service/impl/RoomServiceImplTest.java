@@ -87,7 +87,8 @@ class RoomServiceImplTest {
 
     @Test
     void testCreateRoomSuccess() {
-        when(roomTypeRepository.findById(Objects.requireNonNull(roomTypeId))).thenReturn(Optional.of(roomType));
+        when(roomTypeRepository.findByIdAndHotelId(Objects.requireNonNull(roomTypeId), Objects.requireNonNull(hotelId)))
+                .thenReturn(Optional.of(roomType));
         when(roomMapper.toEntity(Objects.requireNonNull(request))).thenReturn(room);
         when(roomRepository.save(Objects.requireNonNull(room))).thenReturn(room);
         when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
@@ -105,7 +106,9 @@ class RoomServiceImplTest {
         final UUID authenticatedHotelId = UUID.randomUUID();
         final RoomRequest crossTenantRequest = new RoomRequest(requestHotelId, ROOM_101, roomTypeId, RoomStatus.CLEAN);
 
-        when(roomTypeRepository.findById(Objects.requireNonNull(roomTypeId))).thenReturn(Optional.of(roomType));
+        when(roomTypeRepository.findByIdAndHotelId(
+                Objects.requireNonNull(roomTypeId), Objects.requireNonNull(authenticatedHotelId)))
+                .thenReturn(Optional.of(roomType));
         when(roomMapper.toEntity(Objects.requireNonNull(crossTenantRequest))).thenReturn(room);
         when(roomRepository.save(Objects.requireNonNull(room))).thenReturn(room);
         when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
@@ -117,7 +120,8 @@ class RoomServiceImplTest {
 
     @Test
     void testCreateRoomRoomTypeNotFound() {
-        when(roomTypeRepository.findById(Objects.requireNonNull(roomTypeId))).thenReturn(Optional.empty());
+        when(roomTypeRepository.findByIdAndHotelId(Objects.requireNonNull(roomTypeId), Objects.requireNonNull(hotelId)))
+                .thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class, () -> roomService.createRoom(request, hotelId));
     }
@@ -192,7 +196,8 @@ class RoomServiceImplTest {
                 null, null);
 
         when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.of(room));
-        when(roomTypeRepository.findById(Objects.requireNonNull(roomTypeId))).thenReturn(Optional.of(roomType));
+        when(roomTypeRepository.findByIdAndHotelId(Objects.requireNonNull(roomTypeId), Objects.requireNonNull(hotelId)))
+                .thenReturn(Optional.of(roomType));
         when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(updatedRoom);
         when(roomMapper.toResponse(Objects.requireNonNull(updatedRoom))).thenReturn(updateResponse);
 
@@ -209,7 +214,8 @@ class RoomServiceImplTest {
         final RoomRequest crossTenantRequest = new RoomRequest(requestHotelId, ROOM_102, roomTypeId, RoomStatus.DIRTY);
 
         when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.of(room));
-        when(roomTypeRepository.findById(Objects.requireNonNull(roomTypeId))).thenReturn(Optional.of(roomType));
+        when(roomTypeRepository.findByIdAndHotelId(Objects.requireNonNull(roomTypeId), Objects.requireNonNull(hotelId)))
+                .thenReturn(Optional.of(roomType));
         when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(room);
         when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
 

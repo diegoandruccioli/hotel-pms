@@ -45,17 +45,18 @@ final class TenantIsolationArchTest {
      * entity/repository is introduced — the rule only inspects interfaces
      * named here.
      *
-     * <p>{@code RoomTypeRepository} is deliberately NOT listed here: {@code RoomType}
-     * has no {@code hotel_id} column today (room-type catalog is global, not
-     * per-hotel) — a pre-existing design gap flagged during the ADR-004
-     * exploration but out of scope for this rule (it's a schema change, not
-     * a missing query filter). If this gap is ever closed, also update
-     * {@code RoomTypeServiceImpl}'s {@code @Cacheable("roomTypes")} entries (keys
-     * {@code #id} / {@code 'all'}) to include hotelId — otherwise the cache itself
-     * becomes a cross-tenant leak (one hotel's room-type list served to another) even
-     * after the repository query is fixed.
+     * <p>{@code RoomTypeRepository} was added here for T-ROOM-02 (2026-07-18):
+     * {@code RoomType} had no {@code hotel_id} column since the V1 baseline
+     * migration — any hotel's ADMIN/OWNER could read, tamper with (price, name,
+     * capacity) or soft-delete another hotel's room-type catalog. Fixed with
+     * V7 (hotel_id + per-hotel unique constraint). The
+     * {@code RoomTypeServiceImpl} {@code @Cacheable("roomTypes")} cache keys
+     * were updated in the same fix to include hotelId — a reminder for future
+     * schema gaps of this shape: fixing the repository query alone is not
+     * enough if a cache sits in front of it.
      */
     private static final Set<String> TENANT_ROOT_REPOSITORIES = Set.of(
+            "com.hotelpms.frontdesk.rooms.repository.RoomTypeRepository",
             "com.hotelpms.frontdesk.reservations.repository.ReservationRepository",
             "com.hotelpms.frontdesk.rooms.repository.RoomRepository",
             "com.hotelpms.frontdesk.stays.repository.StayRepository",

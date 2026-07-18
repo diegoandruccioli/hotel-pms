@@ -11,41 +11,46 @@ import java.util.UUID;
  */
 public interface RoomTypeService {
     /**
-     * Creates a room type.
+     * Creates a room type, scoped to the caller's hotel (T-ROOM-02).
      *
      * @param request the request
+     * @param hotelId the authenticated hotel UUID
      * @return the response
      */
-    RoomTypeResponse createRoomType(RoomTypeRequest request);
+    RoomTypeResponse createRoomType(RoomTypeRequest request, UUID hotelId);
 
     /**
-     * Gets a room type by id.
-     *
-     * @param id the id
-     * @return the response
-     */
-    RoomTypeResponse getRoomTypeById(UUID id);
-
-    /**
-     * Gets all room types.
-     *
-     * @return the list of responses
-     */
-    List<RoomTypeResponse> getAllRoomTypes();
-
-    /**
-     * Updates a room type.
+     * Gets a room type by id, scoped to the caller's hotel (T-ROOM-02).
      *
      * @param id      the id
+     * @param hotelId the authenticated hotel UUID; the room type must belong to it
+     * @return the response
+     */
+    RoomTypeResponse getRoomTypeById(UUID id, UUID hotelId);
+
+    /**
+     * Gets all room types belonging to the caller's hotel (T-ROOM-02).
+     *
+     * @param hotelId the authenticated hotel UUID
+     * @return the list of responses
+     */
+    List<RoomTypeResponse> getAllRoomTypes(UUID hotelId);
+
+    /**
+     * Updates a room type, scoped to the caller's hotel (T-ROOM-02).
+     *
+     * @param id      the id
+     * @param hotelId the authenticated hotel UUID; the room type must belong to it
      * @param request the request
      * @return the response
      */
-    RoomTypeResponse updateRoomType(UUID id, RoomTypeRequest request);
+    RoomTypeResponse updateRoomType(UUID id, UUID hotelId, RoomTypeRequest request);
 
     /**
-     * Deletes a room type.
+     * Deletes a room type, scoped to the caller's hotel (T-ROOM-02).
      *
-     * @param id the id
+     * @param id      the id
+     * @param hotelId the authenticated hotel UUID; the room type must belong to it
      */
-    void deleteRoomType(UUID id);
+    void deleteRoomType(UUID id, UUID hotelId);
 }

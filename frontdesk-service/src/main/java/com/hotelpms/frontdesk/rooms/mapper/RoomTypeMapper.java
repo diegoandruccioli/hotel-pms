@@ -28,6 +28,7 @@ public interface RoomTypeMapper {
      * @return the entity
      */
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "hotelId", ignore = true)
     @Mapping(target = "active", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)

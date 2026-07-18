@@ -8,6 +8,7 @@ import com.hotelpms.frontdesk.rooms.dto.RoomTypeResponse;
 import com.hotelpms.frontdesk.exception.GlobalExceptionHandler;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.rooms.service.RoomTypeService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +16,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
@@ -24,6 +27,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,6 +48,7 @@ class RoomTypeControllerTest {
     private static final String ROOM_TYPE_SINGLE = "Single";
     private static final String ROOM_TYPE_DESC = "A single room";
     private static final String PRICE_50 = "50.00";
+    private static final UUID HOTEL_ID = UUID.randomUUID();
 
     @Mock
     private RoomTypeService roomTypeService;
@@ -58,6 +63,11 @@ class RoomTypeControllerTest {
 
     @BeforeEach
     void setUp() {
+        final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                "testuser", "", List.of());
+        auth.setDetails(HOTEL_ID.toString());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+
         objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -75,12 +85,17 @@ class RoomTypeControllerTest {
                 roomTypeId, ROOM_TYPE_SINGLE, ROOM_TYPE_DESC, 1, new BigDecimal(PRICE_50), true, null, null);
     }
 
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
+
     @Test
     void shouldCreateRoomTypeReturn201() throws Exception {
         final RoomTypeRequest request =
                 new RoomTypeRequest(ROOM_TYPE_SINGLE, ROOM_TYPE_DESC, 1, new BigDecimal(PRICE_50));
 
-        when(roomTypeService.createRoomType(any(RoomTypeRequest.class))).thenReturn(roomTypeResponse);
+        when(roomTypeService.createRoomType(any(RoomTypeRequest.class), eq(HOTEL_ID))).thenReturn(roomTypeResponse);
 
         mockMvc.perform(post(BASE_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -89,12 +104,12 @@ class RoomTypeControllerTest {
                 .andExpect(jsonPath("$.id").value(roomTypeId.toString()))
                 .andExpect(jsonPath(JSON_NAME).value(ROOM_TYPE_SINGLE));
 
-        verify(roomTypeService).createRoomType(any(RoomTypeRequest.class));
+        verify(roomTypeService).createRoomType(any(RoomTypeRequest.class), eq(HOTEL_ID));
     }
 
     @Test
     void shouldGetRoomTypeByIdReturn200() throws Exception {
-        when(roomTypeService.getRoomTypeById(roomTypeId)).thenReturn(roomTypeResponse);
+        when(roomTypeService.getRoomTypeById(roomTypeId, HOTEL_ID)).thenReturn(roomTypeResponse);
 
         mockMvc.perform(get(BASE_URL + PATH_BY_ID, roomTypeId))
                 .andExpect(status().isOk())
@@ -104,7 +119,7 @@ class RoomTypeControllerTest {
 
     @Test
     void shouldGetRoomTypeByIdReturn404WhenNotFound() throws Exception {
-        when(roomTypeService.getRoomTypeById(roomTypeId))
+        when(roomTypeService.getRoomTypeById(roomTypeId, HOTEL_ID))
                 .thenThrow(new NotFoundException("ROOM_TYPE_NOT_FOUND"));
 
         mockMvc.perform(get(BASE_URL + PATH_BY_ID, roomTypeId))
@@ -113,7 +128,7 @@ class RoomTypeControllerTest {
 
     @Test
     void shouldGetAllRoomTypesReturn200() throws Exception {
-        when(roomTypeService.getAllRoomTypes()).thenReturn(List.of(roomTypeResponse));
+        when(roomTypeService.getAllRoomTypes(HOTEL_ID)).thenReturn(List.of(roomTypeResponse));
 
         mockMvc.perform(get(BASE_URL))
                 .andExpect(status().isOk())
@@ -125,7 +140,7 @@ class RoomTypeControllerTest {
         final RoomTypeRequest request =
                 new RoomTypeRequest(ROOM_TYPE_SINGLE, ROOM_TYPE_DESC, 1, new BigDecimal(PRICE_50));
 
-        when(roomTypeService.updateRoomType(any(UUID.class), any(RoomTypeRequest.class)))
+        when(roomTypeService.updateRoomType(any(UUID.class), eq(HOTEL_ID), any(RoomTypeRequest.class)))
                 .thenReturn(roomTypeResponse);
 
         mockMvc.perform(put(BASE_URL + PATH_BY_ID, roomTypeId)
@@ -134,16 +149,16 @@ class RoomTypeControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_NAME).value(ROOM_TYPE_SINGLE));
 
-        verify(roomTypeService).updateRoomType(any(UUID.class), any(RoomTypeRequest.class));
+        verify(roomTypeService).updateRoomType(any(UUID.class), eq(HOTEL_ID), any(RoomTypeRequest.class));
     }
 
     @Test
     void shouldDeleteRoomTypeReturn204() throws Exception {
-        doNothing().when(roomTypeService).deleteRoomType(roomTypeId);
+        doNothing().when(roomTypeService).deleteRoomType(roomTypeId, HOTEL_ID);
 
         mockMvc.perform(delete(BASE_URL + PATH_BY_ID, roomTypeId))
                 .andExpect(status().isNoContent());
 
-        verify(roomTypeService).deleteRoomType(roomTypeId);
+        verify(roomTypeService).deleteRoomType(roomTypeId, HOTEL_ID);
     }
 }
