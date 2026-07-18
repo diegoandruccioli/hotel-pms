@@ -58,22 +58,17 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     Optional<Invoice> findFirstByReservationIdAndHotelIdOrderByIssueDateDesc(UUID reservationId, UUID hotelId);
 
     /**
-     * Finds all invoices associated with a specific guest.
+     * Finds all invoices for a hotel whose issue date falls within the given window
+     * (T-BILL-04, IDOR/cross-tenant financial data leak). Used by the Owner
+     * financial report to aggregate revenues by date range, scoped to the
+     * authenticated hotel — the report must never mix in another hotel's invoices.
      *
-     * @param guestId the guest UUID
-     * @return a list of invoices
+     * @param hotelId the hotel UUID from the authenticated request
+     * @param start   beginning of the time window (inclusive)
+     * @param end     end of the time window (exclusive)
+     * @return list of matching invoices for that hotel
      */
-    List<Invoice> findByGuestId(UUID guestId);
-
-    /**
-     * Finds all invoices whose issue date falls within the given window.
-     * Used by the Owner financial report to aggregate revenues by date range.
-     *
-     * @param start beginning of the time window (inclusive)
-     * @param end   end of the time window (exclusive)
-     * @return list of matching invoices
-     */
-    List<Invoice> findByIssueDateBetween(LocalDateTime start, LocalDateTime end);
+    List<Invoice> findByHotelIdAndIssueDateBetween(UUID hotelId, LocalDateTime start, LocalDateTime end);
 
     /**
      * Finds the active invoice for a stay, scoped to a hotel (IDOR-safe lookup).

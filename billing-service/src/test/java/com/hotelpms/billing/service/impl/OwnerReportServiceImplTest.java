@@ -22,7 +22,9 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,11 +57,13 @@ class OwnerReportServiceImplTest {
         private Invoice issuedInvoice;
         private LocalDate startDate;
         private LocalDate endDate;
+        private UUID hotelId;
 
         @BeforeEach
         void setUp() {
                 startDate = LocalDate.of(YEAR, MONTH_START, DAY_START);
                 endDate = LocalDate.of(YEAR, MONTH_END, DAY_END);
+                hotelId = UUID.randomUUID();
 
                 paidInvoice1 = Invoice.builder()
                                 .id(UUID.randomUUID())
@@ -95,12 +99,13 @@ class OwnerReportServiceImplTest {
         @Test
         void shouldReturnCorrectAggregatesForThreeInvoicesTwoPaid() {
                 // Arrange
-                when(invoiceRepository.findByIssueDateBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
+                when(invoiceRepository.findByHotelIdAndIssueDateBetween(
+                                eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class)))
                                 .thenReturn(List.of(paidInvoice1, paidInvoice2, issuedInvoice));
                 when(invoiceMapper.toResponse(any(Invoice.class))).thenReturn(mock(InvoiceResponse.class));
 
                 // Act
-                final OwnerFinancialReportDto report = ownerReportService.getFinancialReport(startDate, endDate);
+                final OwnerFinancialReportDto report = ownerReportService.getFinancialReport(hotelId, startDate, endDate);
 
                 // Assert
                 assertNotNull(report);
@@ -116,16 +121,31 @@ class OwnerReportServiceImplTest {
         @Test
         void shouldReturnZeroRevenueWhenNoInvoicesFound() {
                 // Arrange
-                when(invoiceRepository.findByIssueDateBetween(any(LocalDateTime.class), any(LocalDateTime.class)))
+                when(invoiceRepository.findByHotelIdAndIssueDateBetween(
+                                eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class)))
                                 .thenReturn(List.of());
 
                 // Act
-                final OwnerFinancialReportDto report = ownerReportService.getFinancialReport(startDate, endDate);
+                final OwnerFinancialReportDto report = ownerReportService.getFinancialReport(hotelId, startDate, endDate);
 
                 // Assert
                 assertNotNull(report);
                 assertEquals(0, report.totalInvoices());
                 assertEquals(0, report.paidInvoices());
                 assertEquals(BigDecimal.ZERO, report.totalRevenue());
+        }
+
+        @Test
+        void shouldScopeQueryToTheAuthenticatedHotelOnly() {
+                // Regression test for T-BILL-04: the report must never query invoices
+                // across hotels — it must always pass the caller's hotelId through.
+                when(invoiceRepository.findByHotelIdAndIssueDateBetween(
+                                eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class)))
+                                .thenReturn(List.of());
+
+                ownerReportService.getFinancialReport(hotelId, startDate, endDate);
+
+                verify(invoiceRepository).findByHotelIdAndIssueDateBetween(
+                                eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class));
         }
 }

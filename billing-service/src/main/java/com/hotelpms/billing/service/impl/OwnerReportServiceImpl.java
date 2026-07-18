@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Implementation of the OwnerReportService for financial reporting.
@@ -32,13 +33,14 @@ public class OwnerReportServiceImpl implements OwnerReportService {
         /** {@inheritDoc} */
         @Override
         @Transactional(readOnly = true)
-        public OwnerFinancialReportDto getFinancialReport(final LocalDate startDate, final LocalDate endDate) {
-                log.info("Generating owner financial report from {} to {}", startDate, endDate);
+        public OwnerFinancialReportDto getFinancialReport(
+                        final UUID hotelId, final LocalDate startDate, final LocalDate endDate) {
+                log.info("Generating owner financial report for hotelId={} from {} to {}", hotelId, startDate, endDate);
 
                 final LocalDateTime start = startDate.atStartOfDay();
                 final LocalDateTime end = endDate.plusDays(1).atStartOfDay();
 
-                final List<Invoice> invoices = invoiceRepository.findByIssueDateBetween(start, end);
+                final List<Invoice> invoices = invoiceRepository.findByHotelIdAndIssueDateBetween(hotelId, start, end);
 
                 final BigDecimal totalRevenue = invoices.stream()
                                 .map((@NonNull Invoice inv) -> inv.getTotalAmount())

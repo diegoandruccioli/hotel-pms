@@ -3789,6 +3789,92 @@ caller, e ripulito in \texttt{tearDown()}. Aggiunto il caso
 \paragraph{Riferimento} Commit: \commitref{4a44eea}{fix(security): T-BILL-01 --- IDOR fix on billing-service (hotel-scoped invoice/payment lookup)}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Data Leak Cross-Tenant sul Report Finanziario Owner \threat{T-BILL-04}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante il design di una regola ArchUnit per imporre lo scoping \texttt{hotel\_id}
+su tutte le query multi-tenant (non da un pentest mirato) --- l'endpoint
+\texttt{GET /api/v1/reports/owner}, protetto da \texttt{@PreAuthorize("hasAnyRole('OWNER','ADMIN')")},
+non estraeva mai l'\texttt{hotelId} dal contesto di sicurezza. Il controller passava le
+sole date al service, che interrogava \texttt{InvoiceRepository.findByIssueDateBetween(start, end)}
+--- una query priva di qualunque parametro \texttt{hotel\_id}. Il report aggregava fatturato,
+conteggio fatture e lista fatture (inclusi dati ospite) di \emph{tutti} gli hotel della
+piattaforma. Non serviva alcuna enumerazione di UUID: era il comportamento di default
+dell'endpoint per qualunque Owner/Admin autenticato, su un hotel qualsiasi. Il bug era
+invisibile in produzione con un solo hotel attivo, ma immediatamente sfruttabile non
+appena la piattaforma passa multi-tenant. Classificato OWASP A01 --- Broken Access Control.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- OwnerReportController/ServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: nessun hotelId estratto dal contesto autenticato
+@GetMapping("/owner")
+@PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+public ResponseEntity<OwnerFinancialReportDto> getOwnerFinancialReport(
+        LocalDate startDate, LocalDate endDate) {
+    OwnerFinancialReportDto report =
+        ownerReportService.getFinancialReport(startDate, endDate);  // no hotel scope
+    return ResponseEntity.ok(report);
+}
+
+// INSICURO: aggrega fatture di TUTTI gli hotel
+public OwnerFinancialReportDto getFinancialReport(LocalDate startDate, LocalDate endDate) {
+    List<Invoice> invoices = invoiceRepository.findByIssueDateBetween(start, end);
+    // ... nessun filtro hotel_id ...
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Stesso pattern già consolidato per T-BILL-01/T-GST-01/T-RES-02, applicato a un endpoint
+mai coperto in precedenza:
+
+\begin{enumerate}
+    \item \textbf{extractHotelId() nel controller} --- stesso helper già presente in
+          \texttt{InvoiceController}, legge \texttt{Authentication.details} (popolato
+          dall'header \texttt{X-Auth-Hotel} via \texttt{InternalAuthFilter}).
+    \item \textbf{Nuovo metodo repository hotel-scoped} ---
+          \texttt{findByHotelIdAndIssueDateBetween(hotelId, start, end)} sostituisce
+          l'unscoped \texttt{findByIssueDateBetween}.
+    \item \textbf{Firma del service estesa} --- \texttt{getFinancialReport(hotelId,
+          startDate, endDate)}; l'\texttt{hotelId} arriva sempre dal contesto
+          autenticato, mai dal client.
+    \item \textbf{Pulizia correlata} --- rimosso anche \texttt{InvoiceRepository.findByGuestId}
+          (dead code, zero chiamanti, stesso rischio strutturale se mai richiamato in futuro).
+\end{enumerate}
+
+\begin{securebox}[title={Codice Sicuro --- OwnerReportController/ServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: hotelId risolto dal SecurityContext, mai dal client
+@GetMapping("/owner")
+@PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+public ResponseEntity<OwnerFinancialReportDto> getOwnerFinancialReport(
+        LocalDate startDate, LocalDate endDate) {
+    UUID hotelId = extractHotelId();
+    OwnerFinancialReportDto report =
+        ownerReportService.getFinancialReport(hotelId, startDate, endDate);
+    return ResponseEntity.ok(report);
+}
+
+// SICURO: aggrega solo le fatture dell'hotel del caller
+public OwnerFinancialReportDto getFinancialReport(
+        UUID hotelId, LocalDate startDate, LocalDate endDate) {
+    List<Invoice> invoices =
+        invoiceRepository.findByHotelIdAndIssueDateBetween(hotelId, start, end);
+    // ...
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Nuovo \texttt{shouldScopeQueryToTheAuthenticatedHotelOnly} in \texttt{OwnerReportServiceImplTest}
+verifica che il repository sia sempre invocato con l'\texttt{hotelId} del caller.
+\texttt{OwnerReportControllerTest} aggiornato con \texttt{SecurityContextHolder} popolato
+(stesso pattern di T-BILL-01), asserzioni \texttt{verify(...)} sull'\texttt{hotelId} propagato.
+
+\paragraph{Riferimento} Commit: [pending --- da aggiornare al push]
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}
 % ─────────────────────────────────────────────────────────────────────────────
 

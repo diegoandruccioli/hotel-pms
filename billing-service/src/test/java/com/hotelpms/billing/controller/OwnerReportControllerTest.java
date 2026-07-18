@@ -3,20 +3,27 @@ package com.hotelpms.billing.controller;
 import com.hotelpms.billing.dto.OwnerFinancialReportDto;
 import com.hotelpms.billing.exception.GlobalExceptionHandler;
 import com.hotelpms.billing.service.OwnerReportService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -36,12 +43,24 @@ class OwnerReportControllerTest {
     private OwnerReportController ownerReportController;
 
     private MockMvc mockMvc;
+    private UUID hotelId;
 
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(ownerReportController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
+
+        hotelId = UUID.randomUUID();
+        final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                "owner", "", List.of(new SimpleGrantedAuthority("ROLE_OWNER")));
+        auth.setDetails(hotelId.toString());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -53,7 +72,7 @@ class OwnerReportControllerTest {
                 10L,
                 8L,
                 List.of());
-        when(ownerReportService.getFinancialReport(any(LocalDate.class), any(LocalDate.class)))
+        when(ownerReportService.getFinancialReport(eq(hotelId), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(report);
 
         mockMvc.perform(get(BASE_URL)
@@ -62,6 +81,8 @@ class OwnerReportControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalInvoices").value(10))
                 .andExpect(jsonPath("$.paidInvoices").value(8));
+
+        verify(ownerReportService).getFinancialReport(eq(hotelId), any(LocalDate.class), any(LocalDate.class));
     }
 
     @Test
@@ -73,7 +94,7 @@ class OwnerReportControllerTest {
                 0L,
                 0L,
                 List.of());
-        when(ownerReportService.getFinancialReport(any(LocalDate.class), any(LocalDate.class)))
+        when(ownerReportService.getFinancialReport(eq(hotelId), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(empty);
 
         mockMvc.perform(get(BASE_URL)
