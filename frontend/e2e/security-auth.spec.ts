@@ -11,7 +11,7 @@ const MOCK_USER = { username: 'admin', role: 'ADMIN' };
 // ---------------------------------------------------------------------------
 async function mockDashboardApis(page: import('@playwright/test').Page): Promise<void> {
   const emptyPage = { content: [], totalElements: 0, totalPages: 0, number: 0, size: 20 };
-  await page.route('**/api/v1/guests', (route) =>
+  await page.route('**/api/v1/guests/search**', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(emptyPage) })
   );
   await page.route('**/api/v1/reservations**', async (route) => {
@@ -99,8 +99,8 @@ test.describe('Security – Authentication Attack Paths', () => {
       })
     );
 
-    // GET /guests returns 401 → triggers the silent-refresh → that also fails
-    await page.route('**/api/v1/guests', (route) =>
+    // GET /guests/search returns 401 → triggers the silent-refresh → that also fails
+    await page.route('**/api/v1/guests/search**', (route) =>
       route.fulfill({
         status: 401,
         contentType: 'application/json',
@@ -179,7 +179,14 @@ test.describe('Security – Authentication Attack Paths', () => {
 
     await mockDashboardApis(page);
 
-    // Override /guests: GET returns empty list; POST (create) rejected with 403
+    // Override /guests/search: GET returns empty list; POST /guests (create) rejected with 403
+    await page.route('**/api/v1/guests/search**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 20 }),
+      })
+    );
     await page.route('**/api/v1/guests', async (route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({

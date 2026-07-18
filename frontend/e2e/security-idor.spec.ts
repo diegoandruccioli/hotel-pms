@@ -163,7 +163,7 @@ test.describe('Security – IDOR Prevention', () => {
       { ...MOCK_GUEST, id: 'g-hotel-a-002', firstName: 'BobHotelA', lastName: 'Jones' },
     ];
 
-    await page.route('**/api/v1/guests', (route) =>
+    await page.route('**/api/v1/guests/search**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',

@@ -36,7 +36,7 @@ test.describe('Billing flow', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          content: [MOCK_INVOICE],
+          content: [{ invoice: MOCK_INVOICE, guestName: null }],
           totalElements: 1,
           totalPages: 1,
           number: 0,

@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 // ---------------------------------------------------------------------------
 async function mockDashboardApis(page: import('@playwright/test').Page): Promise<void> {
   const emptyPage = { content: [], totalElements: 0, totalPages: 0, number: 0, size: 20 };
-  await page.route('**/api/v1/guests', (route) =>
+  await page.route('**/api/v1/guests/search**', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(emptyPage) })
   );
   await page.route('**/api/v1/reservations**', async (route) => {

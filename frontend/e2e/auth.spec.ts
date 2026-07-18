@@ -59,7 +59,7 @@ test.describe('Authentication – Happy Path', () => {
     // Dashboard aggregates 5 API calls. Mock them all so the stats-grid renders
     // instead of the error state (the mock SESSION cookie is not a valid JWT).
     const emptyPage = { content: [], totalElements: 0, totalPages: 0, number: 0, size: 20 };
-    await page.route('**/api/v1/guests', (route) =>
+    await page.route('**/api/v1/guests/search**', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(emptyPage) })
     );
     await page.route('**/api/v1/reservations**', async (route) => {

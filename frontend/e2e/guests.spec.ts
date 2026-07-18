@@ -65,13 +65,18 @@ test.describe('Guests', () => {
         await route.fallback();
       }
     });
-    await page.route('**/api/v1/guests/search**', (route) =>
-      route.fulfill({
+    await page.route('**/api/v1/guests/search**', (route) => {
+      const url = new URL(route.request().url());
+      const query = (url.searchParams.get('query') ?? '').toLowerCase();
+      const matched = query
+        ? MOCK_GUESTS.filter((g) => `${g.firstName} ${g.lastName}`.toLowerCase().includes(query))
+        : MOCK_GUESTS;
+      return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ content: [MOCK_GUESTS[0]], totalElements: 1, totalPages: 1, number: 0, size: 20 }),
-      }),
-    );
+        body: JSON.stringify({ content: matched, totalElements: matched.length, totalPages: 1, number: 0, size: 20 }),
+      });
+    });
     await page.route('**/api/v1/guests/g-001', async (route) => {
       const method = route.request().method();
       if (method === 'PUT') {
