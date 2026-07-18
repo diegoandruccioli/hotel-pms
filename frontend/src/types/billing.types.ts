@@ -51,3 +51,9 @@ export interface InvoiceResponse {
   payments: PaymentResponse[];
   charges?: ChargeResponse[];
 }
+
+/** A single invoice search result (C12): the invoice plus a resolved guest display name. */
+export interface InvoiceSearchResult {
+  invoice: InvoiceResponse;
+  guestName: string | null;
+}

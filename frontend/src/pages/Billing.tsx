@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
-import type { InvoiceResponse, InvoiceStatus } from '../types/billing.types';
+import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types/billing.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
+import { M3Button } from '../components/m3/M3Button';
 import { billingService } from '../services/billingService';
 import { PaymentModal } from './Billing/PaymentModal';
 import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useTranslation } from 'react-i18next';
+
+const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 300;
 
 const getStatusTone = (status: InvoiceStatus) => {
   switch (status) {
@@ -28,7 +32,7 @@ const PAY_BTN_CLASS = [
 ].join(' ');
 
 interface InvoiceRowProps {
-  invoice: InvoiceResponse;
+  result: InvoiceSearchResult;
   onView: (inv: InvoiceResponse) => void;
   onPay: (inv: InvoiceResponse) => void;
   formatDate: (d?: string) => string;
@@ -39,7 +43,7 @@ interface InvoiceRowProps {
 }
 
 const InvoiceRow = memo(({
-  invoice,
+  result,
   onView,
   onPay,
   formatDate,
@@ -49,6 +53,7 @@ const InvoiceRow = memo(({
   tPending,
 }: InvoiceRowProps) => {
   const { t } = useTranslation('common');
+  const { invoice, guestName } = result;
   const handleView = useCallback(() => onView(invoice), [onView, invoice]);
   const handlePay  = useCallback(() => onPay(invoice),  [onPay,  invoice]);
 
@@ -59,6 +64,7 @@ const InvoiceRow = memo(({
           <span className="text-on-surface-variant italic">{tPending}</span>
         )}
       </M3TableCell>
+      <M3TableCell className="text-on-surface-variant">{guestName ?? '—'}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(invoice.issueDate)}</M3TableCell>
       <M3TableCell className="font-medium">{formatCurrency(invoice.totalAmount)}</M3TableCell>
       <M3TableCell>
@@ -105,42 +111,76 @@ StatusFilterChip.displayName = 'StatusFilterChip';
 
 export const Billing = memo(() => {
   const { t, i18n } = useTranslation('common');
-  const [invoices, setInvoices] = useState<InvoiceResponse[]>([]);
+  const [results, setResults] = useState<InvoiceSearchResult[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceResponse | null>(null);
   const [detailTarget, setDetailTarget]   = useState<InvoiceResponse | null>(null);
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
+
+  // Any filter change invalidates the current page — always restart from page 0.
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, statusFilter, dateFrom, dateTo]);
+
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  const handleDateFromChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setDateFrom(e.target.value);
+  }, []);
+
+  const handleDateToChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setDateTo(e.target.value);
+  }, []);
+
+  const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
+  const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
 
   const loadInvoices = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await billingService.getAllInvoices();
-      setInvoices(data);
+      const data = await billingService.searchInvoices({
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+        query: debouncedSearch,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        page,
+        size: PAGE_SIZE,
+      });
+      setResults(data.content);
+      setTotalPages(data.totalPages);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
       setError(e.response?.data?.detail ?? e.message ?? t('failed_load_invoices'));
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [t, statusFilter, debouncedSearch, dateFrom, dateTo, page]);
 
   useEffect(() => {
     loadInvoices();
   }, [loadInvoices]);
-
-  const filteredInvoices = useMemo(
-    () => statusFilter === 'ALL' ? invoices : invoices.filter((inv) => inv.status === statusFilter),
-    [invoices, statusFilter],
-  );
 
   const handleStatusFilterClick = useCallback((s: InvoiceStatus | 'ALL') => {
     setStatusFilter(s);
   }, []);
 
   const handlePaid = useCallback((updated: InvoiceResponse) => {
-    setInvoices((prev) => prev.map((inv) => (inv.id === updated.id ? updated : inv)));
+    setResults((prev) => prev.map((r) => (r.invoice.id === updated.id ? { ...r, invoice: updated } : r)));
   }, []);
 
   const handleOpenDetail  = useCallback((inv: InvoiceResponse) => setDetailTarget(inv), []);
@@ -148,7 +188,7 @@ export const Billing = memo(() => {
   const handleCloseDetail  = useCallback(() => setDetailTarget(null), []);
   const handleClosePayment = useCallback(() => setPaymentTarget(null), []);
   const handleInvoiceUpdated = useCallback((updated: InvoiceResponse) => {
-    setInvoices((prev) => prev.map((inv) => (inv.id === updated.id ? updated : inv)));
+    setResults((prev) => prev.map((r) => (r.invoice.id === updated.id ? { ...r, invoice: updated } : r)));
     setDetailTarget(updated);
   }, []);
 
@@ -169,6 +209,7 @@ export const Billing = memo(() => {
   const tableHeaders = useMemo(
     () => [
       t('invoice_number'),
+      t('guest_name'),
       t('issue_date'),
       t('total_amount'),
       t('status'),
@@ -191,18 +232,49 @@ export const Billing = memo(() => {
           </h1>
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('billing_subtitle')}</p>
         </div>
+        <div className="relative">
+          <MaterialIcon name="search" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            placeholder={t('invoice_search_placeholder')}
+            aria-label={t('invoice_search_placeholder')}
+            className="pl-9 pr-3 py-2 w-full sm:w-72 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+          />
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-2" role="group" aria-label={t('filter_status')}>
-        {(['ALL', 'ISSUED', 'PAID', 'CANCELLED'] as const).map((s) => (
-          <StatusFilterChip
-            key={s}
-            value={s}
-            active={statusFilter === s}
-            label={s === 'ALL' ? t('filter_all') : t(`invoice_status_${s}`, s)}
-            onClick={handleStatusFilterClick}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t('filter_status')}>
+          {(['ALL', 'ISSUED', 'PAID', 'CANCELLED'] as const).map((s) => (
+            <StatusFilterChip
+              key={s}
+              value={s}
+              active={statusFilter === s}
+              label={s === 'ALL' ? t('filter_all') : t(`invoice_status_${s}`, s)}
+              onClick={handleStatusFilterClick}
+            />
+          ))}
+        </div>
+        <div className="flex items-center gap-2 text-sm font-body">
+          <label htmlFor="billing-date-from" className="text-on-surface-variant">{t('date_from')}</label>
+          <input
+            id="billing-date-from"
+            type="date"
+            value={dateFrom}
+            onChange={handleDateFromChange}
+            className="px-2 py-1 rounded-shape-xs border border-outline bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
           />
-        ))}
+          <label htmlFor="billing-date-to" className="text-on-surface-variant">{t('date_to')}</label>
+          <input
+            id="billing-date-to"
+            type="date"
+            value={dateTo}
+            onChange={handleDateToChange}
+            className="px-2 py-1 rounded-shape-xs border border-outline bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -226,17 +298,17 @@ export const Billing = memo(() => {
         </div>
       ) : (
         <M3Table headers={tableHeaders}>
-          {filteredInvoices.length === 0 ? (
+          {results.length === 0 ? (
             <tr>
-              <td colSpan={5} className="py-8 text-center text-sm font-body text-on-surface-variant">
+              <td colSpan={6} className="py-8 text-center text-sm font-body text-on-surface-variant">
                 {t('no_invoices')}
               </td>
             </tr>
           ) : (
-            filteredInvoices.map((invoice) => (
+            results.map((result) => (
               <InvoiceRow
-                key={invoice.id}
-                invoice={invoice}
+                key={result.invoice.id}
+                result={result}
                 onView={handleOpenDetail}
                 onPay={handleOpenPayment}
                 formatDate={formatDate}
@@ -248,6 +320,32 @@ export const Billing = memo(() => {
             ))
           )}
         </M3Table>
+      )}
+
+      {!loading && !error && totalPages > 1 && (
+        <nav aria-label={t('pagination')} className="flex items-center justify-center gap-3">
+          <M3Button
+            variant="outlined"
+            icon="chevron_left"
+            disabled={page === 0}
+            onClick={handlePrevPage}
+            aria-label={t('prev_page')}
+          >
+            {t('prev_page')}
+          </M3Button>
+          <span className="text-sm font-body text-on-surface-variant">
+            {t('page_x_of_y', { current: page + 1, total: totalPages })}
+          </span>
+          <M3Button
+            variant="outlined"
+            icon="chevron_right"
+            disabled={page >= totalPages - 1}
+            onClick={handleNextPage}
+            aria-label={t('next_page')}
+          >
+            {t('next_page')}
+          </M3Button>
+        </nav>
       )}
 
       {paymentTarget && (

@@ -1,5 +1,13 @@
 import api from './api';
-import type { DocumentType, InvoiceResponse, PaymentRequest, PaymentResponse, SdiStatus } from '../types/billing.types';
+import type {
+  DocumentType,
+  InvoiceResponse,
+  InvoiceSearchResult,
+  InvoiceStatus,
+  PaymentRequest,
+  PaymentResponse,
+  SdiStatus,
+} from '../types/billing.types';
 import type { SpringPage } from '../types/page.types';
 
 const BASE_PATH = '/api/v1/invoices';
@@ -16,9 +24,26 @@ export const billingService = {
     return response.data;
   },
 
-  getAllInvoices: async (): Promise<InvoiceResponse[]> => {
-    const response = await api.get<SpringPage<InvoiceResponse>>(BASE_PATH);
-    return response.data.content;
+  searchInvoices: async (params: {
+    status?: InvoiceStatus;
+    query?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    size?: number;
+  }): Promise<SpringPage<InvoiceSearchResult>> => {
+    const searchParams = new URLSearchParams({
+      page: String(params.page ?? 0),
+      size: String(params.size ?? 20),
+    });
+    if (params.status) searchParams.set('status', params.status);
+    if (params.query?.trim()) searchParams.set('query', params.query.trim());
+    if (params.dateFrom) searchParams.set('dateFrom', params.dateFrom);
+    if (params.dateTo) searchParams.set('dateTo', params.dateTo);
+    const response = await api.get<SpringPage<InvoiceSearchResult>>(
+      `${BASE_PATH}/search?${searchParams.toString()}`,
+    );
+    return response.data;
   },
 
   updateDocumentType: async (invoiceId: string, documentType: DocumentType): Promise<InvoiceResponse> => {

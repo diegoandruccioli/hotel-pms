@@ -1,17 +1,20 @@
 package com.hotelpms.billing.service;
 
 import com.hotelpms.billing.domain.DocumentType;
+import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
+import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -57,6 +60,25 @@ public interface InvoiceService {
      * @return a page of invoice responses
      */
     Page<InvoiceResponse> getAllInvoices(Pageable pageable);
+
+    /**
+     * Combinable search over the caller's hotel invoices (C12): optional status,
+     * optional issue-date window, and an optional free-text query matched against
+     * the invoice number or the associated guest's name/email (resolved via a
+     * cross-service call to guest-service, since Invoice only stores a guestId).
+     * Every filter left {@code null} is skipped entirely, not treated as "no match".
+     * Results include {@code guestName}, batch-resolved for the returned page only.
+     *
+     * @param status   optional invoice status filter, or {@code null}
+     * @param query    optional free-text query (invoice number or guest name/email),
+     *                 or {@code null}/blank to skip it
+     * @param dateFrom optional lower bound on issue date (inclusive day), or {@code null}
+     * @param dateTo   optional upper bound on issue date (inclusive day), or {@code null}
+     * @param pageable pagination parameters
+     * @return a page of matching invoice search results, scoped to the authenticated hotel
+     */
+    Page<InvoiceSearchResultResponse> searchInvoices(
+            InvoiceStatus status, String query, LocalDate dateFrom, LocalDate dateTo, Pageable pageable);
 
     /**
      * Retrieves the most recent invoice for a given reservation.

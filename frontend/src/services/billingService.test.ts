@@ -30,14 +30,40 @@ describe('billingService', () => {
     expect(result).toEqual(mockResponse);
   });
 
-  it('should fetch all invoices', async () => {
-    const mockInvoices = [{ id: 'inv1', status: 'ISSUED' }];
-    vi.mocked(api.get).mockResolvedValueOnce({ data: { content: mockInvoices } });
+  it('should search invoices with default pagination when no filters are given', async () => {
+    const mockPage = { content: [{ invoice: { id: 'inv1', status: 'ISSUED' }, guestName: 'Mario Rossi' }] };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockPage });
 
-    const result = await billingService.getAllInvoices();
+    const result = await billingService.searchInvoices({});
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/invoices');
-    expect(result).toEqual(mockInvoices);
+    expect(api.get).toHaveBeenCalledWith('/api/v1/invoices/search?page=0&size=20');
+    expect(result).toEqual(mockPage);
+  });
+
+  it('should search invoices with all filters set', async () => {
+    const mockPage = { content: [] };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockPage });
+
+    await billingService.searchInvoices({
+      status: 'PAID',
+      query: '  mario  ',
+      dateFrom: '2026-08-01',
+      dateTo: '2026-08-31',
+      page: 2,
+      size: 10,
+    });
+
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/invoices/search?page=2&size=10&status=PAID&query=mario&dateFrom=2026-08-01&dateTo=2026-08-31',
+    );
+  });
+
+  it('should omit an empty/whitespace-only search query from the request', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { content: [] } });
+
+    await billingService.searchInvoices({ query: '   ' });
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/invoices/search?page=0&size=20');
   });
 
   it('should trigger the invoice PDF download via a hidden iframe', () => {

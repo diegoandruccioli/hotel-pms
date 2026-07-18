@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
 import { Billing } from './Billing';
 import { billingService } from '../services/billingService';
-import type { InvoiceResponse } from '../types/billing.types';
+import type { InvoiceResponse, InvoiceSearchResult } from '../types/billing.types';
 
 vi.mock('react-i18next', () => {
   const t = vi.fn((key: string) => key);
@@ -16,7 +16,7 @@ vi.mock('react-i18next', () => {
 
 vi.mock('../services/billingService', () => ({
   billingService: {
-    getAllInvoices: vi.fn(),
+    searchInvoices: vi.fn(),
     processPayment: vi.fn(),
   },
 }));
@@ -62,48 +62,69 @@ const PAID_INVOICE: InvoiceResponse = {
   ],
 };
 
+const page = (results: InvoiceSearchResult[], totalPages = 1) =>
+  ({ content: results, totalPages, totalElements: results.length });
+
+const result = (invoice: InvoiceResponse, guestName: string | null = null): InvoiceSearchResult =>
+  ({ invoice, guestName });
+
 describe('Billing', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('should show loading spinner initially', () => {
-    vi.mocked(billingService.getAllInvoices).mockReturnValue(new Promise(() => {}));
+    vi.mocked(billingService.searchInvoices).mockReturnValue(new Promise(() => {}));
     render(<Billing />);
     expect(screen.getByText('progress_activity')).toBeInTheDocument();
   });
 
   it('should render invoices on success', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+    expect(billingService.searchInvoices).toHaveBeenCalledWith({
+      status: undefined,
+      query: '',
+      dateFrom: undefined,
+      dateTo: undefined,
+      page: 0,
+      size: 20,
+    });
+  });
+
+  it('should render the resolved guest name for a result', async () => {
+    vi.mocked(billingService.searchInvoices)
+        .mockResolvedValueOnce(page([result(ISSUED_INVOICE, 'Mario Rossi')]) as never);
+    render(<Billing />);
+    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
   });
 
   it('should show empty state when no invoices', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([]) as never);
     render(<Billing />);
     await waitFor(() => expect(screen.getByText('no_invoices')).toBeInTheDocument());
   });
 
   it('should show error on failure', async () => {
-    vi.mocked(billingService.getAllInvoices).mockRejectedValueOnce(new Error('Network error'));
+    vi.mocked(billingService.searchInvoices).mockRejectedValueOnce(new Error('Network error'));
     render(<Billing />);
     await waitFor(() => expect(screen.getByText('error_loading_invoices')).toBeInTheDocument());
   });
 
   it('should not show register_payment button for PAID invoice', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([PAID_INVOICE]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(PAID_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => expect(screen.getByText('INV-002')).toBeInTheDocument());
     expect(screen.queryByText('register_payment')).not.toBeInTheDocument();
   });
 
   it('should show register_payment button for ISSUED invoice', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => expect(screen.getByText('register_payment')).toBeInTheDocument());
   });
 
   it('should open PaymentModal when register_payment is clicked', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => screen.getByText('register_payment'));
     fireEvent.click(screen.getByText('register_payment'));
@@ -111,7 +132,7 @@ describe('Billing', () => {
   });
 
   it('should close PaymentModal when cancel is clicked', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => screen.getByText('register_payment'));
     fireEvent.click(screen.getByText('register_payment'));
@@ -123,7 +144,7 @@ describe('Billing', () => {
   });
 
   it('should open InvoiceDetailModal when view is clicked', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([PAID_INVOICE]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(PAID_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => screen.getByText('view'));
     fireEvent.click(screen.getByText('view'));
@@ -131,7 +152,7 @@ describe('Billing', () => {
   });
 
   it('should close InvoiceDetailModal on close button', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([PAID_INVOICE]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(PAID_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => screen.getByText('view'));
     fireEvent.click(screen.getByText('view'));
@@ -142,7 +163,7 @@ describe('Billing', () => {
 
   it('should call processPayment and update invoice status on submit', async () => {
     const user = userEvent.setup();
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
     vi.mocked(billingService.processPayment).mockResolvedValueOnce({
       id: 'pay-new',
       paymentDate: '2026-04-01T15:00:00',
@@ -176,7 +197,7 @@ describe('Billing', () => {
 
   it('should show amount validation error for zero amount', async () => {
     const user = userEvent.setup();
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => screen.getByText('register_payment'));
     await user.click(screen.getByText('register_payment'));
@@ -193,7 +214,7 @@ describe('Billing', () => {
   });
 
   it('should show detail modal with payment history for paid invoice', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([PAID_INVOICE]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(PAID_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => screen.getByText('view'));
     fireEvent.click(screen.getByText('view'));
@@ -202,7 +223,7 @@ describe('Billing', () => {
   });
 
   it('should show F&B charges in detail modal', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => screen.getByText('view'));
     fireEvent.click(screen.getByText('view'));
@@ -210,43 +231,63 @@ describe('Billing', () => {
     expect(screen.getByText('Dinner')).toBeInTheDocument();
   });
 
-  it('should filter to only ISSUED invoices when ISSUED chip is clicked', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE, PAID_INVOICE]);
+  it('should re-query the server with the ISSUED status when the ISSUED chip is clicked', async () => {
+    vi.mocked(billingService.searchInvoices)
+        .mockResolvedValueOnce(page([result(ISSUED_INVOICE), result(PAID_INVOICE)]) as never)
+        .mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'invoice_status_ISSUED' }));
 
-    expect(screen.getByText('INV-001')).toBeInTheDocument();
-    expect(screen.queryByText('INV-002')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(billingService.searchInvoices).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'ISSUED' }),
+      );
+      expect(screen.queryByText('INV-002')).not.toBeInTheDocument();
+    });
   });
 
-  it('should filter to only PAID invoices when PAID chip is clicked', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE, PAID_INVOICE]);
+  it('should re-query the server with the PAID status when the PAID chip is clicked', async () => {
+    vi.mocked(billingService.searchInvoices)
+        .mockResolvedValueOnce(page([result(ISSUED_INVOICE), result(PAID_INVOICE)]) as never)
+        .mockResolvedValueOnce(page([result(PAID_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => expect(screen.getByText('INV-002')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'invoice_status_PAID' }));
 
-    expect(screen.getByText('INV-002')).toBeInTheDocument();
-    expect(screen.queryByText('INV-001')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(billingService.searchInvoices).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'PAID' }),
+      );
+      expect(screen.queryByText('INV-001')).not.toBeInTheDocument();
+    });
   });
 
-  it('should show all invoices when ALL chip is clicked after filtering', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([ISSUED_INVOICE, PAID_INVOICE]);
+  it('should re-query with no status filter when the ALL chip is clicked after filtering', async () => {
+    vi.mocked(billingService.searchInvoices)
+        .mockResolvedValueOnce(page([result(ISSUED_INVOICE), result(PAID_INVOICE)]) as never)
+        .mockResolvedValueOnce(page([result(PAID_INVOICE)]) as never)
+        .mockResolvedValueOnce(page([result(ISSUED_INVOICE), result(PAID_INVOICE)]) as never);
     render(<Billing />);
     await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'invoice_status_PAID' }));
-    expect(screen.queryByText('INV-001')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('INV-001')).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'filter_all' }));
-    expect(screen.getByText('INV-001')).toBeInTheDocument();
-    expect(screen.getByText('INV-002')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(billingService.searchInvoices).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: undefined }),
+      );
+      expect(screen.getByText('INV-001')).toBeInTheDocument();
+      expect(screen.getByText('INV-002')).toBeInTheDocument();
+    });
   });
 
   it('should have no accessibility violations on empty state', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([]);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([]) as never);
     const { container } = render(<Billing />);
     await waitFor(() => expect(screen.getByText('no_invoices')).toBeInTheDocument());
     const results = await axe(container);
@@ -254,10 +295,8 @@ describe('Billing', () => {
   });
 
   it('should have no accessibility violations with invoices', async () => {
-    vi.mocked(billingService.getAllInvoices).mockResolvedValueOnce([
-      ISSUED_INVOICE,
-      PAID_INVOICE,
-    ]);
+    vi.mocked(billingService.searchInvoices)
+        .mockResolvedValueOnce(page([result(ISSUED_INVOICE), result(PAID_INVOICE)]) as never);
     const { container } = render(<Billing />);
     await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
     const results = await axe(container);

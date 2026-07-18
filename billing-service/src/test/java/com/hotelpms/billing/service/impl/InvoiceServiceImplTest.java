@@ -1,5 +1,8 @@
 package com.hotelpms.billing.service.impl;
 
+import com.hotelpms.billing.client.GuestClient;
+import com.hotelpms.billing.client.dto.GuestResponse;
+import com.hotelpms.billing.client.dto.GuestSearchPageResponse;
 import com.hotelpms.billing.domain.ChargeType;
 import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.Invoice;
@@ -11,6 +14,7 @@ import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
+import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.exception.NotFoundException;
@@ -27,6 +31,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -40,6 +47,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -47,6 +55,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.notNull;
 import org.mockito.ArgumentCaptor;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -59,6 +68,14 @@ class InvoiceServiceImplTest {
 
         private static final String SIMPLE_DRINK = "Coffee";
         private static final String INV_123 = "INV-123";
+        private static final String QUERY_MARIO = "mario";
+        private static final int GUEST_SEARCH_CAP = 200;
+        private static final int PAGE_ZERO = 0;
+        private static final int PAGE_SIZE_TWENTY = 20;
+        private static final int SEARCH_YEAR = 2026;
+        private static final int SEARCH_MONTH = 8;
+        private static final int DAY_ONE = 1;
+        private static final int DAY_FIVE = 5;
 
         @Mock
         private InvoiceRepository invoiceRepository;
@@ -74,6 +91,9 @@ class InvoiceServiceImplTest {
 
         @Mock
         private InvoiceChargeMapper invoiceChargeMapper;
+
+        @Mock
+        private GuestClient guestClient;
 
         @InjectMocks
         private InvoiceServiceImpl invoiceService;
@@ -520,5 +540,123 @@ class InvoiceServiceImplTest {
                 // Act & Assert
                 assertThrows(InvoiceConflictException.class,
                                 () -> invoiceService.updateSdiStatus(invoiceId, SdiStatus.SENT));
+        }
+
+        @Test
+        @DisplayName("C12: searchInvoices with no query skips guest resolution and passes an empty guestIds list")
+        void searchInvoicesWithNoQuerySkipsGuestResolution() {
+                // Arrange
+                final UUID invoiceId = UUID.randomUUID();
+                final Invoice invoice = new Invoice();
+                invoice.setId(invoiceId);
+                invoice.setGuestId(guestId);
+                final InvoiceResponse mapped = new InvoiceResponse(invoiceId, hotelId, INV_123, null,
+                                BigDecimal.TEN, InvoiceStatus.ISSUED, reservationId, guestId, null,
+                                null, null, List.of(), List.of());
+                final PageRequest pageable = PageRequest.of(PAGE_ZERO, PAGE_SIZE_TWENTY);
+
+                when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(InvoiceStatus.ISSUED), eq(null), eq(null),
+                                eq(null), eq(List.of()), eq(pageable)))
+                                .thenReturn(new PageImpl<>(List.of(invoice)));
+                when(invoiceMapper.toResponse(invoice)).thenReturn(mapped);
+                when(guestClient.getGuestsBatch(List.of(guestId)))
+                                .thenReturn(List.of(new GuestResponse(guestId, "Mario", "Rossi", "mario@test.com",
+                                                null, null, null, null, null)));
+
+                // Act
+                final Page<InvoiceSearchResultResponse> result = invoiceService.searchInvoices(
+                                InvoiceStatus.ISSUED, null, null, null, pageable);
+
+                // Assert
+                assertEquals(1, result.getTotalElements());
+                assertEquals("Mario Rossi", result.getContent().get(0).guestName());
+                verify(guestClient, never()).searchGuests(any(), anyInt());
+        }
+
+        @Test
+        @DisplayName("C12: searchInvoices with a blank query behaves like no query at all")
+        void searchInvoicesWithBlankQueryIsTreatedAsNoQuery() {
+                // Arrange
+                final PageRequest pageable = PageRequest.of(PAGE_ZERO, PAGE_SIZE_TWENTY);
+                when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
+                                eq(null), eq(List.of()), eq(pageable)))
+                                .thenReturn(new PageImpl<>(List.of()));
+
+                // Act
+                invoiceService.searchInvoices(null, "   ", null, null, pageable);
+
+                // Assert
+                verify(guestClient, never()).searchGuests(any(), anyInt());
+        }
+
+        @Test
+        @DisplayName("C12: searchInvoices with a query resolves matching guest IDs and passes them through")
+        void searchInvoicesWithQueryResolvesGuestIds() {
+                // Arrange
+                final UUID otherGuestId = UUID.randomUUID();
+                final PageRequest pageable = PageRequest.of(PAGE_ZERO, PAGE_SIZE_TWENTY);
+                when(guestClient.searchGuests(QUERY_MARIO, GUEST_SEARCH_CAP))
+                                .thenReturn(new GuestSearchPageResponse(List.of(
+                                                new GuestResponse(otherGuestId, "Mario", "Bianchi",
+                                                                "mario.b@test.com", null, null, null, null, null))));
+                when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
+                                eq(QUERY_MARIO), eq(List.of(otherGuestId)), eq(pageable)))
+                                .thenReturn(new PageImpl<>(List.of()));
+
+                // Act
+                invoiceService.searchInvoices(null, "  " + QUERY_MARIO + "  ", null, null, pageable);
+
+                // Assert: verified via the repository stub matching the resolved guestIds exactly
+                verify(invoiceRepository).searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
+                                eq(QUERY_MARIO), eq(List.of(otherGuestId)), eq(pageable));
+        }
+
+        @Test
+        @DisplayName("C12: searchInvoices converts the date range to an inclusive-day window")
+        void searchInvoicesConvertsDateRangeToInclusiveDayWindow() {
+                // Arrange
+                final LocalDate from = LocalDate.of(SEARCH_YEAR, SEARCH_MONTH, DAY_ONE);
+                final LocalDate to = LocalDate.of(SEARCH_YEAR, SEARCH_MONTH, DAY_FIVE);
+                final PageRequest pageable = PageRequest.of(PAGE_ZERO, PAGE_SIZE_TWENTY);
+                when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null),
+                                eq(from.atStartOfDay()), eq(to.plusDays(1).atStartOfDay()),
+                                eq(null), eq(List.of()), eq(pageable)))
+                                .thenReturn(new PageImpl<>(List.of()));
+
+                // Act
+                invoiceService.searchInvoices(null, null, from, to, pageable);
+
+                // Assert
+                verify(invoiceRepository).searchInvoicesByHotelId(eq(hotelId), eq(null),
+                                eq(from.atStartOfDay()), eq(to.plusDays(1).atStartOfDay()),
+                                eq(null), eq(List.of()), eq(pageable));
+        }
+
+        @Test
+        @DisplayName("C12: searchInvoices omits guestName when guest-service resolves nothing (circuit breaker open)")
+        void searchInvoicesOmitsGuestNameWhenBatchResolutionFails() {
+                // Arrange
+                final UUID invoiceId = UUID.randomUUID();
+                final Invoice invoice = new Invoice();
+                invoice.setId(invoiceId);
+                invoice.setGuestId(guestId);
+                final InvoiceResponse mapped = new InvoiceResponse(invoiceId, hotelId, INV_123, null,
+                                BigDecimal.TEN, InvoiceStatus.ISSUED, reservationId, guestId, null,
+                                null, null, List.of(), List.of());
+                final PageRequest pageable = PageRequest.of(PAGE_ZERO, PAGE_SIZE_TWENTY);
+
+                when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
+                                eq(null), eq(List.of()), eq(pageable)))
+                                .thenReturn(new PageImpl<>(List.of(invoice)));
+                when(invoiceMapper.toResponse(invoice)).thenReturn(mapped);
+                when(guestClient.getGuestsBatch(List.of(guestId))).thenReturn(List.of());
+
+                // Act
+                final Page<InvoiceSearchResultResponse> result =
+                                invoiceService.searchInvoices(null, null, null, null, pageable);
+
+                // Assert: fallback fails soft — invoice still returned, just without a guest name
+                assertEquals(1, result.getTotalElements());
+                assertNull(result.getContent().get(0).guestName());
         }
 }

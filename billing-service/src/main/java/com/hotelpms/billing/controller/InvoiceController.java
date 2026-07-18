@@ -1,10 +1,12 @@
 package com.hotelpms.billing.controller;
 
+import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.DocumentTypeRequest;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
+import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
 import com.hotelpms.billing.dto.SdiStatusRequest;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
@@ -18,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -31,8 +34,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -81,6 +86,33 @@ public class InvoiceController {
                     direction = Sort.Direction.DESC) final Pageable pageable) {
         log.info("REST request to get all invoices");
         final Page<InvoiceResponse> page = invoiceService.getAllInvoices(pageable);
+        return ResponseEntity.ok(page);
+    }
+
+    /**
+     * Combinable search over the caller's hotel invoices (C12): optional status,
+     * optional issue-date window, and an optional free-text query matched against
+     * the invoice number or the associated guest's name/email.
+     *
+     * @param status   optional invoice status filter
+     * @param query    optional free-text query (invoice number or guest name/email)
+     * @param dateFrom optional lower bound on issue date (inclusive day)
+     * @param dateTo   optional upper bound on issue date (inclusive day)
+     * @param pageable pagination parameters
+     * @return a page of matching invoice responses
+     */
+    @GetMapping("/search")
+    public ResponseEntity<Page<InvoiceSearchResultResponse>> searchInvoices(
+            @RequestParam(required = false) final InvoiceStatus status,
+            @RequestParam(required = false) final String query,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate dateTo,
+            @PageableDefault(size = DEFAULT_PAGE_SIZE, sort = "issueDate",
+                    direction = Sort.Direction.DESC) final Pageable pageable) {
+        log.info("REST request to search invoices | status={} hasQuery={} dateFrom={} dateTo={}",
+                status, query != null && !query.isBlank(), dateFrom, dateTo);
+        final Page<InvoiceSearchResultResponse> page =
+                invoiceService.searchInvoices(status, query, dateFrom, dateTo, pageable);
         return ResponseEntity.ok(page);
     }
 

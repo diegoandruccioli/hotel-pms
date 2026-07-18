@@ -1,9 +1,12 @@
 package com.hotelpms.billing.repository;
 
 import com.hotelpms.billing.domain.Invoice;
+import com.hotelpms.billing.domain.InvoiceStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -103,4 +106,38 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
      * @return list of invoices, most recent first
      */
     List<Invoice> findByGuestIdAndHotelIdOrderByIssueDateDesc(UUID guestId, UUID hotelId);
+
+    /**
+     * Combinable search over a hotel's invoices (C12): optional status, optional issue-date
+     * window, and an optional free-text query matched against the invoice number OR a
+     * pre-resolved set of guest IDs (guest name/email search happens in guest-service —
+     * this repository only knows guestId, not name/email, see
+     * {@code InvoiceServiceImpl.searchInvoices}). Any filter left {@code null} is skipped
+     * entirely rather than excluding results.
+     *
+     * @param hotelId  the hotel UUID from the authenticated request (always applied)
+     * @param status   optional invoice status filter
+     * @param dateFrom optional lower bound on issue date (inclusive), or {@code null}
+     * @param dateTo   optional upper bound on issue date (exclusive), or {@code null}
+     * @param query    optional free-text query matched against invoiceNumber, or {@code null}
+     *                 to skip the query filter entirely
+     * @param guestIds guest IDs matching {@code query} in guest-service; must be non-null
+     *                 (empty when {@code query} is null, or when no guest matched)
+     * @param pageable pagination parameters
+     * @return a page of matching invoices scoped to the hotel
+     */
+    @Query("SELECT i FROM Invoice i WHERE i.hotelId = :hotelId "
+            + "AND (:status IS NULL OR i.status = :status) "
+            + "AND (:dateFrom IS NULL OR i.issueDate >= :dateFrom) "
+            + "AND (:dateTo IS NULL OR i.issueDate < :dateTo) "
+            + "AND (:query IS NULL OR LOWER(i.invoiceNumber) LIKE LOWER(CONCAT('%', :query, '%')) "
+            + "OR i.guestId IN :guestIds)")
+    Page<Invoice> searchInvoicesByHotelId(
+            @Param("hotelId") UUID hotelId,
+            @Param("status") InvoiceStatus status,
+            @Param("dateFrom") LocalDateTime dateFrom,
+            @Param("dateTo") LocalDateTime dateTo,
+            @Param("query") String query,
+            @Param("guestIds") List<UUID> guestIds,
+            Pageable pageable);
 }

@@ -1,5 +1,7 @@
 package com.hotelpms.billing.service.impl;
 
+import com.hotelpms.billing.client.GuestClient;
+import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.domain.ChargeType;
 import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.Invoice;
@@ -11,6 +13,7 @@ import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
+import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.InvoiceConflictException;
@@ -35,9 +38,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of the InvoiceService interface for billing processing.
@@ -48,12 +53,14 @@ import java.util.UUID;
 public class InvoiceServiceImpl implements InvoiceService {
 
     private static final String INVOICE_NOT_FOUND = "INVOICE_NOT_FOUND";
+    private static final int GUEST_SEARCH_MATCH_CAP = 200;
 
     private final InvoiceRepository invoiceRepository;
     private final InvoiceChargeRepository invoiceChargeRepository;
     private final InvoiceSequenceRepository sequenceRepository;
     private final InvoiceMapper invoiceMapper;
     private final InvoiceChargeMapper invoiceChargeMapper;
+    private final GuestClient guestClient;
 
     /** {@inheritDoc} */
     @Override
@@ -150,6 +157,68 @@ public class InvoiceServiceImpl implements InvoiceService {
         final UUID hotelId = resolveHotelId();
         return invoiceRepository.findByHotelId(hotelId, safePageable)
                 .map(invoiceMapper::toResponse);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<InvoiceSearchResultResponse> searchInvoices(
+            final InvoiceStatus status, final String query, final LocalDate dateFrom,
+            final LocalDate dateTo, final Pageable pageable) {
+        final UUID hotelId = resolveHotelId();
+        final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
+        final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
+        final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
+
+        final Page<Invoice> results = invoiceRepository.searchInvoicesByHotelId(
+                hotelId,
+                status,
+                dateFrom == null ? null : dateFrom.atStartOfDay(),
+                dateTo == null ? null : dateTo.plusDays(1).atStartOfDay(),
+                trimmedQuery,
+                guestIds,
+                safePageable);
+
+        final Map<UUID, String> guestNames = resolveGuestNames(
+                results.getContent().stream().map(Invoice::getGuestId).distinct().toList());
+
+        return results.map(invoice -> new InvoiceSearchResultResponse(
+                invoiceMapper.toResponse(invoice), guestNames.get(invoice.getGuestId())));
+    }
+
+    /**
+     * Resolves which guest IDs (within the caller's hotel) match a free-text query,
+     * via a cross-service call to guest-service (Invoice only stores a guestId, not
+     * a name/email). Capped at {@link #GUEST_SEARCH_MATCH_CAP} matches — invoice
+     * search is a filter aid, not a guest directory export.
+     *
+     * @param query the free-text query (already trimmed, non-blank)
+     * @return matching guest IDs, or an empty list if guest-service is unavailable
+     *         (circuit breaker fallback) or nothing matched
+     */
+    private List<UUID> resolveGuestIds(final String query) {
+        return guestClient.searchGuests(query, GUEST_SEARCH_MATCH_CAP).content().stream()
+                .map(GuestResponse::id)
+                .toList();
+    }
+
+    /**
+     * Batch-resolves display names for a set of guest IDs in a single round-trip,
+     * used to populate {@code InvoiceResponse.guestName} for a page of search
+     * results without one Feign call per row.
+     *
+     * @param guestIds the guest IDs to resolve (may be empty)
+     * @return a map of guestId to "First Last", missing entries omitted rather than
+     *         failing the whole search (guest-service unavailable or guest deleted)
+     */
+    private Map<UUID, String> resolveGuestNames(final List<UUID> guestIds) {
+        if (guestIds.isEmpty()) {
+            return Map.of();
+        }
+        return guestClient.getGuestsBatch(guestIds).stream()
+                .collect(Collectors.toMap(GuestResponse::id,
+                        g -> (g.firstName() + " " + g.lastName()).trim(),
+                        (first, second) -> first));
     }
 
     /**

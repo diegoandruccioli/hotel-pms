@@ -11,6 +11,7 @@ import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.DocumentTypeRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
+import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.SdiStatusRequest;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.GlobalExceptionHandler;
@@ -35,6 +36,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -71,6 +73,11 @@ class InvoiceControllerTest {
     private static final String PATH_FATTURA_PA = "/{id}/fatturaPA";
     private static final String PATH_SDI_STATUS = "/{id}/sdi-status";
     private static final String INV_NUMBER = "INV-001";
+    private static final String QUERY_MARIO = "mario";
+    private static final int PAGE_ZERO = 0;
+    private static final int PAGE_SIZE_TWENTY = 20;
+    private static final LocalDate SEARCH_DATE_FROM = LocalDate.of(2026, 8, 1);
+    private static final LocalDate SEARCH_DATE_TO = LocalDate.of(2026, 8, 31);
 
     @Mock
     private InvoiceService invoiceService;
@@ -136,6 +143,37 @@ class InvoiceControllerTest {
         when(invoiceService.getAllInvoices(any(Pageable.class))).thenReturn(page);
 
         mockMvc.perform(get(BASE_URL))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldSearchInvoicesReturn200() throws Exception {
+        final Page<InvoiceSearchResultResponse> page = new PageImpl<>(
+                List.of(new InvoiceSearchResultResponse(invoiceResponse, "Mario Rossi")),
+                PageRequest.of(PAGE_ZERO, PAGE_SIZE_TWENTY), 1L);
+        when(invoiceService.searchInvoices(eq(InvoiceStatus.ISSUED), eq(QUERY_MARIO),
+                eq(SEARCH_DATE_FROM), eq(SEARCH_DATE_TO), any(Pageable.class)))
+                .thenReturn(page);
+
+        mockMvc.perform(get(BASE_URL + "/search")
+                        .param("status", "ISSUED")
+                        .param("query", QUERY_MARIO)
+                        .param("dateFrom", "2026-08-01")
+                        .param("dateTo", "2026-08-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].invoice.id").value(INVOICE_ID.toString()))
+                .andExpect(jsonPath("$.content[0].guestName").value("Mario Rossi"));
+    }
+
+    @Test
+    void shouldSearchInvoicesWithNoFiltersReturn200() throws Exception {
+        final Page<InvoiceSearchResultResponse> page = new PageImpl<>(
+                List.of(new InvoiceSearchResultResponse(invoiceResponse, null)),
+                PageRequest.of(PAGE_ZERO, PAGE_SIZE_TWENTY), 1L);
+        when(invoiceService.searchInvoices(eq(null), eq(null), eq(null), eq(null), any(Pageable.class)))
+                .thenReturn(page);
+
+        mockMvc.perform(get(BASE_URL + "/search"))
                 .andExpect(status().isOk());
     }
 
