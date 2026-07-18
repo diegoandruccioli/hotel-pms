@@ -11,6 +11,8 @@ import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import { GuestFormModal } from './GuestFormModal';
 
+const PAGE_SIZE = 20;
+
 interface GuestRowProps {
   guest: GuestResponseDTO;
   onEdit: (g: GuestResponseDTO) => void;
@@ -58,6 +60,8 @@ export const Guests = memo(() => {
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
 
   const [guests, setGuests] = useState<GuestResponseDTO[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -74,33 +78,32 @@ export const Guests = memo(() => {
     return () => clearTimeout(id);
   }, [searchQuery]);
 
+  // A new search query invalidates the current page — always restart from page 0.
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch]);
+
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   }, []);
 
-  const filteredGuests = useMemo(() => {
-    if (!debouncedSearch.trim()) return guests;
-    const q = debouncedSearch.toLowerCase();
-    return guests.filter(
-      (g) =>
-        `${g.firstName} ${g.lastName}`.toLowerCase().includes(q) ||
-        g.email?.toLowerCase().includes(q),
-    );
-  }, [guests, debouncedSearch]);
+  const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
+  const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
 
   const loadGuests = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await guestService.getAllGuests();
-      setGuests(data);
+      const data = await guestService.searchGuestsPaged(debouncedSearch, page, PAGE_SIZE);
+      setGuests(data.content);
+      setTotalPages(data.totalPages);
     } catch (err: unknown) {
       const e = err as {response?: {data?: {detail?: string}}, message?: string};
       setError(e.response?.data?.detail || e.message || 'Failed to load guests');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [debouncedSearch, page]);
 
   useEffect(() => {
     loadGuests();
@@ -138,7 +141,7 @@ export const Guests = memo(() => {
     setDeleting(true);
     try {
       await guestService.deleteGuest(guestToDelete.id);
-      setGuests((prev) => prev.filter((g) => g.id !== guestToDelete.id));
+      await loadGuests();
       addToast(t('guest_deleted_success'), 'success');
     } catch (err: unknown) {
       const e = err as { response?: { status?: number } };
@@ -151,7 +154,7 @@ export const Guests = memo(() => {
       setDeleting(false);
       setGuestToDelete(null);
     }
-  }, [guestToDelete, addToast, t]);
+  }, [guestToDelete, addToast, t, loadGuests]);
 
   const headers = useMemo(() => [
     t('name'),
@@ -206,10 +209,10 @@ export const Guests = memo(() => {
         </div>
       ) : (
         <M3Table headers={headers}>
-          {filteredGuests.length === 0 ? (
+          {guests.length === 0 ? (
             <tr><td colSpan={5} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_guests_found')}</td></tr>
           ) : (
-            filteredGuests.map((guest) => (
+            guests.map((guest) => (
               <GuestRow
                 key={guest.id}
                 guest={guest}
@@ -220,6 +223,32 @@ export const Guests = memo(() => {
             ))
           )}
         </M3Table>
+      )}
+
+      {!loading && !error && totalPages > 1 && (
+        <nav aria-label={t('pagination')} className="flex items-center justify-center gap-3">
+          <M3Button
+            variant="outlined"
+            icon="chevron_left"
+            disabled={page === 0}
+            onClick={handlePrevPage}
+            aria-label={t('prev_page')}
+          >
+            {t('prev_page')}
+          </M3Button>
+          <span className="text-sm font-body text-on-surface-variant">
+            {t('page_x_of_y', { current: page + 1, total: totalPages })}
+          </span>
+          <M3Button
+            variant="outlined"
+            icon="chevron_right"
+            disabled={page >= totalPages - 1}
+            onClick={handleNextPage}
+            aria-label={t('next_page')}
+          >
+            {t('next_page')}
+          </M3Button>
+        </nav>
       )}
 
       {isModalOpen && (

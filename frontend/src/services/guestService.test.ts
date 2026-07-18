@@ -9,16 +9,6 @@ describe('guestService', () => {
     vi.clearAllMocks();
   });
 
-  it('should fetch all guests', async () => {
-    const mockGuests = [{ id: '1', firstName: 'John' }];
-    vi.mocked(api.get).mockResolvedValueOnce({ data: { content: mockGuests } });
-
-    const result = await guestService.getAllGuests();
-
-    expect(api.get).toHaveBeenCalledWith('/api/v1/guests');
-    expect(result).toEqual(mockGuests);
-  });
-
   it('should fetch guest by id', async () => {
     const mockGuest = { id: '1', firstName: 'John' };
     vi.mocked(api.get).mockResolvedValueOnce({ data: mockGuest });
@@ -77,5 +67,25 @@ describe('guestService', () => {
 
     expect(api.get).toHaveBeenCalledWith('/api/v1/guests');
     expect(result).toEqual(mockGuests);
+  });
+
+  it('should fetch a paginated, hotel-scoped search page with query/page/size', async () => {
+    const mockPage = { content: [{ id: '1', firstName: 'Mario' }], totalPages: 3, totalElements: 45 };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockPage });
+
+    const result = await guestService.searchGuestsPaged('mario', 1, 20);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/guests/search?page=1&size=20&query=mario');
+    expect(result).toEqual(mockPage);
+  });
+
+  it('should page through the full list when the query is blank, without a query param', async () => {
+    const mockPage = { content: [], totalPages: 1, totalElements: 0 };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockPage });
+
+    const result = await guestService.searchGuestsPaged('', 0, 20);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/guests/search?page=0&size=20');
+    expect(result).toEqual(mockPage);
   });
 });

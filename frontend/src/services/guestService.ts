@@ -5,16 +5,21 @@ import type { SpringPage } from '../types/page.types';
 const BASE_PATH = '/api/v1/guests';
 
 export const guestService = {
-  getAllGuests: async (): Promise<GuestResponseDTO[]> => {
-    const response = await api.get<SpringPage<GuestResponseDTO>>(BASE_PATH);
-    return response.data.content;
-  },
-
   searchGuests: async (query: string): Promise<GuestResponseDTO[]> => {
     const trimmed = query.trim();
     const url = trimmed ? `${BASE_PATH}/search?query=${encodeURIComponent(trimmed)}` : BASE_PATH;
     const response = await api.get<SpringPage<GuestResponseDTO>>(url);
     return response.data.content;
+  },
+
+  searchGuestsPaged: async (query: string, page = 0, size = 20): Promise<SpringPage<GuestResponseDTO>> => {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    const trimmed = query.trim();
+    if (trimmed) {
+      params.set('query', trimmed);
+    }
+    const response = await api.get<SpringPage<GuestResponseDTO>>(`${BASE_PATH}/search?${params.toString()}`);
+    return response.data;
   },
 
   getGuestById: async (id: string): Promise<GuestResponseDTO> => {

@@ -17,7 +17,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../services/guestService', () => ({
-  guestService: { getAllGuests: vi.fn(), deleteGuest: vi.fn() },
+  guestService: { searchGuestsPaged: vi.fn(), deleteGuest: vi.fn() },
 }));
 
 vi.mock('../store/authStore', () => ({
@@ -46,6 +46,18 @@ const GUEST = {
   country: 'IT',
 };
 
+const JANE = {
+  id: 'g2',
+  firstName: 'Jane',
+  lastName: 'Smith',
+  email: 'jane@test.com',
+  phone: '',
+  city: '',
+  country: '',
+};
+
+const page = (content: unknown[], totalPages = 1) => ({ content, totalPages, totalElements: content.length });
+
 const mockAddToast = vi.fn();
 
 const mockAuthAdmin = (selector: unknown) =>
@@ -65,23 +77,24 @@ describe('Guests', () => {
   });
 
   it('should show loading spinner initially', () => {
-    vi.mocked(guestService.getAllGuests).mockReturnValue(new Promise(() => {}));
+    vi.mocked(guestService.searchGuestsPaged).mockReturnValue(new Promise(() => {}));
     render(<Guests />);
     expect(screen.getByText('progress_activity')).toBeInTheDocument();
   });
 
   it('should render guest list on success', async () => {
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([GUEST] as never);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
 
     render(<Guests />);
 
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
+    expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('', 0, 20);
   });
 
   it('should show empty state message when no guests', async () => {
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([]);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([]) as never);
     render(<Guests />);
 
     await waitFor(() => {
@@ -90,7 +103,7 @@ describe('Guests', () => {
   });
 
   it('should show error message on failure', async () => {
-    vi.mocked(guestService.getAllGuests).mockRejectedValueOnce(new Error('Network error'));
+    vi.mocked(guestService.searchGuestsPaged).mockRejectedValueOnce(new Error('Network error'));
     render(<Guests />);
 
     await waitFor(() => {
@@ -99,7 +112,7 @@ describe('Guests', () => {
   });
 
   it('should render page title', async () => {
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([]);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([]) as never);
     render(<Guests />);
 
     await waitFor(() => {
@@ -111,9 +124,9 @@ describe('Guests', () => {
   it('should escape XSS payload in guest fields (T-FE-01)', async () => {
     const xssFirst = '<img src=x onerror=alert(1)>';
     const xssEmail = '"><svg onload=alert(2)>';
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([
       { id: '1', firstName: xssFirst, lastName: 'XSS', email: xssEmail, phone: '', city: '', country: '' },
-    ] as never);
+    ]) as never);
 
     const { container } = render(<Guests />);
 
@@ -130,7 +143,7 @@ describe('Guests', () => {
 
   it('should not show delete button for RECEPTIONIST', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthReceptionist);
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([GUEST] as never);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
@@ -139,7 +152,7 @@ describe('Guests', () => {
 
   it('should show delete button for ADMIN', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([GUEST] as never);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
@@ -148,7 +161,7 @@ describe('Guests', () => {
 
   it('should open confirmation dialog when delete button is clicked', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([GUEST] as never);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
@@ -157,9 +170,11 @@ describe('Guests', () => {
     expect(screen.getByText('delete_guest_confirm')).toBeInTheDocument();
   });
 
-  it('should call deleteGuest and remove guest on confirm', async () => {
+  it('should call deleteGuest and reload the current page on confirm', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([GUEST] as never);
+    vi.mocked(guestService.searchGuestsPaged)
+      .mockResolvedValueOnce(page([GUEST]) as never)
+      .mockResolvedValueOnce(page([]) as never);
     vi.mocked(guestService.deleteGuest).mockResolvedValueOnce(undefined);
     render(<Guests />);
 
@@ -170,12 +185,13 @@ describe('Guests', () => {
     await waitFor(() => {
       expect(guestService.deleteGuest).toHaveBeenCalledWith('guest-1');
       expect(mockAddToast).toHaveBeenCalledWith('guest_deleted_success', 'success');
+      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
     });
   });
 
   it('should show GDPR hold toast on 451 response', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([GUEST] as never);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     vi.mocked(guestService.deleteGuest).mockRejectedValueOnce({ response: { status: 451 } });
     render(<Guests />);
 
@@ -188,11 +204,10 @@ describe('Guests', () => {
     });
   });
 
-  it('should filter guests by name on search input', async () => {
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([
-      GUEST,
-      { id: 'g2', firstName: 'Jane', lastName: 'Smith', email: 'jane@test.com', phone: '', city: '', country: '' },
-    ] as never);
+  it('should search guests server-side on search input (not just filter the loaded page)', async () => {
+    vi.mocked(guestService.searchGuestsPaged)
+      .mockResolvedValueOnce(page([GUEST]) as never)
+      .mockResolvedValueOnce(page([JANE]) as never);
     render(<Guests />);
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
 
@@ -200,44 +215,40 @@ describe('Guests', () => {
     fireEvent.change(input, { target: { value: 'Jane' } });
 
     await waitFor(() => {
+      expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('Jane', 0, 20);
       expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
       expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     }, { timeout: 500 });
   });
 
-  it('should filter guests by email on search input', async () => {
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([
-      GUEST,
-      { id: 'g2', firstName: 'Jane', lastName: 'Smith', email: 'jane@test.com', phone: '', city: '', country: '' },
-    ] as never);
+  it('should pre-populate search from URL ?search param and query the server with it', async () => {
+    mockUseSearchParams.mockReturnValueOnce([new URLSearchParams('search=Jane')] as [URLSearchParams]);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([JANE]) as never);
+    render(<Guests />);
+
+    await waitFor(() => {
+      expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('Jane', 0, 20);
+      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    });
+  });
+
+  it('should show pagination controls and request the next page on click', async () => {
+    vi.mocked(guestService.searchGuestsPaged)
+      .mockResolvedValueOnce(page([GUEST], 2) as never)
+      .mockResolvedValueOnce(page([JANE], 2) as never);
     render(<Guests />);
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
 
-    const input = screen.getByRole('searchbox');
-    fireEvent.change(input, { target: { value: 'jane@test' } });
+    fireEvent.click(screen.getByRole('button', { name: 'next_page' }));
 
     await waitFor(() => {
-      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
-      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-    }, { timeout: 500 });
-  });
-
-  it('should pre-populate search from URL ?search param', async () => {
-    mockUseSearchParams.mockReturnValueOnce([new URLSearchParams('search=Jane')] as [URLSearchParams]);
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([
-      GUEST,
-      { id: 'g2', firstName: 'Jane', lastName: 'Smith', email: 'jane@test.com', phone: '', city: '', country: '' },
-    ] as never);
-    render(<Guests />);
-
-    await waitFor(() => {
-      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+      expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('', 1, 20);
       expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     });
   });
 
   it('should have no accessibility violations', async () => {
-    vi.mocked(guestService.getAllGuests).mockResolvedValueOnce([]);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([]) as never);
     const { container } = render(<Guests />);
     await waitFor(() => expect(screen.getByText('no_guests_found')).toBeInTheDocument());
     const results = await axe(container);
