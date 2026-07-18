@@ -1,5 +1,6 @@
 package com.hotelpms.auth.repository;
 
+import com.hotelpms.auth.architecture.TenantScopeExempt;
 import com.hotelpms.auth.domain.UserAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -26,6 +27,10 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
      * @return an {@link Optional} containing the user account if found, empty
      *         otherwise
      */
+    @TenantScopeExempt(reason = "Login lookup happens before the caller's hotel is known — "
+            + "the username is the only credential available at this point in the auth flow. "
+            + "Usernames are globally unique across the platform by design (one login identity "
+            + "per person, not per hotel).")
     Optional<UserAccount> findByUsername(String username);
 
     /**
@@ -34,6 +39,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
      * @param email the email to check
      * @return true if an account with the specified email exists, false otherwise
      */
+    @TenantScopeExempt(reason = "Registration-time uniqueness check, global by design — an "
+            + "email can only ever back one account on the whole platform, same as findByUsername.")
     boolean existsByEmail(String email);
 
     /**
@@ -42,6 +49,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
      * @param username the username to check
      * @return true if an account with the specified username exists, false otherwise
      */
+    @TenantScopeExempt(reason = "Registration-time uniqueness check, global by design — "
+            + "same as existsByEmail.")
     boolean existsByUsername(String username);
 
     /**
@@ -70,6 +79,9 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
      * @param attempts   the new failed-attempts value
      * @param lockedUntil the lock expiry (null = not yet locked)
      */
+    @TenantScopeExempt(reason = "Updates the account already resolved by findByUsername earlier "
+            + "in the same login attempt — username uniquely identifies one account platform-wide, "
+            + "so there is no other-hotel account this could touch instead.")
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     @Modifying
     @Query("UPDATE UserAccount u SET u.failedAttempts = :attempts, u.lockedUntil = :lockedUntil WHERE u.username = :username")

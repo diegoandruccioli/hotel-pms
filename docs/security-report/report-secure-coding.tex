@@ -4759,6 +4759,97 @@ Tutti e quattro gli step del piano di mitigazione sono implementati;
 la copertura del test include i boundary value temporali critici richiesti
 dalla normativa italiana.
 
+% ─────────────────────────────────────────────────────────────────────────────
+\section{GAP-6 --- Nessun Controllo Preventivo sull'Isolamento Multi-Tenant}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+A differenza degli altri GAP di questo capitolo, non è la scoperta di un
+singolo bug ma l'assenza di un \emph{meccanismo preventivo}. T-BILL-04 e
+T-STAY-06 (Sezione ``Broken Access Control --- Isolamento Multi-Tenant'',
+Capitolo~3) sono stati trovati manualmente durante l'esplorazione per la decisione multi-tenant
+(ADR-004) --- nessun controllo automatico impediva che una futura query
+repository su un'entità tenant-root (con colonna \texttt{hotel\_id} propria)
+venisse scritta senza scoping \texttt{hotelId}. La scoperta di questa
+classe di bug dipendeva interamente dalla revisione umana, la stessa
+condizione che aveva già permesso a T-BILL-04 e T-STAY-06 di restare
+inosservati in produzione.
+
+\paragraph{Mitigazione applicata}
+\texttt{TenantIsolationArchTest} (ArchUnit) aggiunto ai 5 servizi con
+repository multi-tenant (auth, guest, frontdesk, billing, fb): fallisce la
+build se un metodo custom su un repository tenant-root non contiene
+\texttt{HotelId} nel nome e non è annotato \texttt{@TenantScopeExempt(reason=...)}.
+
+\begin{securebox}[title={TenantIsolationArchTest.java --- struttura della regola}]
+\begin{lstlisting}[style=java]
+@AnalyzeClasses(packages = "com.hotelpms.billing",
+                 importOptions = ImportOption.DoNotIncludeTests.class)
+final class TenantIsolationArchTest {
+
+    private static final Set<String> TENANT_ROOT_REPOSITORIES = Set.of(
+            "com.hotelpms.billing.repository.InvoiceRepository",
+            "com.hotelpms.billing.repository.InvoiceSequenceRepository");
+
+    @ArchTest
+    static final ArchRule CUSTOM_QUERY_METHODS_..._MUST_SCOPE_BY_HOTEL_ID =
+        classes()
+            .that(/* is one of TENANT_ROOT_REPOSITORIES */)
+            .should(/* every declared method: name contains "HotelId"
+                       OR is @TenantScopeExempt(reason=...) */);
+}
+\end{lstlisting}
+\end{securebox}
+
+I metodi ereditati da \texttt{JpaRepository}/\texttt{CrudRepository}
+(\texttt{findById}, \texttt{save}, \texttt{delete}) sono fuori scope --- ArchUnit
+\texttt{getMethods()} restituisce solo i metodi dichiarati sull'interfaccia
+stessa; quei metodi sono già guardati al call-site (pattern
+\texttt{findByIdAndHotelId}, mai il \texttt{findById} ereditato, sulle entità
+tenant-root).
+
+\paragraph{Eccezioni documentate}
+8 eccezioni verificate manualmente call-site per call-site (non semplicemente
+silenziate): login/registrazione pre-hotel-resolve su \texttt{UserAccount}
+(4, auth-service --- lo username è l'unica credenziale disponibile prima che
+l'hotel del chiamante sia noto); batch GDPR notturno platform-wide su
+\texttt{Guest} (1, guest-service --- pre-filtro, i vincoli di legal-hold per
+hotel sono verificati a valle); query di overlap prenotazioni con
+\texttt{roomIds} già scoped a monte da \texttt{verifyRoomsAvailability}/
+\texttt{findCleanRooms} (3, frontdesk-service). billing-service e fb-service
+non necessitano eccezioni.
+
+\begin{insecurebox}[title={Esempio di eccezione documentata}]
+\begin{lstlisting}[style=java]
+@TenantScopeExempt(reason = "Login lookup happens before the caller's "
+    + "hotel is known -- the username is the only credential available "
+    + "at this point in the auth flow. Usernames are globally unique "
+    + "across the platform by design.")
+Optional<UserAccount> findByUsername(String username);
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Pulizia correlata}
+Rimosso anche codice morto trovato nella stessa esplorazione, zero
+chiamanti in tutto il codebase: \texttt{Room.findByRoomNumberAndActiveTrue},
+\texttt{Room.findAllByActiveTrue}, \texttt{Invoice.findByGuestId},
+\texttt{Stay.findByReservationId}.
+
+\paragraph{Verifica della regola}
+Smoke test manuale: aggiunto temporaneamente un metodo non scoped a
+\texttt{InvoiceRepository}, confermato che \texttt{TenantIsolationArchTest}
+fallisce con un messaggio chiaro, poi rimosso. La regola cattura
+effettivamente la classe di bug per cui è stata scritta, non solo compila.
+
+\paragraph{Gap residuo, noto e accettato}
+\texttt{RoomType} non ha colonna \texttt{hotel\_id} (catalogo tipologie
+camera oggi globale, non per-hotel) --- richiede una migrazione di schema,
+non una query mancante; fuori scope per questa regola, documentato nel
+Javadoc di \texttt{TenantIsolationArchTest} e in \texttt{THREAT\_MODEL.md}
+come gap da riaprire quando si affronta lo schema di \texttt{room\_types}.
+
+\paragraph{Riferimento} Commit: [pending --- da aggiornare al push]
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════

@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.reservations.repository;
 
+import com.hotelpms.frontdesk.architecture.TenantScopeExempt;
 import com.hotelpms.frontdesk.reservations.domain.Reservation;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
 import jakarta.persistence.LockModeType;
@@ -50,6 +51,11 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
      * @param checkOut  check-out date
      * @return list of overlapping reservations
      */
+    @TenantScopeExempt(reason = "roomIds is always pre-validated per-hotel by "
+            + "verifyRoomsAvailability(lineItems, hotelId) before this call (ReservationServiceImpl."
+            + "updateReservation/createReservation) — a room UUID belongs to exactly one hotel, so "
+            + "results can't cross tenants even without a hotel_id column in this query. excludeId "
+            + "likewise comes from a reservation already resolved via findByIdAndHotelId.")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT r FROM Reservation r
@@ -78,6 +84,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
      * @param checkOut check-out date
      * @return list of overlapping reservations
      */
+    @TenantScopeExempt(reason = "Same as findOverlappingReservations: roomIds is always "
+            + "pre-validated per-hotel by verifyRoomsAvailability(lineItems, hotelId) before this "
+            + "call (ReservationServiceImpl.createReservation).")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT r FROM Reservation r
@@ -110,6 +119,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
      * @return distinct room IDs, among {@code roomIds}, that are booked for some
      *         part of the given range
      */
+    @TenantScopeExempt(reason = "roomIds is always the caller's own hotel-scoped clean-room set, "
+            + "sourced from roomService.findCleanRooms(hotelId) in "
+            + "ReservationServiceImpl.getAvailableRooms — never attacker-supplied.")
     @Query("""
             SELECT DISTINCT li.roomId FROM Reservation r
             JOIN r.lineItems li

@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.stays.repository;
 
+import com.hotelpms.frontdesk.architecture.TenantScopeExempt;
 import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,10 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      * @param reservationId the reservation ID
      * @return list of stays for that reservation
      */
+    @TenantScopeExempt(reason = "reservationId always comes from a Stay already resolved via "
+            + "findByIdAndHotelId (checkOut) or just created within the same hotel-verified "
+            + "check-in saga (checkIn) — never attacker-supplied. See StayServiceImpl."
+            + "updateReservationGuests / updateReservationStatusAfterCheckOut.")
     List<Stay> findAllByReservationId(UUID reservationId);
 
     /**

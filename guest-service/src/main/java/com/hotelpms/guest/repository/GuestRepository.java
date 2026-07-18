@@ -1,5 +1,6 @@
 package com.hotelpms.guest.repository;
 
+import com.hotelpms.guest.architecture.TenantScopeExempt;
 import com.hotelpms.guest.model.Guest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -84,5 +85,9 @@ public interface GuestRepository extends JpaRepository<Guest, UUID> {
      * @param cutoff the exclusive upper bound for the consent date
      * @return list of candidate guests
      */
+    @TenantScopeExempt(reason = "Intentionally platform-wide: the nightly retention job scans "
+            + "every hotel for candidates, then GuestRetentionJobServiceImpl verifies the "
+            + "per-guest legal-hold constraints (TULPS/fiscal) before ever anonymising anything "
+            + "(T-GST-05) — this is a pre-filter, not a data-returning endpoint.")
     List<Guest> findByGdprConsentDateBefore(LocalDate cutoff);
 }
