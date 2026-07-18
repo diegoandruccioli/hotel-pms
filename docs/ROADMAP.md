@@ -22,7 +22,7 @@ mono-hotel Docker Compose. La roadmap descrive il percorso verso
 | Qualità codice | 9.0/10 | PMD zero, Testcontainers billing+frontdesk (P7 ✅), coverage gate 90/80/88/92% (P15 ✅), Zod validation (P11 ✅), SRP refactor (P10 ✅) |
 | Operabilità | 7.5/10 | Docker Compose prod hardening (P0 ✅), backup automatizzato (P3 ✅), alert+runbook (P4/P5 ✅), branch protection+CodeQL (P12/P13 ✅) — no K8s, no secrets manager |
 | Conformità normativa | 9.5/10 | Alloggiati SOAP nativo, GDPR, numerazione fattura YYYY/NNNN (C2 ✅), IVA disaggregata (C3 ✅), dati fiscali ospite (E12 parz. ✅), generazione XML FatturaPA FPR12+SDI tracking (E3 parz. ✅) — accreditamento SDI e audit log immutabile (E13) ancora aperti |
-| UX e funzionalità | 8.0/10 | Flussi core completi (prenotazione→check-in→F&B→fattura→checkout), dashboard KPI+room-grid, sort/filter, WCAG 2.2 AA, settings multi-pagina, verticale billing (C2/C3/FatturaPA) — no mobile, no email (C1 blocca vendibilità) |
+| UX e funzionalità | 8.5/10 | Flussi core completi (prenotazione→check-in→F&B→fattura→checkout), dashboard KPI+room-grid, sort/filter, WCAG 2.2 AA, settings multi-pagina, verticale billing (C2/C3/FatturaPA), email conferma/checkout con personalizzazione (C1 ✅) — no mobile, no SMS |
 
 **Punto di forza unico rispetto ai competitor:**
 Implementazione Alloggiati PS nativa (SOAP, DRY_RUN, auto-send,
@@ -65,7 +65,7 @@ Feature necessarie per la vendibilità del prodotto.
 
 | # | Implementazione | Priorità | Effort | Impatto |
 |---|---|---|---|---|
-| C1 | Email/SMS conferme prenotazione (notification-service) | 🔴 Critica | 1-2 sett | Standard minimo assoluto — senza non vendibile |
+| C1 | ~~Email/SMS conferme prenotazione (notification-service)~~ | ✅ **Fatto** | — | `notification-service` (porta 8088): reservation-confirmed + checkout email (Thymeleaf it/en, Resilience4j fallback non-bloccante). Toggle granulare per tipo email + subject/saluto/logo personalizzabili da Impostazioni→Sistema. Retry manuale su fallimento (badge UI). Check-in email **non implementata** (mai cablata in `StayServiceImpl`, out of scope esplicito) — solo SMS resta non fatto |
 | C2 | ~~Numerazione fattura sequenziale certificata~~ | ✅ **Fatto** | — | `InvoiceSequence` + lock pessimistico PESSIMISTIC_WRITE; formato `YYYY/NNNN` per hotel+anno; Flyway V5; constraint unico su (hotel_id, invoice_number) |
 | C3 | ~~IVA disaggregata nella fattura PDF~~ | ✅ **Fatto** | — | `computeVatBreakdown` raggruppa charges per aliquota; PDF mostra righe `Imponibile X%` + `IVA X%` solo per FATTURA; Flyway V6 aggiunge `vat_rate` su `invoice_charges` |
 | C4 | Report KPI avanzati (RevPAR, ADR, GOPPAR, Occupancy) | 🟡 Alta | 1-2 sett | Dashboard ha KPI operativi base (arrivi/partenze/camere) — mancano RevPAR/ADR/GOPPAR |
