@@ -49,7 +49,11 @@ final class TenantIsolationArchTest {
      * has no {@code hotel_id} column today (room-type catalog is global, not
      * per-hotel) — a pre-existing design gap flagged during the ADR-004
      * exploration but out of scope for this rule (it's a schema change, not
-     * a missing query filter).
+     * a missing query filter). If this gap is ever closed, also update
+     * {@code RoomTypeServiceImpl}'s {@code @Cacheable("roomTypes")} entries (keys
+     * {@code #id} / {@code 'all'}) to include hotelId — otherwise the cache itself
+     * becomes a cross-tenant leak (one hotel's room-type list served to another) even
+     * after the repository query is fixed.
      */
     private static final Set<String> TENANT_ROOT_REPOSITORIES = Set.of(
             "com.hotelpms.frontdesk.reservations.repository.ReservationRepository",
