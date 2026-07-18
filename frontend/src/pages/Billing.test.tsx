@@ -286,6 +286,63 @@ describe('Billing', () => {
     });
   });
 
+  it('should re-query the server with dateFrom when the date-from input changes', async () => {
+    vi.mocked(billingService.searchInvoices)
+        .mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never)
+        .mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
+    render(<Billing />);
+    await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('date_from'), { target: { value: '2026-08-01' } });
+
+    await waitFor(() => {
+      expect(billingService.searchInvoices).toHaveBeenLastCalledWith(
+        expect.objectContaining({ dateFrom: '2026-08-01' }),
+      );
+    });
+  });
+
+  it('should re-query the server with dateTo when the date-to input changes', async () => {
+    vi.mocked(billingService.searchInvoices)
+        .mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never)
+        .mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
+    render(<Billing />);
+    await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('date_to'), { target: { value: '2026-08-31' } });
+
+    await waitFor(() => {
+      expect(billingService.searchInvoices).toHaveBeenLastCalledWith(
+        expect.objectContaining({ dateTo: '2026-08-31' }),
+      );
+    });
+  });
+
+  it('should show pagination controls and request the next page on click', async () => {
+    vi.mocked(billingService.searchInvoices)
+        .mockResolvedValueOnce(page([result(ISSUED_INVOICE)], 2) as never)
+        .mockResolvedValueOnce(page([result(PAID_INVOICE)], 2) as never);
+    render(<Billing />);
+    await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'next_page' }));
+
+    await waitFor(() => {
+      expect(billingService.searchInvoices).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 1 }),
+      );
+      expect(screen.getByText('INV-002')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'prev_page' }));
+
+    await waitFor(() => {
+      expect(billingService.searchInvoices).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 0 }),
+      );
+    });
+  });
+
   it('should have no accessibility violations on empty state', async () => {
     vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([]) as never);
     const { container } = render(<Billing />);

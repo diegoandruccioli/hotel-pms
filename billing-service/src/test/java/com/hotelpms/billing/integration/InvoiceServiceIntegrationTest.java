@@ -1,5 +1,6 @@
 package com.hotelpms.billing.integration;
 
+import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.domain.SdiStatus;
@@ -23,6 +24,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -38,8 +40,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Integration tests for InvoiceService using the JPA test slice.
  *
- * <p>{@code @DataJpaTest} loads only JPA/Flyway/transaction infrastructure — no Feign,
- * no Security filter chain, no Redis — so no mocks are needed for those concerns.
+ * <p>{@code @DataJpaTest} loads only JPA/Flyway/transaction infrastructure — no real
+ * Feign client wiring, no Security filter chain, no Redis. {@code InvoiceServiceImpl}
+ * now takes {@link GuestClient} as a constructor dependency (C12 invoice search); since
+ * this slice doesn't configure OpenFeign, it's provided as a {@code @MockitoBean} purely
+ * so the context can wire the constructor — none of these tests exercise
+ * {@code searchInvoices} (the only method that calls it), so it's never stubbed.
  * {@code BillingApplication}'s {@code @EnableJpaAuditing} is processed by the slice
  * bootstrapper, so {@code Invoice}'s {@code @CreatedDate}/{@code @LastModifiedDate} fields
  * are populated. Flyway applies all migrations at context startup; each test rolls back
@@ -74,6 +80,9 @@ class InvoiceServiceIntegrationTest {
 
     @Autowired
     private InvoiceService invoiceService;
+
+    @MockitoBean
+    private GuestClient guestClient;
 
     @DynamicPropertySource
     static void configureDatabase(final DynamicPropertyRegistry registry) {

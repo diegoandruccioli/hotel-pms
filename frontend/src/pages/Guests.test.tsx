@@ -33,7 +33,9 @@ vi.mock('focus-trap-react', () => ({
 }));
 
 vi.mock('./GuestFormModal', () => ({
-  GuestFormModal: () => null,
+  GuestFormModal: ({ onSaved }: { onSaved: () => void }) => (
+    <button type="button" onClick={onSaved}>trigger-saved</button>
+  ),
 }));
 
 const GUEST = {
@@ -186,6 +188,52 @@ describe('Guests', () => {
       expect(guestService.deleteGuest).toHaveBeenCalledWith('guest-1');
       expect(mockAddToast).toHaveBeenCalledWith('guest_deleted_success', 'success');
       expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+    });
+  });
+
+  it('should close the delete confirmation dialog on cancel', async () => {
+    vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    render(<Guests />);
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /delete John Doe/ }));
+    expect(screen.getByText('delete_guest_confirm')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
+
+    expect(screen.queryByText('delete_guest_confirm')).not.toBeInTheDocument();
+    expect(guestService.deleteGuest).not.toHaveBeenCalled();
+  });
+
+  it('should show a generic failure toast on a non-GDPR delete error', async () => {
+    vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    vi.mocked(guestService.deleteGuest).mockRejectedValueOnce({ response: { status: 500 } });
+    render(<Guests />);
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /delete John Doe/ }));
+    fireEvent.click(screen.getAllByRole('button', { name: /^delete$/ })[0]);
+
+    await waitFor(() => {
+      expect(mockAddToast).toHaveBeenCalledWith('delete_guest_failed', 'error');
+    });
+  });
+
+  it('should reload the guest list when the form modal reports a save', async () => {
+    vi.mocked(guestService.searchGuestsPaged)
+      .mockResolvedValueOnce(page([GUEST]) as never)
+      .mockResolvedValueOnce(page([GUEST, JANE]) as never);
+    render(<Guests />);
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'add_guest' }));
+    fireEvent.click(screen.getByText('trigger-saved'));
+
+    await waitFor(() => {
+      expect(guestService.searchGuestsPaged).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     });
   });
 
