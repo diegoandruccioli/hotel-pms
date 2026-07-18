@@ -263,7 +263,8 @@ public class StayServiceImpl implements StayService {
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
-    public Optional<StayResponse> getLastCompletedStayForGuest(@NonNull final UUID guestId) {
+    public Optional<StayResponse> getLastCompletedStayForGuest(
+            @NonNull final UUID guestId, @NonNull final UUID hotelId) {
         log.debug("Pre-fill check: verifying guest profile active for guestId={}", guestId);
         final GuestResponse guest;
         try {
@@ -278,7 +279,7 @@ public class StayServiceImpl implements StayService {
                 guest.firstName(), guest.lastName(), guestId);
 
         return stayRepository
-                .findTopByGuestIdAndStatusOrderByActualCheckInTimeDesc(guestId, StayStatus.CHECKED_OUT)
+                .findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(guestId, hotelId, StayStatus.CHECKED_OUT)
                 .map(stayMapper::toDto);
     }
 

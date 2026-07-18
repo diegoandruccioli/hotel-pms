@@ -20,14 +20,6 @@ import java.util.UUID;
 public interface StayRepository extends JpaRepository<Stay, UUID> {
 
     /**
-     * Finds a stay by reservation ID.
-     *
-     * @param reservationId the reservation ID
-     * @return the Optional containing the stay if found
-     */
-    Optional<Stay> findByReservationId(UUID reservationId);
-
-    /**
      * Finds all stays by reservation ID.
      *
      * @param reservationId the reservation ID
@@ -102,16 +94,18 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
     List<Stay> findByHotelIdAndAlloggiatiSendFailedTrue(UUID hotelId);
 
     /**
-     * Finds the most recent stay for a guest with the given status,
-     * ordered by actual check-in time descending.
+     * Finds the most recent stay for a guest within a hotel with the given status,
+     * ordered by actual check-in time descending (T-STAY-06, tenant isolation).
      * Used to pre-fill the check-in form for returning guests, after the
      * caller has verified that the guest profile is still active in guest-service.
      *
      * @param guestId the guest UUID
+     * @param hotelId the hotel UUID (tenant isolation)
      * @param status  the stay status to filter by
-     * @return an Optional containing the most recent matching stay
+     * @return an Optional containing the most recent matching stay within that hotel
      */
-    Optional<Stay> findTopByGuestIdAndStatusOrderByActualCheckInTimeDesc(UUID guestId, StayStatus status);
+    Optional<Stay> findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
+            UUID guestId, UUID hotelId, StayStatus status);
 
     /**
      * Finds the most recent stay for a guest within a hotel, regardless of status.

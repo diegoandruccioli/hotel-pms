@@ -3875,6 +3875,60 @@ verifica che il repository sia sempre invocato con l'\texttt{hotelId} del caller
 \paragraph{Riferimento} Commit: \commitref{c983946}{fix(security): T-BILL-04 --- cross-tenant data leak on Owner financial report}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Data Leak Cross-Tenant sul Pre-fill Check-in \threat{T-STAY-06}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato nella stessa esplorazione di T-BILL-04. \texttt{StayServiceImpl.getLastCompletedStayForGuest(guestId)}
+--- usato per pre-compilare il form di check-in con i dati dell'ultimo soggiorno di un
+ospite di ritorno --- interrogava \texttt{StayRepository.findTopByGuestIdAndStatusOrderByActualCheckInTimeDesc(guestId,
+CHECKED\_OUT)} senza alcun parametro \texttt{hotel\_id}. L'unico controllo presente era che
+il profilo ospite fosse ancora attivo su guest-service, non che il soggiorno restituito
+appartenesse all'hotel del chiamante. Un receptionist dell'Hotel A, per un
+\texttt{guestId} noto, poteva ottenere numero camera, date e stato fattura/Alloggiati
+dell'ultimo soggiorno di quell'ospite anche se avvenuto presso l'Hotel B. Classificato
+OWASP A01 --- Broken Access Control.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- StayServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: nessun hotelId, solo verifica che il guest sia attivo
+public Optional<StayResponse> getLastCompletedStayForGuest(UUID guestId) {
+    GuestResponse guest = guestClient.getGuestById(guestId);  // solo attivo?
+    return stayRepository
+        .findTopByGuestIdAndStatusOrderByActualCheckInTimeDesc(guestId, CHECKED_OUT)
+        .map(stayMapper::toDto);  // soggiorno di QUALSIASI hotel
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Stesso pattern di T-STAY-04/T-STAY-05: nuova query hotel-scoped
+\texttt{findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc}; il service e il
+controller richiedono ora \texttt{hotelId}, risolto da \texttt{StayController.extractHotelId()}
+(mai dal client).
+
+\begin{securebox}[title={Codice Sicuro --- StayServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: hotelId propagato dal controller, mai dal client
+public Optional<StayResponse> getLastCompletedStayForGuest(UUID guestId, UUID hotelId) {
+    GuestResponse guest = guestClient.getGuestById(guestId);
+    return stayRepository
+        .findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
+            guestId, hotelId, CHECKED_OUT)
+        .map(stayMapper::toDto);
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Nuovi \texttt{shouldReturnLastCompletedStayScopedToTheAuthenticatedHotel} e
+\texttt{shouldReturnEmptyWhenGuestServiceUnavailableForPreFill} in
+\texttt{StayServiceImplTest} --- l'endpoint non aveva alcuna copertura di regressione
+in precedenza, coerente con come il gap sia passato inosservato.
+
+\paragraph{Riferimento} Commit: [pending --- da aggiornare al push]
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}
 % ─────────────────────────────────────────────────────────────────────────────
 

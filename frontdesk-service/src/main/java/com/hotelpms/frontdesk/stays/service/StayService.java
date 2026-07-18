@@ -68,14 +68,17 @@ public interface StayService {
     Page<StayResponse> getStaysByReservationId(@NonNull UUID reservationId, @NonNull UUID hotelId, Pageable pageable);
 
     /**
-     * Returns the most recent completed stay for a guest, for check-in form pre-filling.
+     * Returns the most recent completed stay for a guest within the caller's hotel, for
+     * check-in form pre-filling. Scoped to {@code hotelId} (T-STAY-06, IDOR/cross-tenant
+     * stay history leak) — a guest's stay at a different hotel must never be returned.
      * Verifies the guest profile is still active in guest-service before returning data
      * (fail-safe: returns empty if the profile was anonymised or the service is unavailable).
      *
      * @param guestId the guest UUID
+     * @param hotelId the authenticated hotel UUID; only a stay owned by this hotel is returned
      * @return an Optional containing the last CHECKED_OUT stay, or empty if none or guest inactive
      */
-    Optional<StayResponse> getLastCompletedStayForGuest(@NonNull UUID guestId);
+    Optional<StayResponse> getLastCompletedStayForGuest(@NonNull UUID guestId, @NonNull UUID hotelId);
 
     /**
      * Returns the most recent check-in date for a guest within a hotel.

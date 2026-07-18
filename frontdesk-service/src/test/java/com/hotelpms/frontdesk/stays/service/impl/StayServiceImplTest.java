@@ -59,6 +59,7 @@ import org.mockito.InOrder;
 import org.springframework.lang.NonNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -1162,6 +1163,39 @@ class StayServiceImplTest {
         assertNotNull(response);
         verify(roomService, times(1)).updateRoomStatus(room, null, RoomStatus.OCCUPIED);
         verify(stayRepository, times(1)).save(Objects.requireNonNull(unmappedStay));
+    }
+
+    @Test
+    void shouldReturnLastCompletedStayScopedToTheAuthenticatedHotel() {
+        // Regression test for T-STAY-06: pre-fill must never return another hotel's stay.
+        final Stay checkedOutStay = Objects.requireNonNull(savedStay);
+        checkedOutStay.setStatus(StayStatus.CHECKED_OUT);
+
+        when(guestClient.getGuestById(guestId))
+                .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(stayRepository.findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
+                guestId, hotelId, StayStatus.CHECKED_OUT))
+                .thenReturn(Optional.of(checkedOutStay));
+        when(stayMapper.toDto(checkedOutStay)).thenReturn(Objects.requireNonNull(validResponse));
+
+        final Optional<StayResponse> result = stayService.getLastCompletedStayForGuest(guestId, hotelId);
+
+        assertTrue(result.isPresent());
+        verify(stayRepository).findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
+                guestId, hotelId, StayStatus.CHECKED_OUT);
+    }
+
+    @Test
+    void shouldReturnEmptyWhenGuestServiceUnavailableForPreFill() {
+        when(guestClient.getGuestById(guestId))
+                .thenThrow(mock(feign.FeignException.NotFound.class));
+
+        final Optional<StayResponse> result = stayService.getLastCompletedStayForGuest(guestId, hotelId);
+
+        assertFalse(result.isPresent());
+        verify(stayRepository, never())
+                .findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
+                        ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
     }
 
     /**

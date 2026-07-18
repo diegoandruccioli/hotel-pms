@@ -131,10 +131,13 @@ public class StayController {
     }
 
     /**
-     * Returns the most recent completed stay for a guest, used to pre-fill the check-in form.
-     * Verifies that the guest profile is still active before returning any data (Option-B
-     * GDPR safeguard). Returns 204 No Content when the guest has no previous stays, the
-     * profile was anonymised, or guest-service is unreachable (fail-safe).
+     * Returns the most recent completed stay for a guest within the caller's hotel, used
+     * to pre-fill the check-in form. Scoped to the caller's hotel (T-STAY-06, IDOR/
+     * cross-tenant stay history leak): a guest's stay at a different hotel is never
+     * returned. Verifies that the guest profile is still active before returning any
+     * data (Option-B GDPR safeguard). Returns 204 No Content when the guest has no
+     * previous stays in this hotel, the profile was anonymised, or guest-service is
+     * unreachable (fail-safe).
      *
      * @param guestId the guest UUID
      * @return 200 with the last completed stay, or 204 No Content
@@ -142,7 +145,7 @@ public class StayController {
     @GetMapping("/guest/{guestId}/latest")
     public ResponseEntity<StayResponse> getLastCompletedStayForGuest(
             @NonNull @PathVariable("guestId") final UUID guestId) {
-        return stayService.getLastCompletedStayForGuest(guestId)
+        return stayService.getLastCompletedStayForGuest(guestId, Objects.requireNonNull(extractHotelId()))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.noContent().build());
     }

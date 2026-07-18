@@ -224,7 +224,7 @@ class StayControllerTest {
 
     @Test
     void shouldGetLastCompletedStayReturn200WhenPresent() throws Exception {
-        when(stayService.getLastCompletedStayForGuest(guestId))
+        when(stayService.getLastCompletedStayForGuest(guestId, hotelId))
                 .thenReturn(Optional.of(stayResponse));
 
         mockMvc.perform(get(BASE_URL + PATH_GUEST_LATEST, guestId))
@@ -234,7 +234,7 @@ class StayControllerTest {
 
     @Test
     void shouldGetLastCompletedStayReturn204WhenAbsent() throws Exception {
-        when(stayService.getLastCompletedStayForGuest(guestId))
+        when(stayService.getLastCompletedStayForGuest(guestId, hotelId))
                 .thenReturn(Optional.empty());
 
         mockMvc.perform(get(BASE_URL + PATH_GUEST_LATEST, guestId))
