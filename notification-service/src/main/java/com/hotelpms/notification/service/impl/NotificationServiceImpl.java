@@ -63,7 +63,7 @@ public class NotificationServiceImpl implements NotificationService {
         final String html = templateEngine.process(template, ctx);
         final String subject = buildSubject("Conferma prenotazione", "Booking confirmation", request.locale(),
                 request.hotelName(), request.customSubject());
-        sendHtmlEmail(request.guestEmail(), subject, html);
+        sendHtmlEmail(request.guestEmail(), subject, html, request.hotelName());
         log.info("[NOTIFY] reservation-confirmed sent | to={}", EmailMasker.mask(request.guestEmail()));
     }
 
@@ -76,7 +76,7 @@ public class NotificationServiceImpl implements NotificationService {
         final String html = templateEngine.process(template, ctx);
         final String subject = buildSubject("Benvenuto al check-in", "Welcome — Check-in confirmed",
                 request.locale(), request.hotelName(), null);
-        sendHtmlEmail(request.guestEmail(), subject, html);
+        sendHtmlEmail(request.guestEmail(), subject, html, request.hotelName());
         log.info("[NOTIFY] checkin sent | to={}", EmailMasker.mask(request.guestEmail()));
     }
 
@@ -89,22 +89,25 @@ public class NotificationServiceImpl implements NotificationService {
         final String html = templateEngine.process(template, ctx);
         final String subject = buildSubject("Riepilogo soggiorno e fattura", "Stay summary and invoice",
                 request.locale(), request.hotelName(), request.customSubject());
-        sendHtmlEmail(request.guestEmail(), subject, html);
+        sendHtmlEmail(request.guestEmail(), subject, html, request.hotelName());
         log.info("[NOTIFY] checkout sent | to={}", EmailMasker.mask(request.guestEmail()));
     }
 
     /**
      * Creates and sends a MIME HTML email message.
      *
-     * @param to      the recipient address
-     * @param subject the email subject
-     * @param html    the rendered HTML body
+     * @param to        the recipient address
+     * @param subject   the email subject
+     * @param html      the rendered HTML body
+     * @param hotelName the hotel display name for the "From" header (ADR-005: the
+     *                  technical address stays platform-wide — no per-hotel domain
+     *                  exists yet — but the guest-visible sender name is the hotel's)
      */
-    private void sendHtmlEmail(final String to, final String subject, final String html) {
+    private void sendHtmlEmail(final String to, final String subject, final String html, final String hotelName) {
         try {
             final MimeMessage message = mailSender.createMimeMessage();
             final MimeMessageHelper helper = new MimeMessageHelper(message, true, CHARSET);
-            helper.setFrom(new InternetAddress(fromAddress, fromName, CHARSET));
+            helper.setFrom(new InternetAddress(fromAddress, resolveFromName(hotelName), CHARSET));
             helper.setTo(java.util.Objects.requireNonNull(to));
             helper.setSubject(java.util.Objects.requireNonNull(subject));
             helper.setText(java.util.Objects.requireNonNull(html), true);
@@ -112,6 +115,17 @@ public class NotificationServiceImpl implements NotificationService {
         } catch (final MessagingException | UnsupportedEncodingException e) {
             throw new IllegalStateException("EMAIL_SEND_FAILED: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Resolves the "From" display name: the hotel's own name when available,
+     * falling back to the platform default otherwise.
+     *
+     * @param hotelName the hotel display name (may be null or blank)
+     * @return the name to use for the "From" header
+     */
+    private String resolveFromName(final String hotelName) {
+        return (hotelName != null && !hotelName.isBlank()) ? hotelName : fromName;
     }
 
     /**

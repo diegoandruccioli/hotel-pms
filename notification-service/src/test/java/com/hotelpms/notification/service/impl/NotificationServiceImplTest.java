@@ -199,6 +199,43 @@ class NotificationServiceImplTest {
     }
 
     @Test
+    void sendReservationConfirmedFromHeaderUsesHotelName() {
+        final ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        final String distinctHotelName = "Grand Hotel Roma";
+        final ReservationConfirmedRequest req = new ReservationConfirmedRequest(
+                GUEST_EMAIL, GUEST_NAME, distinctHotelName, ROOM_GENERIC,
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 4), 3, "RES-007", LOCALE_IT,
+                null, null, null);
+
+        service.sendReservationConfirmed(req);
+
+        verify(mailSender).send(captor.capture());
+        assertFromHeaderContains(captor.getValue(), distinctHotelName);
+    }
+
+    @Test
+    void sendCheckinBlankHotelNameFallsBackToPlatformFromName() {
+        final ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        final CheckinNotificationRequest req = new CheckinNotificationRequest(
+                GUEST_EMAIL, GUEST_NAME, "   ", ROOM_NUMBER_101,
+                LocalDate.of(2026, 8, 5), LOCALE_IT);
+
+        service.sendCheckin(req);
+
+        verify(mailSender).send(captor.capture());
+        assertFromHeaderContains(captor.getValue(), FROM_NAME);
+    }
+
+    private static void assertFromHeaderContains(final MimeMessage message, final String expected) {
+        try {
+            assertTrue(message.getFrom()[0].toString().contains(expected),
+                    "From header should contain \"" + expected + "\" but was: " + message.getFrom()[0]);
+        } catch (final jakarta.mail.MessagingException e) {
+            throw new AssertionError("Could not read From header", e);
+        }
+    }
+
+    @Test
     void sendCheckoutBlankCustomSubjectFallsBackToDefault() {
         final ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
         final CheckoutNotificationRequest req = new CheckoutNotificationRequest(
