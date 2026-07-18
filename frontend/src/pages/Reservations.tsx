@@ -15,6 +15,8 @@ import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 
 const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
+const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 300;
 
 type SortField = 'checkInDate' | 'checkOutDate' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -24,11 +26,6 @@ interface ReservationsNavState {
   sortField?: SortField;
   sortDir?: SortDir;
 }
-
-const getTodayString = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
 
 const getStatusTone = (status: string) => {
   switch (status.toUpperCase()) {
@@ -181,6 +178,8 @@ export const Reservations = () => {
 
   const [reservations, setReservations] = useState<ReservationResponse[]>([]);
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
@@ -193,9 +192,14 @@ export const Reservations = () => {
   const [retryingEmail, setRetryingEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    const id = setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(id);
   }, [searchQuery]);
+
+  // Any filter/sort change invalidates the current page — always restart from page 0.
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, sortField, sortDir, upcomingOnly]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -213,28 +217,25 @@ export const Reservations = () => {
     setUpcomingOnly((prev) => !prev);
   }, []);
 
-  const filteredReservations = useMemo(() => {
-    const active = reservations.filter((r) => r.active !== false);
-    const upcoming = !upcomingOnly ? active : active.filter((r) => r.checkInDate >= getTodayString());
-    const searched = !debouncedSearch.trim()
-      ? upcoming
-      : upcoming.filter((r) => r.guestFullName?.toLowerCase().includes(debouncedSearch.toLowerCase()));
-    const sorted = [...searched].sort((a, b) => {
-      const cmp = a[sortField].localeCompare(b[sortField]);
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-    return sorted;
-  }, [reservations, debouncedSearch, sortField, sortDir, upcomingOnly]);
+  const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
+  const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
 
   const loadReservations = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const [resData, roomsData] = await Promise.all([
-        reservationService.getAllReservations(),
+        reservationService.searchReservations({
+          query: debouncedSearch,
+          upcomingOnly,
+          page,
+          size: PAGE_SIZE,
+          sort: `${sortField},${sortDir}`,
+        }),
         inventoryService.getAllRooms(0, 500)
       ]);
-      setReservations(resData);
+      setReservations(resData.content);
+      setTotalPages(resData.totalPages);
       setRooms(roomsData.content);
     } catch (err: unknown) {
       const e = err as {response?: {data?: {detail?: string}}, message?: string};
@@ -242,7 +243,7 @@ export const Reservations = () => {
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [t, debouncedSearch, upcomingOnly, page, sortField, sortDir]);
 
   const handleRetryConfirmationEmail = useCallback(async (id: string) => {
     setRetryingEmail(id);
@@ -293,7 +294,7 @@ export const Reservations = () => {
     setDeleting(true);
     try {
       await reservationService.deleteReservation(reservationToDelete);
-      setReservations((prev) => prev.filter((r) => r.id !== reservationToDelete));
+      await loadReservations();
       addToast(t('reservation_deleted_success'), 'success');
     } catch {
       addToast(t('delete_reservation_failed'), 'error');
@@ -301,7 +302,7 @@ export const Reservations = () => {
       setDeleting(false);
       setReservationToDelete(null);
     }
-  }, [reservationToDelete, addToast, t]);
+  }, [reservationToDelete, addToast, t, loadReservations]);
 
   const tableHeaders = useMemo(() => [
     t('guest_name'), 
@@ -391,14 +392,14 @@ export const Reservations = () => {
         </div>
       ) : (
         <M3Table headers={tableHeaders}>
-          {filteredReservations.length === 0 ? (
+          {reservations.length === 0 ? (
             <tr>
               <td colSpan={6} className="py-8 text-center text-sm font-body text-on-surface-variant">
                 {upcomingOnly ? t('no_upcoming_reservations_found') : t('no_reservations_found')}
               </td>
             </tr>
           ) : (
-            filteredReservations.map((reservation) => (
+            reservations.map((reservation) => (
               <ReservationRow
                 key={reservation.id}
                 reservation={reservation}
@@ -414,6 +415,32 @@ export const Reservations = () => {
             ))
           )}
         </M3Table>
+      )}
+
+      {!loading && !error && totalPages > 1 && (
+        <nav aria-label={t('pagination')} className="flex items-center justify-center gap-3">
+          <M3Button
+            variant="outlined"
+            icon="chevron_left"
+            disabled={page === 0}
+            onClick={handlePrevPage}
+            aria-label={t('prev_page')}
+          >
+            {t('prev_page')}
+          </M3Button>
+          <span className="text-sm font-body text-on-surface-variant">
+            {t('page_x_of_y', { current: page + 1, total: totalPages })}
+          </span>
+          <M3Button
+            variant="outlined"
+            icon="chevron_right"
+            disabled={page >= totalPages - 1}
+            onClick={handleNextPage}
+            aria-label={t('next_page')}
+          >
+            {t('next_page')}
+          </M3Button>
+        </nav>
       )}
       {reservationToDelete && (
         <M3Dialog

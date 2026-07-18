@@ -8,7 +8,10 @@ const MOCK_ROOMS = [
   { id: 'rm-3', roomNumber: '103', status: 'OCCUPIED', roomType: { name: 'Suite', basePrice: 200 } },
 ];
 
-const TODAY = new Date().toISOString().split('T')[0];
+// Local date, matching dashboardService.getTodayDateString() — not toISOString(),
+// which is UTC and can disagree with the local date near local midnight.
+const nowForToday = new Date();
+const TODAY = `${nowForToday.getFullYear()}-${String(nowForToday.getMonth() + 1).padStart(2, '0')}-${String(nowForToday.getDate()).padStart(2, '0')}`;
 
 const MOCK_GUESTS = [
   { id: 'g-1', firstName: 'Mario', lastName: 'Rossi', email: 'mario@test.com' },

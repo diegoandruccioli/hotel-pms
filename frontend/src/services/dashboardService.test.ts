@@ -10,7 +10,11 @@ vi.mock('./stayService');
 vi.mock('./inventoryService');
 vi.mock('./billingReportService');
 
-const TODAY = new Date().toISOString().slice(0, 10);
+// Local date, matching dashboardService.getTodayDateString() — not toISOString(),
+// which is UTC and can disagree with the local date near local midnight, making
+// this test flaky depending on the machine's timezone offset at run time.
+const now = new Date();
+const TODAY = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
 const BASE_STAYS_PAGE = {
   totalElements: 0, totalPages: 1, number: 0, size: 20,

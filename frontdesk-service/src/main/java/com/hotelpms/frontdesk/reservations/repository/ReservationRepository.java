@@ -150,4 +150,30 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
      * @return true if a non-terminal reservation exists for this guest in this hotel
      */
     boolean existsByGuestIdAndHotelIdAndStatusNotIn(UUID guestId, UUID hotelId, List<ReservationStatus> terminalStatuses);
+
+    /**
+     * Combinable search over a hotel's reservations (C12): optional lower bound on
+     * check-in date, and an optional set of guest IDs pre-resolved from a free-text
+     * query (guest name/email search happens in guest-service — this repository
+     * only knows guestId, see {@code ReservationServiceImpl.searchReservations}).
+     * Any filter left {@code null} is skipped entirely rather than excluding results.
+     *
+     * @param hotelId      the hotel UUID from the authenticated request (always applied)
+     * @param checkInFrom  optional lower bound on check-in date (inclusive), or {@code null}
+     * @param query        non-null marker that a guest query was requested (drives the
+     *                     {@code guestIds} filter); {@code null} to skip it entirely
+     * @param guestIds     guest IDs matching the query in guest-service; must be non-null
+     *                     (empty when {@code query} is null, or when no guest matched)
+     * @param pageable     pagination and sorting parameters
+     * @return a page of matching reservations scoped to the hotel
+     */
+    @Query("SELECT r FROM Reservation r WHERE r.hotelId = :hotelId "
+            + "AND (:checkInFrom IS NULL OR r.checkInDate >= :checkInFrom) "
+            + "AND (:query IS NULL OR r.guestId IN :guestIds)")
+    Page<Reservation> searchReservationsByHotelId(
+            @Param("hotelId") UUID hotelId,
+            @Param("checkInFrom") LocalDate checkInFrom,
+            @Param("query") String query,
+            @Param("guestIds") List<UUID> guestIds,
+            Pageable pageable);
 }

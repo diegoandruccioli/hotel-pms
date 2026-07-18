@@ -56,15 +56,31 @@ const roomsPage = {
 
 test.describe('Reservations', () => {
   test.beforeEach(async ({ page }) => {
+    // Tracks reservations deleted during the test so the search-mock reflects the
+    // deletion on the reload that Reservations.tsx now does after a successful
+    // delete (C12: server-side pagination replaced the old local-array splice).
+    const deletedIds = new Set<string>();
+
     await page.route('**/api/v1/auth/me', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER) }),
     );
     await page.route('**/api/v1/reservations**', async (route) => {
       const method = route.request().method();
       const url = route.request().url();
-      if (method === 'GET') {
+      if (method === 'GET' && url.includes('/search')) {
+        const query = (new URL(url).searchParams.get('query') ?? '').toLowerCase();
+        const matched = MOCK_RESERVATIONS
+          .filter((r) => !deletedIds.has(r.id))
+          .filter((r) => !query || r.guestFullName.toLowerCase().includes(query));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ...resPage, content: matched, totalElements: matched.length }),
+        });
+      } else if (method === 'GET') {
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(resPage) });
       } else if (method === 'DELETE' && url.includes('res-002')) {
+        deletedIds.add('res-002');
         await route.fulfill({ status: 204 });
       } else if (method === 'PUT' && url.includes('res-002')) {
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CANCELLED_RESERVATION) });
@@ -155,7 +171,7 @@ test.describe('Reservations', () => {
     await expect(page).toHaveURL(/\/reservations\/new/);
   });
 
-  test('client-side search filters by guest name', async ({ page }) => {
+  test('search filters by guest name', async ({ page }) => {
     await page.goto('/reservations');
     await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
 

@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -133,6 +134,31 @@ class ReservationControllerTest {
         when(reservationService.getAllReservations(any(Pageable.class))).thenReturn(page);
 
         mockMvc.perform(get(BASE_URL))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldSearchReservationsReturn200() throws Exception {
+        final Page<ReservationResponse> page = new PageImpl<>(
+                List.of(response), PageRequest.of(0, 20), 1L);
+        when(reservationService.searchReservations(eq("mario"), eq(true), any(Pageable.class)))
+                .thenReturn(page);
+
+        mockMvc.perform(get(BASE_URL + "/search")
+                        .param("query", "mario")
+                        .param("upcomingOnly", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(reservationId.toString()));
+    }
+
+    @Test
+    void shouldSearchReservationsWithNoFiltersReturn200() throws Exception {
+        final Page<ReservationResponse> page = new PageImpl<>(
+                List.of(response), PageRequest.of(0, 20), 1L);
+        when(reservationService.searchReservations(eq(null), eq(false), any(Pageable.class)))
+                .thenReturn(page);
+
+        mockMvc.perform(get(BASE_URL + "/search"))
                 .andExpect(status().isOk());
     }
 

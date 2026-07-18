@@ -41,6 +41,22 @@ public interface ReservationService {
     Page<ReservationResponse> getAllReservations(Pageable pageable);
 
     /**
+     * Combinable search over the caller's hotel reservations (C12): an optional
+     * {@code upcomingOnly} filter (check-in date today or later) and an optional
+     * free-text query matched against the associated guest's name/email (resolved
+     * via a cross-service call to guest-service, since Reservation only stores a
+     * guestId). Results include {@code guestFullName}, batch-resolved for the
+     * returned page only — same pattern as {@link #getAllReservations(Pageable)}.
+     *
+     * @param query        optional free-text query (guest name/email), or {@code null}/blank
+     *                     to skip it
+     * @param upcomingOnly if {@code true}, only reservations with check-in today or later
+     * @param pageable     pagination and sorting parameters
+     * @return a page of matching reservation responses, scoped to the authenticated hotel
+     */
+    Page<ReservationResponse> searchReservations(String query, boolean upcomingOnly, Pageable pageable);
+
+    /**
      * Updates an existing reservation.
      *
      * @param id      the reservation ID

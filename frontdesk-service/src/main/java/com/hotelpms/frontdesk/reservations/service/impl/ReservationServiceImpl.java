@@ -55,6 +55,8 @@ public class ReservationServiceImpl implements ReservationService {
             List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
     private static final String NOTIFICATION_SERVICE_UNAVAILABLE_REASON = "NOTIFICATION_SERVICE_UNAVAILABLE";
     private static final int MAX_FAILURE_REASON_LENGTH = 500;
+    private static final int GUEST_SEARCH_MATCH_CAP = 200;
+    private static final String UNKNOWN_GUEST = "Unknown Guest";
 
     private final ReservationRepository reservationRepository;
     private final ReservationMapper reservationMapper;
@@ -126,8 +128,56 @@ public class ReservationServiceImpl implements ReservationService {
 
         return reservationPage.map(reservation -> {
             final ReservationResponse response = reservationMapper.toResponse(reservation);
-            return enrichWithGuestName(response, guestNameMap.getOrDefault(reservation.getGuestId(), "Unknown Guest"));
+            return enrichWithGuestName(response, guestNameMap.getOrDefault(reservation.getGuestId(), UNKNOWN_GUEST));
         });
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ReservationResponse> searchReservations(
+            final String query, final boolean upcomingOnly, final Pageable pageable) {
+        final UUID hotelId = resolveHotelId();
+        final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
+        final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
+        final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
+        final LocalDate checkInFrom = upcomingOnly ? LocalDate.now() : null;
+
+        final Page<Reservation> results = reservationRepository.searchReservationsByHotelId(
+                hotelId, checkInFrom, trimmedQuery, guestIds, safePageable);
+
+        final List<UUID> pageGuestIds = results.getContent().stream()
+                .map((@NonNull Reservation r) -> r.getGuestId())
+                .distinct()
+                .toList();
+        if (pageGuestIds.isEmpty()) {
+            return results.map(reservationMapper::toResponse);
+        }
+
+        final java.util.Map<UUID, String> guestNameMap = guestClient.getGuestsBatch(pageGuestIds).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        (@NonNull GuestResponse gr) -> gr.id(),
+                        g -> g.firstName() + " " + g.lastName()));
+
+        return results.map(reservation -> enrichWithGuestName(
+                reservationMapper.toResponse(reservation),
+                guestNameMap.getOrDefault(reservation.getGuestId(), UNKNOWN_GUEST)));
+    }
+
+    /**
+     * Resolves which guest IDs (within the caller's hotel) match a free-text query,
+     * via a cross-service call to guest-service (Reservation only stores a guestId,
+     * not a name/email). Capped at {@link #GUEST_SEARCH_MATCH_CAP} matches — reservation
+     * search is a filter aid, not a guest directory export.
+     *
+     * @param query the free-text query (already trimmed, non-blank)
+     * @return matching guest IDs, or an empty list if guest-service is unavailable
+     *         (circuit breaker fallback) or nothing matched
+     */
+    private List<UUID> resolveGuestIds(final String query) {
+        return guestClient.searchGuests(query, GUEST_SEARCH_MATCH_CAP).content().stream()
+                .map(GuestResponse::id)
+                .toList();
     }
 
     /** {@inheritDoc} */
@@ -316,7 +366,7 @@ public class ReservationServiceImpl implements ReservationService {
 
     private ReservationResponse enrichWithGuestName(final ReservationResponse response, final GuestResponse guest) {
         if (guest == null) {
-            return enrichWithGuestName(response, "Unknown Guest");
+            return enrichWithGuestName(response, UNKNOWN_GUEST);
         }
         return enrichWithGuestName(response, guest.firstName() + " " + guest.lastName());
     }

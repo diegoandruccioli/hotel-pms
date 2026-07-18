@@ -1,6 +1,7 @@
 package com.hotelpms.frontdesk.client;
 
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
+import com.hotelpms.frontdesk.client.dto.GuestSearchPageResponse;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 import java.util.UUID;
@@ -78,5 +80,33 @@ public interface GuestClient {
     default List<GuestResponse> getGuestsBatchFallback(final List<UUID> ids, final Throwable throwable) {
         LOG.warn("[GuestClient] getGuestsBatch fallback triggered for {} ids: {}", ids.size(), throwable.getMessage());
         return List.of();
+    }
+
+    /**
+     * Free-text guest search, hotel-scoped server-side by guest-service. Used to
+     * resolve which guest IDs match a search query typed into the reservation
+     * search box (C12) — the reservation itself only carries a guestId, no name.
+     *
+     * @param query the search term (name, email, city)
+     * @param size  the maximum number of matches to consider
+     * @return the matching guests (first page only, capped at {@code size})
+     */
+    @GetMapping("/api/v1/guests/search")
+    @CircuitBreaker(name = "guestService", fallbackMethod = "searchGuestsFallback")
+    GuestSearchPageResponse searchGuests(@RequestParam("query") String query, @RequestParam("size") int size);
+
+    /**
+     * Fallback for {@link #searchGuests(String, int)} if guest-service is unavailable:
+     * no matches, rather than failing the whole reservation search.
+     *
+     * @param query     the original search term
+     * @param size      the original page size
+     * @param throwable the exception that caused the fallback
+     * @return an empty result
+     */
+    default GuestSearchPageResponse searchGuestsFallback(
+            final String query, final int size, final Throwable throwable) {
+        LOG.warn("[GuestClient] searchGuests fallback triggered for query \"{}\": {}", query, throwable.getMessage());
+        return new GuestSearchPageResponse(List.of());
     }
 }

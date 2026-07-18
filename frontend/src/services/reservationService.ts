@@ -10,6 +10,26 @@ export const reservationService = {
     return response.data.content;
   },
 
+  searchReservations: async (params: {
+    query?: string;
+    upcomingOnly?: boolean;
+    page?: number;
+    size?: number;
+    sort?: string;
+  }): Promise<SpringPage<ReservationResponse>> => {
+    const searchParams = new URLSearchParams({
+      page: String(params.page ?? 0),
+      size: String(params.size ?? 20),
+    });
+    if (params.query?.trim()) searchParams.set('query', params.query.trim());
+    if (params.upcomingOnly) searchParams.set('upcomingOnly', 'true');
+    if (params.sort) searchParams.set('sort', params.sort);
+    const response = await api.get<SpringPage<ReservationResponse>>(
+      `${BASE_PATH}/search?${searchParams.toString()}`,
+    );
+    return response.data;
+  },
+
   getReservationById: async (id: string): Promise<ReservationResponse> => {
     const response = await api.get<ReservationResponse>(`${BASE_PATH}/${id}`);
     return response.data;

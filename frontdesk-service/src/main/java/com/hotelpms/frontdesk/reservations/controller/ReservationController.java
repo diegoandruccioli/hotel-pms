@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.RestController;
@@ -78,6 +79,28 @@ public class ReservationController {
                     direction = Sort.Direction.DESC
             ) final Pageable pageable) {
         return ResponseEntity.ok(reservationService.getAllReservations(pageable));
+    }
+
+    /**
+     * Combinable search over the caller's hotel reservations (C12): an optional
+     * {@code upcomingOnly} filter and an optional free-text query matched against
+     * the associated guest's name/email.
+     *
+     * @param query        optional free-text query (guest name/email)
+     * @param upcomingOnly if {@code true}, only reservations with check-in today or later
+     * @param pageable     pagination and sorting parameters
+     * @return a page of matching reservation responses
+     */
+    @GetMapping("/search")
+    public ResponseEntity<Page<ReservationResponse>> searchReservations(
+            @RequestParam(required = false) final String query,
+            @RequestParam(defaultValue = "false") final boolean upcomingOnly,
+            @PageableDefault(
+                    size = DEFAULT_PAGE_SIZE,
+                    sort = "checkInDate",
+                    direction = Sort.Direction.DESC
+            ) final Pageable pageable) {
+        return ResponseEntity.ok(reservationService.searchReservations(query, upcomingOnly, pageable));
     }
 
     /**

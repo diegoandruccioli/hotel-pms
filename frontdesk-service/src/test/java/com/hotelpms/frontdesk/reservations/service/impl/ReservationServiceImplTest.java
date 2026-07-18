@@ -3,6 +3,7 @@ package com.hotelpms.frontdesk.reservations.service.impl;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
+import com.hotelpms.frontdesk.client.dto.GuestSearchPageResponse;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
 import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import com.hotelpms.frontdesk.reservations.domain.Reservation;
@@ -54,6 +55,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -72,6 +75,8 @@ class ReservationServiceImplTest {
     private static final Reservation ANY_RESERVATION = new Reservation();
     private static final UUID ANY_UUID = Objects.requireNonNull(UUID.randomUUID());
     private static final String ERR_CHECKOUT_AFTER_CHECKIN = "CHECKOUT_MUST_BE_AFTER_CHECKIN";
+    private static final String QUERY_MARIO = "mario";
+    private static final int GUEST_SEARCH_CAP = 200;
 
     private static final String GUEST_FIRST_NAME = "Test";
     private static final String GUEST_LAST_NAME = "Guest";
@@ -389,6 +394,85 @@ class ReservationServiceImplTest {
 
         assertNotNull(result);
         assertEquals(0, result.getTotalElements());
+    }
+
+    // ---------------------------------------------------------------
+    // searchReservations (C12)
+    // ---------------------------------------------------------------
+
+    @Test
+    void testSearchReservationsWithNoQuerySkipsGuestResolution() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        final Page<Reservation> reservationPage = new PageImpl<>(List.of(entity), pageable, 1L);
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+
+        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, null, List.of(), pageable))
+                .thenReturn(reservationPage);
+        when(guestClient.getGuestsBatch(List.of(GUEST_ID))).thenReturn(List.of(mockGuestResponse));
+        when(reservationMapper.toResponse(entity)).thenReturn(response);
+
+        final Page<ReservationResponse> result = reservationService.searchReservations(null, false, pageable);
+
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        verify(guestClient, never()).searchGuests(any(), anyInt());
+    }
+
+    @Test
+    void testSearchReservationsWithBlankQueryIsTreatedAsNoQuery() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, null, List.of(), pageable))
+                .thenReturn(Page.empty(pageable));
+
+        reservationService.searchReservations("   ", false, pageable);
+
+        verify(guestClient, never()).searchGuests(any(), anyInt());
+    }
+
+    @Test
+    void testSearchReservationsWithQueryResolvesGuestIds() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        final UUID otherGuestId = Objects.requireNonNull(UUID.randomUUID());
+        final GuestResponse matched =
+                new GuestResponse(otherGuestId, "Mario", "Rossi", "mario@test.com");
+
+        when(guestClient.searchGuests(QUERY_MARIO, GUEST_SEARCH_CAP))
+                .thenReturn(new GuestSearchPageResponse(List.of(matched)));
+        when(reservationRepository.searchReservationsByHotelId(
+                HOTEL_ID, null, QUERY_MARIO, List.of(otherGuestId), pageable))
+                .thenReturn(Page.empty(pageable));
+
+        reservationService.searchReservations("  " + QUERY_MARIO + "  ", false, pageable);
+
+        verify(reservationRepository).searchReservationsByHotelId(
+                HOTEL_ID, null, QUERY_MARIO, List.of(otherGuestId), pageable);
+    }
+
+    @Test
+    void testSearchReservationsUpcomingOnlyAppliesTodayAsLowerBound() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        when(reservationRepository.searchReservationsByHotelId(
+                eq(HOTEL_ID), eq(LocalDate.now()), eq(null), eq(List.of()), eq(pageable)))
+                .thenReturn(Page.empty(pageable));
+
+        reservationService.searchReservations(null, true, pageable);
+
+        verify(reservationRepository).searchReservationsByHotelId(
+                eq(HOTEL_ID), eq(LocalDate.now()), eq(null), eq(List.of()), eq(pageable));
+    }
+
+    @Test
+    void testSearchReservationsEmptyResultSkipsGuestBatchResolution() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, null, List.of(), pageable))
+                .thenReturn(Page.empty(pageable));
+
+        final Page<ReservationResponse> result = reservationService.searchReservations(null, false, pageable);
+
+        assertNotNull(result);
+        assertEquals(0, result.getTotalElements());
+        verify(guestClient, never()).getGuestsBatch(any());
     }
 
     @Test
