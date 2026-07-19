@@ -10,6 +10,7 @@ import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.PaymentResponse;
 import com.hotelpms.billing.service.InvoiceService;
 import com.hotelpms.billing.service.PdfInvoiceService;
+import com.hotelpms.billing.service.VatBreakdownCalculator;
 import com.hotelpms.pdftemplate.PdfTemplateRenderer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,14 +20,12 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.UUID;
 
 /**
@@ -65,6 +64,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
     private final HotelSettingsClient hotelSettingsClient;
     private final GuestClient guestClient;
     private final PdfTemplateRenderer pdfTemplateRenderer;
+    private final VatBreakdownCalculator vatBreakdownCalculator;
 
     /** {@inheritDoc} */
     @Override
@@ -108,6 +108,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
         context.put("guestVat", blankToNull(guest.vatNumber()));
         context.put("guestPec", blankToNull(guest.pecEmail()));
 
+        vatBreakdownCalculator.assertReconciles(invoice.totalAmount(), invoice.charges());
         context.put("charges", toChargeRows(invoice.charges()));
         context.put("payments", toPaymentRows(invoice.payments()));
 
@@ -173,37 +174,16 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
     }
 
     private List<Map<String, String>> toVatRows(final List<ChargeResponse> charges) {
-        final Map<BigDecimal, BigDecimal[]> breakdown = computeVatBreakdown(charges);
+        final Map<BigDecimal, VatBreakdownCalculator.VatLine> breakdown = vatBreakdownCalculator.groupByRate(charges);
         final List<Map<String, String>> rows = new ArrayList<>();
-        for (final Map.Entry<BigDecimal, BigDecimal[]> entry : breakdown.entrySet()) {
+        for (final Map.Entry<BigDecimal, VatBreakdownCalculator.VatLine> entry : breakdown.entrySet()) {
             final Map<String, String> row = new HashMap<>();
             row.put("rateLabel", vatRateToLabel(entry.getKey()));
-            row.put("taxableFormatted", formatAmount(entry.getValue()[0]));
-            row.put("vatFormatted", formatAmount(entry.getValue()[1]));
+            row.put("taxableFormatted", formatAmount(entry.getValue().taxable()));
+            row.put("vatFormatted", formatAmount(entry.getValue().vat()));
             rows.add(row);
         }
         return rows;
-    }
-
-    private static Map<BigDecimal, BigDecimal[]> computeVatBreakdown(final List<ChargeResponse> charges) {
-        final Map<BigDecimal, BigDecimal[]> breakdown = new TreeMap<>();
-        if (charges == null) {
-            return breakdown;
-        }
-        for (final ChargeResponse charge : charges) {
-            if (charge.vatRate() == null || charge.amount() == null) {
-                continue;
-            }
-            final BigDecimal rate = charge.vatRate();
-            final BigDecimal amount = charge.amount();
-            final BigDecimal taxable = amount.divide(BigDecimal.ONE.add(rate), 2, RoundingMode.HALF_UP);
-            final BigDecimal vat = amount.subtract(taxable);
-            final BigDecimal[] group = breakdown.computeIfAbsent(rate,
-                    k -> new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO});
-            group[0] = group[0].add(taxable);
-            group[1] = group[1].add(vat);
-        }
-        return breakdown;
     }
 
     private static String vatRateToLabel(final BigDecimal rate) {

@@ -9,9 +9,11 @@ import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.PaymentResponse;
+import com.hotelpms.billing.exception.BillingValidationException;
 import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.service.FatturaPAService;
 import com.hotelpms.billing.service.InvoiceService;
+import com.hotelpms.billing.service.VatBreakdownCalculator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
@@ -34,7 +36,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -56,8 +57,6 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
     private static final String TIPO_DOCUMENTO = "TD01";
     private static final String DIVISA = "EUR";
     private static final String NAZIONE_IT = "IT";
-    private static final String CAP_PLACEHOLDER = "00000";
-    private static final String COMUNE_PLACEHOLDER = "-";
     private static final String REGIME_FISCALE = "RF01";
     private static final String COND_PAGAMENTO = "TP02";
     private static final String ESIGIBILITA_IVA = "I";
@@ -71,15 +70,18 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
     private final InvoiceService invoiceService;
     private final HotelSettingsClient hotelSettingsClient;
     private final GuestClient guestClient;
+    private final VatBreakdownCalculator vatBreakdownCalculator;
 
     @Override
     public byte[] generateXml(@NonNull final UUID invoiceId) {
         log.info("Generating FatturaPA XML for invoice {}", invoiceId);
         final InvoiceResponse invoice = invoiceService.getInvoice(invoiceId);
         validateEligibility(invoice);
+        vatBreakdownCalculator.assertReconciles(invoice.totalAmount(), invoice.charges());
 
         final HotelSettingsResponse hotel = hotelSettingsClient.getSettings();
         final GuestResponse guest = guestClient.getGuestById(invoice.guestId());
+        validateFiscalAddress(hotel, guest);
 
         try {
             final Document doc = buildDocument(invoice, hotel, guest);
@@ -97,6 +99,31 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
         if (invoice.documentType() != DocumentType.FATTURA) {
             throw new InvoiceConflictException("SDI_ONLY_VALID_FOR_FATTURA");
         }
+    }
+
+    /**
+     * Verifies that both the hotel (CedentePrestatore) and the guest (CessionarioCommittente)
+     * have a complete structured address (CAP/Comune/Provincia) before generating the XML —
+     * the FatturaPA schema requires a real {@code Sede} on both sides (P0-1). The PDF courtesy
+     * copy has no such requirement and stays generatable regardless; only the SDI-bound XML
+     * export is blocked, with an explicit error rather than a silent {@code 00000}/{@code -}
+     * placeholder that would produce an XML the Sistema di Interscambio rejects.
+     *
+     * @param hotel the hotel settings
+     * @param guest the guest (cessionario); may be {@code null} if unresolved
+     * @throws BillingValidationException if either side's structured address is incomplete
+     */
+    private static void validateFiscalAddress(final HotelSettingsResponse hotel, final GuestResponse guest) {
+        if (isBlank(hotel.cap()) || isBlank(hotel.comune()) || isBlank(hotel.provincia())) {
+            throw new BillingValidationException("HOTEL_STRUCTURED_ADDRESS_INCOMPLETE");
+        }
+        if (guest == null || isBlank(guest.cap()) || isBlank(guest.comune()) || isBlank(guest.provincia())) {
+            throw new BillingValidationException("GUEST_STRUCTURED_ADDRESS_INCOMPLETE");
+        }
+    }
+
+    private static boolean isBlank(final String value) {
+        return value == null || value.isBlank();
     }
 
     private Document buildDocument(final InvoiceResponse invoice,
@@ -172,21 +199,25 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
         datiAna.appendChild(anagrafica);
         datiAna.appendChild(el(doc, "RegimeFiscale", REGIME_FISCALE));
         cedente.appendChild(datiAna);
-        cedente.appendChild(buildSede(doc, truncate(hotel.address(), INDIRIZZO_MAX_LEN)));
+        cedente.appendChild(buildSede(doc, truncate(hotel.address(), INDIRIZZO_MAX_LEN),
+                hotel.cap(), hotel.comune(), hotel.provincia()));
         return cedente;
     }
 
     private Element buildCessionarioCommittente(final Document doc, final GuestResponse guest) {
+        // guest is never null here: getGuestById's circuit-breaker fallback always returns
+        // a placeholder GuestResponse, and validateFiscalAddress already rejected the export
+        // if guest is missing or its structured address is incomplete.
         final Element cessionario = doc.createElement("CessionarioCommittente");
         final Element datiAna = doc.createElement("DatiAnagrafici");
 
-        if (guest != null && guest.vatNumber() != null && !guest.vatNumber().isBlank()) {
+        if (guest.vatNumber() != null && !guest.vatNumber().isBlank()) {
             final Element idFiscaleIVA = doc.createElement("IdFiscaleIVA");
             idFiscaleIVA.appendChild(el(doc, ID_PAESE_TAG, NAZIONE_IT));
             idFiscaleIVA.appendChild(el(doc, ID_CODICE_TAG, guest.vatNumber()));
             datiAna.appendChild(idFiscaleIVA);
         }
-        if (guest != null && guest.fiscalCode() != null && !guest.fiscalCode().isBlank()) {
+        if (guest.fiscalCode() != null && !guest.fiscalCode().isBlank()) {
             datiAna.appendChild(el(doc, "CodiceFiscale", guest.fiscalCode()));
         }
 
@@ -195,15 +226,18 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
         anagrafica.appendChild(el(doc, "Denominazione", denominazione));
         datiAna.appendChild(anagrafica);
         cessionario.appendChild(datiAna);
-        cessionario.appendChild(buildSede(doc, "-"));
+        cessionario.appendChild(buildSede(doc, truncate(guest.address(), INDIRIZZO_MAX_LEN),
+                guest.cap(), guest.comune(), guest.provincia()));
         return cessionario;
     }
 
-    private static Element buildSede(final Document doc, final String indirizzo) {
+    private static Element buildSede(final Document doc, final String indirizzo,
+                                      final String cap, final String comune, final String provincia) {
         final Element sede = doc.createElement("Sede");
         sede.appendChild(el(doc, "Indirizzo", indirizzo.isBlank() ? "-" : indirizzo));
-        sede.appendChild(el(doc, "CAP", CAP_PLACEHOLDER));
-        sede.appendChild(el(doc, "Comune", COMUNE_PLACEHOLDER));
+        sede.appendChild(el(doc, "CAP", cap));
+        sede.appendChild(el(doc, "Comune", comune));
+        sede.appendChild(el(doc, "Provincia", provincia.toUpperCase(java.util.Locale.ROOT)));
         sede.appendChild(el(doc, "Nazione", NAZIONE_IT));
         return sede;
     }
@@ -237,37 +271,28 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
             final BigDecimal fallbackAmount = totalAmount != null ? totalAmount : BigDecimal.ZERO;
             datiBeniServizi.appendChild(buildDettaglioLinea(doc, 1, "Soggiorno",
                     fallbackAmount, DEFAULT_VAT_RATE));
-            final BigDecimal imponibile = imponibile(fallbackAmount, DEFAULT_VAT_RATE);
-            final BigDecimal imposta = fallbackAmount.subtract(imponibile);
-            final Element riepilogo = buildDatiRiepilogo(doc, DEFAULT_VAT_RATE, imponibile, imposta);
-            datiBeniServizi.appendChild(riepilogo);
+            final VatBreakdownCalculator.VatLine line =
+                    vatBreakdownCalculator.splitLine(fallbackAmount, DEFAULT_VAT_RATE);
+            datiBeniServizi.appendChild(buildDatiRiepilogo(doc, DEFAULT_VAT_RATE, line.taxable(), line.vat()));
             return datiBeniServizi;
         }
 
-        final Map<BigDecimal, BigDecimal[]> vatGroups = new LinkedHashMap<>();
         int lineNum = 1;
         for (final ChargeResponse charge : charges) {
-            final BigDecimal vatRate = charge.vatRate() != null
-                    ? charge.vatRate() : DEFAULT_VAT_RATE;
-            final BigDecimal imponibile = imponibile(charge.amount(), vatRate);
-            final BigDecimal imposta = charge.amount().subtract(imponibile).setScale(2, RoundingMode.HALF_UP);
-
             datiBeniServizi.appendChild(buildDettaglioLinea(doc, lineNum,
-                    sanitize(charge.description(), "Prestazione"), charge.amount(), vatRate));
+                    sanitize(charge.description(), "Prestazione"), charge.amount(), charge.vatRate()));
             lineNum++;
-
-            vatGroups.merge(vatRate, new BigDecimal[]{imponibile, imposta},
-                    (a, b) -> new BigDecimal[]{a[0].add(b[0]), a[1].add(b[1])});
         }
 
-        for (final Map.Entry<BigDecimal, BigDecimal[]> entry : vatGroups.entrySet()) {
+        for (final Map.Entry<BigDecimal, VatBreakdownCalculator.VatLine> entry
+                : vatBreakdownCalculator.groupByRate(charges).entrySet()) {
             datiBeniServizi.appendChild(buildDatiRiepilogo(doc, entry.getKey(),
-                    entry.getValue()[0], entry.getValue()[1]));
+                    entry.getValue().taxable(), entry.getValue().vat()));
         }
         return datiBeniServizi;
     }
 
-    private static Element buildDettaglioLinea(final Document doc, final int numero,
+    private Element buildDettaglioLinea(final Document doc, final int numero,
                                                 final String descrizione,
                                                 final BigDecimal prezzoUnitario,
                                                 final BigDecimal aliquotaIVA) {
@@ -358,11 +383,11 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
         return (first + " " + last).trim();
     }
 
-    private static BigDecimal imponibile(final BigDecimal lordo, final BigDecimal aliquota) {
+    private BigDecimal imponibile(final BigDecimal lordo, final BigDecimal aliquota) {
         if (lordo == null || lordo.compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;
         }
-        return lordo.divide(BigDecimal.ONE.add(aliquota), 2, RoundingMode.HALF_UP);
+        return vatBreakdownCalculator.splitLine(lordo, aliquota).taxable();
     }
 
     private static String formatDecimal(final BigDecimal value) {

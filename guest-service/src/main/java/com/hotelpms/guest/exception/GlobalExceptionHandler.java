@@ -62,6 +62,22 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles GuestValidationException — a business rule violation not expressible
+     * as a Jakarta Bean Validation annotation (e.g. an invalid Comune/Provincia pair).
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 400 status
+     */
+    @ExceptionHandler(GuestValidationException.class)
+    public ProblemDetail handleGuestValidationException(final GuestValidationException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+        problemDetail.setTitle("Request Validation Error");
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/bad-request")));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
+
+    /**
      * Handles ExternalServiceException or FeignException.
      *
      * @param ex the exception

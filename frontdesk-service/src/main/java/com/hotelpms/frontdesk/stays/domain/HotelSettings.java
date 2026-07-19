@@ -35,6 +35,9 @@ public class HotelSettings {
     private static final int LEN_ALLOGGIATI_USERNAME = 100;
     private static final int LEN_EMAIL_SUBJECT = 200;
     private static final int LEN_EMAIL_GREETING = 300;
+    private static final int LEN_CAP = 5;
+    private static final int LEN_PROVINCIA = 2;
+    private static final int LEN_COMUNE = 100;
 
     /** The hotel this settings row belongs to (primary key). */
     @Id
@@ -67,6 +70,21 @@ public class HotelSettings {
     /** Optional URL of the hotel logo image. */
     @Column(name = "logo_url", length = LEN_LOGO_URL)
     private String logoUrl;
+
+    /** CAP — Italian 5-digit postal code, required for a valid FatturaPA {@code Sede}. */
+    @Column(name = "cap", length = LEN_CAP)
+    private String cap;
+
+    /**
+     * Comune — municipality name, validated against the Portale Alloggiati Web
+     * {@code alloggiati_comuni} reference table together with {@link #provincia}.
+     */
+    @Column(name = "comune", length = LEN_COMUNE)
+    private String comune;
+
+    /** Provincia — 2-letter province code (e.g. {@code "RM"}). */
+    @Column(name = "provincia", length = LEN_PROVINCIA)
+    private String provincia;
 
     /**
      * Per-hotel Alloggiati Web portal username. Not a secret on its own (a portal

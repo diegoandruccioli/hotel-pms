@@ -149,6 +149,12 @@ export interface HotelSettingsRequest {
   emailSubjectCheckout?: string;
   /** Greeting/signature line appended to every transactional email footer. */
   emailGreetingText?: string;
+  /** CAP — Italian 5-digit postal code. Required only to export a valid FatturaPA XML. */
+  cap?: string;
+  /** Comune — municipality name, validated together with provincia. */
+  comune?: string;
+  /** Provincia — 2-letter province code, e.g. "RM". */
+  provincia?: string;
 }
 
 export interface HotelSettingsResponse {
@@ -166,4 +172,7 @@ export interface HotelSettingsResponse {
   emailSubjectReservationConfirmed?: string | null;
   emailSubjectCheckout?: string | null;
   emailGreetingText?: string | null;
+  cap?: string | null;
+  comune?: string | null;
+  provincia?: string | null;
 }

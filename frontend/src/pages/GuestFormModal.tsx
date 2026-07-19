@@ -5,6 +5,7 @@ import { guestService } from '../services/guestService';
 import type { GuestResponseDTO, GuestRequestDTO } from '../types/guest.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
+import { StructuredAddressFields } from '../components/StructuredAddressFields';
 import { useToastStore } from '../store/toastStore';
 import * as FocusTrapModule from 'focus-trap-react';
 
@@ -81,12 +82,28 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
     companyName: guest?.companyName || '',
     sdiCode: guest?.sdiCode || '',
     pecEmail: guest?.pecEmail || '',
+    cap: guest?.cap || '',
+    comune: guest?.comune || '',
+    provincia: guest?.provincia || '',
   });
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   }, []);
+
+  const handleCapChange = useCallback(
+    (value: string) => setFormData((prev) => ({ ...prev, cap: value })),
+    [],
+  );
+  const handleComuneChange = useCallback(
+    (value: string) => setFormData((prev) => ({ ...prev, comune: value })),
+    [],
+  );
+  const handleProvinciaChange = useCallback(
+    (value: string) => setFormData((prev) => ({ ...prev, provincia: value })),
+    [],
+  );
 
   const handlePhonePrefixChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setPhonePrefix(e.target.value);
@@ -331,6 +348,15 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
                         <input type="email" id="pecEmail" name="pecEmail" value={formData.pecEmail ?? ''} onChange={handleChange} className={inputClass} />
                       </div>
                     </div>
+                    <StructuredAddressFields
+                      idPrefix="guest"
+                      cap={formData.cap ?? ''}
+                      comune={formData.comune ?? ''}
+                      provincia={formData.provincia ?? ''}
+                      onCapChange={handleCapChange}
+                      onComuneChange={handleComuneChange}
+                      onProvinciaChange={handleProvinciaChange}
+                    />
                   </div>
                 )}
               </div>

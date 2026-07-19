@@ -32,6 +32,6 @@ public interface HotelSettingsClient {
      * @return a default {@link HotelSettingsResponse} with empty fields
      */
     default HotelSettingsResponse getSettingsFallback(final Throwable throwable) {
-        return new HotelSettingsResponse(null, "Hotel", "", "", "", null);
+        return new HotelSettingsResponse(null, "Hotel", "", "", "", null, null, null, null);
     }
 }

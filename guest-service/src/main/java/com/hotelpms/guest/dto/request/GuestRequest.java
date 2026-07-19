@@ -26,6 +26,11 @@ import java.time.LocalDate;
  * @param companyName  Company / legal entity name (optional).
  * @param sdiCode      SDI/Destinatario code for electronic invoicing (optional).
  * @param pecEmail     PEC email for electronic invoicing (optional).
+ * @param cap          CAP — Italian 5-digit postal code (optional; required only to
+ *                     use this guest as FatturaPA cessionario).
+ * @param comune       Comune — municipality name, validated together with {@code provincia}
+ *                     (optional; required only to use this guest as FatturaPA cessionario).
+ * @param provincia    Provincia — 2-letter province code, e.g. {@code "RM"} (optional).
  */
 public record GuestRequest(
         @NotBlank
@@ -63,7 +68,10 @@ public record GuestRequest(
         @Pattern(regexp = ValidationConstants.SDI_CODE_PATTERN)
         String sdiCode,
         @Email @Size(max = ValidationConstants.MAX_EMAIL_LENGTH)
-        String pecEmail) {
+        String pecEmail,
+        @Pattern(regexp = "^$|\\d{5}", message = "CAP must be 5 digits") String cap,
+        @Size(max = 100) String comune,
+        @Pattern(regexp = "^$|[A-Za-z]{2}", message = "Provincia must be 2 letters") String provincia) {
 
     /**
      * Validates that at least one of email or phone is provided.

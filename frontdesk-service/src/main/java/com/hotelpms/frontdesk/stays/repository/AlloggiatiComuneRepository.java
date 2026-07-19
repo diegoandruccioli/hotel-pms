@@ -58,4 +58,22 @@ public interface AlloggiatiComuneRepository extends JpaRepository<AlloggiatiComu
             @Param("provincia") String provincia,
             @Param("today") LocalDate today,
             Pageable pageable);
+
+    /**
+     * Checks whether an active comune with the given name exists in the given province —
+     * used to validate the hotel/guest structured address before it can be used in a
+     * FatturaPA XML export (P0-1).
+     *
+     * @param comune    the comune name (case-insensitive exact match)
+     * @param provincia the 2-character province code
+     * @param today     today's date used for expiry check
+     * @return {@code true} if a matching active comune exists
+     */
+    @Query("SELECT COUNT(c) > 0 FROM AlloggiatiComune c "
+            + "WHERE LOWER(c.descrizione) = LOWER(:comune) AND c.provincia = :provincia "
+            + "AND (c.dataFineVal IS NULL OR c.dataFineVal > :today)")
+    boolean existsActiveByComuneAndProvincia(
+            @Param("comune") String comune,
+            @Param("provincia") String provincia,
+            @Param("today") LocalDate today);
 }

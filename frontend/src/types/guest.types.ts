@@ -27,6 +27,12 @@ export interface GuestRequestDTO {
   companyName?: string;
   sdiCode?: string;
   pecEmail?: string;
+  /** CAP — Italian 5-digit postal code. Required only to use this guest as a FatturaPA cessionario. */
+  cap?: string;
+  /** Comune — municipality name, validated together with provincia. */
+  comune?: string;
+  /** Provincia — 2-letter province code, e.g. "RM". */
+  provincia?: string;
 }
 
 export interface GuestResponseDTO {
@@ -43,6 +49,9 @@ export interface GuestResponseDTO {
   companyName?: string;
   sdiCode?: string;
   pecEmail?: string;
+  cap?: string;
+  comune?: string;
+  provincia?: string;
   identityDocuments?: IdentityDocumentResponseDTO[];
   createdAt: string;
   updatedAt: string;

@@ -7,6 +7,7 @@ import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3Card } from '../components/m3/M3Card';
 import { PasswordVisibilityToggle } from '../components/m3/PasswordVisibilityToggle';
+import { StructuredAddressFields } from '../components/StructuredAddressFields';
 import { useToastStore } from '../store/toastStore';
 
 const VAT_NUMBER_REGEX = /^\d{11}$/;
@@ -87,6 +88,9 @@ export function HotelProfile() {
     alloggiatiUsername: '',
     alloggiatiPassword: '',
     alloggiatiWsKey: '',
+    cap: '',
+    comune: '',
+    provincia: '',
   });
   const [credentialsConfigured, setCredentialsConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -119,6 +123,9 @@ export function HotelProfile() {
           alloggiatiUsername: s.alloggiatiUsername ?? '',
           alloggiatiPassword: '',
           alloggiatiWsKey: '',
+          cap: s.cap ?? '',
+          comune: s.comune ?? '',
+          provincia: s.provincia ?? '',
         });
         setCredentialsConfigured(s.alloggiatiCredentialsConfigured);
       })
@@ -136,6 +143,19 @@ export function HotelProfile() {
   const handleToggle = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setForm((prev) => ({ ...prev, alloggiatiAutoSend: e.target.checked })),
+    [],
+  );
+
+  const handleCapChange = useCallback(
+    (value: string) => setForm((prev) => ({ ...prev, cap: value })),
+    [],
+  );
+  const handleComuneChange = useCallback(
+    (value: string) => setForm((prev) => ({ ...prev, comune: value })),
+    [],
+  );
+  const handleProvinciaChange = useCallback(
+    (value: string) => setForm((prev) => ({ ...prev, provincia: value })),
     [],
   );
 
@@ -216,6 +236,16 @@ export function HotelProfile() {
           value={form.address ?? ''}
           placeholder={t('placeholder_address')}
           onChange={handleChange('address')}
+        />
+
+        <StructuredAddressFields
+          idPrefix="profile"
+          cap={form.cap ?? ''}
+          comune={form.comune ?? ''}
+          provincia={form.provincia ?? ''}
+          onCapChange={handleCapChange}
+          onComuneChange={handleComuneChange}
+          onProvinciaChange={handleProvinciaChange}
         />
 
         <div className="grid grid-cols-2 gap-4">

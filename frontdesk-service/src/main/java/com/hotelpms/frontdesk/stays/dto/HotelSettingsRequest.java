@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.stays.dto;
 
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -36,6 +37,13 @@ import jakarta.validation.constraints.Size;
  *                                        blank/null falls back to the default IT/EN subject
  * @param emailGreetingText              optional greeting/signature line appended to every
  *                                        transactional email footer (optional)
+ * @param cap                            CAP — Italian 5-digit postal code (optional; required
+ *                                        only to export a valid FatturaPA XML)
+ * @param comune                         Comune — municipality name, validated together with
+ *                                        {@code provincia} against the Alloggiati Web reference
+ *                                        data (optional; required only to export FatturaPA)
+ * @param provincia                      Provincia — 2-letter province code, e.g. {@code "RM"}
+ *                                        (optional; required only to export FatturaPA)
  */
 public record HotelSettingsRequest(
         Boolean alloggiatiAutoSend,
@@ -51,7 +59,10 @@ public record HotelSettingsRequest(
         Boolean sendCheckoutEmail,
         @Size(max = MAX_SUBJECT_LENGTH) String emailSubjectReservationConfirmed,
         @Size(max = MAX_SUBJECT_LENGTH) String emailSubjectCheckout,
-        @Size(max = MAX_GREETING_LENGTH) String emailGreetingText) {
+        @Size(max = MAX_GREETING_LENGTH) String emailGreetingText,
+        @Pattern(regexp = "^$|\\d{5}", message = "CAP must be 5 digits") String cap,
+        @Size(max = 100) String comune,
+        @Pattern(regexp = "^$|[A-Za-z]{2}", message = "Provincia must be 2 letters") String provincia) {
 
     /** Maximum length accepted for the Alloggiati Web password/WsKey fields. */
     public static final int MAX_CREDENTIAL_LENGTH = 200;

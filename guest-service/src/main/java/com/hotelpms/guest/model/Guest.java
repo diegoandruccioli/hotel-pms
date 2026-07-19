@@ -52,6 +52,9 @@ public class Guest {
     private static final int MAX_VAT_NUMBER_LENGTH = 20;
     private static final int MAX_COMPANY_NAME_LENGTH = 200;
     private static final int MAX_SDI_CODE_LENGTH = 7;
+    private static final int MAX_CAP_LENGTH = 5;
+    private static final int MAX_PROVINCIA_LENGTH = 2;
+    private static final int MAX_COMUNE_LENGTH = 100;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -99,6 +102,21 @@ public class Guest {
 
     @Column(name = "pec_email", length = MAX_EMAIL_LENGTH)
     private String pecEmail;
+
+    /** CAP — Italian 5-digit postal code, required for a valid FatturaPA {@code Sede}. */
+    @Column(name = "cap", length = MAX_CAP_LENGTH)
+    private String cap;
+
+    /**
+     * Comune — municipality name, validated against the Portale Alloggiati Web
+     * reference data (frontdesk-service) together with {@link #provincia}.
+     */
+    @Column(name = "comune", length = MAX_COMUNE_LENGTH)
+    private String comune;
+
+    /** Provincia — 2-letter province code (e.g. {@code "RM"}). */
+    @Column(name = "provincia", length = MAX_PROVINCIA_LENGTH)
+    private String provincia;
 
     @Builder.Default
     @OneToMany(mappedBy = "guest", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

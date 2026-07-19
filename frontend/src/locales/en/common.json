@@ -311,5 +311,11 @@
   "err_invalid_number": "Must be a valid number",
   "err_invalid_vat": "Invalid VAT number (11 digits required)",
   "err_invalid_fiscal_code": "Invalid fiscal code",
-  "err_invalid_url": "Invalid URL"
+  "err_invalid_url": "Invalid URL",
+  "label_cap": "Postal code",
+  "placeholder_cap": "e.g. 00100",
+  "label_comune": "Municipality",
+  "placeholder_comune": "Type to search...",
+  "label_provincia": "Province",
+  "placeholder_provincia": "e.g. RM"
 }

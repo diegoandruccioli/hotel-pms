@@ -28,6 +28,9 @@ import java.util.UUID;
  *                                        or {@code null} if using the default
  * @param emailGreetingText               greeting/signature line appended to every
  *                                        transactional email footer, or {@code null} if unset
+ * @param cap                             CAP — Italian 5-digit postal code, or {@code null} if unset
+ * @param comune                          Comune — municipality name, or {@code null} if unset
+ * @param provincia                       Provincia — 2-letter province code, or {@code null} if unset
  */
 public record HotelSettingsResponse(
         UUID hotelId,
@@ -43,5 +46,8 @@ public record HotelSettingsResponse(
         boolean sendCheckoutEmail,
         String emailSubjectReservationConfirmed,
         String emailSubjectCheckout,
-        String emailGreetingText) {
+        String emailGreetingText,
+        String cap,
+        String comune,
+        String provincia) {
 }

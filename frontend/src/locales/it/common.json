@@ -311,5 +311,11 @@
   "err_invalid_number": "Deve essere un numero valido",
   "err_invalid_vat": "Partita IVA non valida (richiesti 11 cifre)",
   "err_invalid_fiscal_code": "Codice fiscale non valido",
-  "err_invalid_url": "URL non valido"
+  "err_invalid_url": "URL non valido",
+  "label_cap": "CAP",
+  "placeholder_cap": "es. 00100",
+  "label_comune": "Comune",
+  "placeholder_comune": "Digita per cercare...",
+  "label_provincia": "Provincia",
+  "placeholder_provincia": "es. RM"
 }

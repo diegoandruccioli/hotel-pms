@@ -561,7 +561,7 @@ class InvoiceServiceImplTest {
                 when(invoiceMapper.toResponse(invoice)).thenReturn(mapped);
                 when(guestClient.getGuestsBatch(List.of(guestId)))
                                 .thenReturn(List.of(new GuestResponse(guestId, "Mario", "Rossi", "mario@test.com",
-                                                null, null, null, null, null)));
+                                                null, null, null, null, null, null, null, null, null)));
 
                 // Act
                 final Page<InvoiceSearchResultResponse> result = invoiceService.searchInvoices(
@@ -598,7 +598,7 @@ class InvoiceServiceImplTest {
                 when(guestClient.searchGuests(QUERY_MARIO, GUEST_SEARCH_CAP))
                                 .thenReturn(new GuestSearchPageResponse(List.of(
                                                 new GuestResponse(otherGuestId, "Mario", "Bianchi",
-                                                                "mario.b@test.com", null, null, null, null, null))));
+                                                                "mario.b@test.com", null, null, null, null, null, null, null, null, null))));
                 when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
                                 eq(QUERY_MARIO), eq(List.of(otherGuestId)), eq(pageable)))
                                 .thenReturn(new PageImpl<>(List.of()));

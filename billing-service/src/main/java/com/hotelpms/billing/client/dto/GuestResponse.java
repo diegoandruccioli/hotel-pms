@@ -14,6 +14,10 @@ import java.util.UUID;
  * @param companyName company / legal entity name (optional)
  * @param sdiCode     SDI recipient code (optional)
  * @param pecEmail    PEC email (optional)
+ * @param address     full street address, or {@code null} if unset
+ * @param cap         CAP — Italian 5-digit postal code, or {@code null} if unset
+ * @param comune      Comune — municipality name, or {@code null} if unset
+ * @param provincia   Provincia — 2-letter province code, or {@code null} if unset
  */
 public record GuestResponse(
         UUID id,
@@ -24,5 +28,9 @@ public record GuestResponse(
         String vatNumber,
         String companyName,
         String sdiCode,
-        String pecEmail) {
+        String pecEmail,
+        String address,
+        String cap,
+        String comune,
+        String provincia) {
 }

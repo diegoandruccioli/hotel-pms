@@ -11,6 +11,9 @@ import java.util.UUID;
  * @param vatNumber  Partita IVA — Italian VAT number
  * @param fiscalCode Codice Fiscale — Italian fiscal code
  * @param logoUrl    optional URL of the hotel logo image
+ * @param cap        CAP — Italian 5-digit postal code, or {@code null} if unset
+ * @param comune     Comune — municipality name, or {@code null} if unset
+ * @param provincia  Provincia — 2-letter province code, or {@code null} if unset
  */
 public record HotelSettingsResponse(
         UUID hotelId,
@@ -18,5 +21,8 @@ public record HotelSettingsResponse(
         String address,
         String vatNumber,
         String fiscalCode,
-        String logoUrl) {
+        String logoUrl,
+        String cap,
+        String comune,
+        String provincia) {
 }

@@ -12,6 +12,7 @@ import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.PaymentResponse;
 import com.hotelpms.billing.service.InvoiceService;
+import com.hotelpms.billing.service.VatBreakdownCalculator;
 import com.hotelpms.pdftemplate.PdfTemplateRenderer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -65,6 +67,8 @@ class PdfInvoiceServiceImplTest {
     private GuestClient guestClient;
     @Mock
     private PdfTemplateRenderer pdfTemplateRenderer;
+    @Spy
+    private VatBreakdownCalculator vatBreakdownCalculator = new VatBreakdownCalculator();
 
     @InjectMocks
     private PdfInvoiceServiceImpl pdfInvoiceService;
@@ -73,9 +77,9 @@ class PdfInvoiceServiceImplTest {
     void setUp() {
         final HotelSettingsResponse hotelSettings = new HotelSettingsResponse(
                 HOTEL_ID, "Hotel Bella Vista", "Via Roma 1, Milano",
-                "01234567890", "BLLVST80A01F205X", null);
+                "01234567890", "BLLVST80A01F205X", null, null, null, null);
         final GuestResponse guest = new GuestResponse(GUEST_ID, "Mario", "Rossi", "mario@example.com",
-                null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
         when(hotelSettingsClient.getSettings()).thenReturn(hotelSettings);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
         when(pdfTemplateRenderer.render(anyString(), anyMap())).thenReturn(FAKE_PDF_BYTES);
@@ -165,7 +169,7 @@ class PdfInvoiceServiceImplTest {
     @Test
     void showsCompanyNameAsDisplayNameWithPersonalNameAsSecondaryLine() {
         final GuestResponse fiscalGuest = new GuestResponse(GUEST_ID, "Mario", "Rossi", "mario@example.com",
-                "RSSMRA74D22A001Q", "01234567890", "Hotel Srl", "ABCDE12", "mario@pec.it");
+                "RSSMRA74D22A001Q", "01234567890", "Hotel Srl", "ABCDE12", "mario@pec.it", null, null, null, null);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(fiscalGuest);
         final InvoiceResponse invoice = buildInvoice(List.of(), List.of());
         when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
@@ -194,7 +198,7 @@ class PdfInvoiceServiceImplTest {
     @Test
     void blankHotelSettingsFieldsAreOmittedFromTheContext() {
         final HotelSettingsResponse fallback = new HotelSettingsResponse(
-                null, "Hotel", "", "", "", null);
+                null, "Hotel", "", "", "", null, null, null, null);
         when(hotelSettingsClient.getSettings()).thenReturn(fallback);
         final InvoiceResponse invoice = buildInvoice(List.of(), List.of());
         when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
@@ -241,10 +245,12 @@ class PdfInvoiceServiceImplTest {
 
     private InvoiceResponse buildInvoice(final List<ChargeResponse> charges,
                                           final List<PaymentResponse> payments) {
+        final BigDecimal totalAmount = charges.isEmpty() ? AMOUNT_150
+                : charges.stream().map(ChargeResponse::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
         return new InvoiceResponse(
                 INVOICE_ID, HOTEL_ID, "INV-TEST-001",
                 LocalDateTime.of(ISSUE_YEAR, ISSUE_MONTH, ISSUE_DAY, ISSUE_HOUR, 0),
-                AMOUNT_150, InvoiceStatus.PAID,
+                totalAmount, InvoiceStatus.PAID,
                 RESERVATION_ID, GUEST_ID, null,
                 DocumentType.FATTURA, null, payments, charges);
     }

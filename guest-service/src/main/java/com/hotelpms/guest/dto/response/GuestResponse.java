@@ -22,6 +22,9 @@ import java.util.UUID;
  * @param companyName       Company / legal entity name (optional).
  * @param sdiCode           SDI/Destinatario code (optional).
  * @param pecEmail          PEC email (optional).
+ * @param cap               CAP — Italian 5-digit postal code (optional).
+ * @param comune            Comune — municipality name (optional).
+ * @param provincia         Provincia — 2-letter province code (optional).
  * @param identityDocuments The list of identity documents belonging to the
  *                          guest.
  * @param gdprConsentDate   The date GDPR consent was recorded.
@@ -44,6 +47,9 @@ public record GuestResponse(
         String companyName,
         String sdiCode,
         String pecEmail,
+        String cap,
+        String comune,
+        String provincia,
         List<IdentityDocumentResponseDTO> identityDocuments,
         LocalDate gdprConsentDate,
         LocalDateTime createdAt,

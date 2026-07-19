@@ -8,8 +8,10 @@ import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.dto.InvoiceResponse;
+import com.hotelpms.billing.exception.BillingValidationException;
 import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.service.InvoiceService;
+import com.hotelpms.billing.service.VatBreakdownCalculator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +20,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -52,6 +55,8 @@ class FatturaPAServiceImplTest {
     private HotelSettingsClient hotelSettingsClient;
     @Mock
     private GuestClient guestClient;
+    @Spy
+    private VatBreakdownCalculator vatBreakdownCalculator = new VatBreakdownCalculator();
 
     @InjectMocks
     private FatturaPAServiceImpl service;
@@ -61,9 +66,11 @@ class FatturaPAServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        hotel = new HotelSettingsResponse(HOTEL_ID, "Hotel Test", "Via Roma 1", "12345678901", "TSTDNL80A01H501W", null);
+        hotel = new HotelSettingsResponse(HOTEL_ID, "Hotel Test", "Via Roma 1", "12345678901", "TSTDNL80A01H501W", null,
+                "00100", "Roma", "RM");
         guest = new GuestResponse(GUEST_ID, "Mario", "Rossi", "mario@rossi.it",
-                "RSSMRA80A01H501T", null, null, "ABC1234", null);
+                "RSSMRA80A01H501T", null, null, "ABC1234", null,
+                "Via Milano 5", "20100", "Milano", "MI");
     }
 
     @Test
@@ -105,7 +112,8 @@ class FatturaPAServiceImplTest {
     @Test
     void shouldFallbackToDefaultDestinatarioWhenNoSdiCode() {
         final GuestResponse noSdi = new GuestResponse(GUEST_ID, "Mario", "Rossi",
-                "mario@rossi.it", null, null, null, null, null);
+                "mario@rossi.it", null, null, null, null, null,
+                "Via Milano 5", "20100", "Milano", "MI");
         final InvoiceResponse invoice = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
         when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
         when(hotelSettingsClient.getSettings()).thenReturn(hotel);
@@ -114,6 +122,36 @@ class FatturaPAServiceImplTest {
         final String xmlStr = new String(service.generateXml(INVOICE_ID), StandardCharsets.UTF_8);
 
         assertThat(xmlStr).contains("<CodiceDestinatario>0000000</CodiceDestinatario>");
+    }
+
+    @Test
+    void shouldRejectExportWhenHotelStructuredAddressIsIncomplete() {
+        final HotelSettingsResponse incompleteHotel = new HotelSettingsResponse(
+                HOTEL_ID, "Hotel Test", "Via Roma 1", "12345678901", "TSTDNL80A01H501W", null,
+                null, null, null);
+        final InvoiceResponse invoice = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+        when(hotelSettingsClient.getSettings()).thenReturn(incompleteHotel);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
+
+        assertThatThrownBy(() -> service.generateXml(INVOICE_ID))
+                .isInstanceOf(BillingValidationException.class)
+                .hasMessageContaining("HOTEL_STRUCTURED_ADDRESS_INCOMPLETE");
+    }
+
+    @Test
+    void shouldRejectExportWhenGuestStructuredAddressIsIncomplete() {
+        final GuestResponse incompleteGuest = new GuestResponse(GUEST_ID, "Mario", "Rossi",
+                "mario@rossi.it", null, null, null, null, null,
+                "Via Milano 5", null, null, null);
+        final InvoiceResponse invoice = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+        when(hotelSettingsClient.getSettings()).thenReturn(hotel);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(incompleteGuest);
+
+        assertThatThrownBy(() -> service.generateXml(INVOICE_ID))
+                .isInstanceOf(BillingValidationException.class)
+                .hasMessageContaining("GUEST_STRUCTURED_ADDRESS_INCOMPLETE");
     }
 
     @Test

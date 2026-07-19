@@ -1,8 +1,10 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
+import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.stays.domain.HotelSettings;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsRequest;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
+import com.hotelpms.frontdesk.stays.repository.AlloggiatiComuneRepository;
 import com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository;
 import com.hotelpms.frontdesk.stays.security.AlloggiatiCredentialEncryptor;
 import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
@@ -10,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -22,6 +25,7 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
 
     private final HotelSettingsRepository hotelSettingsRepository;
     private final AlloggiatiCredentialEncryptor alloggiatiCredentialEncryptor;
+    private final AlloggiatiComuneRepository alloggiatiComuneRepository;
 
     /** {@inheritDoc} */
     @Override
@@ -83,7 +87,37 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
         if (request.emailGreetingText() != null) {
             settings.setEmailGreetingText(request.emailGreetingText());
         }
+        if (request.cap() != null) {
+            settings.setCap(request.cap());
+        }
+        final String comune = request.comune() != null ? request.comune() : settings.getComune();
+        final String provincia = request.provincia() != null
+                ? request.provincia().toUpperCase(java.util.Locale.ROOT) : settings.getProvincia();
+        if (request.comune() != null || request.provincia() != null) {
+            validateComune(comune, provincia);
+            settings.setComune(comune);
+            settings.setProvincia(provincia);
+        }
         return toResponse(hotelSettingsRepository.save(Objects.requireNonNull(settings)));
+    }
+
+    /**
+     * Validates that comune and provincia are both present and form a real, active
+     * municipality per the Alloggiati Web reference data — the same data source already
+     * used for police check-in reporting (F2), reused here so the FatturaPA {@code Sede}
+     * is never built from a comune/provincia pair that doesn't actually exist.
+     *
+     * @param comune    the comune name
+     * @param provincia the 2-letter province code
+     * @throws BadRequestException if either is missing or the pair doesn't match a real comune
+     */
+    private void validateComune(final String comune, final String provincia) {
+        if (comune == null || comune.isBlank() || provincia == null || provincia.isBlank()) {
+            throw new BadRequestException("COMUNE_AND_PROVINCIA_MUST_BE_PROVIDED_TOGETHER");
+        }
+        if (!alloggiatiComuneRepository.existsActiveByComuneAndProvincia(comune, provincia, LocalDate.now())) {
+            throw new BadRequestException("COMUNE_NOT_FOUND_FOR_PROVINCIA");
+        }
     }
 
     private HotelSettings createDefault(final UUID hotelId) {
@@ -111,6 +145,9 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
                 entity.isSendCheckoutEmail(),
                 entity.getEmailSubjectReservationConfirmed(),
                 entity.getEmailSubjectCheckout(),
-                entity.getEmailGreetingText());
+                entity.getEmailGreetingText(),
+                entity.getCap(),
+                entity.getComune(),
+                entity.getProvincia());
     }
 }

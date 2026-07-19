@@ -176,7 +176,7 @@ class ReservationServiceImplTest {
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null));
+                        true, true, null, null, null, null, null, null));
         when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
 
         final ReservationResponse result = reservationService.createReservation(request);
@@ -201,7 +201,7 @@ class ReservationServiceImplTest {
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null));
+                        true, true, null, null, null, null, null, null));
         when(notificationClient.sendReservationConfirmed(any())).thenReturn(false);
 
         reservationService.createReservation(request);
@@ -222,7 +222,7 @@ class ReservationServiceImplTest {
         when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null));
+                        true, true, null, null, null, null, null, null));
         when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
         when(reservationRepository.save(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
@@ -251,7 +251,7 @@ class ReservationServiceImplTest {
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        false, true, null, null, null));
+                        false, true, null, null, null, null, null, null));
 
         final ReservationResponse result = reservationService.createReservation(request);
 
@@ -284,7 +284,7 @@ class ReservationServiceImplTest {
         when(reservationMapper.toResponse(entityWithNullStatus)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null));
+                        true, true, null, null, null, null, null, null));
 
         reservationService.createReservation(requestWithNullStatus);
 

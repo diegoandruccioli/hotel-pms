@@ -444,7 +444,7 @@ class StayServiceImplTest {
                 .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(hotelSettingsService.getOrCreate(hotelId))
                 .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null));
+                        true, true, null, null, null, null, null, null));
         when(billingClient.getInvoiceForEmail(invoiceId))
                 .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, PAID_STATUS,
                         INVOICE_TOTAL_200, CURRENCY_EUR, List.of()));
@@ -491,7 +491,7 @@ class StayServiceImplTest {
                 .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(hotelSettingsService.getOrCreate(hotelId))
                 .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null));
+                        true, true, null, null, null, null, null, null));
         when(billingClient.getInvoiceForEmail(invoiceId))
                 .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, PAID_STATUS,
                         INVOICE_TOTAL_200, CURRENCY_EUR, List.of()));
@@ -530,7 +530,7 @@ class StayServiceImplTest {
         when(stayRepository.findAllByReservationId(reservationId)).thenReturn(List.of(checkedInStay));
         when(hotelSettingsService.getOrCreate(hotelId))
                 .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, false, null, null, null));
+                        true, false, null, null, null, null, null, null));
 
         // Act
         final StayResponse response = stayService.checkOut(id, hotelId);
@@ -577,7 +577,7 @@ class StayServiceImplTest {
                 .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(hotelSettingsService.getOrCreate(hotelId))
                 .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null));
+                        true, true, null, null, null, null, null, null));
         when(billingClient.getInvoiceForEmail(invoiceId))
                 .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, PAID_STATUS,
                         INVOICE_TOTAL_200, CURRENCY_EUR, List.of()));
@@ -630,7 +630,7 @@ class StayServiceImplTest {
                 .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(hotelSettingsService.getOrCreate(hotelId))
                 .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null));
+                        true, true, null, null, null, null, null, null));
         when(billingClient.getInvoiceForEmail(invoiceId))
                 .thenReturn(new InvoiceForEmailResponse(invoiceId, null, INVOICE_NUMBER_TEST, PAID_STATUS,
                         INVOICE_TOTAL_80, CURRENCY_EUR, List.of()));
@@ -868,7 +868,7 @@ class StayServiceImplTest {
         when(billingClient.getLatestInvoiceByReservation(reservationId)).thenReturn(paidInvoice);
         when(hotelSettingsService.getOrCreate(hotelId))
                 .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null));
+                        true, true, null, null, null, null, null, null));
         when(guestClient.getGuestById(guestId))
                 .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(billingClient.getInvoiceForEmail(stay.getInvoiceId()))
@@ -924,7 +924,7 @@ class StayServiceImplTest {
         when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(stayWithHotel);
         when(hotelSettingsService.getOrCreate(stayHotelId))
                 .thenReturn(new HotelSettingsResponse(stayHotelId, true, null, null, null, null, null, null, false,
-                        true, true, null, null, null));
+                        true, true, null, null, null, null, null, null));
         when(stayMapper.toDto(stayWithHotel)).thenReturn(Objects.requireNonNull(validResponse));
 
         stayService.checkIn(request);
@@ -961,7 +961,7 @@ class StayServiceImplTest {
         when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(stayWithHotel);
         when(hotelSettingsService.getOrCreate(stayHotelId))
                 .thenReturn(new HotelSettingsResponse(stayHotelId, false, null, null, null, null, null, null, false,
-                        true, true, null, null, null));
+                        true, true, null, null, null, null, null, null));
         when(stayMapper.toDto(stayWithHotel)).thenReturn(Objects.requireNonNull(validResponse));
 
         stayService.checkIn(request);
@@ -997,7 +997,7 @@ class StayServiceImplTest {
         when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(stayWithHotel);
         when(hotelSettingsService.getOrCreate(stayHotelId))
                 .thenReturn(new HotelSettingsResponse(stayHotelId, true, null, null, null, null, null, null, false,
-                        true, true, null, null, null));
+                        true, true, null, null, null, null, null, null));
         doThrow(new ExternalServiceException(PS_PORTAL_DOWN, null))
                 .when(alloggiatiWebSenderService)
                 .submitReport(ArgumentMatchers.any(LocalDate.class), ArgumentMatchers.any(UUID.class));
