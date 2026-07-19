@@ -49,8 +49,9 @@ public class ThymeleafPdfTemplateRenderer implements PdfTemplateRenderer {
         final String html = templateEngine.process(templateName, thymeleafContext);
 
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            // Fast mode has been the default renderer since openhtmltopdf 1.0.5 —
+            // no need to request it explicitly (the method is now deprecated).
             new PdfRendererBuilder()
-                    .useFastMode()
                     .withHtmlContent(html, null)
                     .toStream(out)
                     .run();
