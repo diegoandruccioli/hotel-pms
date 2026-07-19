@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="it">
 <head>
     <meta charset="UTF-8"/>
-    <title>Ricevuta</title>
+    <title th:text="'Ricevuta ' + ${invoiceNumber} + ' — ' + ${hotelName}">Ricevuta</title>
+    <meta name="description" th:content="'Ricevuta ' + ${invoiceNumber} + ' emessa da ' + ${hotelName}"/>
+    <meta name="subject" content="Ricevuta"/>
     <th:block th:replace="~{invoice-fragments :: styles}"></th:block>
 </head>
 <body>

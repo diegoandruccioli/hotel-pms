@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="it">
 <head>
     <meta charset="UTF-8"/>
-    <title>Fattura</title>
+    <title th:text="'Fattura ' + ${invoiceNumber} + ' — ' + ${hotelName}">Fattura</title>
+    <meta name="description" th:content="'Fattura ' + ${invoiceNumber} + ' emessa da ' + ${hotelName}"/>
+    <meta name="subject" content="Fattura"/>
     <th:block th:replace="~{invoice-fragments :: styles}"></th:block>
 </head>
 <body>

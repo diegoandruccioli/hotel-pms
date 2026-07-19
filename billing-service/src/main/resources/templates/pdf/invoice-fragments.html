@@ -13,22 +13,23 @@
 <th:block th:fragment="styles">
 <style>
     @page { size: A4; margin: 2.2cm 1.8cm; }
-    body { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #1a1a1a; }
+    body { font-family: 'Noto Sans', sans-serif; font-size: 9pt; color: #1a1a1a; }
     .header { display: flex; justify-content: space-between; align-items: flex-start;
         border-bottom: 1px solid #333; padding-bottom: 8pt; margin-bottom: 12pt; }
     .header img.logo { max-height: 48px; max-width: 160px; }
     .hotel-name { font-size: 15pt; font-weight: bold; }
     .hotel-details { font-size: 9pt; color: #444; }
-    .doc-title { font-size: 15pt; font-weight: bold; text-align: right; }
+    .doc-title { font-size: 15pt; font-weight: bold; text-align: right; margin: 0; }
     .meta-section { display: flex; justify-content: space-between;
         border-bottom: 1px solid #333; padding-bottom: 8pt; margin-bottom: 12pt; }
     .meta-label { font-weight: bold; }
     table.rows { width: 100%; border-collapse: collapse; margin-bottom: 12pt; }
+    table.rows caption { text-align: left; font-weight: bold; font-size: 10pt;
+        margin-bottom: 4pt; caption-side: top; }
     table.rows th { text-align: left; font-size: 8pt; font-weight: bold;
         border-bottom: 1px solid #333; padding: 3pt 4pt; }
     table.rows td { font-size: 9pt; padding: 3pt 4pt; border-bottom: 0.5px solid #ccc; }
     table.rows td.amount, table.rows th.amount { text-align: right; }
-    .section-title { font-weight: bold; font-size: 10pt; margin-bottom: 4pt; }
     .totals { width: 100%; border-top: 1px solid #333; padding-top: 8pt; }
     .totals .row { display: flex; justify-content: flex-end; gap: 12pt; padding: 2pt 0; }
     .totals .row .label { width: 160pt; text-align: right; }
@@ -41,13 +42,13 @@
 
 <div class="header" th:fragment="header">
     <div>
-        <img th:if="${logoDataUri != null}" th:src="${logoDataUri}" class="logo" alt=""/>
+        <img th:if="${logoDataUri != null}" th:src="${logoDataUri}" th:alt="'Logo ' + ${hotelName}" class="logo"/>
         <div class="hotel-name" th:text="${hotelName}">Hotel Name</div>
         <div class="hotel-details" th:if="${hotelAddress != null}" th:text="${hotelAddress}">Address</div>
         <div class="hotel-details" th:if="${hotelVat != null}" th:text="'P.IVA: ' + ${hotelVat}">P.IVA</div>
         <div class="hotel-details" th:if="${hotelFiscalCode != null}" th:text="'C.F.: ' + ${hotelFiscalCode}">C.F.</div>
     </div>
-    <div class="doc-title" th:text="${docTitle}">FATTURA</div>
+    <h1 class="doc-title" th:text="${docTitle} + ' N. ' + ${invoiceNumber}">FATTURA N. 2026/0001</h1>
 </div>
 
 <div class="meta-section" th:fragment="meta">
@@ -66,8 +67,8 @@
 </div>
 
 <th:block th:fragment="chargesTable">
-    <div class="section-title">ADDEBITI</div>
     <table class="rows">
+        <caption>ADDEBITI</caption>
         <thead>
         <tr><th>Tipo</th><th>Descrizione</th><th class="amount">%IVA</th><th class="amount">Importo</th></tr>
         </thead>
@@ -84,8 +85,8 @@
 </th:block>
 
 <th:block th:fragment="paymentsTable">
-    <div class="section-title">PAGAMENTI</div>
     <table class="rows">
+        <caption>PAGAMENTI</caption>
         <thead>
         <tr><th>Metodo</th><th>Data</th><th>Riferimento</th><th class="amount">Importo</th></tr>
         </thead>

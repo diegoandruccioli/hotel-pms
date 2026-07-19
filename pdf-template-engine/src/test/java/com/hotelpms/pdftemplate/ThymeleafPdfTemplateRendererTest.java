@@ -1,7 +1,11 @@
 package com.hotelpms.pdftemplate;
 
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDDocumentCatalog;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
@@ -38,5 +42,24 @@ class ThymeleafPdfTemplateRendererTest {
     void throwsPdfRenderExceptionForAMissingTemplate() {
         assertThatThrownBy(() -> renderer.render("does-not-exist", Map.of()))
                 .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void producesATaggedPdfWithMarkInfoAndStructureTree() throws IOException {
+        final byte[] pdf = renderer.render(MINIMAL_TEMPLATE, Map.of(TITLE_VAR, "Accessible"));
+
+        try (PDDocument document = Loader.loadPDF(pdf)) {
+            final PDDocumentCatalog catalog = document.getDocumentCatalog();
+            assertThat(catalog.getMarkInfo()).isNotNull();
+            assertThat(catalog.getMarkInfo().isMarked())
+                    .as("PDF/UA requires the document to be marked as Tagged PDF (/MarkInfo /Marked true)")
+                    .isTrue();
+            assertThat(catalog.getStructureTreeRoot())
+                    .as("PDF/UA requires a structure tree describing reading order/semantics")
+                    .isNotNull();
+            assertThat(catalog.getLanguage())
+                    .as("PDF/UA requires a document-level language")
+                    .isEqualTo("en");
+        }
     }
 }
