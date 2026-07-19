@@ -176,7 +176,7 @@ public class ReservationServiceImpl implements ReservationService {
      */
     private List<UUID> resolveGuestIds(final String query) {
         return guestClient.searchGuests(query, GUEST_SEARCH_MATCH_CAP).content().stream()
-                .map(GuestResponse::id)
+                .map((@NonNull GuestResponse gr) -> gr.id())
                 .toList();
     }
 
