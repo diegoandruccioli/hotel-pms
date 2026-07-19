@@ -69,8 +69,8 @@ dependencies {
     // --- OpenAPI / Swagger UI ---
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4")
 
-    // PDF invoice generation — Apache 2.0 licence
-    implementation("org.apache.pdfbox:pdfbox:3.0.3")
+    // PDF invoice generation — Thymeleaf template + openhtmltopdf renderer (LGPL-2.1+)
+    implementation(project(":pdf-template-engine"))
 
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.flywaydb:flyway-core")

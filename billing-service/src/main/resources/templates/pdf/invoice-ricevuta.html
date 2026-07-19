@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Ricevuta</title>
+    <th:block th:replace="~{invoice-fragments :: styles}"></th:block>
+</head>
+<body>
+
+<div th:replace="~{invoice-fragments :: header}"></div>
+<div th:replace="~{invoice-fragments :: meta}"></div>
+<th:block th:replace="~{invoice-fragments :: chargesTable}"></th:block>
+<th:block th:replace="~{invoice-fragments :: paymentsTable}"></th:block>
+
+<!-- No VAT breakdown for RICEVUTA — non-fiscal receipt. -->
+<div class="totals">
+    <div class="row grand-total">
+        <div class="label">TOTALE:</div>
+        <div class="value" th:text="${totalFormatted}">EUR 0,00</div>
+    </div>
+    <div class="row">
+        <div class="label">Da pagare:</div>
+        <div class="value" th:text="${dueFormatted}">EUR 0,00</div>
+    </div>
+</div>
+
+</body>
+</html>

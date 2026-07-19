@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Fattura</title>
+    <th:block th:replace="~{invoice-fragments :: styles}"></th:block>
+</head>
+<body>
+
+<div th:replace="~{invoice-fragments :: header}"></div>
+<div th:replace="~{invoice-fragments :: meta}"></div>
+<th:block th:replace="~{invoice-fragments :: chargesTable}"></th:block>
+<th:block th:replace="~{invoice-fragments :: paymentsTable}"></th:block>
+
+<div class="totals">
+    <th:block th:each="vat : ${vatBreakdown}">
+        <div class="row">
+            <div class="label" th:text="'Imponibile ' + ${vat.rateLabel} + ':'">Imponibile 10%:</div>
+            <div class="value" th:text="${vat.taxableFormatted}">EUR 0,00</div>
+        </div>
+        <div class="row">
+            <div class="label" th:text="'IVA ' + ${vat.rateLabel} + ':'">IVA 10%:</div>
+            <div class="value" th:text="${vat.vatFormatted}">EUR 0,00</div>
+        </div>
+    </th:block>
+    <div class="row grand-total">
+        <div class="label">TOTALE:</div>
+        <div class="value" th:text="${totalFormatted}">EUR 0,00</div>
+    </div>
+    <div class="row">
+        <div class="label">Da pagare:</div>
+        <div class="value" th:text="${dueFormatted}">EUR 0,00</div>
+    </div>
+</div>
+
+</body>
+</html>

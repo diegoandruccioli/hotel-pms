@@ -10,323 +10,179 @@ import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.PaymentResponse;
 import com.hotelpms.billing.service.InvoiceService;
 import com.hotelpms.billing.service.PdfInvoiceService;
+import com.hotelpms.pdftemplate.PdfTemplateRenderer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
-import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 
 /**
- * Generates A4 PDF invoices using Apache PDFBox 3.x.
- * Hotel header data is fetched from stay-service; guest name from guest-service.
+ * Generates A4 PDF invoices/receipts by rendering a Thymeleaf HTML template with
+ * {@link PdfTemplateRenderer} (see {@code pdf-template-engine} module). One template
+ * per {@link DocumentType} — FATTURA needs a VAT breakdown section, RICEVUTA does not —
+ * selected by {@link #templateFor(DocumentType)}.
+ *
+ * <p>Hotel header data is fetched from stay-service; guest name from guest-service.
  * Both Feign calls use circuit-breaker fallbacks so PDF generation never blocks.
+ *
+ * <p>This class owns all domain formatting (amounts, dates, VAT grouping, charge/payment
+ * type labels) — the templates are display-only, no business logic in markup.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class PdfInvoiceServiceImpl implements PdfInvoiceService {
 
-    // Layout constants (A4 = 595×842 pt, origin at bottom-left)
-    private static final float PAGE_HEIGHT = PDRectangle.A4.getHeight();
-    private static final float PAGE_WIDTH = PDRectangle.A4.getWidth();
-    private static final float MARGIN = 50f;
-    private static final float RIGHT_EDGE = PAGE_WIDTH - MARGIN;
-    private static final float TOP_Y = PAGE_HEIGHT - MARGIN;
+    private static final String TEMPLATE_FATTURA = "invoice-fattura";
+    private static final String TEMPLATE_RICEVUTA = "invoice-ricevuta";
 
-    private static final float FONT_SIZE_TITLE = 15f;
-    private static final float FONT_SIZE_SECTION = 10f;
-    private static final float FONT_SIZE_BODY = 9f;
-    private static final float FONT_SIZE_SMALL = 8f;
-
-    private static final float LINE_HEIGHT = 13f;
-    private static final float SECTION_GAP = 18f;
-    private static final float RULE_OFFSET = 4f;
-    private static final float LINE_WIDTH_THIN = 0.5f;
-
-    // Charges table column X positions
-    private static final float COL_TYPE_X = MARGIN;
-    private static final float COL_DESC_X = MARGIN + 90f;
-    private static final float COL_VAT_X = RIGHT_EDGE - 100f;
-    private static final float COL_AMT_X = RIGHT_EDGE;
-
-    // Payments table column X positions
-    private static final float COL_PAY_METHOD_X = MARGIN;
-    private static final float COL_PAY_DATE_X = MARGIN + 110f;
-    private static final float COL_PAY_REF_X = MARGIN + 240f;
-    private static final float COL_PAY_AMT_X = RIGHT_EDGE;
-
-    private static final float LABEL_X_RIGHT = RIGHT_EDGE - 120f;
-    private static final float LABEL_VALUE_OFFSET = 70f;
-
-    private static final int MAX_CHARGE_DESC_LEN = 32;
-    private static final int MAX_PAYMENT_REF_LEN = 15;
-
-    private static final String EMPTY_VALUE = "---";
+    // Classpath location for the dev-provided hotel logo (never admin-uploaded —
+    // see ADR in backup/DECISIONS.md: uploads are an attack surface, a static asset
+    // shipped by the developer is not). Optional: absent means no logo in the PDF,
+    // the template guards on this with th:if.
+    private static final String LOGO_CLASSPATH_RESOURCE = "static/pdf/logo.png";
+    private static final String LOGO_DATA_URI_PREFIX = "data:image/png;base64,";
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
+    private static final String EMPTY_VALUE = "---";
+
     private final InvoiceService invoiceService;
     private final HotelSettingsClient hotelSettingsClient;
     private final GuestClient guestClient;
+    private final PdfTemplateRenderer pdfTemplateRenderer;
 
     /** {@inheritDoc} */
     @Override
-    @SuppressWarnings("null")
     public byte[] generateInvoicePdf(final UUID invoiceId) {
         log.info("Generating PDF for invoice {}", invoiceId);
         final InvoiceResponse invoice = invoiceService.getInvoice(invoiceId);
         final HotelSettingsResponse hotel = hotelSettingsClient.getSettings();
         final GuestResponse guest = guestClient.getGuestById(invoice.guestId());
-
-        try (PDDocument doc = new PDDocument()) {
-            final PDPage page = new PDPage(PDRectangle.A4);
-            doc.addPage(page);
-            try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
-                buildContent(cs, invoice, hotel, guest);
-            }
-            final ByteArrayOutputStream out = new ByteArrayOutputStream();
-            doc.save(out);
-            log.info("PDF generated for invoice {} — {} bytes", invoiceId, out.size());
-            return out.toByteArray();
-        } catch (final IOException e) {
-            throw new IllegalStateException("PDF_GENERATION_FAILED", e);
-        }
-    }
-
-    private void buildContent(final PDPageContentStream cs,
-                              final InvoiceResponse invoice,
-                              final HotelSettingsResponse hotel,
-                              final GuestResponse guest) throws IOException {
-        final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
-        final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
         final DocumentType docType = invoice.documentType() != null
                 ? invoice.documentType() : DocumentType.FATTURA;
 
-        float y = TOP_Y;
-        y = drawHotelHeader(cs, hotel, docType, bold, regular, y);
-        drawHorizontalLine(cs, y);
-        y -= SECTION_GAP;
-        y = drawInvoiceMeta(cs, invoice, guest, bold, regular, y);
-        drawHorizontalLine(cs, y);
-        y -= SECTION_GAP;
-        y = drawChargesSection(cs, invoice.charges(), bold, regular, y);
-        drawHorizontalLine(cs, y);
-        y -= SECTION_GAP;
-        y = drawPaymentsSection(cs, invoice.payments(), bold, regular, y);
-        drawHorizontalLine(cs, y);
-        y -= SECTION_GAP;
+        final Map<String, Object> context = buildContext(invoice, hotel, guest, docType);
+        final byte[] pdf = pdfTemplateRenderer.render(templateFor(docType), context);
+        log.info("PDF generated for invoice {} — {} bytes", invoiceId, pdf.length);
+        return pdf;
+    }
+
+    private static String templateFor(final DocumentType docType) {
+        return docType == DocumentType.FATTURA ? TEMPLATE_FATTURA : TEMPLATE_RICEVUTA;
+    }
+
+    private Map<String, Object> buildContext(final InvoiceResponse invoice, final HotelSettingsResponse hotel,
+            final GuestResponse guest, final DocumentType docType) {
+        final Map<String, Object> context = new HashMap<>();
+        context.put("logoDataUri", loadLogoDataUri());
+        context.put("hotelName", hotel.hotelName() != null ? hotel.hotelName() : "Hotel");
+        context.put("hotelAddress", blankToNull(hotel.address()));
+        context.put("hotelVat", blankToNull(hotel.vatNumber()));
+        context.put("hotelFiscalCode", blankToNull(hotel.fiscalCode()));
+        context.put("docTitle", docType == DocumentType.FATTURA ? "FATTURA" : "RICEVUTA");
+
+        context.put("invoiceNumber", invoice.invoiceNumber());
+        context.put("issueDate", invoice.issueDate() != null ? invoice.issueDate().format(DATE_FMT) : EMPTY_VALUE);
+        context.put("status", invoice.status().name());
+
+        final boolean hasCompany = guest.companyName() != null && !guest.companyName().isBlank();
+        final String guestName = guest.firstName() + " " + guest.lastName();
+        context.put("guestDisplayName", hasCompany ? guest.companyName() : guestName);
+        context.put("guestPersonalName", hasCompany ? guestName : null);
+        context.put("guestFiscalCode", blankToNull(guest.fiscalCode()));
+        context.put("guestVat", blankToNull(guest.vatNumber()));
+        context.put("guestPec", blankToNull(guest.pecEmail()));
+
+        context.put("charges", toChargeRows(invoice.charges()));
+        context.put("payments", toPaymentRows(invoice.payments()));
+
         final BigDecimal paid = invoice.payments().stream()
                 .map((@NonNull PaymentResponse pr) -> pr.amount())
                 .reduce(BigDecimal.ZERO, (@NonNull BigDecimal a, @NonNull BigDecimal b) -> a.add(b));
-        drawTotals(cs, invoice.totalAmount(), paid, invoice.charges(),
-                docType == DocumentType.FATTURA, bold, regular, y);
+        context.put("totalFormatted", formatAmount(invoice.totalAmount()));
+        context.put("dueFormatted", formatAmount(invoice.totalAmount().subtract(paid)));
+        if (docType == DocumentType.FATTURA) {
+            context.put("vatBreakdown", toVatRows(invoice.charges()));
+        }
+        return context;
     }
 
-    private float drawHotelHeader(final PDPageContentStream cs,
-                                   final HotelSettingsResponse hotel,
-                                   final DocumentType documentType,
-                                   final PDType1Font bold,
-                                   final PDType1Font regular,
-                                   final float startY) throws IOException {
-        float y = startY;
-        final String name = hotel.hotelName() != null ? hotel.hotelName() : "Hotel";
-        final String docTitle = documentType == DocumentType.FATTURA ? "FATTURA" : "RICEVUTA";
-        drawText(cs, bold, FONT_SIZE_TITLE, MARGIN, y, name);
-        drawRightAlignedText(cs, bold, FONT_SIZE_TITLE, RIGHT_EDGE, y, docTitle);
-        y -= LINE_HEIGHT + 2f;
-
-        if (hotel.address() != null && !hotel.address().isBlank()) {
-            drawText(cs, regular, FONT_SIZE_BODY, MARGIN, y, hotel.address());
-            y -= LINE_HEIGHT;
-        }
-        if (hotel.vatNumber() != null && !hotel.vatNumber().isBlank()) {
-            drawText(cs, regular, FONT_SIZE_BODY, MARGIN, y, "P.IVA: " + hotel.vatNumber());
-            y -= LINE_HEIGHT;
-        }
-        if (hotel.fiscalCode() != null && !hotel.fiscalCode().isBlank()) {
-            drawText(cs, regular, FONT_SIZE_BODY, MARGIN, y, "C.F.: " + hotel.fiscalCode());
-            y -= LINE_HEIGHT;
-        }
-        return y - RULE_OFFSET;
+    private static String blankToNull(final String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
-    private float drawInvoiceMeta(final PDPageContentStream cs,
-                                   final InvoiceResponse invoice,
-                                   final GuestResponse guest,
-                                   final PDType1Font bold,
-                                   final PDType1Font regular,
-                                   final float startY) throws IOException {
-        float y = startY;
-        drawText(cs, bold, FONT_SIZE_SECTION, MARGIN, y, "N. Fattura:");
-        drawText(cs, regular, FONT_SIZE_SECTION, MARGIN + LABEL_VALUE_OFFSET, y, invoice.invoiceNumber());
-        drawText(cs, bold, FONT_SIZE_SECTION, LABEL_X_RIGHT, y, "Intestatario:");
-        y -= LINE_HEIGHT;
-
-        final String dateStr = invoice.issueDate() != null
-                ? invoice.issueDate().format(DATE_FMT) : EMPTY_VALUE;
-        drawText(cs, bold, FONT_SIZE_SECTION, MARGIN, y, "Data:");
-        drawText(cs, regular, FONT_SIZE_SECTION, MARGIN + LABEL_VALUE_OFFSET, y, dateStr);
-
-        // Right column: company name (if any) then personal name, then fiscal details
-        float rightY = y;
-        final String guestName = guest.firstName() + " " + guest.lastName();
-        final boolean hasCompany = guest.companyName() != null && !guest.companyName().isBlank();
-        drawText(cs, regular, FONT_SIZE_SECTION, LABEL_X_RIGHT, rightY,
-                hasCompany ? guest.companyName() : guestName);
-        rightY -= LINE_HEIGHT;
-        if (hasCompany) {
-            drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, rightY, guestName);
-            rightY -= LINE_HEIGHT;
-        }
-        rightY = drawFiscalDetails(cs, guest, regular, rightY);
-
-        y -= LINE_HEIGHT;
-        drawText(cs, bold, FONT_SIZE_SECTION, MARGIN, y, "Stato:");
-        drawText(cs, regular, FONT_SIZE_SECTION, MARGIN + LABEL_VALUE_OFFSET, y, invoice.status().name());
-
-        return Math.min(y - LINE_HEIGHT, rightY) - RULE_OFFSET;
-    }
-
-    private float drawFiscalDetails(final PDPageContentStream cs,
-                                     final GuestResponse guest,
-                                     final PDType1Font regular,
-                                     final float startY) throws IOException {
-        float rightY = startY;
-        if (guest.fiscalCode() != null && !guest.fiscalCode().isBlank()) {
-            drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, rightY, "C.F.: " + guest.fiscalCode());
-            rightY -= LINE_HEIGHT;
-        }
-        if (guest.vatNumber() != null && !guest.vatNumber().isBlank()) {
-            drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, rightY, "P.IVA: " + guest.vatNumber());
-            rightY -= LINE_HEIGHT;
-        }
-        if (guest.pecEmail() != null && !guest.pecEmail().isBlank()) {
-            drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, rightY, "PEC: " + guest.pecEmail());
-            rightY -= LINE_HEIGHT;
-        }
-        return rightY;
-    }
-
-    private float drawChargesSection(final PDPageContentStream cs,
-                                      final List<ChargeResponse> charges,
-                                      final PDType1Font bold,
-                                      final PDType1Font regular,
-                                      final float startY) throws IOException {
-        float y = startY;
-        drawText(cs, bold, FONT_SIZE_SECTION, MARGIN, y, "ADDEBITI");
-        y -= LINE_HEIGHT;
-
-        drawText(cs, bold, FONT_SIZE_SMALL, COL_TYPE_X, y, "Tipo");
-        drawText(cs, bold, FONT_SIZE_SMALL, COL_DESC_X, y, "Descrizione");
-        drawRightAlignedText(cs, bold, FONT_SIZE_SMALL, COL_VAT_X, y, "%IVA");
-        drawRightAlignedText(cs, bold, FONT_SIZE_SMALL, COL_AMT_X, y, "Importo");
-        y -= LINE_HEIGHT;
-
-        final List<ChargeResponse> rows = charges != null ? charges : List.of();
-        for (final ChargeResponse charge : rows) {
-            final String typeName = formatChargeType(charge.type().name());
-            final String desc = charge.description() != null ? charge.description() : EMPTY_VALUE;
-            final String vatLabel = charge.vatRate() != null
-                    ? vatRateToLabel(charge.vatRate()) : EMPTY_VALUE;
-            drawText(cs, regular, FONT_SIZE_BODY, COL_TYPE_X, y, typeName);
-            drawText(cs, regular, FONT_SIZE_BODY, COL_DESC_X, y, truncate(desc, MAX_CHARGE_DESC_LEN));
-            drawRightAlignedText(cs, regular, FONT_SIZE_BODY, COL_VAT_X, y, vatLabel);
-            drawRightAlignedText(cs, regular, FONT_SIZE_BODY, COL_AMT_X, y,
-                    formatAmount(charge.amount()));
-            y -= LINE_HEIGHT;
-        }
-        if (rows.isEmpty()) {
-            drawText(cs, regular, FONT_SIZE_BODY, MARGIN, y, "Nessun addebito");
-            y -= LINE_HEIGHT;
-        }
-        return y - RULE_OFFSET;
-    }
-
-    private float drawPaymentsSection(final PDPageContentStream cs,
-                                       final List<PaymentResponse> payments,
-                                       final PDType1Font bold,
-                                       final PDType1Font regular,
-                                       final float startY) throws IOException {
-        float y = startY;
-        drawText(cs, bold, FONT_SIZE_SECTION, MARGIN, y, "PAGAMENTI");
-        y -= LINE_HEIGHT;
-
-        drawText(cs, bold, FONT_SIZE_SMALL, COL_PAY_METHOD_X, y, "Metodo");
-        drawText(cs, bold, FONT_SIZE_SMALL, COL_PAY_DATE_X, y, "Data");
-        drawText(cs, bold, FONT_SIZE_SMALL, COL_PAY_REF_X, y, "Riferimento");
-        drawRightAlignedText(cs, bold, FONT_SIZE_SMALL, COL_PAY_AMT_X, y, "Importo");
-        y -= LINE_HEIGHT;
-
-        final List<PaymentResponse> rows = payments != null ? payments : List.of();
-        for (final PaymentResponse payment : rows) {
-            final String method = formatPaymentMethod(payment.paymentMethod().name());
-            final String date = payment.paymentDate() != null
-                    ? payment.paymentDate().format(DATETIME_FMT) : EMPTY_VALUE;
-            final String ref = payment.transactionReference() != null
-                    ? payment.transactionReference() : EMPTY_VALUE;
-            drawText(cs, regular, FONT_SIZE_BODY, COL_PAY_METHOD_X, y, method);
-            drawText(cs, regular, FONT_SIZE_BODY, COL_PAY_DATE_X, y, date);
-            drawText(cs, regular, FONT_SIZE_BODY, COL_PAY_REF_X, y, truncate(ref, MAX_PAYMENT_REF_LEN));
-            drawRightAlignedText(cs, regular, FONT_SIZE_BODY, COL_PAY_AMT_X, y,
-                    formatAmount(payment.amount()));
-            y -= LINE_HEIGHT;
-        }
-        if (rows.isEmpty()) {
-            drawText(cs, regular, FONT_SIZE_BODY, MARGIN, y, "Nessun pagamento");
-            y -= LINE_HEIGHT;
-        }
-        return y - RULE_OFFSET;
-    }
-
-    private void drawTotals(final PDPageContentStream cs,
-                             final BigDecimal total,
-                             final BigDecimal paid,
-                             final List<ChargeResponse> charges,
-                             final boolean showVatBreakdown,
-                             final PDType1Font bold,
-                             final PDType1Font regular,
-                             final float startY) throws IOException {
-        float y = startY;
-        if (showVatBreakdown) {
-            final Map<BigDecimal, BigDecimal[]> vatBreakdown = computeVatBreakdown(charges);
-            for (final Map.Entry<BigDecimal, BigDecimal[]> entry : vatBreakdown.entrySet()) {
-                final BigDecimal taxable = entry.getValue()[0];
-                final BigDecimal vat = entry.getValue()[1];
-                final String rateLabel = vatRateToLabel(entry.getKey());
-                drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, y, "Imponibile " + rateLabel + ":");
-                drawRightAlignedText(cs, regular, FONT_SIZE_BODY, RIGHT_EDGE, y, formatAmount(taxable));
-                y -= LINE_HEIGHT;
-                drawText(cs, regular, FONT_SIZE_BODY, LABEL_X_RIGHT, y, "IVA " + rateLabel + ":");
-                drawRightAlignedText(cs, regular, FONT_SIZE_BODY, RIGHT_EDGE, y, formatAmount(vat));
-                y -= LINE_HEIGHT;
+    /**
+     * Reads the dev-provided logo (see {@link #LOGO_CLASSPATH_RESOURCE}) and returns it
+     * as a {@code data:} URI, or {@code null} if no logo file has been shipped — the
+     * templates render without a logo in that case, never a broken image.
+     *
+     * @return the logo as a base64 data URI, or {@code null}
+     */
+    private String loadLogoDataUri() {
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream(LOGO_CLASSPATH_RESOURCE)) {
+            if (in == null) {
+                return null;
             }
-            if (!vatBreakdown.isEmpty()) {
-                drawHorizontalLine(cs, y);
-                y -= LINE_HEIGHT;
-            }
+            return LOGO_DATA_URI_PREFIX + Base64.getEncoder().encodeToString(in.readAllBytes());
+        } catch (final IOException e) {
+            log.warn("Failed to load PDF logo asset from classpath — rendering without a logo", e);
+            return null;
         }
-        drawText(cs, bold, FONT_SIZE_SECTION, LABEL_X_RIGHT, y, "TOTALE:");
-        drawRightAlignedText(cs, bold, FONT_SIZE_SECTION, RIGHT_EDGE, y, formatAmount(total));
-        y -= LINE_HEIGHT;
-        final BigDecimal due = total.subtract(paid);
-        drawText(cs, regular, FONT_SIZE_SECTION, LABEL_X_RIGHT, y, "Da pagare:");
-        drawRightAlignedText(cs, regular, FONT_SIZE_SECTION, RIGHT_EDGE, y, formatAmount(due));
+    }
+
+    private List<Map<String, String>> toChargeRows(final List<ChargeResponse> charges) {
+        final List<Map<String, String>> rows = new ArrayList<>();
+        for (final ChargeResponse charge : charges) {
+            final Map<String, String> row = new HashMap<>();
+            row.put("typeLabel", formatChargeType(charge.type().name()));
+            row.put("description", charge.description() != null ? charge.description() : EMPTY_VALUE);
+            row.put("vatLabel", charge.vatRate() != null ? vatRateToLabel(charge.vatRate()) : EMPTY_VALUE);
+            row.put("amountFormatted", formatAmount(charge.amount()));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private List<Map<String, String>> toPaymentRows(final List<PaymentResponse> payments) {
+        final List<Map<String, String>> rows = new ArrayList<>();
+        for (final PaymentResponse payment : payments) {
+            final Map<String, String> row = new HashMap<>();
+            row.put("methodLabel", formatPaymentMethod(payment.paymentMethod().name()));
+            row.put("dateFormatted",
+                    payment.paymentDate() != null ? payment.paymentDate().format(DATETIME_FMT) : EMPTY_VALUE);
+            row.put("reference", payment.transactionReference() != null ? payment.transactionReference() : EMPTY_VALUE);
+            row.put("amountFormatted", formatAmount(payment.amount()));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private List<Map<String, String>> toVatRows(final List<ChargeResponse> charges) {
+        final Map<BigDecimal, BigDecimal[]> breakdown = computeVatBreakdown(charges);
+        final List<Map<String, String>> rows = new ArrayList<>();
+        for (final Map.Entry<BigDecimal, BigDecimal[]> entry : breakdown.entrySet()) {
+            final Map<String, String> row = new HashMap<>();
+            row.put("rateLabel", vatRateToLabel(entry.getKey()));
+            row.put("taxableFormatted", formatAmount(entry.getValue()[0]));
+            row.put("vatFormatted", formatAmount(entry.getValue()[1]));
+            rows.add(row);
+        }
+        return rows;
     }
 
     private static Map<BigDecimal, BigDecimal[]> computeVatBreakdown(final List<ChargeResponse> charges) {
@@ -354,31 +210,6 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
         return rate.movePointRight(2).stripTrailingZeros().toPlainString() + "%";
     }
 
-    private void drawHorizontalLine(final PDPageContentStream cs, final float y) throws IOException {
-        cs.setLineWidth(LINE_WIDTH_THIN);
-        cs.moveTo(MARGIN, y);
-        cs.lineTo(RIGHT_EDGE, y);
-        cs.stroke();
-    }
-
-    private void drawText(final PDPageContentStream cs, final PDType1Font font,
-                           final float size, final float x, final float y,
-                           final String text) throws IOException {
-        cs.beginText();
-        cs.setFont(font, size);
-        cs.newLineAtOffset(x, y);
-        cs.showText(sanitize(text));
-        cs.endText();
-    }
-
-    private void drawRightAlignedText(final PDPageContentStream cs, final PDType1Font font,
-                                       final float size, final float rightX, final float y,
-                                       final String text) throws IOException {
-        final String safe = sanitize(text);
-        final float textWidth = font.getStringWidth(safe) / 1000f * size;
-        drawText(cs, font, size, rightX - textWidth, y, safe);
-    }
-
     private String formatAmount(final BigDecimal amount) {
         if (amount == null) {
             return "EUR 0,00";
@@ -404,19 +235,5 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
             case "CHECK" -> "Assegno";
             default -> method;
         };
-    }
-
-    private String sanitize(final String text) {
-        if (text == null) {
-            return "";
-        }
-        return text.replaceAll("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]", "");
-    }
-
-    private String truncate(final String text, final int maxLen) {
-        if (text == null || text.length() <= maxLen) {
-            return text == null ? "" : text;
-        }
-        return text.substring(0, maxLen - 3) + "...";
     }
 }

@@ -8,7 +8,8 @@ val projects = listOf(
     "fb-service",
     "auth-service",
     "api-gateway",
-    "notification-service"
+    "notification-service",
+    "pdf-template-engine"
 )
 for (p in projects) {
     if (file(p).exists()) {
