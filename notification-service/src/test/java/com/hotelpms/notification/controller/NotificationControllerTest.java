@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SuppressWarnings("null")
@@ -41,6 +42,7 @@ class NotificationControllerTest {
     private static final String ROOM_NUMBER = "201";
     private static final String LOCALE_IT = "it";
     private static final String CURRENCY_EUR = "EUR";
+    private static final String TRUE_BODY = "true";
 
     @Mock
     private NotificationService notificationService;
@@ -63,7 +65,7 @@ class NotificationControllerTest {
     }
 
     @Test
-    void reservationConfirmedValidRequestReturns204() throws Exception {
+    void reservationConfirmedValidRequestReturns200True() throws Exception {
         final ReservationConfirmedRequest req = new ReservationConfirmedRequest(
                 GUEST_EMAIL, "John Doe", HOTEL_NAME, "Superior Room",
                 LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 5), 4, "RES-001", LOCALE_IT,
@@ -72,7 +74,8 @@ class NotificationControllerTest {
         mockMvc.perform(post(BASE_URL + "/reservation-confirmed")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(content().string(TRUE_BODY));
 
         verify(notificationService, times(1)).sendReservationConfirmed(any());
     }
@@ -91,7 +94,7 @@ class NotificationControllerTest {
     }
 
     @Test
-    void checkinValidRequestReturns204() throws Exception {
+    void checkinValidRequestReturns200True() throws Exception {
         final CheckinNotificationRequest req = new CheckinNotificationRequest(
                 GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, ROOM_NUMBER,
                 LocalDate.of(2026, 8, 5), LOCALE_IT);
@@ -99,13 +102,14 @@ class NotificationControllerTest {
         mockMvc.perform(post(BASE_URL + "/checkin")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(content().string(TRUE_BODY));
 
         verify(notificationService, times(1)).sendCheckin(any());
     }
 
     @Test
-    void checkoutValidRequestReturns204() throws Exception {
+    void checkoutValidRequestReturns200True() throws Exception {
         final CheckoutNotificationRequest req = new CheckoutNotificationRequest(
                 GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, ROOM_NUMBER,
                 LocalDateTime.of(2026, 8, 1, 14, 0),
@@ -117,7 +121,8 @@ class NotificationControllerTest {
         mockMvc.perform(post(BASE_URL + "/checkout")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(content().string(TRUE_BODY));
 
         verify(notificationService, times(1)).sendCheckout(any());
     }

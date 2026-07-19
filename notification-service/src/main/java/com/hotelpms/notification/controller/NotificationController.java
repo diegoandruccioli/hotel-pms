@@ -33,39 +33,46 @@ public class NotificationController {
     /**
      * Sends a reservation-confirmed email to the guest.
      *
+     * <p>Returns {@code 200 OK} with a {@code true} body rather than
+     * {@code 204 No Content}: the caller's {@code NotificationClient} declares
+     * a primitive {@code boolean} return type so Resilience4j's circuit-breaker
+     * proxy can report success/failure to the caller — decoding an empty
+     * no-content body into a primitive throws inside the proxy and is
+     * misread as a failure, marking every successful send as failed.
+     *
      * @param request the notification payload
-     * @return 204 No Content on success
+     * @return 200 OK with body {@code true} on success
      */
     @PostMapping("/reservation-confirmed")
-    public ResponseEntity<Void> reservationConfirmed(@Valid @RequestBody final ReservationConfirmedRequest request) {
+    public ResponseEntity<Boolean> reservationConfirmed(@Valid @RequestBody final ReservationConfirmedRequest request) {
         log.debug("[NOTIFY] reservation-confirmed request received");
         notificationService.sendReservationConfirmed(request);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(Boolean.TRUE);
     }
 
     /**
      * Sends a check-in welcome email to the guest.
      *
      * @param request the notification payload
-     * @return 204 No Content on success
+     * @return 200 OK with body {@code true} on success
      */
     @PostMapping("/checkin")
-    public ResponseEntity<Void> checkin(@Valid @RequestBody final CheckinNotificationRequest request) {
+    public ResponseEntity<Boolean> checkin(@Valid @RequestBody final CheckinNotificationRequest request) {
         log.debug("[NOTIFY] checkin request received");
         notificationService.sendCheckin(request);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(Boolean.TRUE);
     }
 
     /**
      * Sends a check-out summary email including invoice detail to the guest.
      *
      * @param request the notification payload
-     * @return 204 No Content on success
+     * @return 200 OK with body {@code true} on success
      */
     @PostMapping("/checkout")
-    public ResponseEntity<Void> checkout(@Valid @RequestBody final CheckoutNotificationRequest request) {
+    public ResponseEntity<Boolean> checkout(@Valid @RequestBody final CheckoutNotificationRequest request) {
         log.debug("[NOTIFY] checkout request received");
         notificationService.sendCheckout(request);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(Boolean.TRUE);
     }
 }

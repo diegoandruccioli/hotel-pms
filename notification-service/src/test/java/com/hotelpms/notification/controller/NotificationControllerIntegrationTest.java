@@ -39,6 +39,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SuppressWarnings({"null", "PMD.HardCodedCryptoKey"})
@@ -115,7 +116,8 @@ class NotificationControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req))
                         .headers(buildHmacHeaders()))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(content().string("true"));
 
         greenMail.waitForIncomingEmail(MAIL_WAIT_MS, 1);
         final MimeMessage[] messages = greenMail.getReceivedMessages();
@@ -142,7 +144,8 @@ class NotificationControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req))
                         .headers(buildHmacHeaders()))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(content().string("true"));
 
         greenMail.waitForIncomingEmail(MAIL_WAIT_MS, 1);
         final MimeMessage[] messages = greenMail.getReceivedMessages();
