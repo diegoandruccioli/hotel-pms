@@ -1,8 +1,8 @@
 package com.hotelpms.billing.service;
 
+import org.springframework.lang.NonNull;
+
 import java.util.UUID;
-
-
 
 /**
  * Generates PDF representations of invoices for download.
@@ -17,5 +17,5 @@ public interface PdfInvoiceService {
      * @param invoiceId the invoice UUID
      * @return raw PDF bytes ready to stream as {@code application/pdf}
      */
-    byte[] generateInvoicePdf(UUID invoiceId);
+    byte[] generateInvoicePdf(@NonNull UUID invoiceId);
 }

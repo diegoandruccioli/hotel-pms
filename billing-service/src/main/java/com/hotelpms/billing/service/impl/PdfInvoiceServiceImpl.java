@@ -68,7 +68,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
 
     /** {@inheritDoc} */
     @Override
-    public byte[] generateInvoicePdf(final UUID invoiceId) {
+    public byte[] generateInvoicePdf(@NonNull final UUID invoiceId) {
         log.info("Generating PDF for invoice {}", invoiceId);
         final InvoiceResponse invoice = invoiceService.getInvoice(invoiceId);
         final HotelSettingsResponse hotel = hotelSettingsClient.getSettings();

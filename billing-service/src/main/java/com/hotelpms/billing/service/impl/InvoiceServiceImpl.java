@@ -180,7 +180,10 @@ public class InvoiceServiceImpl implements InvoiceService {
                 safePageable);
 
         final Map<UUID, String> guestNames = resolveGuestNames(
-                results.getContent().stream().map(Invoice::getGuestId).distinct().toList());
+                results.getContent().stream()
+                        .map((@NonNull Invoice invoice) -> invoice.getGuestId())
+                        .distinct()
+                        .toList());
 
         return results.map(invoice -> new InvoiceSearchResultResponse(
                 invoiceMapper.toResponse(invoice), guestNames.get(invoice.getGuestId())));
@@ -198,7 +201,7 @@ public class InvoiceServiceImpl implements InvoiceService {
      */
     private List<UUID> resolveGuestIds(final String query) {
         return guestClient.searchGuests(query, GUEST_SEARCH_MATCH_CAP).content().stream()
-                .map(GuestResponse::id)
+                .map((@NonNull GuestResponse gr) -> gr.id())
                 .toList();
     }
 
@@ -216,7 +219,7 @@ public class InvoiceServiceImpl implements InvoiceService {
             return Map.of();
         }
         return guestClient.getGuestsBatch(guestIds).stream()
-                .collect(Collectors.toMap(GuestResponse::id,
+                .collect(Collectors.toMap((@NonNull GuestResponse gr) -> gr.id(),
                         g -> (g.firstName() + " " + g.lastName()).trim(),
                         (first, second) -> first));
     }
