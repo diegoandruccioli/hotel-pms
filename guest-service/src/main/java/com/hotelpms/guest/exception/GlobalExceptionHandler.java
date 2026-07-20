@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private static final String TIMESTAMP_FIELD = "timestamp";
+    private static final String REQUEST_VALIDATION_ERROR_TITLE = "Request Validation Error";
+    private static final String BAD_REQUEST_ERROR_TYPE = "https://hotel-pms.com/errors/bad-request";
 
     /**
      * Handles GdprLegalHoldException — returns HTTP 451 Unavailable For Legal
@@ -71,8 +73,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(GuestValidationException.class)
     public ProblemDetail handleGuestValidationException(final GuestValidationException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
-        problemDetail.setTitle("Request Validation Error");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/bad-request")));
+        problemDetail.setTitle(REQUEST_VALIDATION_ERROR_TITLE);
+        problemDetail.setType(Objects.requireNonNull(URI.create(BAD_REQUEST_ERROR_TYPE)));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
@@ -104,8 +106,8 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleValidationExceptions(final MethodArgumentNotValidException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
                 "VALIDATION_FAILED");
-        problemDetail.setTitle("Request Validation Error");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/bad-request")));
+        problemDetail.setTitle(REQUEST_VALIDATION_ERROR_TITLE);
+        problemDetail.setType(Objects.requireNonNull(URI.create(BAD_REQUEST_ERROR_TYPE)));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
 
         final List<String> errors = ex.getBindingResult()
@@ -128,8 +130,8 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleHttpMessageNotReadableException(final HttpMessageNotReadableException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
                 "INVALID_JSON_PAYLOAD");
-        problemDetail.setTitle("Request Validation Error");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/bad-request")));
+        problemDetail.setTitle(REQUEST_VALIDATION_ERROR_TITLE);
+        problemDetail.setType(Objects.requireNonNull(URI.create(BAD_REQUEST_ERROR_TYPE)));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }

@@ -67,6 +67,8 @@ class GuestServiceImplTest {
     private static final String TEST_CITY = "Anytown";
     private static final String TEST_COUNTRY = "Country";
     private static final String DOC_NUMBER = "AB123456";
+    private static final String COMUNE_ROMA = "Roma";
+    private static final String PROVINCIA_RM = "RM";
 
     @Mock
     private GuestRepository guestRepository;
@@ -185,12 +187,12 @@ class GuestServiceImplTest {
                 TEST_FIRST_NAME, TEST_LAST_NAME, TEST_EMAIL,
                 TEST_PHONE, TEST_ADDRESS, TEST_CITY, TEST_COUNTRY, null,
                 null, null, null, null, null,
-                "00100", "Roma", "RM");
+                "00100", COMUNE_ROMA, PROVINCIA_RM);
         final Guest nonNullGuest = Objects.requireNonNull(guest);
         final GuestResponse nonNullGuestResponse = Objects.requireNonNull(guestResponse);
 
-        when(alloggiatiComuniClient.searchComuni("Roma", "RM"))
-                .thenReturn(List.of(new AlloggiatiComuneClientResponse("058091", "Roma", "RM")));
+        when(alloggiatiComuniClient.searchComuni(COMUNE_ROMA, PROVINCIA_RM))
+                .thenReturn(List.of(new AlloggiatiComuneClientResponse("058091", COMUNE_ROMA, PROVINCIA_RM)));
         when(guestMapper.toEntity(requestWithAddress)).thenReturn(nonNullGuest);
         when(guestRepository.save(nonNullGuest)).thenReturn(nonNullGuest);
         when(guestMapper.toResponse(nonNullGuest)).thenReturn(nonNullGuestResponse);
@@ -207,9 +209,9 @@ class GuestServiceImplTest {
                 TEST_FIRST_NAME, TEST_LAST_NAME, TEST_EMAIL,
                 null, null, null, null, null,
                 null, null, null, null, null,
-                null, "Cittainesistente", "RM");
+                null, "Cittainesistente", PROVINCIA_RM);
 
-        when(alloggiatiComuniClient.searchComuni("Cittainesistente", "RM")).thenReturn(List.of());
+        when(alloggiatiComuniClient.searchComuni("Cittainesistente", PROVINCIA_RM)).thenReturn(List.of());
 
         assertThrows(GuestValidationException.class, () -> guestService.createGuest(requestWithBadComune));
         verify(guestRepository, never()).save(any());
@@ -221,7 +223,7 @@ class GuestServiceImplTest {
                 TEST_FIRST_NAME, TEST_LAST_NAME, TEST_EMAIL,
                 null, null, null, null, null,
                 null, null, null, null, null,
-                null, "Roma", null);
+                null, COMUNE_ROMA, null);
 
         assertThrows(GuestValidationException.class, () -> guestService.createGuest(requestWithoutProvincia));
     }
