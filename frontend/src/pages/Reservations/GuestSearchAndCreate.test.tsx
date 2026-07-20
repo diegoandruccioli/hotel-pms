@@ -67,6 +67,29 @@ describe('GuestSearchAndCreate', () => {
     await waitFor(() => expect(onSelectGuest).toHaveBeenCalledWith(GUEST));
   });
 
+  it('searches guests on input change and selects a suggestion', async () => {
+    vi.mocked(guestService.searchGuests).mockResolvedValue([GUEST] as never);
+    render(<GuestSearchAndCreate selectedGuest={null} onSelectGuest={onSelectGuest} onClearGuest={onClearGuest} />);
+
+    fireEvent.change(screen.getByLabelText('search_guest_placeholder'), { target: { value: 'John' } });
+
+    await waitFor(() => expect(guestService.searchGuests).toHaveBeenCalledWith('John'), { timeout: 1000 });
+    const suggestion = await screen.findByText('John Doe');
+    fireEvent.click(suggestion);
+
+    expect(onSelectGuest).toHaveBeenCalledWith(GUEST);
+  });
+
+  it('shows the empty-results message when search returns no suggestions', async () => {
+    vi.mocked(guestService.searchGuests).mockResolvedValue([] as never);
+    render(<GuestSearchAndCreate selectedGuest={null} onSelectGuest={onSelectGuest} onClearGuest={onClearGuest} />);
+
+    fireEvent.change(screen.getByLabelText('search_guest_placeholder'), { target: { value: 'Nobody' } });
+
+    await waitFor(() => expect(guestService.searchGuests).toHaveBeenCalledWith('Nobody'), { timeout: 1000 });
+    expect(await screen.findByText('no_guests_search')).toBeInTheDocument();
+  });
+
   it('passes axe accessibility check on search view', async () => {
     const { container } = render(
       <GuestSearchAndCreate selectedGuest={null} onSelectGuest={onSelectGuest} onClearGuest={onClearGuest} />
