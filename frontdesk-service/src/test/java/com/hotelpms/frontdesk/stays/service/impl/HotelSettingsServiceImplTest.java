@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class HotelSettingsServiceImplTest {
 
     private static final String HOTEL_USERNAME = "hotelUser";
