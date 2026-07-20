@@ -19,10 +19,6 @@ import java.util.TreeMap;
 @Component
 public class VatBreakdownCalculator {
 
-    /** Taxable base and VAT for one charge or one VAT-rate group. */
-    public record VatLine(BigDecimal taxable, BigDecimal vat) {
-    }
-
     /**
      * Splits a single gross amount into taxable base and VAT at the given rate.
      * VAT is derived by subtraction ({@code gross - taxable}), not an independent
@@ -78,13 +74,23 @@ public class VatBreakdownCalculator {
         if (charges == null || charges.isEmpty()) {
             return;
         }
-        final BigDecimal sum = charges.stream()
-                .map(ChargeResponse::amount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sum = BigDecimal.ZERO;
+        for (final ChargeResponse charge : charges) {
+            sum = sum.add(charge.amount());
+        }
         final BigDecimal total = totalAmount != null ? totalAmount : BigDecimal.ZERO;
         if (sum.compareTo(total) != 0) {
             throw new BillingValidationException(
                     "INVOICE_TOTAL_MISMATCH: charges sum=" + sum + " but invoice totalAmount=" + total);
         }
+    }
+
+    /**
+     * Taxable base and VAT for one charge or one VAT-rate group.
+     *
+     * @param taxable the taxable base (imponibile)
+     * @param vat     the VAT amount (imposta)
+     */
+    public record VatLine(BigDecimal taxable, BigDecimal vat) {
     }
 }
