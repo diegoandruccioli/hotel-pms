@@ -163,7 +163,8 @@ public class GuestServiceImpl implements GuestService {
         if (!hasComune || !hasProvincia) {
             throw new GuestValidationException("COMUNE_AND_PROVINCIA_MUST_BE_PROVIDED_TOGETHER");
         }
-        final boolean matches = alloggiatiComuniClient.searchComuni(comune, provincia.toUpperCase(java.util.Locale.ROOT))
+        final boolean matches = alloggiatiComuniClient.searchComuni(
+                        comune, Objects.requireNonNull(provincia).toUpperCase(java.util.Locale.ROOT))
                 .stream()
                 .anyMatch(c -> c.descrizione().equalsIgnoreCase(comune));
         if (!matches) {
