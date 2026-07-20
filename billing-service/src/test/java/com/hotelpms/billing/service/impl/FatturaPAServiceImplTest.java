@@ -48,6 +48,11 @@ class FatturaPAServiceImplTest {
     private static final UUID RES_ID = Objects.requireNonNull(UUID.fromString("00000000-0000-0000-0000-000000000004"));
     private static final int ISSUE_YEAR = 2026;
     private static final int ISSUE_DAY = 15;
+    private static final String HOTEL_NAME = "Hotel Test";
+    private static final String GUEST_FIRST_NAME = "Mario";
+    private static final String GUEST_LAST_NAME = "Rossi";
+    private static final String GUEST_EMAIL = "mario@rossi.it";
+    private static final String GUEST_ADDRESS = "Via Milano 5";
 
     @Mock
     private InvoiceService invoiceService;
@@ -56,7 +61,7 @@ class FatturaPAServiceImplTest {
     @Mock
     private GuestClient guestClient;
     @Spy
-    private VatBreakdownCalculator vatBreakdownCalculator = new VatBreakdownCalculator();
+    private final VatBreakdownCalculator vatBreakdownCalculator = new VatBreakdownCalculator();
 
     @InjectMocks
     private FatturaPAServiceImpl service;
@@ -66,11 +71,11 @@ class FatturaPAServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        hotel = new HotelSettingsResponse(HOTEL_ID, "Hotel Test", "Via Roma 1", "12345678901", "TSTDNL80A01H501W", null,
+        hotel = new HotelSettingsResponse(HOTEL_ID, HOTEL_NAME, "Via Roma 1", "12345678901", "TSTDNL80A01H501W", null,
                 "00100", "Roma", "RM");
-        guest = new GuestResponse(GUEST_ID, "Mario", "Rossi", "mario@rossi.it",
+        guest = new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL,
                 "RSSMRA80A01H501T", null, null, "ABC1234", null,
-                "Via Milano 5", "20100", "Milano", "MI");
+                GUEST_ADDRESS, "20100", "Milano", "MI");
     }
 
     @Test
@@ -88,7 +93,7 @@ class FatturaPAServiceImplTest {
         assertThat(xmlStr).contains("FPR12");
         assertThat(xmlStr).contains("TD01");
         assertThat(xmlStr).contains("EUR");
-        assertThat(xmlStr).contains("Hotel Test");
+        assertThat(xmlStr).contains(HOTEL_NAME);
         assertThat(xmlStr).contains("ABC1234");
         // invoice total must appear in the fallback line (no charges → use totalAmount)
         assertThat(xmlStr).contains("100.00"); // imponibile of 110.00 at 10% VAT
@@ -111,9 +116,9 @@ class FatturaPAServiceImplTest {
 
     @Test
     void shouldFallbackToDefaultDestinatarioWhenNoSdiCode() {
-        final GuestResponse noSdi = new GuestResponse(GUEST_ID, "Mario", "Rossi",
-                "mario@rossi.it", null, null, null, null, null,
-                "Via Milano 5", "20100", "Milano", "MI");
+        final GuestResponse noSdi = new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME,
+                GUEST_EMAIL, null, null, null, null, null,
+                GUEST_ADDRESS, "20100", "Milano", "MI");
         final InvoiceResponse invoice = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
         when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
         when(hotelSettingsClient.getSettings()).thenReturn(hotel);
@@ -127,7 +132,7 @@ class FatturaPAServiceImplTest {
     @Test
     void shouldRejectExportWhenHotelStructuredAddressIsIncomplete() {
         final HotelSettingsResponse incompleteHotel = new HotelSettingsResponse(
-                HOTEL_ID, "Hotel Test", "Via Roma 1", "12345678901", "TSTDNL80A01H501W", null,
+                HOTEL_ID, HOTEL_NAME, "Via Roma 1", "12345678901", "TSTDNL80A01H501W", null,
                 null, null, null);
         final InvoiceResponse invoice = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
         when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
@@ -141,9 +146,9 @@ class FatturaPAServiceImplTest {
 
     @Test
     void shouldRejectExportWhenGuestStructuredAddressIsIncomplete() {
-        final GuestResponse incompleteGuest = new GuestResponse(GUEST_ID, "Mario", "Rossi",
-                "mario@rossi.it", null, null, null, null, null,
-                "Via Milano 5", null, null, null);
+        final GuestResponse incompleteGuest = new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME,
+                GUEST_EMAIL, null, null, null, null, null,
+                GUEST_ADDRESS, null, null, null);
         final InvoiceResponse invoice = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
         when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
         when(hotelSettingsClient.getSettings()).thenReturn(hotel);

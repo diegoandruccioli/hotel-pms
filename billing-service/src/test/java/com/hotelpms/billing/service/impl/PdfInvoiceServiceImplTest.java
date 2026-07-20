@@ -68,7 +68,7 @@ class PdfInvoiceServiceImplTest {
     @Mock
     private PdfTemplateRenderer pdfTemplateRenderer;
     @Spy
-    private VatBreakdownCalculator vatBreakdownCalculator = new VatBreakdownCalculator();
+    private final VatBreakdownCalculator vatBreakdownCalculator = new VatBreakdownCalculator();
 
     @InjectMocks
     private PdfInvoiceServiceImpl pdfInvoiceService;

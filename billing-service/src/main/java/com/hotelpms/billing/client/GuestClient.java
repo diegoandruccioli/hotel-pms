@@ -37,7 +37,8 @@ public interface GuestClient {
      * @return a default GuestResponse
      */
     default GuestResponse getGuestFallback(final UUID id, final Throwable throwable) {
-        return new GuestResponse(id, "Unknown", "Guest", "unknown@guest.com", null, null, null, null, null, null, null, null, null);
+        return new GuestResponse(
+                id, "Unknown", "Guest", "unknown@guest.com", null, null, null, null, null, null, null, null, null);
     }
 
     /**

@@ -598,7 +598,8 @@ class InvoiceServiceImplTest {
                 when(guestClient.searchGuests(QUERY_MARIO, GUEST_SEARCH_CAP))
                                 .thenReturn(new GuestSearchPageResponse(List.of(
                                                 new GuestResponse(otherGuestId, "Mario", "Bianchi",
-                                                                "mario.b@test.com", null, null, null, null, null, null, null, null, null))));
+                                                                "mario.b@test.com", null, null, null, null, null,
+                                                                null, null, null, null))));
                 when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
                                 eq(QUERY_MARIO), eq(List.of(otherGuestId)), eq(pageable)))
                                 .thenReturn(new PageImpl<>(List.of()));

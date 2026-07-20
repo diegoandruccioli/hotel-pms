@@ -19,22 +19,24 @@ class VatBreakdownCalculatorTest {
     private static final BigDecimal VAT_RATE_10 = new BigDecimal("0.10");
     private static final BigDecimal VAT_RATE_22 = new BigDecimal("0.22");
     private static final UUID INVOICE_ID = UUID.randomUUID();
+    private static final BigDecimal GROSS_110 = new BigDecimal("110.00");
+    private static final BigDecimal UNRELATED_TOTAL = new BigDecimal("999.00");
 
     private final VatBreakdownCalculator calculator = new VatBreakdownCalculator();
 
     @Test
     void splitLineReconstructsGrossAmountExactly() {
-        final VatBreakdownCalculator.VatLine line = calculator.splitLine(new BigDecimal("110.00"), VAT_RATE_10);
+        final VatBreakdownCalculator.VatLine line = calculator.splitLine(GROSS_110, VAT_RATE_10);
 
         assertThat(line.taxable()).isEqualByComparingTo("100.00");
         assertThat(line.vat()).isEqualByComparingTo("10.00");
-        assertThat(line.taxable().add(line.vat())).isEqualByComparingTo("110.00");
+        assertThat(line.taxable().add(line.vat())).isEqualByComparingTo(GROSS_110);
     }
 
     @Test
     void groupByRateSumsChargesWithTheSameRate() {
         final List<ChargeResponse> charges = List.of(
-                charge(new BigDecimal("110.00"), VAT_RATE_10),
+                charge(GROSS_110, VAT_RATE_10),
                 charge(new BigDecimal("55.00"), VAT_RATE_10),
                 charge(new BigDecimal("12.20"), VAT_RATE_22));
 
@@ -56,7 +58,7 @@ class VatBreakdownCalculatorTest {
     @Test
     void assertReconcilesPassesWhenSumMatchesTotal() {
         final List<ChargeResponse> charges = List.of(
-                charge(new BigDecimal("110.00"), VAT_RATE_10),
+                charge(GROSS_110, VAT_RATE_10),
                 charge(new BigDecimal("12.20"), VAT_RATE_22));
 
         calculator.assertReconciles(new BigDecimal("122.20"), charges);
@@ -64,15 +66,15 @@ class VatBreakdownCalculatorTest {
 
     @Test
     void assertReconcilesIsANoOpForNullOrEmptyCharges() {
-        calculator.assertReconciles(new BigDecimal("999.00"), null);
-        calculator.assertReconciles(new BigDecimal("999.00"), List.of());
+        calculator.assertReconciles(UNRELATED_TOTAL, null);
+        calculator.assertReconciles(UNRELATED_TOTAL, List.of());
     }
 
     @Test
     void assertReconcilesThrowsWhenSumDisagreesWithTotal() {
-        final List<ChargeResponse> charges = List.of(charge(new BigDecimal("110.00"), VAT_RATE_10));
+        final List<ChargeResponse> charges = List.of(charge(GROSS_110, VAT_RATE_10));
 
-        assertThatThrownBy(() -> calculator.assertReconciles(new BigDecimal("999.00"), charges))
+        assertThatThrownBy(() -> calculator.assertReconciles(UNRELATED_TOTAL, charges))
                 .isInstanceOf(BillingValidationException.class)
                 .hasMessageContaining("INVOICE_TOTAL_MISMATCH");
     }

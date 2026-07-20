@@ -16,4 +16,20 @@
         <Class name="com.hotelpms.billing.security.RedisNonceStore"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+    <!--
+      UrF on vatBreakdownCalculator in these two test classes: the field is a
+      Mockito @Spy used only for @InjectMocks wiring — Mockito assigns it into
+      the service under test via reflection, so it is never dereferenced
+      directly in test code. SpotBugs' static analysis cannot see that usage.
+    -->
+    <Match>
+        <Class name="com.hotelpms.billing.service.impl.FatturaPAServiceImplTest"/>
+        <Field name="vatBreakdownCalculator"/>
+        <Bug pattern="URF_UNREAD_FIELD"/>
+    </Match>
+    <Match>
+        <Class name="com.hotelpms.billing.service.impl.PdfInvoiceServiceImplTest"/>
+        <Field name="vatBreakdownCalculator"/>
+        <Bug pattern="URF_UNREAD_FIELD"/>
+    </Match>
 </FindBugsFilter>
