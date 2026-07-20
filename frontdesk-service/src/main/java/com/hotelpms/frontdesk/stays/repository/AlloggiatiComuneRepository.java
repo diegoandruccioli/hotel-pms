@@ -16,6 +16,9 @@ import java.util.List;
 @Repository
 public interface AlloggiatiComuneRepository extends JpaRepository<AlloggiatiComune, String> {
 
+    /** Named-parameter key shared by the {@code :today} placeholder across the queries below. */
+    String TODAY_PARAM = "today";
+
     /**
      * Returns all comuni whose validity has not expired.
      *
@@ -23,7 +26,7 @@ public interface AlloggiatiComuneRepository extends JpaRepository<AlloggiatiComu
      * @return list of active comuni
      */
     @Query("SELECT c FROM AlloggiatiComune c WHERE c.dataFineVal IS NULL OR c.dataFineVal > :today")
-    List<AlloggiatiComune> findActive(@Param("today") LocalDate today);
+    List<AlloggiatiComune> findActive(@Param(TODAY_PARAM) LocalDate today);
 
     /**
      * Returns comuni for a given province whose validity has not expired.
@@ -36,7 +39,7 @@ public interface AlloggiatiComuneRepository extends JpaRepository<AlloggiatiComu
             + "AND (c.dataFineVal IS NULL OR c.dataFineVal > :today)")
     List<AlloggiatiComune> findActiveByProvincia(
             @Param("provincia") String provincia,
-            @Param("today") LocalDate today);
+            @Param(TODAY_PARAM) LocalDate today);
 
     /**
      * Full-text search on comune name, optionally filtered by province.
@@ -56,7 +59,7 @@ public interface AlloggiatiComuneRepository extends JpaRepository<AlloggiatiComu
     List<AlloggiatiComune> searchActive(
             @Param("term") String term,
             @Param("provincia") String provincia,
-            @Param("today") LocalDate today,
+            @Param(TODAY_PARAM) LocalDate today,
             Pageable pageable);
 
     /**
@@ -75,5 +78,5 @@ public interface AlloggiatiComuneRepository extends JpaRepository<AlloggiatiComu
     boolean existsActiveByComuneAndProvincia(
             @Param("comune") String comune,
             @Param("provincia") String provincia,
-            @Param("today") LocalDate today);
+            @Param(TODAY_PARAM) LocalDate today);
 }

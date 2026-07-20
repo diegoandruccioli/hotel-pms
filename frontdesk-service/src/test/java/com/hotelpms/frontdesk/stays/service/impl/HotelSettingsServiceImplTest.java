@@ -36,6 +36,8 @@ class HotelSettingsServiceImplTest {
     private static final String HOTEL_USERNAME = "hotelUser";
     private static final String ENCRYPTED_PASSWORD = "enc-pass";
     private static final String ENCRYPTED_WS_KEY = "enc-key";
+    private static final String COMUNE_ROMA = "Roma";
+    private static final String PROVINCIA_RM = "RM";
 
     @Mock
     private HotelSettingsRepository hotelSettingsRepository;
@@ -171,7 +173,7 @@ class HotelSettingsServiceImplTest {
         assertEquals(ENCRYPTED_PASSWORD, existing.getAlloggiatiPasswordEncrypted());
         assertEquals(ENCRYPTED_WS_KEY, existing.getAlloggiatiWsKeyEncrypted());
         assertTrue(result.alloggiatiCredentialsConfigured());
-        verify(alloggiatiCredentialEncryptor, times(0)).encrypt(org.mockito.ArgumentMatchers.any());
+        verify(alloggiatiCredentialEncryptor, times(0)).encrypt(ArgumentMatchers.any());
     }
 
     @Test
@@ -231,15 +233,15 @@ class HotelSettingsServiceImplTest {
         when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
         when(hotelSettingsRepository.save(existing)).thenReturn(existing);
         when(alloggiatiComuneRepository.existsActiveByComuneAndProvincia(
-                "Roma", "RM", LocalDate.now())).thenReturn(true);
+                COMUNE_ROMA, PROVINCIA_RM, LocalDate.now())).thenReturn(true);
 
         final HotelSettingsResponse result = hotelSettingsService.update(hotelId, new HotelSettingsRequest(
                 null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, "00100", "Roma", "RM"));
+                null, null, null, null, null, "00100", COMUNE_ROMA, PROVINCIA_RM));
 
         assertEquals("00100", result.cap());
-        assertEquals("Roma", result.comune());
-        assertEquals("RM", result.provincia());
+        assertEquals(COMUNE_ROMA, result.comune());
+        assertEquals(PROVINCIA_RM, result.provincia());
     }
 
     @Test
@@ -250,11 +252,11 @@ class HotelSettingsServiceImplTest {
 
         when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
         when(alloggiatiComuneRepository.existsActiveByComuneAndProvincia(
-                "Cittainesistente", "RM", LocalDate.now())).thenReturn(false);
+                "Cittainesistente", PROVINCIA_RM, LocalDate.now())).thenReturn(false);
 
         final HotelSettingsRequest request = new HotelSettingsRequest(
                 null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, "Cittainesistente", "RM");
+                null, null, null, null, null, null, "Cittainesistente", PROVINCIA_RM);
 
         assertThrows(BadRequestException.class, () -> hotelSettingsService.update(hotelId, request));
         verify(hotelSettingsRepository, times(0)).save(ArgumentMatchers.any());
@@ -270,7 +272,7 @@ class HotelSettingsServiceImplTest {
 
         final HotelSettingsRequest request = new HotelSettingsRequest(
                 null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, "Roma", null);
+                null, null, null, null, null, null, COMUNE_ROMA, null);
 
         assertThrows(BadRequestException.class, () -> hotelSettingsService.update(hotelId, request));
     }
