@@ -233,7 +233,7 @@ jobs:
         image:
           - postgres:15-alpine
           - redis:alpine
-          - grafana/grafana:11.5.0
+          - grafana/grafana:12.4.6
 
     steps:
       - name: Checkout repository
