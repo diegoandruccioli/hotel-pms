@@ -55,7 +55,7 @@ public class AlloggiatiLookupServiceImpl implements AlloggiatiLookupService {
     @Override
     @Transactional(readOnly = true)
     public List<AlloggiatiComune> findComuniByProvincia(final String provincia) {
-        log.debug("Fetching active comuni for provincia: {}", provincia);
+        log.debug("Fetching active comuni for provincia: {}", sanitizeForLog(provincia));
         return comuneRepository.findActiveByProvincia(provincia, LocalDate.now());
     }
 
@@ -98,11 +98,15 @@ public class AlloggiatiLookupServiceImpl implements AlloggiatiLookupService {
     @Override
     @Transactional(readOnly = true)
     public List<AlloggiatiComune> searchComuni(final String query, final String provincia) {
-        log.debug("Searching comuni query='{}' provincia='{}'", query, provincia);
+        log.debug("Searching comuni query='{}' provincia='{}'", sanitizeForLog(query), sanitizeForLog(provincia));
         return comuneRepository.searchActive(
                 query,
                 (provincia != null && !provincia.isBlank()) ? provincia : null,
                 LocalDate.now(),
                 PageRequest.of(0, AUTOCOMPLETE_MAX_RESULTS));
+    }
+
+    private static String sanitizeForLog(final String value) {
+        return value == null ? null : value.replaceAll("[\r\n]", "_");
     }
 }

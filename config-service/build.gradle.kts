@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.5.14"
+    id("org.springframework.boot") version "3.5.16"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.danilopianini.gradle-java-qa") version "1.165.0"
 }
@@ -30,8 +30,8 @@ repositories {
 
 ext {
     set("springCloudVersion", "2025.0.0")
-    // CVE-2026-42583/42584/42579/42587: fixed in 4.1.133.Final; CVE-2026-47691/45674/45416/44249: fixed in 4.1.135.Final — override Spring Boot BOM pin.
-    set("netty.version", "4.1.135.Final")
+    // CVE-2026-42583/42584/42579/42587: fixed in 4.1.133.Final; CVE-2026-47691/45674/45416/44249: fixed in 4.1.135.Final; CVE-2026-56745/55833/55831/59901: fixed in 4.1.136.Final — override Spring Boot BOM pin.
+    set("netty.version", "4.1.136.Final")
     // CVE-2026-43512/43513/43515/41284/41293/42498: fixed in Tomcat 10.1.55 (2026-05-05).
     set("tomcat.version", "10.1.55")
 }
