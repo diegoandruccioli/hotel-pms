@@ -232,7 +232,7 @@ jobs:
       matrix:
         image:
           - postgres:15-alpine
-          - redis:alpine
+          - redis:8.8.1-alpine
           - grafana/grafana:12.4.6
 
     steps:
