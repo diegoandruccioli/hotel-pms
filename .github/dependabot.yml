@@ -118,3 +118,13 @@ updates:
     schedule:
       interval: "weekly"
     labels: ["dependencies", "docker"]
+
+  # ── Infra images referenced only in docker-compose.yml (not a Dockerfile) ──
+  # Sprint 1 audit (2026-07-25): postgres/redis/loki/grafana/zipkin/prometheus/
+  # alertmanager were previously unmonitored — only the 9 service Dockerfiles above
+  # had coverage. Directory "/" picks up docker-compose.yml at repo root.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "docker", "infra"]

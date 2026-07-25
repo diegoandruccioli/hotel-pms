@@ -103,7 +103,7 @@ services:
   # nonce store (T-GW-08, all 5 InternalAuthFilter validators)
   # ----------------------------------------------------------
   redis:
-    image: redis:alpine
+    image: redis:8.8.1-alpine
     container_name: hotel_redis
     restart: unless-stopped
     ports:
@@ -192,7 +192,7 @@ services:
   # Zipkin - Distributed Tracing
   # ----------------------------------------------------------
   zipkin:
-    image: openzipkin/zipkin
+    image: openzipkin/zipkin:3.6.1
     container_name: hotel_zipkin
     restart: unless-stopped
     profiles: ["observability"]
@@ -250,7 +250,7 @@ services:
   # Prometheus - Metrics and Monitoring
   # ----------------------------------------------------------
   prometheus:
-    image: prom/prometheus
+    image: prom/prometheus:v3.13.1
     container_name: hotel_prometheus
     restart: unless-stopped
     profiles: ["observability"]
