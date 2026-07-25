@@ -11,11 +11,6 @@ on:
       - main
 
 
-# Opt into Node.js 24 for all JavaScript-based actions to silence
-# the Node.js 20 deprecation warning (removal scheduled Sep 2026).
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 # ══════════════════════════════════════════════════════════════════════════════
 jobs:
 
@@ -28,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 21 (Temurin)
         uses: actions/setup-java@v4
@@ -37,7 +32,7 @@ jobs:
           distribution: temurin
 
       - name: Cache Gradle packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.gradle/caches
@@ -50,7 +45,7 @@ jobs:
 
       - name: Upload test and quality reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-reports
           path: |
@@ -63,7 +58,7 @@ jobs:
       # Trivy and E2E jobs download this artifact to build Docker images
       # without re-running Gradle (avoids Maven Central rate limiting).
       - name: Upload Spring Boot JARs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: spring-boot-jars
           path: "**/build/libs/*-SNAPSHOT.jar"
@@ -79,10 +74,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -157,19 +152,19 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Restore the pre-built JARs from the backend job so docker build
       # can COPY them without running Gradle (avoids Maven Central calls).
       # Frontend matrix entry ignores the JARs; its Dockerfile uses context ./frontend.
       - name: Download Spring Boot JARs
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: spring-boot-jars
           path: .
 
       - name: Cache Trivy DB
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/trivy
           key: trivy-db-${{ github.run_id }}
@@ -242,10 +237,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Cache Trivy DB
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/trivy
           key: trivy-db-${{ github.run_id }}
@@ -302,10 +297,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -316,7 +311,7 @@ jobs:
         run: npm ci
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       # All Playwright tests intercept every API call via page.route() before
       # it reaches the network — no backend service is needed at runtime.
@@ -367,7 +362,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: frontend/playwright-report/
@@ -386,7 +381,7 @@ jobs:
 
       - name: Upload container logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docker-container-logs
           path: /tmp/docker-logs.txt
