@@ -28,7 +28,7 @@ This is a **production-grade enterprise PMS** validated for real hotel operation
 
 ### Complete and production-ready
 
-- 9 microservices, full RBAC (ADMIN / OWNER / RECEPTIONIST), JWT httpOnly + HMAC internal auth, CSRF, rate limiting
+- 8 microservices + 1 shared PDF-rendering library, full RBAC (ADMIN / OWNER / RECEPTIONIST), JWT httpOnly + HMAC internal auth, CSRF, rate limiting
 - Alloggiati Web v2.0 SOAP integration (art. 109 TULPS) — collaudo with real PS portal documented in [`docs/ALLOGGIATI_COLLAUDO_REALE.md`](docs/ALLOGGIATI_COLLAUDO_REALE.md)
 - F&B → room charge billing, walk-in check-in, multi-tenant data isolation (`hotel_id` on every entity)
 - GDPR Art. 20 data export, structured PII audit log, right-to-erasure anonymisation
@@ -105,16 +105,15 @@ graph TD
     subgraph SVC["Microservices"]
         Auth["Auth :8087"]
         Guest["Guest :8083"]
-        Inv["Inventory :8081"]
-        Res["Reservation :8082"]
-        Stay["Stay :8084"]
+        Frontdesk["Frontdesk :8081\n(rooms + reservations + stays)"]
         Bill["Billing :8085"]
         FB["F&amp;B :8086"]
+        Notif["Notification :8088\n(internal-only, no gateway route)"]
     end
 
     subgraph INFRA["Infrastructure"]
-        PG[("PostgreSQL :5432\none DB per service")]
-        Redis[("Redis :6379\nrate-limit store")]
+        PG[("PostgreSQL :5432\n5 databases, one per stateful service")]
+        Redis[("Redis :6379\nrate-limit, refresh-token blacklist, anti-replay nonce store")]
         Config["Config Server :8888"]
     end
 
@@ -147,11 +146,10 @@ graph TD
 | Config Server | `8888` | Infrastructure |
 | Auth Service | `8087` | Microservice |
 | Guest Service | `8083` | Microservice |
-| Inventory Service | `8081` | Microservice |
-| Reservation Service | `8082` | Microservice |
-| Stay Service | `8084` | Microservice |
+| Frontdesk Service (rooms, reservations, stays) | `8081` | Microservice |
 | Billing Service | `8085` | Microservice |
 | F&B Service | `8086` | Microservice |
+| Notification Service | `8088` | Microservice (internal-only, not routed by the gateway) |
 | PostgreSQL | `5432` | Database |
 | Redis | `6379` | Cache |
 | Zipkin | `9411` | Tracing |
@@ -183,15 +181,15 @@ Non-obvious choices made during development, with the reasoning behind each.
 
 | Decision | Chosen approach | Why | Alternative not chosen |
 |---|---|---|---|
-| **Service topology** | One PostgreSQL DB per microservice | True data isolation; no cross-service SQL JOINs; independent schema evolution via Flyway | Shared DB: simpler but creates coupling, blocks independent deployments, risks GDPR data leakage across tenants |
+| **Service topology** | One PostgreSQL DB per stateful microservice (5 DBs — `frontdesk-service` consolidates rooms/reservations/stays behind a single DB per ADR-001) | True data isolation; no cross-service SQL JOINs; independent schema evolution via Flyway | Shared DB: simpler but creates coupling, blocks independent deployments, risks GDPR data leakage across tenants |
 | **Auth token storage** | JWT in httpOnly cookies | Eliminates XSS token theft — browser never exposes the token to JavaScript | `localStorage`: simpler but vulnerable to XSS; rejected as a non-negotiable security baseline |
 | **Internal service auth** | HMAC-SHA256 on every Feign call (`X-Internal-Signature`) | Zero-trust between services: a compromised internal network cannot forge calls without the shared secret | Mutual TLS: stronger but requires certificate infrastructure not yet justified at this scale |
 | **Guest full-text search** | PostgreSQL `pg_trgm` GIN index | ILIKE `%keyword%` goes from O(n) full-table scan to O(log n) index scan; no additional infrastructure | Elasticsearch / OpenSearch: more powerful but adds a full search cluster for a problem PostgreSQL solves natively at single-hotel volumes |
 | **Invoice collection loading** | `@NamedEntityGraph` + `@EntityGraph` on repository | Eliminates N+1: `findByHotelId(pageable)` loads `charges` + `payments` in one LEFT JOIN instead of N separate queries per row | `@Transactional` + `Hibernate.initialize()`: works but couples service logic to persistence internals |
 | **Concurrent billing writes** | `@Version` optimistic locking on `Invoice` | F&B and billing can both add charges; Hibernate raises `OptimisticLockException` on conflict instead of silently overwriting data | Pessimistic lock (`SELECT FOR UPDATE`): serialises all writes, degrades throughput unnecessarily for low-contention workloads |
-| **Resilience** | Resilience4j `@CircuitBreaker` on all Feign clients | Graceful degradation: if `stay-service` is down, GDPR export returns partial data; check-in is never blocked by a `billing-service` outage | No circuit breaker: simpler code but a single service failure cascades to full system outage |
-| **Multi-tenancy** | `hotel_id` column on every entity, injected from JWT via API Gateway | Row-level isolation with no application-layer complexity; `hotel_id` is extracted from the verified JWT, never from client input | Schema-per-tenant: stronger isolation but 9× schema management overhead per hotel added |
-| **Why microservices at this scale** | 9 bounded contexts, independent deployability | Each domain (billing, stays, guests, inventory) has distinct data models and lifecycles; boundary design anticipates multi-hotel scaling and eventual Kubernetes deployment | Monolith: faster initial development but mixing billing/stay/GDPR domains creates long-term coupling that is harder to isolate for compliance audits |
+| **Resilience** | Resilience4j `@CircuitBreaker` on all Feign clients | Graceful degradation: if `frontdesk-service` is down, GDPR export returns partial data; check-in is never blocked by a `billing-service` outage | No circuit breaker: simpler code but a single service failure cascades to full system outage |
+| **Multi-tenancy** | `hotel_id` column on every entity, injected from JWT via API Gateway | Row-level isolation with no application-layer complexity; `hotel_id` is extracted from the verified JWT, never from client input; enforced at build time by an ArchUnit rule (`TenantIsolationArchTest`) so a missing-scope query fails CI, not production | Schema-per-tenant: stronger isolation but 5× schema management overhead per hotel added; Postgres Row-Level Security evaluated (ADR-004) and rejected — the real leaks found were missing application-layer filters, not something RLS would have caught better, and it adds real operational cost (`SET LOCAL` per request) |
+| **Why microservices at this scale** | 8 deployable services (`frontdesk-service` merges the former inventory/reservation/stay-service per ADR-001, since the actual bounded context — the shared Room↔Reservation↔Stay aggregate — was one domain split across 3 unrelated databases, not 3 independent ones) | Each remaining domain (billing, frontdesk, guests, F&B, auth, notifications) has a genuinely distinct data model and lifecycle; boundary design anticipates multi-hotel SaaS scaling and eventual Kubernetes deployment | Monolith: faster initial development but mixing billing/stay/GDPR domains creates long-term coupling that is harder to isolate for compliance audits |
 
 ---
 
@@ -315,9 +313,9 @@ hotel-pms/
 ├── config-service/        # Spring Cloud Config Server (native profile)
 ├── fb-service/            # Food & Beverage / Restaurant POS
 ├── guest-service/         # Guest profile management
-├── inventory-service/     # Room types and room inventory
-├── reservation-service/   # Booking management
-├── stay-service/          # Check-in / check-out / Alloggiati reports
+├── frontdesk-service/     # Rooms + reservations + check-in/check-out + Alloggiati (ADR-001 consolidation, package-by-feature: rooms/ reservations/ stays/)
+├── notification-service/  # Transactional email (reservation confirm, checkout) — internal-only
+├── pdf-template-engine/   # Shared library (plain Java, no Spring): renders fiscal PDFs for billing-service
 ├── frontend/              # React SPA (Vite + TypeScript + Tailwind)
 ├── docker/                # Docker init scripts (PostgreSQL multi-DB setup)
 ├── docs/                  # Technical documentation (architecture, security, user manual, audit)
@@ -371,10 +369,11 @@ See [`docs/PILOT_READINESS_AUDIT.md §5b`](docs/PILOT_READINESS_AUDIT.md) for pe
 
 | Branch | Role |
 |--------|------|
-| `main` | Final integrated state — build green, all tests pass |
-| `pre-secure-coding` | Baseline snapshot before security hardening (exam reference) |
-| `feature/secure-coding-hardening` | Full security hardening history — SHA cited in LaTeX report |
-| `feature/frontend-development` | Development branch (source of all feature work) |
+| `main` | Active development — build green, all tests pass. All work now lands here directly |
+| `pre-secure-coding` | Baseline snapshot before security hardening (exam reference) — architecturally stale, pre-dates the `frontdesk-service` consolidation, not a clean "pre-hardening-only" diff anymore |
+| `feature/secure-coding-hardening` | Full security hardening history — SHA cited in LaTeX report. Merged, frozen |
+| `feature/frontdesk-consolidation` | ADR-001: merges former inventory/reservation/stay-service into `frontdesk-service`. Merged, frozen |
+| `feature/frontend-development` | Historical — merged, ~257 commits behind `main`. Not an active development base despite the name |
 
 See [`docs/BRANCH_STRATEGY.md`](docs/BRANCH_STRATEGY.md) for full topology and governance rules.
 

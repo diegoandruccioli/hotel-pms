@@ -2,7 +2,7 @@
 
 **Metodologia**: STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege)  
 **Branch di riferimento**: `feature/secure-coding-hardening`  
-**Data ultima revisione**: 2026-04-15  
+**Data ultima revisione**: 2026-07-25  
 **Autore**: Diego Andruccioli
 
 ---
@@ -15,11 +15,12 @@
 | Token JWT (access + refresh) | CRITICO | auth-service, api-gateway |
 | Segreti di configurazione (HMAC key, JWT secret) | CRITICO | config-service |
 | Dati ospiti (PII: nome, documento, nazionalità) | ALTO | guest-service |
-| Dati di prenotazione | ALTO | reservation-service |
-| Report Alloggiati (dati PS) | ALTO | stay-service |
+| Dati di prenotazione | ALTO | frontdesk-service (ex reservation-service, consolidato ADR-001) |
+| Report Alloggiati (dati PS) | ALTO | frontdesk-service (ex stay-service, consolidato ADR-001) |
 | Dati di fatturazione | ALTO | billing-service |
 | Ordini F&B collegati a camera | MEDIO | fb-service |
-| Disponibilità camere | MEDIO | inventory-service |
+| Disponibilità camere | MEDIO | frontdesk-service (ex inventory-service, consolidato ADR-001) |
+| Notifiche email transazionali (indirizzo ospite in corpo/subject) | MEDIO | notification-service |
 
 ---
 
@@ -30,18 +31,18 @@
       │  HTTPS (cookie httpOnly)
       ▼
 [API Gateway :8080]  ← JWT validation, rate limiting (Redis), CORS, headers HTTP
-      │  X-Auth-User / X-Auth-Role / X-Internal-Signature
-      ├──► [auth-service :8087]        ← login, register, refresh token
-      ├──► [guest-service :8083]       ← CRUD ospiti
-      ├──► [inventory-service :8081]   ← disponibilità camere
-      ├──► [reservation-service :8082] ← prenotazioni
-      ├──► [stay-service :8084]        ← check-in/out, alloggiati
-      ├──► [billing-service :8085]     ← fatture, pagamenti
-      └──► [fb-service :8086]          ← POS F&B
+      │  X-Auth-User / X-Auth-Role / X-Auth-Hotel / X-Internal-Signature
+      ├──► [auth-service :8087]         ← login, register, refresh token
+      ├──► [guest-service :8083]        ← CRUD ospiti
+      ├──► [frontdesk-service :8081]    ← rooms, prenotazioni, check-in/out, alloggiati (ADR-001: ex inventory+reservation+stay-service)
+      │        │
+      │        └──► [notification-service :8088]  ← email transazionali (nessuna route gateway, solo rete interna)
+      ├──► [billing-service :8085]      ← fatture, pagamenti
+      └──► [fb-service :8086]           ← POS F&B
              │
              └── (direct, no gateway) ← [config-service :8888]
-                                          [PostgreSQL x9]
-                                          [Redis :6379]
+                                          [PostgreSQL x5]
+                                          [Redis :6379 — rate limit, refresh-token blacklist, nonce anti-replay]
                                           [Zipkin :9411]
 ```
 
@@ -96,7 +97,7 @@
 | T-GST-04 | Tampering | Mass Assignment: DTO potrebbe accettare campi non previsti tramite JSON | MEDIO | MEDIA | ✅ RISOLTO |
 | T-GST-05 | Information Disclosure | GDPR Data Retention: PII ospite (nome, data nascita, documento, numero documento) conservata a tempo indeterminato senza retention policy; soft-delete non soddisfa diritto all'oblio (Art. 17 GDPR); nessun campo consenso su entità Guest | ALTO | MEDIA | ✅ RISOLTO |
 
-### 4.4 reservation-service
+### 4.4 frontdesk-service — reservations domain (ex reservation-service, consolidato ADR-001)
 
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
@@ -104,7 +105,7 @@
 | T-RES-02 | Elevation of Privilege | IDOR: accesso a prenotazioni di altri hotel senza verifica ownership | CRITICO | MEDIA | ✅ RISOLTO |
 | T-RES-03 | Injection | Filtri di ricerca date non validati server-side | MEDIO | BASSA | ✅ RISOLTO |
 
-### 4.5 stay-service
+### 4.5 frontdesk-service — stays domain (ex stay-service, consolidato ADR-001)
 
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
@@ -148,7 +149,7 @@
 | T-FE-03 | Elevation of Privilege | Broken Access Control frontend: route admin accessibili nascondendo solo elementi UI | MEDIO | ALTA | ✅ RISOLTO |
 | T-FE-04 | Tampering | Assenza Content-Security-Policy: possibilità di inject di script esterni | ALTO | MEDIA | ✅ RISOLTO |
 
-### 4.10 frontdesk-service — rooms domain (post-consolidation)
+### 4.10 frontdesk-service — rooms domain (ex inventory-service, consolidato ADR-001)
 
 | ID | Categoria STRIDE | Threat | Impatto | Probabilità | Stato |
 |----|-----------------|--------|---------|-------------|-------|
