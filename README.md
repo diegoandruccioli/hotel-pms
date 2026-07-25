@@ -228,10 +228,16 @@ Use the provided scripts to boot the entire ecosystem. Each script will:
 2. Ensure Docker Desktop is running
 3. Generate HMAC / JWT secrets (first time only)
 4. Build all microservices with `./gradlew clean build -x test`
-5. Start all Docker containers (`docker compose up -d --build`)
+5. Start all Docker containers (`docker compose --profile observability --profile backup up -d --build`) — dev stack, all ports exposed on host
 6. Wait for the **Config Server** to become healthy
 7. Wait for the **API Gateway** to become healthy
 8. Install frontend dependencies (if needed) and start the Vite dev server
+
+> **Production deployment**: `start.sh`/`start.ps1`/`start.bat` are for local/dev
+> use only — they run the dev `docker-compose.yml` with every port exposed on
+> the host. For a real production deploy, use `docker-compose.prod.yml` (port
+> hardening — only `:80`/`:8080` published) instead; see
+> [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) §4.
 
 ```bash
 # Linux / macOS

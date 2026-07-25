@@ -1,6 +1,6 @@
 # Deployment Guide — Hotel PMS
 
-**Versione:** 1.0 — 2026-05-17  
+**Versione:** 1.1 — 2026-07-25 (aggiunto hardening porte prod, corretto backup/alert gia esistenti, riferimenti stay-service/container dopo audit Sprint 1)  
 **Destinatari:** Tecnico IT che installa il sistema su un server di produzione
 
 ---
@@ -30,8 +30,9 @@
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER
 
-# Docker Compose v2 (incluso in Docker Desktop o installare il plugin)
-docker compose version   # deve mostrare v2.x
+# Docker Compose — richiesto >= 2.24 (il merge-tag `!reset` usato dal file
+# di hardening produzione, §4, non funziona su versioni precedenti)
+docker compose version   # deve mostrare v2.24 o superiore
 
 # openssl (per generare i segreti)
 openssl version
@@ -105,9 +106,18 @@ GW_CORS_ALLOWED_ORIGINS=https://pms.tuohotel.com
 
 ## 4. Avvio del sistema
 
+**Importante — hardening delle porte in produzione.** `docker-compose.yml` da solo
+espone TUTTE le porte sull'host (comodo in sviluppo, non sicuro in produzione).
+Il file `docker-compose.prod.yml` è un override che azzera le porte esposte di
+ogni servizio interno (DB, Redis, Prometheus/Grafana/Zipkin/Loki, tutti i
+backend) lasciando pubblici solo `:80` (frontend) e `:8080` (API Gateway). Va
+**sempre** combinato con entrambi i flag `--profile` (altrimenti Alertmanager/
+Grafana/Loki/Prometheus/backup automatico non partono affatto — sono opt-in):
+
 ```bash
-# Avvio completo in background
-docker compose up -d
+# Avvio produzione — hardening porte + osservabilità + backup automatico
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  --profile observability --profile backup up -d
 
 # Verifica che tutti i container siano healthy (attesa ~90 secondi)
 watch docker compose ps
@@ -116,8 +126,14 @@ watch docker compose ps
 docker compose logs --tail=50 api-gateway
 ```
 
+Un `docker compose up -d` semplice (senza `-f docker-compose.prod.yml` e senza
+i `--profile`) avvia solo i 11 servizi core con **tutte le porte esposte
+sull'host** e **senza** monitoring/backup — va bene per sviluppo/test, non per
+un deploy di produzione reale.
+
 Al primo avvio:
-- Flyway esegue le migration su tutti i 9 database
+- Flyway esegue le migration su tutti i 5 database (frontdesk-service ne
+  consolida 3 ex-separati — ADR-001, `docs/BRANCH_STRATEGY.md`)
 - `AlloggiatiLookupDataLoader` scarica le tabelle di riferimento dal portale PS
   (richiede connettività internet verso `alloggiatiweb.poliziadistato.it`)
 - L'account admin default viene creato con `mustChangePassword=true`
@@ -188,6 +204,10 @@ sudo certbot renew --dry-run
 
 ## 6. Porte da esporre al pubblico
 
+Con `docker-compose.prod.yml` (§4) questo è già enforced a livello Docker, non
+solo firewall — i servizi elencati come "No" non hanno proprio una porta
+pubblicata sull'host, indipendentemente dal firewall.
+
 | Porta | Servizio | Esporre al pubblico |
 |---|---|---|
 | 80 | nginx HTTP | Sì (redirect a 443) |
@@ -198,7 +218,10 @@ sudo certbot renew --dry-run
 | 9090 | Prometheus | No — solo LAN interna |
 | 3000 | Grafana | No — solo LAN interna (o VPN) |
 | 9411 | Zipkin | No — solo LAN interna |
-| 8081-8087 | Microservizi | **No — mai** |
+| 9093 | Alertmanager | No — solo LAN interna |
+| 8081/8083/8085/8086/8087/8088 | Microservizi (frontdesk/guest/billing/fb/auth/notification) | **No — mai** |
+| 8888 | Config Server | **No — mai** |
+| 8090 | Management/Actuator (tutti i backend) | **No — mai pubblicata di default**, nemmeno in dev — vedi `docs/OPERATIONS_RUNBOOK.md §1` per come interrogarla da dentro la rete Docker |
 
 ### Configurazione firewall (ufw)
 
@@ -218,7 +241,7 @@ sudo ufw status
 
 ```bash
 # 1. Backup del DB (obbligatorio prima di ogni aggiornamento)
-docker exec postgres pg_dumpall -U postgres > "backup-pre-update-$(date +%Y%m%d).sql"
+docker exec hotel_postgres pg_dumpall -U postgres > "backup-pre-update-$(date +%Y%m%d).sql"
 
 # 2. Pull del codice aggiornato
 git pull origin main
@@ -226,12 +249,13 @@ git pull origin main
 # 3. Rebuild delle immagini Docker
 docker compose build
 
-# 4. Aggiornamento rolling (tempo di downtime < 30 secondi)
-docker compose up -d
+# 4. Aggiornamento rolling (tempo di downtime < 30 secondi) — stessi flag di §4
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  --profile observability --profile backup up -d
 
 # 5. Verifica post-aggiornamento
 docker compose ps
-curl -s http://localhost:8080/actuator/health | grep '"status":"UP"'
+docker exec api-gateway wget -qO- http://localhost:8090/actuator/health | grep '"status":"UP"'
 ```
 
 Le migration Flyway vengono eseguite automaticamente.
@@ -248,33 +272,46 @@ Se una migration fallisce, il servizio non si avvia — vedi `docs/OPERATIONS_RU
 | Grafana | `http://localhost:3000` | Dashboard metriche e log |
 | Prometheus | `http://localhost:9090` | Metriche raw |
 | Zipkin | `http://localhost:9411` | Distributed tracing |
-| Spring Actuator | `http://localhost:<port>/actuator/health` | Health check singolo servizio |
+| Spring Actuator | interrogabile solo da dentro la rete Docker (porta 8090, mai pubblicata) — vedi `docs/OPERATIONS_RUNBOOK.md §1` | Health check singolo servizio |
 
-> **Alert rule:** nessuna alert rule è configurata nell'installazione base.
-> Configurare le alert rule Grafana prima del go-live in produzione
-> — vedi `docs/ROADMAP.md §P4`.
+> **Alert rule:** 6 alert Prometheus sono già configurate (`docker/prometheus/alert_rules.yml`):
+> ServiceDown, HighErrorRate, HighLatencyP99, JvmHeapHigh, CircuitBreakerOpen,
+> DbConnectionPoolNearExhaustion. Richiedono il profilo `observability` (§4).
+> **Da fare prima del go-live**: il receiver Alertmanager di default è `null`
+> (nessuna notifica esce, solo visibili su `http://localhost:9093`) — configurare
+> un receiver reale (email/Slack/PagerDuty) in `docker/alertmanager/alertmanager.yml`
+> se si vuole essere avvisati attivamente, non solo poter controllare la UI.
 
 ### Health check rapido da cron
 
 ```bash
-# Aggiungere a crontab per verifica ogni 5 minuti
-*/5 * * * * curl -sf http://localhost:8080/actuator/health > /dev/null || \
+# Aggiungere a crontab per verifica ogni 5 minuti (eseguito da dentro l'host
+# Docker, non serve esporre la porta di management)
+*/5 * * * * docker exec api-gateway wget -qO- http://localhost:8090/actuator/health > /dev/null || \
   echo "API Gateway DOWN $(date)" >> /var/log/hotel-pms-health.log
 ```
 
 ---
 
-## 9. Backup automatico (da configurare)
+## 9. Backup automatico
 
-Un backup automatico schedulato non è incluso nell'installazione base
-(vedi `docs/ROADMAP.md §P3`). Nel frattempo, eseguire manualmente:
+**Già incluso** con il profilo `backup` (§4, `--profile backup`): il container
+`hotel_db_backup` esegue `pg_dumpall` ogni 24h (configurabile via
+`BACKUP_INTERVAL_SECONDS`/`BACKUP_RETENTION_DAYS` in `docker-compose.yml`),
+comprime il dump e mantiene gli ultimi 14 giorni sul volume dedicato
+`postgres_backups`. Nessun cron da configurare a mano.
 
 ```bash
-# Aggiungere a crontab per backup giornaliero alle 3:00
-0 3 * * * docker exec postgres pg_dumpall -U postgres | \
-  gzip > /backup/hotel-pms/hotel-pms-$(date +\%Y\%m\%d).sql.gz && \
-  find /backup/hotel-pms/ -name "*.sql.gz" -mtime +30 -delete
+# Elenca i backup automatici disponibili
+docker exec hotel_db_backup ls -lh /backups
+
+# Copia periodicamente un backup fuori dal server (S3/NAS) — il volume
+# Docker da solo non protegge da un crash disco dell'host
+docker cp hotel_db_backup:/backups/hotel-pms-YYYYMMDD-HHMMSS.sql.gz .
 ```
+
+Dettagli completi (restore, backup manuale pre-aggiornamento) in
+`docs/OPERATIONS_RUNBOOK.md §5`.
 
 ---
 
@@ -292,5 +329,5 @@ Un backup automatico schedulato non è incluso nell'installazione base
 - [ ] Credenziali Alloggiati PS testate con DRY_RUN=true → log `SUBMISSION_SUCCESS | operation=Test`
 - [ ] Backup manuale eseguito e verificato
 - [ ] Crontab backup giornaliero configurato
-- [ ] `ALLOGGIATI_DRY_RUN=false` impostato per produzione → stay-service riavviato
+- [ ] `ALLOGGIATI_DRY_RUN=false` impostato per produzione → frontdesk-service riavviato
 - [ ] Primo check-in reale → log `SUBMISSION_SUCCESS | operation=Send` → schedina su portale PS verificata

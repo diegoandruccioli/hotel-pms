@@ -1,6 +1,6 @@
 # Operations Runbook — Hotel PMS
 
-**Versione:** 1.0 — 2026-05-17  
+**Versione:** 1.1 — 2026-07-25 (corretti riferimenti stay-service/porte/container dopo audit Sprint 1)  
 **Destinatari:** Tecnico IT responsabile dell'installazione  
 **Prerequisiti:** accesso SSH al server, Docker installato, file `.env` configurato
 
@@ -11,8 +11,13 @@
 ### Avvio completo
 
 ```bash
-# Avvia tutti i container in background
+# Stack core (11 servizi) — SENZA osservabilità/backup
 docker compose up -d
+
+# Stack completo (raccomandato in produzione): aggiunge Loki/Grafana/Zipkin/
+# Alertmanager/Prometheus (profilo "observability") e il backup automatico
+# Postgres (profilo "backup") — entrambi i --profile sono opt-in, senza non partono
+docker compose --profile observability --profile backup up -d
 
 # Verifica che tutti i servizi siano healthy
 docker compose ps
@@ -25,16 +30,21 @@ Tempo stimato per avvio completo: **60-90 secondi**.
 ### Verifica salute del sistema
 
 ```bash
-# Stato sintetico di tutti i container
+# Stato sintetico di tutti i container (il modo più semplice: si basa
+# sull'HEALTHCHECK Docker già configurato su ogni servizio)
 docker compose ps
 
-# Health check dell'API Gateway (primo punto di ingresso)
-curl -s http://localhost:8080/actuator/health | python3 -m json.tool
+# Health check dettagliato di un servizio: l'actuator gira su una porta di
+# management SEPARATA (8090), mai pubblicata sull'host — va interrogata da
+# dentro la rete Docker, non da curl sull'host sulla porta applicativa
+docker exec api-gateway wget -qO- http://localhost:8090/actuator/health
 
-# Verifica tutti i microservizi in parallelo
-for port in 8081 8082 8083 8084 8085 8086 8087; do
-  echo -n "Port $port: "
-  curl -s http://localhost:$port/actuator/health | grep -o '"status":"[^"]*"'
+# Verifica tutti i microservizi in un colpo (nomi container, non porte host)
+for svc in config-server api-gateway auth-service guest-service frontdesk-service \
+           billing-service fb-service notification-service; do
+  echo -n "$svc: "
+  docker exec "$svc" wget -qO- http://localhost:8090/actuator/health 2>/dev/null \
+    | grep -o '"status":"[^"]*"' || echo "UNREACHABLE"
 done
 ```
 
@@ -59,7 +69,7 @@ docker compose down
 docker compose logs -f
 
 # Singolo servizio
-docker compose logs -f stay-service
+docker compose logs -f frontdesk-service
 docker compose logs -f api-gateway
 
 # Ultimi N log + stream
@@ -76,16 +86,19 @@ docker compose logs --tail=500 | grep -E "ERROR|WARN"
 docker compose logs | grep "correlationId=<UUID>"
 
 # Log Alloggiati PS
-docker compose logs stay-service | grep -E "ALLOGGIATI|SOAP_ERROR|SUBMISSION"
+docker compose logs frontdesk-service | grep -E "ALLOGGIATI|SOAP_ERROR|SUBMISSION"
 ```
 
 ### Grafana + Loki (aggregazione log)
 
-Apri **http://localhost:3000** con credenziali Grafana.
-Naviga in **Explore → Loki** e usa query LogQL:
+Richiede il profilo `observability` (vedi §1). Apri **http://localhost:3000**
+con credenziali Grafana. Naviga in **Explore → Loki** e usa query LogQL — il
+label `container` corrisponde al `container_name` esplicito in
+`docker-compose.yml` (es. `frontdesk-service`, `api-gateway`), non al nome
+di default prefissato dal progetto Compose:
 ```logql
-{container="hotel-pms-stay-service-1"} |= "ERROR"
-{container=~"hotel-pms-.*"} |= "correlationId=abc123"
+{container="frontdesk-service"} |= "ERROR"
+{container=~".*-service"} |= "correlationId=abc123"
 ```
 
 ---
@@ -118,9 +131,9 @@ docker compose up <nome-servizio>   # avvia in foreground per vedere l'output
 ### Riavvio singolo servizio (senza riavviare tutto)
 
 ```bash
-docker compose restart stay-service
+docker compose restart frontdesk-service
 # oppure rebuild dell'immagine se il codice è cambiato:
-docker compose up -d --no-deps --build stay-service
+docker compose up -d --no-deps --build frontdesk-service
 ```
 
 ---
@@ -233,11 +246,12 @@ nano .env
 # ALLOGGIATI_WS_KEY=<nuova-chiave>
 # (e ALLOGGIATI_PASSWORD se cambiata)
 
-# 2. Riavviare SOLO lo stay-service (l'unico che usa queste variabili)
-docker compose up -d --no-deps stay-service
+# 2. Riavviare SOLO il frontdesk-service (l'unico che usa queste variabili —
+#    da ADR-001 consolida quello che era stay-service)
+docker compose up -d --no-deps frontdesk-service
 
 # 3. Verificare nei log che il nuovo token venga ottenuto correttamente
-docker compose logs --tail=50 stay-service | grep -E "ALLOGGIATI|TOKEN"
+docker compose logs --tail=50 frontdesk-service | grep -E "ALLOGGIATI|TOKEN"
 
 # 4. Fare un invio di test (dry-run)
 # Ottenere prima un JWT admin:
@@ -284,14 +298,16 @@ docker compose ps
 # Step 2: errori recenti
 docker compose logs --tail=200 | grep -E "ERROR|FATAL|Exception"
 
-# Step 3: salute API Gateway (punto di ingresso)
-curl -s http://localhost:8080/actuator/health
+# Step 3: salute API Gateway (punto di ingresso) — actuator è su una porta di
+# management separata (8090), mai pubblicata sull'host: va interrogata da
+# dentro il container, non da curl sull'host
+docker exec api-gateway wget -qO- http://localhost:8090/actuator/health
 
 # Step 4: connettività DB
 docker exec hotel_postgres psql -U postgres -c "SELECT 1" 2>&1
 
 # Step 5: connettività Redis
-docker exec redis redis-cli ping
+docker exec hotel_redis redis-cli ping
 
 # Step 6: se container in CrashLoopBackOff
 docker compose logs <nome-container> --tail=100
@@ -305,7 +321,7 @@ Verificare ogni mattina prima dell'apertura:
 
 ```bash
 # Alloggiati non inviati del giorno precedente
-docker compose logs stay-service | grep -E "ALLOGGIATI_SOAP_ERROR|ALLOGGIATI_SEND_FAILED"
+docker compose logs frontdesk-service | grep -E "ALLOGGIATI_SOAP_ERROR|ALLOGGIATI_SEND_FAILED"
 # Nessun output = tutto OK
 
 # Errori 5xx nelle ultime 24 ore
