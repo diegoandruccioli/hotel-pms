@@ -38,47 +38,80 @@ updates:
       - "ci"
 
   # ── Docker base images — one entry per Dockerfile directory (no glob support) ──
+  # Java major-version bumps (e.g. 21 → 25) are intentionally ignored here: they must land
+  # as one coordinated migration across toolchain + CI + all Dockerfiles together, never as
+  # a per-service runtime-only bump. See docs/BRANCH_STRATEGY.md "Branch automatici (Dependabot)".
   - package-ecosystem: "docker"
     directory: "/api-gateway"
     schedule:
       interval: "weekly"
     labels: ["dependencies", "docker"]
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/auth-service"
     schedule:
       interval: "weekly"
     labels: ["dependencies", "docker"]
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/billing-service"
     schedule:
       interval: "weekly"
     labels: ["dependencies", "docker"]
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/config-service"
     schedule:
       interval: "weekly"
     labels: ["dependencies", "docker"]
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/fb-service"
     schedule:
       interval: "weekly"
     labels: ["dependencies", "docker"]
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/frontdesk-service"
     schedule:
       interval: "weekly"
     labels: ["dependencies", "docker"]
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/guest-service"
     schedule:
       interval: "weekly"
     labels: ["dependencies", "docker"]
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "docker"
+    directory: "/notification-service"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "docker"]
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/frontend"
