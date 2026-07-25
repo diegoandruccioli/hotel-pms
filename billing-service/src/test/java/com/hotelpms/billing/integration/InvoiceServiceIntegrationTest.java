@@ -181,20 +181,25 @@ class InvoiceServiceIntegrationTest {
         testEntityManager.flush();
         testEntityManager.clear();
 
-        // Simulate two concurrent readers (e.g. billing-service and F&B both loading the
-        // same invoice to add a charge/payment) by fetching two independent copies of the
-        // same row, each starting from the same @Version value.
-        final Invoice firstReader = invoiceRepository.findById(created.id()).orElseThrow();
-        testEntityManager.clear();
-        final Invoice secondReader = invoiceRepository.findById(created.id()).orElseThrow();
+        // Load and keep a managed reference — its in-memory @Version stays at 0
+        // even after the row is bumped from under it below (Hibernate never
+        // silently refreshes an already-loaded entity's version).
+        final Invoice loaded = invoiceRepository.findById(created.id()).orElseThrow();
 
-        firstReader.setStatus(InvoiceStatus.PAID);
-        invoiceRepository.saveAndFlush(firstReader);
+        // Simulate a concurrent writer (e.g. F&B service adding a charge to the
+        // same invoice) committing out-of-band, via a native UPDATE that bypasses
+        // this entity manager's persistence context entirely.
+        testEntityManager.getEntityManager()
+                .createNativeQuery("UPDATE invoices SET version = version + 1 WHERE id = :id")
+                .setParameter("id", created.id())
+                .executeUpdate();
+        testEntityManager.flush();
 
-        secondReader.setStatus(InvoiceStatus.CANCELLED);
+        loaded.setStatus(InvoiceStatus.CANCELLED);
         assertThrows(ObjectOptimisticLockingFailureException.class,
-                () -> invoiceRepository.saveAndFlush(secondReader),
-                "The second writer must lose the race: its copy is stale (version already bumped by the first writer)");
+                () -> invoiceRepository.saveAndFlush(loaded),
+                "The stale reader must lose the race: version in memory (0) no longer "
+                        + "matches the row's real version (bumped concurrently to 1)");
     }
 
 }
