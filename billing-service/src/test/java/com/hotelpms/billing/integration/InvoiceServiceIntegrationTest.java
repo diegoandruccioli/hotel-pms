@@ -2,6 +2,7 @@ package com.hotelpms.billing.integration;
 
 import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.domain.DocumentType;
+import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.dto.InvoiceResponse;
@@ -9,6 +10,7 @@ import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.mapper.InvoiceChargeMapperImpl;
 import com.hotelpms.billing.mapper.InvoiceMapperImpl;
 import com.hotelpms.billing.mapper.PaymentMapperImpl;
+import com.hotelpms.billing.repository.InvoiceRepository;
 import com.hotelpms.billing.service.InvoiceService;
 import com.hotelpms.billing.service.impl.InvoiceServiceImpl;
 import org.junit.jupiter.api.AfterEach;
@@ -18,7 +20,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -35,6 +39,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -80,6 +85,12 @@ class InvoiceServiceIntegrationTest {
 
     @Autowired
     private InvoiceService invoiceService;
+
+    @Autowired
+    private InvoiceRepository invoiceRepository;
+
+    @Autowired
+    private TestEntityManager testEntityManager;
 
     @MockitoBean
     private GuestClient guestClient;
@@ -160,6 +171,30 @@ class InvoiceServiceIntegrationTest {
                 () -> "Expected prefix " + currentYear + "/ but got: " + number);
         final String suffix = number.substring(number.indexOf('/') + 1);
         assertEquals(4, suffix.length(), "Suffix must be exactly 4 digits (zero-padded)");
+    }
+
+    @Test
+    @DisplayName("P1: saving a stale Invoice (concurrent modification) throws ObjectOptimisticLockingFailureException")
+    void concurrentInvoiceUpdateThrowsOptimisticLockingException() {
+        final InvoiceResponse created = invoiceService.createInvoiceForStay(
+                new StayInvoiceRequest(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()));
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // Simulate two concurrent readers (e.g. billing-service and F&B both loading the
+        // same invoice to add a charge/payment) by fetching two independent copies of the
+        // same row, each starting from the same @Version value.
+        final Invoice firstReader = invoiceRepository.findById(created.id()).orElseThrow();
+        testEntityManager.clear();
+        final Invoice secondReader = invoiceRepository.findById(created.id()).orElseThrow();
+
+        firstReader.setStatus(InvoiceStatus.PAID);
+        invoiceRepository.saveAndFlush(firstReader);
+
+        secondReader.setStatus(InvoiceStatus.CANCELLED);
+        assertThrows(ObjectOptimisticLockingFailureException.class,
+                () -> invoiceRepository.saveAndFlush(secondReader),
+                "The second writer must lose the race: its copy is stale (version already bumped by the first writer)");
     }
 
 }

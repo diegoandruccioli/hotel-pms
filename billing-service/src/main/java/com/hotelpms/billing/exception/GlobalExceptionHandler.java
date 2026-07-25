@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.lang.NonNull;
@@ -84,6 +85,25 @@ public class GlobalExceptionHandler {
         problemDetail.setTitle("External Service Error");
         problemDetail
                 .setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/external-service-error")));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
+
+    /**
+     * Handles ObjectOptimisticLockingFailureException thrown by JPA when a concurrent
+     * modification is detected via the {@code @Version} field on {@link com.hotelpms.billing.domain.Invoice}
+     * (e.g. billing-service and F&amp;B both adding a charge to the same invoice at once).
+     *
+     * @param ex the optimistic locking exception
+     * @return ProblemDetail with 409 status
+     */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLockingFailure(final ObjectOptimisticLockingFailureException ex) {
+        log.warn("[OptimisticLock] Concurrent modification detected: {}", ex.getMessage());
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "CONCURRENT_MODIFICATION");
+        problemDetail.setTitle("Conflict");
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/conflict")));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
