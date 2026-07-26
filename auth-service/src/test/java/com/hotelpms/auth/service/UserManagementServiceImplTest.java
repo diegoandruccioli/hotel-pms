@@ -35,7 +35,6 @@ import static org.mockito.Mockito.when;
 class UserManagementServiceImplTest {
 
     private static final UUID HOTEL_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
-    private static final UUID HOTEL_OTHER = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
     private static final String USERNAME = "newuser";
     private static final String PASSWORD = "password123";
@@ -173,7 +172,8 @@ class UserManagementServiceImplTest {
 
     @Test
     void activateUserShouldSetActiveTrue() {
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(inactiveUser));
+        when(userRepository.findByIdAndHotelIdIncludingInactive(USER_ID, HOTEL_ID))
+                .thenReturn(Optional.of(inactiveUser));
 
         final UserResponse result = userManagementService.activateUser(HOTEL_ID, USER_ID);
 
@@ -184,7 +184,7 @@ class UserManagementServiceImplTest {
 
     @Test
     void activateUserShouldThrowWhenNotFound() {
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+        when(userRepository.findByIdAndHotelIdIncludingInactive(USER_ID, HOTEL_ID)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class,
                 () -> userManagementService.activateUser(HOTEL_ID, USER_ID));
@@ -227,13 +227,10 @@ class UserManagementServiceImplTest {
 
     @Test
     void activateUserShouldThrowWhenUserBelongsToAnotherHotel() {
-        final UserAccount wrongHotelUser = UserAccount.builder()
-                .id(USER_ID)
-                .username(USERNAME)
-                .hotelId(HOTEL_OTHER)
-                .active(false)
-                .build();
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(wrongHotelUser));
+        // The native query is hotel-scoped, so a user belonging to a different
+        // hotel is never returned for HOTEL_ID — same as a real cross-tenant
+        // lookup against the DB, no separate "wrong hotel" fixture needed.
+        when(userRepository.findByIdAndHotelIdIncludingInactive(USER_ID, HOTEL_ID)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class,
                 () -> userManagementService.activateUser(HOTEL_ID, USER_ID));

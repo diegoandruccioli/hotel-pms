@@ -1653,6 +1653,90 @@ in allow-list resti raggiungibile nonostante il claim \texttt{true}.
 \paragraph{Riferimento} Commit: \commitref{a82ce14}{fix(security): T-AUTH-06 --- mustChangePassword enforced server-side via JWT claim}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Riattivazione utente disattivato sempre fallita \threat{T-AUTH-07}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante un audit E2E reale (\texttt{docs/LIVE\_E2E\_AUDIT\_2026-07.md},
+BUG-12). Il bottone ``Activate'' su un utente disattivato in Admin Users falliva
+**sempre** con 404. \texttt{UserManagementServiceImpl.activateUser} cercava il
+target con \texttt{userRepository.findById(targetUserId)}, ma \texttt{UserAccount}
+porta \texttt{@SQLRestriction("active = true")} a livello di classe --- un
+filtro Hibernate iniettato in \emph{ogni} query generata per l'entità,
+comprese le query HQL-derivate ereditate come \texttt{findById}, non solo le
+query JPQL custom. Un utente con \texttt{active=false} non veniva quindi mai
+trovato, e la funzione simmetrica di ``Deactivate'' --- azione di primo
+livello, non nascosta, presente su ogni riga della tabella --- non aveva alcun
+percorso di ritorno da UI. Il commento nel codice originale (``Must query
+including inactive --- use raw query bypassing @SQLRestriction'') descriveva
+l'intento corretto ma il codice sottostante non lo implementava mai.
+Classificato OWASP A04 --- Insecure Design (il pattern
+\texttt{@SQLRestriction} + query ereditate non è mai stato validato end-to-end
+per il caso ``recupera includendo gli inattivi'', un gap di design più che
+un'iniezione di vulnerabilità).
+
+\begin{insecurebox}[title={Codice Vulnerabile --- UserManagementServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: findById e' filtrato da @SQLRestriction("active = true")
+// su UserAccount -- un utente disattivato non viene MAI trovato
+public UserResponse activateUser(UUID hotelId, UUID targetUserId) {
+    UserAccount target = userRepository.findById(targetUserId)
+        .filter(u -> hotelId.equals(u.getHotelId()))
+        .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));  // sempre qui
+    target.setActive(true);
+    userRepository.save(target);
+    return toResponse(target);
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Nuovo metodo \texttt{findByIdAndHotelIdIncludingInactive} in
+\texttt{UserAccountRepository}, basato su query \emph{nativa} anziché
+JPQL/HQL: a differenza delle query derivate o annotate con HQL,
+\texttt{@SQLRestriction} non viene iniettato in una query nativa scritta a
+mano --- primo caso nel repository, nessun precedente esisteva da copiare.
+Mantenuto hotel-scoped (predicato \texttt{hotel\_id} nella query) per non
+trasformare il bypass in un leak cross-tenant; nome conforme alla regola
+ArchUnit \texttt{TenantIsolationArchTest} (deve contenere \texttt{HotelId} nel
+nome per essere riconosciuto come query tenant-scoped senza necessitare
+un'esenzione esplicita).
+
+\begin{securebox}[title={Codice Sicuro --- UserAccountRepository.java / UserManagementServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: query nativa, non soggetta a @SQLRestriction, hotel-scoped
+@Query(value = "SELECT * FROM user_account WHERE id = :id AND hotel_id = :hotelId",
+       nativeQuery = true)
+Optional<UserAccount> findByIdAndHotelIdIncludingInactive(
+        @Param("id") UUID id, @Param("hotelId") UUID hotelId);
+
+// Service:
+public UserResponse activateUser(UUID hotelId, UUID targetUserId) {
+    UserAccount target = userRepository
+        .findByIdAndHotelIdIncludingInactive(targetUserId, hotelId)
+        .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND"));
+    target.setActive(true);
+    userRepository.save(target);
+    return toResponse(target);
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Il test esistente \texttt{activateUserShouldSetActiveTrue} mockava
+\texttt{findById} direttamente con Mockito --- lo stub bypassava del tutto
+Hibernate, quindi il test passava anche col bug realmente presente in
+produzione: nessuna copertura di regressione poteva mai catturarlo. Riscritto
+per mockare \texttt{findByIdAndHotelIdIncludingInactive}; il test
+\texttt{activateUserShouldThrowWhenUserBelongsToAnotherHotel} riscritto per
+riflettere che ora è la query stessa, hotel-scoped, a non restituire un
+utente di un altro hotel (non più un filtro applicativo separato). Verificato
+anche dal vivo via browser reale: utente disattivato → ``Activate'' → torna
+``Active'' senza alcun intervento diretto sul database.
+
+\paragraph{Riferimento} Commit: \commitref{[pending]}{fix(security): T-AUTH-07 --- activateUser bypasses @SQLRestriction via native query}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Audit Log e Security Monitoring \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
 % ─────────────────────────────────────────────────────────────────────────────
 

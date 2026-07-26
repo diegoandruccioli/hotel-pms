@@ -71,6 +71,25 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
     Optional<UserAccount> findByIdAndHotelId(UUID id, UUID hotelId);
 
     /**
+     * Finds a user by id scoped to a hotel, including inactive (soft-deleted)
+     * accounts (BUG-12, {@code docs/LIVE_E2E_AUDIT_2026-07.md}).
+     *
+     * <p>{@link UserAccount} carries {@code @SQLRestriction("active = true")} at
+     * the class level, which Hibernate injects into every HQL-derived query for
+     * the entity — including inherited methods like {@code findById}. A native
+     * query is the one thing {@code @SQLRestriction} does not intercept, which
+     * is the only way to legitimately look up a deactivated account (e.g. to
+     * reactivate it). Kept hotel-scoped so this bypass can never become a
+     * cross-tenant read.</p>
+     *
+     * @param id      the user UUID
+     * @param hotelId the hotel UUID
+     * @return the user if found within that hotel, active or not
+     */
+    @Query(value = "SELECT * FROM user_account WHERE id = :id AND hotel_id = :hotelId", nativeQuery = true)
+    Optional<UserAccount> findByIdAndHotelIdIncludingInactive(@Param("id") UUID id, @Param("hotelId") UUID hotelId);
+
+    /**
      * Atomically increments the failed-login counter and sets the lock expiry.
      * Runs in its own transaction so the update is committed even when the caller
      * rolls back (e.g. after throwing BadCredentialsException).

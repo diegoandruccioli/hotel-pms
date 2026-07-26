@@ -90,9 +90,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Override
     @Transactional
     public UserResponse activateUser(final UUID hotelId, final UUID targetUserId) {
-        // Must query including inactive — use raw query bypassing @SQLRestriction
-        final UserAccount target = userRepository.findById(targetUserId)
-                .filter(u -> hotelId.equals(u.getHotelId()))
+        final UserAccount target = userRepository.findByIdAndHotelIdIncludingInactive(targetUserId, hotelId)
                 .orElseThrow(() -> new NotFoundException(MSG_USER_NOT_FOUND));
 
         target.setActive(true);
