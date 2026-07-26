@@ -16,6 +16,7 @@ vi.mock('../i18n', () => ({
 }));
 
 import api from './api';
+import i18n from '../i18n';
 
 function makeResponse<T>(config: InternalAxiosRequestConfig, status: number, data: T): AxiosResponse<T> {
   return {
@@ -84,6 +85,25 @@ describe('api (axios instance + interceptors)', () => {
 
     await expect(api.get('/api/v1/reservations')).rejects.toMatchObject({
       response: { data: { detail: 'TRANSLATED(errors:ROOM_NOT_AVAILABLE)' } },
+    });
+  });
+
+  it('BUG-6: leaves the raw code untouched when i18next has no translation for it '
+      + '(real i18next returns the bare key on a miss, not the namespaced one)', async () => {
+    // Simulate the actual i18next missing-key fallback: the bare key, no
+    // "errors:" prefix — verified empirically against the real i18next
+    // package, not assumed. A guard comparing against `errors:${code}`
+    // would never match this and would be a permanent no-op.
+    vi.mocked(i18n.t).mockImplementationOnce(
+      ((key: string) => key.replace(/^errors:/, '')) as typeof i18n.t,
+    );
+    adapter.mockRejectedValueOnce({
+      config: { url: '/api/v1/reservations', headers: {} },
+      response: { status: 400, data: { detail: 'SOME_CODE_WITH_NO_TRANSLATION' } },
+    });
+
+    await expect(api.get('/api/v1/reservations')).rejects.toMatchObject({
+      response: { data: { detail: 'SOME_CODE_WITH_NO_TRANSLATION' } },
     });
   });
 

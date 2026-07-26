@@ -71,11 +71,14 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    // Translate UPPER_SNAKE_CASE error codes from backend
+    // Translate UPPER_SNAKE_CASE error codes from backend (BUG-6: the guard
+    // used to compare against `errors:${code}` — but i18next's default
+    // missing-key fallback returns the bare key, not the namespaced one, so
+    // the comparison never matched and the guard was a permanent no-op).
     if (error.response?.data?.detail && /^[A-Z_]+$/.test(error.response.data.detail)) {
       const code = error.response.data.detail;
       const translated = i18n.t(`errors:${code}`);
-      if (translated !== `errors:${code}`) {
+      if (translated !== code) {
         error.response.data.detail = translated;
       }
     }
