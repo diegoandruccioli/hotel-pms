@@ -15,8 +15,14 @@ import java.util.UUID;
 
 /**
  * Feign client for interacting with the guest service.
+ *
+ * <p>Pinned to an explicit URL (BUG-0b, {@code docs/LIVE_E2E_AUDIT_2026-07.md}) rather than
+ * relying on service discovery — Eureka is disabled cluster-wide, so a bare
+ * {@code @FeignClient(name = "guest-service")} always failed with "No servers available",
+ * silently degrading every call to its circuit-breaker fallback (e.g. PDF invoices showing
+ * "Unknown Guest" instead of the real name). Same pattern as {@link HotelSettingsClient}.
  */
-@FeignClient(name = "guest-service", path = "/api/v1/guests")
+@FeignClient(name = "guest-service", url = "${application.config.guest-service-url}", path = "/api/v1/guests")
 public interface GuestClient {
 
     /**

@@ -7,6 +7,10 @@ application:
     # services (ADR-001, backup/DECISIONS.md). HotelSettingsClient still
     # reads from the stays-domain path (/api/v1/stays/settings) on it.
     frontdesk-service-url: http://frontdesk-service:8081
+    # GuestClient pinned URL (BUG-0b) — Eureka is disabled cluster-wide, so a
+    # bare @FeignClient(name = "guest-service") always failed with "No servers
+    # available", silently falling back (PDF invoices showed "Unknown Guest").
+    guest-service-url: http://guest-service:8083
 
 internal:
   hmac:

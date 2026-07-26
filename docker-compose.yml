@@ -568,7 +568,11 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      # MaxMetaspaceSize raised from 128m (BUG-0b stopgap, docs/LIVE_E2E_AUDIT_2026-07.md):
+      # PDF generation was crashing the process with a Metaspace OOM. The root causes
+      # (GuestClient discovery failure + per-render font re-read/re-subset) are fixed
+      # separately; this headroom stays as a safety net.
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy

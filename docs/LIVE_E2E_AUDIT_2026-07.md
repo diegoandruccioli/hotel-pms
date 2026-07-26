@@ -49,7 +49,7 @@ Voce ROADMAP: C12 parte 2, marcata ✅ il 18/07.
 
 Perché non è mai stato scoperto: `billing.spec.ts` mocka l'endpoint — non ha mai eseguito questa query contro Postgres reale.
 
-### BUG-0b (CRITICO) — Generare un PDF fattura crasha l'intero billing-service
+### BUG-0b (CRITICO) — Generare un PDF fattura crasha l'intero billing-service — ✅ RISOLTO (vedi §5)
 Voce ROADMAP: C13 (PDF/UA), marcata ✅ il 19/07.
 `GET /invoices/{id}/pdf` → 500 generico Spring Boot (non il formato ProblemDetail dell'app — segno che l'eccezione non è stata gestita normalmente ma dal crash del processo). Log: `WARN ... No servers available for service: guest-service` seguito immediatamente da `Terminating due to java.lang.OutOfMemoryError: Metaspace` — il container muore e viene riavviato da Docker. Verificato: 6 occorrenze storiche, RestartCount=3, non un incidente isolato di questo test.
 
@@ -91,12 +91,12 @@ Ogni piano indica: causa radice, fix proposto, file da toccare, verifica, branch
 - **Verifica**: aggiunti 2 test Testcontainers reali (non mockati, Postgres vero) in `InvoiceServiceIntegrationTest.java` — `searchInvoicesWithoutQuerySucceeds` (query null, ex-crash su `lower(bytea)`) e `searchInvoicesWithQueryFiltersByInvoiceNumberOnly` (query valorizzata + verifica che il filtro status non venga bypassato). `./gradlew :billing-service:build` verde (8/8 test, PMD/Checkstyle/SpotBugs/coverage tutti passati)
 - **Branch**: `main` (bug fix ordinario, non tocca auth/RBAC/injection-mitigation)
 
-### BUG-0b — PDF fattura crasha billing-service
-- **Fix parte 1 (causa radice del "No servers available")**: pinnare `GuestClient` a un URL esplicito, coerente con `HotelSettingsClient` — nuova proprietà `application.config.guest-service-url` in `config-service/src/main/resources/config/billing-service.yml`, passata come variabile d'ambiente in `docker-compose.yml` (billing-service block), `@FeignClient(name = "guest-service", url = "${application.config.guest-service-url}")` in `GuestClient.java`
-- **Fix parte 2 (irrobustimento del rendering, causa concorrente dell'OOM)**: leggere i byte dei font Noto Sans **una volta sola** (campo statico/costante caricato al class-init) in `pdf-template-engine/src/main/java/com/hotelpms/pdftemplate/ThymeleafPdfTemplateRenderer.java`, invece di riaprire lo stream classpath e ri-registrare/ri-subsettare ad ogni chiamata `render()`
-- **Fix parte 3 (rete di sicurezza operativa, immediata e a basso rischio)**: alzare `-XX:MaxMetaspaceSize` per billing-service in `docker-compose.yml` come stopgap, mentre si verifica sperimentalmente se le parti 1+2 rimuovono la causa per intero
-- **File**: `billing-service/src/main/java/com/hotelpms/billing/client/GuestClient.java`, `config-service/.../billing-service.yml`, `docker-compose.yml`, `pdf-template-engine/.../ThymeleafPdfTemplateRenderer.java`
-- **Verifica**: generare N PDF consecutivi (es. 20) via chiamata diretta, controllare che il Metaspace resti piatto (metrica Actuator/JMX) e che il container non crashi; verificare che il PDF mostri il nome ospite reale, non più "Unknown Guest"
+### BUG-0b — PDF fattura crasha billing-service — ✅ RISOLTO
+- **Fix parte 1 (causa radice del "No servers available")**: `GuestClient` pinnato a URL esplicito, coerente con `HotelSettingsClient` — nuova proprietà `application.config.guest-service-url: http://guest-service:8083` in `config-service/src/main/resources/config/billing-service.yml`, `@FeignClient(name = "guest-service", url = "${application.config.guest-service-url}", path = "/api/v1/guests")` in `GuestClient.java`. Nessun override in `docker-compose.yml` necessario (stesso pattern di `frontdesk-service-url`, risolto interamente da config-service)
+- **Fix parte 2 (irrobustimento del rendering, causa concorrente dell'OOM)**: i byte dei font Noto Sans ora letti **una volta sola** in campi statici (`FONT_REGULAR_BYTES`/`FONT_BOLD_BYTES`, class-init) in `ThymeleafPdfTemplateRenderer.java`, `useFont` avvolge un `ByteArrayInputStream` invece di riaprire lo stream classpath ad ogni `render()`
+- **Fix parte 3 (rete di sicurezza operativa)**: `-XX:MaxMetaspaceSize` per billing-service alzato 128m→192m in `docker-compose.yml`
+- **File**: `billing-service/src/main/java/com/hotelpms/billing/client/GuestClient.java`, `config-service/src/main/resources/config/billing-service.yml`, `billing-service/src/test/resources/application.yml`, `docker-compose.yml`, `pdf-template-engine/src/main/java/com/hotelpms/pdftemplate/ThymeleafPdfTemplateRenderer.java`
+- **Verifica**: `./gradlew :pdf-template-engine:build :billing-service:build :config-service:build` verde. Live: rebuild+restart `config-server`+`billing-service`, login admin via gateway, `GET /api/v1/invoices/{id}/pdf` su 2 fatture reali → 200, PDF valido, **"Intestatario: Mario Rossi"** (nome reale, non più "Unknown Guest"). 20 generazioni consecutive sulla stessa fattura → 20×200, container rimasto `healthy`, RestartCount invariato (7, tutti pre-fix), Metaspace 138MB/192MB committed, nessun nuovo crash
 - **Branch**: `main`
 
 ### BUG-2 — Ricerca ospiti non trova "Nome Cognome" insieme

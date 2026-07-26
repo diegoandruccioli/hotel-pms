@@ -8,6 +8,7 @@ import org.thymeleaf.context.Context;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,6 +40,14 @@ public class ThymeleafPdfTemplateRenderer implements PdfTemplateRenderer {
     private static final int WEIGHT_REGULAR = 400;
     private static final int WEIGHT_BOLD = 700;
     private static final boolean SUBSET_FONT = true;
+
+    // Read once at class-init (BUG-0b, docs/LIVE_E2E_AUDIT_2026-07.md): re-reading these
+    // from the classpath on every render() call was the only per-request allocation point
+    // in the whole PDF pipeline and a contributor to the Metaspace OOM that was crashing
+    // billing-service. TemplateEngine/ClassLoaderTemplateResolver above were already
+    // correctly singleton/cached.
+    private static final byte[] FONT_REGULAR_BYTES = loadFontBytes(FONT_REGULAR_RESOURCE);
+    private static final byte[] FONT_BOLD_BYTES = loadFontBytes(FONT_BOLD_RESOURCE);
 
     private final TemplateEngine templateEngine;
 
@@ -73,9 +82,9 @@ public class ThymeleafPdfTemplateRenderer implements PdfTemplateRenderer {
             // no need to request it explicitly (the method is now deprecated).
             new PdfRendererBuilder()
                     .usePdfUaAccessibility(true)
-                    .useFont(() -> fontStream(FONT_REGULAR_RESOURCE), FONT_FAMILY,
+                    .useFont(() -> new ByteArrayInputStream(FONT_REGULAR_BYTES), FONT_FAMILY,
                             WEIGHT_REGULAR, FontStyle.NORMAL, SUBSET_FONT)
-                    .useFont(() -> fontStream(FONT_BOLD_RESOURCE), FONT_FAMILY,
+                    .useFont(() -> new ByteArrayInputStream(FONT_BOLD_BYTES), FONT_FAMILY,
                             WEIGHT_BOLD, FontStyle.NORMAL, SUBSET_FONT)
                     .withHtmlContent(html, null)
                     .toStream(out)
@@ -87,11 +96,15 @@ public class ThymeleafPdfTemplateRenderer implements PdfTemplateRenderer {
         }
     }
 
-    private InputStream fontStream(final String classpathResource) {
-        final InputStream in = getClass().getClassLoader().getResourceAsStream(classpathResource);
-        if (in == null) {
-            throw new IllegalStateException("PDF_FONT_ASSET_MISSING: " + classpathResource);
+    private static byte[] loadFontBytes(final String classpathResource) {
+        try (InputStream in = ThymeleafPdfTemplateRenderer.class.getClassLoader()
+                .getResourceAsStream(classpathResource)) {
+            if (in == null) {
+                throw new IllegalStateException("PDF_FONT_ASSET_MISSING: " + classpathResource);
+            }
+            return in.readAllBytes();
+        } catch (final IOException e) {
+            throw new IllegalStateException("PDF_FONT_ASSET_MISSING: " + classpathResource, e);
         }
-        return in;
     }
 }
