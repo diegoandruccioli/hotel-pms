@@ -51,6 +51,8 @@ describe('Settings hub', () => {
     expect(screen.getByRole('link', { name: /settings_section_accessibility/ })).toHaveAttribute('href', '/settings/accessibility');
     expect(screen.getByRole('link', { name: /settings_appearance_language_title/ })).toHaveAttribute('href', '/settings/appearance');
     expect(screen.queryByRole('link', { name: /settings_section_system/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /settings_section_hotel_profile/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /settings_section_admin_users/ })).not.toBeInTheDocument();
   });
 
   it('also shows the System category for ADMIN', () => {
@@ -63,6 +65,14 @@ describe('Settings hub', () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuth('OWNER'));
     renderSettings();
     expect(screen.getByRole('link', { name: /settings_section_system/ })).toHaveAttribute('href', '/settings/system');
+  });
+
+  it('BUG-11: also shows Hotel Profile and User Management for ADMIN/OWNER, '
+      + 'previously reachable only by typing the URL from memory', () => {
+    vi.mocked(useAuthStore).mockImplementation(mockAuth('ADMIN'));
+    renderSettings();
+    expect(screen.getByRole('link', { name: /settings_section_hotel_profile/ })).toHaveAttribute('href', '/profile/hotel');
+    expect(screen.getByRole('link', { name: /settings_section_admin_users/ })).toHaveAttribute('href', '/admin/users');
   });
 
   it('should have no accessibility violations', async () => {

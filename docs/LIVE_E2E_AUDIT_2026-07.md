@@ -249,7 +249,7 @@ CLAUDE.md richiede per l'intera app "Focus indicators: highly visible, ≥ 3:1 c
 **Fix proposto (non applicato):** non azzerare `query` in `StatoSelect.handleSelect` (o, più robusto, far sì che `LookupAutocomplete` mantenga in cache l'ultima opzione effettivamente selezionata — `{codice, label}` — indipendentemente da cosa contiene `options` in un dato momento, invece di ri-derivare la label da una ricerca in un array che può cambiare sotto i piedi).
 **Severità:** MEDIA (UX/fiducia nei dati — il valore salvato è corretto, ma la UI mente su cosa mostra).
 
-### 8.4 BUG-11 (nuovo, ALTA severità) — `/profile/hotel` E `/admin/users` non hanno alcun punto di accesso nella UI
+### 8.4 BUG-11 (nuovo, ALTA severità) — `/profile/hotel` E `/admin/users` non hanno alcun punto di accesso nella UI — ✅ RISOLTO
 
 **Descrizione.** La route `/profile/hotel` → `HotelProfile.tsx` esiste in `App.tsx:105` ed è una pagina funzionante e completa: ragione sociale, indirizzo strutturato, P.IVA/codice fiscale, e — soprattutto — le **credenziali del portale Alloggiati Web** (campo password con toggle mostra/nascondi, verosimilmente username/password/WsKey usati per l'invio automatico del report di pubblica sicurezza). Nessun componente dell'app ci punta: non c'è alcuna card nell'hub Impostazioni (`Settings.tsx` ha solo 5 voci: Profilo/Password/Accessibilità/Aspetto/Sistema), non c'è alcun link dentro `SettingsSystem.tsx` (verificato via grep su `navigate`/`Link`/`/profile` — solo `navigate(-1)` per il bottone Indietro), non c'è alcun link altrove nel codebase (`grep -rl "profile/hotel" src` trova solo `App.tsx` stesso). L'unico modo per raggiungerla è digitare l'URL a mano conoscendola in anticipo.
 
@@ -260,6 +260,8 @@ CLAUDE.md richiede per l'intera app "Focus indicators: highly visible, ≥ 3:1 c
 **File:** `frontend/src/App.tsx:104-105` (entrambe le route orfane), `frontend/src/pages/Settings.tsx`, `frontend/src/pages/Settings/SettingsSystem.tsx`, `frontend/src/layouts/MainLayout.tsx` (nav items) — nessuno di questi punta a `/profile/hotel` o `/admin/users`.
 **Fix proposto (non applicato):** aggiungere entrambe le pagine come card nell'hub Impostazioni (o come voci extra nella sidebar/menu utente, gated ADMIN/OWNER com'è già la route stessa).
 **Severità:** ALTA (due funzionalità amministrative critiche — compliance fiscale/Alloggiati e gestione staff — completamente non scopribili da UI).
+
+**Fix applicato (Fase B del piano fix-order, dopo BUG-12 e BUG-7 per i vincoli d'ordine — Activate funzionante prima di rendere `/admin/users` raggiungibile, focus ring canonico già disponibile per le nuove voci).** Aggiunte 2 nuove entry all'hub `Settings.tsx`, riusando esattamente lo stesso pattern già usato da `SYSTEM_ITEM` (gated `isAdminOrOwner`, stesso componente `SettingsHubRow` con ring `focus-visible:ring-2 ring-offset-2` già corretto). Nuove chiavi i18n IT+EN in `settings.json`. Verificato dal vivo: come RECEPTIONIST le 2 nuove voci non compaiono (solo i 4 item standard); come ADMIN compaiono entrambe — "Hotel Profile" → `/profile/hotel`, "User Management" → `/admin/users` — cliccabili e funzionanti. 2 nuovi test in `Settings.test.tsx` (assenza per non-admin, presenza+href corretto per ADMIN). `npm run lint`/`build`/`test:coverage` verdi (683/683).
 
 ### 8.5 Indizio (da investigare, non ancora un bug numerato) — Creazione fattura al check-in inaffidabile
 

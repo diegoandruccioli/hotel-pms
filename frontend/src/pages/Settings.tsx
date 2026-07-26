@@ -24,6 +24,18 @@ const SYSTEM_ITEM: SettingsHubItem = {
   to: '/settings/system', icon: 'admin_panel_settings', titleKey: 'settings_section_system', descKey: 'settings_hub_system_desc',
 };
 
+// BUG-11 (docs/LIVE_E2E_AUDIT_2026-07.md): both routes existed and worked,
+// but neither had a link anywhere in the app — reachable only by typing the
+// URL from memory. Gated the same as SYSTEM_ITEM (ADMIN/OWNER only), which
+// matches their own ProtectedRoute gating in App.tsx.
+const HOTEL_PROFILE_ITEM: SettingsHubItem = {
+  to: '/profile/hotel', icon: 'apartment', titleKey: 'settings_section_hotel_profile', descKey: 'settings_hub_hotel_profile_desc',
+};
+
+const ADMIN_USERS_ITEM: SettingsHubItem = {
+  to: '/admin/users', icon: 'manage_accounts', titleKey: 'settings_section_admin_users', descKey: 'settings_hub_admin_users_desc',
+};
+
 const SettingsHubRow = memo(({ item }: { item: SettingsHubItem }) => {
   const { t } = useTranslation('settings');
   return (
@@ -53,7 +65,9 @@ export const Settings = () => {
   const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const items = useMemo(
-    () => (isAdminOrOwner ? [...SETTINGS_ITEMS, SYSTEM_ITEM] : SETTINGS_ITEMS),
+    () => (isAdminOrOwner
+      ? [...SETTINGS_ITEMS, HOTEL_PROFILE_ITEM, ADMIN_USERS_ITEM, SYSTEM_ITEM]
+      : SETTINGS_ITEMS),
     [isAdminOrOwner]
   );
 
