@@ -61,6 +61,12 @@ describe('RoomFormModal', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('BUG-9: calls onClose on Escape (now built on M3Dialog, which handles it)', () => {
+    render(<RoomFormModal roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it('calls createRoom and onSaved on add form submission', async () => {
     vi.mocked(inventoryService.createRoom).mockResolvedValue(ROOM as never);
     render(<RoomFormModal roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);

@@ -14,6 +14,16 @@ interface M3DialogProps {
   titleId?: string;
   onClose: () => void;
   children: React.ReactNode;
+  /**
+   * Optional sticky, non-scrolling section rendered below the body (e.g.
+   * Cancel/Save buttons on a form). Layout-neutral on purpose — some callers
+   * need `justify-end` (plain actions), others `justify-between` (a
+   * destructive action on one side, primary actions on the other), so the
+   * caller supplies its own flex wrapper instead of this component forcing
+   * one. Omit the prop entirely and the body fills the dialog exactly as
+   * before — existing callers are unaffected.
+   */
+  footer?: React.ReactNode;
 }
 
 /**
@@ -29,6 +39,7 @@ export const M3Dialog = ({
   titleId = 'dialog-title',
   onClose,
   children,
+  footer,
 }: M3DialogProps) => {
   const { t } = useTranslation('common');
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -108,6 +119,13 @@ export const M3Dialog = ({
 
           {/* Scrollable body */}
           <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+
+          {footer && (
+            <>
+              <div className="h-px bg-outline-variant mx-6" />
+              <div className="px-6 py-4">{footer}</div>
+            </>
+          )}
         </div>
       </div>
     </FocusTrap>

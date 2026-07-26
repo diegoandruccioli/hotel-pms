@@ -60,6 +60,12 @@ describe('RoomTypeFormModal', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('BUG-9: calls onClose on Escape (now built on M3Dialog, which handles it)', () => {
+    render(<RoomTypeFormModal onClose={onClose} onSaved={onSaved} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it('shows delete button only in edit mode', () => {
     const { rerender } = render(<RoomTypeFormModal onClose={onClose} onSaved={onSaved} />);
     expect(screen.queryByText('delete')).not.toBeInTheDocument();

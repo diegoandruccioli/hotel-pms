@@ -3,12 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { inventoryService } from '../../services/inventoryService';
 import type { RoomRequest, RoomResponse, RoomTypeResponse } from '../../types/inventory.types';
-import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
+import { M3Dialog } from '../../components/m3/M3Dialog';
 import { useToastStore } from '../../store/toastStore';
-import * as FocusTrapModule from 'focus-trap-react';
-
-const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
 
 interface Props {
   room?: RoomResponse;
@@ -79,101 +76,85 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
   const inputClass = "block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
 
   return (
-    <FocusTrap>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0" role="dialog" aria-modal="true" aria-labelledby="room-modal-title">
-        <div className="fixed inset-0 bg-scrim/40 transition-opacity" onClick={onClose} aria-hidden="true" />
-        <div className="relative bg-surface rounded-shape-lg shadow-elevation-3 w-full max-w-md max-h-[90vh] flex flex-col animate-scale-in">
+    <M3Dialog
+      open
+      title={room ? t('edit_room') : t('add_room')}
+      titleId="room-modal-title"
+      onClose={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <M3Button variant="text" onClick={onClose} disabled={loading}>{t('cancel')}</M3Button>
+          <M3Button form="room-form" type="submit" loading={loading} disabled={loading}>{t('save')}</M3Button>
+        </div>
+      }
+    >
+      <form id="room-form" onSubmit={handleSubmit} noValidate className="space-y-4">
 
-          <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/30">
-            <h3 id="room-modal-title" className="text-xl font-display font-medium text-on-surface">
-              {room ? t('edit_room') : t('add_room')}
-            </h3>
-            <button
-              onClick={onClose}
-              type="button"
-              aria-label={t('close')}
-              className="w-10 h-10 flex items-center justify-center rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none"
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="roomNumber" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+              {t('room_number_col')} *
+            </label>
+            <input
+              type="text"
+              id="roomNumber"
+              name="roomNumber"
+              value={formData.roomNumber}
+              onChange={handleChange}
+              className={inputClass}
+              placeholder="101"
+              aria-invalid={!!fieldErrors.roomNumber}
+              aria-describedby={fieldErrors.roomNumber ? 'roomNumber-error' : undefined}
+            />
+            {fieldErrors.roomNumber && (
+              <p id="roomNumber-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.roomNumber}</p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="roomStatus" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+              {t('status')} *
+            </label>
+            <select
+              id="roomStatus"
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              className={inputClass}
             >
-              <MaterialIcon name="close" size={20} />
-            </button>
-          </div>
-
-          <div className="p-6 overflow-y-auto">
-            <form id="room-form" onSubmit={handleSubmit} noValidate className="space-y-4">
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="roomNumber" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                    {t('room_number_col')} *
-                  </label>
-                  <input
-                    type="text"
-                    id="roomNumber"
-                    name="roomNumber"
-                    value={formData.roomNumber}
-                    onChange={handleChange}
-                    className={inputClass}
-                    placeholder="101"
-                    aria-invalid={!!fieldErrors.roomNumber}
-                    aria-describedby={fieldErrors.roomNumber ? 'roomNumber-error' : undefined}
-                  />
-                  {fieldErrors.roomNumber && (
-                    <p id="roomNumber-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.roomNumber}</p>
-                  )}
-                </div>
-                <div>
-                  <label htmlFor="roomStatus" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                    {t('status')} *
-                  </label>
-                  <select
-                    id="roomStatus"
-                    name="status"
-                    value={formData.status}
-                    onChange={handleChange}
-                    className={inputClass}
-                  >
-                    <option value="CLEAN">{t('room_status_clean')}</option>
-                    <option value="DIRTY">{t('room_status_dirty')}</option>
-                    <option value="MAINTENANCE">{t('room_status_maintenance')}</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="roomTypeId" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                  {t('room_type')} *
-                </label>
-                <select
-                  id="roomTypeId"
-                  name="roomTypeId"
-                  value={formData.roomTypeId}
-                  onChange={handleChange}
-                  className={inputClass}
-                  aria-invalid={!!fieldErrors.roomTypeId}
-                  aria-describedby={fieldErrors.roomTypeId ? 'roomTypeId-error' : undefined}
-                >
-                  <option value="" disabled>{t('select_placeholder')}</option>
-                  {roomTypes.map(rt => (
-                    <option key={rt.id} value={rt.id}>
-                      {rt.name} (Max {rt.maxOccupancy} pax)
-                    </option>
-                  ))}
-                </select>
-                {fieldErrors.roomTypeId && (
-                  <p id="roomTypeId-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.roomTypeId}</p>
-                )}
-              </div>
-
-            </form>
-          </div>
-
-          <div className="flex justify-end gap-2 px-6 py-4 border-t border-outline-variant/30 bg-surface-container-lowest rounded-b-shape-lg">
-            <M3Button variant="text" onClick={onClose} disabled={loading}>{t('cancel')}</M3Button>
-            <M3Button form="room-form" type="submit" loading={loading} disabled={loading}>{t('save')}</M3Button>
+              <option value="CLEAN">{t('room_status_clean')}</option>
+              <option value="DIRTY">{t('room_status_dirty')}</option>
+              <option value="MAINTENANCE">{t('room_status_maintenance')}</option>
+            </select>
           </div>
         </div>
-      </div>
-    </FocusTrap>
+
+        <div>
+          <label htmlFor="roomTypeId" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+            {t('room_type')} *
+          </label>
+          <select
+            id="roomTypeId"
+            name="roomTypeId"
+            value={formData.roomTypeId}
+            onChange={handleChange}
+            className={inputClass}
+            aria-invalid={!!fieldErrors.roomTypeId}
+            aria-describedby={fieldErrors.roomTypeId ? 'roomTypeId-error' : undefined}
+          >
+            <option value="" disabled>{t('select_placeholder')}</option>
+            {roomTypes.map(rt => (
+              <option key={rt.id} value={rt.id}>
+                {rt.name} (Max {rt.maxOccupancy} pax)
+              </option>
+            ))}
+          </select>
+          {fieldErrors.roomTypeId && (
+            <p id="roomTypeId-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.roomTypeId}</p>
+          )}
+        </div>
+
+      </form>
+    </M3Dialog>
   );
 });
 

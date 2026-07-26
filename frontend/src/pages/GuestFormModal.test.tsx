@@ -37,6 +37,13 @@ describe('GuestFormModal', () => {
     vi.clearAllMocks();
   });
 
+  it('BUG-9: calls onClose on Escape (now built on M3Dialog, which handles it)', () => {
+    const onClose = vi.fn();
+    render(<GuestFormModal onClose={onClose} onSaved={vi.fn()} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it('should have no accessibility violations in add mode', async () => {
     const { container } = render(
       <GuestFormModal onClose={vi.fn()} onSaved={vi.fn()} />

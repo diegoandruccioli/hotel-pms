@@ -120,6 +120,26 @@ describe('M3Dialog', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it('BUG-9: renders an optional footer outside the scrollable body', () => {
+    render(
+      <M3Dialog open title="My Dialog" onClose={vi.fn()} footer={<button type="button">Save</button>}>
+        <p>body</p>
+      </M3Dialog>,
+    );
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+  });
+
+  it('renders no footer section when the footer prop is omitted (existing callers unaffected)', () => {
+    const { container } = render(
+      <M3Dialog open title="My Dialog" onClose={vi.fn()}>
+        <p>body</p>
+      </M3Dialog>,
+    );
+    // 1 divider (header/body) when there's no footer; a 2nd divider only
+    // appears once a footer is rendered.
+    expect(container.querySelectorAll('.bg-outline-variant')).toHaveLength(1);
+  });
+
   it('should have no accessibility violations', async () => {
     const { container } = render(
       <M3Dialog open title="My Dialog" onClose={vi.fn()}>

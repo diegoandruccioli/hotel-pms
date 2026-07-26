@@ -5,11 +5,9 @@ import { guestService } from '../services/guestService';
 import type { GuestResponseDTO, GuestRequestDTO } from '../types/guest.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
+import { M3Dialog } from '../components/m3/M3Dialog';
 import { StructuredAddressFields } from '../components/StructuredAddressFields';
 import { useToastStore } from '../store/toastStore';
-import * as FocusTrapModule from 'focus-trap-react';
-
-const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
 
 const COUNTRY_CODES = [
   { code: '+39', label: '🇮🇹 +39' },
@@ -193,27 +191,40 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
   const inputClass = "block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
   const selectClass = "shrink-0 w-24 rounded-shape-xs border border-outline px-2 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
 
+  const footer = showDeleteConfirm ? (
+    <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+      <span className="text-sm font-medium font-body text-error">
+        {t('confirm_delete_guest')}
+      </span>
+      <div className="flex gap-2">
+        <M3Button variant="text" onClick={closeDeleteConfirm} disabled={loading}>{t('cancel')}</M3Button>
+        <M3Button onClick={handleDelete} loading={loading} disabled={loading} className="bg-error text-on-error hover:bg-error/90 border-transparent">{t('btn_confirm')}</M3Button>
+      </div>
+    </div>
+  ) : (
+    <div className="flex justify-between items-center">
+      <div>
+        {guest && (
+          <M3Button variant="text" onClick={openDeleteConfirm} disabled={loading} className="text-error hover:bg-error-container/20">
+            {t('delete')}
+          </M3Button>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <M3Button variant="text" onClick={onClose} disabled={loading}>{t('cancel')}</M3Button>
+        <M3Button form="guest-form" type="submit" loading={loading} disabled={loading}>{t('save')}</M3Button>
+      </div>
+    </div>
+  );
+
   return (
-    <FocusTrap>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0" role="dialog" aria-modal="true" aria-labelledby="guest-modal-title">
-        <div className="fixed inset-0 bg-scrim/40 transition-opacity" onClick={onClose} aria-hidden="true" />
-        <div className="relative bg-surface rounded-shape-lg shadow-elevation-3 w-full max-w-md max-h-[90vh] flex flex-col animate-scale-in">
-
-          <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/30">
-            <h3 id="guest-modal-title" className="text-xl font-display font-medium text-on-surface">
-              {guest ? t('edit_guest') : t('add_guest')}
-            </h3>
-            <button
-              onClick={onClose}
-              type="button"
-              aria-label={t('close')}
-              className="w-10 h-10 flex items-center justify-center rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none"
-            >
-              <MaterialIcon name="close" size={20} />
-            </button>
-          </div>
-
-          <div className="p-6 overflow-y-auto">
+    <M3Dialog
+      open
+      title={guest ? t('edit_guest') : t('add_guest')}
+      titleId="guest-modal-title"
+      onClose={onClose}
+      footer={footer}
+    >
             <form id="guest-form" onSubmit={handleSubmit} noValidate className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -361,36 +372,7 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
                 )}
               </div>
             </form>
-          </div>
-
-          {showDeleteConfirm ? (
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 px-6 py-4 border-t border-error/20 bg-error-container/20 rounded-b-shape-lg">
-              <span className="text-sm font-medium font-body text-error">
-                {t('confirm_delete_guest')}
-              </span>
-              <div className="flex gap-2">
-                <M3Button variant="text" onClick={closeDeleteConfirm} disabled={loading}>{t('cancel')}</M3Button>
-                <M3Button onClick={handleDelete} loading={loading} disabled={loading} className="bg-error text-on-error hover:bg-error/90 border-transparent">{t('btn_confirm')}</M3Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex justify-between items-center px-6 py-4 border-t border-outline-variant/30 bg-surface-container-lowest rounded-b-shape-lg">
-              <div>
-                {guest && (
-                  <M3Button variant="text" onClick={openDeleteConfirm} disabled={loading} className="text-error hover:bg-error-container/20">
-                    {t('delete')}
-                  </M3Button>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <M3Button variant="text" onClick={onClose} disabled={loading}>{t('cancel')}</M3Button>
-                <M3Button form="guest-form" type="submit" loading={loading} disabled={loading}>{t('save')}</M3Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </FocusTrap>
+    </M3Dialog>
   );
 });
 
