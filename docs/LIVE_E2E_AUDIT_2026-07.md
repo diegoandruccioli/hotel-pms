@@ -61,7 +61,7 @@ Causa dell'OOM stesso (concorrente, non alternativa): in `ThymeleafPdfTemplateRe
 Pattern C12 condiviso da Guests/Billing/Reservations.
 `GuestRepository.searchByKeywordAndHotelId` (righe 67-72) matcha un **singolo** `:keyword` con LIKE su firstName OR lastName OR email OR city, ciascuno indipendente — "Test Verifica" come stringa intera non è sottostringa né di firstName="Test" né di lastName="Verifica" presi singolarmente → 0 risultati, verificato sia su `/guests` diretta sia nel form prenotazione. Nessuna utility di tokenizzazione esiste nel codebase da riusare. Rischio concreto: l'utente non trova l'ospite esistente, clicca "Nuovo Ospite", crea un duplicato.
 
-### BUG-3 — Ricerca comune Alloggiati non trova mai "ROMA" (il comune più popoloso d'Italia)
+### BUG-3 — Ricerca comune Alloggiati non trova mai "ROMA" (il comune più popoloso d'Italia) — ✅ RISOLTO (vedi §5)
 `AlloggiatiComuneRepository.searchActive` (righe 54-63): `ORDER BY c.descrizione` (alfabetico) + `LIMIT 20` (`AlloggiatiLookupServiceImpl.AUTOCOMPLETE_MAX_RESULTS = 20`) senza alcuna priorità su match esatto/prefisso. Con ~19 comuni omonimi/derivati che iniziano con lettere precedenti a "R" (Arcinazzo Romano... Montorio Romano), il cap si esaurisce prima di raggiungere "ROMA" alfabeticamente. Verificato in rete: `GET /comuni?q=Roma` risponde 200 con 20 elementi, nessuno è "ROMA". Bug ad alta severità su un adempimento legale obbligatorio (report Alloggiati/Questura).
 
 ### BUG-4 (revisionato) — Messaggio errato su errori 4xx/5xx in 11+ punti frontend
@@ -106,10 +106,10 @@ Ogni piano indica: causa radice, fix proposto, file da toccare, verifica, branch
 - **Impatto positivo indiretto**: beneficia anche Billing (cross-service guest-name resolution) e Reservations, che riusano lo stesso endpoint tramite `GuestClient.searchGuests`
 - **Branch**: `main`
 
-### BUG-3 — Ricerca comune Alloggiati non trova mai "ROMA"
-- **Fix**: cambiare `ORDER BY` in `AlloggiatiComuneRepository.searchActive` per dare priorità a match esatto, poi prefisso, poi sottostringa prima del cap di 20 — `ORDER BY CASE WHEN descrizione = :term THEN 0 WHEN descrizione LIKE CONCAT(:term,'%') THEN 1 ELSE 2 END, descrizione`
+### BUG-3 — Ricerca comune Alloggiati non trova mai "ROMA" — ✅ RISOLTO
+- **Fix**: `ORDER BY` in `AlloggiatiComuneRepository.searchActive` ora dà priorità a match esatto (0), poi prefisso (1), poi sottostringa (2), prima del cap di 20 — `ORDER BY CASE WHEN LOWER(descrizione) = LOWER(:term) THEN 0 WHEN LOWER(descrizione) LIKE LOWER(CONCAT(:term,'%')) THEN 1 ELSE 2 END, descrizione` (case-insensitive, coerente col `WHERE` esistente)
 - **File**: `frontdesk-service/src/main/java/com/hotelpms/frontdesk/stays/repository/AlloggiatiComuneRepository.java:54-63`
-- **Verifica**: query "Roma" deve restituire "ROMA" come primo risultato; estendere (non solo far ripassare) `AlloggiatiLookupServiceImplTest`/`AlloggiatiLookupControllerTest`
+- **Verifica**: nuovo `AlloggiatiComuneRepositoryIntegrationTest` (`@DataJpaTest` + Testcontainers, Postgres reale, stesso pattern usato per BUG-2) — seeda 20 comuni "Arcinazzo Romano N" alfabeticamente precedenti a "ROMA" più "ROMA" stesso: `exactMatchRanksFirstAndSurvivesCap` verifica che "ROMA" sia il primo risultato anche col cap a 20; `prefixMatchRanksAheadOfSubstringMatch` verifica che un prefisso ("Romano di Lombardia") batta un match di sola sottostringa. `./gradlew :frontdesk-service:build` verde (PMD/Checkstyle/SpotBugs/coverage tutti passati)
 - **Branch**: `main`
 
 ### BUG-4 — Messaggio errato su errori 4xx/5xx

@@ -43,7 +43,10 @@ public interface AlloggiatiComuneRepository extends JpaRepository<AlloggiatiComu
 
     /**
      * Full-text search on comune name, optionally filtered by province.
-     * Results are ordered alphabetically and limited by the supplied {@link Pageable}.
+     * Results are ordered by match quality (exact match, then prefix match, then substring
+     * match) before falling back to alphabetical order, then limited by the supplied
+     * {@link Pageable} — otherwise a common comune (e.g. "Roma") can be pushed past the cap
+     * by alphabetically earlier substring matches (e.g. "Arcinazzo Romano").
      *
      * @param term      search term (case-insensitive substring match on descrizione)
      * @param provincia optional 2-character province filter (pass {@code null} to skip)
@@ -55,7 +58,10 @@ public interface AlloggiatiComuneRepository extends JpaRepository<AlloggiatiComu
             + "WHERE LOWER(c.descrizione) LIKE LOWER(CONCAT('%', :term, '%')) "
             + "AND (c.dataFineVal IS NULL OR c.dataFineVal > :today) "
             + "AND (:provincia IS NULL OR c.provincia = :provincia) "
-            + "ORDER BY c.descrizione")
+            + "ORDER BY CASE "
+            + "WHEN LOWER(c.descrizione) = LOWER(:term) THEN 0 "
+            + "WHEN LOWER(c.descrizione) LIKE LOWER(CONCAT(:term, '%')) THEN 1 "
+            + "ELSE 2 END, c.descrizione")
     List<AlloggiatiComune> searchActive(
             @Param("term") String term,
             @Param("provincia") String provincia,
