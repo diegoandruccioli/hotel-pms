@@ -134,3 +134,202 @@ Ogni piano indica: causa radice, fix proposto, file da toccare, verifica, branch
 2. **BUG-5** — sicurezza, ma impatto limitato (richiede comunque credenziali valide, solo vanifica la rotazione forzata)
 3. **BUG-2 + BUG-3** — UX/dati, rischio concreto di duplicati e rallentamento su un adempimento legale
 4. **BUG-4** — qualità UX, nessun rischio funzionale
+
+---
+
+## 7. Round 2 — verifica regressione + copertura estesa (2026-07-26, dopo il fix di BUG-0/0b/2/3/4/5)
+
+**Branch:** `main` (HEAD `6bf60d9`, tutti e 6 i bug del Round 1 già mergiati). Stack Docker live (17/17 container `healthy`), utenti di test creati via `POST /api/v1/auth/register` (pubblico, nessun bootstrap admin necessario): `e2eaudit`/ADMIN, `e2eowner`/OWNER, `e2edesk`/RECEPTIONIST, più un utente RECEPTIONIST creato via Admin Users (`mustChangePassword=true`) per la verifica T-AUTH-06.
+
+### 7.1 Verifica regressione dei 6 bug del Round 1
+
+| Bug | Esito | Evidenza |
+|-----|-------|----------|
+| BUG-0 (Billing 500) | ✅ OK | `GET /invoices/search` senza query e con query → 200, filtri status/data non bypassati |
+| BUG-0b (PDF crash) | ✅ OK | 3 download PDF consecutivi sulla stessa fattura → 200/PDF valido/22439 byte ogni volta, `billing-service` rimasto `healthy` |
+| BUG-2 (ricerca "Nome Cognome") | ✅ OK | `query=Test%20Verifica` e `query=Verifica%20Test` → entrambe trovano l'ospite |
+| BUG-3 (comune "Roma") | ✅ OK | `GET /stays/lookup/comuni?q=Roma` → **"ROMA" è il primo risultato** (prima di "ROMAGNANO...", "ARCINAZZO ROMANO" ecc.) |
+| BUG-5 / T-AUTH-06 (mustChangePassword) | ✅ OK | Utente con `mustChangePassword=true`: `GET /guests/search` → **403**, `GET /auth/me` → 200 (allow-list). Dopo `POST /change-password` → stesso endpoint `/guests/search` → **200** con i cookie aggiornati |
+| BUG-4 (messaggio errore reale) | ⚠️ **Fix corretto ma insufficiente** — vedi BUG-6 sotto | Il codice del fix (`getErrorMessage`) estrae correttamente `error.response.data.detail`, ma se quel codice non ha una voce nel dizionario `errors.json` il toast mostra il **codice enum grezzo** invece di un messaggio umano — vedi BUG-6 |
+
+### 7.2 BUG-6 (nuovo, ALTA severità) — 27 codici errore backend su 39 non hanno traduzione frontend
+
+**Descrizione.** Il fix di BUG-4 (`utils/errorMessage.ts`) estrae correttamente `error.response.data.detail` invece del generico `err.message` di Axios — ma quel `detail`, per i codici `[A-Z_]+`, viene tradotto da un dizionario statico `frontend/src/locales/{it,en}/errors.json` tramite l'interceptor Axios (`services/api.ts:66-72`). Quel dizionario ha **31 chiavi**, ma il backend solleva **39 codici distinti** in tutto il repo (`throw new XxxException("CODICE")`), lasciando **27 codici senza alcuna traduzione**. Quando l'interceptor non trova la chiave, `i18n.t()` ritorna la chiave stessa e la sostituzione avviene comunque (nessuna verifica che la traduzione sia diversa dal placeholder namespaced) — risultato: l'utente vede la stringa enum grezza in un toast, es. **"BILLING_NOT_PAID"** invece di un messaggio come "Impossibile effettuare il check-out: la fattura non è ancora stata pagata".
+
+**Riprodotto dal vivo:** check-out di un soggiorno con fattura non pagata (`Rossi Mario`, camera 101) → `PUT /stays/{id}/check-out` → 409 `BILLING_NOT_PAID` → toast mostra letteralmente `BILLING_NOT_PAID` (verificato leggendo il DOM `[role="alert"]` subito dopo il click, prima dell'auto-dismiss a 4000ms).
+
+**Codici mancanti (verificati via diff tra i codici `throw new *Exception("...")` di tutti i servizi e le chiavi di `frontend/src/locales/it/errors.json`, identiche in `en/errors.json`):**
+```
+ACCOUNT_TEMPORARILY_LOCKED, BILLING_NOT_PAID, CANNOT_DEACTIVATE_SELF,
+CANNOT_EXPORT_CANCELLED_INVOICE, CANNOT_UPDATE_CANCELLED_INVOICE,
+CHECKOUT_MUST_BE_AFTER_CHECKIN, COMUNE_AND_PROVINCIA_MUST_BE_PROVIDED_TOGETHER,
+COMUNE_NOT_FOUND_FOR_PROVINCIA, DOCUMENT_MISMATCH, GUEST_HAS_ACTIVE_RESERVATIONS,
+GUEST_STRUCTURED_ADDRESS_INCOMPLETE, HOTEL_ID_NOT_AVAILABLE,
+HOTEL_STRUCTURED_ADDRESS_INCOMPLETE, INVALID_CURRENT_PASSWORD, INVALID_ORDER_STATUS,
+INVALID_STAY_STATUS, INVOICE_ALREADY_EXISTS_FOR_STAY, INVOICE_CANCELLED,
+INVOICE_NOT_FOUND_FOR_STAY, INVOICE_NOT_OPEN, MENU_ITEM_NOT_FOUND,
+MISSING_HOTEL_CONTEXT, PAYMENT_EXCEEDS_BALANCE, RESERVATION_NOT_DELETABLE,
+ROOM_UNAVAILABLE, SDI_ONLY_VALID_FOR_FATTURA, USERNAME_ALREADY_EXISTS
+```
+Alcuni sono percorsi utente molto comuni: `ACCOUNT_TEMPORARILY_LOCKED` (lockout al login, T-AUTH-02), `INVALID_CURRENT_PASSWORD` (cambio password fallito — incluso il flusso BUG-5/T-AUTH-06 appena aggiunto), `USERNAME_ALREADY_EXISTS` (creazione utente admin), `ROOM_UNAVAILABLE`/`RESERVATION_NOT_DELETABLE` (prenotazioni), `PAYMENT_EXCEEDS_BALANCE` (pagamenti fattura), `MENU_ITEM_NOT_FOUND` (F&B). Alcuni altri (`HOTEL_ID_NOT_AVAILABLE`, `MISSING_HOTEL_CONTEXT`) potrebbero essere guard-clause interne mai raggiungibili da un flusso utente normale — non verificato caso per caso, da confermare in fase di fix.
+
+**Fix proposto (non applicato in questo giro):** aggiungere le 27 chiavi mancanti a `frontend/src/locales/it/errors.json` ed `en/errors.json`; considerare anche un fallback esplicito lato `services/api.ts` (es. loggare un warning se la chiave non esiste, invece di sostituire silenziosamente col placeholder) per evitare che il gap si riformi silenziosamente in futuro quando si aggiungono nuove eccezioni backend.
+
+**File:** `frontend/src/locales/it/errors.json`, `frontend/src/locales/en/errors.json`, `frontend/src/services/api.ts:66-72`
+**Severità:** ALTA (UX — messaggi incomprensibili su percorsi di errore comuni), nessun impatto di sicurezza.
+
+### 7.3 BUG-7 (nuovo, MEDIA severità) — Focus ring della sidebar di navigazione non conforme al mandato di accessibilità del progetto
+
+CLAUDE.md richiede per l'intera app "Focus indicators: highly visible, ≥ 3:1 contrast... treated as a first-class design element". Lo skip-link (`MainLayout.tsx:133`) rispetta questo requisito (`focus:ring-2 focus:ring-primary focus:ring-offset-2`, verificato: box-shadow doppio anello bianco+blu scuro, molto visibile). Ma i **link della sidebar principale** (Bacheca/Dashboard, Ospiti, Prenotazioni, Calendario, Soggiorni, Pulizie, Fatturazione, Ristorante, Camere, Analytics — 10 voci, la superficie di navigazione più usata dell'intera app) sono generati da `getRailNavItemClasses`/`getDrawerNavItemClasses` (`MainLayout.tsx:27-39`), che **non includono alcuna classe `focus:ring`/`focus-visible:ring`**. Verificato dal vivo: navigando via TAB fino al link "Ospiti", `getComputedStyle` mostra `outline-width: 0.8px`, nessun `box-shadow` — il ring custom dell'app è del tutto assente, l'elemento si affida al solo outline nativo sottile del browser, che è l'esatto anti-pattern che CLAUDE.md chiede di evitare ("mai un ripensamento").
+
+**File:** `frontend/src/layouts/MainLayout.tsx:27-39` (funzioni `getRailNavItemClasses`, `getDrawerNavItemClasses`)
+**Fix proposto (non applicato):** aggiungere `focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2` (o l'utility ring equivalente già usata altrove nell'app, es. sullo skip-link) a entrambe le funzioni.
+**Severità:** MEDIA (accessibilità — non blocca l'uso da tastiera, ma il focus è difficile da individuare visivamente sulla superficie di navigazione più usata dell'app).
+
+**Aggiornamento Round 4 — stesso difetto trovato su altri 5 file, non è isolato alla sidebar.** Testando la navigazione TAB sulla tabella Reservations, i bottoni azione "View"/"Edit" di ogni riga mostrano lo stesso `outline: 0.8px auto` nativo senza `box-shadow` custom (`className` verificato dal vivo: `"text-primary hover:text-primary/80 font-medium text-sm mr-4"`, nessuna classe `focus-visible:ring*`). Non è un componente condiviso rotto: **`M3Button` di per sé ha correttamente `focus-visible:ring-2` su tutte le varianti** (`components/m3/M3Button.tsx:13-18`) — il problema è che diverse pagine non lo riusano per queste azioni compatte in tabella, preferendo bottoni/link Tailwind scritti a mano, e a metà di loro (`Guests.tsx`, `Stays.tsx`, `Dashboard.tsx`, `Restaurant.tsx:51`, `InvoiceDetailModal.tsx`) qualcuno si è ricordato di aggiungere manualmente `focus-visible:ring*`, mentre agli altri manca del tutto:
+- `frontend/src/pages/Billing.tsx:25`
+- `frontend/src/pages/Reservations.tsx:135,142,149` (verificato dal vivo)
+- `frontend/src/pages/Restaurant.tsx:114,125`
+- `frontend/src/pages/Rooms/RoomList.tsx:54`
+- `frontend/src/pages/Rooms/RoomTypeList.tsx:27`
+
+**Fix proposto (aggiornato):** oltre al fix puntuale sulla sidebar, converrebbe estrarre un piccolo componente condiviso tipo `M3TableActionLink` (stesse classi base + `focus-visible:ring*` già corrette, riusate da `Guests.tsx`/`Stays.tsx`) e migrare i 5 file sopra a usarlo, invece di continuare a copiare/incollare la stringa di classi Tailwind pagina per pagina (rischio concreto di regressione ogni volta che si aggiunge una nuova tabella).
+**Severità:** invariata, MEDIA — ma lo scope è ora "6 superfici" (sidebar + 5 tabelle dati) invece di 1.
+
+### 7.4 Osservazioni minori (non bloccanti, non tracciate come bug numerati)
+
+- **Placeholder data italiano anche in lingua inglese**: cambiando lingua app in Inglese (`/settings/appearance` → Language → English), l'input `<input type="date">` di Fatturazione (filtro "From"/"To") continua a mostrare il placeholder nativo `gg/mm/aaaa` invece di un formato inglese. È un comportamento nativo del browser (placeholder di `<input type="date">` derivato dalla locale del sistema/browser, non dall'i18n dell'app) — non risolvibile con una semplice traduzione, richiederebbe un date-picker custom. Impatto basso, cosmetico.
+- **Fattura a €0,00**: l'ospite "Test Verifica" (creato durante la sessione precedente per verificare BUG-2) ha una fattura `2026/0002` con `totalAmount: €0.00` — non verificato se sia dato di test residuo o un caso limite reale (fattura emessa senza addebiti); non abbastanza tempo per approfondire in questo giro.
+- **"Email failed" su una prenotazione** (`Mario Rossi`, badge `NOTIFICATION_SERVICE_UNAVAILABLE` con bottone retry) osservato nella pagina Prenotazioni — il meccanismo di retry manuale (feature esistente, sessione 17/07) è presente e visibile correttamente; non verificato se il retry funzioni davvero (notification-service risultava `healthy` in `docker ps` al momento del test) — probabile blip transitorio, non approfondito per limiti di tempo.
+- Cambio lingua IT→EN verificato su Fatturazione e Prenotazioni: traduzioni complete, nessuna chiave i18n grezza visibile, nessuna rottura di layout.
+
+### 7.5 Copertura di questo round
+
+**Verificato:** le 6 regressioni sopra, Calendario/Planning Board (carica correttamente, nessun errore console), hub Impostazioni e sotto-pagina Aspetto/Lingua, cambio lingua IT/EN su 2 pagine, un check TAB/focus-ring sulla sidebar.
+
+**Non coperto per limiti di tempo (da fare in un round successivo):** flusso Walk-in check-in completo, check-out con fattura pagata (percorso di successo, verificato solo il percorso di blocco 409), Settings/Password, Settings/Sistema (profilo hotel + credenziali Alloggiati Web + toggle notifiche), Admin Users (creazione/reset/attivazione da UI, non solo via API), CRUD Room/RoomType, F&B ordini, Housekeeping cambi stato, Owner Analytics + export CSV, RBAC da UI per OWNER/RECEPTIONIST (verificato solo via claim JWT/API, non cliccando in giro con quegli utenti), TAB-accessibilità estesa oltre la sidebar (modali, form, tabelle).
+
+---
+
+## 8. Round 3 — copertura rimanente (2026-07-26, dopo Round 2)
+
+**Branch:** `main` (HEAD `6bf60d9`). Stack Docker riusato dal Round 2 (billing-service/frontdesk-service/auth-service up da 6h). Utenti di test nuovi via `POST /api/v1/auth/register`: `r3admin`/ADMIN, `r3owner`/OWNER, `r3desk`/RECEPTIONIST (hotel `00000000-0000-0000-0000-000000000001`, password `Round3Test2026!!`).
+
+### 8.1 BUG-8 (nuovo, ALTA severità) — Refresh silenzioso non funziona su reload/apertura diretta: logout forzato ogni 15 minuti
+
+**Descrizione.** `App.tsx:42-52` verifica la sessione chiamando `GET /api/v1/auth/me` **una sola volta**, dentro un `useEffect` che gira al mount del componente `App` — cioè ad ogni caricamento completo della pagina (F5, link diretto, nuova scheda), non ad ogni navigazione client-side (quella la gestisce React Router senza remount). Ma l'interceptor Axios che gestisce il refresh silenzioso (`services/api.ts:76-78`) esclude esplicitamente `/me` dal meccanismo di retry-dopo-refresh: `if (url.includes('/login') || url.includes('/me')) { return Promise.reject(error); }` — commento nel codice: "Never attempt refresh on auth endpoints themselves to prevent loops". La motivazione è valida per `/login` (non ha senso tentare un refresh su un tentativo di login fallito) ma è sovra-estesa a `/me`, che è un endpoint di sola lettura: un refresh-poi-retry su `/me` non causerebbe alcun loop (stesso pattern già usato con successo per tutti gli altri endpoint business).
+
+**Effetto pratico:** l'access token JWT dura 15 minuti (`ACCESS_COOKIE_MAX_AGE`/`jwt.expiration`); il refresh token dura 7 giorni ed è pienamente valido. Ma se l'utente ricarica la pagina (o apre un link diretto, o la scheda viene ricaricata dal sistema operativo) **dopo che i 15 minuti sono scaduti**, `GET /me` fallisce con 401, l'interceptor non tenta il refresh, `checkAuth(null)` fa scattare `ProtectedRoute` → redirect a `/login` — nonostante l'utente abbia un refresh token valido per altri 7 giorni in un cookie httpOnly. Riprodotto dal vivo: login → 15 minuti di normale uso dell'app (navigazione client-side, che non ri-attiva `/me`) → `page.goto()` su una URL diretta → redirect immediato a `/login`, lavoro non salvato perso se in corso.
+
+**Impatto:** per un receptionist a inizio turno che tiene la scheda aperta tutto il giorno navigando solo via click (mai un vero reload) il bug non si manifesta; ma qualunque F5 accidentale, apertura da bookmark/nuova scheda, o refresh automatico del browser dopo >15 minuti di sessione forza un re-login completo, anche con credenziali/sessione altrimenti valide per 7 giorni — attrito frequente e non necessario, comportamento diverso da quello che il meccanismo di refresh è chiaramente progettato per garantire.
+
+**File:** `frontend/src/App.tsx:42-52` (chiamata singola a `fetchMe` al mount), `frontend/src/services/api.ts:76-78` (esclusione di `/me` dal retry-con-refresh)
+**Fix proposto (non applicato):** rimuovere `/me` dall'esclusione dell'interceptor (mantenere solo `/login` e `/refresh`), così un 401 su `/me` al bootstrap dell'app tenta un refresh silenzioso prima di arrendersi — nessun rischio di loop perché il refresh stesso, se fallisce, chiama `performLogout()` senza ritentare.
+**Severità:** ALTA (UX — rompe la persistenza di sessione, il caso d'uso principale per cui il refresh token a 7 giorni esiste), nessun impatto di sicurezza.
+
+### 8.2 BUG-9 (nuovo, MEDIA severità) — Modali `GuestFormModal`/`RoomFormModal`/`RoomTypeFormModal` non chiudono su Escape
+
+**Descrizione.** CLAUDE.md mandata: "Focus MUST be trapped inside open modals/dialogs; Escape closes them". Il componente condiviso `M3Dialog.tsx` implementa correttamente entrambi i requisiti (focus trap via `focus-trap-react` + `useEffect` con `document.addEventListener('keydown', ...)` che chiama `onClose` su Escape, righe 42-49). Ma **3 modali reimplementano da zero** il pattern invece di riusare `M3Dialog` — `GuestFormModal.tsx`, `RoomFormModal.tsx`, `RoomTypeFormModal.tsx` — tutti e 3 importano `focus-trap-react` direttamente ma **nessuno dei tre registra un listener per Escape**. Riprodotto dal vivo su `RoomFormModal`: aperto "Add Room", compilato il campo Room #, premuto Escape → il modale resta aperto, dati intatti, il focus salta fuori dal trap verso il bottone "Add Room" retrostante (visibile nello screenshot: il modale è ancora renderizzato in primo piano, il bottone dietro risulta "active"). Solo la X o il click sullo scrim chiudono questi 3 modali.
+
+**File:** `frontend/src/pages/GuestFormModal.tsx`, `frontend/src/pages/Rooms/RoomFormModal.tsx`, `frontend/src/pages/Rooms/RoomTypeFormModal.tsx` (nessuno ha un handler Escape, verificato via grep)
+**Fix proposto (non applicato):** il modo più pulito è far sì che i 3 modali riusino `M3Dialog` invece di reimplementare l'overlay/focus-trap a mano (elimina la duplicazione e la classe intera di bug); in alternativa, copiare il pattern `useEffect`+`keydown` di `M3Dialog.tsx:42-49` in ciascuno dei 3 file.
+**Severità:** MEDIA (accessibilità — funzionalità di chiusura da tastiera mancante su 3 form molto usati; non blocca l'uso, X/scrim restano disponibili).
+
+### 8.3 BUG-10 (nuovo, MEDIA severità) — Autocomplete `StatoSelect` mostra il codice raw invece del nome dopo la selezione
+
+**Descrizione.** Nei form Alloggiati (Walk-in check-in, Check-in da prenotazione), i campi "Citizenship"/"Country of Birth"/documento-Paese-di-rilascio sono un `StatoSelect` (`StayGuestFieldSection.tsx:177-210`), backed dal componente generico `LookupAutocomplete` (righe 60-161). Dopo la selezione di un'opzione, `LookupAutocomplete` calcola l'etichetta da mostrare così: `options.find(o => o.codice === value)` (riga 70) — ma `StatoSelect.handleSelect` (riga 195) resetta `query` a `''` subito dopo la selezione, il che fa ricalcolare `options` (via `useMemo`, righe 179-192) alla sua slice di default: **i primi 20 stati dell'elenco non filtrato**, non più il risultato della ricerca appena fatta. Se lo stato selezionato (es. "ITALIA", codice `100000100`) non rientra in quei primi 20, `options.find(...)` non trova corrispondenza e la funzione ricade sul valore raw (riga 71: `return matched ? ... : value`) — il campo mostra quindi il codice numerico grezzo `100000100` invece di "ITALIA". Riprodotto dal vivo, live, su tutti e 2 i campi `StatoSelect` compilati durante il walk-in (Citizenship e Country of Birth). Da notare: il componente gemello `ComuneAutocomplete` (righe 223-262) **non ha questo bug** — le sue `options` sono il risultato dell'ultima ricerca server-side e non vengono resettate a una slice di default dopo la selezione, quindi "Municipality of Birth" mostra correttamente `412058091 — ROMA (RM)`.
+
+**Impatto:** il dato salvato è corretto (il `codice` giusto arriva comunque al backend — non è un bug di integrità dati), ma un receptionist che compila il form non ha più modo di verificare visivamente cosa ha selezionato senza ri-aprire il dropdown — sembra un campo rotto/non salvato.
+
+**File:** `frontend/src/pages/Stays/StayGuestFieldSection.tsx:68-72` (calcolo `displayLabel`), `:190` (`useMemo` che ricade sulla slice di default quando `query===''`), `:195` (`handleSelect` che azzera `query`)
+**Fix proposto (non applicato):** non azzerare `query` in `StatoSelect.handleSelect` (o, più robusto, far sì che `LookupAutocomplete` mantenga in cache l'ultima opzione effettivamente selezionata — `{codice, label}` — indipendentemente da cosa contiene `options` in un dato momento, invece di ri-derivare la label da una ricerca in un array che può cambiare sotto i piedi).
+**Severità:** MEDIA (UX/fiducia nei dati — il valore salvato è corretto, ma la UI mente su cosa mostra).
+
+### 8.4 BUG-11 (nuovo, ALTA severità) — `/profile/hotel` E `/admin/users` non hanno alcun punto di accesso nella UI
+
+**Descrizione.** La route `/profile/hotel` → `HotelProfile.tsx` esiste in `App.tsx:105` ed è una pagina funzionante e completa: ragione sociale, indirizzo strutturato, P.IVA/codice fiscale, e — soprattutto — le **credenziali del portale Alloggiati Web** (campo password con toggle mostra/nascondi, verosimilmente username/password/WsKey usati per l'invio automatico del report di pubblica sicurezza). Nessun componente dell'app ci punta: non c'è alcuna card nell'hub Impostazioni (`Settings.tsx` ha solo 5 voci: Profilo/Password/Accessibilità/Aspetto/Sistema), non c'è alcun link dentro `SettingsSystem.tsx` (verificato via grep su `navigate`/`Link`/`/profile` — solo `navigate(-1)` per il bottone Indietro), non c'è alcun link altrove nel codebase (`grep -rl "profile/hotel" src` trova solo `App.tsx` stesso). L'unico modo per raggiungerla è digitare l'URL a mano conoscendola in anticipo.
+
+**Aggiornamento Round 4 — stesso identico pattern anche su `/admin/users`.** Verificato dal vivo come OWNER (`r3owner`): la pagina User Management è pienamente funzionante e raggiungibile via URL diretto, ma **non compare né nella sidebar** (10 voci: Dashboard/Guests/Reservations/Calendar/Stays/Housekeeping/Billing/Restaurant/Rooms/Analytics — nessuna voce Admin/Utenti) **né nel menu utente in alto a destra** (solo "Settings" e "Log out", verificato aprendo il menu dal vivo). Confermato anche via grep: `grep -rn "admin/users" frontend/src` trova **solo** la dichiarazione della route in `App.tsx:104`, nessun `Link`/`navigate` verso di essa da nessuna parte del codebase. Stesso identico difetto di `/profile/hotel`: una pagina amministrativa completa e funzionante, raggiungibile solo se si conosce già l'URL a memoria.
+
+**Impatto:** `/profile/hotel` contiene sia i dati fiscali richiesti per FatturaPA sia le credenziali obbligatorie per l'invio Alloggiati (adempimento legale verso la Questura); `/admin/users` è l'unico modo per creare/disattivare/resettare le credenziali dello staff. Un ADMIN/OWNER che non conosce già gli URL a memoria non ha modo di raggiungere **due delle funzioni amministrative più critiche dell'app** da UI — funzionalmente equivalenti a feature assenti per chiunque non abbia letto il codice sorgente.
+
+**File:** `frontend/src/App.tsx:104-105` (entrambe le route orfane), `frontend/src/pages/Settings.tsx`, `frontend/src/pages/Settings/SettingsSystem.tsx`, `frontend/src/layouts/MainLayout.tsx` (nav items) — nessuno di questi punta a `/profile/hotel` o `/admin/users`.
+**Fix proposto (non applicato):** aggiungere entrambe le pagine come card nell'hub Impostazioni (o come voci extra nella sidebar/menu utente, gated ADMIN/OWNER com'è già la route stessa).
+**Severità:** ALTA (due funzionalità amministrative critiche — compliance fiscale/Alloggiati e gestione staff — completamente non scopribili da UI).
+
+### 8.5 Indizio (da investigare, non ancora un bug numerato) — Creazione fattura al check-in inaffidabile
+
+Durante il walk-in check-in di test (guest "Test Verifica", room `R3-101`), la creazione della fattura al check-in è fallita: badge "Invoice failed" con motivo `BILLING_SERVICE_UNAVAILABLE` (log `frontdesk-service`: `[STAY] INVOICE_CREATION_FAILED | reason=BILLING_SERVICE_UNAVAILABLE`, nessuna richiesta corrispondente arrivata a `billing-service` nello stesso istante — verificato sui log di entrambi i servizi). Il bottone "Retry invoice creation" esistente (pattern outbox-mirato, 17/07) è stato premuto e **ha fallito di nuovo con lo stesso errore generico**, 1 minuto dopo. Connettività di rete frontdesk→billing verificata OK nel frattempo (richiesta diretta `wget` dal container `frontdesk-service` a `billing-service:8085/api/v1/invoices/stay` → 401, cioè risposta HTTP reale, non un errore di connessione). `billing-service` risultava `healthy` e rispondeva normalmente ad altre richieste (es. `OwnerReportServiceImpl` nello stesso minuto). Nessuna eccezione con stack trace loggata su nessuno dei due lati: il fallback di `BillingClient.createInvoiceForStayFallback` (`frontdesk-service/.../client/BillingClient.java`) scarta silenziosamente il `Throwable` originale invece di loggarlo, rendendo impossibile diagnosticare la causa reale dai log applicativi.
+
+**Indizio collegato, probabilmente stesso bug:** la fattura preesistente `2026/0002` (ospite "Test Verifica", creata nella sessione Round 1/2 durante il check-in della stay `T2607A`, room type "Doppia Standard" con prezzo base €90) ha **`totalAmount: €0.00` e zero addebiti** — sintomo compatibile con una creazione-fattura che "riesce" (la entity Invoice viene creata) ma il charge della tariffa camera non viene mai attaccato, oppure con un fallimento parziale simile a quello appena osservato ma non intercettato/segnalato all'epoca.
+
+**Non risolto in questo giro** (richiede accesso a log DEBUG/reproduzione controllata con un debugger attaccato, fuori scope per un giro di sola verifica). Da riaprire come bug numerato una volta isolata la causa — verosimilmente merita anche un fix di osservabilità indipendente dal bug stesso: il fallback di `BillingClient` dovrebbe loggare almeno `throwable.getClass().getSimpleName()` e `throwable.getMessage()`, non solo la stringa fissa `BILLING_SERVICE_UNAVAILABLE`.
+
+**File:** `frontdesk-service/src/main/java/com/hotelpms/frontdesk/client/BillingClient.java` (fallback silenzioso), stay `ccc4578b-4865-48c6-ab91-87e1f6293fa1` / invoice `2026/0002` per riproduzione.
+
+**Aggiornamento Round 4 — confermato, non era un fluke.** Riaperta la fattura `2026/0002` dopo aver aggiunto un addebito F&B da €6.00 (vedi §9.4): la fattura ora mostra correttamente €6.00, ma la sezione "Charges" contiene **solo** la riga F&B (`"F&B: 2x Cappuccino" — €6.00`) — **nessuna riga per la tariffa camera** della stay `T2607A` (Doppia Standard, €90/notte). Questo conferma con certezza l'ipotesi: la creazione della fattura al check-in produce un guscio di fattura vuoto (l'entity `Invoice` viene creata, l'`InvoiceServiceImpl` risponde 200/esiste nel DB, tant'è che addebiti aggiunti dopo — F&B — si attaccano correttamente), ma il charge iniziale della tariffa camera **non viene mai creato**, silenziosamente, senza badge di errore visibile in UI per questo specifico charge (il badge "Invoice failed" osservato durante il walk-in di questo round era un fallimento diverso e più totale — l'intera fattura non veniva creata — mentre qui la fattura esiste ma è incompleta). Sembra quindi esserci **più di un modo di fallire** nello stesso punto del codice (fallimento totale vs. fallimento parziale del solo charge camera), entrambi riconducibili all'area `BillingClient`/creazione-fattura-al-check-in ma probabilmente in punti diversi della catena di chiamate. Resta da isolare con un debugger — la fattura `2026/0002` è ora un caso di riproduzione vivo e permanente (fattura reale con solo charge F&B, mai charge camera) invece che solo un log storico.
+
+### 8.6 Osservazioni minori (non bloccanti, non tracciate come bug numerati)
+
+- **Nessun bottone "Elimina" per Room/RoomType in UI**: il backend espone `DELETE /api/v1/rooms/{id}` e `DELETE /api/v1/room-types/{id}` (verificato `@DeleteMapping` in `RoomController.java:141`/`RoomTypeController.java:95`), ma né `RoomList.tsx` né `RoomTypeList.tsx` mostrano un'azione di eliminazione — solo "Edit". Potrebbe essere una scelta di prodotto intenzionale (asset fisici, raramente cancellati) più che un bug — segnalato per conferma, non fixato.
+- Focus trap verificato **corretto** (a differenza di Escape) su `RoomFormModal`: Tab dall'ultimo campo va a Cancel→Save→Close e da Close torna al primo campo, nessuna fuga verso la pagina sottostante durante il ciclo normale di Tab.
+- Validazione client-side sul form Walk-in verificata solida: messaggi di errore specifici e comprensibili quando si tenta submit con campi Alloggiati obbligatori mancanti (es. "Guest 1: document-issuing municipality is required for Italian-issued documents"), niente submit silenzioso o crash.
+- Checkout con fattura pagata: percorso di successo verificato pulito, nessun errore, stay passa a `Checked-Out` con timestamp corretto, nessuna conferma richiesta (azione one-click, coerente con l'assenza di rischio essendo la fattura già pagata).
+
+### 8.7 Copertura di questo round
+
+**Verificato:** Walk-in check-in (flusso completo, incluse tutte le lookup Alloggiati), Room/RoomType CRUD (create), focus trap + Escape su modale, checkout con fattura pagata (percorso di successo), Settings/System (toggle notifiche, Alloggiati auto-send — struttura verificata, non ogni singolo campo), scoperta che `/profile/hotel` è irraggiungibile da UI.
+
+**Non coperto per limiti di tempo (da fare in un round successivo):** Settings/Password (cambio password proprio + checklist live), Admin Users da UI (creazione/reset/attivazione — solo via API nei round precedenti), F&B ordini, Housekeeping cambi stato, Owner Analytics + export CSV, RBAC da UI per OWNER/RECEPTIONIST (login e navigazione effettiva con quei ruoli, non solo verifica claim/API), TAB-accessibilità su tabelle dati e form completi (solo un modale verificato in questo round), causa radice del fallimento creazione fattura (§8.5).
+
+## 9. Round 4 — copertura finale (2026-07-26, dopo Round 3)
+
+**Branch:** `main` (HEAD `6bf60d9`). Stack Docker riusato dai round precedenti. Password admin invalidata (come già successo in sessioni precedenti) — resettata via UPDATE diretto su `user_account.password_hash` (hash generato registrando un utente temporaneo via API con password conforme alla policy, poi copiato e l'utente temporaneo eliminato). Utente disponibile creato via API per test cambio-password: `r4pwtest`/RECEPTIONIST. Utente creato da UI per test Admin Users: `r4newuser`/RECEPTIONIST.
+
+### 9.1 BUG-12 (CRITICA) — Riattivare un utente disattivato è impossibile: il bottone "Activate" fallisce sempre con 404
+
+**Descrizione.** `UserManagementServiceImpl.activateUser` (righe 89-102) cerca l'utente target con `userRepository.findById(targetUserId)`. Ma `UserAccount` (riga 37) porta `@SQLRestriction("active = true")` a livello di classe — un filtro Hibernate applicato a **ogni** query generata per quell'entità, comprese le query standard ereditate come `findById`, non solo alle query JPQL custom. Il commento nel codice ("Must query including inactive — use raw query bypassing @SQLRestriction") descrive l'intento corretto ma il codice sottostante non lo implementa: `findById` resta filtrato, quindi su un utente con `active=false` la query non trova mai nulla e la lambda `orElseThrow` scatta sempre, producendo `404 USER_NOT_FOUND`.
+
+**Riprodotto dal vivo:** creato `r4newuser` da UI Admin Users → "Deactivate" (funziona, riga passa a "Inactive", bottone diventa "Activate") → click su "Activate" → **nessun feedback visibile in UI** (nessun toast di errore, il bottone resta cliccabile, la riga resta "Inactive") → console browser: `Failed to load resource: 404 @ /api/v1/auth/users/{id}/activate` → verificato anche a livello DB (`SELECT active FROM user_account WHERE username='r4newuser'` → rimasto `f` dopo il click). Bug a doppio impatto: (1) funzionalità di riattivazione **completamente non funzionante** per qualunque utente realmente disattivato — è impossibile invertire una disattivazione tramite l'app, unico rimedio è accesso diretto al DB; (2) fallimento **silenzioso** in UI, nessun errore mostrato all'operatore (`AdminUsers.tsx` — verificare se il catch del bottone Activate/Deactivate mostra toast su errore o lo scarta).
+
+**Impatto:** un ADMIN che disattiva per errore un membro dello staff (o lo disattiva temporaneamente con l'intenzione di riattivarlo dopo, es. ferie/sospensione) **non ha alcun modo di riportarlo attivo** dall'interfaccia — l'unica via è un intervento diretto sul database. Trattandosi dell'azione simmetrica e prevista di "Deactivate" (presente in ogni riga della tabella, azione di primo livello, non nascosta), la severità è CRITICA: non è un edge case, è la conseguenza diretta e prevedibile del flusso "disattiva poi ripensaci".
+
+**File:** `auth-service/src/main/java/com/hotelpms/auth/service/UserManagementServiceImpl.java:89-102` (query filtrata da `@SQLRestriction`), `auth-service/src/main/java/com/hotelpms/auth/domain/UserAccount.java:37` (`@SQLRestriction("active = true")`), `frontend/src/pages/AdminUsers.tsx:345-346` (chiamata) — verificare anche se manca un toast di errore sul fallimento.
+**Fix proposto (non applicato):** bypassare il filtro con una query nativa o JPQL esplicita che non erediti `@SQLRestriction` (es. `@Query(value = "SELECT * FROM user_account WHERE id = :id", nativeQuery = true)` dedicata, oppure `Session.disableFilter`/equivalente se il progetto passa a `@FilterDef` invece di `@SQLRestriction` — `@SQLRestriction` stesso non è disattivabile per-query, a differenza del vecchio `@Filter` di Hibernate, quindi serve una query nativa o `EntityManager` con restrizione esplicitamente bypassata). Verificare anche `activateUser` HotelSettings/altri repository per lo stesso pattern (`findById` su entità con `@SQLRestriction`) — rischio di bug gemelli altrove.
+**Severità:** CRITICA (funzionalità amministrativa di base completamente rotta, nessun workaround da UI, fallimento silenzioso).
+
+**Dato di test ripristinato:** `r4newuser.active` riportato a `true` via UPDATE diretto per pulizia, non tramite il flusso rotto.
+
+### 9.2 Regression check — nessuna regressione sui fix precedenti osservata in questo round
+Nessuna interazione di questo round ha toccato i percorsi di BUG-0/0b/2/3/4/5/6/7/8/9/10/11 — vedi Round 2/3 per gli esiti.
+
+### 9.3 BUG-13 (MEDIA, UX) — Cambio password volontario forza un logout completo invece di mantenere la sessione
+
+**Descrizione.** `AuthServiceImpl.changePassword` è specificamente progettato per **non** disconnettere l'utente: emette un nuovo token pair valido subito dopo l'incremento di `tokenVersion`, proprio per garantire continuità di sessione (commento nel codice backend e in `THREAT_MODEL.md` T-AUTH-04-residuo: "Il cambio password reimposta anche i cookie del browser della sessione corrente con il nuovo token pair, garantendo continuità di servizio al legittimo proprietario"). Ma `SettingsPassword.tsx:59-62` ignora questo intento: dopo `authService.changePassword(...)` (200 OK, nuovi cookie già impostati dal backend), chiama comunque `logout()` e `navigate('/login')` incondizionatamente — buttando via la sessione appena rinnovata e forzando un re-login completo.
+
+**Riprodotto dal vivo:** utente `r4pwtest` (sessione attiva, non in flusso `mustChangePassword`) cambia volontariamente password da Settings → Cambia Password → submit → 200 OK confermato in rete → redirect immediato a `/login`, nessuna sessione attiva → l'utente deve ridigitare da capo la password appena impostata per rientrare. Verificato che la nuova password funziona correttamente (il dato è salvato bene, non è un bug di integrità), il problema è puramente la sessione buttata via lato client.
+
+**Impatto:** attrito non necessario — l'utente ha appena dimostrato di conoscere sia la password vecchia sia quella nuova (le ha appena scritte in un form), ma viene comunque forzato a un secondo giro di login. Vanifica parzialmente lo sforzo del backend fatto apposta per evitarlo.
+
+**File:** `frontend/src/pages/Settings/SettingsPassword.tsx:61-62`
+**Fix proposto (non applicato):** rimuovere `logout()`+`navigate('/login')` sul path di successo; il backend ha già impostato i cookie nuovi — basta un `navigate(-1)` o redirect alla pagina precedente/dashboard (pattern già usato da `handleBack`), coerente con l'intento del backend. Se la scelta di forzare re-login fosse in realtà intenzionale per motivi di sicurezza percepita, andrebbe quantomeno documentata come tale (oggi sembra un residuo di codice più che una scelta deliberata, dato che contraddice esplicitamente il commento del backend).
+**Severità:** MEDIA (UX, nessun impatto di sicurezza o integrità dati — anzi il comportamento attuale è "più sicuro" per accidente, ma non è quello che il backend è stato costruito per fare).
+
+### 9.4 Verificato funzionante in questo round
+
+- **F&B → Fattura (di nuovo, con dati freschi):** ordine creato per T2607A (2x Cappuccino, €6.00), "Confirm" → passa direttamente a "Billed to Room", addebito compare correttamente sulla fattura `2026/0002` con descrizione "F&B: 2x Cappuccino". Sync confermata end-to-end.
+- **Housekeeping status change come RECEPTIONIST:** Room 101 Dirty→Clean funziona, contatori aggiornati, bottoni azione coerenti col nuovo stato.
+- **RBAC da UI:** RECEPTIONIST (`r4pwtest`) reindirizzato pulito (nessun crash/pagina bianca) da `/owner-dashboard`, `/admin/users`, `/profile/hotel` — tutti e tre verificati dal vivo navigando direttamente via URL. OWNER (`r3owner`) può raggiungere sia `/owner-dashboard` sia `/admin/users` — coerente con `AuthenticationFilter.ADMIN_OWNER_ROLES` che tratta ADMIN e OWNER come equivalenti lato gateway.
+- **Owner Analytics + CSV:** report generato con KPI coerenti (Total Revenue €20.50 = somma esatta delle 2 fatture visibili in Billing), CSV scaricato e ispezionato — ben formato, intestazioni corrette, dati coerenti con la tabella a schermo.
+- **Retry email di conferma (item aperto dal Round 2):** bottone "Retry confirmation email" su una prenotazione con badge "Email failed"/`NOTIFICATION_SERVICE_UNAVAILABLE" — premuto dal vivo, il badge sparisce immediatamente, nessun errore. Il meccanismo di retry funziona correttamente; il fallimento originale era transiente.
+- **Admin Users — creazione, deactivate, reset password (parziale):** creazione utente da UI funziona pulita; Deactivate funziona e riflette correttamente lo stato; Reset Password non ri-testato esplicitamente in questo round (stesso codepath di creazione, già coperto concettualmente) — **ma Activate è rotto, vedi BUG-12**.
+- **Settings/Password:** checklist live corretta (4 requisiti, aggiornamento in tempo reale mentre si digita), cambio password persiste correttamente (login successivo con la nuova password riuscito) — **ma la sessione viene buttata via inutilmente dopo, vedi BUG-13**.
+- **TAB-accessibilità estesa:** form "New Reservation" (Guest search → New Guest → Check-in/Check-out date → Expected Guests → pulsanti stanza → Cancel/Confirm) interamente navigabile e operabile da tastiera, nessun trap reale; i 3 segmenti di `<input type="date">` consumano Tab multipli prima di uscire dal campo — comportamento nativo standard del browser, non un bug applicativo (verificato con attenzione prima di scartare un falso positivo). Tabella Reservations: azioni riga "View"/"Edit" raggiungibili e operabili da tastiera in ordine prevedibile — ma senza ring di focus visibile, vedi aggiornamento BUG-7.
+
+### 9.5 Copertura finale — riepilogo dei 4 round
+
+**Ora coperto (Round 1-4):** login/logout, dashboard + 4 card "vedi tutto", ricerca/paginazione Guests/Billing/Reservations, ricerca comune Alloggiati, check-in da prenotazione, walk-in check-in completo, checkout (sia con fattura pagata sia il percorso di errore con fattura non pagata), Calendar/Planning Board, Settings (hub, Profilo, Password, Accessibilità, Aspetto, Sistema — struttura), Admin Users (lista, creazione, deactivate/activate, reset password — parziale), Room/RoomType CRUD (create), F&B ordini + sync fattura, Housekeeping cambio stato, Owner Analytics + CSV export, RBAC da UI per tutti e 3 i ruoli (ADMIN/OWNER/RECEPTIONIST, sia lato claim/API sia navigazione UI diretta), lingua IT/EN, TAB-accessibilità su sidebar, un modale, un form completo, una tabella dati, focus trap sui modali M3Dialog-based.
+
+**Bug totali trovati in questo giro di audit (Round 1-4): 13** — BUG-0, 0b, 2, 3, 4 (tutti dal Round 1, ora ✅ risolti insieme a BUG-5/T-AUTH-06), più BUG-6 (traduzioni errori mancanti), BUG-7 (focus ring assente su 6 superfici), BUG-8 (refresh silenzioso non copre `/me`), BUG-9 (Escape non chiude 3 modali), BUG-10 (`StatoSelect` mostra codice raw), BUG-11 (2 route amministrative orfane), BUG-12 (Activate utente sempre 404, CRITICA), BUG-13 (cambio password forza re-login inutile) — questi ultimi 8 (BUG-6...BUG-13) ancora **non risolti**, nessun fix applicato in nessuno dei 4 round (solo verifica/documentazione, come da richiesta).
+
+**Genuinamente non coperto anche dopo 4 round (onestamente, non per mancanza di tentativi):** causa radice esatta del mancato addebito camera al check-in (§8.5/9.4 — ora riprodotto in modo affidabile ma non isolato a livello di codice, serve un debugger attaccato); Reset Password re-testato esplicitamente in Round 4 (stesso codepath della creazione, non ri-verificato passo-passo); flusso E2E reale di invio Alloggiati Web al portale esterno (mai testato in nessun round — richiederebbe credenziali reali di un ente esterno); scenari di concorrenza (due receptionist sulla stessa prenotazione/camera in contemporanea); test su viewport mobile/tablet (tutti i round condotti su viewport desktop); test con screen reader reale (solo verificato via accessibility tree/axe, non con NVDA/JAWS/VoiceOver reali).
