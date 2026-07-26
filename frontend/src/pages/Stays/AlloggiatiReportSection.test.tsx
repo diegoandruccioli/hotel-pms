@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { AlloggiatiReportSection } from './AlloggiatiReportSection';
 import { stayService } from '../../services/stayService';
+import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
@@ -47,10 +48,12 @@ describe('AlloggiatiReportSection', () => {
   });
 
   it('shows an error toast when the TXT download fails', async () => {
-    vi.mocked(stayService.downloadAlloggiatiReport).mockRejectedValueOnce(new Error('boom'));
+    vi.mocked(stayService.downloadAlloggiatiReport)
+      .mockRejectedValueOnce(mockAxiosErrorWithDetail('Nessuna presenza da riportare per la data selezionata'));
     render(<AlloggiatiReportSection isAdminOrOwner={false} />);
     fireEvent.click(screen.getByText('generate_and_download'));
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('boom', 'error'));
+    await waitFor(() =>
+      expect(mockAddToast).toHaveBeenCalledWith('Nessuna presenza da riportare per la data selezionata', 'error'));
   });
 
   it('downloads the JSON export for admin/owner and shows a success toast', async () => {
@@ -80,12 +83,21 @@ describe('AlloggiatiReportSection', () => {
       await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('alloggiati_submit_success', 'success'));
     });
 
-    it('shows an error toast when the submit fails', async () => {
+    it('shows an error toast with the backend reason when the submit fails', async () => {
       confirmSpy.mockReturnValue(true);
-      vi.mocked(stayService.submitAlloggiatiReport).mockRejectedValueOnce(new Error('nope'));
+      vi.mocked(stayService.submitAlloggiatiReport)
+        .mockRejectedValueOnce(mockAxiosErrorWithDetail('Credenziali Alloggiati Web non valide'));
       render(<AlloggiatiReportSection isAdminOrOwner />);
       fireEvent.click(screen.getByText('alloggiati_submit'));
       await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('alloggiati_submit_error', 'error'));
+    });
+
+    it('falls back to a generic error toast when the submit fails without a backend detail', async () => {
+      confirmSpy.mockReturnValue(true);
+      vi.mocked(stayService.submitAlloggiatiReport).mockRejectedValueOnce(new Error('network down'));
+      render(<AlloggiatiReportSection isAdminOrOwner />);
+      fireEvent.click(screen.getByText('alloggiati_submit'));
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('alloggiati_submit_failed', 'error'));
     });
   });
 

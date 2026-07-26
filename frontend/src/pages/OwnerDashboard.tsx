@@ -10,6 +10,7 @@ import { M3Card } from '../components/m3/M3Card';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { useTranslation } from 'react-i18next';
+import { getErrorMessage } from '../utils/errorMessage';
 
 const getStatusTone = (status: InvoiceResponse['status']) => {
   switch (status) {
@@ -79,7 +80,7 @@ export const OwnerDashboard = memo(() => {
       const data = await billingReportService.getOwnerFinancialReport(startDate, endDate);
       setReport(data);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('failed_load_report');
+      const message = getErrorMessage(err, t('failed_load_report'));
       setError(message);
       addToast(message, 'error');
     } finally {

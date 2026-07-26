@@ -6,6 +6,7 @@ import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { useTranslation } from 'react-i18next';
+import { getErrorMessage } from '../utils/errorMessage';
 
 const STATUS_KEYS: Record<RoomStatus, string> = {
   CLEAN: 'room_status_clean',
@@ -136,7 +137,7 @@ export const Housekeeping = memo(() => {
       const data = await inventoryService.getAllRooms();
       setRooms(data.content);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('failed_load_rooms');
+      const message = getErrorMessage(err, t('failed_load_rooms'));
       setError(message);
     } finally {
       setLoading(false);

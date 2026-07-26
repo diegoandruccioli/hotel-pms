@@ -14,6 +14,7 @@ import {
   validateAlloggiatiGuests,
 } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
+import { getErrorMessage } from '../../utils/errorMessage';
 
 const todayIso = new Date().toISOString().split('T')[0];
 
@@ -175,8 +176,8 @@ export function WalkInCheckInForm() {
         });
         addToast(t('walkin_success'), 'success');
         navigate('/stays');
-      } catch {
-        setError(t('err_checkin_failed'));
+      } catch (err) {
+        setError(getErrorMessage(err, t('err_checkin_failed')));
       } finally {
         setLoading(false);
       }

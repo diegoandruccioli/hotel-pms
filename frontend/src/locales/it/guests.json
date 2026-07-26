@@ -14,6 +14,7 @@
   "label_phone_hint": "Telefono (se senza email)",
   "label_phone_number": "Numero di telefono",
   "err_email_or_phone": "È necessario inserire Email oppure Telefono",
+  "err_create_guest_failed": "Creazione ospite non riuscita",
   "toast_guest_updated": "Ospite aggiornato con successo",
   "toast_guest_saved": "Salvato con successo",
   "toast_guest_deleted": "Eliminato con successo",

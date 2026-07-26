@@ -12,6 +12,7 @@ import { M3Card } from '../components/m3/M3Card';
 import PlanningBoard from '@/pages/PlanningBoard';
 import { inventoryService } from '../services/inventoryService';
 import type { RoomResponse } from '../types/inventory.types';
+import { getErrorMessage } from '../utils/errorMessage';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
@@ -69,7 +70,7 @@ export const CalendarPlanning = () => {
       setReservations(reservData);
       setRooms(roomsData.content);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('failed_load_data');
+      const message = getErrorMessage(err, t('failed_load_data'));
       setError(message);
     } finally {
       setLoading(false);

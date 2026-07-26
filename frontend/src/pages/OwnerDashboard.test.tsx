@@ -4,6 +4,7 @@ import { axe } from 'vitest-axe';
 import { OwnerDashboard } from './OwnerDashboard';
 import { billingReportService } from '../services/billingReportService';
 import type { OwnerFinancialReportDto } from '../types/ownerReport.types';
+import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
@@ -122,12 +123,14 @@ describe('OwnerDashboard', () => {
 
   it('shows an error toast and banner when the report fails to load', async () => {
     mockUseAuthStore.mockReturnValue({ user: { role: 'OWNER' } });
-    vi.mocked(billingReportService.getOwnerFinancialReport).mockRejectedValueOnce(new Error('boom'));
+    vi.mocked(billingReportService.getOwnerFinancialReport)
+      .mockRejectedValueOnce(mockAxiosErrorWithDetail('Report non disponibile per il periodo selezionato'));
     render(<OwnerDashboard />);
 
     fireEvent.click(screen.getByText('generate_report'));
 
-    await waitFor(() => expect(screen.getByText('boom')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Report non disponibile per il periodo selezionato')).toBeInTheDocument());
   });
 
   it('updates start and end date inputs', () => {

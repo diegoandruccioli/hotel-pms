@@ -52,6 +52,7 @@ vi.mock('../store/toastStore', () => ({
 
 import { reservationService } from '../services/reservationService';
 import { inventoryService } from '../services/inventoryService';
+import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
 
 describe('CalendarPlanning', () => {
   beforeEach(() => {
@@ -145,12 +146,13 @@ describe('CalendarPlanning', () => {
   });
 
   it('shows an error state with a retry button when loading fails, and reloads on retry', async () => {
-    vi.mocked(reservationService.getAllReservations).mockRejectedValueOnce(new Error('network down'));
+    vi.mocked(reservationService.getAllReservations)
+      .mockRejectedValueOnce(mockAxiosErrorWithDetail('Camera non disponibile per le date selezionate'));
     render(<CalendarPlanning />);
 
     await waitFor(() => {
       expect(screen.getByText('error_loading_reservations')).toBeInTheDocument();
-      expect(screen.getByText('network down')).toBeInTheDocument();
+      expect(screen.getByText('Camera non disponibile per le date selezionate')).toBeInTheDocument();
     });
 
     vi.mocked(reservationService.getAllReservations).mockResolvedValueOnce([] as never);

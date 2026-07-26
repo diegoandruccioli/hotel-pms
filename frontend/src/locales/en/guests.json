@@ -14,6 +14,7 @@
   "label_phone_hint": "Phone (if no email)",
   "label_phone_number": "Phone number",
   "err_email_or_phone": "Email or phone is required",
+  "err_create_guest_failed": "Failed to create guest",
   "toast_guest_updated": "Guest updated successfully",
   "toast_guest_saved": "Guest saved successfully",
   "toast_guest_deleted": "Guest deleted successfully",

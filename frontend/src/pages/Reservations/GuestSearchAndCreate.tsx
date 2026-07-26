@@ -5,6 +5,7 @@ import { M3Button } from '../../components/m3/M3Button';
 import { M3TextField } from '../../components/m3/M3TextField';
 import { guestService } from '../../services/guestService';
 import type { GuestResponseDTO, GuestRequestDTO } from '../../types/guest.types';
+import { getErrorMessage } from '../../utils/errorMessage';
 
 interface GuestSuggestionItemProps {
   guest: GuestResponseDTO;
@@ -91,12 +92,11 @@ export const GuestSearchAndCreate = memo(({
       setIsCreatingGuest(false);
       setSearchQuery('');
     } catch (err: unknown) {
-      const e = err as {response?: {data?: {detail?: string}}, message?: string};
-      setError(e.response?.data?.detail || e.message || 'Failed to create guest');
+      setError(getErrorMessage(err, t('err_create_guest_failed')));
     } finally {
       setLoading(false);
     }
-  }, [newGuest, onSelectGuest]);
+  }, [newGuest, onSelectGuest, t]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

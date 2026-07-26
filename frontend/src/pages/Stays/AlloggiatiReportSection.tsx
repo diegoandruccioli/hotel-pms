@@ -5,6 +5,7 @@ import { useToastStore } from '../../store/toastStore';
 import { M3Card } from '../../components/m3/M3Card';
 import { M3Button } from '../../components/m3/M3Button';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { getErrorMessage } from '../../utils/errorMessage';
 
 const getTodayString = () => {
   const now = new Date();
@@ -33,7 +34,7 @@ export const AlloggiatiReportSection = memo(({ isAdminOrOwner }: AlloggiatiRepor
       await stayService.downloadAlloggiatiReport(alloggiatiDate);
       addToast(t('alloggiati_report_downloaded', { date: alloggiatiDate }), 'success');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('failed_generate_report');
+      const message = getErrorMessage(err, t('failed_generate_report'));
       addToast(message, 'error');
     } finally {
       setDownloadingReport(false);
@@ -46,7 +47,7 @@ export const AlloggiatiReportSection = memo(({ isAdminOrOwner }: AlloggiatiRepor
       await stayService.downloadAlloggiatiJson(alloggiatiDate);
       addToast(t('alloggiati_json_downloaded', { date: alloggiatiDate }), 'success');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('failed_generate_report');
+      const message = getErrorMessage(err, t('failed_generate_report'));
       addToast(message, 'error');
     } finally {
       setDownloadingJson(false);
@@ -61,7 +62,7 @@ export const AlloggiatiReportSection = memo(({ isAdminOrOwner }: AlloggiatiRepor
       await stayService.submitAlloggiatiReport(alloggiatiDate);
       addToast(t('alloggiati_submit_success'), 'success');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '';
+      const message = getErrorMessage(err, '');
       addToast(message ? t('alloggiati_submit_error', { message }) : t('alloggiati_submit_failed'), 'error');
     } finally {
       setSubmitting(false);

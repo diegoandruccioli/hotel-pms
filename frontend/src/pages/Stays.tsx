@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { TFunction } from 'i18next';
 import { AlloggiatiReportSection } from './Stays/AlloggiatiReportSection';
+import { getErrorMessage } from '../utils/errorMessage';
 
 type StaySortField = 'actualCheckInTime' | 'expectedCheckOutDate' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -253,7 +254,7 @@ export const Stays = memo(() => {
       setStays(data.content);
       setTotalPages(data.totalPages);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('failed_load_stays');
+      const message = getErrorMessage(err, t('failed_load_stays'));
       setError(message);
     } finally {
       setLoading(false);
@@ -271,7 +272,7 @@ export const Stays = memo(() => {
       setStays((prev) => prev.map((s) => (s.id === stay.id ? updated : s)));
       addToast(t('guest_checked_out_success'), 'success');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('checkout_failed');
+      const message = getErrorMessage(err, t('checkout_failed'));
       addToast(message, 'error');
     } finally {
       setCheckingOut(null);
@@ -285,7 +286,7 @@ export const Stays = memo(() => {
       setStays((prev) => prev.map((s) => (s.id === stay.id ? updated : s)));
       addToast(t('invoice_retry_success'), 'success');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('invoice_retry_failed');
+      const message = getErrorMessage(err, t('invoice_retry_failed'));
       addToast(message, 'error');
     } finally {
       setRetryingInvoice(null);
@@ -299,7 +300,7 @@ export const Stays = memo(() => {
       setStays((prev) => prev.map((s) => (s.id === stay.id ? updated : s)));
       addToast(t('checkout_email_retry_success'), 'success');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('checkout_email_retry_failed');
+      const message = getErrorMessage(err, t('checkout_email_retry_failed'));
       addToast(message, 'error');
     } finally {
       setRetryingEmail(null);

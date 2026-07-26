@@ -13,6 +13,7 @@ import { inventoryService } from '../services/inventoryService';
 import type { RoomResponse } from '../types/inventory.types';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
+import { getErrorMessage } from '../utils/errorMessage';
 
 const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 const PAGE_SIZE = 20;
@@ -252,7 +253,7 @@ export const Reservations = () => {
       setReservations((prev) => prev.map((r) => (r.id === id ? updated : r)));
       addToast(t('confirmation_email_retry_success'), 'success');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('confirmation_email_retry_failed');
+      const message = getErrorMessage(err, t('confirmation_email_retry_failed'));
       addToast(message, 'error');
     } finally {
       setRetryingEmail(null);
