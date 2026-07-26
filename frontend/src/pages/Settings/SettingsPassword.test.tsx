@@ -18,7 +18,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../../services/authService', () => ({
-  authService: { changePassword: vi.fn() },
+  authService: { changePassword: vi.fn(), fetchMe: vi.fn() },
 }));
 
 const addToastMock = vi.fn();
@@ -26,9 +26,9 @@ vi.mock('../../store/toastStore', () => ({
   useToastStore: () => ({ addToast: addToastMock }),
 }));
 
-const logoutMock = vi.fn();
+const checkAuthMock = vi.fn();
 vi.mock('../../store/authStore', () => ({
-  useAuthStore: () => ({ logout: logoutMock }),
+  useAuthStore: () => ({ checkAuth: checkAuthMock }),
 }));
 
 const renderPage = () => render(<MemoryRouter><SettingsPassword /></MemoryRouter>);
@@ -86,8 +86,11 @@ describe('SettingsPassword', () => {
     expect(screen.getByLabelText('password_requirements')).toBeInTheDocument();
   });
 
-  it('calls changePassword and logs out on success', async () => {
+  it('BUG-13: keeps the session alive on success instead of forcing a re-login', async () => {
     vi.mocked(authService.changePassword).mockResolvedValueOnce(undefined);
+    vi.mocked(authService.fetchMe).mockResolvedValueOnce({
+      sub: 'u1', username: 'r4pwtest', role: 'RECEPTIONIST', mustChangePassword: false,
+    });
     renderPage();
     fireEvent.change(screen.getByLabelText('current_password'), { target: { value: 'oldPass1' } });
     fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'HotelPms@@2026xx' } });
@@ -98,8 +101,38 @@ describe('SettingsPassword', () => {
       newPassword: 'HotelPms@@2026xx',
     }));
     expect(addToastMock).toHaveBeenCalledWith('password_changed_success', 'success');
-    expect(logoutMock).toHaveBeenCalled();
-    expect(mockNavigate).toHaveBeenCalledWith('/login');
+    // The backend already issued a fresh, valid token pair for this change —
+    // no logout, just a session-store refresh so a stale mustChangePassword
+    // flag (if this was the forced flow) is cleared.
+    await waitFor(() => expect(checkAuthMock).toHaveBeenCalledWith(
+      expect.objectContaining({ mustChangePassword: false }),
+    ));
+    expect(mockNavigate).toHaveBeenCalledWith(-1);
+  });
+
+  it('navigates to the dashboard (not back) when the change was the forced mustChangePassword flow', async () => {
+    mockUseLocation.mockReturnValue({ state: { mustChangePassword: true } } as never);
+    vi.mocked(authService.changePassword).mockResolvedValueOnce(undefined);
+    vi.mocked(authService.fetchMe).mockResolvedValueOnce({
+      sub: 'u1', username: 'r4pwtest', role: 'RECEPTIONIST', mustChangePassword: false,
+    });
+    renderPage();
+    fireEvent.change(screen.getByLabelText('current_password'), { target: { value: 'oldPass1' } });
+    fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'HotelPms@@2026xx' } });
+    fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'HotelPms@@2026xx' } });
+    fireEvent.click(screen.getByRole('button', { name: 'change_password' }));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'));
+  });
+
+  it('still completes the navigation if the post-change session refresh itself fails', async () => {
+    vi.mocked(authService.changePassword).mockResolvedValueOnce(undefined);
+    vi.mocked(authService.fetchMe).mockRejectedValueOnce(new Error('network blip'));
+    renderPage();
+    fireEvent.change(screen.getByLabelText('current_password'), { target: { value: 'oldPass1' } });
+    fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'HotelPms@@2026xx' } });
+    fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'HotelPms@@2026xx' } });
+    fireEvent.click(screen.getByRole('button', { name: 'change_password' }));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith(-1));
   });
 
   it('shows API error message on failure', async () => {

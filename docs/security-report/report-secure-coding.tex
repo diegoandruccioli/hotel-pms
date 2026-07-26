@@ -1809,6 +1809,79 @@ non un loop.
 \paragraph{Riferimento} Commit: \commitref{[pending]}{fix(security): T-AUTH-08 --- silent refresh no longer excludes /me}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Cambio password volontario forzava un logout non necessario \threat{T-AUTH-09}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante un audit E2E reale (\texttt{docs/LIVE\_E2E\_AUDIT\_2026-07.md},
+BUG-13). \texttt{AuthServiceImpl.changePassword} è specificamente progettato
+per \emph{non} disconnettere l'utente (T-AUTH-04 residuo): incrementa
+\texttt{tokenVersion}, aggiorna la cache Redis, ed emette un nuovo token pair
+valido subito dopo --- proprio per garantire continuità di sessione dopo un
+cambio password volontario, comportamento esplicitamente documentato nel
+codice backend e in questo stesso report. Ma \texttt{SettingsPassword.tsx}
+ignorava questo intento: dopo una risposta \texttt{200 OK} (i nuovi cookie
+erano già stati impostati dal backend), chiamava comunque
+\texttt{logout()}+redirect a \texttt{/login} incondizionatamente, buttando via
+la sessione appena rinnovata. Non è un rischio di sicurezza in senso stretto
+(il comportamento era per puro accidente ``più prudente'' del necessario), ma
+contraddiceva esplicitamente un comportamento backend deliberatamente
+progettato: l'utente doveva ridigitare da capo la password che aveva appena
+finito di scrivere due volte nel form. Classificato OWASP A07 ---
+Identification \& Authentication Failures (vanifica parzialmente la
+persistenza di sessione che T-AUTH-04 residuo esiste per garantire).
+
+\begin{insecurebox}[title={Codice Vulnerabile --- SettingsPassword.tsx (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: il backend ha appena emesso un token pair fresco apposta
+// per NON disconnettere l'utente -- questo lo butta via comunque
+await authService.changePassword({ currentPassword, newPassword });
+addToast(t('password_changed_success'), 'success');
+logout();
+navigate('/login');  // re-login inutile, l'utente conosce gia' entrambe le password
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Rimossa la chiamata a \texttt{logout()}. Dopo il successo, la sessione viene
+ri-sincronizzata (\texttt{authService.fetchMe()} +
+\texttt{authStore.checkAuth(user)}) così un eventuale \texttt{mustChangePassword}
+stale nello store client (se il cambio veniva dal flusso forzato al primo
+login) viene azzerato al valore fresco \texttt{false} già restituito dal
+backend, invece di restare appeso finché lo store non viene ricaricato altrove.
+Navigazione post-successo: alla dashboard se il cambio veniva dal flusso
+forzato (\texttt{mustChangePassword} in arrivo da \texttt{location.state}),
+altrimenti indietro alla pagina di provenienza --- mai più a \texttt{/login}.
+Se il refresh della sessione fallisce per una causa indipendente (es. un blip
+di rete), la navigazione procede comunque: il cambio password stesso è già
+riuscito, non ha senso bloccare l'utente su quello.
+
+\begin{securebox}[title={Codice Sicuro --- SettingsPassword.tsx (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: nessun logout, la sessione fresca emessa dal backend resta valida
+await authService.changePassword({ currentPassword, newPassword });
+addToast(t('password_changed_success'), 'success');
+try {
+  const freshUser = await authService.fetchMe();
+  checkAuth(freshUser);  // azzera mustChangePassword stale nello store
+} catch {
+  // il cambio password e' comunque riuscito, non blocca la navigazione
+}
+navigate(mustChangePassword ? '/' : -1);
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Il test \texttt{'calls changePassword and logs out on success'} codificava
+il comportamento buggato (asseriva che \texttt{logout} venisse chiamato).
+Riscritto in 3 test: sessione mantenuta viva con `checkAuth` chiamato con
+\texttt{mustChangePassword: false}, navigazione alla dashboard quando il
+cambio veniva dal flusso forzato, e navigazione comunque completata se il
+refresh post-cambio fallisce.
+
+\paragraph{Riferimento} Commit: \commitref{[pending]}{fix(security): T-AUTH-09 --- voluntary password change preserves the session}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Audit Log e Security Monitoring \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
 % ─────────────────────────────────────────────────────────────────────────────
 

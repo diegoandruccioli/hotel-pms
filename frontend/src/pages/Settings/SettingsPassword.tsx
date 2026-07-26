@@ -17,7 +17,7 @@ export const SettingsPassword = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const mustChangePassword = (location.state as { mustChangePassword?: boolean } | null)?.mustChangePassword === true;
-  const { logout } = useAuthStore();
+  const { checkAuth } = useAuthStore();
   const { addToast } = useToastStore();
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -58,15 +58,33 @@ export const SettingsPassword = () => {
       setLoading(true);
       await authService.changePassword({ currentPassword, newPassword });
       addToast(t('password_changed_success'), 'success');
-      logout();
-      navigate('/login');
+
+      // BUG-13: the backend deliberately issues a fresh token pair on a
+      // successful change-password (AuthServiceImpl.changePassword, T-AUTH-04
+      // residuo) so the current session survives the rotation — logging the
+      // user out here would throw that away for no reason. Re-fetch the
+      // session instead, so the store's stale `mustChangePassword` (if this
+      // came from the forced flow) is cleared to the backend's fresh `false`.
+      try {
+        const freshUser = await authService.fetchMe();
+        checkAuth(freshUser);
+      } catch {
+        // Session refresh failed for some unrelated reason (e.g. network
+        // blip) — the password change itself already succeeded, so fall
+        // through to navigation rather than blocking the user here.
+      }
+      if (mustChangePassword) {
+        navigate('/');
+      } else {
+        navigate(-1);
+      }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
       setError(e.response?.data?.detail || t('password_change_failed'));
     } finally {
       setLoading(false);
     }
-  }, [currentPassword, newPassword, confirmPassword, t, addToast, logout, navigate]);
+  }, [currentPassword, newPassword, confirmPassword, t, addToast, checkAuth, navigate, mustChangePassword]);
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-10">
