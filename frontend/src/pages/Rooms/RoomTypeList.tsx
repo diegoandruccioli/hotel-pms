@@ -5,6 +5,7 @@ import type { RoomTypeResponse } from '../../types/inventory.types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
+import { M3TableActionLink } from '../../components/m3/M3TableActionLink';
 import { useToastStore } from '../../store/toastStore';
 import { RoomTypeFormModal } from './RoomTypeFormModal';
 
@@ -24,9 +25,9 @@ const RoomTypeRow = memo(({ rt, onEdit, t }: {
       <M3TableCell className="text-on-surface-variant font-medium">€ {rt.basePrice.toFixed(2)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant max-w-xs truncate" title={rt.description}>{rt.description || '-'}</M3TableCell>
       <M3TableCell className="text-right">
-        <button onClick={handleEdit} className="text-primary hover:text-primary/80 font-medium text-sm lg:mr-4">
+        <M3TableActionLink onClick={handleEdit} className="lg:mr-4">
           {t('edit')}
-        </button>
+        </M3TableActionLink>
       </M3TableCell>
     </M3TableRow>
   );

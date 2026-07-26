@@ -24,15 +24,21 @@ const ownerNavigation = [
   { nameKey: 'owner_dashboard', href: '/owner-dashboard', icon: 'bar_chart' },
 ];
 
+// BUG-7 (docs/LIVE_E2E_AUDIT_2026-07.md): the sidebar had no focus-visible
+// ring at all, unlike the skip-link — same recipe as M3Button/M3TableActionLink
+// so focus indicators are consistent across the whole app.
+const NAV_ITEM_FOCUS_RING =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2';
+
 const getRailNavItemClasses = ({ isActive }: { isActive: boolean }) =>
-  `group flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-shape-lg transition-colors w-full ${
+  `group flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-shape-lg transition-colors w-full ${NAV_ITEM_FOCUS_RING} ${
     isActive
       ? 'text-on-primary-container'
       : 'text-on-surface-variant hover:text-on-surface'
   }`;
 
 const getDrawerNavItemClasses = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-3 px-4 py-3 mx-3 rounded-shape-full text-sm font-medium font-body transition-colors ${
+  `flex items-center gap-3 px-4 py-3 mx-3 rounded-shape-full text-sm font-medium font-body transition-colors ${NAV_ITEM_FOCUS_RING} ${
     isActive
       ? 'bg-primary-container text-on-primary-container'
       : 'text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface'

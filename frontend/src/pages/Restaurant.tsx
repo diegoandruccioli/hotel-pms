@@ -6,6 +6,7 @@ import { M3Button } from '../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { M3Card } from '../components/m3/M3Card';
+import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store/authStore';
@@ -106,26 +107,20 @@ const OrderRow = memo(({ order, confirmingId, onConfirm, onView, formatCurrency,
       <M3TableCell className="text-right">
         <div className="flex justify-end gap-2">
           {isConfirmable && (
-            <button
-              type="button"
+            <M3TableActionLink
               onClick={handleConfirmClick}
               disabled={isConfirming}
               aria-label={`${t('confirm_order')} ${order.id}`}
-              className="text-primary hover:text-primary/80 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              className="flex items-center gap-1"
             >
               {isConfirming
                 ? <MaterialIcon name="progress_activity" size={14} className="animate-spin" aria-hidden="true" />
                 : t('confirm')}
-            </button>
+            </M3TableActionLink>
           )}
-          <button
-            type="button"
-            onClick={handleViewClick}
-            aria-label={`${t('view')} ${order.id}`}
-            className="text-primary hover:text-primary/80 font-medium text-sm"
-          >
+          <M3TableActionLink onClick={handleViewClick} aria-label={`${t('view')} ${order.id}`}>
             {t('view')}
-          </button>
+          </M3TableActionLink>
         </div>
       </M3TableCell>
     </M3TableRow>

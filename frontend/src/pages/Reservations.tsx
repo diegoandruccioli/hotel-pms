@@ -5,6 +5,7 @@ import type { ReservationResponse } from '../types/reservation.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
+import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { M3Dialog } from '../components/m3/M3Dialog';
 import { useTranslation } from 'react-i18next';
@@ -131,35 +132,25 @@ const ReservationRow = memo(({
       </M3TableCell>
       <M3TableCell className="text-right">
         {reservation.status === 'CONFIRMED' && (
-          <button 
-            className="text-primary hover:text-primary/80 font-medium text-sm mr-4"
-            onClick={handleCheckInClick}
-          >
+          <M3TableActionLink className="mr-4" onClick={handleCheckInClick}>
             {t('check_in')}
-          </button>
+          </M3TableActionLink>
         )}
-        <button 
-          className="text-primary hover:text-primary/80 font-medium text-sm mr-4"
-          onClick={handleViewClick}
-        >
+        <M3TableActionLink className="mr-4" onClick={handleViewClick}>
           {t('view')}
-        </button>
-        <button
-          type="button"
-          className="text-primary hover:text-primary/80 font-medium text-sm"
-          onClick={handleEditClick}
-        >
+        </M3TableActionLink>
+        <M3TableActionLink onClick={handleEditClick}>
           {t('edit')}
-        </button>
+        </M3TableActionLink>
         {onDelete && DELETABLE_STATUSES.has(reservation.status) && (
-          <button
-            type="button"
+          <M3TableActionLink
+            tone="error"
+            className="ml-4"
             aria-label={`${t('delete_reservation')} ${reservation.id}`}
             onClick={handleDeleteClick}
-            className="text-error hover:text-error/80 font-medium text-sm ml-4"
           >
             {t('delete_reservation')}
-          </button>
+          </M3TableActionLink>
         )}
       </M3TableCell>
     </M3TableRow>

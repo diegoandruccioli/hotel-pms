@@ -6,6 +6,7 @@ import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3Dialog } from '../components/m3/M3Dialog';
+import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
@@ -31,22 +32,18 @@ const GuestRow = memo(({ guest, onEdit, onDelete, t }: GuestRowProps) => {
       <M3TableCell className="text-on-surface-variant">{guest.phone || '-'}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{guest.city || '-'} ({guest.country || '-'})</M3TableCell>
       <M3TableCell className="text-right">
-        <button
-          type="button"
-          className="text-primary hover:text-primary/80 font-medium text-sm rounded focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-none"
-          onClick={handleEdit}
-        >
+        <M3TableActionLink onClick={handleEdit}>
           {t('edit')}
-        </button>
+        </M3TableActionLink>
         {onDelete && (
-          <button
-            type="button"
+          <M3TableActionLink
+            tone="error"
+            className="ml-3"
             aria-label={`${t('delete')} ${guest.firstName} ${guest.lastName}`}
             onClick={handleDeleteClick}
-            className="ml-3 text-error hover:text-error/80 font-medium text-sm rounded focus-visible:ring-2 focus-visible:ring-error focus-visible:ring-offset-1 focus-visible:outline-none"
           >
             {t('delete')}
-          </button>
+          </M3TableActionLink>
         )}
       </M3TableCell>
     </M3TableRow>

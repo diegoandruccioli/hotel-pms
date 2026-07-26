@@ -7,6 +7,7 @@ import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
 import { M3StatusChip } from '../../components/m3/M3StatusChip';
+import { M3TableActionLink } from '../../components/m3/M3TableActionLink';
 import { useToastStore } from '../../store/toastStore';
 import { RoomFormModal } from './RoomFormModal';
 
@@ -51,9 +52,9 @@ const RoomRow = memo(({ room, onEdit, t }: {
         <M3StatusChip label={t(`room_status_${room.status.toLowerCase()}`)} tone={getStatusTone(room.status)} />
       </M3TableCell>
       <M3TableCell className="text-right">
-        <button onClick={handleEdit} className="text-primary hover:text-primary/80 font-medium text-sm lg:mr-4">
+        <M3TableActionLink onClick={handleEdit} className="lg:mr-4">
           {t('edit')}
-        </button>
+        </M3TableActionLink>
       </M3TableCell>
     </M3TableRow>
   );

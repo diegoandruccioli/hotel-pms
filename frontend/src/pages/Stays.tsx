@@ -8,6 +8,7 @@ import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
+import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { useTranslation } from 'react-i18next';
 
 import type { TFunction } from 'i18next';
@@ -72,14 +73,13 @@ const StayRow = memo(({
         </span>
       </M3TableCell>
       <M3TableCell className="text-on-surface-variant">
-        <button
-          type="button"
+        <M3TableActionLink
           onClick={handleGuestNameClick}
-          className="truncate block max-w-[120px] text-left text-primary hover:text-primary/80 font-medium text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 rounded"
+          className="truncate block max-w-[120px] text-left"
           title={stay.guestId}
         >
           {stay.guestDisplayName ?? `${stay.guestId.substring(0, 8)}…`}
-        </button>
+        </M3TableActionLink>
       </M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(stay.actualCheckInTime)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(stay.actualCheckOutTime)}</M3TableCell>
