@@ -1,11 +1,13 @@
 package com.hotelpms.billing.integration;
 
 import com.hotelpms.billing.client.GuestClient;
+import com.hotelpms.billing.client.dto.GuestSearchPageResponse;
 import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.dto.InvoiceResponse;
+import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.mapper.InvoiceChargeMapperImpl;
 import com.hotelpms.billing.mapper.InvoiceMapperImpl;
@@ -22,6 +24,8 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -41,6 +45,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.when;
 
 /**
  * Integration tests for InvoiceService using the JPA test slice.
@@ -49,8 +56,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Feign client wiring, no Security filter chain, no Redis. {@code InvoiceServiceImpl}
  * now takes {@link GuestClient} as a constructor dependency (C12 invoice search); since
  * this slice doesn't configure OpenFeign, it's provided as a {@code @MockitoBean} purely
- * so the context can wire the constructor — none of these tests exercise
- * {@code searchInvoices} (the only method that calls it), so it's never stubbed.
+ * so the context can wire the constructor — stubbed only in the {@code searchInvoices}
+ * tests below, which are the only ones that call it.
  * {@code BillingApplication}'s {@code @EnableJpaAuditing} is processed by the slice
  * bootstrapper, so {@code Invoice}'s {@code @CreatedDate}/{@code @LastModifiedDate} fields
  * are populated. Flyway applies all migrations at context startup; each test rolls back
@@ -200,6 +207,41 @@ class InvoiceServiceIntegrationTest {
                 () -> invoiceRepository.saveAndFlush(loaded),
                 "The stale reader must lose the race: version in memory (0) no longer "
                         + "matches the row's real version (bumped concurrently to 1)");
+    }
+
+    @Test
+    @DisplayName("BUG-0: searchInvoices with no free-text query succeeds against real Postgres "
+            + "(regression guard for the lower(bytea) parameter-type inference bug)")
+    void searchInvoicesWithoutQuerySucceeds() {
+        invoiceService.createInvoiceForStay(
+                new StayInvoiceRequest(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()));
+
+        final Page<InvoiceSearchResultResponse> results = invoiceService.searchInvoices(
+                null, null, null, null, PageRequest.of(0, 20));
+
+        assertTrue(results.getTotalElements() >= 1);
+    }
+
+    @Test
+    @DisplayName("BUG-0: searchInvoices with a free-text query filters by invoice number "
+            + "and does not leak results excluded by status/date filters (parenthesis grouping bug)")
+    void searchInvoicesWithQueryFiltersByInvoiceNumberOnly() {
+        final InvoiceResponse created = invoiceService.createInvoiceForStay(
+                new StayInvoiceRequest(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()));
+        when(guestClient.searchGuests(any(), anyInt()))
+                .thenReturn(new GuestSearchPageResponse(List.of()));
+
+        final Page<InvoiceSearchResultResponse> matching = invoiceService.searchInvoices(
+                null, created.invoiceNumber(), null, null, PageRequest.of(0, 20));
+        assertEquals(1, matching.getTotalElements());
+        assertEquals(created.invoiceNumber(),
+                matching.getContent().get(0).invoice().invoiceNumber());
+
+        final Page<InvoiceSearchResultResponse> statusExcluded = invoiceService.searchInvoices(
+                InvoiceStatus.CANCELLED, created.invoiceNumber(), null, null, PageRequest.of(0, 20));
+        assertEquals(0, statusExcluded.getTotalElements(),
+                "A status filter must still apply even when the free-text query matches — "
+                        + "guestId matches must not bypass status/date filters");
     }
 
 }

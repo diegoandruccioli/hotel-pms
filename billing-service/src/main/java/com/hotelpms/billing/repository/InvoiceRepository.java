@@ -127,11 +127,12 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
      * @return a page of matching invoices scoped to the hotel
      */
     @Query("SELECT i FROM Invoice i WHERE i.hotelId = :hotelId "
-            + "AND (:status IS NULL OR i.status = :status) "
-            + "AND (:dateFrom IS NULL OR i.issueDate >= :dateFrom) "
-            + "AND (:dateTo IS NULL OR i.issueDate < :dateTo) "
-            + "AND (:query IS NULL OR LOWER(i.invoiceNumber) LIKE LOWER(CONCAT('%', :query, '%')) "
-            + "OR i.guestId IN :guestIds)")
+            + "AND (CAST(:status AS string) IS NULL OR i.status = :status) "
+            + "AND (CAST(:dateFrom AS timestamp) IS NULL OR i.issueDate >= :dateFrom) "
+            + "AND (CAST(:dateTo AS timestamp) IS NULL OR i.issueDate < :dateTo) "
+            + "AND (CAST(:query AS string) IS NULL OR ("
+            + "LOWER(i.invoiceNumber) LIKE LOWER(CONCAT('%', CAST(:query AS string), '%')) "
+            + "OR i.guestId IN :guestIds))")
     Page<Invoice> searchInvoicesByHotelId(
             @Param("hotelId") UUID hotelId,
             @Param("status") InvoiceStatus status,
