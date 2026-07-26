@@ -56,6 +56,7 @@ class GuestSearchIntegrationTest {
 
     private static final UUID HOTEL_ID = UUID.randomUUID();
     private static final UUID OTHER_HOTEL_ID = UUID.randomUUID();
+    private static final String LAST_NAME_ROSSI = "Rossi";
 
     @Autowired
     private GuestRepository guestRepository;
@@ -72,7 +73,7 @@ class GuestSearchIntegrationTest {
     void seedGuests() {
         guestRepository.save(Guest.builder()
                 .firstName("Mario")
-                .lastName("Rossi")
+                .lastName(LAST_NAME_ROSSI)
                 .email("mario.rossi@example.com")
                 .city("Firenze")
                 .hotelId(HOTEL_ID)
@@ -109,7 +110,7 @@ class GuestSearchIntegrationTest {
         final Page<Guest> byFirstName =
                 guestRepository.searchByKeywordAndHotelId("mario", HOTEL_ID, PageRequest.of(0, 10));
         assertEquals(1, byFirstName.getTotalElements());
-        assertEquals("Rossi", byFirstName.getContent().get(0).getLastName());
+        assertEquals(LAST_NAME_ROSSI, byFirstName.getContent().get(0).getLastName());
 
         final Page<Guest> byLastName =
                 guestRepository.searchByKeywordAndHotelId("VERDI", HOTEL_ID, PageRequest.of(0, 10));
@@ -124,5 +125,24 @@ class GuestSearchIntegrationTest {
 
         assertEquals(1, result.getTotalElements());
         assertTrue(result.getContent().stream().allMatch(g -> HOTEL_ID.equals(g.getHotelId())));
+    }
+
+    @Test
+    @DisplayName("BUG-2: a 'Nome Cognome' query matches even though neither field alone "
+            + "contains the full string, and order (Cognome Nome) doesn't matter")
+    void searchMatchesFirstNameAndLastNameTogether() {
+        final Page<Guest> nameThenSurname =
+                guestRepository.searchByKeywordAndHotelId("Mario Rossi", HOTEL_ID, PageRequest.of(0, 10));
+        assertEquals(1, nameThenSurname.getTotalElements());
+        assertEquals(LAST_NAME_ROSSI, nameThenSurname.getContent().get(0).getLastName());
+
+        final Page<Guest> surnameThenName =
+                guestRepository.searchByKeywordAndHotelId("rossi mario", HOTEL_ID, PageRequest.of(0, 10));
+        assertEquals(1, surnameThenName.getTotalElements());
+
+        final Page<Guest> noMatch =
+                guestRepository.searchByKeywordAndHotelId("Mario Verdi", HOTEL_ID, PageRequest.of(0, 10));
+        assertEquals(0, noMatch.getTotalElements(),
+                "Every token must match some field — Mario exists but not paired with Verdi");
     }
 }

@@ -341,7 +341,7 @@ class GuestServiceImplTest {
         when(reservationClient.hasActiveReservations(guestId)).thenReturn(true);
 
         assertThrows(IllegalStateException.class, () -> guestService.deleteGuest(guestId));
-        verify(guestRepository, never()).delete(any());
+        verify(guestRepository, never()).delete(any(Guest.class));
     }
 
     @Test

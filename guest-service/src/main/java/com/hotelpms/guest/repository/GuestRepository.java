@@ -5,8 +5,7 @@ import com.hotelpms.guest.model.Guest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -23,7 +22,7 @@ import java.util.UUID;
  * in the service layer; hotel-scoped variants must be used instead.
  */
 @Repository
-public interface GuestRepository extends JpaRepository<Guest, UUID> {
+public interface GuestRepository extends JpaRepository<Guest, UUID>, JpaSpecificationExecutor<Guest> {
 
     /**
      * Finds an active guest by UUID within the given hotel.
@@ -59,20 +58,21 @@ public interface GuestRepository extends JpaRepository<Guest, UUID> {
      * Searches guests within a hotel by first name, last name, email or city
      * containing the provided value (case-insensitive).
      *
-     * @param keyword  search term matched against name, email, city
+     * <p>The keyword is split on whitespace and every token must match at least one of
+     * the four fields (BUG-2, {@code docs/LIVE_E2E_AUDIT_2026-07.md}) — a single LIKE
+     * against the whole string never matched a "Nome Cognome" query, since neither field
+     * alone contains both words. See {@link GuestSearchSpecifications}.
+     *
+     * @param keyword  search term matched against name, email, city; may contain multiple
+     *                 whitespace-separated tokens
      * @param hotelId  the owning hotel UUID
      * @param pageable pagination information
      * @return a page of matching guests scoped to the hotel
      */
-    @Query("SELECT g FROM Guest g WHERE g.hotelId = :hotelId AND ("
-            + "LOWER(g.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
-            + "LOWER(g.lastName)  LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
-            + "LOWER(g.email)     LIKE LOWER(CONCAT('%', :keyword, '%')) OR "
-            + "LOWER(g.city)      LIKE LOWER(CONCAT('%', :keyword, '%')))")
-    Page<Guest> searchByKeywordAndHotelId(
-            @Param("keyword") String keyword,
-            @Param("hotelId") UUID hotelId,
-            Pageable pageable);
+    default Page<Guest> searchByKeywordAndHotelId(
+            final String keyword, final UUID hotelId, final Pageable pageable) {
+        return findAll(GuestSearchSpecifications.matchingAllTokens(keyword, hotelId), pageable);
+    }
 
     /**
      * Returns all active guests whose GDPR consent date is strictly before the

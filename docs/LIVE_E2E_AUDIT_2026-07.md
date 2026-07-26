@@ -57,7 +57,7 @@ Voce ROADMAP: C13 (PDF/UA), marcata ✅ il 19/07.
 
 Causa dell'OOM stesso (concorrente, non alternativa): in `ThymeleafPdfTemplateRenderer.render()` (`pdf-template-engine`), i due font Noto Sans vengono riletti dal classpath e ri-registrati/ri-subsettati su un `PdfRendererBuilder` **nuovo ad ogni chiamata** — l'unico punto di allocazione per-richiesta nell'intera pipeline PDF (il `TemplateEngine`/`ClassLoaderTemplateResolver` è invece un singleton corretto, cache-abilitato, costruito una sola volta all'avvio). Limiti JVM del container molto stretti per questo carico: `-Xmx256m -XX:MaxMetaspaceSize=128m`.
 
-### BUG-2 — Ricerca ospiti non trova "Nome Cognome" insieme
+### BUG-2 — Ricerca ospiti non trova "Nome Cognome" insieme — ✅ RISOLTO (vedi §5)
 Pattern C12 condiviso da Guests/Billing/Reservations.
 `GuestRepository.searchByKeywordAndHotelId` (righe 67-72) matcha un **singolo** `:keyword` con LIKE su firstName OR lastName OR email OR city, ciascuno indipendente — "Test Verifica" come stringa intera non è sottostringa né di firstName="Test" né di lastName="Verifica" presi singolarmente → 0 risultati, verificato sia su `/guests` diretta sia nel form prenotazione. Nessuna utility di tokenizzazione esiste nel codebase da riusare. Rischio concreto: l'utente non trova l'ospite esistente, clicca "Nuovo Ospite", crea un duplicato.
 
@@ -99,10 +99,10 @@ Ogni piano indica: causa radice, fix proposto, file da toccare, verifica, branch
 - **Verifica**: `./gradlew :pdf-template-engine:build :billing-service:build :config-service:build` verde. Live: rebuild+restart `config-server`+`billing-service`, login admin via gateway, `GET /api/v1/invoices/{id}/pdf` su 2 fatture reali → 200, PDF valido, **"Intestatario: Mario Rossi"** (nome reale, non più "Unknown Guest"). 20 generazioni consecutive sulla stessa fattura → 20×200, container rimasto `healthy`, RestartCount invariato (7, tutti pre-fix), Metaspace 138MB/192MB committed, nessun nuovo crash
 - **Branch**: `main`
 
-### BUG-2 — Ricerca ospiti non trova "Nome Cognome" insieme
-- **Fix**: in `GuestRepository.searchByKeywordAndHotelId` (righe 67-72), splittare il termine di ricerca in token (spazio) e richiedere che OGNI token matchi almeno uno dei campi (AND di OR per token, non un singolo LIKE sull'intera stringa) — nessuna utility di tokenizzazione esiste nel codebase, va scritta ex-novo
-- **File**: `guest-service/src/main/java/com/hotelpms/guest/repository/GuestRepository.java:67-75`
-- **Verifica**: test unit con "Nome Cognome" e ordine invertito "Cognome Nome"; ri-eseguire dal vivo la stessa ricerca fallita in sessione (ospite "Test Verifica")
+### BUG-2 — Ricerca ospiti non trova "Nome Cognome" insieme — ✅ RISOLTO
+- **Fix**: `GuestRepository` ora estende anche `JpaSpecificationExecutor<Guest>`; `searchByKeywordAndHotelId` è diventato un default method che delega a una nuova `GuestSearchSpecifications.matchingAllTokens(keyword, hotelId)` — splitta il termine su whitespace e richiede che OGNI token matchi almeno uno dei 4 campi (AND di OR per token, Criteria API dato che JPQL statico non supporta un numero di token variabile). Nessuna utility di tokenizzazione esisteva nel codebase, scritta ex-novo
+- **File**: `guest-service/src/main/java/com/hotelpms/guest/repository/GuestRepository.java`, nuovo `GuestSearchSpecifications.java` (stesso package)
+- **Verifica**: nuovo test Testcontainers reale `searchMatchesFirstNameAndLastNameTogether` (`GuestSearchIntegrationTest.java`) con "Mario Rossi", "rossi mario" (ordine invertito) e un caso negativo cross-guest; `./gradlew :guest-service:build` verde. Dal vivo via gateway: `GET /guests/search?query=Test%20Verifica` e `query=Verifica%20Test` → entrambe 200 con l'ospite reale trovato (prima: 0 risultati in entrambi i casi)
 - **Impatto positivo indiretto**: beneficia anche Billing (cross-service guest-name resolution) e Reservations, che riusano lo stesso endpoint tramite `GuestClient.searchGuests`
 - **Branch**: `main`
 
