@@ -74,8 +74,13 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const url: string = error.config?.url ?? '';
 
-      // Never attempt refresh on auth endpoints themselves to prevent loops
-      if (url.includes('/login') || url.includes('/me')) {
+      // Never attempt refresh on the login endpoint itself, to prevent loops.
+      // /me is deliberately NOT excluded (BUG-8): it's a read-only bootstrap
+      // check, so a 401-then-refresh-then-retry cannot loop — the refresh
+      // call itself never routes back through this branch (see /refresh
+      // handling below), and if the refresh fails performLogout() is called
+      // once, not retried.
+      if (url.includes('/login')) {
         return Promise.reject(error);
       }
       if (url.includes('/refresh')) {

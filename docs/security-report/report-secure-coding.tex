@@ -1737,6 +1737,78 @@ anche dal vivo via browser reale: utente disattivato → ``Activate'' → torna
 \paragraph{Riferimento} Commit: \commitref{[pending]}{fix(security): T-AUTH-07 --- activateUser bypasses @SQLRestriction via native query}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Refresh silenzioso escludeva /me, logout forzato ogni 15 minuti \threat{T-AUTH-08}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante un audit E2E reale (\texttt{docs/LIVE\_E2E\_AUDIT\_2026-07.md},
+BUG-8). L'interceptor Axios responsabile del refresh silenzioso (T-AUTH-04)
+escludeva esplicitamente \texttt{/api/v1/auth/me} dal meccanismo di
+retry-dopo-refresh su un 401, con il commento ``Never attempt refresh on auth
+endpoints themselves to prevent loops''. La motivazione è corretta per
+\texttt{/login} (un tentativo di login fallito non deve innescare un
+refresh), ma sovra-estesa a \texttt{/me}: un endpoint di sola lettura,
+chiamato una sola volta al bootstrap dell'app (\texttt{App.tsx}, in un
+\texttt{useEffect} al mount, non ad ogni navigazione client-side). L'access
+token JWT dura 15 minuti; il refresh token dura 7 giorni ed è pienamente
+valido. Ma se l'utente ricarica la pagina, apre un link diretto, o la scheda
+viene ricaricata dal sistema operativo \emph{dopo} che i 15 minuti sono
+scaduti, \texttt{GET /me} falliva con 401, l'interceptor non tentava il
+refresh, e l'utente veniva reindirizzato a \texttt{/login} nonostante un
+refresh token valido per altri giorni in un cookie httpOnly --- un logout
+forzato che il meccanismo di refresh a 7 giorni esiste esplicitamente per
+evitare. Classificato OWASP A07 --- Identification \& Authentication
+Failures (nega al legittimo proprietario la persistenza di sessione che il
+sistema di refresh è progettato per garantire).
+
+\begin{insecurebox}[title={Codice Vulnerabile --- api.ts (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: /me escluso dal retry-dopo-refresh, nessuna ragione valida
+// per un endpoint di sola lettura -- un 401-poi-refresh-poi-retry
+// non puo' creare un loop
+if (url.includes('/login') || url.includes('/me')) {
+  return Promise.reject(error);  // niente refresh, logout forzato
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Rimossa l'esclusione di \texttt{/me} dalla condizione. Nessun rischio di loop:
+il refresh stesso viene gestito da un branch dedicato subito dopo
+(\texttt{url.includes('/refresh')}) che chiama \texttt{performLogout()} una
+sola volta e non ritenta mai un secondo refresh; \texttt{/me} in fallimento
+ora percorre lo stesso identico percorso già usato con successo da tutti gli
+altri endpoint business (refresh silenzioso, poi retry della richiesta
+originale).
+
+\begin{securebox}[title={Codice Sicuro --- api.ts (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: solo /login e' escluso -- un login fallito non deve
+// mai tentare un refresh, ma /me (sola lettura) si'
+if (url.includes('/login')) {
+  return Promise.reject(error);
+}
+if (url.includes('/refresh')) {
+  performLogout();  // l'unico punto che chiama logout, mai un retry
+  return Promise.reject(error);
+}
+// ... refresh silenzioso + retry, invariato per /me come per tutti
+// gli altri endpoint
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Il test \texttt{'rejects immediately on 401 from the /me endpoint without
+attempting refresh'} codificava il comportamento buggato (nessuna copertura
+di regressione lo avrebbe mai contraddetto). Riscritto in 2 test: uno verifica
+che un 401 su \texttt{/me} innesca refresh silenzioso e retry (stesso pattern
+già testato per un 401 generico su un endpoint business), l'altro che un
+refresh fallito dopo un 401 su \texttt{/me} produce comunque un solo logout,
+non un loop.
+
+\paragraph{Riferimento} Commit: \commitref{[pending]}{fix(security): T-AUTH-08 --- silent refresh no longer excludes /me}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Audit Log e Security Monitoring \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
 % ─────────────────────────────────────────────────────────────────────────────
 

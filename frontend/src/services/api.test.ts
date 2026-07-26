@@ -87,16 +87,33 @@ describe('api (axios instance + interceptors)', () => {
     });
   });
 
-  it('rejects immediately on 401 from the /me endpoint without attempting refresh', async () => {
-    adapter.mockRejectedValueOnce({
-      config: { url: '/api/v1/auth/me', headers: {} },
-      response: { status: 401, data: {} },
-    });
+  it('BUG-8: a 401 from /me on app bootstrap silently refreshes and retries, instead of forcing a re-login', async () => {
+    const meConfig = { url: '/api/v1/auth/me', headers: {} } as InternalAxiosRequestConfig;
+
+    adapter
+      .mockRejectedValueOnce({ config: meConfig, response: { status: 401, data: {} } })
+      .mockResolvedValueOnce(makeResponse(meConfig, 200, { ok: 'refreshed' }))
+      .mockResolvedValueOnce(makeResponse(meConfig, 200, { username: 'admin' }));
+
+    const result = await api.get('/api/v1/auth/me');
+
+    expect(adapter).toHaveBeenCalledTimes(3);
+    expect((adapter.mock.calls[1][0] as InternalAxiosRequestConfig).url).toBe('/api/v1/auth/refresh');
+    expect(result.data).toEqual({ username: 'admin' });
+    expect(logoutMock).not.toHaveBeenCalled();
+  });
+
+  it('logs out (only) when a 401 from /me is followed by a failed silent refresh', async () => {
+    adapter
+      .mockRejectedValueOnce({ config: { url: '/api/v1/auth/me', headers: {} }, response: { status: 401, data: {} } })
+      .mockRejectedValueOnce({ config: { url: '/api/v1/auth/refresh', headers: {} }, response: { status: 401, data: {} } });
 
     await expect(api.get('/api/v1/auth/me')).rejects.toBeTruthy();
 
-    expect(adapter).toHaveBeenCalledTimes(1);
-    expect(logoutMock).not.toHaveBeenCalled();
+    // No refresh loop: the refresh call's own 401 is handled by the /refresh
+    // branch (performLogout, no retry), it never re-enters as a /me request.
+    expect(logoutMock).toHaveBeenCalled();
+    expect(window.location.href).toBe('/login');
   });
 
   it('rejects immediately on 401 from the /login endpoint without attempting refresh', async () => {
