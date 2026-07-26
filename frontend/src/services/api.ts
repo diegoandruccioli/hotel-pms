@@ -53,7 +53,16 @@ function drainQueue(success: boolean, err: unknown): void {
 
 function performLogout(): void {
   useAuthStore.getState().logout();
-  window.location.href = '/login';
+  // Guard against a reload loop: since /me is no longer excluded from the
+  // refresh-then-retry flow (T-AUTH-08), an anonymous visit or a fresh
+  // logout — /me 401s, /refresh also 401s (no cookies either way) — ends up
+  // here. Unconditionally reassigning href to the page already loaded still
+  // triggers a full reload, which remounts App, which re-runs the same /me
+  // bootstrap check, which lands back here — forever. Only navigate if we're
+  // not already there.
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
 }
 
 // Response interceptor: translate error codes and handle 401 with silent refresh (T-AUTH-04)

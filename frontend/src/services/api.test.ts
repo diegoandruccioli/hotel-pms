@@ -103,6 +103,26 @@ describe('api (axios instance + interceptors)', () => {
     expect(logoutMock).not.toHaveBeenCalled();
   });
 
+  it('T-AUTH-08 regression: does not reassign location.href (reload loop) when performLogout runs while already on /login', async () => {
+    // An anonymous visit to /login also mounts App, which calls /me once —
+    // now that /me is no longer excluded from refresh-then-retry, this used
+    // to walk into performLogout() -> href reassignment -> full reload ->
+    // App remounts -> /me 401 again -> forever. Guard: no reassignment if
+    // the pathname is already /login (query string is untouched proof of that).
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, pathname: '/login', href: '/login?redirect=%2Fbilling' },
+      writable: true,
+    });
+    adapter
+      .mockRejectedValueOnce({ config: { url: '/api/v1/auth/me', headers: {} }, response: { status: 401, data: {} } })
+      .mockRejectedValueOnce({ config: { url: '/api/v1/auth/refresh', headers: {} }, response: { status: 401, data: {} } });
+
+    await expect(api.get('/api/v1/auth/me')).rejects.toBeTruthy();
+
+    expect(logoutMock).toHaveBeenCalled();
+    expect(window.location.href).toBe('/login?redirect=%2Fbilling');
+  });
+
   it('logs out (only) when a 401 from /me is followed by a failed silent refresh', async () => {
     adapter
       .mockRejectedValueOnce({ config: { url: '/api/v1/auth/me', headers: {} }, response: { status: 401, data: {} } })
