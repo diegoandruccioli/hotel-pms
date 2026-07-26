@@ -90,17 +90,29 @@ class AuthenticationFilterTest {
         // -----------------------------------------------------------------------
 
         private String buildJwt(final long ttlMillis, final String username, final String role) {
+                return buildJwt(ttlMillis, username, role, null);
+        }
+
+        /**
+         * Builds a signed JWT, optionally carrying a {@code mustChangePassword} claim
+         * (BUG-5). Pass {@code null} to omit the claim entirely, matching tokens
+         * issued before this feature existed.
+         */
+        private String buildJwt(final long ttlMillis, final String username, final String role,
+                        final Boolean mustChangePassword) {
                 final Key key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(JWT_SECRET_B64));
                 final Date now = new Date();
                 final Date expiration = new Date(now.getTime() + ttlMillis);
-                return Jwts.builder()
+                final io.jsonwebtoken.JwtBuilder builder = Jwts.builder()
                                 .setSubject(username)
                                 .claim("role", role)
                                 .claim("hotelId", TEST_HOTEL_ID)
                                 .setIssuedAt(now)
-                                .setExpiration(expiration)
-                                .signWith(key, SignatureAlgorithm.HS256)
-                                .compact();
+                                .setExpiration(expiration);
+                if (mustChangePassword != null) {
+                        builder.claim("mustChangePassword", mustChangePassword);
+                }
+                return builder.signWith(key, SignatureAlgorithm.HS256).compact();
         }
 
         /**
@@ -459,6 +471,82 @@ class AuthenticationFilterTest {
                         final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST");
                         final MockServerWebExchange exchange = MockServerWebExchange.from(
                                         MockServerHttpRequest.get("/api/v1/reservations")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        verify(chainMock).filter(any());
+                }
+        }
+
+        @Nested
+        @DisplayName("BUG-5: forced password rotation")
+        class MustChangePasswordTests {
+
+                @Test
+                @DisplayName("blocks a business endpoint with 403 when mustChangePassword=true")
+                void blocksBusinessEndpointWhenMustChangePasswordTrue() {
+                        final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST", true);
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/guests")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                }
+
+                @Test
+                @DisplayName("blocks even an ADMIN from a business endpoint when mustChangePassword=true "
+                                + "(role alone must not bypass the rotation requirement)")
+                void blocksAdminTooWhenMustChangePasswordTrue() {
+                        final String token = buildJwt(ONE_HOUR_MS, "admin", "ADMIN", true);
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/reservations")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                }
+
+                @Test
+                @DisplayName("allows /api/v1/auth/users through the allow-list check even when "
+                                + "mustChangePassword=true is absent (regression guard for the false-negative path)")
+                void allowsRequestWhenMustChangePasswordClaimAbsent() {
+                        when(chainMock.filter(any())).thenReturn(Mono.empty());
+                        final String token = buildJwt(ONE_HOUR_MS, "admin", "ADMIN", null);
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/guests")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        verify(chainMock).filter(any());
+                }
+
+                @Test
+                @DisplayName("allows a change-password-allow-listed path through even when "
+                                + "mustChangePassword=true")
+                void allowsAllowListedPathWhenMustChangePasswordTrue() {
+                        when(chainMock.filter(any())).thenReturn(Mono.empty());
+                        final String token = buildJwt(ONE_HOUR_MS, "admin", "ADMIN", true);
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/auth/me")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        verify(chainMock).filter(any());
+                }
+
+                @Test
+                @DisplayName("allows the request through when mustChangePassword=false")
+                void allowsRequestWhenMustChangePasswordFalse() {
+                        when(chainMock.filter(any())).thenReturn(Mono.empty());
+                        final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST", false);
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/guests")
                                                         .cookie(new HttpCookie("jwt", token)).build());
 
                         StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))

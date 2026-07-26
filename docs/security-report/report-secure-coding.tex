@@ -1577,6 +1577,82 @@ al legittimo proprietario.
 \paragraph{Riferimento} Commit: \commitref{b473265}{fix(security): GAP-1 --- password change revokes existing sessions via tokenVersion}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Cambio password obbligatorio non applicato lato server \threat{T-AUTH-06}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante un giro di navigazione E2E reale con Playwright (non un pentest
+mirato --- \texttt{docs/LIVE\_E2E\_AUDIT\_2026-07.md}, BUG-5). Un utente creato da
+un ADMIN o sottoposto a reset password riceve \texttt{mustChangePassword=true}:
+il frontend reindirizza correttamente a \texttt{/settings/password} al login, ma
+quel reindirizzamento è l'\emph{unico} controllo esistente. Navigando direttamente
+a un'altra URL, o chiamando l'API direttamente con le credenziali provvisorie
+valide, ogni endpoint autenticato rispondeva normalmente: il claim non esisteva
+nel JWT (solo colonna \texttt{must\_change\_password} in DB, letta esclusivamente
+da \texttt{GET /auth/me}) e nessun filtro server-side lo controllava mai. La
+rotazione forzata della password era quindi puramente cosmetica.
+Classificato OWASP A01 (Broken Access Control) / A07 (Identification \&
+Authentication Failures).
+
+\begin{insecurebox}[title={Codice Vulnerabile --- enforcement assente (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: mustChangePassword non e' nel JWT, nessun filtro lo controlla mai
+public String generateToken(String username, Role role, UUID hotelId, int tokenVersion) {
+    Map<String, Object> claims = new HashMap<>();
+    claims.put("role", role.name());
+    claims.put("hotelId", hotelId.toString());
+    claims.put("tv", tokenVersion);
+    return buildToken(claims, username, jwtExpiration);
+    // credenziali provvisorie valide su QUALUNQUE endpoint autenticato
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+\texttt{mustChangePassword} è ora un claim JWT firmato, aggiunto a
+\texttt{JwtService.generateToken}/\texttt{generateRefreshToken} e popolato su
+tutti e 4 i percorsi che emettono token: \texttt{register}, \texttt{login},
+\texttt{refresh} (propaga lo stato corrente dell'utente) e
+\texttt{changePassword} (emette sempre \texttt{false}, coerente col reset appena
+avvenuto --- l'utente non resta bloccato dopo aver adempiuto). L'\texttt{AuthenticationFilter}
+del gateway --- unico punto che copre tutte le route business (billing/guest/
+frontdesk/fb) e \texttt{/api/v1/auth/users/**} --- rifiuta con \texttt{403
+PASSWORD\_CHANGE\_REQUIRED} qualunque richiesta il cui claim sia \texttt{true} e
+il cui path non sia nell'allow-list (\texttt{/api/v1/auth/change-password},
+\texttt{/me}, \texttt{/logout}, \texttt{/refresh}); il controllo gira
+\emph{prima} della RBAC, così nemmeno un ruolo ADMIN può bypassare l'obbligo
+sfruttando i propri privilegi. Nota architetturale: le route pubbliche di
+auth-service (login/refresh/change-password/me/logout) non passano comunque da
+\texttt{AuthenticationFilter} (nessun filtro su quella route in
+\texttt{api-gateway.yml}, \texttt{permitAll} per design) --- l'allow-list è
+quindi un backstop difensivo, non il gate primario per quei quattro path.
+
+\begin{securebox}[title={Codice Sicuro --- AuthenticationFilter.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: bloccato prima della RBAC, indipendentemente dal ruolo
+Boolean mustChangePassword = claims.get("mustChangePassword", Boolean.class);
+if (Boolean.TRUE.equals(mustChangePassword)
+        && !MUST_CHANGE_PASSWORD_ALLOWED_PATHS.contains(request.getPath().value())) {
+    return this.onError(exchange, "PASSWORD_CHANGE_REQUIRED", HttpStatus.FORBIDDEN);
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+\texttt{AuthServiceImplTest.loginPropagatesMustChangePasswordIntoJwtClaims}
+verifica che il claim raggiunga \texttt{JwtService} con valore \texttt{true};
+\texttt{changePasswordClearsMustChangePasswordEvenWhenItWasTrue} verifica che il
+token emesso subito dopo il cambio password porti \texttt{false} (nessun
+lockout residuo). Nuovo gruppo \texttt{MustChangePasswordTests} in
+\texttt{AuthenticationFilterTest}: blocco di un endpoint business con
+\texttt{mustChangePassword=true} sia per RECEPTIONIST sia per ADMIN (il ruolo
+non basta a bypassare), richiesta permessa quando il claim è assente/\texttt{false}
+(retro-compatibilità con token pre-esistenti), e verifica esplicita che un path
+in allow-list resti raggiungibile nonostante il claim \texttt{true}.
+
+\paragraph{Riferimento} Commit: \commitref{[pending]}{fix(security): T-AUTH-06 --- mustChangePassword enforced server-side via JWT claim}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Audit Log e Security Monitoring \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
 % ─────────────────────────────────────────────────────────────────────────────
 

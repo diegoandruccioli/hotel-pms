@@ -38,6 +38,17 @@ public class JwtService {
     private static final String CLAIM_HOTEL_ID = "hotelId";
 
     /**
+     * Custom claim key marking a forced password rotation (BUG-5,
+     * {@code docs/LIVE_E2E_AUDIT_2026-07.md}).
+     *
+     * <p>Mirrors {@code UserAccount.mustChangePassword}. The gateway's
+     * {@code AuthenticationFilter} rejects any request outside the
+     * change-password allow-list while this claim is {@code true}, closing the
+     * gap where the requirement was enforced only by a frontend redirect.</p>
+     */
+    private static final String CLAIM_MUST_CHANGE_PASSWORD = "mustChangePassword";
+
+    /**
      * Custom claim key for the token version counter (T-AUTH-04 residuo).
      *
      * <p>The value mirrors {@code UserAccount.tokenVersion}. When a password
@@ -62,18 +73,21 @@ public class JwtService {
      * Incrementing that counter on password change makes all previously issued tokens
      * distinguishable from the current generation (T-AUTH-04 residuo).</p>
      *
-     * @param username     the user's username
-     * @param role         the user's role
-     * @param hotelId      the tenant identifier for multi-hotel isolation
-     * @param tokenVersion the current token version counter for the user
+     * @param username          the user's username
+     * @param role              the user's role
+     * @param hotelId           the tenant identifier for multi-hotel isolation
+     * @param tokenVersion      the current token version counter for the user
+     * @param mustChangePassword {@code true} if the user must rotate their password
+     *                          before performing any other action (BUG-5)
      * @return the generated access JWT
      */
     public String generateToken(final String username, final Role role, final UUID hotelId,
-            final int tokenVersion) {
+            final int tokenVersion, final boolean mustChangePassword) {
         final Map<String, Object> claims = new HashMap<>();
         claims.put("role", role.name());
         claims.put(CLAIM_HOTEL_ID, hotelId.toString());
         claims.put(CLAIM_TOKEN_VERSION, tokenVersion);
+        claims.put(CLAIM_MUST_CHANGE_PASSWORD, mustChangePassword);
         return buildToken(claims, username, jwtExpiration);
     }
 
@@ -85,19 +99,22 @@ public class JwtService {
      * counter, the refresh endpoint rejects tokens whose {@code tv} diverges from the
      * Redis-cached value (T-AUTH-04 residuo).</p>
      *
-     * @param username     the user's username
-     * @param role         the user's role
-     * @param hotelId      the tenant identifier for multi-hotel isolation
-     * @param tokenVersion the current token version counter for the user
+     * @param username          the user's username
+     * @param role              the user's role
+     * @param hotelId           the tenant identifier for multi-hotel isolation
+     * @param tokenVersion      the current token version counter for the user
+     * @param mustChangePassword {@code true} if the user must rotate their password
+     *                          before performing any other action (BUG-5)
      * @return the generated refresh JWT
      */
     public String generateRefreshToken(final String username, final Role role, final UUID hotelId,
-            final int tokenVersion) {
+            final int tokenVersion, final boolean mustChangePassword) {
         final Map<String, Object> claims = new HashMap<>();
         claims.put("role", role.name());
         claims.put(CLAIM_HOTEL_ID, hotelId.toString());
         claims.put(CLAIM_TYPE, TYPE_REFRESH);
         claims.put(CLAIM_TOKEN_VERSION, tokenVersion);
+        claims.put(CLAIM_MUST_CHANGE_PASSWORD, mustChangePassword);
         return buildRefreshToken(claims, username, refreshExpiration, UUID.randomUUID().toString());
     }
 
@@ -167,6 +184,18 @@ public class JwtService {
     public UUID extractHotelId(final String token) {
         final String raw = extractClaim(token, c -> c.get(CLAIM_HOTEL_ID, String.class));
         return raw != null ? UUID.fromString(raw) : null;
+    }
+
+    /**
+     * Extracts the {@code mustChangePassword} claim from the given token.
+     *
+     * @param token the JWT
+     * @return {@code true} if the claim is present and {@code true}; {@code false}
+     *         otherwise, including for tokens issued before this claim existed
+     */
+    public boolean extractMustChangePassword(final String token) {
+        final Boolean value = extractClaim(token, c -> c.get(CLAIM_MUST_CHANGE_PASSWORD, Boolean.class));
+        return Boolean.TRUE.equals(value);
     }
 
     /**

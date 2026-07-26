@@ -28,12 +28,14 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.mockito.ArgumentCaptor;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -103,8 +105,9 @@ class AuthServiceImplTest {
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
         when(userMapper.toEntity(any(RegisterRequest.class))).thenReturn(testUser);
         when(passwordEncoder.encode(anyString())).thenReturn(HASHED_PASSWORD);
-        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt())).thenReturn(MOCK_TOKEN);
-        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt()))
+        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
+                .thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_REFRESH_TOKEN);
 
         final AuthResponse response = authService.register(registerRequest);
@@ -145,8 +148,9 @@ class AuthServiceImplTest {
     void loginSuccess() {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
-        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt())).thenReturn(MOCK_TOKEN);
-        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt()))
+        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
+                .thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_REFRESH_TOKEN);
 
         final AuthResponse response = authService.login(loginRequest);
@@ -154,6 +158,31 @@ class AuthServiceImplTest {
         assertNotNull(response, "Response should not be null");
         assertEquals(MOCK_TOKEN, response.token(), "Token should match mocked one");
         assertEquals(MOCK_REFRESH_TOKEN, response.refreshToken(), "Refresh token should match mocked one");
+    }
+
+    @Test
+    void loginPropagatesMustChangePasswordIntoJwtClaims() {
+        final UserAccount userWithTempPassword = UserAccount.builder()
+                .username(TEST_USER)
+                .email(TEST_EMAIL)
+                .passwordHash(HASHED_PASSWORD)
+                .role(Role.RECEPTIONIST)
+                .hotelId(TEST_HOTEL_ID)
+                .active(true)
+                .mustChangePassword(true)
+                .build();
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(userWithTempPassword));
+        when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
+        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), eq(true)))
+                .thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), eq(true)))
+                .thenReturn(MOCK_REFRESH_TOKEN);
+
+        final AuthResponse response = authService.login(loginRequest);
+
+        assertEquals(MOCK_TOKEN, response.token(),
+                "BUG-5: generateToken must be called with mustChangePassword=true so the gateway can enforce it");
+        assertNotNull(response.mustChangePassword());
     }
 
     @Test
@@ -233,8 +262,9 @@ class AuthServiceImplTest {
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
         when(passwordEncoder.upgradeEncoding(HASHED_PASSWORD)).thenReturn(true);
         when(passwordEncoder.encode(RAW_PASSWORD)).thenReturn("rehashed_password");
-        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt())).thenReturn(MOCK_TOKEN);
-        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt()))
+        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
+                .thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_REFRESH_TOKEN);
 
         final AuthResponse response = authService.login(loginRequest);
@@ -251,8 +281,9 @@ class AuthServiceImplTest {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
         when(passwordEncoder.upgradeEncoding(HASHED_PASSWORD)).thenReturn(false);
-        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt())).thenReturn(MOCK_TOKEN);
-        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt()))
+        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
+                .thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_REFRESH_TOKEN);
 
         authService.login(loginRequest);
@@ -275,8 +306,9 @@ class AuthServiceImplTest {
 
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(userWithPriorFailures));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
-        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt())).thenReturn(MOCK_TOKEN);
-        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt()))
+        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
+                .thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_REFRESH_TOKEN);
 
         final AuthResponse response = authService.login(loginRequest);
@@ -305,8 +337,9 @@ class AuthServiceImplTest {
         when(jwtService.extractTokenVersion(MOCK_REFRESH_TOKEN)).thenReturn(TEST_TOKEN_VERSION);
         when(jwtService.extractExpirationInstant(MOCK_REFRESH_TOKEN))
                 .thenReturn(Instant.now().plusSeconds(FUTURE_TTL_SECONDS));
-        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt())).thenReturn(MOCK_TOKEN);
-        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt()))
+        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
+                .thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_NEW_REFRESH_TOKEN);
 
         final AuthResponse response = authService.refresh(MOCK_REFRESH_TOKEN);
@@ -344,8 +377,9 @@ class AuthServiceImplTest {
         when(refreshTokenService.getTokenVersion(TEST_USER)).thenReturn(-1);
         when(jwtService.extractExpirationInstant(MOCK_REFRESH_TOKEN))
                 .thenReturn(Instant.now().plusSeconds(FUTURE_TTL_SECONDS));
-        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt())).thenReturn(MOCK_TOKEN);
-        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt()))
+        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
+                .thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_NEW_REFRESH_TOKEN);
 
         final AuthResponse response = authService.refresh(MOCK_REFRESH_TOKEN);
@@ -396,8 +430,9 @@ class AuthServiceImplTest {
         when(userRepository.findByUsername(TEST_USER)).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
         when(passwordEncoder.encode(newRawPassword)).thenReturn(newHash);
-        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt())).thenReturn(MOCK_TOKEN);
-        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt()))
+        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
+                .thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_REFRESH_TOKEN);
 
         final AuthResponse response = authService.changePassword(TEST_USER,
@@ -412,6 +447,36 @@ class AuthServiceImplTest {
                 "Password hash must be updated to the new value");
         verify(userRepository).save(Objects.requireNonNull(testUser));
         verify(refreshTokenService).storeTokenVersion(eq(TEST_USER), eq(1), any(Duration.class));
+        verify(jwtService).generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), eq(false));
+        verify(jwtService).generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), eq(false));
+    }
+
+    @Test
+    void changePasswordClearsMustChangePasswordEvenWhenItWasTrue() {
+        final UserAccount userWithTempPassword = UserAccount.builder()
+                .username(TEST_USER)
+                .email(TEST_EMAIL)
+                .passwordHash(HASHED_PASSWORD)
+                .role(Role.RECEPTIONIST)
+                .hotelId(TEST_HOTEL_ID)
+                .active(true)
+                .mustChangePassword(true)
+                .build();
+        when(userRepository.findByUsername(TEST_USER)).thenReturn(Optional.of(userWithTempPassword));
+        when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
+        when(passwordEncoder.encode(NEW_PASSWORD)).thenReturn("newhashedpassword");
+        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), eq(false)))
+                .thenReturn(MOCK_TOKEN);
+        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), eq(false)))
+                .thenReturn(MOCK_REFRESH_TOKEN);
+
+        final AuthResponse response = authService.changePassword(TEST_USER,
+                new ChangePasswordRequest(RAW_PASSWORD, NEW_PASSWORD));
+
+        assertEquals(MOCK_TOKEN, response.token(),
+                "BUG-5: the fresh token pair issued after a password change must not carry "
+                        + "mustChangePassword=true, otherwise the gateway would keep blocking the user");
+        assertFalse(response.mustChangePassword());
     }
 
     @Test

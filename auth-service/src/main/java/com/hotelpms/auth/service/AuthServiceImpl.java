@@ -76,9 +76,9 @@ public class AuthServiceImpl implements AuthService {
 
         log.info("[AUTH] REGISTER_SUCCESS | user={}", user.getUsername());
         final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole(),
-                user.getHotelId(), user.getTokenVersion());
+                user.getHotelId(), user.getTokenVersion(), user.isMustChangePassword());
         final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole(),
-                user.getHotelId(), user.getTokenVersion());
+                user.getHotelId(), user.getTokenVersion(), user.isMustChangePassword());
         return new AuthResponse(accessToken, refreshToken, user.isMustChangePassword());
     }
 
@@ -146,9 +146,9 @@ public class AuthServiceImpl implements AuthService {
         log.info("[AUTH] LOGIN_SUCCESS | user={} | mustChangePassword={}", user.getUsername(),
                 user.isMustChangePassword());
         final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole(),
-                user.getHotelId(), user.getTokenVersion());
+                user.getHotelId(), user.getTokenVersion(), user.isMustChangePassword());
         final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole(),
-                user.getHotelId(), user.getTokenVersion());
+                user.getHotelId(), user.getTokenVersion(), user.isMustChangePassword());
         return new AuthResponse(accessToken, refreshToken, user.isMustChangePassword());
     }
 
@@ -198,9 +198,9 @@ public class AuthServiceImpl implements AuthService {
 
         log.info("[AUTH] REFRESH_SUCCESS | user={}", username);
         final String newAccessToken = jwtService.generateToken(username, user.getRole(),
-                user.getHotelId(), user.getTokenVersion());
+                user.getHotelId(), user.getTokenVersion(), user.isMustChangePassword());
         final String newRefreshToken = jwtService.generateRefreshToken(username, user.getRole(),
-                user.getHotelId(), user.getTokenVersion());
+                user.getHotelId(), user.getTokenVersion(), user.isMustChangePassword());
         return new AuthResponse(newAccessToken, newRefreshToken, user.isMustChangePassword());
     }
 
@@ -252,9 +252,9 @@ public class AuthServiceImpl implements AuthService {
                 user.getTokenVersion());
 
         final String accessToken = jwtService.generateToken(username, user.getRole(),
-                user.getHotelId(), user.getTokenVersion());
+                user.getHotelId(), user.getTokenVersion(), user.isMustChangePassword());
         final String refreshToken = jwtService.generateRefreshToken(username, user.getRole(),
-                user.getHotelId(), user.getTokenVersion());
+                user.getHotelId(), user.getTokenVersion(), user.isMustChangePassword());
         return new AuthResponse(accessToken, refreshToken, false);
     }
 

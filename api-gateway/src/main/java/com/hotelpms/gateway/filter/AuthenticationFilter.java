@@ -101,6 +101,21 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
     /** Path prefix for user management — always restricted to ADMIN/OWNER. */
     private static final String USERS_PATH_PREFIX = "/api/v1/auth/users";
 
+    /**
+     * Paths reachable while {@code mustChangePassword=true} (BUG-5,
+     * {@code docs/LIVE_E2E_AUDIT_2026-07.md}). auth-service's own login/refresh/
+     * change-password/me/logout endpoints are not routed through this filter (see
+     * {@code api-gateway.yml} — the {@code auth-service} route carries no
+     * {@code AuthenticationFilter}), so this list is a defense-in-depth backstop
+     * for any route that IS filtered, not the primary enforcement point.
+     */
+    private static final Set<String> MUST_CHANGE_PASSWORD_ALLOWED_PATHS = Set.of(
+            "/api/v1/auth/change-password",
+            "/api/v1/auth/me",
+            "/api/v1/auth/logout",
+            "/api/v1/auth/refresh"
+    );
+
     private final JwtUtil jwtUtil;
     private final String hmacSecret;
 
@@ -152,6 +167,14 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
 
             if (hotelId == null || hotelId.isEmpty()) {
                 return this.onError(exchange, "JWT missing hotelId claim", HttpStatus.UNAUTHORIZED);
+            }
+
+            // Forced password rotation (BUG-5) — runs before RBAC so a temporary-password
+            // account cannot use its role to reach any endpoint outside the allow-list.
+            final Boolean mustChangePassword = claims.get("mustChangePassword", Boolean.class);
+            if (Boolean.TRUE.equals(mustChangePassword)
+                    && !MUST_CHANGE_PASSWORD_ALLOWED_PATHS.contains(request.getPath().value())) {
+                return this.onError(exchange, "PASSWORD_CHANGE_REQUIRED", HttpStatus.FORBIDDEN);
             }
 
             // RBAC enforcement — runs before the request is forwarded
