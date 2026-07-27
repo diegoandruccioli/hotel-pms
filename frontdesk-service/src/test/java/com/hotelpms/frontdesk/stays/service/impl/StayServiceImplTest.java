@@ -3,6 +3,7 @@ package com.hotelpms.frontdesk.stays.service.impl;
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
+import com.hotelpms.frontdesk.client.dto.ChargeResponse;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
@@ -17,6 +18,7 @@ import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
 import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
+import com.hotelpms.frontdesk.rooms.dto.RoomTypeResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomService;
 import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.domain.StayGuest;
@@ -85,6 +87,7 @@ class StayServiceImplTest {
     private static final String ROOM_NOT_FOUND = "ROOM_NOT_FOUND";
     private static final String PS_PORTAL_DOWN = "PS portal down";
     private static final String PAID_STATUS = "PAID";
+    private static final String BILLING_SERVICE_UNAVAILABLE = "BILLING_SERVICE_UNAVAILABLE";
     private static final String HOTEL_NAME_TEST = "Hotel Test";
     private static final String INVOICE_NUMBER_TEST = "2026/0001";
     private static final String CURRENCY_EUR = "EUR";
@@ -148,8 +151,10 @@ class StayServiceImplTest {
                 .reservationId(reservationId)
                 .guestId(guestId)
                 .roomId(roomId)
+                .roomNumber(ROOM_NUMBER_101)
                 .status(StayStatus.CHECKED_IN)
                 .actualCheckInTime(LocalDateTime.now())
+                .expectedCheckOutDate(LocalDate.now().plusDays(3))
                 .build();
 
         validResponse = new StayResponse(stayId, null, reservationId, guestId, roomId,
@@ -165,7 +170,9 @@ class StayServiceImplTest {
     }
 
     private RoomResponse room() {
-        return new RoomResponse(roomId, hotelId, ROOM_NUMBER_101, null, RoomStatus.CLEAN, true, null, null);
+        final RoomTypeResponse roomType = new RoomTypeResponse(
+                UUID.randomUUID(), "Standard", null, 2, BigDecimal.valueOf(90), true, null, null);
+        return new RoomResponse(roomId, hotelId, ROOM_NUMBER_101, roomType, RoomStatus.CLEAN, true, null, null);
     }
 
     @Test
@@ -764,6 +771,7 @@ class StayServiceImplTest {
         final UUID room = Objects.requireNonNull(roomId);
         final StayRequest request = Objects.requireNonNull(validRequest);
         final Stay saved = Objects.requireNonNull(savedStay);
+        saved.setHotelId(hotelId);
 
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
@@ -778,6 +786,11 @@ class StayServiceImplTest {
         final UUID invoiceId = UUID.randomUUID();
         when(billingClient.createInvoiceForStay(anyNonNull(StayInvoiceRequest.class)))
                 .thenReturn(new InvoiceCreatedResponse(invoiceId));
+        when(billingClient.addCharge(ArgumentMatchers.eq(stayId), ArgumentMatchers.any()))
+                .thenReturn(new ChargeResponse(UUID.randomUUID()));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null));
         when(stayMapper.toDto(saved)).thenReturn(Objects.requireNonNull(validResponse));
 
         // Act
@@ -785,6 +798,7 @@ class StayServiceImplTest {
 
         // Assert
         verify(billingClient, times(1)).createInvoiceForStay(anyNonNull(StayInvoiceRequest.class));
+        verify(billingClient, times(1)).addCharge(ArgumentMatchers.eq(stayId), ArgumentMatchers.any());
         assertEquals(invoiceId, saved.getInvoiceId());
         assertFalse(saved.isInvoiceCreationFailed());
         verify(stayRepository, times(2)).save(anyNonNull(Stay.class));
@@ -817,7 +831,7 @@ class StayServiceImplTest {
         // Assert — check-in still succeeds (non-blocking), but the failure is now durable
         assertNull(saved.getInvoiceId());
         assertTrue(saved.isInvoiceCreationFailed());
-        assertEquals("BILLING_SERVICE_UNAVAILABLE", saved.getInvoiceCreationFailureReason());
+        assertEquals(BILLING_SERVICE_UNAVAILABLE, saved.getInvoiceCreationFailureReason());
     }
 
     @Test
@@ -826,12 +840,15 @@ class StayServiceImplTest {
         final Stay stay = Objects.requireNonNull(savedStay);
         stay.setHotelId(hotelId);
         stay.setInvoiceCreationFailed(true);
-        stay.setInvoiceCreationFailureReason("BILLING_SERVICE_UNAVAILABLE");
+        stay.setInvoiceCreationFailureReason(BILLING_SERVICE_UNAVAILABLE);
 
         final UUID invoiceId = UUID.randomUUID();
         when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
         when(billingClient.createInvoiceForStay(anyNonNull(StayInvoiceRequest.class)))
                 .thenReturn(new InvoiceCreatedResponse(invoiceId));
+        when(roomService.getRoomById(roomId, hotelId)).thenReturn(room());
+        when(billingClient.addCharge(ArgumentMatchers.any(), ArgumentMatchers.any()))
+                .thenReturn(new ChargeResponse(UUID.randomUUID()));
         when(stayRepository.save(stay)).thenReturn(stay);
         when(stayMapper.toDto(stay)).thenReturn(Objects.requireNonNull(validResponse));
 
@@ -843,6 +860,53 @@ class StayServiceImplTest {
         assertEquals(invoiceId, stay.getInvoiceId());
         assertFalse(stay.isInvoiceCreationFailed());
         assertNull(stay.getInvoiceCreationFailureReason());
+    }
+
+    @Test
+    void shouldRetryOnlyChargeWhenInvoiceAlreadyCreatedButChargeFailed() {
+        // Arrange — partial failure: invoice shell exists, room charge never attached
+        final Stay stay = Objects.requireNonNull(savedStay);
+        final UUID invoiceId = UUID.randomUUID();
+        stay.setHotelId(hotelId);
+        stay.setInvoiceId(invoiceId);
+        stay.setInvoiceCreationFailed(true);
+        stay.setInvoiceCreationFailureReason(BILLING_SERVICE_UNAVAILABLE);
+
+        when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
+        when(roomService.getRoomById(roomId, hotelId)).thenReturn(room());
+        when(billingClient.addCharge(ArgumentMatchers.any(), ArgumentMatchers.any()))
+                .thenReturn(new ChargeResponse(UUID.randomUUID()));
+        when(stayRepository.save(stay)).thenReturn(stay);
+        when(stayMapper.toDto(stay)).thenReturn(Objects.requireNonNull(validResponse));
+
+        // Act
+        stayService.retryInvoiceCreation(stayId, hotelId);
+
+        // Assert — invoice is NOT re-created, only the missing charge is retried
+        verify(billingClient, never()).createInvoiceForStay(ArgumentMatchers.any());
+        verify(billingClient, times(1)).addCharge(ArgumentMatchers.any(), ArgumentMatchers.any());
+        assertEquals(invoiceId, stay.getInvoiceId());
+        assertFalse(stay.isInvoiceCreationFailed());
+    }
+
+    @Test
+    void shouldSkipInvoiceFlowWhenAlreadyCompletedToAvoidDoubleBilling() {
+        // Arrange — invoice + room charge already recorded successfully on a prior call
+        final Stay stay = Objects.requireNonNull(savedStay);
+        stay.setHotelId(hotelId);
+        stay.setInvoiceId(UUID.randomUUID());
+        stay.setInvoiceCreationFailed(false);
+
+        when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
+        when(stayMapper.toDto(stay)).thenReturn(Objects.requireNonNull(validResponse));
+
+        // Act — a stray retry (e.g. double-click) must not re-bill the room
+        stayService.retryInvoiceCreation(stayId, hotelId);
+
+        // Assert
+        verify(billingClient, never()).createInvoiceForStay(ArgumentMatchers.any());
+        verify(billingClient, never()).addCharge(ArgumentMatchers.any(), ArgumentMatchers.any());
+        verify(stayRepository, never()).save(ArgumentMatchers.any());
     }
 
     @Test
@@ -1083,6 +1147,7 @@ class StayServiceImplTest {
         final UUID room = Objects.requireNonNull(roomId);
         final StayRequest request = Objects.requireNonNull(validRequest);
         final Stay saved = Objects.requireNonNull(savedStay);
+        saved.setHotelId(hotelId);
 
         when(guestClient.getGuestById(guest))
                 .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
@@ -1091,6 +1156,11 @@ class StayServiceImplTest {
         when(roomService.getRoomById(room, hotelId)).thenReturn(room());
         when(billingClient.createInvoiceForStay(anyNonNull(StayInvoiceRequest.class)))
                 .thenReturn(new InvoiceCreatedResponse(UUID.randomUUID()));
+        when(billingClient.addCharge(ArgumentMatchers.any(), ArgumentMatchers.any()))
+                .thenReturn(new ChargeResponse(UUID.randomUUID()));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null));
 
         final Stay unmappedStay = new Stay();
         when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
@@ -1102,7 +1172,7 @@ class StayServiceImplTest {
 
         // Assert — OCCUPIED must be confirmed before invoice is opened (no orphan invoices)
         final InOrder sagaOrder = inOrder(roomService, billingClient);
-        sagaOrder.verify(roomService).updateRoomStatus(room, null, RoomStatus.OCCUPIED);
+        sagaOrder.verify(roomService).updateRoomStatus(room, hotelId, RoomStatus.OCCUPIED);
         sagaOrder.verify(billingClient).createInvoiceForStay(anyNonNull(StayInvoiceRequest.class));
     }
 

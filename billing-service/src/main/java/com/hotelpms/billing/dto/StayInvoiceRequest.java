@@ -10,7 +10,9 @@ import java.util.UUID;
  *
  * @param stayId        the stay UUID (logical reference — no DB FK)
  * @param guestId       the guest UUID
- * @param reservationId the reservation UUID
+ * @param reservationId the reservation UUID; {@code null} for walk-in stays (no prior
+ *                      reservation) — such invoices are looked up via {@code invoiceId}
+ *                      stored on the stay, not via reservation
  */
 public record StayInvoiceRequest(
 
@@ -20,6 +22,5 @@ public record StayInvoiceRequest(
         @NotNull(message = "Guest ID is required")
         UUID guestId,
 
-        @NotNull(message = "Reservation ID is required")
         UUID reservationId) {
 }

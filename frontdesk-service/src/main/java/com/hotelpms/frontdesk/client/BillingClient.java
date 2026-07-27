@@ -1,10 +1,14 @@
 package com.hotelpms.frontdesk.client;
 
+import com.hotelpms.frontdesk.client.dto.ChargeRequest;
+import com.hotelpms.frontdesk.client.dto.ChargeResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +23,11 @@ import java.util.UUID;
  */
 @FeignClient(name = "billing-service")
 public interface BillingClient {
+
+    /**
+     * Logger for fallback diagnostics — interfaces cannot use {@code @Slf4j}.
+     */
+    Logger LOG = LoggerFactory.getLogger(BillingClient.class);
 
     /**
      * Status placeholder returned by fallback methods when billing-service is unreachable.
@@ -75,6 +84,17 @@ public interface BillingClient {
     InvoiceCreatedResponse createInvoiceForStay(@RequestBody StayInvoiceRequest request);
 
     /**
+     * Adds a charge to the open invoice for a stay (e.g. the room rate at check-in).
+     *
+     * @param stayId  the stay UUID
+     * @param request the charge details
+     * @return the created charge response, or {@code null} when the fallback fires
+     */
+    @PostMapping("/api/v1/invoices/stay/{stayId}/charges")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "addChargeFallback")
+    ChargeResponse addCharge(@PathVariable("stayId") UUID stayId, @RequestBody ChargeRequest request);
+
+    /**
      * Fallback for getLatestInvoiceByReservation.
      *
      * @param reservationId the reservation id
@@ -82,6 +102,8 @@ public interface BillingClient {
      * @return a degraded response with status UNAVAILABLE
      */
     default InvoiceStatusResponse getLatestInvoiceFallback(final UUID reservationId, final Throwable throwable) {
+        LOG.warn("[BillingClient] getLatestInvoiceByReservation fallback | reservationId={} | cause={}: {}",
+                reservationId, throwable.getClass().getSimpleName(), throwable.getMessage());
         return new InvoiceStatusResponse(null, reservationId, STATUS_UNAVAILABLE, java.math.BigDecimal.ZERO);
     }
 
@@ -93,6 +115,8 @@ public interface BillingClient {
      * @return a degraded response with status UNAVAILABLE
      */
     default InvoiceStatusResponse getInvoiceByIdFallback(final UUID invoiceId, final Throwable throwable) {
+        LOG.warn("[BillingClient] getInvoiceById fallback | invoiceId={} | cause={}: {}",
+                invoiceId, throwable.getClass().getSimpleName(), throwable.getMessage());
         return new InvoiceStatusResponse(invoiceId, null, STATUS_UNAVAILABLE, java.math.BigDecimal.ZERO);
     }
 
@@ -106,6 +130,8 @@ public interface BillingClient {
      */
     default InvoiceForEmailResponse getInvoiceForEmailFallback(
             final UUID invoiceId, final Throwable throwable) {
+        LOG.warn("[BillingClient] getInvoiceForEmail fallback | invoiceId={} | cause={}: {}",
+                invoiceId, throwable.getClass().getSimpleName(), throwable.getMessage());
         return new InvoiceForEmailResponse(invoiceId, null, null, STATUS_UNAVAILABLE,
                 java.math.BigDecimal.ZERO, "EUR", Collections.emptyList());
     }
@@ -120,6 +146,24 @@ public interface BillingClient {
      */
     default InvoiceCreatedResponse createInvoiceForStayFallback(
             final StayInvoiceRequest request, final Throwable throwable) {
+        LOG.error("[BillingClient] createInvoiceForStay fallback | stayId={} | cause={}: {}",
+                request.stayId(), throwable.getClass().getSimpleName(), throwable.getMessage());
+        return null;
+    }
+
+    /**
+     * Fallback for addCharge — returns {@code null} so the caller can mark the stay's
+     * invoice flow as failed and offer a retry, instead of losing the failure silently.
+     *
+     * @param stayId    the stay UUID
+     * @param request   the original charge request
+     * @param throwable the cause
+     * @return null
+     */
+    default ChargeResponse addChargeFallback(
+            final UUID stayId, final ChargeRequest request, final Throwable throwable) {
+        LOG.error("[BillingClient] addCharge fallback | stayId={} | type={} | cause={}: {}",
+                stayId, request.type(), throwable.getClass().getSimpleName(), throwable.getMessage());
         return null;
     }
 }

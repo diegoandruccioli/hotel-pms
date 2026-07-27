@@ -87,7 +87,6 @@ public class Invoice {
     @Column(name = "sdi_status", nullable = false)
     private SdiStatus sdiStatus = SdiStatus.NOT_SENT;
 
-    @Column(nullable = false)
     private UUID reservationId;
 
     @Column(nullable = false)

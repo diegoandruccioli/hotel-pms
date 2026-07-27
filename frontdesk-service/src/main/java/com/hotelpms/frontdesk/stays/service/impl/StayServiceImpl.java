@@ -4,6 +4,8 @@ import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.ChargeLineDto;
+import com.hotelpms.frontdesk.client.dto.ChargeRequest;
+import com.hotelpms.frontdesk.client.dto.ChargeResponse;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
@@ -43,8 +45,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.lang.NonNull;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.Comparator;
 import java.util.List;
@@ -68,6 +72,7 @@ public class StayServiceImpl implements StayService {
 
     private static final String PAID_STATUS = "PAID";
     private static final String BILLING_SERVICE_UNAVAILABLE_REASON = "BILLING_SERVICE_UNAVAILABLE";
+    private static final String ROOM_NIGHT_CHARGE_TYPE = "ROOM_NIGHT";
     private static final String NOTIFICATION_SERVICE_UNAVAILABLE_REASON = "NOTIFICATION_SERVICE_UNAVAILABLE";
     private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
     private static final Set<ReservationStatus> CHECKIN_ALLOWED_STATUSES =
@@ -470,22 +475,64 @@ public class StayServiceImpl implements StayService {
     }
 
     private void openInvoiceForStay(final Stay stay) {
-        final StayInvoiceRequest invoiceReq = new StayInvoiceRequest(
-                stay.getId(), stay.getGuestId(), stay.getReservationId());
-        final InvoiceCreatedResponse invoiceResp = billingClient.createInvoiceForStay(invoiceReq);
-        if (invoiceResp != null && invoiceResp.id() != null) {
-            stay.setInvoiceId(invoiceResp.id());
-            stay.setInvoiceCreationFailed(false);
-            stay.setInvoiceCreationFailureReason(null);
-            stayRepository.save(stay);
-            log.info("[STAY] INVOICE_CREATED | stayId={} | invoiceId={}", stay.getId(), invoiceResp.id());
-        } else {
-            stay.setInvoiceCreationFailed(true);
-            stay.setInvoiceCreationFailureReason(BILLING_SERVICE_UNAVAILABLE_REASON);
-            stayRepository.save(stay);
-            log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason=BILLING_SERVICE_UNAVAILABLE",
-                    stay.getId());
+        if (stay.getInvoiceId() != null && !stay.isInvoiceCreationFailed()) {
+            // Invoice + room charge already recorded on a previous call; a stray retry
+            // (e.g. double-click) must not re-add the room charge and double-bill it.
+            return;
         }
+
+        UUID invoiceId = stay.getInvoiceId();
+        if (invoiceId == null) {
+            final StayInvoiceRequest invoiceReq = new StayInvoiceRequest(
+                    stay.getId(), stay.getGuestId(), stay.getReservationId());
+            final InvoiceCreatedResponse invoiceResp = billingClient.createInvoiceForStay(invoiceReq);
+            if (invoiceResp == null || invoiceResp.id() == null) {
+                markInvoiceFlowFailed(stay);
+                return;
+            }
+            invoiceId = invoiceResp.id();
+            stay.setInvoiceId(invoiceId);
+        }
+
+        final ChargeRequest chargeReq;
+        try {
+            chargeReq = buildRoomChargeRequest(stay);
+        } catch (final NotFoundException ex) {
+            log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason=ROOM_NOT_FOUND | detail={}",
+                    stay.getId(), ex.getMessage());
+            markInvoiceFlowFailed(stay);
+            return;
+        }
+
+        final ChargeResponse chargeResp = billingClient.addCharge(stay.getId(), chargeReq);
+        if (chargeResp == null || chargeResp.id() == null) {
+            markInvoiceFlowFailed(stay);
+            return;
+        }
+
+        stay.setInvoiceCreationFailed(false);
+        stay.setInvoiceCreationFailureReason(null);
+        stayRepository.save(stay);
+        log.info("[STAY] INVOICE_CREATED | stayId={} | invoiceId={} | roomChargeId={}",
+                stay.getId(), invoiceId, chargeResp.id());
+    }
+
+    private void markInvoiceFlowFailed(final Stay stay) {
+        stay.setInvoiceCreationFailed(true);
+        stay.setInvoiceCreationFailureReason(BILLING_SERVICE_UNAVAILABLE_REASON);
+        stayRepository.save(stay);
+        log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason=BILLING_SERVICE_UNAVAILABLE",
+                stay.getId());
+    }
+
+    private ChargeRequest buildRoomChargeRequest(final Stay stay) {
+        final RoomResponse room = roomService.getRoomById(stay.getRoomId(), stay.getHotelId());
+        final BigDecimal nightlyRate = room.roomType().basePrice();
+        final long nights = Math.max(1, ChronoUnit.DAYS.between(
+                stay.getActualCheckInTime().toLocalDate(), stay.getExpectedCheckOutDate()));
+        final BigDecimal amount = nightlyRate.multiply(BigDecimal.valueOf(nights));
+        final String description = "Room " + stay.getRoomNumber() + " - " + nights + " night(s)";
+        return new ChargeRequest(ROOM_NIGHT_CHARGE_TYPE, description, amount, stay.getId());
     }
 
     private void sendCheckoutEmailIfPossible(final Stay stay, final InvoiceStatusResponse invoice) {
