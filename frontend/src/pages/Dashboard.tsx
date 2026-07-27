@@ -42,7 +42,10 @@ interface StatCardConfig {
 export const Dashboard = () => {
   const { t, i18n } = useTranslation('common');
   const user = useAuthStore((state) => state.user);
-  const { stats, isLoading, error, fetchStats } = useDashboardStore();
+  const stats = useDashboardStore((state) => state.stats);
+  const isLoading = useDashboardStore((state) => state.isLoading);
+  const error = useDashboardStore((state) => state.error);
+  const fetchStats = useDashboardStore((state) => state.fetchStats);
 
   const isOwnerOrAdmin = user?.role === 'OWNER' || user?.role === 'ADMIN';
 
