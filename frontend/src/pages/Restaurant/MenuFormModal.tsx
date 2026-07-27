@@ -2,6 +2,8 @@ import { useState, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fbService } from '../../services/fbService';
 import { useToastStore } from '../../store/toastStore';
+import { M3Button } from '../../components/m3/M3Button';
+import { M3Dialog } from '../../components/m3/M3Dialog';
 import type { MenuItemRequest, MenuItemResponse } from '../../types/fb.types';
 
 interface Props {
@@ -19,7 +21,7 @@ function itemToForm(item: MenuItemResponse): MenuItemRequest {
 const INPUT_CLASS = 'w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
 
 export const MenuFormModal = memo(({ item, onClose, onSaved }: Props) => {
-  const { t } = useTranslation('restaurant');
+  const { t } = useTranslation(['restaurant', 'common']);
   const { addToast } = useToastStore();
   const [form, setForm] = useState<MenuItemRequest>(item ? itemToForm(item) : EMPTY_FORM);
   const [loading, setLoading] = useState(false);
@@ -37,14 +39,11 @@ export const MenuFormModal = memo(({ item, onClose, onSaved }: Props) => {
   const handleAvailable = useCallback((e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, available: e.target.checked })), []);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
-  }, [onClose]);
-
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
     if (!form.name.trim() || !form.category.trim() || form.price <= 0) {
-      setError('Name, category and price (> 0) are required.');
+      setError(t('menu_validation_required'));
       return;
     }
     setLoading(true);
@@ -64,20 +63,19 @@ export const MenuFormModal = memo(({ item, onClose, onSaved }: Props) => {
   }, [form, isEdit, item, addToast, t, onSaved]);
 
   return (
-    <dialog
+    <M3Dialog
       open
-      aria-labelledby="menu-form-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-0 border-0 max-w-none w-full h-full"
+      title={isEdit ? t('menu_edit_item') : t('menu_add_item')}
+      titleId="menu-form-title"
+      onClose={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <M3Button variant="text" onClick={onClose} disabled={loading}>{t('cancel')}</M3Button>
+          <M3Button form="menu-form" type="submit" loading={loading} disabled={loading}>{t('save')}</M3Button>
+        </div>
+      }
     >
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-      <div
-        className="bg-surface rounded-2xl shadow-elevation-3 w-full max-w-md p-6 space-y-4"
-        onKeyDown={handleKeyDown}
-      >
-        <h2 id="menu-form-title" className="text-lg font-semibold text-on-surface">
-          {isEdit ? t('menu_edit_item') : t('menu_add_item')}
-        </h2>
-
+      <form id="menu-form" onSubmit={handleSubmit} noValidate className="space-y-4">
         <div>
           <label htmlFor="menu-name" className="block text-sm font-medium text-on-surface mb-1">{t('menu_name')} *</label>
           <input id="menu-name" type="text" value={form.name} onChange={handleName} className={INPUT_CLASS} />
@@ -101,19 +99,8 @@ export const MenuFormModal = memo(({ item, onClose, onSaved }: Props) => {
         </div>
 
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
-
-        <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose}
-            className="rounded-full border border-outline px-5 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary">
-            Annulla
-          </button>
-          <button type="button" onClick={handleSubmit} disabled={loading}
-            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary">
-            {loading ? 'Salvataggio...' : 'Salva'}
-          </button>
-        </div>
-      </div>
-    </dialog>
+      </form>
+    </M3Dialog>
   );
 });
 MenuFormModal.displayName = 'MenuFormModal';

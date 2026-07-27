@@ -8,6 +8,7 @@
   "menu_delete_error": "Impossibile eliminare la voce. Riprova.",
   "menu_save_success": "Voce menu salvata",
   "menu_save_error": "Impossibile salvare la voce. Riprova.",
+  "menu_validation_required": "Nome, categoria e prezzo (> 0) sono obbligatori.",
   "menu_name": "Nome",
   "menu_category": "Categoria",
   "menu_price": "Prezzo (€)",

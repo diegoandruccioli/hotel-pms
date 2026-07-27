@@ -18,6 +18,10 @@ vi.mock('../../store/toastStore', () => ({
   useToastStore: vi.fn(),
 }));
 
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 const EXISTING_ITEM = {
   id: 'item-1',
   name: 'Espresso',
@@ -132,7 +136,7 @@ describe('MenuFormModal', () => {
   it('calls onClose when the Escape key is pressed', () => {
     render(<MenuFormModal onClose={onClose} onSaved={onSaved} />);
 
-    fireEvent.keyDown(screen.getByLabelText(/menu_name/), { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
 
     expect(onClose).toHaveBeenCalled();
   });

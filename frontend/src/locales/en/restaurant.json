@@ -8,6 +8,7 @@
   "menu_delete_error": "Failed to delete item. Please try again.",
   "menu_save_success": "Menu item saved",
   "menu_save_error": "Failed to save item. Please try again.",
+  "menu_validation_required": "Name, category and price (> 0) are required.",
   "menu_name": "Name",
   "menu_category": "Category",
   "menu_price": "Price (€)",
