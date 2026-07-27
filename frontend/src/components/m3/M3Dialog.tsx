@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as FocusTrapModule from 'focus-trap-react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../MaterialIcon';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
 
@@ -52,14 +53,7 @@ export const M3Dialog = ({
   }, [open]);
 
   // Close on Escape key
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
+  useEscapeKey(open, onClose);
 
   if (!open) return null;
 

@@ -5,6 +5,7 @@ import { ToastContainer } from '../components/Toast';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { UserMenu } from '../components/UserMenu';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import * as FocusTrapModule from 'focus-trap-react';
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
 
@@ -127,6 +128,8 @@ export const MainLayout = () => {
   const toggleUserMenu = useCallback(() => setUserMenuOpen((v) => !v), []);
   const closeUserMenu  = useCallback(() => setUserMenuOpen(false), []);
   const openSettings   = useCallback(() => navigate('/settings'), [navigate]);
+
+  useEscapeKey(drawerOpen, closeDrawer);
 
   const isOwnerOrAdmin = user?.role === 'OWNER' || user?.role === 'ADMIN';
   const username       = user?.username ?? t('guest');
