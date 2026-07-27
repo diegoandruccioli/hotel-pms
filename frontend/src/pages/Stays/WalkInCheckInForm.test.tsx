@@ -89,6 +89,21 @@ describe('WalkInCheckInForm', () => {
     await waitFor(() => expect(screen.getByText('guest_number')).toBeInTheDocument());
   });
 
+  it('debounces guest search — one request for a fast multi-character type, not one per keystroke', async () => {
+    vi.mocked(guestService.searchGuests).mockResolvedValue([
+      { id: 'g1', firstName: 'Mario', lastName: 'Rossi', email: 'mario@test.com', createdAt: '2026-01-01T00:00:00', updatedAt: '2026-01-01T00:00:00', active: true },
+    ]);
+    renderComponent();
+    await waitFor(() => expect(screen.getByLabelText(/walkin_label_room/i)).toBeInTheDocument());
+
+    const user = userEvent.setup();
+    const guestInput = screen.getByPlaceholderText('walkin_placeholder_guest');
+    await user.type(guestInput, 'Mario');
+
+    await waitFor(() => expect(guestService.searchGuests).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    expect(guestService.searchGuests).toHaveBeenCalledWith('Mario');
+  });
+
   it('pre-fills guest name when a guest is selected from search', async () => {
     vi.mocked(guestService.searchGuests).mockResolvedValue([
       { id: 'g1', firstName: 'Mario', lastName: 'Rossi', email: 'mario@test.com', createdAt: '2026-01-01T00:00:00', updatedAt: '2026-01-01T00:00:00', active: true },
@@ -100,7 +115,7 @@ describe('WalkInCheckInForm', () => {
     const guestInput = screen.getByPlaceholderText('walkin_placeholder_guest');
     await user.type(guestInput, 'Ma');
 
-    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument(), { timeout: 5000 });
     await user.click(screen.getByRole('button', { name: /Mario/ }));
 
     // After selection, the firstName field inside GuestFieldSection is pre-filled
@@ -137,7 +152,7 @@ describe('WalkInCheckInForm', () => {
     // Select guest
     const guestInput = screen.getByPlaceholderText('walkin_placeholder_guest');
     await user.type(guestInput, 'Ma');
-    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument(), { timeout: 5000 });
     await user.click(screen.getByRole('button', { name: /Mario/ }));
 
     // Set checkout date
@@ -168,7 +183,7 @@ describe('WalkInCheckInForm', () => {
     // Select guest
     const guestInput = screen.getByPlaceholderText('walkin_placeholder_guest');
     await user.type(guestInput, 'Ma');
-    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument(), { timeout: 5000 });
     await user.click(screen.getByRole('button', { name: /Mario/ }));
 
     // Set checkout date
@@ -220,7 +235,7 @@ describe('WalkInCheckInForm', () => {
     await user.selectOptions(screen.getByLabelText(/walkin_label_room/i), 'r1');
     const guestInput = screen.getByPlaceholderText('walkin_placeholder_guest');
     await user.type(guestInput, 'Ma');
-    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument(), { timeout: 5000 });
     await user.click(screen.getByRole('button', { name: /Mario/ }));
     await user.type(screen.getByLabelText(/walkin_label_checkout_date/i), '2026-12-31');
 
@@ -261,7 +276,7 @@ describe('WalkInCheckInForm', () => {
 
     const guestInput = screen.getByPlaceholderText('walkin_placeholder_guest');
     await user.type(guestInput, 'Ma');
-    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument(), { timeout: 5000 });
     await user.click(screen.getByRole('button', { name: /Mario/ }));
 
     await user.type(screen.getByLabelText(/walkin_label_checkout_date/i), '2026-12-31');
@@ -346,7 +361,7 @@ describe('WalkInCheckInForm', () => {
     await user.selectOptions(screen.getByLabelText(/walkin_label_room/i), 'r1');
     const guestInput = screen.getByPlaceholderText('walkin_placeholder_guest');
     await user.type(guestInput, 'Ma');
-    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument(), { timeout: 5000 });
     await user.click(screen.getByRole('button', { name: /Mario/ }));
     await user.type(screen.getByLabelText(/walkin_label_checkout_date/i), '2026-12-31');
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,7 @@ import type { IdentifiableGuest } from './stayGuestFieldHelpers';
 import { getErrorMessage } from '../../utils/errorMessage';
 
 const todayIso = new Date().toISOString().split('T')[0];
+const GUEST_SEARCH_DEBOUNCE_MS = 300;
 
 // -----------------------------------------------------------------------
 // GuestOption — isolates the onClick binding so the parent map is stable
@@ -66,6 +67,7 @@ export function WalkInCheckInForm() {
   const [tipdoc, setTipdoc] = useState<AlloggiatiTipdoc[]>([]);
   // Alloggiati guest data (one primary guest by default, additional guests can be added)
   const [guests, setGuests] = useState<IdentifiableGuest[]>([emptyGuest(true)]);
+  const guestSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setRoomsLoading(true);
@@ -85,20 +87,23 @@ export function WalkInCheckInForm() {
     setSelectedRoomId(e.target.value);
   }, []);
 
-  const handleGuestQueryChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGuestQueryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setGuestQuery(query);
     setSelectedGuest(null);
+    if (guestSearchDebounceRef.current !== null) clearTimeout(guestSearchDebounceRef.current);
     if (query.trim().length < 2) {
       setGuestResults([]);
       return;
     }
-    try {
-      const results = await guestService.searchGuests(query);
-      setGuestResults(results);
-    } catch {
-      setGuestResults([]);
-    }
+    guestSearchDebounceRef.current = setTimeout(async () => {
+      try {
+        const results = await guestService.searchGuests(query);
+        setGuestResults(results);
+      } catch {
+        setGuestResults([]);
+      }
+    }, GUEST_SEARCH_DEBOUNCE_MS);
   }, []);
 
   const handleGuestSelect = useCallback((guest: GuestResponseDTO) => {
