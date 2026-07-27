@@ -4,6 +4,7 @@ import { userService } from '../services/userService';
 import type { UserResponse, CreateUserRequest } from '../types/user.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
+import { M3Dialog } from '../components/m3/M3Dialog';
 import { PasswordVisibilityToggle } from '../components/m3/PasswordVisibilityToggle';
 import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
@@ -38,11 +39,8 @@ const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProps) => {
   const handleRole = useCallback((e: React.ChangeEvent<HTMLSelectElement>) =>
     setForm((p) => ({ ...p, role: e.target.value as Role })), []);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
-  }, [onClose]);
-
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
     if (!form.username || !form.password || !form.email) {
       setError(t('err_all_fields_required'));
@@ -60,18 +58,19 @@ const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProps) => {
   }, [form, onCreated, t]);
 
   return (
-    <dialog
+    <M3Dialog
       open
-      aria-labelledby="create-user-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-0 border-0 max-w-none w-full h-full"
+      title={t('modal_create_title')}
+      titleId="create-user-title"
+      onClose={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <M3Button variant="text" onClick={onClose} disabled={loading}>{t('btn_cancel')}</M3Button>
+          <M3Button form="create-user-form" type="submit" loading={loading} disabled={loading}>{t('btn_create')}</M3Button>
+        </div>
+      }
     >
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-      <div className="bg-surface rounded-2xl shadow-elevation-3 w-full max-w-md p-6 space-y-4"
-        onKeyDown={handleKeyDown}>
-        <h2 id="create-user-title" className="text-lg font-semibold text-on-surface">
-          {t('modal_create_title')}
-        </h2>
-
+      <form id="create-user-form" onSubmit={handleSubmit} noValidate className="space-y-4">
         <div>
           <label htmlFor="new-username" className="block text-sm font-medium text-on-surface mb-1">
             {t('label_username')}
@@ -113,19 +112,8 @@ const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProps) => {
         </div>
 
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
-
-        <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose}
-            className="rounded-full border border-outline px-5 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary">
-            {t('btn_cancel')}
-          </button>
-          <button type="button" onClick={handleSubmit} disabled={loading}
-            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary">
-            {loading ? t('btn_saving') : t('btn_create')}
-          </button>
-        </div>
-      </div>
-    </dialog>
+      </form>
+    </M3Dialog>
   );
 });
 CreateUserModal.displayName = 'CreateUserModal';
@@ -156,11 +144,8 @@ const ResetPasswordModal = memo(({ user, onClose, onSuccess }: ResetPasswordModa
   const toggleShowNewPw = useCallback(() => setShowNewPw((prev) => !prev), []);
   const toggleShowConfirmPw = useCallback(() => setShowConfirmPw((prev) => !prev), []);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') onClose();
-  }, [onClose]);
-
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
     if (newPw.length < 16) { setError(t('err_password_too_short')); return; }
     if (!PW_REGEX.test(newPw)) { setError(t('err_password_too_weak')); return; }
@@ -177,17 +162,19 @@ const ResetPasswordModal = memo(({ user, onClose, onSuccess }: ResetPasswordModa
   }, [newPw, confirmPw, user.id, onSuccess, t]);
 
   return (
-    <dialog
+    <M3Dialog
       open
-      aria-labelledby="reset-pw-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-0 border-0 max-w-none w-full h-full"
+      title={t('modal_reset_title', { username: user.username })}
+      titleId="reset-pw-title"
+      onClose={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <M3Button variant="text" onClick={onClose} disabled={loading}>{t('btn_cancel')}</M3Button>
+          <M3Button form="reset-pw-form" type="submit" loading={loading} disabled={loading}>{t('btn_reset_password')}</M3Button>
+        </div>
+      }
     >
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-      <div className="bg-surface rounded-2xl shadow-elevation-3 w-full max-w-md p-6 space-y-4"
-        onKeyDown={handleKeyDown}>
-        <h2 id="reset-pw-title" className="text-lg font-semibold text-on-surface">
-          {t('modal_reset_title', { username: user.username })}
-        </h2>
+      <form id="reset-pw-form" onSubmit={handleSubmit} noValidate className="space-y-4">
         <div>
           <label htmlFor="reset-new-pw" className="block text-sm font-medium text-on-surface mb-1">
             {t('label_new_password')}
@@ -217,18 +204,8 @@ const ResetPasswordModal = memo(({ user, onClose, onSuccess }: ResetPasswordModa
           </div>
         </div>
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
-        <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose}
-            className="rounded-full border border-outline px-5 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary">
-            {t('btn_cancel')}
-          </button>
-          <button type="button" onClick={handleSubmit} disabled={loading}
-            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary">
-            {loading ? t('btn_saving') : t('btn_reset_password')}
-          </button>
-        </div>
-      </div>
-    </dialog>
+      </form>
+    </M3Dialog>
   );
 });
 ResetPasswordModal.displayName = 'ResetPasswordModal';

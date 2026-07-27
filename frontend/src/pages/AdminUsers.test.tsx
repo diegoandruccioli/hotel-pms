@@ -36,6 +36,10 @@ vi.mock('../store/toastStore', () => ({
   useToastStore: () => ({ addToast: mockAddToast }),
 }));
 
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 const USER_ACTIVE = {
   id: 'u1', username: 'alice', email: 'alice@hotel.com',
   role: 'RECEPTIONIST' as Role, active: true, mustChangePassword: false, createdAt: '',
@@ -216,7 +220,7 @@ describe('AdminUsers', () => {
       render(<AdminUsers />);
       await waitFor(() => screen.getByText('btn_new_user'));
       fireEvent.click(screen.getByText('btn_new_user'));
-      fireEvent.keyDown(screen.getByText('modal_create_title').closest('div')!, { key: 'Escape' });
+      fireEvent.keyDown(document, { key: 'Escape' });
       expect(screen.queryByText('modal_create_title')).not.toBeInTheDocument();
     });
   });
@@ -330,7 +334,7 @@ describe('AdminUsers', () => {
       expect(screen.queryByText('modal_reset_title')).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
-      fireEvent.keyDown(screen.getByText('modal_reset_title').closest('div')!, { key: 'Escape' });
+      fireEvent.keyDown(document, { key: 'Escape' });
       expect(screen.queryByText('modal_reset_title')).not.toBeInTheDocument();
     });
   });
