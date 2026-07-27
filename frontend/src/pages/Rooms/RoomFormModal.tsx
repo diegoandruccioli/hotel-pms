@@ -18,6 +18,7 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
   const { t } = useTranslation(['rooms', 'common']);
   const addToast = useToastStore((s) => s.addToast);
   const [loading, setLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [formData, setFormData] = useState<RoomRequest>({
     roomNumber: room?.roomNumber || '',
     roomTypeId: room?.roomType.id || (roomTypes.length > 0 ? roomTypes[0].id : ''),
@@ -73,7 +74,53 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
     }
   }, [formData, room, roomSchema, onSaved, addToast, t]);
 
+  const handleDelete = useCallback(async () => {
+    if (!room) return;
+    setLoading(true);
+    try {
+      await inventoryService.deleteRoom(room.id);
+      addToast(t('toast_deleted'), 'success');
+      onSaved();
+    } catch (err: unknown) {
+      const e = err as {response?: {data?: {detail?: string}}};
+      const errorMsg = e.response?.data?.detail || t('toast_delete_error');
+      addToast(errorMsg, 'error');
+    } finally {
+      setLoading(false);
+      setShowDeleteConfirm(false);
+    }
+  }, [room, onSaved, addToast, t]);
+
+  const openDeleteConfirm = useCallback(() => setShowDeleteConfirm(true), []);
+  const closeDeleteConfirm = useCallback(() => setShowDeleteConfirm(false), []);
+
   const inputClass = "block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
+
+  const footer = showDeleteConfirm ? (
+    <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+      <span className="text-sm font-medium font-body text-error">
+        {t('confirm_delete_room')}
+      </span>
+      <div className="flex gap-2">
+        <M3Button variant="text" onClick={closeDeleteConfirm} disabled={loading}>{t('cancel')}</M3Button>
+        <M3Button onClick={handleDelete} loading={loading} disabled={loading} className="bg-error text-on-error hover:bg-error/90 border-transparent">{t('btn_confirm')}</M3Button>
+      </div>
+    </div>
+  ) : (
+    <div className="flex justify-between items-center">
+      <div>
+        {room && (
+          <M3Button variant="text" onClick={openDeleteConfirm} disabled={loading} className="text-error hover:bg-error-container/20">
+            {t('delete')}
+          </M3Button>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <M3Button variant="text" onClick={onClose} disabled={loading}>{t('cancel')}</M3Button>
+        <M3Button form="room-form" type="submit" loading={loading} disabled={loading}>{t('save')}</M3Button>
+      </div>
+    </div>
+  );
 
   return (
     <M3Dialog
@@ -81,12 +128,7 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
       title={room ? t('edit_room') : t('add_room')}
       titleId="room-modal-title"
       onClose={onClose}
-      footer={
-        <div className="flex justify-end gap-2">
-          <M3Button variant="text" onClick={onClose} disabled={loading}>{t('cancel')}</M3Button>
-          <M3Button form="room-form" type="submit" loading={loading} disabled={loading}>{t('save')}</M3Button>
-        </div>
-      }
+      footer={footer}
     >
       <form id="room-form" onSubmit={handleSubmit} noValidate className="space-y-4">
 

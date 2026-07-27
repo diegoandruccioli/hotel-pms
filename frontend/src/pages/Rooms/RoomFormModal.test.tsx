@@ -10,7 +10,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../../services/inventoryService', () => ({
-  inventoryService: { createRoom: vi.fn(), updateRoom: vi.fn() },
+  inventoryService: { createRoom: vi.fn(), updateRoom: vi.fn(), deleteRoom: vi.fn() },
 }));
 
 vi.mock('../../store/toastStore', () => ({
@@ -65,6 +65,28 @@ describe('RoomFormModal', () => {
     render(<RoomFormModal roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('shows delete button only in edit mode', () => {
+    const { rerender } = render(<RoomFormModal roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
+    expect(screen.queryByText('delete')).not.toBeInTheDocument();
+    rerender(<RoomFormModal room={ROOM} roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
+    expect(screen.getByText('delete')).toBeInTheDocument();
+  });
+
+  it('shows delete confirmation panel on delete click', () => {
+    render(<RoomFormModal room={ROOM} roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
+    fireEvent.click(screen.getByText('delete'));
+    expect(screen.getByText('confirm_delete_room')).toBeInTheDocument();
+    expect(screen.getByText('btn_confirm')).toBeInTheDocument();
+  });
+
+  it('calls deleteRoom and onSaved on confirm delete', async () => {
+    vi.mocked(inventoryService.deleteRoom).mockResolvedValue(undefined as never);
+    render(<RoomFormModal room={ROOM} roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
+    fireEvent.click(screen.getByText('delete'));
+    fireEvent.click(screen.getByText('btn_confirm'));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledOnce());
   });
 
   it('calls createRoom and onSaved on add form submission', async () => {
