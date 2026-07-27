@@ -91,6 +91,11 @@ export default {
         "shape-full": "9999px",
       },
 
+      /* ── M3 Disabled State Opacity (spec: 38%) ───────── */
+      opacity: {
+        38: "0.38",
+      },
+
       /* ── Keyframe Animations ─────────────────────────── */
       keyframes: {
         "fade-in": {
