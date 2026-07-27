@@ -69,7 +69,7 @@ Non "zero feedback" come nella prima stesura — **messaggio sbagliato**. Patter
 
 Difetti minori collegati, stesso pattern: `GuestSearchAndCreate.tsx` (fallback hardcoded in inglese, mai tradotto), `WalkInCheckInForm.tsx` (catch nudo che scarta del tutto il `detail`).
 
-### BUG-5 (sicurezza) — "Cambio password richiesto" non applicato lato backend
+### BUG-5 (sicurezza) — "Cambio password richiesto" non applicato lato backend — ✅ RISOLTO (vedi §5)
 Utente RECEPTIONIST creato con `mustChangePassword=true` → frontend redirige correttamente a `/settings/password` → navigazione diretta ad altra URL bypassa il redirect → chiamata diretta `GET /api/v1/guests/search` con quella sessione → 200 OK, dati reali. Confermato dalla ricerca: `mustChangePassword` **non è nel JWT** (solo claim `role`/`hotelId`/`tv`), esiste solo come colonna DB, letta esclusivamente da `/auth/me`. Nessun filtro (gateway `AuthenticationFilter` o `InternalAuthFilter` nei singoli servizi) lo controlla mai. Il requisito "cambio password obbligatorio" è oggi puramente cosmetico.
 
 ---
@@ -119,7 +119,7 @@ Ogni piano indica: causa radice, fix proposto, file da toccare, verifica, branch
 - **Verifica**: nuovo `errorMessage.test.ts` (5 casi: detail presente/assente/blank, non-Axios error, non-error value); aggiornati i test esistenti che assumevano il vecchio comportamento (`CalendarPlanning.test.tsx`, `OwnerDashboard.test.tsx`, `AlloggiatiReportSection.test.tsx` — questi simulavano `new Error('testo')` aspettandosi che il testo grezzo comparisse, ora costruiscono un `AxiosError` con `response.data.detail` via `mockAxiosErrorWithDetail`, più un test aggiunto per il path di fallback senza detail). Suite completa frontend 669/669 verdi, `npm run lint`/`tsc`/`build` puliti, coverage 91.4/81.88/88.65/93.93 (sopra soglia 90/80/88/92)
 - **Branch**: `main`
 
-### BUG-5 — `mustChangePassword` non applicato lato backend
+### BUG-5 — `mustChangePassword` non applicato lato backend — ✅ RISOLTO
 - **Fix**: aggiungere `mustChangePassword` come claim JWT (accanto a `role`/`hotelId`) in `JwtService.java`, popolato a login/refresh/change-password. In `api-gateway/src/main/java/com/hotelpms/gateway/filter/AuthenticationFilter.java`, accanto a `isAccessAllowed(...)` (righe 253-278), nuovo controllo: se il claim `mustChangePassword=true` e il path richiesto non è nell'allow-list (`/api/v1/auth/change-password`, `/api/v1/auth/me`, `/api/v1/auth/logout`, `/api/v1/auth/refresh`), rispondere 403 prima di inoltrare la richiesta
 - **Nota architetturale**: il gateway è l'unico punto che copre tutte le route business (billing/guest/frontdesk/fb) — `auth-service` non ha `AuthenticationFilter` sulle sue route pubbliche (login/refresh/change-password/me/logout sono già `permitAll` per design), quindi non va toccato
 - **File**: `auth-service/src/main/java/com/hotelpms/auth/service/JwtService.java`, `api-gateway/src/main/java/com/hotelpms/gateway/filter/AuthenticationFilter.java`
@@ -219,7 +219,7 @@ CLAUDE.md richiede per l'intera app "Focus indicators: highly visible, ≥ 3:1 c
 
 **Branch:** `main` (HEAD `6bf60d9`). Stack Docker riusato dal Round 2 (billing-service/frontdesk-service/auth-service up da 6h). Utenti di test nuovi via `POST /api/v1/auth/register`: `r3admin`/ADMIN, `r3owner`/OWNER, `r3desk`/RECEPTIONIST (hotel `00000000-0000-0000-0000-000000000001`, password `Round3Test2026!!`).
 
-### 8.1 BUG-8 (nuovo, ALTA severità) — Refresh silenzioso non funziona su reload/apertura diretta: logout forzato ogni 15 minuti
+### 8.1 BUG-8 (nuovo, ALTA severità) — Refresh silenzioso non funziona su reload/apertura diretta: logout forzato ogni 15 minuti — ✅ RISOLTO
 
 **Descrizione.** `App.tsx:42-52` verifica la sessione chiamando `GET /api/v1/auth/me` **una sola volta**, dentro un `useEffect` che gira al mount del componente `App` — cioè ad ogni caricamento completo della pagina (F5, link diretto, nuova scheda), non ad ogni navigazione client-side (quella la gestisce React Router senza remount). Ma l'interceptor Axios che gestisce il refresh silenzioso (`services/api.ts:76-78`) esclude esplicitamente `/me` dal meccanismo di retry-dopo-refresh: `if (url.includes('/login') || url.includes('/me')) { return Promise.reject(error); }` — commento nel codice: "Never attempt refresh on auth endpoints themselves to prevent loops". La motivazione è valida per `/login` (non ha senso tentare un refresh su un tentativo di login fallito) ma è sovra-estesa a `/me`, che è un endpoint di sola lettura: un refresh-poi-retry su `/me` non causerebbe alcun loop (stesso pattern già usato con successo per tutti gli altri endpoint business).
 
@@ -230,6 +230,8 @@ CLAUDE.md richiede per l'intera app "Focus indicators: highly visible, ≥ 3:1 c
 **File:** `frontend/src/App.tsx:42-52` (chiamata singola a `fetchMe` al mount), `frontend/src/services/api.ts:76-78` (esclusione di `/me` dal retry-con-refresh)
 **Fix proposto (non applicato):** rimuovere `/me` dall'esclusione dell'interceptor (mantenere solo `/login` e `/refresh`), così un 401 su `/me` al bootstrap dell'app tenta un refresh silenzioso prima di arrendersi — nessun rischio di loop perché il refresh stesso, se fallisce, chiama `performLogout()` senza ritentare.
 **Severità:** ALTA (UX — rompe la persistenza di sessione, il caso d'uso principale per cui il refresh token a 7 giorni esiste), nessun impatto di sicurezza.
+
+**Fix applicato (Fase A del piano fix-order, `feature/secure-coding-hardening` → T-AUTH-08, commit `19216d8`).** Rimossa l'esclusione di `/me` come da fix proposto. Security review (agente `security-auditor`) prima del merge ha trovato una **regressione reale** introdotta dal fix stesso: `App.tsx` chiama `/me` anche su `/login`, e con `/me` non più escluso un visitatore anonimo genera un ciclo di reload infinito (401 su `/me` → refresh → 401 anche su `/refresh`, niente cookie → `performLogout()` → `window.location.href='/login'` anche se già lì → reload → `App` rimonta → stesso ciclo). Corretto con un commit di follow-up separato (`fdde3fe`): `performLogout()` naviga a `/login` solo se `pathname !== '/login'`. Verificato dal vivo: logout reale via UI → nessun loop su `/login`; login con `mustChangePassword=true` → redirect corretto → sessione sopravvive a un reload di pagina. `THREAT_MODEL.md` aggiornato (T-AUTH-08).
 
 ### 8.2 BUG-9 (nuovo, MEDIA severità) — Modali `GuestFormModal`/`RoomFormModal`/`RoomTypeFormModal` non chiudono su Escape — ✅ RISOLTO
 
@@ -296,7 +298,7 @@ Durante il walk-in check-in di test (guest "Test Verifica", room `R3-101`), la c
 
 **Branch:** `main` (HEAD `6bf60d9`). Stack Docker riusato dai round precedenti. Password admin invalidata (come già successo in sessioni precedenti) — resettata via UPDATE diretto su `user_account.password_hash` (hash generato registrando un utente temporaneo via API con password conforme alla policy, poi copiato e l'utente temporaneo eliminato). Utente disponibile creato via API per test cambio-password: `r4pwtest`/RECEPTIONIST. Utente creato da UI per test Admin Users: `r4newuser`/RECEPTIONIST.
 
-### 9.1 BUG-12 (CRITICA) — Riattivare un utente disattivato è impossibile: il bottone "Activate" fallisce sempre con 404
+### 9.1 BUG-12 (CRITICA) — Riattivare un utente disattivato è impossibile: il bottone "Activate" fallisce sempre con 404 — ✅ RISOLTO
 
 **Descrizione.** `UserManagementServiceImpl.activateUser` (righe 89-102) cerca l'utente target con `userRepository.findById(targetUserId)`. Ma `UserAccount` (riga 37) porta `@SQLRestriction("active = true")` a livello di classe — un filtro Hibernate applicato a **ogni** query generata per quell'entità, comprese le query standard ereditate come `findById`, non solo alle query JPQL custom. Il commento nel codice ("Must query including inactive — use raw query bypassing @SQLRestriction") descrive l'intento corretto ma il codice sottostante non lo implementa: `findById` resta filtrato, quindi su un utente con `active=false` la query non trova mai nulla e la lambda `orElseThrow` scatta sempre, producendo `404 USER_NOT_FOUND`.
 
@@ -310,10 +312,12 @@ Durante il walk-in check-in di test (guest "Test Verifica", room `R3-101`), la c
 
 **Dato di test ripristinato:** `r4newuser.active` riportato a `true` via UPDATE diretto per pulizia, non tramite il flusso rotto.
 
+**Fix applicato (Fase A del piano fix-order, `feature/secure-coding-hardening` → T-AUTH-07, commit `37e5204`).** Nuova query nativa `findByIdAndHotelIdIncludingInactive` in `UserAccountRepository` — le query native non sono soggette a `@SQLRestriction` (a differenza di JPQL/HQL), primo caso del genere nel repo. Mantenuta hotel-scoped per non introdurre un leak cross-tenant, nome conforme alla regola ArchUnit `TenantIsolationArchTest`. Il test esistente (`activateUserShouldSetActiveTrue`) mockava `findById` direttamente — passava anche col bug presente, riscritto per mockare il nuovo metodo. Verificato dal vivo: deactivate → activate su `tempuser1` → torna "Active" senza intervento DB, bottone risponde 200 non più 404. `THREAT_MODEL.md` aggiornato (T-AUTH-07).
+
 ### 9.2 Regression check — nessuna regressione sui fix precedenti osservata in questo round
 Nessuna interazione di questo round ha toccato i percorsi di BUG-0/0b/2/3/4/5/6/7/8/9/10/11 — vedi Round 2/3 per gli esiti.
 
-### 9.3 BUG-13 (MEDIA, UX) — Cambio password volontario forza un logout completo invece di mantenere la sessione
+### 9.3 BUG-13 (MEDIA, UX) — Cambio password volontario forza un logout completo invece di mantenere la sessione — ✅ RISOLTO
 
 **Descrizione.** `AuthServiceImpl.changePassword` è specificamente progettato per **non** disconnettere l'utente: emette un nuovo token pair valido subito dopo l'incremento di `tokenVersion`, proprio per garantire continuità di sessione (commento nel codice backend e in `THREAT_MODEL.md` T-AUTH-04-residuo: "Il cambio password reimposta anche i cookie del browser della sessione corrente con il nuovo token pair, garantendo continuità di servizio al legittimo proprietario"). Ma `SettingsPassword.tsx:59-62` ignora questo intento: dopo `authService.changePassword(...)` (200 OK, nuovi cookie già impostati dal backend), chiama comunque `logout()` e `navigate('/login')` incondizionatamente — buttando via la sessione appena rinnovata e forzando un re-login completo.
 
@@ -324,6 +328,8 @@ Nessuna interazione di questo round ha toccato i percorsi di BUG-0/0b/2/3/4/5/6/
 **File:** `frontend/src/pages/Settings/SettingsPassword.tsx:61-62`
 **Fix proposto (non applicato):** rimuovere `logout()`+`navigate('/login')` sul path di successo; il backend ha già impostato i cookie nuovi — basta un `navigate(-1)` o redirect alla pagina precedente/dashboard (pattern già usato da `handleBack`), coerente con l'intento del backend. Se la scelta di forzare re-login fosse in realtà intenzionale per motivi di sicurezza percepita, andrebbe quantomeno documentata come tale (oggi sembra un residuo di codice più che una scelta deliberata, dato che contraddice esplicitamente il commento del backend).
 **Severità:** MEDIA (UX, nessun impatto di sicurezza o integrità dati — anzi il comportamento attuale è "più sicuro" per accidente, ma non è quello che il backend è stato costruito per fare).
+
+**Fix applicato (Fase A del piano fix-order, `feature/secure-coding-hardening` → T-AUTH-09, commit `4d357be`).** Rimosso `logout()`; dopo il successo la sessione viene ri-sincronizzata (`fetchMe`+`checkAuth`, azzera un eventuale `mustChangePassword` stale nello store) e naviga alla dashboard (se veniva dal flusso forzato) o alla pagina precedente altrimenti — mai più a `/login`. `THREAT_MODEL.md` aggiornato (T-AUTH-09).
 
 ### 9.4 Verificato funzionante in questo round
 
