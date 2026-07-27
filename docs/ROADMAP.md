@@ -89,7 +89,7 @@ Feature che abilitano la competizione con PMS commerciali.
 | # | Implementazione | Priorità | Effort | Dipendenze | Impatto |
 |---|---|---|---|---|---|
 | E1 | Channel Manager OTA (via intermediario SiteMinder/RateTiger) | 🔴 Critica | 1-2 mesi | Certificazione OTA 2-6 mesi | Sblocca 80% mercato — senza, non nella shortlist di valutazione |
-| E2 | Booking Engine + pagamento online (Stripe Checkout) | 🔴 Alta | 1-2 mesi | C1 (notification-service) | Risparmio commissione OTA 15-25% per prenotazione |
+| E2 | ~~Booking Engine + pagamento online (Stripe Checkout)~~ | ⚫ **Fuori scope per design** | — | — | Decisione esplicita in `backup/DECISIONS.md §2.3`: nessuna integrazione con gateway di pagamento online (Stripe/Nexi/PayPal) — superficie di attacco (PCI DSS, gestione carte) non giustificata per il perimetro attuale del prodotto. Contraddiceva questa riga, ora allineata (verificato 2026-07-27) |
 | E3 | Fattura elettronica SDI/XML | 🔴 Alta | 1-2 mesi | Accreditamento AE | Obbligatorio per clientela business in Italia dal 2019 |
 | E4 | API pubblica documentata + webhook system | 🟡 Alta | 2-3 sett | Nessuna | Ecosistema ISV — senza, nessun partner può integrarsi |
 | E5 | Migrazione **K3s** (non K8s pieno) — vedi ADR-003 in `backup/DECISIONS.md` | 🟡 Alta | 1-2 sett | Container già stateless e K8s-ready by design; consolidamento frontdesk (E0bis) completato prima | Scaling orizzontale, rolling update, failover automatico, a costo ridotto (no control plane gestito). Trigger migrazione a K8s pieno (GKE Standard): soglia clienti (~140, breakeven Professional), soglia carico RPS/CPU, o necessità multi-region/HA (E6) |
