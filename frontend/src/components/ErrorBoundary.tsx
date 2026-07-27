@@ -1,8 +1,9 @@
 import { Component, type CSSProperties, type ErrorInfo, type ReactNode } from 'react';
+import { withTranslation, type WithTranslation } from 'react-i18next';
 
 const ICON_STYLE: CSSProperties = { fontSize: 48 };
 
-interface Props {
+interface Props extends WithTranslation {
   children: ReactNode;
 }
 
@@ -11,7 +12,11 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+/**
+ * Class component — cannot use the useTranslation hook, wrapped with the
+ * withTranslation HOC instead (exported below as ErrorBoundary).
+ */
+class ErrorBoundaryBase extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -30,6 +35,7 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   render(): ReactNode {
+    const { t } = this.props;
     if (this.state.hasError) {
       return (
         <div
@@ -41,17 +47,17 @@ export class ErrorBoundary extends Component<Props, State> {
               error
             </span>
             <h2 className="text-lg font-display font-semibold text-on-surface">
-              Si è verificato un errore inatteso
+              {t('error_unexpected_title')}
             </h2>
             <p className="text-sm font-body text-on-surface-variant">
-              {this.state.error?.message ?? 'An unexpected error occurred.'}
+              {this.state.error?.message || t('error_unexpected_fallback')}
             </p>
             <button
               type="button"
               onClick={this.handleReload}
               className="mt-2 rounded-full bg-primary px-6 py-2 text-sm font-medium text-on-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
             >
-              Ricarica pagina
+              {t('error_reload_button')}
             </button>
           </div>
         </div>
@@ -60,3 +66,5 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
+
+export const ErrorBoundary = withTranslation('common')(ErrorBoundaryBase);
