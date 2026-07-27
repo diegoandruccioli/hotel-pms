@@ -9,6 +9,16 @@ import { guestService } from '../../services/guestService';
 import type { StayResponse } from '../../types/stay.types';
 
 const ITALIA_STATO = { codice: '100000100', descrizione: 'ITALIA' };
+// BUG-10 fixture: 20 states alphabetically before "ITALIA" plus ITALIA itself
+// as the 21st entry (list order, no sort applied) — reproduces the exact
+// "not in the default slice(0, 20)" condition the bug depended on.
+const STATI_WITH_ITALIA_PAST_DEFAULT_SLICE = [
+  ...Array.from({ length: 20 }, (_, i) => ({
+    codice: `A${String(i).padStart(8, '0')}`,
+    descrizione: `ALBANIA ${i}`,
+  })),
+  ITALIA_STATO,
+];
 const FIANO_COMUNE = { codice: '412058036', descrizione: 'FIANO ROMANO', provincia: 'RM' };
 const PASOR_TIPDOC = { codice: 'PASOR', descrizione: 'PASSAPORTO ORDINARIO' };
 
@@ -302,6 +312,22 @@ describe('WalkInCheckInForm', () => {
       }));
     });
     await waitFor(() => expect(screen.getByText('stays_page')).toBeInTheDocument());
+  }, 15000);
+
+  it('BUG-10: shows the selected state\'s name, not its raw code, even when it '
+      + 'falls outside the default 20-item slice', async () => {
+    vi.mocked(stayService.getLookupStati).mockResolvedValue(STATI_WITH_ITALIA_PAST_DEFAULT_SLICE);
+
+    renderComponent();
+    await waitFor(() => expect(screen.getByLabelText(/walkin_label_room/i)).toBeInTheDocument());
+
+    const combo = screen.getByLabelText(/^label_citizenship/, { selector: 'input' });
+    fireEvent.change(combo, { target: { value: 'ITALIA' } });
+    const option = await screen.findByRole('option', { name: /ITALIA/ }, { timeout: 5000 });
+    fireEvent.mouseDown(option);
+
+    await waitFor(() => expect(combo).toHaveValue('100000100 — ITALIA'));
+    expect(combo).not.toHaveValue('100000100');
   }, 15000);
 
   it('shows err_checkin_failed when the createStay request rejects', async () => {

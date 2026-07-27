@@ -192,7 +192,15 @@ const StatoSelect = memo(({ id, label, value, stati, onChange, required }: Stato
   }, [stati, query]);
 
   const handleSearch = useCallback((term: string) => setQuery(term), []);
-  const handleSelect = useCallback((codice: string) => { setQuery(''); onChange(codice); }, [onChange]);
+  // BUG-10: resetting query here used to fall `options` back to the default
+  // unfiltered slice(0, 20) (see the useMemo above), which drops the just-
+  // selected item whenever it isn't alphabetically within the first 20 —
+  // e.g. selecting "ITALIA" then seeing the raw code "100000100" instead of
+  // the name, because LookupAutocomplete's displayLabel looks the value up
+  // in `options`. The input's displayed value is already driven by
+  // `displayLabel`/`editValue` in LookupAutocomplete, not by `query`, so
+  // resetting it here was never actually needed for the UI.
+  const handleSelect = useCallback((codice: string) => { onChange(codice); }, [onChange]);
 
   return (
     <LookupAutocomplete
