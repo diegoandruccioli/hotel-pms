@@ -26,7 +26,8 @@ export const M3TableActionLink = ({
     <button
       type="button"
       disabled={disabled}
-      className={`font-medium text-sm rounded transition-colors
+      className={`inline-flex items-center justify-center min-h-[40px] min-w-[40px] px-2
+        font-medium text-sm rounded transition-colors
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
         disabled:opacity-50 disabled:cursor-not-allowed
         ${toneClasses[tone]}

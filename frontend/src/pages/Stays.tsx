@@ -118,7 +118,7 @@ const StayRow = memo(({
                 onClick={handleRetryInvoice}
                 disabled={retryingInvoice === stay.id}
                 aria-label={t('retry_invoice_creation')}
-                className="flex items-center justify-center w-6 h-6 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+                className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
               >
                 <MaterialIcon name={retryingInvoice === stay.id ? 'progress_activity' : 'refresh'} size={16} />
               </button>
@@ -132,7 +132,7 @@ const StayRow = memo(({
                 onClick={handleRetryCheckoutEmail}
                 disabled={retryingEmail === stay.id}
                 aria-label={t('retry_checkout_email')}
-                className="flex items-center justify-center w-6 h-6 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+                className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
               >
                 <MaterialIcon name={retryingEmail === stay.id ? 'progress_activity' : 'refresh'} size={16} />
               </button>

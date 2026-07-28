@@ -108,7 +108,7 @@ const StatusButton = memo(({ newStatus, updating, onClick, t }: {
     <button
       onClick={handleClick}
       disabled={updating !== null}
-      className={`flex-1 text-xs font-medium font-body border rounded-shape-sm px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${STATUS_BUTTON_STYLES[newStatus]}`}
+      className={`flex-1 flex items-center justify-center min-h-[40px] text-xs font-medium font-body border rounded-shape-sm px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${STATUS_BUTTON_STYLES[newStatus]}`}
     >
       {updating === newStatus ? (
         <span className="flex items-center justify-center gap-1">

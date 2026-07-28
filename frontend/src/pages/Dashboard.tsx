@@ -145,7 +145,7 @@ export const Dashboard = () => {
           </div>
           <Link
             to="/stays"
-            className="text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-error-container rounded"
+            className="inline-flex items-center min-h-[40px] text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-error-container rounded"
           >
             {t('view_all')}
           </Link>
@@ -190,7 +190,7 @@ export const Dashboard = () => {
                   <Link
                     to={item.href}
                     state={item.state}
-                    className="text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                    className="inline-flex items-center min-h-[40px] text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
                   >
                     {t('view_all')}
                   </Link>
@@ -211,7 +211,7 @@ export const Dashboard = () => {
                 </div>
                 <Link
                   to="/housekeeping"
-                  className="text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                  className="inline-flex items-center min-h-[40px] text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
                 >
                   {t('view_all')}
                 </Link>
