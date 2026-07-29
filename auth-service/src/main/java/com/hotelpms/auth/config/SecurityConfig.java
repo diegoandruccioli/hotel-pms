@@ -18,6 +18,7 @@ import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -37,6 +38,18 @@ public class SecurityConfig {
     private static final String AUTH_LOGOUT = "/api/v1/auth/logout";
     private static final String AUTH_CHANGE_PW = "/api/v1/auth/change-password";
     private static final String AUTH_ME = "/api/v1/auth/me";
+    private static final String ACTUATOR = "/actuator";
+
+    /**
+     * Path prefixes exempt from {@link InternalAuthFilter} HMAC validation:
+     * the public auth endpoints (called directly by the frontend, never
+     * routed through the gateway) plus actuator. Shared between the filter
+     * and {@code authorizeHttpRequests} below so the two lists cannot drift
+     * apart the way they previously did (AUDIT_ANALISI_2026-07.md item 2).
+     */
+    private static final List<String> HMAC_EXEMPT_PATH_PREFIXES = List.of(
+            AUTH_PUBLIC_ENDPOINTS, AUTH_REGISTER, AUTH_REFRESH,
+            AUTH_LOGOUT, AUTH_CHANGE_PW, AUTH_ME, ACTUATOR);
 
     // Argon2id parameters — exercise A04:2025, T-AUTH-03 (memory-hard KDF)
     private static final int ARGON2_SALT_LEN = 16; // bytes
@@ -97,7 +110,7 @@ public class SecurityConfig {
                                 "/actuator/**")
                         .permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(new InternalAuthFilter(hmacSecret, nonceStore),
+                .addFilterBefore(new InternalAuthFilter(hmacSecret, nonceStore, HMAC_EXEMPT_PATH_PREFIXES),
                         UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

@@ -20,31 +20,22 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Characterization tests for {@link InternalAuthFilter} — pins down the
- * *current* behavior before the {@code internal-auth-lib} dedup
- * (docs/AUDIT_ANALISI_2026-07.md item 2), including the two ways this
- * variant genuinely diverges from the other 5 services' (otherwise
- * byte-identical) filter:
+ * Unit tests for {@link InternalAuthFilter}, reconciled onto the same
+ * contract as the other 5 services' identical filter
+ * (AUDIT_ANALISI_2026-07.md item 2, ahead of the {@code internal-auth-lib}
+ * extraction).
  *
- * <ol>
- *   <li>{@code shouldNotFilter} is an <b>allowlist</b> here (only
- *   {@code /api/v1/auth/users/**} is protected), not the denylist
- *   ({@code /actuator/**} excluded) the other 5 services use.</li>
- *   <li>Rejections use {@code response.sendError(401, "CODE")} with
- *   distinct string codes, not a fixed JSON body — no other service
- *   does this.</li>
- * </ol>
- *
- * <p>These tests are the contract the shared library's reconciliation
- * must knowingly change (both divergences are unified onto the other 5
- * services' behavior in the dedup, not preserved) — this suite exists so
- * that change is a deliberate, visible diff instead of an accidental one.
+ * <p>The only real per-service customization left is
+ * {@code excludedPathPrefixes}: here it exempts the public unauthenticated
+ * auth endpoints plus {@code /actuator}, whereas the other 5 services only
+ * exempt {@code /actuator} — see {@link ProtectedPathScoping}.
  */
 class InternalAuthFilterTest {
 
@@ -54,6 +45,10 @@ class InternalAuthFilterTest {
     private static final String OTHER_HOTEL_ID = "aaaaaaaa-0000-0000-0000-000000000002";
     private static final String PROTECTED_PATH = "/api/v1/auth/users";
     private static final String UNPROTECTED_PATH = "/api/v1/auth/login";
+
+    private static final List<String> EXCLUDED_PATH_PREFIXES = List.of(
+            "/actuator", "/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/refresh",
+            "/api/v1/auth/logout", "/api/v1/auth/change-password", "/api/v1/auth/me");
 
     private static final int UNAUTHORIZED = HttpServletResponse.SC_UNAUTHORIZED;
     private static final int OK = HttpServletResponse.SC_OK;
@@ -69,7 +64,7 @@ class InternalAuthFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new InternalAuthFilter(filterHmacMaterial(), new InMemoryNonceStore());
+        filter = new InternalAuthFilter(filterHmacMaterial(), new InMemoryNonceStore(), EXCLUDED_PATH_PREFIXES);
         SecurityContextHolder.clearContext();
     }
 
@@ -135,12 +130,12 @@ class InternalAuthFilterTest {
     }
 
     @Nested
-    @DisplayName("shouldNotFilter — allowlist, not denylist (the real divergence from the other 5 services)")
+    @DisplayName("shouldNotFilter — excludedPathPrefixes scoped to this service's public endpoints")
     class ProtectedPathScoping {
 
         @Test
-        @DisplayName("A path outside /api/v1/auth/users bypasses the filter entirely, even with no headers")
-        void shouldBypassFilterOutsideProtectedPath() throws IOException, ServletException {
+        @DisplayName("A public auth endpoint (e.g. /login) bypasses the filter entirely, even with no headers")
+        void shouldBypassFilterOnPublicAuthEndpoint() throws IOException, ServletException {
             final MockHttpServletRequest request = new MockHttpServletRequest();
             request.setRequestURI(UNPROTECTED_PATH);
             final MockHttpServletResponse response = new MockHttpServletResponse();
@@ -163,8 +158,8 @@ class InternalAuthFilterTest {
         }
 
         @Test
-        @DisplayName("Unlike the other 5 services, /actuator is NOT special-cased here — it is simply unprotected")
-        void actuatorIsUnprotectedLikeAnyOtherNonUsersPath() throws IOException, ServletException {
+        @DisplayName("Actuator endpoint — no headers required, passes chain")
+        void shouldBypassFilterForActuatorEndpoint() throws IOException, ServletException {
             final MockHttpServletRequest request = new MockHttpServletRequest();
             request.setRequestURI("/actuator/health");
             final MockHttpServletResponse response = new MockHttpServletResponse();
@@ -176,7 +171,7 @@ class InternalAuthFilterTest {
     }
 
     @Nested
-    @DisplayName("Presence check — missing header → 401 MISSING_INTERNAL_HEADERS")
+    @DisplayName("Presence check — missing or blank header → 401")
     class PresenceCheck {
 
         @Test
@@ -192,7 +187,21 @@ class InternalAuthFilterTest {
             filter.doFilter(request, response, new MockFilterChain());
 
             assertThat(response.getStatus()).isEqualTo(UNAUTHORIZED);
-            assertThat(response.getErrorMessage()).isEqualTo("MISSING_INTERNAL_HEADERS");
+        }
+
+        @Test
+        @DisplayName("Blank X-Auth-User (present but empty) → 401 — was NOT caught before reconciliation")
+        void shouldRejectWhenUsernameBlank()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            final String timestamp = String.valueOf(System.currentTimeMillis());
+            final String nonce = freshNonce();
+            final String sig = computeHmac("", TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce);
+            final MockHttpServletRequest request = buildRequest("", TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce, sig);
+            final MockHttpServletResponse response = new MockHttpServletResponse();
+
+            filter.doFilter(request, response, new MockFilterChain());
+
+            assertThat(response.getStatus()).isEqualTo(UNAUTHORIZED);
         }
 
         @Test
@@ -262,24 +271,6 @@ class InternalAuthFilterTest {
 
             assertThat(response.getStatus()).isEqualTo(UNAUTHORIZED);
         }
-
-        @Test
-        @DisplayName("KNOWN DIVERGENCE: an empty-string header (not absent) passes the presence check here — "
-                + "the other 5 services use StringUtils.hasText and reject blank values too")
-        void emptyStringHeaderIsNotCaughtByThePresenceCheck()
-                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
-            final String timestamp = String.valueOf(System.currentTimeMillis());
-            final String nonce = freshNonce();
-            // Signed for an empty username - still requires the real secret to forge,
-            // so this is a behavioral quirk (authenticates as username=""), not a bypass.
-            final String sig = computeHmac("", TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce);
-            final MockHttpServletRequest request = buildRequest("", TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce, sig);
-            final MockHttpServletResponse response = new MockHttpServletResponse();
-
-            filter.doFilter(request, response, new MockFilterChain());
-
-            assertThat(response.getStatus()).isEqualTo(OK);
-        }
     }
 
     @Nested
@@ -287,7 +278,7 @@ class InternalAuthFilterTest {
     class HmacCheck {
 
         @Test
-        @DisplayName("Invalid signature → 401 INVALID_INTERNAL_SIGNATURE")
+        @DisplayName("Invalid signature → 401")
         void shouldRejectWhenSignatureInvalid() throws IOException, ServletException {
             final String timestamp = String.valueOf(System.currentTimeMillis());
             final MockHttpServletRequest request =
@@ -297,7 +288,6 @@ class InternalAuthFilterTest {
             filter.doFilter(request, response, new MockFilterChain());
 
             assertThat(response.getStatus()).isEqualTo(UNAUTHORIZED);
-            assertThat(response.getErrorMessage()).isEqualTo("INVALID_INTERNAL_SIGNATURE");
         }
 
         @Test
@@ -344,7 +334,7 @@ class InternalAuthFilterTest {
     class ReplayCheck {
 
         @Test
-        @DisplayName("Timestamp older than the tolerance window → 401 STALE_INTERNAL_SIGNATURE")
+        @DisplayName("Timestamp older than the tolerance window → 401")
         void shouldRejectWhenTimestampIsStale()
                 throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
             final String staleTimestamp = String.valueOf(
@@ -358,7 +348,6 @@ class InternalAuthFilterTest {
             filter.doFilter(request, response, new MockFilterChain());
 
             assertThat(response.getStatus()).isEqualTo(UNAUTHORIZED);
-            assertThat(response.getErrorMessage()).isEqualTo("STALE_INTERNAL_SIGNATURE");
         }
 
         @Test
@@ -379,7 +368,7 @@ class InternalAuthFilterTest {
         }
 
         @Test
-        @DisplayName("Replaying the exact same valid request a second time → 401 REPLAYED_INTERNAL_SIGNATURE")
+        @DisplayName("Replaying the exact same valid request a second time → 401")
         void shouldRejectReplayedNonce()
                 throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
             final String timestamp = String.valueOf(System.currentTimeMillis());
@@ -398,7 +387,6 @@ class InternalAuthFilterTest {
             filter.doFilter(replayedRequest, replayedResponse, new MockFilterChain());
 
             assertThat(replayedResponse.getStatus()).isEqualTo(UNAUTHORIZED);
-            assertThat(replayedResponse.getErrorMessage()).isEqualTo("REPLAYED_INTERNAL_SIGNATURE");
         }
 
         @Test
