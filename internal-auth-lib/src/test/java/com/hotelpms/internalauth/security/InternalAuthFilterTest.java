@@ -165,6 +165,19 @@ class InternalAuthFilterTest {
 
             assertThat(response.getStatus()).isEqualTo(UNAUTHORIZED);
         }
+
+        @Test
+        @DisplayName("A path that merely starts with an excluded prefix as a substring, "
+                + "without a segment boundary, is NOT exempted")
+        void shouldNotExemptPathsThatOnlySharePrefixAsSubstring() throws IOException, ServletException {
+            final MockHttpServletRequest request = new MockHttpServletRequest();
+            request.setRequestURI("/actuator-evil");
+            final MockHttpServletResponse response = new MockHttpServletResponse();
+
+            filter.doFilter(request, response, new MockFilterChain());
+
+            assertThat(response.getStatus()).isEqualTo(UNAUTHORIZED);
+        }
     }
 
     @Nested

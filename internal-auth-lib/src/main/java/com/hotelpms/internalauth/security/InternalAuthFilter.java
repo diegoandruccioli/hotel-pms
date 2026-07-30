@@ -111,7 +111,21 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(@NonNull final HttpServletRequest request) {
         final String path = request.getRequestURI();
-        return excludedPathPrefixes.stream().anyMatch(path::startsWith);
+        return excludedPathPrefixes.stream().anyMatch(prefix -> isExemptPath(path, prefix));
+    }
+
+    /**
+     * Matches {@code path} against {@code prefix} on a path-segment boundary,
+     * not a raw string prefix — {@code "/actuator"} exempts {@code /actuator}
+     * and {@code /actuator/health}, but not {@code /actuator-evil}.
+     *
+     * @param path   the request URI
+     * @param prefix an entry from {@link #excludedPathPrefixes}
+     * @return {@code true} if {@code path} is exactly {@code prefix} or a
+     *         sub-path of it
+     */
+    private static boolean isExemptPath(final String path, final String prefix) {
+        return path.equals(prefix) || path.startsWith(prefix + "/");
     }
 
     @Override
