@@ -31,6 +31,7 @@
   "btn_complete_checkin": "Completa Check-in",
   "err_missing_context": "Dati contesto prenotazione mancanti",
   "err_primary_guest_required": "È richiesto almeno un ospite principale",
+  "err_date_of_birth_required": "Ospite {{number}}: la data di nascita è obbligatoria",
   "err_stato_nascita_required": "Ospite {{number}}: lo stato di nascita è obbligatorio",
   "err_comune_nascita_required": "Ospite {{number}}: il comune di nascita è obbligatorio per i nati in Italia",
   "err_stato_rilascio_required": "Ospite {{number}}: lo stato di rilascio del documento è obbligatorio",

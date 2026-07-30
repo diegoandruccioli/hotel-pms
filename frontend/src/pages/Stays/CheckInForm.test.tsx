@@ -264,6 +264,7 @@ describe('CheckInForm', () => {
 
       // Switch the primary guest to FAMILIARE so no document is required, simplifying the path to submit.
       fireEvent.change(screen.getByLabelText(/^label_guest_type/, { selector: 'select' }), { target: { value: 'FAMILIARE' } });
+      fireEvent.change(screen.getByLabelText('label_date_of_birth'), { target: { value: '1990-01-01' } });
       await selectStato('label_stato_nascita', 'FRANCIA');
 
       fireEvent.submit(container.querySelector('form')!);

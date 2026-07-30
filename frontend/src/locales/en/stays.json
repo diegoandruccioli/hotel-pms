@@ -31,6 +31,7 @@
   "btn_complete_checkin": "Complete Check-in",
   "err_missing_context": "Missing reservation context data",
   "err_primary_guest_required": "At least one primary guest is required",
+  "err_date_of_birth_required": "Guest {{number}}: date of birth is required",
   "err_stato_nascita_required": "Guest {{number}}: country of birth is required",
   "err_comune_nascita_required": "Guest {{number}}: municipality of birth is required for Italian-born guests",
   "err_stato_rilascio_required": "Guest {{number}}: document-issuing country is required",

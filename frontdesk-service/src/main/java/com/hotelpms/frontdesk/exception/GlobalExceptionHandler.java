@@ -39,6 +39,9 @@ public class GlobalExceptionHandler {
     private static final String ERRORS_BASE_URI = "https://hotelpms.com/errors/";
     private static final String TITLE_BAD_REQUEST = "Bad Request";
     private static final String SLUG_CONFLICT = "conflict";
+    private static final String SLUG_BAD_REQUEST = "bad-request";
+    /** PostgreSQL SQLState for a NOT NULL constraint violation. */
+    private static final String SQLSTATE_NOT_NULL_VIOLATION = "23502";
 
     /**
      * Handles NotFoundException.
@@ -65,7 +68,7 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleBadRequestException(final BadRequestException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problemDetail.setTitle(TITLE_BAD_REQUEST);
-        problemDetail.setType(errorType("bad-request"));
+        problemDetail.setType(errorType(SLUG_BAD_REQUEST));
         problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
         return problemDetail;
     }
@@ -217,7 +220,7 @@ public class GlobalExceptionHandler {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
                 "VALIDATION_FAILED");
         problemDetail.setTitle(TITLE_BAD_REQUEST);
-        problemDetail.setType(errorType("bad-request"));
+        problemDetail.setType(errorType(SLUG_BAD_REQUEST));
         problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
 
         final Map<String, String> errors = new HashMap<>();
@@ -230,13 +233,30 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles data integrity violations (e.g., unique constraint).
+     * Handles data integrity violations (unique constraint, not-null constraint, ...).
+     *
+     * <p>A NOT NULL violation is a missing-required-field bug, not a
+     * conflict — reporting it as 409 "RESOURCE_ALREADY_EXISTS" is actively
+     * misleading (nothing "already exists"; some other layer, typically
+     * frontend validation, failed to require a field the database does).
+     * Distinguished by SQLState (23502) rather than message-sniffing, which
+     * is fragile across drivers/locales.
      *
      * @param ex the exception
      * @return the problem detail
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail handleDataIntegrityViolationException(final DataIntegrityViolationException ex) {
+        if (isNotNullViolation(ex)) {
+            LOG.warn("Not-null constraint violation (likely a validation gap upstream): {}", ex.getMessage());
+            final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+                    "REQUIRED_FIELD_MISSING");
+            problemDetail.setTitle(TITLE_BAD_REQUEST);
+            problemDetail.setType(errorType(SLUG_BAD_REQUEST));
+            problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+            return problemDetail;
+        }
+
         LOG.warn("Data integrity violation: {}", ex.getMessage());
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
                 "RESOURCE_ALREADY_EXISTS");
@@ -244,6 +264,12 @@ public class GlobalExceptionHandler {
         problemDetail.setType(errorType(SLUG_CONFLICT));
         problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
         return problemDetail;
+    }
+
+    private static boolean isNotNullViolation(final DataIntegrityViolationException ex) {
+        final Throwable cause = ex.getMostSpecificCause();
+        return cause instanceof final java.sql.SQLException sqlException
+                && SQLSTATE_NOT_NULL_VIOLATION.equals(sqlException.getSQLState());
     }
 
     /**

@@ -63,6 +63,14 @@ const buildAlloggiatiGuestsSchema = (t: GuestErrorTranslator) =>
           ctx.addIssue({ code: 'custom', path: [idx, 'documentPlaceOfIssue'], message: t('err_comune_rilascio_required', { number }) });
         }
       }
+      // Checked last: stay_guests.date_of_birth is NOT NULL in Postgres for
+      // every guest regardless of traveller type, but this was never
+      // validated client-side (found via frontend/e2e-live/walk-in-live.spec.ts
+      // against the real backend — a FAMILIARE guest with no date of birth
+      // used to reach the database's NOT NULL constraint and 500).
+      if (!g.dateOfBirth) {
+        ctx.addIssue({ code: 'custom', path: [idx, 'dateOfBirth'], message: t('err_date_of_birth_required', { number }) });
+      }
     });
   });
 
