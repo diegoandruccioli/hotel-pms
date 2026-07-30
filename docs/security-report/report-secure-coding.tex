@@ -4180,6 +4180,77 @@ verifica che il repository sia sempre invocato con l'\texttt{hotelId} del caller
 \paragraph{Riferimento} Commit: \commitref{c983946}{fix(security): T-BILL-04 --- cross-tenant data leak on Owner financial report}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Denial of Service su Generazione PDF Fattura \threat{T-BILL-05}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+\texttt{ThymeleafPdfTemplateRenderer} (modulo condiviso \texttt{pdf-template-engine},
+usato da billing-service per generare il PDF fattura) rileggeva e ri-subsettava i
+font Noto Sans dal classpath ad \emph{ogni} chiamata a \texttt{render()} --- l'unico
+punto di allocazione Metaspace per-richiesta in tutta la pipeline di generazione.
+Nessun limite era imposto al numero di generazioni concorrenti o sequenziali: un
+volume anche moderato di richieste (traffico legittimo, non uno scenario di attacco
+mirato) esauriva progressivamente il Metaspace e crashava la JVM del servizio ---
+CWE-400, uncontrolled resource consumption, classificabile OWASP A04:2021 ---
+Insecure Design (assenza di un limite di capacità progettato, non una
+misconfigurazione puntuale). Il sintomo è rimasto a lungo mascherato da un secondo
+bug indipendente e concorrente (\texttt{GuestClient}, il client Feign
+billing→guest-service, privo di configurazione discovery: ogni chiamata falliva
+con ``No servers available'' e ogni fattura mostrava ``Unknown Guest''), che
+riduceva drasticamente quanto la funzionalità venisse effettivamente esercitata
+prima della sua riparazione.
+
+\begin{insecurebox}[title={ThymeleafPdfTemplateRenderer.java --- font ricaricati ad ogni render() (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: ogni chiamata a render() rilegge e ri-subsetta i font dal classpath
+public byte[] render(final String templateName, final Map<String, Object> model) {
+    final PdfRendererBuilder builder = new PdfRendererBuilder();
+    // font caricati per-richiesta: allocazione Metaspace non delimitata
+    builder.useFont(() -> loadFontFromClasspath("NotoSans-Regular.ttf"), "Noto Sans");
+    builder.useFont(() -> loadFontFromClasspath("NotoSans-Bold.ttf"), "Noto Sans", 700);
+    // ... render ...
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+\begin{enumerate}
+    \item \textbf{Font caricati una sola volta} --- letti in campi statici
+          all'inizializzazione della classe, non più ad ogni \texttt{render()}.
+    \item \textbf{GuestClient pinnato a URL esplicito} --- nuova proprietà
+          \texttt{application.config.guest-service-url} in config-service, stesso
+          pattern già in uso per \texttt{HotelSettingsClient}/\texttt{frontdesk-service-url}
+          (Eureka è disabilitato cluster-wide nel progetto, la discovery automatica
+          non è mai stata disponibile).
+    \item \textbf{Rete di sicurezza operativa} --- \texttt{MaxMetaspaceSize} alzato
+          da 128m a 192m come margine addizionale, non come mitigazione primaria.
+\end{enumerate}
+
+\begin{securebox}[title={ThymeleafPdfTemplateRenderer.java --- font caricati una sola volta (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: font letti una sola volta, riusati su ogni render()
+private static final FSSupplier<InputStream> NOTO_SANS_REGULAR =
+        loadFontFromClasspath("NotoSans-Regular.ttf");
+private static final FSSupplier<InputStream> NOTO_SANS_BOLD =
+        loadFontFromClasspath("NotoSans-Bold.ttf");
+
+public byte[] render(final String templateName, final Map<String, Object> model) {
+    final PdfRendererBuilder builder = new PdfRendererBuilder();
+    builder.useFont(NOTO_SANS_REGULAR, "Noto Sans");
+    builder.useFont(NOTO_SANS_BOLD, "Noto Sans", 700);
+    // ... render ...
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Verifica}
+Dal vivo: rebuild e restart di config-server e billing-service, 20 generazioni PDF
+consecutive → 20×200, nome ospite reale risolto correttamente, nessun crash,
+Metaspace stabile sotto il nuovo cap.
+
+\paragraph{Riferimento} Commit: \commitref{c803390}{fix(billing): risolve crash OOM su generazione PDF fattura}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \subsection{Data Leak Cross-Tenant sul Pre-fill Check-in \threat{T-STAY-06}}
 % ─────────────────────────────────────────────────────────────────────────────
 
@@ -5547,6 +5618,51 @@ una finestra di tolleranza di 60s sul timestamp e reclama il nonce su un
 \texttt{NonceStore} backed da Redis (\texttt{SETNX}, TTL 120s) — un secondo reclamo dello
 stesso nonce entro la finestra viene rifiutato come replay.
 Commit: \commitref{5dd8ed8}{feat(security): T-GW-08 --- timestamp+nonce anti-replay on internal HMAC auth}
+
+\paragraph{T-NOTIF-01 --- notification-service mai censito nel modello delle minacce}
+notification-service (non instradato dal gateway, raggiungibile solo dalla rete
+Docker interna, 3 endpoint solo-scrittura che innescano invio email transazionali
+contenenti PII ospite nel corpo/subject) era già protetto dallo stesso
+\texttt{InternalAuthFilter} HMAC+anti-replay di T-GW-08 fin dalla sua introduzione,
+ma non compariva mai in \texttt{THREAT\_MODEL.md} se non come voce della tabella
+asset --- zero threat, zero mitigazione tracciati. Senza quella protezione, un
+chiamante privo di firma HMAC valida ma con accesso alla rete interna avrebbe
+potuto innescare invii email arbitrari (subject/corpo/destinatario a scelta del
+chiamante) tramite l'infrastruttura email legittima dell'hotel --- un vettore di
+phishing verso gli ospiti. Formalizzato durante l'estrazione di
+\texttt{internal-auth-lib} (GAP-7), che ha portato a riesaminare insieme la
+protezione di tutti e 6 i servizi.
+Commit: \commitref{5d13a7d}{test(security): characterization tests for InternalAuthFilter on auth/notification-service}
+
+\paragraph{GAP-7 --- Sei copie divergenti di InternalAuthFilter, un solo punto di verità mancante}
+\texttt{InternalAuthFilter}/\texttt{NonceStore}/\texttt{RedisNonceStore} esistevano
+come 6 copie quasi-identiche (auth/billing/fb/frontdesk/guest/notification-service).
+5 erano byte-identiche per disciplina nel copia-incolla, non per un meccanismo che
+lo garantisse --- nessun controllo impediva a una futura modifica di introdurne una
+sesta divergenza silenziosa. auth-service era la prova che il rischio non era
+ipotetico: allowlist invertita anziché denylist, controllo presenza header con
+\texttt{== null} anziché \texttt{StringUtils.hasText} (un header
+\texttt{X-Auth-User: ""} non veniva rifiutato), contratto 401 diverso
+(\texttt{sendError}+codice stringa anziché corpo JSON), zero logging sui rigetti.
+Tre di queste sono difetti di sicurezza reali, non solo stilistici, scoperti da
+questo lavoro di dedup e non da un pentest mirato. Fix in tre passi: test di
+caratterizzazione per fissare il comportamento reale di ciascun servizio prima di
+toccare nulla; riconciliazione di auth-service sul contratto condiviso; estrazione
+in un nuovo modulo Gradle \texttt{internal-auth-lib} (libreria pura, nessuna
+autoconfigurazione Spring) consumato da tutti e 6 i servizi tramite
+\texttt{new InternalAuthFilter(hmacSecret, nonceStore, excludedPathPrefixes)} nel
+rispettivo \texttt{SecurityConfig}, altrimenti invariato. Verificato dal vivo su
+tutti e 6 i servizi (richiesta non firmata→401, timestamp scaduto→401, nonce
+riusato→401, \texttt{/actuator/health/liveness} senza header→200) più un flusso
+applicativo autenticato completo via browser attraverso il gateway reale --- nessuna
+regressione. Una revisione di sicurezza indipendente (subagent dedicato) pre-merge
+ha confermato l'assenza di vulnerabilità sfruttabili e suggerito un solo indurimento
+difensivo aggiuntivo, poi applicato: il matching dei prefissi esenti da HMAC
+(\texttt{/actuator}) avveniva per sottostringa grezza anziché per confine di
+segmento --- non sfruttabile nella configurazione attuale (Spring Security
+richiede comunque autenticazione su qualunque path non esplicitamente permesso),
+ma corretto comunque per eliminare il rischio latente su futuri path esenti.
+Commit: \commitref{5d13a7d}{test(security): characterization tests}, \commitref{8607d7c}{fix(security): reconcile auth-service InternalAuthFilter onto the shared contract}, \commitref{9cec99f}{refactor(security): extract internal-auth-lib}, \commitref{59d5bf5}{fix(security): match excludedPathPrefixes on path-segment boundaries}
 
 \paragraph{T-GW-06 --- Propagazione X-Auth-Hotel end-to-end}
 Aggiunto campo \texttt{hotelId} a \texttt{UserAccount} e claim JWT corrispondente.
