@@ -211,6 +211,56 @@ gunzip -c hotel-pms-YYYYMMDD-HHMMSS.sql.gz | docker exec -i hotel_postgres psql 
 docker exec -i hotel_postgres psql -U postgres < backup-YYYYMMDD-HHMM.sql
 ```
 
+### Restore end-to-end da copia off-site cifrata (disaster recovery)
+
+Procedura per il caso peggiore: l'host è perso, si riparte da zero con solo
+l'accesso al bucket S3-compatible e la chiave privata `age` (custodita fuori
+da questo host, per definizione — vedi `backup/DECISIONS.md §3.5`).
+
+**Prerequisiti**: `age` e `mc` installati sulla macchina da cui si esegue il
+restore (non necessariamente questo host); la chiave privata `age`
+(`backup-key.txt`, generata da `age-keygen`, mai stata su questo host);
+credenziali S3 (`S3_ENDPOINT`/`S3_BUCKET`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`).
+
+```bash
+# 1. Configura l'alias mc verso lo storage esterno
+mc alias set offsite "$S3_ENDPOINT" "$S3_ACCESS_KEY_ID" "$S3_SECRET_ACCESS_KEY"
+
+# 2. Elenca i backup disponibili, scarica il più recente
+mc ls offsite/$S3_BUCKET
+mc cp offsite/$S3_BUCKET/hotel-pms-YYYYMMDD-HHMMSS.sql.gz.age .
+
+# 3. Decifra con la chiave privata (mai su questo host prima d'ora)
+age -d -i backup-key.txt -o hotel-pms-YYYYMMDD-HHMMSS.sql.gz \
+    hotel-pms-YYYYMMDD-HHMMSS.sql.gz.age
+
+# 4. Ripristina su un Postgres vergine (nuovo host/container, mai avere
+#    servizi applicativi puntati al DB prima che il restore sia verificato)
+gunzip -c hotel-pms-YYYYMMDD-HHMMSS.sql.gz | \
+    docker exec -i hotel_postgres psql -U postgres
+
+# 5. Verifica di integrità (obbligatoria prima di riavviare i servizi)
+docker exec hotel_postgres psql -U postgres -d hotel_auth \
+    -c "SELECT count(*) FROM flyway_schema_history;"
+docker exec hotel_postgres psql -U postgres -d hotel_auth \
+    -c "SELECT count(*) FROM user_account;"
+# ripetere per hotel_guest/hotel_frontdesk/hotel_billing/hotel_fb — il conteggio
+# righe di flyway_schema_history deve combaciare con le migration attualmente
+# nel repo, non solo essere "diverso da zero"
+
+# 6. Solo dopo la verifica: avviare i servizi contro il DB ripristinato e
+#    tentare un login reale (non solo un health check)
+```
+
+**Stato**: procedura scritta e pronta, **non ancora eseguita end-to-end**
+contro uno storage off-site reale — nessun bucket di produzione è stato
+ancora provisionato (piano di rifinitura Fase 6, item 6). Quando un bucket
+reale sarà disponibile, eseguire questa procedura una volta per verificarla
+davvero, cronometrare l'RTO (tempo dal via al login riuscito) e registrare
+qui data ed esito, come richiesto dal criterio di accettazione del piano
+("nessun test automatico sostituisce un restore reale eseguito almeno una
+volta").
+
 ---
 
 ## 6. Rollback di una migration Flyway
