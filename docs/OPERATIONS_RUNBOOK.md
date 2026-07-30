@@ -184,6 +184,11 @@ docker cp hotel_db_backup:/backups/hotel-pms-YYYYMMDD-HHMMSS.sql.gz .
 Conservare periodicamente una copia in una posizione esterna al server
 (S3, NAS, ecc.) — il volume Docker da solo non protegge da un crash disco.
 
+**RPO/RTO**: RPO accettato di 24h (dump giornaliero), decisione esplicita
+documentata in `backup/DECISIONS.md §3.5` con criteri di revisione — nessun
+PITR/WAL archiving. La copia esterna cifrata automatica (S3/B2) è pianificata
+ma non ancora implementata (ROADMAP.md P3, item residuo).
+
 ### Backup manuale (prima di un aggiornamento o operazione rischiosa)
 
 ```bash

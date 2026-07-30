@@ -58,7 +58,7 @@ services:
   # (ROADMAP P3). No host ports — db-network only.
   # ----------------------------------------------------------
   db-backup:
-    image: postgres:15-alpine
+    build: ./docker/db-backup
     container_name: hotel_db_backup
     restart: unless-stopped
     profiles: ["backup"]
@@ -69,26 +69,20 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
       BACKUP_RETENTION_DAYS: 14
       BACKUP_INTERVAL_SECONDS: 86400
+      # Off-site copy + encryption (AUDIT_ANALISI_2026-07.md item 4) — both
+      # opt-in. Unset (dev default): unencrypted, local-volume-only, exactly
+      # the prior behavior. See .env.example for how to provision.
+      AGE_RECIPIENT: ${AGE_RECIPIENT:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_REGION: ${S3_REGION:-}
+      OFFSITE_RETENTION_DAYS: 30
     volumes:
       - postgres_backups:/backups
     networks:
       - db-network
-    entrypoint: ["sh", "-c"]
-    command:
-      - |
-        echo "[db-backup] starting — interval=$${BACKUP_INTERVAL_SECONDS}s retention=$${BACKUP_RETENTION_DAYS}d"
-        while true; do
-          ts="$$(date +%Y%m%d-%H%M%S)"
-          file="/backups/hotel-pms-$${ts}.sql"
-          if pg_dumpall -h postgres -U postgres -f "$${file}"; then
-            gzip "$${file}"
-            echo "[db-backup] $$(date -Iseconds) wrote $${file}.gz"
-          else
-            echo "[db-backup] $$(date -Iseconds) FAILED dump attempt"
-          fi
-          find /backups -name '*.sql.gz' -mtime "+$${BACKUP_RETENTION_DAYS}" -delete
-          sleep "$${BACKUP_INTERVAL_SECONDS}"
-        done
     deploy:
       resources:
         limits:
