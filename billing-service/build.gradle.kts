@@ -38,6 +38,7 @@ ext {
 }
 
 dependencies {
+    implementation(project(":internal-auth-lib"))
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
@@ -84,8 +85,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
-    // ADR-004: enforces hotel_id scoping on multi-tenant repositories (T-BILL-04 class of bug)
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+    // ADR-004: enforces hotel_id scoping on multi-tenant repositories (T-BILL-04 class of bug) —
+    // TenantIsolationRules + archunit-junit5 come transitively via the testFixtures below.
+    testImplementation(testFixtures(project(":internal-auth-lib")))
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

@@ -6,7 +6,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.hotelpms.notification.dto.CheckoutNotificationRequest;
 import com.hotelpms.notification.dto.InvoiceLineItemDto;
 import com.hotelpms.notification.dto.ReservationConfirmedRequest;
-import com.hotelpms.notification.security.NonceStore;
+import com.hotelpms.internalauth.security.NonceStore;
 import com.icegreen.greenmail.util.GreenMail;
 import com.icegreen.greenmail.util.ServerSetup;
 import jakarta.mail.internet.MimeMessage;

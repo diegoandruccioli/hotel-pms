@@ -1,6 +1,6 @@
 package com.hotelpms.frontdesk.stays.repository;
 
-import com.hotelpms.frontdesk.architecture.TenantScopeExempt;
+import com.hotelpms.internalauth.architecture.TenantScopeExempt;
 import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import org.springframework.data.domain.Page;

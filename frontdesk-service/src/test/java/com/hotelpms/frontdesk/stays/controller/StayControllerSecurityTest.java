@@ -1,6 +1,6 @@
 package com.hotelpms.frontdesk.stays.controller;
 
-import com.hotelpms.frontdesk.security.NonceStore;
+import com.hotelpms.internalauth.security.NonceStore;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
 import com.hotelpms.frontdesk.security.SecurityConfig;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiReportService;

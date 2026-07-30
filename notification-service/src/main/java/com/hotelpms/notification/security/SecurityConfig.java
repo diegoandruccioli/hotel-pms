@@ -1,5 +1,8 @@
 package com.hotelpms.notification.security;
 
+import com.hotelpms.internalauth.security.InternalAuthFilter;
+import com.hotelpms.internalauth.security.NonceStore;
+import com.hotelpms.internalauth.security.RedisNonceStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,6 +14,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.util.List;
+
 /**
  * Security configuration for notification-service.
  *
@@ -21,6 +26,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    private static final List<String> HMAC_EXEMPT_PATH_PREFIXES = List.of("/actuator");
 
     private final String hmacSecret;
 
@@ -62,7 +69,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**", "/actuator/health").permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(new InternalAuthFilter(hmacSecret, nonceStore),
+                .addFilterBefore(new InternalAuthFilter(hmacSecret, nonceStore, HMAC_EXEMPT_PATH_PREFIXES),
                         UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

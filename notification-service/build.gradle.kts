@@ -37,6 +37,8 @@ ext {
 }
 
 dependencies {
+    implementation(project(":internal-auth-lib"))
+
     // Core web (REST endpoints to receive notification requests from other services)
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")

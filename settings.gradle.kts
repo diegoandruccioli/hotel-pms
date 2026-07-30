@@ -9,7 +9,8 @@ val projects = listOf(
     "auth-service",
     "api-gateway",
     "notification-service",
-    "pdf-template-engine"
+    "pdf-template-engine",
+    "internal-auth-lib"
 )
 for (p in projects) {
     if (file(p).exists()) {

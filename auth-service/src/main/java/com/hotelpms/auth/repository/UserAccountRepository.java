@@ -1,6 +1,6 @@
 package com.hotelpms.auth.repository;
 
-import com.hotelpms.auth.architecture.TenantScopeExempt;
+import com.hotelpms.internalauth.architecture.TenantScopeExempt;
 import com.hotelpms.auth.domain.UserAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;

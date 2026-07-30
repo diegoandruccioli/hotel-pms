@@ -1,8 +1,8 @@
 package com.hotelpms.auth.config;
 
-import com.hotelpms.auth.security.InternalAuthFilter;
-import com.hotelpms.auth.security.NonceStore;
-import com.hotelpms.auth.security.RedisNonceStore;
+import com.hotelpms.internalauth.security.InternalAuthFilter;
+import com.hotelpms.internalauth.security.NonceStore;
+import com.hotelpms.internalauth.security.RedisNonceStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

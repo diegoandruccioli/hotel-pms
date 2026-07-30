@@ -39,6 +39,7 @@ ext {
 }
 
 dependencies {
+    implementation(project(":internal-auth-lib"))
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -86,8 +87,9 @@ dependencies {
     testImplementation("net.bytebuddy:byte-buddy-agent:1.15.11")
     testImplementation("org.mockito:mockito-core:5.15.2")
     testImplementation("org.mockito:mockito-junit-jupiter:5.15.2")
-    // ADR-004: enforces hotel_id scoping on multi-tenant repositories (T-BILL-04 class of bug)
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+    // ADR-004: enforces hotel_id scoping on multi-tenant repositories (T-BILL-04 class of bug) —
+    // TenantIsolationRules + archunit-junit5 come transitively via the testFixtures below.
+    testImplementation(testFixtures(project(":internal-auth-lib")))
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -116,17 +118,15 @@ tasks.withType<Test> {
 // SpotBugs false-positive in JUnit tests: @BeforeEach-initialized fields are not seen
 // by SpotBugs as constructor-initialized, triggering NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR.
 //
-// EI_EXPOSE_REP2 on RedisNonceStore: the StringRedisTemplate field is a Spring-managed
-// singleton injected via constructor DI (T-GW-08 anti-replay nonce store) — a defensive
-// copy is not applicable for a shared Redis client bean.
+// (RedisNonceStore's own EI_EXPOSE_REP2 exclude now lives in internal-auth-lib's
+// config/spotbugs/exclude.xml — the class moved there.)
 tasks.named("populateDefaultSpotBugsExcludes") {
     doLast {
         val f = file("${layout.buildDirectory.get()}/javaqa/spotbugs-excludes.xml")
         f.writeText(
             f.readText().replace(
                 "</FindBugsFilter>",
-                "    <Match>\n        <Bug pattern=\"NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR\"/>\n    </Match>\n" +
-                    "    <Match>\n        <Class name=\"com.hotelpms.auth.security.RedisNonceStore\"/>\n        <Bug pattern=\"EI_EXPOSE_REP2\"/>\n    </Match>\n</FindBugsFilter>"
+                "    <Match>\n        <Bug pattern=\"NP_NONNULL_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR\"/>\n    </Match>\n</FindBugsFilter>"
             )
         )
     }

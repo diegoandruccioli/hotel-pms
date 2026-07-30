@@ -1,6 +1,6 @@
 package com.hotelpms.frontdesk.reservations.repository;
 
-import com.hotelpms.frontdesk.architecture.TenantScopeExempt;
+import com.hotelpms.internalauth.architecture.TenantScopeExempt;
 import com.hotelpms.frontdesk.reservations.domain.Reservation;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
 import jakarta.persistence.LockModeType;

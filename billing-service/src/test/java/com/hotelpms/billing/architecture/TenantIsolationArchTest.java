@@ -1,19 +1,13 @@
 package com.hotelpms.billing.architecture;
 
-import com.tngtech.archunit.base.DescribedPredicate;
-import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaMethod;
+import com.hotelpms.internalauth.architecture.TenantIsolationRules;
+import com.hotelpms.internalauth.architecture.TenantScopeExempt;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
-import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
-import com.tngtech.archunit.lang.ConditionEvents;
-import com.tngtech.archunit.lang.SimpleConditionEvent;
 
 import java.util.Set;
-
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 
 /**
  * ADR-004: every custom query method on a repository for a tenant-root entity
@@ -49,32 +43,7 @@ final class TenantIsolationArchTest {
 
     @ArchTest
     static final ArchRule CUSTOM_QUERY_METHODS_ON_TENANT_ROOT_REPOSITORIES_MUST_SCOPE_BY_HOTEL_ID =
-            classes()
-                    .that(new DescribedPredicate<>("are tenant-root repositories") {
-                        @Override
-                        public boolean test(final JavaClass javaClass) {
-                            return TENANT_ROOT_REPOSITORIES.contains(javaClass.getFullName());
-                        }
-                    })
-                    .should(new ArchCondition<>("declare every custom query method scoped by hotelId") {
-                        @Override
-                        public void check(final JavaClass javaClass, final ConditionEvents events) {
-                            for (final JavaMethod method : javaClass.getMethods()) {
-                                if (isScoped(method)) {
-                                    continue;
-                                }
-                                events.add(SimpleConditionEvent.violated(method, String.format(
-                                        "%s.%s() has no hotelId in its name and no @TenantScopeExempt — "
-                                                + "add hotelId to the query or document why it's safe without one",
-                                        javaClass.getSimpleName(), method.getName())));
-                            }
-                        }
-
-                        private boolean isScoped(final JavaMethod method) {
-                            return method.getName().contains("HotelId")
-                                    || method.isAnnotatedWith(TenantScopeExempt.class);
-                        }
-                    });
+            TenantIsolationRules.customQueryMethodsMustScopeByHotelId(TENANT_ROOT_REPOSITORIES);
 
     private TenantIsolationArchTest() {
     }

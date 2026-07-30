@@ -227,7 +227,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     /**
      * Extracts the hotel UUID from the current authentication context.
      * The hotel ID is stored as {@code details} by
-     * {@link com.hotelpms.billing.security.InternalAuthFilter} after reading the
+     * {@link com.hotelpms.internalauth.security.InternalAuthFilter} after reading the
      * {@code X-Auth-Hotel} header injected by the API Gateway.
      *
      * @return the hotel UUID of the authenticated caller

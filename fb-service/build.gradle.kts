@@ -38,6 +38,7 @@ ext {
 }
 
 dependencies {
+    implementation(project(":internal-auth-lib"))
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
@@ -74,8 +75,9 @@ dependencies {
     testImplementation("net.bytebuddy:byte-buddy-agent:1.15.11")
     testImplementation("org.mockito:mockito-core:5.15.2")
     testImplementation("org.mockito:mockito-junit-jupiter:5.15.2")
-    // ADR-004: enforces hotel_id scoping on multi-tenant repositories (T-BILL-04 class of bug)
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+    // ADR-004: enforces hotel_id scoping on multi-tenant repositories (T-BILL-04 class of bug) —
+    // TenantIsolationRules + archunit-junit5 come transitively via the testFixtures below.
+    testImplementation(testFixtures(project(":internal-auth-lib")))
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -99,11 +101,4 @@ dependencyManagement {
 tasks.withType<Test> {
     useJUnitPlatform()
     systemProperty("net.bytebuddy.experimental", "true")
-}
-
-// SpotBugs: project-specific exclusions (Spring DI beans — EI_EXPOSE_REP2 not applicable)
-tasks.withType<com.github.spotbugs.snom.SpotBugsTask>().configureEach {
-    extraArgs.addAll(
-        listOf("-exclude", "${project.projectDir}/config/spotbugs/exclude.xml")
-    )
 }

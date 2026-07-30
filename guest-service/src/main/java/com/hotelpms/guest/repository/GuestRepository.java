@@ -1,6 +1,6 @@
 package com.hotelpms.guest.repository;
 
-import com.hotelpms.guest.architecture.TenantScopeExempt;
+import com.hotelpms.internalauth.architecture.TenantScopeExempt;
 import com.hotelpms.guest.model.Guest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
