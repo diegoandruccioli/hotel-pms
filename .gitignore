@@ -17,6 +17,7 @@ frontend/.vite/
 frontend/coverage/
 frontend/playwright-report/
 frontend/test-results/
+frontend/e2e-live/.auth/
 frontend/.eslintcache
 
 # ── IDE ──────────────────────────────────────────────────────────────────────
