@@ -21,9 +21,13 @@ CVE-2026-22739
 #   not invoke the affected code paths (net/mail, html/template, httputil,
 #   HTTP/2 transport). Reference: github.com/tianon/gosu/issues/104.
 #
-# For Grafana (grafana/grafana:11.6-security-01, third-party monitoring):
+# For Grafana (grafana/grafana:13.1.1 as of 2026-07-31, third-party monitoring):
 #   Grafana is a monitoring dependency, not part of the application attack
-#   surface. Accepted upstream pending Grafana release with Go ≥ 1.26.3.
+#   surface. Bumped 12.4.6 -> 13.1.1 to clear ~25 flagged CVEs at once
+#   (854b8b7); the Go-stdlib entries below are left suppressed until the
+#   next CI Trivy scan confirms which ones the new image already resolved —
+#   GitHub auto-resolves code-scanning alerts that no longer reproduce, no
+#   manual dismissal needed for genuinely-fixed ones.
 #
 # CVE-2026-33811 — net: CNAME double-free/DoS via long CNAME response (cgo DNS).
 #   gosu: does not make cgo DNS queries.

@@ -5691,6 +5691,15 @@ Commit: \commitref{c934f6e}{fix(security): T-CFG-03 --- HTTP Basic Auth on confi
 Corrisponde alla fase \textbf{Verification} di OWASP SAMM e al principio shift-left.
 Commit: \commitref{92c0050}{fix(ci): add permissions: contents: read to all CI jobs}
 
+3 ulteriori alert \texttt{java/log-injection} (2026-07-31) su
+\texttt{internal-auth-lib/InternalAuthFilter.java} --- falsi positivi:
+\texttt{sanitizeForLog()} rimuove già CR/LF (CWE-117) prima di ogni chiamata di
+log flaggata, ma la query standard di CodeQL non riconosce un sanitizzatore
+custom del progetto come interruzione del flusso di taint. Commenti di
+soppressione \texttt{codeql[java/log-injection]} aggiunti ad ogni chiamata
+(documentazione inline, non solo dismissal silenzioso); alert chiusi su GitHub
+con motivazione.
+
 \paragraph{CVE scanning con Trivy (DEP-CVE-01/02/04)}
 Pipeline CI esegue Trivy su ogni immagine Docker.
 CVE risolte: \texttt{CVE-2026-33870/33871} (Netty request smuggling + HTTP/2 DoS),

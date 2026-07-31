@@ -148,18 +148,22 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
         }
 
         if (!isSignatureValid(username, role, hotelId, timestamp, nonce, signature)) {
+            // codeql[java/log-injection]: sanitizeForLog strips CR/LF below (CWE-117) — CodeQL's
+            // standard query doesn't model this project's custom sanitizer as a taint sanitizer.
             LOG.warn("[InternalAuthFilter] HMAC signature mismatch for user={}", sanitizeForLog(username));
             rejectRequest(response, "Invalid internal request signature");
             return;
         }
 
         if (!isTimestampFresh(timestamp)) {
+            // codeql[java/log-injection]: see sanitizeForLog note above.
             LOG.warn("[InternalAuthFilter] Stale or future-dated timestamp for user={}", sanitizeForLog(username));
             rejectRequest(response, "Stale or future-dated request signature");
             return;
         }
 
         if (!nonceStore.claim(nonce, NONCE_TTL_SECONDS)) {
+            // codeql[java/log-injection]: see sanitizeForLog note above.
             LOG.warn("[InternalAuthFilter] Replayed nonce detected for user={}", sanitizeForLog(username));
             rejectRequest(response, "Request signature already used");
             return;
