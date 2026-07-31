@@ -204,48 +204,17 @@ Documenti necessari per il livello enterprise che richiedono produzione
 
 *I documenti contrassegnati come obbligatori richiedono revisione legale prima della pubblicazione.*
 
-### Scoping tecnico (Fase 8 piano di rifinitura, item 19 — 2026-07-30)
+### Scoping tecnico (Fase 8 piano di rifinitura, item 19 — 2026-07-30, brief consegnabile 2026-07-31)
 
 Il contenuto dei tre documenti obbligatori è materia legale, non generabile
-da questo lavoro — questa sezione documenta solo **cosa deve coprire ciascuno
-dato lo stato reale del sistema** (verificato sul codice, non assunto) e
-**come verranno esposti**, così che quando il testo arriva da un consulente
-l'integrazione sia un cambio di contenuto, non di architettura.
-
-**Privacy Policy (verso l'ospite)** deve coprire, sulla base dei dati
-effettivamente raccolti: identità e documento (nome, data di nascita, tipo e
-numero documento, cittadinanza — raccolti per obbligo Alloggiati Web/TULPS,
-non per scelta di prodotto), email/telefono (contatto, notifiche
-transazionali via notification-service), dati di fatturazione (codice
-fiscale/P.IVA se il soggiorno viene fatturato). Base giuridica: TULPS per i
-dati Alloggiati (non è consenso, è obbligo di legge — da esplicitare, è
-l'errore più comune in questo tipo di informativa), consenso/contratto per
-il resto. Retention: T-GST-05 (`THREAT_MODEL.md`) — hard-anonymize con
-guardia legale duale TULPS (5 anni)/fiscale (10 anni), configurabile per
-hotel via `GuestPrivacySettingsController`; l'informativa deve dichiarare
-questi periodi reali, non un valore arbitrario.
-
-**Data Processing Agreement (verso l'hotel cliente)** — l'hotel è titolare,
-la piattaforma è responsabile del trattamento (GDPR Art. 28). Deve elencare
-i sub-processor reali: hosting (dove sono effettivamente ospitati i
-container in produzione — da definire al primo cliente pagante), provider
-SMTP per notification-service (email transazionali), storage backup
-off-site una volta provisionato (Fase 6 item 4 — piano di rifinitura,
-`backup/DECISIONS.md §3.5`). Deve specificare le misure tecniche già in
-atto piuttosto che generiche ("cifratura in transito", "isolamento
-multi-tenant per hotel_id", "audit log strutturato") in modo verificabile
-da un audit reale, non promesso a vuoto.
-
-**Cookie Policy** — inventario cookie verificato sul codice, non su
-supposizione: `jwt` e `refresh_token` (httpOnly, Secure, SameSite=Strict —
-mai leggibili da JavaScript, T-FE-02), `csrf_token` (non-httpOnly per
-design, richiesto dal pattern double-submit-cookie, T-GW-05). Nessun cookie
-di tracciamento/analytics/marketing di terze parti nel codice attuale —
-verificato via `frontend/src/services/api.ts` e assenza di script esterni
-in `index.html`/CSP (`frontend/nginx.conf`, T-FE-04). Sotto ePrivacy
-Directive questi sono cookie "strictly necessary" (autenticazione/sicurezza
-di sessione), che non richiedono banner di consenso — ma la policy deve
-comunque dichiararli e la loro durata.
+da questo lavoro. Il brief completo e consegnabile a un consulente legale è
+**`docs/legal/PRIVACY_DPA_COOKIE_BRIEF.md`** — dati raccolti per categoria di
+interessato, basi giuridiche (TULPS vs contratto/consenso), retention reale
+(5 anni TULPS / 10 anni fiscale, `THREAT_MODEL.md` T-GST-05), sub-processor
+reali (incluso Backblaze B2, ora effettivamente configurato — Fase 6 item 4,
+region UE ma società USA, domanda aperta sul trasferimento extra-UE),
+inventario cookie, misure tecniche verificabili per il DPA Art. 32, e i
+deliverable esatti attesi (formato, dove verranno esposti).
 
 **Esposizione in UI (deciso, non ancora implementato)**: route lazy-loaded
 `/legal/privacy` e `/legal/cookies` (pattern identico alle altre pagine
