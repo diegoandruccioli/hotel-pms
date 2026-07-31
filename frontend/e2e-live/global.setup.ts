@@ -35,5 +35,24 @@ setup('authenticate as live-suite admin', async ({ page }) => {
         throw new Error(`Login failed for live-suite admin: ${loginResponse.status()} ${await loginResponse.text()}`);
     }
 
+    // FatturaPAServiceImpl requires the HOTEL's own structured address
+    // (cap/comune/provincia) to export a FATTURA — the seed hotel never had
+    // one configured. A partial PUT (every other field null = "unchanged")
+    // is safe to repeat on every setup run.
+    const csrfCookie = (await page.context().cookies()).find((c) => c.name === 'csrf_token');
+    if (!csrfCookie) {
+        throw new Error('csrf_token cookie missing right after login');
+    }
+    const settingsResponse = await page.request.put('/api/v1/stays/settings', {
+        headers: { 'X-CSRF-Token': csrfCookie.value },
+        data: { cap: '00185', comune: 'Roma', provincia: 'RM' },
+    });
+    if (settingsResponse.status() !== 200) {
+        throw new Error(
+            `Failed to configure hotel structured address for FatturaPA: ${settingsResponse.status()} `
+                + (await settingsResponse.text()),
+        );
+    }
+
     await page.context().storageState({ path: STORAGE_STATE });
 });
