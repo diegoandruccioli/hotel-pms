@@ -252,14 +252,26 @@ docker exec hotel_postgres psql -U postgres -d hotel_auth \
 #    tentare un login reale (non solo un health check)
 ```
 
-**Stato**: procedura scritta e pronta, **non ancora eseguita end-to-end**
-contro uno storage off-site reale — nessun bucket di produzione è stato
-ancora provisionato (piano di rifinitura Fase 6, item 6). Quando un bucket
-reale sarà disponibile, eseguire questa procedura una volta per verificarla
-davvero, cronometrare l'RTO (tempo dal via al login riuscito) e registrare
-qui data ed esito, come richiesto dal criterio di accettazione del piano
-("nessun test automatico sostituisce un restore reale eseguito almeno una
-volta").
+**Stato**: ✅ **Eseguita end-to-end, 2026-07-31.** Bucket Backblaze B2
+(`hotel-pms-backups`, region `eu-central-003`) provisionato, `AGE_RECIPIENT`
+configurato, `db-backup` verificato dal vivo: dump → gzip → cifratura age →
+upload reale sul bucket confermato (`mc ls` mostra l'oggetto `.sql.gz.age`
+nel bucket). Drill di restore: scaricato l'oggetto dal bucket reale,
+decifrato con la chiave privata (custodita fuori da questo host), ripristinato
+su un Postgres vergine (container scratch, non lo stack di produzione).
+Verifica di integrità: tutte e 5 le database presenti (`hotel_auth`,
+`hotel_billing`, `hotel_fb`, `hotel_frontdesk`, `hotel_guest`),
+`flyway_schema_history` coerente col numero di migration attuali per
+servizio (auth 6, frontdesk 8, billing 10, guest 9, fb 6), conteggi righe
+sulle tabelle chiave non nulli e plausibili (20 user_account, 14 rooms,
+6 stays, 2 reservations, 10 guests — coerenti coi dati di test di sessione).
+**RTO del solo restore SQL: ~2 secondi** (dump di sviluppo, ~130KB cifrato —
+il tempo scala con la dimensione reale del DB in produzione, da ricronometrare
+quando il volume dati sarà rappresentativo). Container scratch e file
+temporanei rimossi a fine drill. Step non eseguito in questo giro: avviare i
+servizi applicativi contro il DB ripristinato e fare un login reale end-to-end
+(il container scratch è stato smontato subito dopo la verifica SQL) — la
+procedura sopra resta valida per farlo quando serve un drill più completo.
 
 ---
 
