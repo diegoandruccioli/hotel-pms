@@ -26,7 +26,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(final MethodArgumentNotValidException ex) {
         final ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
-        problem.setType(Objects.requireNonNull(URI.create("https://hotelpms.local/problems/validation-error")));
+        problem.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/validation-error")));
         problem.setTitle("Validation Error");
         problem.setDetail(ex.getBindingResult().getFieldErrors().stream()
                 .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
@@ -44,7 +44,7 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleMailFailure(final IllegalStateException ex) {
         log.error("[NOTIFY] Email send failure: {}", ex.getMessage());
         final ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
-        problem.setType(Objects.requireNonNull(URI.create("https://hotelpms.local/problems/notification-failure")));
+        problem.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/notification-failure")));
         problem.setTitle("Notification Failure");
         problem.setDetail("Email could not be dispatched");
         return problem;
