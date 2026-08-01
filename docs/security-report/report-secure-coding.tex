@@ -5664,6 +5664,73 @@ richiede comunque autenticazione su qualunque path non esplicitamente permesso),
 ma corretto comunque per eliminare il rischio latente su futuri path esenti.
 Commit: \commitref{5d13a7d}{test(security): characterization tests}, \commitref{8607d7c}{fix(security): reconcile auth-service InternalAuthFilter onto the shared contract}, \commitref{9cec99f}{refactor(security): extract internal-auth-lib}, \commitref{59d5bf5}{fix(security): match excludedPathPrefixes on path-segment boundaries}
 
+\paragraph{T-FB-03 --- \texttt{@PreAuthorize} mai applicato su MenuItemController}
+\texttt{SecurityConfig} di fb-service mancava l'annotazione
+\texttt{@EnableMethodSecurity}: i tre \texttt{@PreAuthorize("hasAnyRole('ADMIN','OWNER')")}
+su \texttt{MenuItemController} (create/update/delete) non venivano mai valutati
+da Spring --- qualunque ruolo autenticato, incluso RECEPTIONIST, poteva creare,
+modificare o cancellare voci di menu. Il gap non è stato trovato da un pentest
+ma diffando le 5 copie di \texttt{SecurityConfig} prima di consolidarle
+(GAP-8 sotto): l'assenza dell'annotazione era invisibile leggendo il singolo
+file, evidente solo confrontandolo con gli altri 4 servizi --- lo stesso schema
+di scoperta di GAP-7. Il test unitario esistente
+(\texttt{MenuItemControllerTest}) non l'aveva mai intercettato perché usa
+\texttt{MockMvcBuilders.standaloneSetup()}, che non carica la security filter
+chain reale.
+Fix: \texttt{@EnableMethodSecurity} aggiunta a fb-service; applicata anche a
+guest-service (che non ha ancora nessun \texttt{@PreAuthorize}) come difesa in
+profondità, cosicché questa classe di bug non possa ripresentarsi
+silenziosamente in futuro. Nuovo \texttt{MenuItemControllerSecurityTest}
+(\texttt{@WebMvcTest} con la \texttt{SecurityConfig} reale importata, non uno
+standalone MockMvc) come regressione mirata.
+Commit: \commitref{bdce1e5}{fix(security): shared internal API security filter chain + missing RBAC enforcement}
+
+\paragraph{GAP-8 --- FeignHeaderConfig, SecurityConfig e GlobalExceptionHandler: stesso pattern di GAP-7}
+\texttt{FeignHeaderConfig} (4 copie, 107--125 righe) e \texttt{SecurityConfig}
+(5 copie, 75--79 righe) presentavano lo stesso rischio strutturale già
+osservato in GAP-7: duplicazione mantenuta identica per disciplina nel
+copia-incolla, non per un meccanismo che lo garantisse. Diffando le copie
+prima di consolidarle sono emersi due difetti reali, non solo differenze
+cosmetiche di javadoc: (1) T-FB-03 sopra; (2) né fb-service né billing-service
+gestivano \texttt{AccessDeniedException} nel proprio \texttt{GlobalExceptionHandler}
+--- un diniego \texttt{@PreAuthorize} (corretto: l'autorizzazione era comunque
+negata, non un bypass) cadeva nell'handler generico e tornava HTTP~500 anziché
+403, un contratto di risposta scorretto che billing-service aveva da quando
+\texttt{OwnerReportController} ha adottato \texttt{@PreAuthorize}, mai emerso
+perché il traffico reale non aveva mai esercitato il path di diniego in modo
+osservabile.
+
+Fix: \texttt{FeignHeaderConfig} estratto in
+\texttt{InternalFeignAuthInterceptor} (\texttt{internal-auth-lib}) --- l'unica
+divergenza comportamentale reale, il fallback di guest-service per il job
+batch GDPR che gira fuori da un contesto HTTP, è stata modellata come
+strategia (\texttt{FeignAuthFallbackProvider}) invece di un \texttt{if}
+duplicato in ogni copia. \texttt{SecurityConfig} estratto in
+\texttt{InternalApiSecurityFilterChainFactory}, stessa libreria. Handler
+\texttt{AccessDeniedException} aggiunto a fb-service e billing-service
+(pattern già presente in frontdesk-service).
+
+Nello stesso lavoro, anche le 6 copie di \texttt{GlobalExceptionHandler}: solo
+billing/fb/guest erano davvero identici (stesso host URI, stessa forma degli
+errori di validazione) e sono stati consolidati in
+\texttt{AbstractProblemDetailAdvice} (nuovo modulo \texttt{common-web-lib}).
+auth-service e frontdesk-service usano una forma diversa per gli errori di
+validazione (mappa campo→messaggio, non lista) e frontdesk-service genera un
+\texttt{traceId} di correlazione che gli altri non hanno --- forzarli nella
+stessa base avrebbe significato perdere il traceId o cambiare silenziosamente
+il contratto di risposta, quindi sono rimasti separati. Trovati invece cinque
+host URI diversi per il campo \texttt{type} RFC~7807
+(\texttt{hotel-pms.com}, \texttt{hotelpms.com}, \texttt{api.hotelpms.com},
+\texttt{hotelpms.local/problems}) --- nessuno è un dominio registrato
+(progetto pre-lancio, vedi \texttt{backup/DECISIONS.md}), nessun frontend o
+test e2e dipende dal valore esatto: normalizzati tutti su
+\texttt{https://hotel-pms.com/errors/}.
+
+Verificato con build completa (\texttt{./gradlew clean build}, 193 task, zero
+warning PMD/checkstyle/SpotBugs) più i test di regressione esistenti su
+ciascun servizio toccato.
+Commit: \commitref{79cd3b1}{refactor(security): single HMAC Feign header config in internal-auth-lib}, \commitref{bdce1e5}{fix(security): shared internal API security filter chain + missing RBAC enforcement}, \commitref{54575ec}{refactor: shared RFC 7807 problem detail advice, normalize error-type host}
+
 \paragraph{T-GW-06 --- Propagazione X-Auth-Hotel end-to-end}
 Aggiunto campo \texttt{hotelId} a \texttt{UserAccount} e claim JWT corrispondente.
 L'API Gateway inietta \texttt{X-Auth-Hotel} su ogni richiesta a valle.
