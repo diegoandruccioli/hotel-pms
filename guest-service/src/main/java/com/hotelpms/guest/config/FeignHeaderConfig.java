@@ -1,38 +1,28 @@
 package com.hotelpms.guest.config;
 
+import com.hotelpms.internalauth.feign.FeignAuthContext;
+import com.hotelpms.internalauth.feign.InternalFeignAuthInterceptor;
 import feign.RequestInterceptor;
-import feign.RequestTemplate;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.StringUtils;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.util.Optional;
 
 /**
- * Feign configuration that propagates gateway authentication headers
- * (X-Auth-User, X-Auth-Role, X-Auth-Hotel) from the current inbound HTTP
- * request to all outgoing Feign calls, and recomputes the HMAC-SHA256
- * internal signature so that downstream service {@code InternalAuthFilter}
- * instances accept the call (T-GW-07 / T-GST-05).
+ * Feign configuration that signs outgoing calls with the internal HMAC
+ * signature so that downstream service {@code InternalAuthFilter} instances
+ * accept them (T-GW-07 / T-GST-05). See {@link InternalFeignAuthInterceptor}
+ * for the shared signing logic.
  *
- * <p>Each outgoing call gets a freshly computed timestamp + nonce (T-GW-08):
- * this service acts as its own signer for calls it originates, rather than
- * forwarding the inbound gateway signature, which avoids reusing a nonce
- * that may already have been claimed when this service's own InternalAuthFilter
- * validated the inbound request.
+ * <p>Unlike the other services, guest-service also originates calls from the
+ * GDPR retention batch job (T-GST-05), which runs outside an HTTP request
+ * context and therefore has no inbound gateway headers to forward. The
+ * fallback below sources the auth context from {@link BatchJobContext}
+ * instead.
  */
 @Configuration
 public class FeignHeaderConfig {
-
-    private static final String HEADER_USER = "X-Auth-User";
-    private static final String HEADER_ROLE = "X-Auth-Role";
-    private static final String HEADER_HOTEL = "X-Auth-Hotel";
-    private static final String HEADER_SIGNATURE = "X-Internal-Signature";
-    private static final String HEADER_TIMESTAMP = "X-Auth-Timestamp";
-    private static final String HEADER_NONCE = "X-Auth-Nonce";
-    private static final String HMAC_ALGORITHM = "HmacSHA256";
 
     private final String hmacSecret;
 
@@ -46,80 +36,21 @@ public class FeignHeaderConfig {
     }
 
     /**
-     * Registers a {@link RequestInterceptor} that extracts the gateway auth
-     * headers from the current servlet request context and forwards them on
-     * every outgoing Feign call, together with a freshly computed HMAC signature.
+     * Registers the shared {@link InternalFeignAuthInterceptor} with a
+     * fallback that sources the auth context from {@link BatchJobContext}
+     * when no inbound request context is bound to the current thread.
      *
      * @return the configured interceptor
      */
     @Bean
     public RequestInterceptor authHeaderInterceptor() {
-        return (final RequestTemplate template) -> {
-            final ServletRequestAttributes attrs = (ServletRequestAttributes)
-                    RequestContextHolder.getRequestAttributes();
-            if (attrs != null) {
-                final HttpServletRequest request = attrs.getRequest();
-                final String user = request.getHeader(HEADER_USER);
-                final String role = request.getHeader(HEADER_ROLE);
-                final String hotel = request.getHeader(HEADER_HOTEL);
-                if (StringUtils.hasText(user) && StringUtils.hasText(role)
-                        && StringUtils.hasText(hotel)) {
-                    final String timestamp = String.valueOf(System.currentTimeMillis());
-                    final String nonce = java.util.UUID.randomUUID().toString();
-                    template.header(HEADER_USER, user);
-                    template.header(HEADER_ROLE, role);
-                    template.header(HEADER_HOTEL, hotel);
-                    template.header(HEADER_TIMESTAMP, timestamp);
-                    template.header(HEADER_NONCE, nonce);
-                    template.header(HEADER_SIGNATURE, computeHmac(user, role, hotel, timestamp, nonce));
-                }
-            } else {
-                final BatchJobContext batchCtx = BatchJobContext.get();
-                if (batchCtx != null) {
-                    final String timestamp = String.valueOf(System.currentTimeMillis());
-                    final String nonce = java.util.UUID.randomUUID().toString();
-                    template.header(HEADER_USER, batchCtx.getUser());
-                    template.header(HEADER_ROLE, batchCtx.getRole());
-                    template.header(HEADER_HOTEL, batchCtx.getHotelId());
-                    template.header(HEADER_TIMESTAMP, timestamp);
-                    template.header(HEADER_NONCE, nonce);
-                    template.header(HEADER_SIGNATURE,
-                            computeHmac(batchCtx.getUser(), batchCtx.getRole(),
-                                    batchCtx.getHotelId(), timestamp, nonce));
-                }
-            }
-        };
+        return new InternalFeignAuthInterceptor(hmacSecret, FeignHeaderConfig::resolveBatchJobFallback);
     }
 
-    /**
-     * Computes the HMAC-SHA256 signature for the given username, role, hotelId,
-     * timestamp and nonce. Must match the payload format used by
-     * {@code InternalAuthFilter} in every downstream service:
-     * {@code "username:role:hotelId:timestamp:nonce"} (T-GW-08).
-     *
-     * @param username  the authenticated username
-     * @param role      the role associated with the user
-     * @param hotelId   the hotel UUID associated with the user
-     * @param timestamp the epoch-millis timestamp generated for this call
-     * @param nonce     the random nonce generated for this call
-     * @return hex-encoded HMAC digest
-     */
-    private String computeHmac(final String username, final String role, final String hotelId,
-            final String timestamp, final String nonce) {
-        try {
-            final javax.crypto.Mac mac = javax.crypto.Mac.getInstance(HMAC_ALGORITHM);
-            final javax.crypto.spec.SecretKeySpec keySpec =
-                    new javax.crypto.spec.SecretKeySpec(
-                            hmacSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-                            HMAC_ALGORITHM);
-            mac.init(keySpec);
-            final byte[] digest = mac.doFinal(
-                    (username + ":" + role + ":" + hotelId + ":" + timestamp + ":" + nonce)
-                            .getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(digest);
-        } catch (final java.security.NoSuchAlgorithmException
-                       | java.security.InvalidKeyException e) {
-            throw new IllegalStateException("FEIGN_HMAC_SIGNATURE_FAILED", e);
-        }
+    private static Optional<FeignAuthContext> resolveBatchJobFallback() {
+        final BatchJobContext ctx = BatchJobContext.get();
+        return ctx == null
+                ? Optional.empty()
+                : Optional.of(new FeignAuthContext(ctx.getUser(), ctx.getRole(), ctx.getHotelId()));
     }
 }

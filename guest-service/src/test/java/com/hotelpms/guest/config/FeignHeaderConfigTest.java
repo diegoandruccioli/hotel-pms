@@ -3,9 +3,7 @@ package com.hotelpms.guest.config;
 import feign.RequestTemplate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -19,9 +17,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit tests for {@link FeignHeaderConfig}.
  *
- * <p>Verifies the outgoing Feign signature includes the T-GW-08 anti-replay
- * fields (timestamp + nonce) on both the request-context path and the
- * {@link BatchJobContext} fallback path used by scheduled jobs.
+ * <p>The signing logic itself (headers, HMAC, timestamp/nonce, empty-fallback
+ * behavior) is covered once by
+ * {@code com.hotelpms.internalauth.feign.InternalFeignAuthInterceptorTest} in
+ * internal-auth-lib. This class only verifies guest-service's own wiring: that
+ * outgoing calls made outside an HTTP request context (the GDPR retention
+ * batch job, T-GST-05) are signed using {@link BatchJobContext}.
  */
 class FeignHeaderConfigTest {
 
@@ -32,8 +33,6 @@ class FeignHeaderConfigTest {
     private static final String HEADER_TIMESTAMP = "X-Auth-Timestamp";
     private static final String HEADER_NONCE = "X-Auth-Nonce";
 
-    private static final String USER = "recept1";
-    private static final String ROLE = "RECEPTIONIST";
     private static final String HOTEL_ID = "00000000-0000-0000-0000-000000000001";
 
     private final FeignHeaderConfig config = new FeignHeaderConfig(hmacSecret());
@@ -58,20 +57,6 @@ class FeignHeaderConfigTest {
         BatchJobContext.clear();
     }
 
-    private static void setInboundHeaders(final String user, final String role, final String hotelId) {
-        final MockHttpServletRequest request = new MockHttpServletRequest();
-        if (user != null) {
-            request.addHeader(HEADER_USER, user);
-        }
-        if (role != null) {
-            request.addHeader(HEADER_ROLE, role);
-        }
-        if (hotelId != null) {
-            request.addHeader(HEADER_HOTEL, hotelId);
-        }
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-    }
-
     private static String computeHmac(final String username, final String role, final String hotelId,
             final String timestamp, final String nonce) throws NoSuchAlgorithmException, InvalidKeyException {
         final Mac mac = Mac.getInstance("HmacSHA256");
@@ -80,61 +65,6 @@ class FeignHeaderConfigTest {
                 (username + ":" + role + ":" + hotelId + ":" + timestamp + ":" + nonce)
                         .getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(digest);
-    }
-
-    @Test
-    void shouldSignOutgoingCallWithTimestampAndNonceWhenRequestContextPresent()
-            throws NoSuchAlgorithmException, InvalidKeyException {
-        setInboundHeaders(USER, ROLE, HOTEL_ID);
-
-        final RequestTemplate template = new RequestTemplate();
-        config.authHeaderInterceptor().apply(template);
-
-        final String timestamp = template.headers().get(HEADER_TIMESTAMP).iterator().next();
-        final String nonce = template.headers().get(HEADER_NONCE).iterator().next();
-        final String signature = template.headers().get(HEADER_SIGNATURE).iterator().next();
-
-        assertThat(template.headers().get(HEADER_USER)).containsExactly(USER);
-        assertThat(template.headers().get(HEADER_ROLE)).containsExactly(ROLE);
-        assertThat(template.headers().get(HEADER_HOTEL)).containsExactly(HOTEL_ID);
-        assertThat(timestamp).isNotBlank();
-        assertThat(nonce).isNotBlank();
-        assertThat(signature).isEqualTo(computeHmac(USER, ROLE, HOTEL_ID, timestamp, nonce));
-    }
-
-    @Test
-    void shouldGenerateDifferentNonceOnEachCall() {
-        setInboundHeaders(USER, ROLE, HOTEL_ID);
-
-        final RequestTemplate templateA = new RequestTemplate();
-        config.authHeaderInterceptor().apply(templateA);
-        final RequestTemplate templateB = new RequestTemplate();
-        config.authHeaderInterceptor().apply(templateB);
-
-        final String nonceA = templateA.headers().get(HEADER_NONCE).iterator().next();
-        final String nonceB = templateB.headers().get(HEADER_NONCE).iterator().next();
-
-        assertThat(nonceA).isNotEqualTo(nonceB);
-    }
-
-    @Test
-    void shouldNotSetHeadersWhenNoRequestContextAndNoBatchJobContext() {
-        RequestContextHolder.resetRequestAttributes();
-
-        final RequestTemplate template = new RequestTemplate();
-        config.authHeaderInterceptor().apply(template);
-
-        assertThat(template.headers()).isEmpty();
-    }
-
-    @Test
-    void shouldNotSetHeadersWhenHotelIdMissingFromInboundRequest() {
-        setInboundHeaders(USER, ROLE, null);
-
-        final RequestTemplate template = new RequestTemplate();
-        config.authHeaderInterceptor().apply(template);
-
-        assertThat(template.headers()).isEmpty();
     }
 
     @Test
@@ -156,5 +86,16 @@ class FeignHeaderConfigTest {
         assertThat(template.headers().get(HEADER_HOTEL)).containsExactly(HOTEL_ID);
         assertThat(signature)
                 .isEqualTo(computeHmac(batchCtx.getUser(), batchCtx.getRole(), HOTEL_ID, timestamp, nonce));
+    }
+
+    @Test
+    void shouldNotSetHeadersWhenNeitherRequestContextNorBatchJobContextPresent() {
+        RequestContextHolder.resetRequestAttributes();
+        BatchJobContext.clear();
+
+        final RequestTemplate template = new RequestTemplate();
+        config.authHeaderInterceptor().apply(template);
+
+        assertThat(template.headers()).isEmpty();
     }
 }

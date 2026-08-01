@@ -1,4 +1,4 @@
-package com.hotelpms.fb.config;
+package com.hotelpms.internalauth.feign;
 
 import feign.RequestTemplate;
 import org.junit.jupiter.api.AfterEach;
@@ -13,17 +13,19 @@ import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Unit tests for {@link FeignHeaderConfig}.
+ * Unit tests for {@link InternalFeignAuthInterceptor}.
  *
  * <p>Verifies the outgoing Feign signature includes the T-GW-08 anti-replay
- * fields (timestamp + nonce) so calls to other services are accepted by
- * their {@code InternalAuthFilter}.
+ * fields (timestamp + nonce) on both the request-context path and the
+ * {@link FeignAuthFallbackProvider} path used by callers outside an HTTP
+ * request (e.g. scheduled batch jobs).
  */
-class FeignHeaderConfigTest {
+class InternalFeignAuthInterceptorTest {
 
     private static final String HEADER_USER = "X-Auth-User";
     private static final String HEADER_ROLE = "X-Auth-Role";
@@ -36,11 +38,9 @@ class FeignHeaderConfigTest {
     private static final String ROLE = "RECEPTIONIST";
     private static final String HOTEL_ID = "00000000-0000-0000-0000-000000000001";
 
-    private final FeignHeaderConfig config = new FeignHeaderConfig(hmacSecret());
-
     /**
-     * Returns the shared HMAC material used to construct the config under test
-     * and to compute expected signatures in helper methods.
+     * Returns the shared HMAC material used to construct the interceptor under
+     * test and to compute expected signatures in helper methods.
      *
      * <p>Returning the value from a method rather than storing it in a named
      * field prevents static-analysis rules that flag field names matching
@@ -49,7 +49,7 @@ class FeignHeaderConfigTest {
      * @return fixed HMAC material string for unit tests
      */
     private static String hmacSecret() {
-        return "unit-test-feign-header-config-fb-service";
+        return "unit-test-internal-feign-auth-interceptor";
     }
 
     @AfterEach
@@ -85,9 +85,11 @@ class FeignHeaderConfigTest {
     void shouldSignOutgoingCallWithTimestampAndNonceWhenRequestContextPresent()
             throws NoSuchAlgorithmException, InvalidKeyException {
         setInboundHeaders(USER, ROLE, HOTEL_ID);
+        final InternalFeignAuthInterceptor interceptor =
+                new InternalFeignAuthInterceptor(hmacSecret(), Optional::empty);
 
         final RequestTemplate template = new RequestTemplate();
-        config.authHeaderInterceptor().apply(template);
+        interceptor.apply(template);
 
         final String timestamp = template.headers().get(HEADER_TIMESTAMP).iterator().next();
         final String nonce = template.headers().get(HEADER_NONCE).iterator().next();
@@ -104,11 +106,13 @@ class FeignHeaderConfigTest {
     @Test
     void shouldGenerateDifferentNonceOnEachCall() {
         setInboundHeaders(USER, ROLE, HOTEL_ID);
+        final InternalFeignAuthInterceptor interceptor =
+                new InternalFeignAuthInterceptor(hmacSecret(), Optional::empty);
 
         final RequestTemplate templateA = new RequestTemplate();
-        config.authHeaderInterceptor().apply(templateA);
+        interceptor.apply(templateA);
         final RequestTemplate templateB = new RequestTemplate();
-        config.authHeaderInterceptor().apply(templateB);
+        interceptor.apply(templateB);
 
         final String nonceA = templateA.headers().get(HEADER_NONCE).iterator().next();
         final String nonceB = templateB.headers().get(HEADER_NONCE).iterator().next();
@@ -117,11 +121,13 @@ class FeignHeaderConfigTest {
     }
 
     @Test
-    void shouldNotSetHeadersWhenNoRequestContext() {
+    void shouldNotSetHeadersWhenNoRequestContextAndFallbackEmpty() {
         RequestContextHolder.resetRequestAttributes();
+        final InternalFeignAuthInterceptor interceptor =
+                new InternalFeignAuthInterceptor(hmacSecret(), Optional::empty);
 
         final RequestTemplate template = new RequestTemplate();
-        config.authHeaderInterceptor().apply(template);
+        interceptor.apply(template);
 
         assertThat(template.headers()).isEmpty();
     }
@@ -129,10 +135,34 @@ class FeignHeaderConfigTest {
     @Test
     void shouldNotSetHeadersWhenHotelIdMissingFromInboundRequest() {
         setInboundHeaders(USER, ROLE, null);
+        final InternalFeignAuthInterceptor interceptor =
+                new InternalFeignAuthInterceptor(hmacSecret(), Optional::empty);
 
         final RequestTemplate template = new RequestTemplate();
-        config.authHeaderInterceptor().apply(template);
+        interceptor.apply(template);
 
         assertThat(template.headers()).isEmpty();
+    }
+
+    @Test
+    void shouldSignOutgoingCallUsingFallbackProviderWhenNoRequestContext()
+            throws NoSuchAlgorithmException, InvalidKeyException {
+        RequestContextHolder.resetRequestAttributes();
+        final FeignAuthContext fallbackContext = new FeignAuthContext("gdpr-retention-job", "ADMIN", HOTEL_ID);
+        final InternalFeignAuthInterceptor interceptor =
+                new InternalFeignAuthInterceptor(hmacSecret(), () -> Optional.of(fallbackContext));
+
+        final RequestTemplate template = new RequestTemplate();
+        interceptor.apply(template);
+
+        final String timestamp = template.headers().get(HEADER_TIMESTAMP).iterator().next();
+        final String nonce = template.headers().get(HEADER_NONCE).iterator().next();
+        final String signature = template.headers().get(HEADER_SIGNATURE).iterator().next();
+
+        assertThat(template.headers().get(HEADER_USER)).containsExactly(fallbackContext.user());
+        assertThat(template.headers().get(HEADER_ROLE)).containsExactly(fallbackContext.role());
+        assertThat(template.headers().get(HEADER_HOTEL)).containsExactly(HOTEL_ID);
+        assertThat(signature).isEqualTo(
+                computeHmac(fallbackContext.user(), fallbackContext.role(), HOTEL_ID, timestamp, nonce));
     }
 }
