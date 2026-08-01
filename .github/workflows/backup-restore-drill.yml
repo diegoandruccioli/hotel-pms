@@ -1,0 +1,98 @@
+name: Backup Restore Drill (off-site)
+
+# Weekly proof that repo2 (Backblaze B2, off-site) is independently
+# restorable — not just that WAL/backups were uploaded. Runs on a fresh
+# GitHub-hosted runner, never on the production host: the private
+# PGBACKREST_CIPHER_PASS only ever needs to exist here and on the postgres
+# container itself, never checked into the repo. See backup/DECISIONS.md §3.5b.
+on:
+  schedule:
+    - cron: "0 4 * * 1" # every Monday 04:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  restore-drill:
+    name: "Restore latest off-site backup and verify"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+
+    steps:
+      - name: Install pgBackRest + PostgreSQL 15
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pgbackrest postgresql-15
+
+      - name: Write pgBackRest config (repo2 only — this drill only proves off-site)
+        env:
+          PGBACKREST_CIPHER_PASS: ${{ secrets.PGBACKREST_CIPHER_PASS }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+        run: |
+          sudo mkdir -p /etc/pgbackrest
+          {
+            echo "[global]"
+            echo "repo1-type=s3"
+            echo "repo1-s3-endpoint=${S3_ENDPOINT#https://}"
+            echo "repo1-s3-bucket=${S3_BUCKET}"
+            echo "repo1-s3-key=${S3_ACCESS_KEY_ID}"
+            echo "repo1-s3-key-secret=${S3_SECRET_ACCESS_KEY}"
+            echo "repo1-s3-region=${S3_REGION}"
+            echo "repo1-path=/hotel-pms"
+            echo "repo1-cipher-type=aes-256-cbc"
+            echo "repo1-cipher-pass=${PGBACKREST_CIPHER_PASS}"
+            echo "repo1-bundle=y"
+            echo "repo1-block=y"
+            echo ""
+            echo "[hotel-pms]"
+            echo "pg1-path=${{ runner.temp }}/restore"
+          } | sudo tee /etc/pgbackrest/pgbackrest.conf >/dev/null
+          # Note: this runner's pgbackrest.conf calls the off-site bucket
+          # "repo1" (it's the only repo this job knows about) — it is the
+          # same bucket the production postgres container calls "repo2".
+
+      - name: Show what's actually in the off-site repo before restoring
+        run: |
+          pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --stanza=hotel-pms info
+
+      - name: Restore latest backup from off-site into a scratch directory
+        run: |
+          mkdir -p "${{ runner.temp }}/restore"
+          pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --stanza=hotel-pms \
+            --pg1-path="${{ runner.temp }}/restore" \
+            --target-action=promote \
+            restore
+
+      - name: Start restored data directory as a standalone Postgres instance
+        run: |
+          sudo chown -R postgres:postgres "${{ runner.temp }}/restore"
+          sudo chmod 0700 "${{ runner.temp }}/restore"
+          sudo -u postgres /usr/lib/postgresql/15/bin/pg_ctl -D "${{ runner.temp }}/restore" \
+            -o "-p 5433 -c unix_socket_directories=/tmp" -w -t 120 start
+
+      - name: Verify each database is queryable and has a non-empty migration history
+        run: |
+          fail=0
+          for db in hotel_auth hotel_frontdesk hotel_guest hotel_billing hotel_fb; do
+            count=$(sudo -u postgres psql -h /tmp -p 5433 -d "$db" -t -A \
+              -c "SELECT count(*) FROM flyway_schema_history;" 2>&1) || {
+                echo "::error::$db is not queryable after restore: $count"
+                fail=1
+                continue
+              }
+            if [[ "$count" -lt 1 ]]; then
+              echo "::error::$db has zero flyway_schema_history rows after restore — restore is not trustworthy"
+              fail=1
+            else
+              echo "$db: $count migrations applied — OK"
+            fi
+          done
+          exit "$fail"
+
+      - name: Stop the restored instance
+        if: always()
+        run: sudo -u postgres /usr/lib/postgresql/15/bin/pg_ctl -D "${{ runner.temp }}/restore" -m fast stop || true
