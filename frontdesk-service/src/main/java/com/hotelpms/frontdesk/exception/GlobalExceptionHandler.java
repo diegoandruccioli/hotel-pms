@@ -36,7 +36,7 @@ public class GlobalExceptionHandler {
 
     private static final String TIMESTAMP_PROPERTY = "timestamp";
     private static final String TRACE_ID_PROPERTY = "traceId";
-    private static final String ERRORS_BASE_URI = "https://hotelpms.com/errors/";
+    private static final String ERRORS_BASE_URI = "https://hotel-pms.com/errors/";
     private static final String TITLE_BAD_REQUEST = "Bad Request";
     private static final String SLUG_CONFLICT = "conflict";
     private static final String SLUG_BAD_REQUEST = "bad-request";

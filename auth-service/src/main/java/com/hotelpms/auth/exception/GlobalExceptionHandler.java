@@ -33,7 +33,7 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleAccountLockedException(final AccountLockedException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
         problemDetail.setTitle("Account Temporarily Locked");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/too-many-requests")));
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/too-many-requests")));
         problemDetail.setProperty(TIMESTAMP, Instant.now());
         return problemDetail;
     }
@@ -48,7 +48,7 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleBadCredentialsException(final BadCredentialsException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
         problemDetail.setTitle("Authentication Failed");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/unauthorized")));
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/unauthorized")));
         problemDetail.setProperty(TIMESTAMP, Instant.now());
         return problemDetail;
     }
@@ -63,7 +63,7 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleDuplicateResourceException(final DuplicateResourceException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problemDetail.setTitle("Resource Conflict");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/conflict")));
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/conflict")));
         problemDetail.setProperty(TIMESTAMP, Instant.now());
         return problemDetail;
     }
@@ -79,7 +79,7 @@ public class GlobalExceptionHandler {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
                 "VALIDATION_FAILED");
         problemDetail.setTitle("Bad Request");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/bad-request")));
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/bad-request")));
         problemDetail.setProperty(TIMESTAMP, Instant.now());
 
         final Map<String, String> errors = new HashMap<>();
@@ -101,7 +101,7 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleNotFoundException(final NotFoundException ex) {
         final ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         detail.setTitle("Not Found");
-        detail.setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/not-found")));
+        detail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/not-found")));
         detail.setProperty(TIMESTAMP, Instant.now());
         return detail;
     }
@@ -116,7 +116,7 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleIllegalStateException(final IllegalStateException ex) {
         final ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         detail.setTitle("Conflict");
-        detail.setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/conflict")));
+        detail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/conflict")));
         detail.setProperty(TIMESTAMP, Instant.now());
         return detail;
     }
@@ -132,7 +132,7 @@ public class GlobalExceptionHandler {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
                 "INVALID_JSON_PAYLOAD");
         problemDetail.setTitle("Bad Request");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/bad-request")));
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/bad-request")));
         problemDetail.setProperty(TIMESTAMP, Instant.now());
         return problemDetail;
     }
@@ -150,7 +150,7 @@ public class GlobalExceptionHandler {
                 "INTERNAL_SERVER_ERROR");
         problemDetail.setTitle("Internal Server Error");
         problemDetail
-                .setType(Objects.requireNonNull(URI.create("https://api.hotelpms.com/errors/internal-server-error")));
+                .setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/internal-server-error")));
         problemDetail.setProperty(TIMESTAMP, Instant.now());
         return problemDetail;
     }

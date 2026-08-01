@@ -39,6 +39,7 @@ ext {
 
 dependencies {
     implementation(project(":internal-auth-lib"))
+    implementation(project(":common-web-lib"))
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
