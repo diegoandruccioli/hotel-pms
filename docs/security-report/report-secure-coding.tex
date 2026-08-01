@@ -5731,6 +5731,83 @@ warning PMD/checkstyle/SpotBugs) più i test di regressione esistenti su
 ciascun servizio toccato.
 Commit: \commitref{79cd3b1}{refactor(security): single HMAC Feign header config in internal-auth-lib}, \commitref{bdce1e5}{fix(security): shared internal API security filter chain + missing RBAC enforcement}, \commitref{54575ec}{refactor: shared RFC 7807 problem detail advice, normalize error-type host}
 
+\paragraph{T-OPS-01 --- RPO fisso a 24h: da dump pianificato a WAL archiving continuo}
+Il meccanismo di backup originale (\texttt{docker/db-backup/}, \texttt{pg\_dumpall}
+giornaliero, gzip, cifratura \texttt{age}, upload via \texttt{mc}) aveva un RPO
+fisso di 24h: un disastro poco prima del prossimo dump pianificato perdeva
+fino a un'intera giornata di lavoro. Una decisione precedente
+(\texttt{backup/DECISIONS.md~\S3.5}, 2026-07-30) aveva accettato
+esplicitamente questo RPO, rifiutando PITR/WAL archiving per complessità
+non giustificata dal profilo di rischio del prodotto. La decisione è stata
+riaperta e ribaltata il 2026-08-01 su richiesta diretta dell'utente ---
+non da uno dei quattro criteri di revisione originariamente documentati,
+ma dal ragionamento sul caso peggiore: un dump a mezzanotte con una
+perdita dati poco prima significa perdere quasi un giorno di lavoro.
+
+Fix: sostituito interamente \texttt{docker/db-backup/} con
+\textbf{pgBackRest}, integrato nel container \texttt{postgres} stesso
+(\texttt{docker/postgres/}) --- l'\texttt{archive\_command} deve girare
+come sottoprocesso del motore Postgres, non in un container satellite.
+WAL archiving continuo (\texttt{archive\_timeout=120s}, RPO in minuti,
+non più 24h) più backup full settimanali/incrementali giornalieri su due
+repository pgBackRest indipendenti: \texttt{repo1} locale e \texttt{repo2}
+off-site (Backblaze B2, stesso bucket già provisionato).
+
+Bug trovato e corretto durante la verifica dal vivo, non ipotetico:
+\texttt{pgbackrest backup} opera su un repository per invocazione
+(default \texttt{repo1} se \texttt{--repo} non specificato), a differenza
+di \texttt{archive-push} che scrive automaticamente su tutti i repository
+configurati. La prima versione di \texttt{backup-scheduler.sh} non
+specificava mai \texttt{--repo}: il WAL raggiungeva correttamente
+entrambi i repository, ma i backup full/incrementali finivano solo su
+\texttt{repo1} --- \texttt{repo2} aveva WAL continuo ma zero backup
+validi (\texttt{pgbackrest info} riportava esplicitamente
+\texttt{repo2: error (no valid backups)}). Fix: lo scheduler itera ora
+esplicitamente su ogni repository configurato.
+
+\textbf{Drill PITR reale eseguito e verificato}, non solo scritto: creata
+una tabella marker, inserita una riga, forzato uno switch WAL
+(\texttt{pg\_switch\_wal()}), eseguito
+\texttt{pgbackrest restore --type=time --target=<timestamp prima
+dell'insert>} in una directory scratch separata dallo stack live, avviata
+come istanza Postgres temporanea su una porta alternativa. La riga
+marker risulta assente nel restore, la tabella (creata prima del target)
+è presente, \texttt{flyway\_schema\_history} è coerente. Il log di
+pgBackRest conferma esplicitamente:
+\emph{"recovery stopping before commit of transaction ..., time
+2026-08-01 18:48:18"} --- esattamente la transazione dell'insert,
+fermata prima del commit. Verifica visiva sul bucket B2 reale
+(\texttt{secure.backblaze.com}) richiede il login dell'utente al proprio
+account --- non eseguibile da un agente automatico senza le sue
+credenziali, lasciata come passo manuale esplicito.
+
+Nuovo workflow \texttt{.github/workflows/backup-restore-drill.yml}: drill
+off-site settimanale (+ \texttt{workflow\_dispatch}) su un runner GitHub
+effimero, non ancora eseguito dal vivo --- richiede prima la
+configurazione dei secret CI.
+Commit: \commitref{48828ad}{feat(backup): continuous WAL archiving + PITR via pgBackRest, replaces daily dump}, \commitref{663a0bf}{fix: include docker-compose.yml and remaining backup-hardening changes}
+
+\paragraph{T-OPS-02 --- Cambio del modello di cifratura backup: da asimmetrico a simmetrico}
+Il WAL archiving continuo di T-OPS-01 richiede che pgBackRest scriva WAL
+cifrato in tempo reale, il che richiede la passphrase di cifratura
+presente sullo stesso host che fa girare Postgres. pgBackRest cifra con
+una passphrase \textbf{simmetrica} (\texttt{PGBACKREST\_CIPHER\_PASS},
+\texttt{repo-cipher-pass}), non con una coppia di chiavi asimmetriche
+come lo schema \texttt{age} precedente. La proprietà che aveva lo schema
+\texttt{age} --- solo la chiave pubblica sull'host di produzione, la
+privata mai --- \textbf{non è replicabile} con questo strumento: se
+l'host di produzione viene compromesso, chi lo compromette ha anche la
+chiave per decifrare i backup passati e futuri.
+
+Questo non è un rischio scoperto per caso ma un trade-off dichiarato
+esplicitamente all'utente \emph{prima} dell'implementazione, in cambio
+di: WAL archiving continuo (T-OPS-01), verify/restore-check integrati in
+pgBackRest, meno codice infrastrutturale hand-rolled da mantenere
+(strumento maturo e mantenuto invece di script bash a mano, coerente con
+\texttt{ADR-002}). Documentato per iscritto in
+\texttt{backup/DECISIONS.md~\S3.5b} prima di procedere, non dopo.
+Commit: \commitref{48828ad}{feat(backup): continuous WAL archiving + PITR via pgBackRest, replaces daily dump}
+
 \paragraph{T-GW-06 --- Propagazione X-Auth-Hotel end-to-end}
 Aggiunto campo \texttt{hotelId} a \texttt{UserAccount} e claim JWT corrispondente.
 L'API Gateway inietta \texttt{X-Auth-Hotel} su ogni richiesta a valle.
