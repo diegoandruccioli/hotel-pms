@@ -1,5 +1,6 @@
 package com.hotelpms.notification.security;
 
+import com.hotelpms.internalauth.security.InternalApiSecurityFilterChainFactory;
 import com.hotelpms.internalauth.security.InternalAuthFilter;
 import com.hotelpms.internalauth.security.NonceStore;
 import com.hotelpms.internalauth.security.RedisNonceStore;
@@ -10,17 +11,17 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import java.util.List;
 
 /**
  * Security configuration for notification-service.
  *
- * <p>All requests except actuator endpoints require a valid HMAC internal signature
- * (T-GW-08). Sessions are stateless; CSRF is disabled (API-only, no browser sessions).
+ * <p>All requests except actuator endpoints require a valid HMAC internal
+ * signature (T-GW-08). Sessions are stateless; CSRF is disabled (API-only,
+ * no browser sessions). See {@link InternalApiSecurityFilterChainFactory} for
+ * the shared filter chain logic.
  */
 @Configuration
 @EnableWebSecurity
@@ -63,14 +64,6 @@ public class SecurityConfig {
     @SuppressWarnings({"PMD.SignatureDeclareThrowsException", "null"})
     public SecurityFilterChain securityFilterChain(final HttpSecurity http, final NonceStore nonceStore)
             throws Exception {
-        http
-                .csrf(org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/**", "/actuator/health").permitAll()
-                        .anyRequest().authenticated())
-                .addFilterBefore(new InternalAuthFilter(hmacSecret, nonceStore, HMAC_EXEMPT_PATH_PREFIXES),
-                        UsernamePasswordAuthenticationFilter.class);
-        return http.build();
+        return InternalApiSecurityFilterChainFactory.build(http, hmacSecret, nonceStore, HMAC_EXEMPT_PATH_PREFIXES);
     }
 }

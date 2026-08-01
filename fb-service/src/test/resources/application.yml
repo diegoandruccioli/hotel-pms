@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: fb-service
+  config:
+    import: "optional:configserver:"
+  cloud:
+    config:
+      enabled: false
+
+internal:
+  hmac:
+    secret: test-hmac-secret-minimum-32-characters-for-unit-tests
+
+application:
+  config:
+    # Not called in @WebMvcTest slices (no live Feign calls) — only resolved so
+    # FeignClientsRegistrar can build the client beans without a real URISyntaxException.
+    frontdesk-service-url: http://frontdesk-service:8081
+    billing-service-url: http://billing-service:8085

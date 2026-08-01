@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.lang.NonNull;
@@ -144,6 +145,23 @@ public class GlobalExceptionHandler {
                 "INVALID_JSON_PAYLOAD");
         problemDetail.setTitle("Request Validation Error");
         problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/bad-request")));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
+
+    /**
+     * Handles AccessDeniedException thrown by {@code @PreAuthorize} when the
+     * caller's role is not in the allowed set. Must be explicit so the catch-all
+     * handler below does not swallow it and return 500 instead of 403.
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 403 status
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDeniedException(final AccessDeniedException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "ACCESS_DENIED");
+        problemDetail.setTitle("Forbidden");
+        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/access-denied")));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }

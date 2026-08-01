@@ -47,6 +47,7 @@ dependencies {
     api("org.springframework:spring-web")
     api("org.springframework.security:spring-security-web")
     api("org.springframework.security:spring-security-core")
+    api("org.springframework.security:spring-security-config")
     api("io.github.openfeign:feign-core")
     implementation("org.springframework.data:spring-data-redis")
     implementation("org.slf4j:slf4j-api")
