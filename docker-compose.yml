@@ -10,14 +10,20 @@
 # ============================================================
 #
 # Dev profiles: loki/grafana/zipkin/alertmanager/prometheus (profile
-# "observability") and db-backup (profile "backup") are opt-in — a plain
-# `docker compose up -d` now starts only the 11 core services (domain
-# services + postgres/redis/config-server/frontend), for faster iterative
-# dev (rebuild/restart a single service without relaunching the full stack).
-# Add them back with:
-#   docker compose --profile observability --profile backup up -d
-# start.ps1/start.sh/start.bat pass both profiles explicitly, so the
+# "observability") are opt-in — a plain `docker compose up -d` now starts
+# only the 11 core services (domain services + postgres/redis/config-server/
+# frontend), for faster iterative dev (rebuild/restart a single service
+# without relaunching the full stack). Add them back with:
+#   docker compose --profile observability up -d
+# start.ps1/start.sh/start.bat pass this profile explicitly, so the
 # documented one-click "start everything" bootstrap is unchanged.
+#
+# There is no "backup" profile anymore: WAL archiving + local pgBackRest
+# backups (repo1) are now part of the always-on postgres service itself —
+# a plain `docker compose up -d` with no profiles was silently taking zero
+# backups before, which was its own risk. Only the off-site copy (repo2,
+# Backblaze B2) stays opt-in, gated on whether S3_BUCKET is set in .env,
+# same as before. See backup/DECISIONS.md §3.5.
 # ============================================================
 
 services:
@@ -25,17 +31,43 @@ services:
   # PostgreSQL – shared database host
   # ----------------------------------------------------------
   postgres:
-    image: postgres:15-alpine
+    build: ./docker/postgres
     container_name: hotel_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Continuous WAL archiving + scheduled full/incremental backups via
+      # pgBackRest — replaces the old db-backup sidecar (pg_dumpall on a
+      # fixed 24h cadence). RPO is now measured in minutes
+      # (PGBACKREST_ARCHIVE_TIMEOUT), not a full day. See backup/DECISIONS.md §3.5.
+      PGBACKREST_STANZA: hotel-pms
+      PGBACKREST_ARCHIVE_TIMEOUT: 120
+      BACKUP_FULL_INTERVAL_SECONDS: 604800
+      BACKUP_INCR_INTERVAL_SECONDS: 86400
+      PGBACKREST_REPO1_RETENTION_FULL: 4
+      PGBACKREST_REPO2_RETENTION_FULL: 8
+      # Encrypts both repos when set (recommended — generate with
+      # `openssl rand -base64 48`). Unset: repos stored unencrypted, same
+      # "opt-in" default philosophy as the old AGE_RECIPIENT var, logged as
+      # a warning on every start. NOTE the security-model change vs the old
+      # age scheme: this is a symmetric passphrase that must live on this
+      # same host (WAL archiving needs it in real time) — there is no
+      # "public key only on the prod host" equivalent with pgBackRest.
+      PGBACKREST_CIPHER_PASS: ${PGBACKREST_CIPHER_PASS:-}
+      # Off-site repo2 (Backblaze B2 / any S3-compatible endpoint) — opt-in,
+      # same vars already used for the old scheme. Unset: local repo1 only.
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      S3_REGION: ${S3_REGION:-}
     ports:
       - "5432:5432"
     volumes:
-      - ./docker/postgres:/docker-entrypoint-initdb.d
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d
       - postgres_data:/var/lib/postgresql/data
+      - pgbackrest_repo:/var/lib/pgbackrest
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -44,53 +76,21 @@ services:
       start_period: 15s
     networks:
       - db-network
+      # Needed only so backup-failure alerts (BackupCycleFailed) can reach
+      # alertmanager:9093 directly — a deliberate, narrow relaxation of the
+      # "db-network: PostgreSQL + microservices only" boundary (see
+      # THREAT_MODEL.md). Every other member of observability-network is
+      # already-trusted internal infra (Grafana/Loki/Prometheus/Zipkin), not
+      # customer/public-facing.
+      - observability-network
     deploy:
       resources:
         limits:
           cpus: "1.0"
-          memory: 384M
+          memory: 512M
         reservations:
           cpus: "0.25"
           memory: 256M
-
-  # ----------------------------------------------------------
-  # PostgreSQL backup — daily pg_dumpall, gzip, retention prune
-  # (ROADMAP P3). No host ports — db-network only.
-  # ----------------------------------------------------------
-  db-backup:
-    build: ./docker/db-backup
-    container_name: hotel_db_backup
-    restart: unless-stopped
-    profiles: ["backup"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      BACKUP_RETENTION_DAYS: 14
-      BACKUP_INTERVAL_SECONDS: 86400
-      # Off-site copy + encryption (AUDIT_ANALISI_2026-07.md item 4) — both
-      # opt-in. Unset (dev default): unencrypted, local-volume-only, exactly
-      # the prior behavior. See .env.example for how to provision.
-      AGE_RECIPIENT: ${AGE_RECIPIENT:-}
-      S3_ENDPOINT: ${S3_ENDPOINT:-}
-      S3_BUCKET: ${S3_BUCKET:-}
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
-      S3_REGION: ${S3_REGION:-}
-      OFFSITE_RETENTION_DAYS: 30
-    volumes:
-      - postgres_backups:/backups
-    networks:
-      - db-network
-    deploy:
-      resources:
-        limits:
-          cpus: "0.25"
-          memory: 128M
-        reservations:
-          cpus: "0.1"
-          memory: 64M
 
   # ----------------------------------------------------------
   # Redis - API Gateway rate limiting + internal HMAC anti-replay
@@ -736,7 +736,7 @@ services:
 
 volumes:
   postgres_data:
-  postgres_backups:
+  pgbackrest_repo:
   loki_data:
   grafana_data:
   alertmanager_data:
@@ -749,7 +749,10 @@ volumes:
 # backend-network:      All microservices + Config Server + Prometheus/Zipkin (internal API mesh)
 #                        Redis also joins this network so all 5 InternalAuthFilter
 #                        validators can reach the HMAC anti-replay nonce store (T-GW-08)
-# db-network:           PostgreSQL + microservices only (transactional data, no external access)
+# db-network:           PostgreSQL + microservices only (transactional data, no external access).
+#                        postgres also joins observability-network — narrowly, only so
+#                        pgBackRest backup-failure alerts can reach alertmanager:9093
+#                        directly (see postgres service comment + THREAT_MODEL.md)
 # observability-network: Loki, Grafana, Prometheus, Zipkin + services exposing metrics
 # ============================================================
 networks:

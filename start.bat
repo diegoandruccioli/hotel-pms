@@ -186,7 +186,7 @@ if not exist "%~dp0.env" (
     goto FATAL
 )
 
-docker compose --env-file .env --profile observability --profile backup up -d --build
+docker compose --env-file .env --profile observability up -d --build
 if !ERRORLEVEL! neq 0 (
     set "FATAL_MSG=docker compose up failed with exit code !ERRORLEVEL!."
     goto FATAL

@@ -12,8 +12,9 @@ import { defineConfig, devices } from '@playwright/test';
 // 2026-07-30): run manually against a live stack.
 //
 // Usage:
-//   docker compose --profile backup up -d   (full stack, or at minimum
-//     postgres/redis/config-server/auth/frontdesk/billing/guest/gateway/frontend)
+//   docker compose up -d   (full stack, or at minimum
+//     postgres/redis/config-server/auth/frontdesk/billing/guest/gateway/frontend —
+//     none of these are profile-gated)
 //   cd frontend && npm run test:e2e:live
 
 const baseURL = process.env.PLAYWRIGHT_LIVE_BASE_URL ?? 'http://localhost';

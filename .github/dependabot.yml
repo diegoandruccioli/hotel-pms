@@ -122,9 +122,20 @@ updates:
   # ── Infra images referenced only in docker-compose.yml (not a Dockerfile) ──
   # Sprint 1 audit (2026-07-25): postgres/redis/loki/grafana/zipkin/prometheus/
   # alertmanager were previously unmonitored — only the 9 service Dockerfiles above
-  # had coverage. Directory "/" picks up docker-compose.yml at repo root.
+  # had coverage. Directory "/" picks up docker-compose.yml at repo root. NOTE:
+  # postgres moved to its own Dockerfile (below) on 2026-08-01 — no longer an
+  # `image:` reference here, redis/loki/grafana/zipkin/prometheus/alertmanager still are.
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
     labels: ["dependencies", "docker", "infra"]
+
+  # postgres now builds its own image (pgBackRest — backup/DECISIONS.md §3.5b),
+  # never monitored before (docker/db-backup, the container it replaced, wasn't
+  # covered either — found during the same backup-hardening pass).
+  - package-ecosystem: "docker"
+    directory: "/docker/postgres"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "docker"]

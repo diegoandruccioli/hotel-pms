@@ -168,110 +168,116 @@ Al prossimo login l'admin sarà costretto a cambiare la password (`mustChangePas
 
 ## 5. Backup del database
 
-Un container `db-backup` (servizio `hotel_db_backup`) esegue `pg_dumpall`
-automaticamente ogni 24h, comprime il dump e mantiene gli ultimi 14 giorni
-(retention configurabile via `BACKUP_RETENTION_DAYS`/`BACKUP_INTERVAL_SECONDS`
-in `docker-compose.yml`). I dump finiscono nel volume `postgres_backups`.
+Il container `postgres` (immagine custom `docker/postgres/`, non più
+`postgres:15-alpine` semplice) integra **pgBackRest**: WAL archiving continuo
+(`archive_timeout=120s`) più backup full settimanali/incrementali giornalieri,
+su due repository indipendenti — `repo1` locale (volume `pgbackrest_repo`) e
+`repo2` off-site (Backblaze B2, opt-in via `S3_*` in `.env`). Sostituisce
+interamente il vecchio container `hotel_db_backup` (`pg_dumpall` ogni 24h) —
+vedi `backup/DECISIONS.md §3.5b` per il perché.
 
 ```bash
-# Elenca i backup automatici disponibili
-docker exec hotel_db_backup ls -lh /backups
+# Stato del repository: catena full/incr, range WAL, ultimo successo per repo
+docker exec hotel_postgres gosu postgres pgbackrest --stanza=hotel-pms info
 
-# Copia un backup fuori dal container (es. su NAS/S3 esterno)
-docker cp hotel_db_backup:/backups/hotel-pms-YYYYMMDD-HHMMSS.sql.gz .
+# Verifica rapida (archive_command + entrambi i repo raggiungibili)
+docker exec hotel_postgres gosu postgres pgbackrest --stanza=hotel-pms check
 ```
 
-Conservare periodicamente una copia in una posizione esterna al server
-(S3, NAS, ecc.) — il volume Docker da solo non protegge da un crash disco.
-
-**RPO/RTO**: RPO accettato di 24h (dump giornaliero), decisione esplicita
-documentata in `backup/DECISIONS.md §3.5` con criteri di revisione — nessun
-PITR/WAL archiving. La copia esterna cifrata automatica (S3/B2) è pianificata
-ma non ancora implementata (ROADMAP.md P3, item residuo).
+**RPO/RTO**: RPO target di **pochi minuti** (non più 24h) — decisione
+esplicita in `backup/DECISIONS.md §3.5b`, che sostituisce la 24h precedente.
+**Cambio di modello di sicurezza da annotare**: la cifratura (`PGBACKREST_CIPHER_PASS`)
+è simmetrica, non asimmetrica come il vecchio schema `age` — la passphrase
+vive necessariamente sullo stesso host di produzione. Vedi `THREAT_MODEL.md` T-OPS-02.
 
 ### Backup manuale (prima di un aggiornamento o operazione rischiosa)
 
 ```bash
-# Backup di tutti i database hotel in un singolo file
+# pg_dumpall resta disponibile per uno snapshot rapido indipendente da pgBackRest
 docker exec hotel_postgres pg_dumpall -U postgres > "backup-$(date +%Y%m%d-%H%M).sql"
-
-# Oppure backup del singolo DB (es. hotel_frontdesk)
-docker exec hotel_postgres pg_dump -U postgres hotel_frontdesk > "hotel_frontdesk-$(date +%Y%m%d-%H%M).sql"
-
-# Verifica che il file sia stato creato e non sia vuoto
-ls -lh backup-*.sql
 ```
 
-### Restore da backup
+### Restore dell'ultimo backup (sovrascrive i dati correnti)
 
 ```bash
-# ATTENZIONE: sovrascrive tutti i dati esistenti
-gunzip -c hotel-pms-YYYYMMDD-HHMMSS.sql.gz | docker exec -i hotel_postgres psql -U postgres
-# oppure, da un backup manuale non compresso:
-docker exec -i hotel_postgres psql -U postgres < backup-YYYYMMDD-HHMM.sql
+# ATTENZIONE: ferma Postgres, sovrascrive PGDATA, poi lo riavvia
+docker compose stop postgres
+docker run --rm -v hotel-pms_postgres_data:/var/lib/postgresql/data \
+  -v hotel-pms_pgbackrest_repo:/var/lib/pgbackrest hotel-pms-postgres \
+  gosu postgres pgbackrest --stanza=hotel-pms --delta restore
+docker compose start postgres
 ```
 
-### Restore end-to-end da copia off-site cifrata (disaster recovery)
+### Restore Point-In-Time (PITR) — a un istante preciso, non solo l'ultimo backup
 
-Procedura per il caso peggiore: l'host è perso, si riparte da zero con solo
-l'accesso al bucket S3-compatible e la chiave privata `age` (custodita fuori
-da questo host, per definizione — vedi `backup/DECISIONS.md §3.5`).
-
-**Prerequisiti**: `age` e `mc` installati sulla macchina da cui si esegue il
-restore (non necessariamente questo host); la chiave privata `age`
-(`backup-key.txt`, generata da `age-keygen`, mai stata su questo host);
-credenziali S3 (`S3_ENDPOINT`/`S3_BUCKET`/`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`).
+Questo è il motivo per cui esiste pgBackRest al posto del vecchio dump
+giornaliero: si può tornare a un secondo prima di un errore (es. una
+migration sbagliata, un `DELETE` senza `WHERE`), non solo all'ultimo backup
+schedulato.
 
 ```bash
-# 1. Configura l'alias mc verso lo storage esterno
-mc alias set offsite "$S3_ENDPOINT" "$S3_ACCESS_KEY_ID" "$S3_SECRET_ACCESS_KEY"
+# Restore in una directory separata — NON tocca lo stack live, permette di
+# verificare prima di decidere se promuovere il restore a dati reali
+docker exec -u postgres hotel_postgres sh -c "
+  mkdir -p /tmp/pitr-restore &&
+  pgbackrest --stanza=hotel-pms --pg1-path=/tmp/pitr-restore \
+    --type=time --target='2026-08-01 12:00:00+00' --target-action=promote \
+    --delta restore
+"
 
-# 2. Elenca i backup disponibili, scarica il più recente
-mc ls offsite/$S3_BUCKET
-mc cp offsite/$S3_BUCKET/hotel-pms-YYYYMMDD-HHMMSS.sql.gz.age .
+# Avvia il restore su una porta alternativa per verificarlo prima di promuoverlo
+docker exec -u postgres hotel_postgres sh -c "
+  postgres -D /tmp/pitr-restore -p 5433 -c unix_socket_directories=/tmp &
+"
+docker exec -u postgres hotel_postgres psql -h /tmp -p 5433 -d hotel_auth \
+  -c "SELECT count(*) FROM flyway_schema_history;"
 
-# 3. Decifra con la chiave privata (mai su questo host prima d'ora)
-age -d -i backup-key.txt -o hotel-pms-YYYYMMDD-HHMMSS.sql.gz \
-    hotel-pms-YYYYMMDD-HHMMSS.sql.gz.age
-
-# 4. Ripristina su un Postgres vergine (nuovo host/container, mai avere
-#    servizi applicativi puntati al DB prima che il restore sia verificato)
-gunzip -c hotel-pms-YYYYMMDD-HHMMSS.sql.gz | \
-    docker exec -i hotel_postgres psql -U postgres
-
-# 5. Verifica di integrità (obbligatoria prima di riavviare i servizi)
-docker exec hotel_postgres psql -U postgres -d hotel_auth \
-    -c "SELECT count(*) FROM flyway_schema_history;"
-docker exec hotel_postgres psql -U postgres -d hotel_auth \
-    -c "SELECT count(*) FROM user_account;"
-# ripetere per hotel_guest/hotel_frontdesk/hotel_billing/hotel_fb — il conteggio
-# righe di flyway_schema_history deve combaciare con le migration attualmente
-# nel repo, non solo essere "diverso da zero"
-
-# 6. Solo dopo la verifica: avviare i servizi contro il DB ripristinato e
-#    tentare un login reale (non solo un health check)
+# Solo dopo aver verificato che è il punto giusto: fermare l'istanza di prova,
+# fermare postgres reale, copiare /tmp/pitr-restore su PGDATA, riavviare
 ```
 
-**Stato**: ✅ **Eseguita end-to-end, 2026-07-31.** Bucket Backblaze B2
-(`hotel-pms-backups`, region `eu-central-003`) provisionato, `AGE_RECIPIENT`
-configurato, `db-backup` verificato dal vivo: dump → gzip → cifratura age →
-upload reale sul bucket confermato (`mc ls` mostra l'oggetto `.sql.gz.age`
-nel bucket). Drill di restore: scaricato l'oggetto dal bucket reale,
-decifrato con la chiave privata (custodita fuori da questo host), ripristinato
-su un Postgres vergine (container scratch, non lo stack di produzione).
-Verifica di integrità: tutte e 5 le database presenti (`hotel_auth`,
-`hotel_billing`, `hotel_fb`, `hotel_frontdesk`, `hotel_guest`),
-`flyway_schema_history` coerente col numero di migration attuali per
-servizio (auth 6, frontdesk 8, billing 10, guest 9, fb 6), conteggi righe
-sulle tabelle chiave non nulli e plausibili (20 user_account, 14 rooms,
-6 stays, 2 reservations, 10 guests — coerenti coi dati di test di sessione).
-**RTO del solo restore SQL: ~2 secondi** (dump di sviluppo, ~130KB cifrato —
-il tempo scala con la dimensione reale del DB in produzione, da ricronometrare
-quando il volume dati sarà rappresentativo). Container scratch e file
-temporanei rimossi a fine drill. Step non eseguito in questo giro: avviare i
-servizi applicativi contro il DB ripristinato e fare un login reale end-to-end
-(il container scratch è stato smontato subito dopo la verifica SQL) — la
-procedura sopra resta valida per farlo quando serve un drill più completo.
+### Restore end-to-end da copia off-site (disaster recovery)
+
+Stessa procedura PITR sopra, ma con `--repo=2` (Backblaze B2) invece di
+`repo1` (locale) — per il caso peggiore, host di produzione perso del tutto.
+Il drill periodico di questo path è **automatizzato** in CI (sotto), non solo
+manuale come nel vecchio schema.
+
+```bash
+pgbackrest --stanza=hotel-pms --repo=2 --pg1-path=/tmp/dr-restore \
+  --target-action=promote --delta restore
+```
+
+### Drill automatico settimanale (CI)
+
+`.github/workflows/backup-restore-drill.yml` — schedulato ogni lunedì
+(più `workflow_dispatch` per un run manuale), scarica l'ultimo backup da
+`repo2`, lo ripristina su un runner GitHub effimero, verifica
+`flyway_schema_history` per le 5 database. La private
+`PGBACKREST_CIPHER_PASS` vive come secret CI, mai nel repo — richiede secret
+GitHub: `PGBACKREST_CIPHER_PASS`, `S3_ENDPOINT`, `S3_BUCKET`,
+`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION` (stessi valori di `.env`).
+
+**Stato**: ✅ **pgBackRest verificato dal vivo, 2026-08-01.** WAL archiving
+confermato su `repo1` e `repo2` (`pg_switch_wal()` forzato, segmento
+comparso su entrambi entro pochi secondi). Backup full+incrementale
+confermati su entrambi i repository — **bug trovato e corretto nello stesso
+giro**: la prima versione dello scheduler backuppava solo il repo di default
+(`repo1`), perché `pgbackrest backup` opera su un repo per invocazione
+(diversamente da `archive-push`, che scrive su tutti i repo configurati in
+automatico); `docker/postgres/backup-scheduler.sh` ora itera esplicitamente
+su ogni repo configurato. **Drill PITR reale eseguito**: tabella marker
+creata, riga inserita, WAL switch forzato, `pgbackrest restore --type=time`
+puntato a un istante precedente l'insert, ripristinato in una directory
+scratch separata dallo stack live, avviato come istanza Postgres temporanea
+— la riga marker è risultata assente, la tabella (creata prima del target)
+presente, `flyway_schema_history` coerente. Log pgBackRest conferma
+esplicitamente: *"recovery stopping before commit of transaction ..."* alla
+transazione esatta dell'insert. Verifica visiva sul bucket B2 reale
+(console `secure.backblaze.com`) richiede login con le credenziali
+dell'utente — da fare manualmente, non eseguibile da un agente automatico.
+Drill CI non ancora eseguito dal vivo — richiede prima la configurazione dei
+secret GitHub elencati sopra.
 
 ---
 

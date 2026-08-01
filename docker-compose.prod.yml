@@ -2,13 +2,15 @@
 # Hotel PMS – Production port-hardening override
 # ============================================================
 # Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-#          --profile observability --profile backup up -d
-# The --profile flags are required here: docker-compose.yml gates
-# loki/grafana/zipkin/alertmanager/prometheus ("observability") and
-# db-backup ("backup") behind opt-in profiles for a leaner dev default.
-# An override file only changes settings for services already selected —
-# it does NOT re-enable a profile-gated service. Omitting these flags in
-# production would silently drop monitoring/backup, not just harden ports.
+#          --profile observability up -d
+# The --profile flag is required here: docker-compose.yml gates
+# loki/grafana/zipkin/alertmanager/prometheus ("observability") behind an
+# opt-in profile for a leaner dev default. An override file only changes
+# settings for services already selected — it does NOT re-enable a
+# profile-gated service. Omitting this flag in production would silently
+# drop monitoring, not just harden ports. (WAL archiving + local pgBackRest
+# backups are part of the always-on postgres service, not profile-gated —
+# see docker-compose.yml.)
 #
 # Removes host port publishing for every service except the two
 # meant to be reachable from outside the host: frontend (:80) and

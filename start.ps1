@@ -341,7 +341,7 @@ try {
         if (-not (Test-Path $envFile)) {
             Stop-WithError ".env file not found at $envFile -- HMAC setup may have failed silently."
         }
-        Invoke-Native 'docker compose up' { docker compose --env-file $envFile --profile observability --profile backup up -d --build } -AllowStderr
+        Invoke-Native 'docker compose up' { docker compose --env-file $envFile --profile observability up -d --build } -AllowStderr
         $script:ComposeStarted = $true
         Write-Success 'All containers are starting.'
 

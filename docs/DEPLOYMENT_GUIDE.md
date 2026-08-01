@@ -111,13 +111,15 @@ espone TUTTE le porte sull'host (comodo in sviluppo, non sicuro in produzione).
 Il file `docker-compose.prod.yml` è un override che azzera le porte esposte di
 ogni servizio interno (DB, Redis, Prometheus/Grafana/Zipkin/Loki, tutti i
 backend) lasciando pubblici solo `:80` (frontend) e `:8080` (API Gateway). Va
-**sempre** combinato con entrambi i flag `--profile` (altrimenti Alertmanager/
-Grafana/Loki/Prometheus/backup automatico non partono affatto — sono opt-in):
+**sempre** combinato col flag `--profile observability` (altrimenti Alertmanager/
+Grafana/Loki/Prometheus non partono affatto — sono opt-in). Il backup automatico
+locale (WAL archiving + pgBackRest) non richiede più un profilo: è parte del
+servizio `postgres` sempre attivo — vedi §9.
 
 ```bash
-# Avvio produzione — hardening porte + osservabilità + backup automatico
+# Avvio produzione — hardening porte + osservabilità
 docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  --profile observability --profile backup up -d
+  --profile observability up -d
 
 # Verifica che tutti i container siano healthy (attesa ~90 secondi)
 watch docker compose ps
@@ -251,7 +253,7 @@ docker compose build
 
 # 4. Aggiornamento rolling (tempo di downtime < 30 secondi) — stessi flag di §4
 docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  --profile observability --profile backup up -d
+  --profile observability up -d
 
 # 5. Verifica post-aggiornamento
 docker compose ps
@@ -277,6 +279,9 @@ Se una migration fallisce, il servizio non si avvia — vedi `docs/OPERATIONS_RU
 > **Alert rule:** 6 alert Prometheus sono già configurate (`docker/prometheus/alert_rules.yml`):
 > ServiceDown, HighErrorRate, HighLatencyP99, JvmHeapHigh, CircuitBreakerOpen,
 > DbConnectionPoolNearExhaustion. Richiedono il profilo `observability` (§4).
+> A queste si aggiunge `BackupCycleFailed`, inviato **direttamente** ad Alertmanager
+> dal container `postgres` (non una regola Prometheus — push via API su fallimento
+> di `archive-push`/`backup`/`check` di pgBackRest, §9).
 > **Da fare prima del go-live**: il receiver Alertmanager di default è `null`
 > (nessuna notifica esce, solo visibili su `http://localhost:9093`) — configurare
 > un receiver reale (email/Slack/PagerDuty) in `docker/alertmanager/alertmanager.yml`
@@ -295,22 +300,29 @@ Se una migration fallisce, il servizio non si avvia — vedi `docs/OPERATIONS_RU
 
 ## 9. Backup automatico
 
-**Già incluso** con il profilo `backup` (§4, `--profile backup`): il container
-`hotel_db_backup` esegue `pg_dumpall` ogni 24h (configurabile via
-`BACKUP_INTERVAL_SECONDS`/`BACKUP_RETENTION_DAYS` in `docker-compose.yml`),
-comprime il dump e mantiene gli ultimi 14 giorni sul volume dedicato
-`postgres_backups`. Nessun cron da configurare a mano.
+**Sempre attivo**, nessun profilo da abilitare: il container `hotel_postgres`
+(immagine custom, `docker/postgres/`) integra **pgBackRest** — WAL archiving
+continuo (RPO in minuti, non più un dump giornaliero fisso) più backup
+full/incrementali schedulati, sul volume dedicato `pgbackrest_repo`. Nessun
+cron da configurare a mano. Il vecchio container `hotel_db_backup`
+(`pg_dumpall` ogni 24h) non esiste più — vedi `backup/DECISIONS.md §3.5`.
 
 ```bash
-# Elenca i backup automatici disponibili
-docker exec hotel_db_backup ls -lh /backups
+# Stato del repository di backup (catena full/incr, WAL, ultimo successo)
+docker exec hotel_postgres gosu postgres pgbackrest --stanza=hotel-pms info
 
-# Copia periodicamente un backup fuori dal server (S3/NAS) — il volume
-# Docker da solo non protegge da un crash disco dell'host
-docker cp hotel_db_backup:/backups/hotel-pms-YYYYMMDD-HHMMSS.sql.gz .
+# Verifica rapida (archive_command + repo raggiungibili)
+docker exec hotel_postgres gosu postgres pgbackrest --stanza=hotel-pms check
 ```
 
-Dettagli completi (restore, backup manuale pre-aggiornamento) in
+Off-site (repo2, Backblaze B2) resta opt-in — impostare `S3_BUCKET` e le
+altre variabili `S3_*` in `.env` (già configurate se il bucket `hotel-pms-backups`
+è stato provisionato in una sessione precedente), più `PGBACKREST_CIPHER_PASS`
+per cifrare entrambi i repository (`openssl rand -base64 48`, **da trattare
+come `POSTGRES_PASSWORD`**: a differenza del vecchio `AGE_RECIPIENT`, questa è
+una passphrase simmetrica, non solo una chiave pubblica).
+
+Dettagli completi (restore, PITR, drill off-site) in
 `docs/OPERATIONS_RUNBOOK.md §5`.
 
 ---

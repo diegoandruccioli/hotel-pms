@@ -299,7 +299,7 @@ log_step "4/8" "Starting Docker infrastructure"
 if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
     die ".env file not found — HMAC setup may have failed silently."
 fi
-docker compose --env-file .env --profile observability --profile backup up -d --build
+docker compose --env-file .env --profile observability up -d --build
 COMPOSE_STARTED=1
 log_ok "All containers are starting."
 
