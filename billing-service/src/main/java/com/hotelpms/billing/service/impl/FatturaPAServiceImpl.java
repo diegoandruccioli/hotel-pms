@@ -12,6 +12,7 @@ import com.hotelpms.billing.dto.PaymentResponse;
 import com.hotelpms.billing.exception.BillingValidationException;
 import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.service.FatturaPAService;
+import com.hotelpms.billing.service.FatturaPaXsdValidator;
 import com.hotelpms.billing.service.InvoiceService;
 import com.hotelpms.billing.service.VatBreakdownCalculator;
 import lombok.RequiredArgsConstructor;
@@ -71,6 +72,7 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
     private final HotelSettingsClient hotelSettingsClient;
     private final GuestClient guestClient;
     private final VatBreakdownCalculator vatBreakdownCalculator;
+    private final FatturaPaXsdValidator xsdValidator;
 
     @Override
     public byte[] generateXml(@NonNull final UUID invoiceId) {
@@ -83,13 +85,26 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
         final GuestResponse guest = guestClient.getGuestById(invoice.guestId());
         validateFiscalAddress(hotel, guest);
 
+        final byte[] xml;
         try {
             final Document doc = buildDocument(invoice, hotel, guest);
-            return serialize(doc);
+            xml = serialize(doc);
         } catch (ParserConfigurationException | TransformerException ex) {
             log.error("Failed to build FatturaPA XML for invoice {}", invoiceId, ex);
             throw new IllegalStateException("FATTURAPA_XML_BUILD_FAILED", ex);
         }
+
+        // Validate against the official Agenzia delle Entrate schema before ever handing
+        // the XML to an operator — a structurally invalid FatturaPA export discovered only
+        // when the commercialista's software (or SDI itself) rejects it is too late; this
+        // is a defect in the generator, not a per-request condition, so it fails loudly.
+        final List<String> validationErrors = xsdValidator.validate(xml);
+        if (!validationErrors.isEmpty()) {
+            log.error("Generated FatturaPA XML for invoice {} failed schema validation: {}",
+                    invoiceId, validationErrors);
+            throw new IllegalStateException("FATTURAPA_XML_SCHEMA_INVALID: " + validationErrors);
+        }
+        return xml;
     }
 
     private static void validateEligibility(final InvoiceResponse invoice) {

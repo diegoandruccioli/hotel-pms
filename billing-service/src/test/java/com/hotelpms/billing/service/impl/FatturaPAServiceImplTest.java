@@ -10,6 +10,7 @@ import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.exception.BillingValidationException;
 import com.hotelpms.billing.exception.InvoiceConflictException;
+import com.hotelpms.billing.service.FatturaPaXsdValidator;
 import com.hotelpms.billing.service.InvoiceService;
 import com.hotelpms.billing.service.VatBreakdownCalculator;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,6 +63,11 @@ class FatturaPAServiceImplTest {
     private GuestClient guestClient;
     @Spy
     private final VatBreakdownCalculator vatBreakdownCalculator = new VatBreakdownCalculator();
+    // Mockito default answer for a List-returning method is an empty list, i.e. "no
+    // validation errors" — matches what every test here expects except the dedicated
+    // schema-validation test below, which stubs a non-empty result explicitly.
+    @Mock
+    private FatturaPaXsdValidator xsdValidator;
 
     @InjectMocks
     private FatturaPAServiceImpl service;
@@ -100,6 +106,20 @@ class FatturaPAServiceImplTest {
         // no payments → default MP05 with the full invoice amount
         assertThat(xmlStr).contains("<ModalitaPagamento>MP05</ModalitaPagamento>");
         assertThat(xmlStr).contains("<ImportoPagamento>110.00</ImportoPagamento>");
+    }
+
+    @Test
+    void shouldThrowWhenGeneratedXmlFailsSchemaValidation() {
+        final InvoiceResponse invoice = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+        when(hotelSettingsClient.getSettings()).thenReturn(hotel);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
+        when(xsdValidator.validate(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of("line 12: unexpected element 'Foo'"));
+
+        assertThatThrownBy(() -> service.generateXml(INVOICE_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("FATTURAPA_XML_SCHEMA_INVALID");
     }
 
     @Test
