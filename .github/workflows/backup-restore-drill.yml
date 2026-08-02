@@ -44,8 +44,15 @@ jobs:
           S3_REGION: ${{ secrets.S3_REGION }}
         run: |
           sudo mkdir -p /etc/pgbackrest
+          # log-path/spool-path default to /var/log/pgbackrest and
+          # /var/spool/pgbackrest, both root-owned by the postgresql-15
+          # package install — this job's steps run as the unprivileged
+          # `runner` user, so point both at somewhere runner can write.
+          mkdir -p /tmp/pgbackrest-log /tmp/pgbackrest-spool
           {
             echo "[global]"
+            echo "log-path=/tmp/pgbackrest-log"
+            echo "spool-path=/tmp/pgbackrest-spool"
             echo "repo1-type=s3"
             echo "repo1-s3-endpoint=${S3_ENDPOINT#https://}"
             echo "repo1-s3-bucket=${S3_BUCKET}"
