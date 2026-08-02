@@ -10,6 +10,7 @@ import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.exception.BillingValidationException;
 import com.hotelpms.billing.exception.InvoiceConflictException;
+import com.hotelpms.billing.repository.InvoiceFiscalExportRepository;
 import com.hotelpms.billing.service.FatturaPaXsdValidator;
 import com.hotelpms.billing.service.InvoiceService;
 import com.hotelpms.billing.service.VatBreakdownCalculator;
@@ -68,6 +69,9 @@ class FatturaPAServiceImplTest {
     // schema-validation test below, which stubs a non-empty result explicitly.
     @Mock
     private FatturaPaXsdValidator xsdValidator;
+
+    @Mock
+    private InvoiceFiscalExportRepository invoiceFiscalExportRepository;
 
     @InjectMocks
     private FatturaPAServiceImpl service;

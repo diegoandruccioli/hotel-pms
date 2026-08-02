@@ -5,12 +5,14 @@ import com.hotelpms.billing.client.HotelSettingsClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.client.dto.HotelSettingsResponse;
 import com.hotelpms.billing.domain.DocumentType;
+import com.hotelpms.billing.domain.InvoiceFiscalExport;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.PaymentResponse;
 import com.hotelpms.billing.exception.BillingValidationException;
 import com.hotelpms.billing.exception.InvoiceConflictException;
+import com.hotelpms.billing.repository.InvoiceFiscalExportRepository;
 import com.hotelpms.billing.service.FatturaPAService;
 import com.hotelpms.billing.service.FatturaPaXsdValidator;
 import com.hotelpms.billing.service.InvoiceService;
@@ -18,7 +20,10 @@ import com.hotelpms.billing.service.VatBreakdownCalculator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -36,7 +41,11 @@ import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -73,8 +82,10 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
     private final GuestClient guestClient;
     private final VatBreakdownCalculator vatBreakdownCalculator;
     private final FatturaPaXsdValidator xsdValidator;
+    private final InvoiceFiscalExportRepository invoiceFiscalExportRepository;
 
     @Override
+    @Transactional
     public byte[] generateXml(@NonNull final UUID invoiceId) {
         log.info("Generating FatturaPA XML for invoice {}", invoiceId);
         final InvoiceResponse invoice = invoiceService.getInvoice(invoiceId);
@@ -104,7 +115,44 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
                     invoiceId, validationErrors);
             throw new IllegalStateException("FATTURAPA_XML_SCHEMA_INVALID: " + validationErrors);
         }
+
+        recordExport(invoice, xml);
         return xml;
+    }
+
+    /**
+     * Persists an immutable snapshot of exactly what was produced for this export —
+     * the legal record that a later regeneration must not be assumed identical to.
+     * Existence of this row also drives the post-export immutability guard on the
+     * invoice's fiscally-relevant fields (see {@code InvoiceServiceImpl}).
+     *
+     * @param invoice the invoice the export was generated from
+     * @param xml     the schema-validated XML bytes just produced
+     */
+    private void recordExport(final InvoiceResponse invoice, final byte[] xml) {
+        final InvoiceFiscalExport export = InvoiceFiscalExport.builder()
+                .invoiceId(invoice.id())
+                .hotelId(invoice.hotelId())
+                .exportedAt(LocalDateTime.now())
+                .xmlPayload(xml)
+                .payloadSha256(sha256Hex(xml))
+                .exportedBy(resolveUsername())
+                .build();
+        invoiceFiscalExportRepository.save(export);
+    }
+
+    private static String sha256Hex(final byte[] xml) {
+        try {
+            final MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(xml));
+        } catch (final NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA256_ALGORITHM_UNAVAILABLE", ex);
+        }
+    }
+
+    private static String resolveUsername() {
+        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null ? auth.getName() : "unknown";
     }
 
     private static void validateEligibility(final InvoiceResponse invoice) {

@@ -21,6 +21,7 @@ import com.hotelpms.billing.exception.NotFoundException;
 import com.hotelpms.billing.mapper.InvoiceChargeMapper;
 import com.hotelpms.billing.mapper.InvoiceMapper;
 import com.hotelpms.billing.repository.InvoiceChargeRepository;
+import com.hotelpms.billing.repository.InvoiceFiscalExportRepository;
 import com.hotelpms.billing.repository.InvoiceRepository;
 import com.hotelpms.billing.repository.InvoiceSequenceRepository;
 import com.hotelpms.billing.service.InvoiceService;
@@ -58,6 +59,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final InvoiceRepository invoiceRepository;
     private final InvoiceChargeRepository invoiceChargeRepository;
     private final InvoiceSequenceRepository sequenceRepository;
+    private final InvoiceFiscalExportRepository invoiceFiscalExportRepository;
     private final InvoiceMapper invoiceMapper;
     private final InvoiceChargeMapper invoiceChargeMapper;
     private final GuestClient guestClient;
@@ -105,6 +107,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         if (invoice.getStatus() != InvoiceStatus.ISSUED) {
             throw new InvoiceConflictException("INVOICE_NOT_OPEN");
         }
+        assertNotFiscallyLocked(invoice);
 
         final InvoiceCharge charge = InvoiceCharge.builder()
                 .type(request.type())
@@ -241,6 +244,22 @@ public class InvoiceServiceImpl implements InvoiceService {
         return UUID.fromString(hotelIdStr);
     }
 
+    /**
+     * Blocks mutation of fiscally-relevant invoice state once at least one FatturaPA
+     * export has been generated for it (see {@code InvoiceFiscalExport}). An Italian
+     * fiscal invoice is corrected via nota di credito, not by editing the original —
+     * this guard exists so the gap doesn't widen further while that flow is built
+     * separately; it does not itself implement corrections.
+     *
+     * @param invoice the invoice about to be mutated
+     * @throws InvoiceConflictException if the invoice has already been fiscally exported
+     */
+    private void assertNotFiscallyLocked(final Invoice invoice) {
+        if (invoiceFiscalExportRepository.existsByInvoiceId(invoice.getId())) {
+            throw new InvoiceConflictException("INVOICE_LOCKED_AFTER_EXPORT");
+        }
+    }
+
     /** {@inheritDoc} */
     @Override
     @Transactional
@@ -253,6 +272,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
             throw new InvoiceConflictException("CANNOT_UPDATE_CANCELLED_INVOICE");
         }
+        assertNotFiscallyLocked(invoice);
         invoice.setDocumentType(documentType);
         final Invoice saved = invoiceRepository.save(Objects.requireNonNull(invoice));
         return invoiceMapper.toResponse(Objects.requireNonNull(saved));

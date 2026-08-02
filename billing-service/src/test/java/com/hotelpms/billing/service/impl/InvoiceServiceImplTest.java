@@ -21,6 +21,7 @@ import com.hotelpms.billing.exception.NotFoundException;
 import com.hotelpms.billing.mapper.InvoiceChargeMapper;
 import com.hotelpms.billing.mapper.InvoiceMapper;
 import com.hotelpms.billing.repository.InvoiceChargeRepository;
+import com.hotelpms.billing.repository.InvoiceFiscalExportRepository;
 import com.hotelpms.billing.repository.InvoiceRepository;
 import com.hotelpms.billing.repository.InvoiceSequenceRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -85,6 +86,11 @@ class InvoiceServiceImplTest {
 
         @Mock
         private InvoiceSequenceRepository sequenceRepository;
+
+        // Unstubbed boolean-returning mock methods default to false (Mockito), i.e.
+        // "not fiscally exported yet" — matches the pre-export test fixtures below.
+        @Mock
+        private InvoiceFiscalExportRepository invoiceFiscalExportRepository;
 
         @Mock
         private InvoiceMapper invoiceMapper;
