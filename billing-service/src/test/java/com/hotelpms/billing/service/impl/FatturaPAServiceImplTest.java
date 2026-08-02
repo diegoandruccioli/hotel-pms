@@ -5,6 +5,7 @@ import com.hotelpms.billing.client.HotelSettingsClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.client.dto.HotelSettingsResponse;
 import com.hotelpms.billing.domain.DocumentType;
+import com.hotelpms.billing.domain.InvoiceFiscalExport;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.dto.InvoiceResponse;
@@ -38,6 +39,9 @@ import com.hotelpms.billing.dto.PaymentResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @SuppressWarnings("null")
@@ -110,6 +114,16 @@ class FatturaPAServiceImplTest {
         // no payments → default MP05 with the full invoice amount
         assertThat(xmlStr).contains("<ModalitaPagamento>MP05</ModalitaPagamento>");
         assertThat(xmlStr).contains("<ImportoPagamento>110.00</ImportoPagamento>");
+
+        final org.mockito.ArgumentCaptor<InvoiceFiscalExport> captor =
+                org.mockito.ArgumentCaptor.forClass(InvoiceFiscalExport.class);
+        verify(invoiceFiscalExportRepository).save(captor.capture());
+        final InvoiceFiscalExport export = captor.getValue();
+        assertThat(export.getInvoiceId()).isEqualTo(INVOICE_ID);
+        assertThat(export.getHotelId()).isEqualTo(HOTEL_ID);
+        assertThat(export.getXmlPayload()).isEqualTo(xml);
+        assertThat(export.getPayloadSha256()).hasSize(64);
+        assertThat(export.getExportedAt()).isNotNull();
     }
 
     @Test
@@ -118,12 +132,13 @@ class FatturaPAServiceImplTest {
         when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
         when(hotelSettingsClient.getSettings()).thenReturn(hotel);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
-        when(xsdValidator.validate(org.mockito.ArgumentMatchers.any()))
+        when(xsdValidator.validate(any()))
                 .thenReturn(List.of("line 12: unexpected element 'Foo'"));
 
         assertThatThrownBy(() -> service.generateXml(INVOICE_ID))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("FATTURAPA_XML_SCHEMA_INVALID");
+        verify(invoiceFiscalExportRepository, never()).save(any());
     }
 
     @Test

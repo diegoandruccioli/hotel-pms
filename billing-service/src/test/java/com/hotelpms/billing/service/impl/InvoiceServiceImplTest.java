@@ -302,6 +302,35 @@ class InvoiceServiceImplTest {
         }
 
         @Test
+        @DisplayName("Should throw InvoiceConflictException when invoice was already fiscally exported")
+        void shouldThrowLockedWhenInvoiceAlreadyExported() {
+                // Arrange
+                final UUID stayId = UUID.randomUUID();
+                final ChargeRequest chargeRequest = new ChargeRequest(
+                                ChargeType.FB_ORDER, SIMPLE_DRINK, BigDecimal.valueOf(3), null);
+
+                final Invoice exportedInvoice = Invoice.builder()
+                                .id(UUID.randomUUID())
+                                .stayId(stayId)
+                                .hotelId(hotelId)
+                                .totalAmount(BigDecimal.TEN)
+                                .status(InvoiceStatus.ISSUED)
+                                .invoiceNumber("INV-TESTXYZ1")
+                                .build();
+
+                when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId))
+                                .thenReturn(Optional.of(exportedInvoice));
+                when(invoiceFiscalExportRepository.existsByInvoiceId(exportedInvoice.getId()))
+                                .thenReturn(true);
+
+                // Act & Assert
+                final Exception exception = assertThrows(InvoiceConflictException.class,
+                                () -> invoiceService.addCharge(Objects.requireNonNull(stayId), chargeRequest));
+                assertEquals("INVOICE_LOCKED_AFTER_EXPORT", exception.getMessage());
+                verify(invoiceChargeRepository, never()).save(any(InvoiceCharge.class));
+        }
+
+        @Test
         @DisplayName("Should throw NotFoundException for addCharge with stayId belonging to different hotel (IDOR)")
         void shouldThrowWhenStayBelongsToDifferentHotel() {
                 // Arrange — stayId from another hotel; findByStayIdAndHotelId returns empty (hotel scoping)
@@ -504,6 +533,25 @@ class InvoiceServiceImplTest {
                 // Act & Assert
                 assertThrows(InvoiceConflictException.class,
                                 () -> invoiceService.updateDocumentType(invoiceId, DocumentType.RICEVUTA));
+        }
+
+        @Test
+        @DisplayName("Should throw InvoiceConflictException when updating document type on an already-exported invoice")
+        void shouldThrowLockedWhenUpdatingDocumentTypeOnExportedInvoice() {
+                // Arrange
+                final UUID invoiceId = UUID.randomUUID();
+                final Invoice invoice = new Invoice();
+                invoice.setId(invoiceId);
+                invoice.setStatus(InvoiceStatus.ISSUED);
+
+                when(invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)).thenReturn(Optional.of(invoice));
+                when(invoiceFiscalExportRepository.existsByInvoiceId(invoiceId)).thenReturn(true);
+
+                // Act & Assert
+                final Exception exception = assertThrows(InvoiceConflictException.class,
+                                () -> invoiceService.updateDocumentType(invoiceId, DocumentType.RICEVUTA));
+                assertEquals("INVOICE_LOCKED_AFTER_EXPORT", exception.getMessage());
+                verify(invoiceRepository, never()).save(any(Invoice.class));
         }
 
         @Test
