@@ -14,6 +14,7 @@ import jakarta.persistence.NamedAttributeNode;
 import jakarta.persistence.NamedEntityGraph;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -36,7 +37,9 @@ import java.util.UUID;
  * Represents an invoice in the billing domain.
  */
 @Entity
-@Table(name = "invoices")
+@Table(name = "invoices",
+        uniqueConstraints = @UniqueConstraint(name = "uq_invoices_hotel_invoice_number",
+                columnNames = {"hotel_id", "invoice_number"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -64,7 +67,10 @@ public class Invoice {
     @Column(name = "hotel_id")
     private UUID hotelId;
 
-    @Column(nullable = false, unique = true)
+    // Uniqueness is per (hotel_id, invoice_number), not invoice_number alone — see the
+    // @Table uniqueConstraints above. Two hotels both issuing "2026/0001" is expected
+    // (V5__add_invoice_sequence.sql), so this column intentionally has no unique=true.
+    @Column(nullable = false)
     private String invoiceNumber;
 
     @Column(nullable = false)
