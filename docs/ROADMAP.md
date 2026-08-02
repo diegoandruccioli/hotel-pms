@@ -21,7 +21,7 @@ mono-hotel Docker Compose. La roadmap descrive il percorso verso
 | Scalabilità | 7.0/10 | 8 servizi, GIN pg_trgm, frontdesk consolidato (ADR-001 ✅), Dependabot (P9 ✅) — SimpleDiscovery statico, no K8s (E5) |
 | Qualità codice | 9.0/10 | PMD zero, Testcontainers billing+frontdesk (P7 ✅), coverage gate 90/80/88/92% (P15 ✅), Zod validation (P11 ✅), SRP refactor (P10 ✅) |
 | Operabilità | 7.5/10 | Docker Compose prod hardening (P0 ✅), backup automatizzato locale (P3 parz.), alert+runbook (P4/P5 ✅), branch protection+CodeQL (P12/P13 ✅) — no K8s, no secrets manager |
-| Conformità normativa | 9.5/10 | Alloggiati SOAP nativo, GDPR, numerazione fattura YYYY/NNNN (C2 ✅), IVA disaggregata (C3 ✅), dati fiscali ospite (E12 parz. ✅), generazione XML FatturaPA FPR12+SDI tracking (E3 parz. ✅) — accreditamento SDI e audit log immutabile (E13) ancora aperti |
+| Conformità normativa | 9.5/10 | Alloggiati SOAP nativo, GDPR, numerazione fattura YYYY/NNNN (C2 ✅), IVA disaggregata (C3 ✅), dati fiscali ospite (E12 parz. ✅), export FatturaPA FPR12 validato XSD, immutabile post-export, batch per commercialista (E3 ✅) — trasmissione diretta SDI (E3bis) e audit log immutabile generico (E13) ancora aperti |
 | UX e funzionalità | 8.5/10 | Flussi core completi (prenotazione→check-in→F&B→fattura→checkout), dashboard KPI+room-grid, sort/filter, WCAG 2.2 AA, settings multi-pagina, verticale billing (C2/C3/FatturaPA), email conferma/checkout con personalizzazione (C1 ✅) — no mobile, no SMS |
 
 **Punto di forza unico rispetto ai competitor:**
@@ -90,7 +90,8 @@ Feature che abilitano la competizione con PMS commerciali.
 |---|---|---|---|---|---|
 | E1 | Channel Manager OTA (via intermediario SiteMinder/RateTiger) | 🔴 Critica | 1-2 mesi | Certificazione OTA 2-6 mesi | Sblocca 80% mercato — senza, non nella shortlist di valutazione |
 | E2 | ~~Booking Engine + pagamento online (Stripe Checkout)~~ | ⚫ **Fuori scope per design** | — | — | Decisione esplicita in `backup/DECISIONS.md §2.3`: nessuna integrazione con gateway di pagamento online (Stripe/Nexi/PayPal) — superficie di attacco (PCI DSS, gestione carte) non giustificata per il perimetro attuale del prodotto. Contraddiceva questa riga, ora allineata (verificato 2026-07-27) |
-| E3 | Fattura elettronica SDI/XML | 🔴 Alta | 1-2 mesi | Accreditamento AE | Obbligatorio per clientela business in Italia dal 2019 |
+| E3 | ~~Fattura elettronica: export FatturaPA FPR12~~ | ✅ **Fatto** (2026-08-03) | — | — | Validazione XSD contro lo schema ufficiale AE, snapshot immutabile per export (`invoice_fiscal_exports`: bytes+SHA-256+timestamp), fattura bloccata da mutazione (`INVOICE_LOCKED_AFTER_EXPORT`) dopo il primo export, endpoint batch ZIP+indice CSV per periodo. **Decisione**: hotel-pms non trasmette a SDI direttamente — produce export corretti pronti per import nel gestionale del cliente/commercialista (TeamSystem, Zucchetti, Danea, ...). Motivo: possedere la trasmissione implica possedere la conservazione sostitutiva (accreditamento, responsabilità legale 10 anni) — costo sproporzionato pre-lancio. Vedi E3bis per il disegno (non implementato) della trasmissione diretta. |
+| E3bis | SdiProvider — trasmissione diretta SDI | 🟢 Bassa (finché non richiesta) | 1-2 sett | E3 | Interfaccia pensata ma non scritta: A-Cube come prima scelta (verificato — sandbox self-service reale, unico provider con Preservation+corrispettivi+SDI in un account), credenziali per-hotel cifrate sullo stesso modello già usato per Alloggiati Web. Non implementare finché non richiesta da un cliente pagante o come feature premium — un'interfaccia senza implementazione è solo codice morto da mantenere. |
 | E4 | API pubblica documentata + webhook system | 🟡 Alta | 2-3 sett | Nessuna | Ecosistema ISV — senza, nessun partner può integrarsi |
 | E5 | Migrazione **K3s** (non K8s pieno) — vedi ADR-003 in `backup/DECISIONS.md` | 🟡 Alta | 1-2 sett | Container già stateless e K8s-ready by design; consolidamento frontdesk (E0bis) completato prima | Scaling orizzontale, rolling update, failover automatico, a costo ridotto (no control plane gestito). Trigger migrazione a K8s pieno (GKE Standard): soglia clienti (~140, breakeven Professional), soglia carico RPS/CPU, o necessità multi-region/HA (E6) |
 | E6 | PostgreSQL HA (replica + failover automatico) | 🟡 Alta | 1-2 sett | E5 (K8s) o Patroni | Single node attuale = SPOF per i dati |
@@ -133,7 +134,7 @@ Feature di differenziazione competitiva ad alto impatto ROI.
 | Gestione prenotazioni | ✅ Completa | ✅ + group, waitlist | Group bookings, waitlist |
 | Channel Manager OTA | ❌ Assente | ✅ 400-1000+ canali | **Gap commerciale critico** |
 | Revenue Management | ❌ Assente | ✅ Dynamic pricing | +10-20% RevPAR |
-| Fatturazione | ⚠️ PDF base | ✅ SDI, multi-valuta, folio | IVA disaggregata, SDI, numerazione legale |
+| Fatturazione | ✅ PDF + export FatturaPA validato XSD/immutabile, IVA disaggregata, numerazione legale | ✅ Trasmissione SDI diretta, multi-valuta, folio | Trasmissione diretta SDI (E3bis), multi-valuta |
 | CRM ospiti | ⚠️ Profilo base | ✅ Loyalty, marketing | Retention, upsell |
 | Housekeeping | ⚠️ Desktop only | ✅ App mobile nativa | Mobile, task assignment |
 | F&B / POS | ✅ Nativo integrato | ✅ + table mgmt, kitchen | Gestione tavoli, stampante cucina |
