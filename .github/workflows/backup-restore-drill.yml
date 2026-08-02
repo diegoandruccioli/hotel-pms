@@ -21,6 +21,16 @@ jobs:
     steps:
       - name: Install pgBackRest + PostgreSQL 15
         run: |
+          # ubuntu-latest (24.04 "noble") ships PostgreSQL 16 by default —
+          # postgresql-15 isn't in the standard repos at all. Must add the
+          # official PGDG apt repo to get a version-15 match for the real
+          # server (mismatched major versions can't reliably restore/replay).
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update
           sudo apt-get install -y pgbackrest postgresql-15
 
