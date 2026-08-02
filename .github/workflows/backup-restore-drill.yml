@@ -72,9 +72,15 @@ jobs:
       - name: Restore latest backup from off-site into a scratch directory
         run: |
           mkdir -p "${{ runner.temp }}/restore"
+          # No --type/--target-action: this drill just proves "latest backup
+          # restores and starts", not a specific point in time (that's the
+          # separate, manually-run PITR drill — see docs/OPERATIONS_RUNBOOK.md §5).
+          # --target-action=promote is only valid together with --type, and
+          # is unnecessary here anyway: with no recovery target at all,
+          # Postgres replays all available WAL and comes up as a normal
+          # read-write primary on its own.
           pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --stanza=hotel-pms \
             --pg1-path="${{ runner.temp }}/restore" \
-            --target-action=promote \
             restore
 
       - name: Start restored data directory as a standalone Postgres instance
