@@ -26,13 +26,18 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import com.hotelpms.billing.domain.PaymentMethod;
 import com.hotelpms.billing.dto.PaymentResponse;
@@ -59,6 +64,9 @@ class FatturaPAServiceImplTest {
     private static final String GUEST_LAST_NAME = "Rossi";
     private static final String GUEST_EMAIL = "mario@rossi.it";
     private static final String GUEST_ADDRESS = "Via Milano 5";
+    private static final String INVOICE_NUMBER_1 = "2026/0001";
+    private static final String INVOICE_NUMBER_2 = "2026/0002";
+    private static final String INDEX_CSV = "index.csv";
 
     @Mock
     private InvoiceService invoiceService;
@@ -234,7 +242,7 @@ class FatturaPAServiceImplTest {
                 UUID.randomUUID(), LocalDateTime.of(ISSUE_YEAR, 1, ISSUE_DAY, 10, 0),
                 amnt, method, null, INVOICE_ID);
         final InvoiceResponse invoice = new InvoiceResponse(
-                INVOICE_ID, HOTEL_ID, "2026/0001",
+                INVOICE_ID, HOTEL_ID, INVOICE_NUMBER_1,
                 LocalDateTime.of(ISSUE_YEAR, 1, ISSUE_DAY, 10, 0),
                 amnt, InvoiceStatus.ISSUED,
                 RES_ID, GUEST_ID, null,
@@ -248,12 +256,84 @@ class FatturaPAServiceImplTest {
         assertThat(xmlStr).contains("<ModalitaPagamento>" + expectedCode + "</ModalitaPagamento>");
     }
 
+    @Test
+    void shouldBuildZipWithOneXmlPerEligibleInvoicePlusIndex() throws java.io.IOException {
+        final UUID otherInvoiceId = UUID.randomUUID();
+        final InvoiceResponse first = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
+        final InvoiceResponse second = new InvoiceResponse(
+                otherInvoiceId, HOTEL_ID, INVOICE_NUMBER_2,
+                LocalDateTime.of(ISSUE_YEAR, 1, ISSUE_DAY, 11, 0),
+                new BigDecimal("55.00"), InvoiceStatus.ISSUED,
+                RES_ID, GUEST_ID, null,
+                DocumentType.FATTURA, SdiStatus.NOT_SENT, List.of(), List.of());
+        final LocalDate from = LocalDate.of(ISSUE_YEAR, 1, 1);
+        final LocalDate to = LocalDate.of(ISSUE_YEAR, 1, 31);
+
+        when(invoiceService.getInvoicesInPeriod(from, to)).thenReturn(List.of(first, second));
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(first);
+        when(invoiceService.getInvoice(otherInvoiceId)).thenReturn(second);
+        when(hotelSettingsClient.getSettings()).thenReturn(hotel);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
+
+        final byte[] zip = service.generateBatchZip(from, to);
+        final ZipContents contents = readZip(zip);
+
+        assertThat(contents.entryNames).containsExactlyInAnyOrder("2026-0001.xml", "2026-0002.xml", INDEX_CSV);
+        assertThat(contents.index).contains(INVOICE_NUMBER_1).contains(INVOICE_NUMBER_2);
+        verify(invoiceFiscalExportRepository, org.mockito.Mockito.times(2)).save(any());
+    }
+
+    @Test
+    void shouldExcludeCancelledAndRicevutaInvoicesFromBatchExport() throws java.io.IOException {
+        final InvoiceResponse cancelled = fattura(InvoiceStatus.CANCELLED, DocumentType.FATTURA);
+        final InvoiceResponse ricevuta = fattura(InvoiceStatus.ISSUED, DocumentType.RICEVUTA);
+        final LocalDate from = LocalDate.of(ISSUE_YEAR, 1, 1);
+        final LocalDate to = LocalDate.of(ISSUE_YEAR, 1, 31);
+
+        when(invoiceService.getInvoicesInPeriod(from, to)).thenReturn(List.of(cancelled, ricevuta));
+
+        final byte[] zip = service.generateBatchZip(from, to);
+        final ZipContents contents = readZip(zip);
+
+        assertThat(contents.entryNames).containsExactly(INDEX_CSV);
+        verify(invoiceFiscalExportRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectBatchExportWhenFromIsAfterTo() {
+        final LocalDate from = LocalDate.of(ISSUE_YEAR, 2, 1);
+        final LocalDate to = LocalDate.of(ISSUE_YEAR, 1, 1);
+
+        assertThatThrownBy(() -> service.generateBatchZip(from, to))
+                .isInstanceOf(BillingValidationException.class)
+                .hasMessageContaining("EXPORT_PERIOD_INVALID");
+    }
+
     private InvoiceResponse fattura(final InvoiceStatus status, final DocumentType docType) {
         return new InvoiceResponse(
-                INVOICE_ID, HOTEL_ID, "2026/0001",
+                INVOICE_ID, HOTEL_ID, INVOICE_NUMBER_1,
                 LocalDateTime.of(ISSUE_YEAR, 1, ISSUE_DAY, 10, 0),
                 new BigDecimal("110.00"), status,
                 RES_ID, GUEST_ID, null,
                 docType, SdiStatus.NOT_SENT, List.of(), List.of());
+    }
+
+    private static ZipContents readZip(final byte[] zip) throws java.io.IOException {
+        final List<String> entryNames = new ArrayList<>();
+        String index = "";
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zip))) {
+            ZipEntry entry = zis.getNextEntry();
+            while (entry != null) {
+                entryNames.add(entry.getName());
+                if (INDEX_CSV.equals(entry.getName())) {
+                    index = new String(zis.readAllBytes(), StandardCharsets.UTF_8);
+                }
+                entry = zis.getNextEntry();
+            }
+        }
+        return new ZipContents(entryNames, index);
+    }
+
+    private record ZipContents(List<String> entryNames, String index) {
     }
 }

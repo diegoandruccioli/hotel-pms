@@ -38,17 +38,21 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Generates FatturaPA FPR12 XML using the Java DOM API.
@@ -153,6 +157,46 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
     private static String resolveUsername() {
         final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth != null ? auth.getName() : "unknown";
+    }
+
+    @Override
+    @Transactional
+    public byte[] generateBatchZip(@NonNull final LocalDate from, @NonNull final LocalDate to) {
+        if (from.isAfter(to)) {
+            throw new BillingValidationException("EXPORT_PERIOD_INVALID");
+        }
+        log.info("Generating FatturaPA batch export from {} to {}", from, to);
+
+        final List<InvoiceResponse> eligibleInvoices = invoiceService.getInvoicesInPeriod(from, to).stream()
+                .filter(invoice -> invoice.status() != InvoiceStatus.CANCELLED)
+                .filter(invoice -> invoice.documentType() == DocumentType.FATTURA)
+                .toList();
+
+        final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(buffer)) {
+            final StringBuilder index = new StringBuilder("invoiceNumber,issueDate,totalAmount,status\n");
+            for (final InvoiceResponse invoice : eligibleInvoices) {
+                final byte[] xml = generateXml(invoice.id());
+                zip.putNextEntry(new ZipEntry(zipEntryName(invoice)));
+                zip.write(xml);
+                zip.closeEntry();
+                index.append(invoice.invoiceNumber()).append(',')
+                        .append(invoice.issueDate() != null ? invoice.issueDate().format(DATE_FMT) : "")
+                        .append(',').append(formatDecimal(invoice.totalAmount()))
+                        .append(',').append(invoice.status()).append('\n');
+            }
+            zip.putNextEntry(new ZipEntry("index.csv"));
+            zip.write(index.toString().getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+        } catch (final IOException ex) {
+            throw new IllegalStateException("FATTURAPA_BATCH_ZIP_FAILED", ex);
+        }
+        return buffer.toByteArray();
+    }
+
+    private static String zipEntryName(final InvoiceResponse invoice) {
+        final String safeNumber = sanitize(invoice.invoiceNumber(), invoice.id().toString()).replace("/", "-");
+        return safeNumber + ".xml";
     }
 
     private static void validateEligibility(final InvoiceResponse invoice) {

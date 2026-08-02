@@ -56,6 +56,8 @@ public class InvoiceController {
     private static final String PDF_EXTENSION = ".pdf";
     private static final String XML_FILENAME_PREFIX = "fatturaPA-";
     private static final String XML_EXTENSION = ".xml";
+    private static final String ZIP_FILENAME_PREFIX = "fatturaPA-export-";
+    private static final String ZIP_EXTENSION = ".zip";
 
     private final InvoiceService invoiceService;
     private final PdfInvoiceService pdfInvoiceService;
@@ -265,6 +267,29 @@ public class InvoiceController {
         log.info("REST request to set SDI status {} on invoice {}", request.sdiStatus(), id);
         final InvoiceResponse response = invoiceService.updateSdiStatus(id, request.sdiStatus());
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Generates a ZIP archive with one FatturaPA XML per eligible invoice issued within
+     * the given period for the caller's hotel, plus a CSV index — the batch hand-off
+     * to the commercialista/third-party accounting software.
+     *
+     * @param from inclusive lower bound (day) on invoice issue date
+     * @param to   inclusive upper bound (day) on invoice issue date
+     * @return ZIP bytes with {@code Content-Disposition: attachment} header
+     */
+    @GetMapping(value = "/export", produces = "application/zip")
+    public ResponseEntity<byte[]> exportBatch(
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate from,
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate to) {
+        log.info("REST request for FatturaPA batch export from {} to {}", from, to);
+        final byte[] zip = fatturaPAService.generateBatchZip(from, to);
+        final ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(ZIP_FILENAME_PREFIX + from + "_" + to + ZIP_EXTENSION)
+                .build();
+        return ResponseEntity.ok()
+                .headers(h -> h.setContentDisposition(disposition))
+                .body(zip);
     }
 
     private UUID extractHotelId() {

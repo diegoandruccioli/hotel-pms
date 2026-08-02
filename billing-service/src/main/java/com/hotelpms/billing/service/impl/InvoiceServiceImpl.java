@@ -38,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -190,6 +191,19 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         return results.map(invoice -> new InvoiceSearchResultResponse(
                 invoiceMapper.toResponse(invoice), guestNames.get(invoice.getGuestId())));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<InvoiceResponse> getInvoicesInPeriod(@NonNull final LocalDate from, @NonNull final LocalDate to) {
+        final UUID hotelId = resolveHotelId();
+        return invoiceRepository
+                .findByHotelIdAndIssueDateBetween(hotelId, from.atStartOfDay(), to.plusDays(1).atStartOfDay())
+                .stream()
+                .sorted(Comparator.comparing(Invoice::getIssueDate))
+                .map(invoiceMapper::toResponse)
+                .toList();
     }
 
     /**

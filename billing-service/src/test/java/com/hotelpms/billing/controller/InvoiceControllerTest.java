@@ -72,6 +72,9 @@ class InvoiceControllerTest {
     private static final String PATH_DOCUMENT_TYPE = "/{id}/document-type";
     private static final String PATH_FATTURA_PA = "/{id}/fatturaPA";
     private static final String PATH_SDI_STATUS = "/{id}/sdi-status";
+    private static final String PATH_EXPORT = "/export";
+    private static final String HEADER_CONTENT_DISPOSITION = "Content-Disposition";
+    private static final String ATTACHMENT = "attachment";
     private static final String INV_NUMBER = "INV-001";
     private static final String QUERY_MARIO = "mario";
     private static final int PAGE_ZERO = 0;
@@ -212,8 +215,8 @@ class InvoiceControllerTest {
                         .accept(MediaType.APPLICATION_PDF))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_PDF))
-                .andExpect(header().string("Content-Disposition",
-                        org.hamcrest.Matchers.containsString("attachment")));
+                .andExpect(header().string(HEADER_CONTENT_DISPOSITION,
+                        org.hamcrest.Matchers.containsString(ATTACHMENT)));
     }
 
     @Test
@@ -250,8 +253,22 @@ class InvoiceControllerTest {
 
         mockMvc.perform(get(BASE_URL + PATH_FATTURA_PA, INVOICE_ID))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Content-Disposition",
-                        org.hamcrest.Matchers.containsString("attachment")));
+                .andExpect(header().string(HEADER_CONTENT_DISPOSITION,
+                        org.hamcrest.Matchers.containsString(ATTACHMENT)));
+    }
+
+    @Test
+    void shouldGetBatchExportZipReturn200() throws Exception {
+        final byte[] zipBytes = {0x50, 0x4B, 0x03, 0x04}; // PK.. — ZIP magic bytes
+        when(fatturaPAService.generateBatchZip(SEARCH_DATE_FROM, SEARCH_DATE_TO)).thenReturn(zipBytes);
+
+        mockMvc.perform(get(BASE_URL + PATH_EXPORT)
+                        .param("from", SEARCH_DATE_FROM.toString())
+                        .param("to", SEARCH_DATE_TO.toString()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HEADER_CONTENT_DISPOSITION,
+                        org.hamcrest.Matchers.containsString(ATTACHMENT)))
+                .andExpect(content().bytes(zipBytes));
     }
 
     @Test

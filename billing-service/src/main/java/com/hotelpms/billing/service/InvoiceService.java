@@ -131,4 +131,15 @@ public interface InvoiceService {
      * @return the updated invoice response
      */
     InvoiceResponse updateSdiStatus(@NonNull UUID invoiceId, @NonNull SdiStatus sdiStatus);
+
+    /**
+     * Returns all invoices for the caller's hotel with an issue date within the given
+     * inclusive day range. Used by the FatturaPA batch export to select which invoices
+     * to hand off to the commercialista for a given period.
+     *
+     * @param from inclusive lower bound (day) on issue date
+     * @param to   inclusive upper bound (day) on issue date
+     * @return matching invoices for the authenticated hotel, ordered by issue date ascending
+     */
+    List<InvoiceResponse> getInvoicesInPeriod(@NonNull LocalDate from, @NonNull LocalDate to);
 }
