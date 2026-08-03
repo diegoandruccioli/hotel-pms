@@ -63,7 +63,7 @@ import java.util.zip.ZipOutputStream;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public final class FatturaPAServiceImpl implements FatturaPAService {
+public class FatturaPAServiceImpl implements FatturaPAService {
 
     private static final String AE_NS =
             "http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2";
@@ -88,6 +88,7 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
     private final FatturaPaXsdValidator xsdValidator;
     private final InvoiceFiscalExportRepository invoiceFiscalExportRepository;
 
+    /** {@inheritDoc} */
     @Override
     @Transactional
     public byte[] generateXml(@NonNull final UUID invoiceId) {
@@ -159,6 +160,7 @@ public final class FatturaPAServiceImpl implements FatturaPAService {
         return auth != null ? auth.getName() : "unknown";
     }
 
+    /** {@inheritDoc} */
     @Override
     @Transactional
     public byte[] generateBatchZip(@NonNull final LocalDate from, @NonNull final LocalDate to) {
