@@ -176,16 +176,9 @@ public class FatturaPAServiceImpl implements FatturaPAService {
 
         final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(buffer)) {
-            final StringBuilder index = new StringBuilder("invoiceNumber,issueDate,totalAmount,status\n");
+            final StringBuilder index = new StringBuilder("invoiceNumber,issueDate,totalAmount,status,export\n");
             for (final InvoiceResponse invoice : eligibleInvoices) {
-                final byte[] xml = generateXml(invoice.id());
-                zip.putNextEntry(new ZipEntry(zipEntryName(invoice)));
-                zip.write(xml);
-                zip.closeEntry();
-                index.append(invoice.invoiceNumber()).append(',')
-                        .append(invoice.issueDate() != null ? invoice.issueDate().format(DATE_FMT) : "")
-                        .append(',').append(formatDecimal(invoice.totalAmount()))
-                        .append(',').append(invoice.status()).append('\n');
+                appendInvoiceToBatch(zip, index, invoice);
             }
             zip.putNextEntry(new ZipEntry("index.csv"));
             zip.write(index.toString().getBytes(StandardCharsets.UTF_8));
@@ -194,6 +187,43 @@ public class FatturaPAServiceImpl implements FatturaPAService {
             throw new IllegalStateException("FATTURAPA_BATCH_ZIP_FAILED", ex);
         }
         return buffer.toByteArray();
+    }
+
+    /**
+     * Generates and writes one invoice's XML into the batch ZIP, isolating failures so a
+     * single problematic invoice (e.g. incomplete guest address) doesn't abort the whole
+     * period export — the other, valid invoices must still reach the commercialista. The
+     * failure is recorded in the index instead, for the operator to fix and re-export later.
+     *
+     * @param zip     the batch ZIP being written
+     * @param index   the CSV index being built
+     * @param invoice the invoice to export
+     * @throws IOException if writing to the ZIP itself fails
+     */
+    private void appendInvoiceToBatch(final ZipOutputStream zip, final StringBuilder index,
+                                       final InvoiceResponse invoice) throws IOException {
+        String exportResult = "OK";
+        try {
+            final byte[] xml = generateXml(invoice.id());
+            zip.putNextEntry(new ZipEntry(zipEntryName(invoice)));
+            zip.write(xml);
+            zip.closeEntry();
+        } catch (final BillingValidationException | InvoiceConflictException | IllegalStateException ex) {
+            log.warn("Skipping invoice {} in batch export: {}", invoice.id(), ex.getMessage());
+            exportResult = "ERROR: " + ex.getMessage();
+        }
+        index.append(invoice.invoiceNumber()).append(',')
+                .append(invoice.issueDate() != null ? invoice.issueDate().format(DATE_FMT) : "")
+                .append(',').append(formatDecimal(invoice.totalAmount()))
+                .append(',').append(invoice.status())
+                .append(',').append(csvEscape(exportResult)).append('\n');
+    }
+
+    private static String csvEscape(final String value) {
+        if (value.indexOf(',') < 0 && value.indexOf('"') < 0 && value.indexOf('\n') < 0) {
+            return value;
+        }
+        return '"' + value.replace("\"", "\"\"") + '"';
     }
 
     private static String zipEntryName(final InvoiceResponse invoice) {

@@ -284,6 +284,38 @@ class FatturaPAServiceImplTest {
     }
 
     @Test
+    void shouldSkipInvoiceWithIncompleteGuestAddressAndStillExportTheRest() throws java.io.IOException {
+        final UUID brokenInvoiceId = UUID.randomUUID();
+        final UUID brokenGuestId = UUID.randomUUID();
+        final InvoiceResponse broken = new InvoiceResponse(
+                brokenInvoiceId, HOTEL_ID, INVOICE_NUMBER_2,
+                LocalDateTime.of(ISSUE_YEAR, 1, ISSUE_DAY, 11, 0),
+                new BigDecimal("55.00"), InvoiceStatus.ISSUED,
+                RES_ID, brokenGuestId, null,
+                DocumentType.FATTURA, SdiStatus.NOT_SENT, List.of(), List.of());
+        final GuestResponse incompleteGuest = new GuestResponse(brokenGuestId, GUEST_FIRST_NAME, GUEST_LAST_NAME,
+                GUEST_EMAIL, null, null, null, null, null,
+                GUEST_ADDRESS, null, null, null);
+        final InvoiceResponse ok = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
+        final LocalDate from = LocalDate.of(ISSUE_YEAR, 1, 1);
+        final LocalDate to = LocalDate.of(ISSUE_YEAR, 1, 31);
+
+        when(invoiceService.getInvoicesInPeriod(from, to)).thenReturn(List.of(broken, ok));
+        when(invoiceService.getInvoice(brokenInvoiceId)).thenReturn(broken);
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(ok);
+        when(hotelSettingsClient.getSettings()).thenReturn(hotel);
+        when(guestClient.getGuestById(brokenGuestId)).thenReturn(incompleteGuest);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
+
+        final byte[] zip = service.generateBatchZip(from, to);
+        final ZipContents contents = readZip(zip);
+
+        assertThat(contents.entryNames).containsExactlyInAnyOrder("2026-0001.xml", INDEX_CSV);
+        assertThat(contents.index).contains("ERROR: GUEST_STRUCTURED_ADDRESS_INCOMPLETE");
+        verify(invoiceFiscalExportRepository, org.mockito.Mockito.times(1)).save(any());
+    }
+
+    @Test
     void shouldExcludeCancelledAndRicevutaInvoicesFromBatchExport() throws java.io.IOException {
         final InvoiceResponse cancelled = fattura(InvoiceStatus.CANCELLED, DocumentType.FATTURA);
         final InvoiceResponse ricevuta = fattura(InvoiceStatus.ISSUED, DocumentType.RICEVUTA);
