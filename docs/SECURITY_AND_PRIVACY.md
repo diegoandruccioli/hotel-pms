@@ -126,9 +126,9 @@ Le migration Flyway garantiscono che `hotel_id` sia NOT NULL su tutte le tabelle
 |------|----------------|---------|
 | Nome, cognome | PII — Personale | guest-service |
 | Email, telefono, città | PII — Contatto | guest-service |
-| Data e luogo di nascita | PII — Sensibile | guest-service, stay-service |
-| Tipo e numero documento | PII — Sensibile | stay-service (StayGuest) |
-| Sesso, nazionalità | PII — Demografico | stay-service (StayGuest) |
+| Data e luogo di nascita | PII — Sensibile | guest-service, frontdesk-service |
+| Tipo e numero documento | PII — Sensibile | frontdesk-service (StayGuest) |
+| Sesso, nazionalità | PII — Demografico | frontdesk-service (StayGuest) |
 | Dati di fatturazione | PII — Finanziario | billing-service |
 
 ### Misure implementate
@@ -137,7 +137,7 @@ Le migration Flyway garantiscono che `hotel_id` sia NOT NULL su tutte le tabelle
 
 **Email uniqueness per hotel:** L'email è unica per coppia `(email, hotel_id)` — non globalmente. Un ospite può avere profili separati in hotel diversi (es. catena alberghiera). L'indice è parziale: `WHERE email IS NOT NULL` per permettere ospiti senza email.
 
-**Separazione dei dati Alloggiati:** I dati PS (stato/comune nascita, documento) sono salvati su `StayGuest` (stay-service) separati dal profilo ospite in `Guest` (guest-service). Un receptionist non vede mai i dati PS storici — sono solo nel report Alloggiati e nel database stay-service.
+**Separazione dei dati Alloggiati:** I dati PS (stato/comune nascita, documento) sono salvati su `StayGuest` (frontdesk-service) separati dal profilo ospite in `Guest` (guest-service). Un receptionist non vede mai i dati PS storici — sono solo nel report Alloggiati e nel database frontdesk-service.
 
 ### Diritti dell'interessato (GDPR Art. 17)
 

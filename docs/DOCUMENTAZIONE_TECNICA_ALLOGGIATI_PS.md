@@ -1,6 +1,6 @@
 # Documentazione Tecnica — Integrazione Portale Alloggiati Web (Polizia di Stato)
 
-**Servizio:** `stay-service` (porta 8084)  
+**Servizio:** `frontdesk-service` (porta 8081)  
 **Normativa di riferimento:** Art. 109 TULPS (T.U. Leggi di Pubblica Sicurezza), D.M. 7 gennaio 2013  
 **Versione documento:** 1.0 — 2026-05-05
 
@@ -10,7 +10,7 @@
 
 L'art. 109 del TULPS impone alle strutture ricettive la comunicazione telematica alla Questura competente delle generalità di ogni ospite entro 24 ore dal check-in. Il Portale Alloggiati Web (`alloggiatiweb.poliziadistato.it`) è il sistema ufficiale della Polizia di Stato per la ricezione di queste comunicazioni.
 
-L'integrazione implementata in `stay-service` supporta **due modalità operative** alternative e complementari:
+L'integrazione implementata in `frontdesk-service` supporta **due modalità operative** alternative e complementari:
 
 | Modalità | Descrizione | Endpoint |
 |---|---|---|
@@ -145,7 +145,7 @@ Il portale PS espone un servizio SOAP 1.1 a:
 Il protocollo è a **due passi**:
 
 ```
-stay-service                              Portale PS
+frontdesk-service                              Portale PS
      │                                         │
      │── POST GenerateToken ─────────────────>│
      │   (Utente, Password, WsKey)             │
@@ -263,7 +263,7 @@ frontend
         └── tipdoc select         (lista da GET /api/v1/stays/lookup/tipdoc)
 
 api-gateway (:8080)
-  └── stay-service (:8084)
+  └── frontdesk-service (:8081)
         ├── AlloggiatiLookupController    → /api/v1/stays/lookup/{stati,comuni,tipdoc}
         ├── StayController                → /api/v1/stays/reports/alloggiati/*
         ├── AlloggiatiReportServiceImpl   ← StayRepository, AlloggiatiLookupService
@@ -274,7 +274,7 @@ api-gateway (:8080)
 
 ### 4.2 Lookup tables PostgreSQL
 
-Popolate automaticamente al primo avvio di `stay-service` da `AlloggiatiLookupDataLoader` scaricando i CSV pubblici del portale PS.
+Popolate automaticamente al primo avvio di `frontdesk-service` da `AlloggiatiLookupDataLoader` scaricando i CSV pubblici del portale PS.
 
 | Tabella | Sorgente CSV | ~Righe | Primary Key | Campo chiave |
 |---|---|---|---|---|
@@ -288,7 +288,7 @@ I lookup frequenti (`findByCodice`) sono cachati in-memory con **Caffeine** (TTL
 # Svuotare le tabelle e riavviare il servizio
 docker exec -it postgres psql -U postgres -d hotel_stay -c \
   "TRUNCATE alloggiati_stati, alloggiati_comuni, alloggiati_tipdoc;"
-docker restart stay-service
+docker restart frontdesk-service
 ```
 
 ### 4.3 Entità StayGuest — campi Alloggiati
@@ -312,7 +312,7 @@ StayGuest
 ### 4.4 Dipendenze build rilevanti
 
 ```kotlin
-// stay-service/build.gradle.kts
+// frontdesk-service/build.gradle.kts
 implementation("org.apache.commons:commons-csv:1.9.0")          // CSV parser con supporto quoted fields
 implementation("org.springframework.boot:spring-boot-starter-cache")
 implementation("com.github.ben-manes.caffeine:caffeine")        // in-memory cache
@@ -352,7 +352,7 @@ Questa procedura consente di validare la correttezza del file generato **prima**
 ```bash
 # Via API (richiede JWT valido)
 curl -s -b "jwt=<token>" \
-  "http://localhost:8084/api/v1/stays/reports/alloggiati?date=2026-04-15" \
+  "http://localhost:8081/api/v1/stays/reports/alloggiati?date=2026-04-15" \
   -o alloggiati-2026-04-15.txt
 
 # Oppure tramite frontend: Soggiorni → Download Alloggiati → seleziona data
@@ -395,7 +395,7 @@ head -c 168 alloggiati-2026-04-15.txt | cut -c15-64 # Cognome
 Completare tutti i punti prima di impostare `ALLOGGIATI_DRY_RUN=false` in produzione:
 
 - [ ] `ALLOGGIATI_USERNAME`, `ALLOGGIATI_PASSWORD`, `ALLOGGIATI_WS_KEY` impostati nel `.env` di produzione
-- [ ] Avvio `stay-service` con `DRY_RUN=true` — verificare nei log che le lookup tables si popolino (`Loaded N stati/comuni/tipdoc from Portale Alloggiati`)
+- [ ] Avvio `frontdesk-service` con `DRY_RUN=true` — verificare nei log che le lookup tables si popolino (`Loaded N stati/comuni/tipdoc from Portale Alloggiati`)
 - [ ] Effettuare almeno un check-in con dati reali e codici PS corretti
 - [ ] Verificare log `ALLOGGIATI_SUBMISSION_SUCCESS | operation=Test`
 - [ ] Accedere al portale PS e confermare che la schedina appaia nell'area archivio (il `Test` è visibile nella sezione test del portale)
@@ -455,11 +455,11 @@ Le tabelle vengono scaricate automaticamente solo se vuote. Per forzare un aggio
 docker exec -it postgres psql -U postgres -d hotel_stay -c \
   "TRUNCATE alloggiati_stati, alloggiati_comuni, alloggiati_tipdoc;"
 
-# 2. Riavviare lo stay-service (il DataLoader rileva le tabelle vuote)
-docker restart stay-service
+# 2. Riavviare lo frontdesk-service (il DataLoader rileva le tabelle vuote)
+docker restart frontdesk-service
 
 # 3. Verificare nei log
-docker logs stay-service --tail=30 | grep -E "alloggiati_stati|alloggiati_comuni|alloggiati_tipdoc|Loaded"
+docker logs frontdesk-service --tail=30 | grep -E "alloggiati_stati|alloggiati_comuni|alloggiati_tipdoc|Loaded"
 ```
 
 ### 6.6 Verifica cache
@@ -467,7 +467,7 @@ docker logs stay-service --tail=30 | grep -E "alloggiati_stati|alloggiati_comuni
 Se i dati sembrano obsoleti nonostante le tabelle aggiornate, la cache Caffeine (TTL 24h) potrebbe essere stantia. Il reset più semplice è il riavvio del servizio:
 
 ```bash
-docker restart stay-service
+docker restart frontdesk-service
 ```
 
 ---
@@ -479,7 +479,7 @@ Questa procedura è destinata al personale tecnico per il collaudo iniziale prim
 **Prerequisiti:**
 - Credenziali del portale PS (`HOTELALFA01` / password)
 - Almeno un check-in completato nella data di test
-- Accesso all'API del `stay-service` (via Postman o curl con JWT)
+- Accesso all'API del `frontdesk-service` (via Postman o curl con JWT)
 
 **Procedura:**
 

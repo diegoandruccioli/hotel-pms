@@ -1,6 +1,6 @@
 # Hotel PMS — Manuale Operativo
 
-**Versione:** 1.1 — 2026-05-15  
+**Versione:** 1.2 — 2026-08-04 (aggiunte pagine Settings multi-pagina, export FatturaPA §3.7a)  
 **Destinatari:** Receptionist, Owner, Admin  
 **Lingua sistema:** Italiano / Inglese (selezionabile)
 
@@ -33,10 +33,15 @@
 | `/calendar` | Calendario | Tutti | Planning board e vista mensile prenotazioni |
 | `/housekeeping` | Housekeeping | Tutti | Status pulizia camere; aggiornamento rapido |
 | `/rooms` | Camere | Tutti | Inventario camere fisiche e tipologie; gestione status |
-| `/profile` | Profilo | Tutti | Cambio password, informazioni account |
+| `/settings` | Impostazioni (hub) | Tutti | Punto d'accesso alle sotto-pagine impostazioni sotto |
+| `/settings/profile` | Profilo utente | Tutti | Informazioni account personale |
+| `/settings/password` | Cambio password | Tutti | Cambio password personale |
+| `/settings/accessibility` | Accessibilità | Tutti | Opzioni di accessibilità dell'interfaccia |
+| `/settings/appearance` | Aspetto | Tutti | Tema chiaro/scuro, lingua IT/EN |
+| `/settings/system` | Sistema | OWNER, ADMIN | Impostazioni privacy/retention ospiti |
 | `/owner-dashboard` | Report Proprietario | OWNER, ADMIN | Revenue, occupancy, ADR, RevPAR; export CSV |
 | `/admin/users` | Gestione Utenti | ADMIN | Crea, modifica, disattiva account receptionist/owner |
-| `/profile/hotel` | Profilo Hotel | ADMIN | Nome, indirizzo, PIVA/CF, logo, toggle Alloggiati automatico |
+| `/profile/hotel` | Profilo Hotel | ADMIN | Nome, indirizzo, PIVA/CF, logo, toggle Alloggiati automatico, credenziali PS |
 
 ---
 
@@ -154,6 +159,31 @@ Solo dopo questi passi il sistema è operativo per ricevere prenotazioni e gesti
 2. Inserire l'importo e selezionare il metodo di pagamento (Contanti, Carta, Bonifico, ecc.)
 3. Clicca **Salva**
 4. Quando l'importo pagato raggiunge il totale della fattura, lo stato passa automaticamente a **PAID**
+
+---
+
+### 3.7a Esportare la fattura elettronica (FatturaPA) per il commercialista
+
+Il sistema **non invia** le fatture allo SDI (Sistema di Interscambio) — produce un
+export XML corretto e validato, pronto da consegnare al commercialista o da importare
+nel software di terze parti già in uso (TeamSystem, Zucchetti, Danea, ecc.).
+
+**Export di una singola fattura:**
+1. Menu → **Fatturazione** → apri la fattura → pulsante **Scarica FatturaPA**
+2. Il sistema valida l'XML contro lo schema ufficiale dell'Agenzia delle Entrate prima
+   di generarlo — se qualcosa non torna (es. indirizzo ospite incompleto), l'errore è
+   segnalato subito invece di produrre un file che il commercialista scoprirebbe errato
+3. **Attenzione**: dal momento in cui una fattura viene esportata, i suoi campi fiscali
+   (importo, numero fattura, tipo documento) **non sono più modificabili** — un
+   tentativo restituisce l'errore `INVOICE_LOCKED_AFTER_EXPORT`. Per correggere una
+   fattura già esportata serve una nota di credito (funzionalità non ancora disponibile,
+   vedi `docs/ROADMAP.md`)
+
+**Export di un intero periodo (consegna al commercialista):**
+1. Menu → **Fatturazione** → **Esporta periodo** → seleziona data inizio/fine
+2. Il sistema produce uno ZIP con un XML per ogni fattura idonea del periodo, più un
+   indice CSV riepilogativo. Le fatture con dati incompleti vengono escluse ed elencate
+   nell'indice con l'errore specifico, senza bloccare l'export delle altre
 
 ---
 

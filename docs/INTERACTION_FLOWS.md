@@ -1,6 +1,6 @@
 # Hotel PMS — Flussi di Interazione
 
-**Versione:** 1.0 — 2026-05-07  
+**Versione:** 1.1 — 2026-08-04 (`inventory-service`/`reservation-service`/`stay-service` consolidati in `frontdesk-service` per ADR-001, riferimenti aggiornati)  
 **Scope:** Flussi end-to-end tra browser, frontend React, API Gateway e microservizi
 
 ---
@@ -18,9 +18,7 @@
     │  Rate limiting via Redis Token Bucket
     ├──► auth-service       :8087
     ├──► guest-service      :8083
-    ├──► inventory-service  :8081
-    ├──► reservation-service :8082
-    ├──► stay-service       :8084
+    ├──► frontdesk-service  :8081  (rooms + reservations + stays, ADR-001)
     ├──► billing-service    :8085
     └──► fb-service         :8086
 ```
@@ -69,9 +67,9 @@ L'utente non vede interruzioni. Se anche il refresh fallisce (token scaduto o re
 ```
 Browser → POST /api/v1/reservations {guestId, roomIds[], checkInDate, checkOutDate, expectedGuests}
   → Gateway (valida JWT, inietta headers)
-  → reservation-service
+  → frontdesk-service (reservations)
       ├── @PreAuthorize: ADMIN / OWNER / RECEPTIONIST
-      ├── verifica disponibilità: GET /api/v1/rooms/{id} per ogni camera (→ inventory-service via Feign)
+      ├── verifica disponibilità: GET /api/v1/rooms/{id} per ogni camera (→ frontdesk-service rooms sub-package, chiamata intra-servizio dopo ADR-001, non più Feign)
       │     CircuitBreaker: fallback con ConflictException se inventory non risponde
       ├── crea Reservation con status CONFIRMED
       └── risponde 201 con ReservationResponse
@@ -82,7 +80,7 @@ Modifica prenotazione:
 
 Cancellazione:
   PATCH /api/v1/reservations/{id}/status {status: CANCELLED}
-    → reservation-service marca status CANCELLED
+    → frontdesk-service (reservations) marca status CANCELLED
 ```
 
 ---
@@ -95,15 +93,15 @@ Browser → POST /api/v1/stays/check-in
                                             statoDiNascita, luogoNascita, travellerType,
                                             tipoDocumento, numeroDocumento, ...}]}
   → Gateway
-  → stay-service.checkIn()
-      ├── verifica reservation (→ reservation-service via Feign)
+  → frontdesk-service (stays).checkIn()
+      ├── verifica reservation (→ frontdesk-service reservations sub-package, chiamata intra-servizio dopo ADR-001, non più Feign)
       │     fallback: eccezione se non trovata
       ├── verifica guest (→ guest-service via Feign)
-      ├── verifica room disponibile (→ inventory-service via Feign)
+      ├── verifica room disponibile (→ frontdesk-service rooms sub-package, chiamata intra-servizio dopo ADR-001, non più Feign)
       ├── crea Stay con expectedCheckOutDate dalla reservation
       ├── salva StayGuest[] con i campi Alloggiati
-      ├── PATCH /api/v1/rooms/{id}/status {OCCUPIED} (→ inventory-service via Feign)
-      ├── PATCH /api/v1/reservations/{id}/status {CHECKED_IN} (→ reservation-service via Feign)
+      ├── PATCH /api/v1/rooms/{id}/status {OCCUPIED} (→ frontdesk-service rooms sub-package, chiamata intra-servizio dopo ADR-001, non più Feign)
+      ├── PATCH /api/v1/reservations/{id}/status {CHECKED_IN} (→ frontdesk-service reservations sub-package, chiamata intra-servizio dopo ADR-001, non più Feign)
       ├── POST /api/v1/invoices/stay (→ billing-service via Feign)
       │     → crea Invoice con status=ISSUED, totalAmount=0, stayId
       │     fallback: log warning, check-in non bloccato
@@ -123,7 +121,7 @@ Browser → POST /api/v1/stays/check-in
 ```
 Browser → POST /api/v1/stays/check-in
           {reservationId: null, roomId, guests: [...], expectedCheckOutDate}
-  → stay-service.checkIn()
+  → frontdesk-service (stays).checkIn()
       ├── nessuna verifica reservation (null tollerato)
       ├── verifica room disponibile
       ├── crea Stay senza reservationId
@@ -137,12 +135,12 @@ Browser → POST /api/v1/stays/check-in
 
 ```
 Browser → PATCH /api/v1/stays/{id}/check-out
-  → stay-service.checkOut()
+  → frontdesk-service (stays).checkOut()
       ├── recupera Stay
       ├── GET /api/v1/invoices/stay/{stayId}/latest (→ billing-service via Feign)
       │     se invoice.status ≠ PAID → risponde 422 (checkout bloccato)
-      ├── PATCH /api/v1/rooms/{roomId}/status {DIRTY} (→ inventory-service via Feign)
-      ├── PATCH /api/v1/reservations/{reservationId}/status {CHECKED_OUT} (→ reservation-service via Feign)
+      ├── PATCH /api/v1/rooms/{roomId}/status {DIRTY} (→ frontdesk-service rooms sub-package, chiamata intra-servizio dopo ADR-001, non più Feign)
+      ├── PATCH /api/v1/reservations/{reservationId}/status {CHECKED_OUT} (→ frontdesk-service reservations sub-package, chiamata intra-servizio dopo ADR-001, non più Feign)
       │     (solo se reservationId presente — walk-in: skip)
       └── aggiorna Stay.checkOutDate=oggi, status=CHECKED_OUT
 ```
@@ -187,13 +185,13 @@ Browser → POST /api/v1/invoices/{invoiceId}/payments
 
 ```
 Browser → GET /api/v1/stays/reports/alloggiati?date=YYYY-MM-DD
-  → stay-service
+  → frontdesk-service (stays)
       ├── recupera tutti gli StayGuest con arrivalDate=date e hotelId=X-Auth-Hotel
       ├── genera file .txt (168 char per record, CRLF, max 1000 righe)
       └── risponde con Content-Type: text/plain; Content-Disposition: attachment; filename=alloggiati-YYYY-MM-DD.txt
 
 Browser → POST /api/v1/stays/reports/alloggiati/submit?date=YYYY-MM-DD
-  → stay-service.AlloggiatiWebSenderService
+  → frontdesk-service (stays).AlloggiatiWebSenderService
       ├── POST SOAP GenerateToken (WsKey) → ottiene Token
       ├── POST SOAP Send (o Test se DRY_RUN=true) con file .txt
       └── risponde 200 / 422 con esito portale
@@ -215,9 +213,9 @@ PATCH /api/v1/users/{id}/activate → auth-service → imposta active=true
 ## 11. Profilo Hotel (ADMIN)
 
 ```
-GET /api/v1/stays/settings → stay-service → restituisce HotelSettings (nome, indirizzo, PIVA, CF, alloggiatiAutoSend, logoUrl)
-PUT /api/v1/stays/settings → stay-service → aggiorna HotelSettings
-POST /api/v1/stays/settings/logo → stay-service → carica logo, salva file, aggiorna logoUrl
+GET /api/v1/stays/settings → frontdesk-service (stays) → restituisce HotelSettings (nome, indirizzo, PIVA, CF, alloggiatiAutoSend, logoUrl)
+PUT /api/v1/stays/settings → frontdesk-service (stays) → aggiorna HotelSettings
+POST /api/v1/stays/settings/logo → frontdesk-service (stays) → carica logo, salva file, aggiorna logoUrl
 ```
 
 ---
@@ -297,7 +295,7 @@ Browser → GET /api/v1/guests/{guestId}/export
       ├── verifica che il guest appartenga all'hotel (multi-tenant check con hotel_id)
       ├── verifica che il guest non sia anonymizzato (active=true)
       ├── raccoglie profilo completo: nome, email, telefono, gdprConsentDate
-      ├── chiama stay-service via Feign → GET /api/v1/stays/guest/{guestId}/history
+      ├── chiama frontdesk-service via Feign → GET /api/v1/stays/guest/{guestId}/history
       │     → lista soggiorni con date, camera, hotel (solo hotel corrente)
       └── risponde 200 JSON con struttura machine-readable (GDPR Art. 20)
 
@@ -322,7 +320,7 @@ Browser → GET /api/v1/invoices/{invoiceId}/pdf
   → billing-service
       ├── verifica che invoice.hotelId = X-Auth-Hotel (multi-tenant check)
       ├── recupera Invoice con charges e payments (EntityGraph — no N+1)
-      ├── recupera dati hotel da stay-service via Feign → GET /api/v1/stays/settings
+      ├── recupera dati hotel da frontdesk-service (stays) → GET /api/v1/stays/settings
       ├── genera PDF on-the-fly con Apache PDFBox:
       │     header con logo e dati fiscali hotel (nome, indirizzo, P.IVA, CF)
       │     dati soggiorno, lista addebiti, totale, stato pagamento (ISSUED/PAID)

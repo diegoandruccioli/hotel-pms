@@ -1,3 +1,10 @@
+> **STATO: STORICO.** Audit del 2026-05-07 sul branch `feature/frontend-development`,
+> che non esiste più. Architettura pre-consolidamento ADR-001, pre-FatturaPA export,
+> pre-backup pgBackRest. Per lo stato di conformità normativa attuale vedi
+> `docs/COMPLIANCE_AUDIT_2026-08.md`; per bug noti attuali vedi
+> `docs/EXPLORATORY_TEST_2026-08.md`. Conservato come riferimento storico del processo
+> di audit, non come stato attuale del progetto.
+
 # Audit Finale Ultra-Severo — Hotel PMS
 
 **Data:** 2026-05-07  

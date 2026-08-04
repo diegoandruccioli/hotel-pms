@@ -66,7 +66,7 @@ Il collaudo è **obbligatorio** prima del pilot perché un errore silenzioso nel
 |---|---|
 | Docker Engine ≥ 24 + Compose v2 attivi | `docker info` e `docker compose version` |
 | Stack avviato e tutti i container healthy | `docker compose ps` — tutti `(healthy)` o `Up` |
-| Rete internet dal container `stay-service` raggiungibile | `docker exec stay-service curl -s -o /dev/null -w "%{http_code}" https://alloggiatiweb.poliziadistato.it` → `200` o `302` |
+| Rete internet dal container `frontdesk-service` raggiungibile | `docker exec frontdesk-service curl -s -o /dev/null -w "%{http_code}" https://alloggiatiweb.poliziadistato.it` → `200` o `302` |
 | PostgreSQL `hotel_stay` DB attivo e migrazioni V1-V8 applicate | `docker exec postgres psql -U postgres -d hotel_stay -c "SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1;"` → `8` |
 | Lookup tables popolate | `docker exec postgres psql -U postgres -d hotel_stay -c "SELECT COUNT(*) FROM alloggiati_comuni;"` → ≥ 7800 |
 
@@ -152,10 +152,10 @@ Preparare nel sistema almeno **tre ospiti di test** con i seguenti profili, usan
 | **TC-05** | Validazione CRLF — nessun CRLF finale | TC-03 completato | `hexdump -C /tmp/alloggiati-test.txt \| tail -4` | Ultima riga finisce con l'ultimo carattere del record, non con `0d 0a`; righe intermedie terminano con `0d 0a` | CRITICO | ⬜ |
 | **TC-06** | Invio SOAP dry-run (operazione Test) | `ALLOGGIATI_DRY_RUN=true`; credenziali PS reali nel `.env`; TC-03 completato | `curl -s -b "jwt=<TOKEN>" -X POST "http://localhost:8080/api/v1/stays/reports/alloggiati/submit?date=$(date +%Y-%m-%d)"` | HTTP 200; log `ALLOGGIATI_SUBMISSION_SUCCESS \| operation=Test`; nessun `ALLOGGIATI_SOAP_ERROR` | BLOCCANTE | ⬜ |
 | **TC-07** | Invio SOAP reale (operazione Send) | TC-06 superato; `ALLOGGIATI_DRY_RUN=false`; accesso al portale PS per verifica | Come TC-06 con `DRY_RUN=false` | HTTP 200; log `ALLOGGIATI_SUBMISSION_SUCCESS \| operation=Send`; sul portale PS → Archivio → schedina presente | BLOCCANTE | ⬜ |
-| **TC-08** | Resilienza — fallimento rete durante invio | Stack avviato; simulare disconnessione di rete del container: `docker network disconnect hotel-pms_default stay-service` | Eseguire check-in completo → poi tentare invio manuale | Check-in completato con HTTP 200 prima della disconnessione; invio fallisce con log `ALLOGGIATI_SOAP_ERROR \| Connection refused`; lo stato del soggiorno rimane CHECKED_IN (non rollback); badge frontend rosso | BLOCCANTE | ⬜ |
+| **TC-08** | Resilienza — fallimento rete durante invio | Stack avviato; simulare disconnessione di rete del container: `docker network disconnect hotel-pms_default frontdesk-service` | Eseguire check-in completo → poi tentare invio manuale | Check-in completato con HTTP 200 prima della disconnessione; invio fallisce con log `ALLOGGIATI_SOAP_ERROR \| Connection refused`; lo stato del soggiorno rimane CHECKED_IN (non rollback); badge frontend rosso | BLOCCANTE | ⬜ |
 | **TC-09** | Resilienza — risposta di errore dal portale PS | `ALLOGGIATI_DRY_RUN=true`; credenziali intenzionalmente errate (es. password sbagliata) | Tentare invio: `POST .../submit?date=...` | HTTP 500 o 422 restituito dall'endpoint; log `ALLOGGIATI_SOAP_ERROR \| action=AlloggiatiService/GenerateToken`; sistema non crasha; retry successivo non bloccato | CRITICO | ⬜ |
 | **TC-10** | Check-in non bloccato da errore invio esterno | `ALLOGGIATI_DRY_RUN=true`; portale PS simulato irraggiungibile (blocco rete) | Eseguire check-in completo con `alloggiatiAutoSend=true` attivo | Check-in restituisce HTTP 200; soggiorno salvato nel DB; log mostra tentativo invio fallito con errore non-blocking; badge frontend rosso (non inviato); receptionist può procedere | BLOCCANTE | ⬜ |
-| **TC-11** | Correlazione log — X-Correlation-ID end-to-end | Stack con correlation ID attivo | Eseguire check-in con header `X-Correlation-ID: test-collaudo-001`; poi tentare invio | Log di `api-gateway`, `stay-service` contengono `correlationId=test-collaudo-001` su ogni riga rilevante; log del `GenerateToken` e `Send` SOAP riportano lo stesso ID | ALTO | ⬜ |
+| **TC-11** | Correlazione log — X-Correlation-ID end-to-end | Stack con correlation ID attivo | Eseguire check-in con header `X-Correlation-ID: test-collaudo-001`; poi tentare invio | Log di `api-gateway`, `frontdesk-service` contengono `correlationId=test-collaudo-001` su ogni riga rilevante; log del `GenerateToken` e `Send` SOAP riportano lo stesso ID | ALTO | ⬜ |
 | **TC-12** | Coerenza dati — frontend vs DB vs file esportato | TC-01 completato con ospite A | 1. Leggere dati ospite dal frontend (pagina Stays → dettaglio). 2. `SELECT * FROM stay_guests WHERE stay_id = '<id>'`. 3. Scaricare file Alloggiati e leggere riga corrispondente. | I 12 campi chiave (nome, cognome, sesso, dataNascita, comuneNascita, cittadinanza, tipoDoc, nDoc, luogoDoc, tipoAlloggiato, arrivo, permanenza) sono identici in tutte e tre le fonti | BLOCCANTE | ⬜ |
 | **TC-13** | Nucleo familiare — ordinamento e campi doc | Ospiti C1 (CAPOFAMIGLIA) e C2 (FAMILIARE) in uno stesso soggiorno | Check-in con due ospiti C1+C2; scaricare file | Nel file: C1 precede C2 (ordinamento per `numericCode` ASC); C2 ha campi documento completamente blank (posizioni 45-97 = spazi) | CRITICO | ⬜ |
 | **TC-14** | Ospite straniero — stato nascita e rilascio doc | Ospite B con stato nascita USA | Check-in ospite B; scaricare file | Campo statoNascita (pos. 58-66) contiene codice stato USA valido dalla lookup; luogoRilascioDoc (pos. 77-85) contiene lo stesso codice stato (non un codice comune); provinciaNascita = spazi | CRITICO | ⬜ |
@@ -277,13 +277,13 @@ docker logs api-gateway 2>&1 | grep -E "HMAC_SECRET"
 
 **1.5** Verificare caricamento lookup tables:
 ```bash
-docker logs stay-service 2>&1 | grep -E "Loaded|lookup"
+docker logs frontdesk-service 2>&1 | grep -E "Loaded|lookup"
 # Atteso: Loaded N stati/comuni/tipdoc from Portale Alloggiati
 ```
 
 **1.6** Verificare assenza di placeholder nelle variabili Alloggiati:
 ```bash
-docker logs stay-service 2>&1 | grep -i "placeholder\|ci_placeholder"
+docker logs frontdesk-service 2>&1 | grep -i "placeholder\|ci_placeholder"
 # Nessun output atteso
 ```
 
@@ -349,7 +349,7 @@ curl -s -b /tmp/cookies.txt -X POST \
 
 **3.5** Verificare i log dell'operazione:
 ```bash
-docker logs stay-service --tail=50 2>&1 | grep -E "ALLOGGIATI|SOAP|TOKEN|SUBMISSION"
+docker logs frontdesk-service --tail=50 2>&1 | grep -E "ALLOGGIATI|SOAP|TOKEN|SUBMISSION"
 ```
 
 Sequenza attesa (nell'ordine):
@@ -379,11 +379,11 @@ ALLOGGIATI_SENT | stayId=<uuid> | date=YYYY-MM-DD
 docker exec postgres pg_dump -U postgres hotel_stay > "backup-pre-send-$(date +%Y%m%d-%H%M).sql"
 ```
 
-**4.2** Cambiare `ALLOGGIATI_DRY_RUN=false` nel `.env` e riavviare solo lo stay-service:
+**4.2** Cambiare `ALLOGGIATI_DRY_RUN=false` nel `.env` e riavviare solo lo frontdesk-service:
 ```bash
-docker compose up -d --no-deps stay-service
-# Attendere che stay-service sia healthy
-docker logs stay-service --tail=20
+docker compose up -d --no-deps frontdesk-service
+# Attendere che frontdesk-service sia healthy
+docker logs frontdesk-service --tail=20
 ```
 
 **4.3** Eseguire un nuovo check-in (ospite A fresco, non già inviato):
@@ -392,7 +392,7 @@ docker logs stay-service --tail=20
 
 **4.4** Verificare il log con operazione `Send`:
 ```bash
-docker logs stay-service --tail=50 2>&1 | grep -E "ALLOGGIATI|operation="
+docker logs frontdesk-service --tail=50 2>&1 | grep -E "ALLOGGIATI|operation="
 # Atteso: operation=Send (non più operation=Test)
 ```
 
@@ -410,7 +410,7 @@ docker logs stay-service --tail=50 2>&1 | grep -E "ALLOGGIATI|operation="
 **5.1** Test fallimento rete (TC-08):
 ```bash
 # Isolare il container dalla rete
-docker network disconnect hotel-pms_default stay-service
+docker network disconnect hotel-pms_default frontdesk-service
 
 # Eseguire check-in da frontend — deve avere successo (200)
 # Tentare invio manuale — deve fallire con errore non-blocking
@@ -418,21 +418,21 @@ curl -s -b /tmp/cookies.txt -X POST \
   "http://localhost:8080/api/v1/stays/reports/alloggiati/submit?date=${DATE}"
 
 # Ripristinare la rete
-docker network connect hotel-pms_default stay-service
+docker network connect hotel-pms_default frontdesk-service
 ```
 
 **5.2** Test credenziali errate (TC-09):
 ```bash
 # Modificare temporaneamente ALLOGGIATI_PASSWORD nel .env con valore errato
-# Riavviare stay-service
-docker compose up -d --no-deps stay-service
+# Riavviare frontdesk-service
+docker compose up -d --no-deps frontdesk-service
 
 # Tentare invio
 curl -s -b /tmp/cookies.txt -X POST \
   "http://localhost:8080/api/v1/stays/reports/alloggiati/submit?date=${DATE}"
 
 # Verificare risposta di errore e log
-docker logs stay-service --tail=30 2>&1 | grep ALLOGGIATI_SOAP_ERROR
+docker logs frontdesk-service --tail=30 2>&1 | grep ALLOGGIATI_SOAP_ERROR
 
 # Ripristinare credenziali corrette e riavviare
 ```
@@ -442,7 +442,7 @@ docker logs stay-service --tail=30 2>&1 | grep ALLOGGIATI_SOAP_ERROR
 # 1. Disattivare alloggiatiAutoSend via frontend (Admin → Hotel Profile → toggle OFF)
 # 2. Eseguire check-in completo
 # 3. Verificare che non appaia ALLOGGIATI_SUBMISSION_START nei log
-docker logs stay-service --tail=50 2>&1 | grep ALLOGGIATI_SUBMISSION_START
+docker logs frontdesk-service --tail=50 2>&1 | grep ALLOGGIATI_SUBMISSION_START
 # Nessun output atteso
 
 # 4. Riattivare toggle
@@ -471,7 +471,7 @@ docker logs stay-service --tail=50 2>&1 | grep ALLOGGIATI_SUBMISSION_START
 
 | Scenario | Azione immediata | NON fare |
 |---|---|---|
-| `GenerateToken` fallisce con `Connection refused` | Verificare rete dal container: `docker exec stay-service curl -v https://alloggiatiweb.poliziadistato.it` | Non continuare a tentare invii in loop |
+| `GenerateToken` fallisce con `Connection refused` | Verificare rete dal container: `docker exec frontdesk-service curl -v https://alloggiatiweb.poliziadistato.it` | Non continuare a tentare invii in loop |
 | `GenerateToken` fallisce con risposta SOAP `fault` | Estrarre il WSDL e confrontare namespace: vedere §6.1 | Non modificare codice in produzione senza test |
 | `Send`/`Test` fallisce con `ErroreCod` non vuoto | Registrare codice errore; consultare tabella in §A.2; isolare il record problematico | Non continuare a inviare lo stesso file |
 | Check-in bloccato da errore esterno | Fermare il collaudo; verificare TC-10; il check-in non deve mai essere bloccato | Non workaround manuali nel DB |
@@ -483,7 +483,7 @@ docker logs stay-service --tail=50 2>&1 | grep ALLOGGIATI_SUBMISSION_START
 **Passo 1 — Identificare la fase che ha fallito:**
 ```bash
 # Cercare la sequenza di log per identificare dove si è fermato il processo
-docker logs stay-service 2>&1 | grep -E "ALLOGGIATI_SUBMISSION_START|TOKEN_OBTAINED|SUBMISSION_SUCCESS|SOAP_ERROR|SUBMISSION_FAILED"
+docker logs frontdesk-service 2>&1 | grep -E "ALLOGGIATI_SUBMISSION_START|TOKEN_OBTAINED|SUBMISSION_SUCCESS|SOAP_ERROR|SUBMISSION_FAILED"
 ```
 
 **Passo 2 — Verificare il payload SOAP:**
@@ -603,7 +603,7 @@ Da usare il giorno del collaudo. Spuntare ogni voce solo dopo verifica effettiva
 - [ ] `ALLOGGIATI_DRY_RUN=true`
 - [ ] Backup DB eseguito: `backup-pre-collaudo-YYYYMMDD.sql`
 - [ ] Stack avviato: tutti i container `healthy`
-- [ ] Log startup stay-service: `Loaded N stati/comuni/tipdoc`
+- [ ] Log startup frontdesk-service: `Loaded N stati/comuni/tipdoc`
 - [ ] Log api-gateway: `HMAC_SECRET_OK`
 - [ ] Namespace SOAP verificato vs WSDL: `ALLOGGIATI_WS_NAMESPACE` corretto
 - [ ] SOAPAction verificati vs WSDL
@@ -628,7 +628,7 @@ Da usare il giorno del collaudo. Spuntare ogni voce solo dopo verifica effettiva
 
 ### Esecuzione reale (Send)
 - [ ] Backup DB eseguito appena prima: `backup-pre-send-YYYYMMDD-HH.sql`
-- [ ] `ALLOGGIATI_DRY_RUN=false` impostato; stay-service riavviato
+- [ ] `ALLOGGIATI_DRY_RUN=false` impostato; frontdesk-service riavviato
 - [ ] TC-07 eseguito: log `operation=Send | SUBMISSION_SUCCESS`
 - [ ] Portale PS verificato: schedina presente in archivio
 - [ ] Numero protocollo/conferma PS annotato: _______________
@@ -665,7 +665,7 @@ INFO  [correlationId=<uuid>] ALLOGGIATI_SENT | stayId=<uuid> | date=YYYY-MM-DD
 |---|---|---|
 | `E001` | Formato record non valido (lunghezza o caratteri non CP1252) | Eseguire awk su /tmp/alloggiati-test.txt; individuare la riga errata; correggere il dato ospite |
 | `E002` | Codice stato/comune/tipdoc non riconosciuto | Verificare che il codice sia presente nelle lookup tables con `SELECT * FROM alloggiati_comuni WHERE codice = '<codice>';` |
-| `E003` | WsKey non valida o scaduta | Rigenerare dal portale PS: Account → Web Service → Genera nuova chiave; aggiornare `.env` e riavviare stay-service |
+| `E003` | WsKey non valida o scaduta | Rigenerare dal portale PS: Account → Web Service → Genera nuova chiave; aggiornare `.env` e riavviare frontdesk-service |
 | `E004` | Struttura non abilitata al Web Service | Contattare la Questura di competenza per abilitazione specifica |
 | `0000` | Successo | Nessuna azione |
 | `Namespace fault` | Namespace SOAP nel codice non corrisponde al WSDL attuale | Aggiornare `ALLOGGIATI_WS_NAMESPACE`; verificare con §6.1 |
@@ -675,7 +675,7 @@ INFO  [correlationId=<uuid>] ALLOGGIATI_SENT | stayId=<uuid> | date=YYYY-MM-DD
 
 | Sintomo | Probabile causa | Tempo diagnosi stimato |
 |---|---|---|
-| Badge sempre rosso anche dopo check-in | Toggle `alloggiatiAutoSend` OFF o stay-service non raggiunge il portale | 5 min |
+| Badge sempre rosso anche dopo check-in | Toggle `alloggiatiAutoSend` OFF o frontdesk-service non raggiunge il portale | 5 min |
 | File .txt scaricato vuoto (0 byte) | Nessun soggiorno nella data richiesta; verificare che il check-in sia stato fatto nella data passata come parametro | 2 min |
 | `Connection refused` al portale | Firewall del server blocca HTTPS outbound verso IP PS | 15 min |
 | Righe del file di 167 o 169 char | Un campo stringa ha un carattere in più/meno rispetto alle specifiche; usare `awk` per trovare la riga e il campo | 10 min |
@@ -685,7 +685,7 @@ INFO  [correlationId=<uuid>] ALLOGGIATI_SENT | stayId=<uuid> | date=YYYY-MM-DD
 ### A.4 Note per il pilot con albergatori
 
 1. **Formare il receptionist** sul badge Alloggiati (verde = inviato, rosso = errore) e su come contattare il supporto tecnico se il badge rimane rosso dopo il check-in.
-2. **Monitorare i log** ogni sera con: `docker logs stay-service 2>&1 | grep -E "ALLOGGIATI_SOAP_ERROR|SUBMISSION_FAILED"` — qualsiasi riga qui è una schedina non inviata.
+2. **Monitorare i log** ogni sera con: `docker logs frontdesk-service 2>&1 | grep -E "ALLOGGIATI_SOAP_ERROR|SUBMISSION_FAILED"` — qualsiasi riga qui è una schedina non inviata.
 3. **La WsKey** ha scadenza: calendarizzare un reminder 30 giorni prima della scadenza per la rigenerazione.
 4. **Invio manuale** disponibile sempre via endpoint `POST .../submit?date=YYYY-MM-DD` per recuperare eventuali mancati invii automatici.
 5. **Non modificare** i codici stato/comune/tipdoc direttamente nel DB — usare sempre l'autocomplete del form check-in che attinge alle lookup tables validate.

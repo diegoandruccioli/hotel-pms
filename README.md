@@ -22,7 +22,7 @@ This is a **production-grade enterprise PMS** validated for real hotel operation
 |-----------|-------------|-------------|
 | **Multi-tenancy** | Data isolated per tenant at row level, enforced by infrastructure | `hotel_id` NOT NULL on every entity; injected from verified JWT, never from client input; all repositories filter by `hotel_id` |
 | **Security posture** | Hardened auth, inter-service trust, least-privilege access | JWT in httpOnly cookies (XSS-proof), HMAC-SHA256 on every Feign call (zero-trust internal), CSRF, Redis token-bucket rate limiting, RBAC enforced at gateway + endpoint level, GDPR Art. 20 + right-to-erasure |
-| **Operational compliance** | Regulatory integrations handled in production | Alloggiati Web v2.0 SOAP (art. 109 TULPS) — two-step protocol, 168-char fixed-width format, CRLF, error codes; collaudo plan documented |
+| **Operational compliance** | Regulatory integrations handled in production | Alloggiati Web v2.0 SOAP (art. 109 TULPS) — two-step protocol, 168-char fixed-width format, CRLF, error codes; collaudo plan documented. FatturaPA FPR12 export — validated against the official AE XSD schema, immutable post-export snapshot, batch export for the commercialista (see `docs/COMPLIANCE_AUDIT_2026-08.md` for the full regulatory audit, including known gaps) |
 | **Observability** | Distributed tracing, metrics, structured logging | Zipkin (trace propagation via `X-Correlation-ID`), Prometheus + Grafana, Loki, Spring Boot Actuator on all services |
 | **Resilience** | Graceful degradation under partial failure | Resilience4j `@CircuitBreaker` on every Feign client; service outages do not cascade; RFC 7807 problem details from all services |
 
@@ -30,36 +30,39 @@ This is a **production-grade enterprise PMS** validated for real hotel operation
 
 - 8 microservices + 1 shared PDF-rendering library, full RBAC (ADMIN / OWNER / RECEPTIONIST), JWT httpOnly + HMAC internal auth, CSRF, rate limiting
 - Alloggiati Web v2.0 SOAP integration (art. 109 TULPS) — collaudo with real PS portal documented in [`docs/ALLOGGIATI_COLLAUDO_REALE.md`](docs/ALLOGGIATI_COLLAUDO_REALE.md)
+- FatturaPA FPR12 export — XSD-validated, immutable post-export (`invoice_fiscal_exports`, `409 INVOICE_LOCKED_AFTER_EXPORT`), batch ZIP+CSV export for the commercialista. Direct SDI transmission is explicitly out of scope — see `backup/DECISIONS.md §2.5`
 - F&B → room charge billing, walk-in check-in, multi-tenant data isolation (`hotel_id` on every entity)
-- GDPR Art. 20 data export, structured PII audit log, right-to-erasure anonymisation
+- GDPR Art. 20 data export (backend), structured PII audit log, right-to-erasure anonymisation with automatic nightly retention job
+- Encrypted off-site backup (pgBackRest, continuous WAL archiving, Backblaze B2) — RPO in minutes, restore verified manually end-to-end; automated CI restore drill exists but is currently blocked by the B2 free-tier daily transaction cap
+- Transactional email (reservation confirmation, checkout summary) via `notification-service`
 - Security hardening fully documented in `docs/security-report/report-secure-coding.tex`
 - CI pipeline (GitHub Actions): build, unit tests, Playwright E2E, Trivy image scan
 
 ### Stable
 
-- **Coverage**: JaCoCo (≥40% instruction) and Vitest (stmt/branch/fn/lines) thresholds are enforced in CI — build fails if coverage drops below minimums. The enforced floor is conservative (40%) to allow incremental growth; per-service targets in the development guidelines are ≥95%, currently averaging ~60% backend instruction coverage. (commit `dab4eea`)
+- **Coverage**: JaCoCo (≥40% instruction, enforced floor) and Vitest (stmt/branch/fn/lines) thresholds are enforced in CI — build fails if coverage drops below minimums. See [Coverage](#coverage-measured-2026-08-04) below for current real numbers, well above the enforced floor.
 - **CVE-2026-42577** (Netty epoll DoS): accepted residual risk — JDK NIO transport is active, Netty 4.2.x is not yet compatible with the fix; mitigated by network-layer isolation
 
 ### Roadmap
 
 Future implementations are documented in detail in [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
-**Next priorities (Sprint 1 — Production-ready, 4–6 weeks):**
-- Automated PostgreSQL backup (pg_dump cron)
+**Next priorities:**
 - Prometheus alert rules (error rate, latency, container restarts)
+- Two regulatory gaps found by [`docs/COMPLIANCE_AUDIT_2026-08.md`](docs/COMPLIANCE_AUDIT_2026-08.md) that were not tracked anywhere before: **imposta di soggiorno** (tourist tax, entirely absent) and **corrispettivi telematici** (Horeca-wide legal obligation since 2026-01-01, entirely absent)
 
-_Already completed:_ `@Version` on `Invoice` ✓ · `restart: unless-stopped` on all containers ✓ · Operations Runbook ✓
+_Already completed:_ `@Version` on `Invoice` ✓ · `restart: unless-stopped` on all containers ✓ · Operations Runbook ✓ · Automated encrypted off-site backup (pgBackRest, RPO in minutes) ✓ · FatturaPA FPR12 export ✓
 
 **Main commercial gaps (Sprint 2–3):**
 - Channel Manager OTA — prerequisite for 80% of the hotel market
-- Email/SMS booking confirmations (absolute minimum standard)
-- Legally-valid Italian invoice (sequential numbering, disaggregated VAT)
+- SMS booking confirmations (email confirmations already implemented)
+- Nota di credito flow to correct an already-exported FatturaPA invoice
 - Mobile PWA (70% of infrastructure already in place)
 - Booking Engine + Stripe Checkout
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full roadmap with effort estimates, dependencies, competitor matrix, and Enterprise SaaS timeline.
 
-See [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) for the evidence-based audit with all open gaps, accepted risks, and the explicit roadmap.
+See [`docs/COMPLIANCE_AUDIT_2026-08.md`](docs/COMPLIANCE_AUDIT_2026-08.md) and [`docs/EXPLORATORY_TEST_2026-08.md`](docs/EXPLORATORY_TEST_2026-08.md) for the current evidence-based gaps and known bugs. `docs/FINAL_AUDIT_ULTRA_SEVERE.md` is the original 2026-05 audit, kept as historical reference.
 
 ---
 
@@ -272,10 +275,10 @@ The startup script auto-generates `.env` with strong random secrets on first run
 | Limit | Detail |
 |-------|--------|
 | **No automated deployment** | GitHub Actions CI runs tests and Trivy scans on push; no push-to-deploy pipeline. |
-| **No backup strategy** | PostgreSQL data lives in Docker named volumes. No automated backup or point-in-time recovery. |
+| **CI restore drill currently blocked** | Backup itself is automated end-to-end (pgBackRest, continuous WAL archiving, encrypted off-site copy to Backblaze B2, RPO in minutes — restore verified manually, real data, real bucket). Only the *automated* GitHub Actions restore drill is currently blocked by the B2 free-tier daily transaction cap; see `docs/OPERATIONS_RUNBOOK.md`. |
 | **No Kubernetes yet** | Infrastructure is Docker Compose only. K8s manifests are planned post-exam. All containers are stateless and K8s-ready by design (`restart: unless-stopped` on all services). |
 | **Single region / single node** | No geographic redundancy. Each service runs as a single container with a single PostgreSQL instance. |
-| **No outbound notifications** | Reservation confirmations, check-in receipts, and billing summaries are not sent via email or SMS. |
+| **No SMS notifications** | Reservation confirmation and checkout summary emails are sent via `notification-service`. SMS is not implemented — no requesting client has needed it yet (see `backup/DECISIONS.md`). |
 | **Grafana CVE residue** | Grafana 11.5.0 Alpine layer carries unpatched OS-level CVEs (OpenSSL, musl, zlib). Dismissed as "won't fix" — internal monitoring tool, no guest PII, isolated Docker network. Documented in `report-secure-coding.tex` §DEP-CVE-04. |
 
 ---
@@ -358,16 +361,22 @@ cd frontend
 npm run test:e2e
 ```
 
-### Coverage Baseline (measured 2026-05-11)
+### Coverage (measured 2026-08-04)
 
-| Layer | Statements | Branches | Lines |
-|-------|-----------|----------|-------|
-| Frontend (Vitest V8) | 68.6% | 54.2% | 71.1% |
-| Backend avg (JaCoCo) | ~60.1% instr. | ~50.4% | ~57.4% |
+| Layer | Statements | Branches | Functions | Lines |
+|-------|-----------|----------|-----------|-------|
+| Frontend (Vitest V8) | 90.4% | 82.3% | 85.0% | 94.1% |
+| Backend aggregate (JaCoCo, weighted across all 11 modules) | 76.6% instr. | 65.2% | — | 73.0% |
 
-Thresholds enforced since 2026-05-16 (`dab4eea`). Build fails if coverage drops below configured minimums.
+Thresholds enforced since 2026-05-16 (`dab4eea`) — CI floor is intentionally conservative
+(40% backend instruction) to allow incremental growth without blocking merges; actual
+coverage runs well above it, as shown above. `functions` on the frontend sits below the
+other three by design: `App.tsx`'s `React.lazy()` route factories only count as covered
+once that specific route is visited in a test — see `vite.config.ts` comment.
 
-See [`docs/PILOT_READINESS_AUDIT.md §5b`](docs/PILOT_READINESS_AUDIT.md) for per-service breakdown and gap analysis.
+See [`docs/PILOT_READINESS_AUDIT.md §5b`](docs/PILOT_READINESS_AUDIT.md) for the older
+per-service breakdown (numbers there predate this measurement, kept for gap-analysis
+history, not as a current baseline).
 
 ---
 
@@ -389,28 +398,33 @@ See [`docs/BRANCH_STRATEGY.md`](docs/BRANCH_STRATEGY.md) for full topology and g
 
 | Document | Description |
 |----------|-------------|
-| [`docs/security-report/report-secure-coding.pdf`](docs/security-report/report-secure-coding.pdf) | **Secure Coding exam report (PDF)** — full security hardening documentation with threat model, mitigations, and commit references |
-| [`docs/security-report/report-secure-coding.tex`](docs/security-report/report-secure-coding.tex) | LaTeX source for the exam report |
+| [`docs/security-report/report-secure-coding.tex`](docs/security-report/report-secure-coding.tex) | **Secure Coding exam report (LaTeX source)** — full security hardening documentation with threat model, mitigations, and commit references. The compiled PDF in the same folder currently lags the `.tex` source (local `pdflatex`/MiKTeX has a pre-existing babel-italian package issue, unrelated to report content) — treat the `.tex` as authoritative |
 | [`THREAT_MODEL.md`](THREAT_MODEL.md) | Threat model — attack surfaces, mitigations table with commit references (security exam artifact) |
-| [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) | **Production-readiness audit** — evidence-based, open gaps, accepted risks, roadmap |
-| [`docs/PILOT_READINESS_AUDIT.md`](docs/PILOT_READINESS_AUDIT.md) | Pilot readiness assessment — all critical blockers resolved; real coverage baseline §5b |
+| [`docs/COMPLIANCE_AUDIT_2026-08.md`](docs/COMPLIANCE_AUDIT_2026-08.md) | **Regulatory compliance audit** — 11 Italian/EU legal obligations checked against the actual codebase (Alloggiati, FatturaPA, GDPR, imposta di soggiorno, corrispettivi telematici, antiriciclaggio, and more) |
+| [`docs/EXPLORATORY_TEST_2026-08.md`](docs/EXPLORATORY_TEST_2026-08.md) | Live unscripted exploratory test findings — bugs found testing the running stack out of the "happy path" order |
+| [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](docs/FINAL_AUDIT_ULTRA_SEVERE.md) | Production-readiness audit (2026-05) — evidence-based, open gaps, accepted risks, roadmap |
+| [`docs/PILOT_READINESS_AUDIT.md`](docs/PILOT_READINESS_AUDIT.md) | Pilot readiness assessment (2026-05) — all critical blockers resolved at the time; coverage numbers there are historical, see [Coverage](#coverage-measured-2026-08-04) above for current |
+| [`docs/AUDIT_ANALISI_2026-07.md`](docs/AUDIT_ANALISI_2026-07.md) | Independent verification of 4 external analyses against the real codebase (2026-07) |
+| [`docs/LIVE_E2E_AUDIT_2026-07.md`](docs/LIVE_E2E_AUDIT_2026-07.md) | Live browser E2E audit against the running Docker stack (2026-07), 14 items, closed |
 | [`docs/SECURITY_AND_PRIVACY.md`](docs/SECURITY_AND_PRIVACY.md) | Security model: JWT, HMAC, RBAC, CSRF, GDPR, TULPS compliance |
+| [`docs/legal/PRIVACY_DPA_COOKIE_BRIEF.md`](docs/legal/PRIVACY_DPA_COOKIE_BRIEF.md) | Technical brief for legal counsel — data processed, legal bases, retention, sub-processors, ready for Privacy Policy/DPA/Cookie Policy drafting |
 | [`docs/INTERACTION_FLOWS.md`](docs/INTERACTION_FLOWS.md) | 12 end-to-end service call chains (check-in, billing, walk-in, GDPR export, …) |
 | [`docs/USER_MANUAL.md`](docs/USER_MANUAL.md) | Step-by-step procedures for all user roles |
 | [`docs/ALLOGGIATI_README.md`](docs/ALLOGGIATI_README.md) | Polizia di Stato SOAP integration — configuration and architecture |
 | [`docs/DOCUMENTAZIONE_TECNICA_ALLOGGIATI_PS.md`](docs/DOCUMENTAZIONE_TECNICA_ALLOGGIATI_PS.md) | Deep-dive: WSDL bindings, field mapping, error codes, TULPS legal context |
 | [`docs/ALLOGGIATI_COLLAUDO_REALE.md`](docs/ALLOGGIATI_COLLAUDO_REALE.md) | Real-portal test plan — 18 test cases, Go/No-Go criteria |
+| [`docs/C1_NOTIFICATION_SERVICE.md`](docs/C1_NOTIFICATION_SERVICE.md) | ADR: `notification-service` design (sync Feign + Resilience4j vs alternatives) |
 | [`docs/I18N.md`](docs/I18N.md) | i18n architecture, namespace conventions, anti-hardcoding rules |
-| [`docs/GAP_ANALYSIS.md`](docs/GAP_ANALYSIS.md) | Gap analysis — 17 items tracked (all resolved as of 2026-05-07) |
+| [`docs/GAP_ANALYSIS.md`](docs/GAP_ANALYSIS.md) | Historical gap analysis (2026-05, all items resolved as of that date — predates the `frontdesk-service` consolidation) |
 | [`docs/BRANCH_STRATEGY.md`](docs/BRANCH_STRATEGY.md) | Branch topology, merge history, governance rules |
-| [`backup/DECISIONS.md`](backup/DECISIONS.md) | All binding architectural and business decisions — rationale, constraints, and non-negotiable rules |
+| `backup/DECISIONS.md` | All binding architectural and business decisions — rationale, constraints, non-negotiable rules. **Not linked**: this file is gitignored (contains working notes), not published to the repository — internal reference only |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Enterprise roadmap — 4 sprints from Pilot-ready to Enterprise SaaS, competitor matrix, pricing model |
 | [`SECURITY.md`](SECURITY.md) | Responsible disclosure policy, in-scope vulnerabilities, accepted risks, security contact |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Developer onboarding, commit conventions, branch strategy, testing patterns |
-| [`CHANGELOG.md`](CHANGELOG.md) | Release history — v0.1.0-pilot feature list, security hardening, infrastructure |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history |
 | [`docs/OPERATIONS_RUNBOOK.md`](docs/OPERATIONS_RUNBOOK.md) | Operational procedures — start/stop, backup, ADMIN recovery, log reading, credentials update |
 | [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) | Production deployment — server requirements, HTTPS, nginx, firewall, update procedure |
-| [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | API reference — auth flow, main endpoints, error codes, rate limiting |
+| [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | API reference — auth flow, main endpoints, error codes, rate limiting (note: predates the FatturaPA export batch endpoints added 2026-08-03, see `docs/API_REFERENCE.md` for the caveat) |
 
 ---
 

@@ -4,7 +4,7 @@
 
 ### Opzione A — implementata ora (sincrona, Feign + Resilience4j)
 
-Il servizio chiamante (reservation-service, stay-service) invoca `notification-service`
+Il servizio chiamante (frontdesk-service) invoca `notification-service`
 via **OpenFeign** con `@CircuitBreaker` Resilience4j.
 Il fallback è silenzioso: log WARN, operazione business completata comunque.
 
@@ -241,9 +241,9 @@ senza questo le lettere accentate italiane sono corrotte.
 
 ### Step 5 — Integrazione nei servizi chiamanti
 
-#### 5a — reservation-service: conferma prenotazione
+#### 5a — frontdesk-service: conferma prenotazione
 
-Creare `NotificationClient` (Feign) in `reservation-service`:
+Creare `NotificationClient` (Feign) in `frontdesk-service`:
 
 ```java
 @FeignClient(name = "notification-service", url = "${notification.service.url:http://localhost:8088}")
@@ -276,7 +276,7 @@ void notificationFallback(ReservationResponse reservation, Exception ex) {
 }
 ```
 
-Config Resilience4j per `notification-service` (in `reservation-service.yml`):
+Config Resilience4j per `notification-service` (in `frontdesk-service.yml`):
 
 ```yaml
 resilience4j.circuitbreaker.instances.notification-service:
@@ -286,7 +286,7 @@ resilience4j.circuitbreaker.instances.notification-service:
   permittedNumberOfCallsInHalfOpenState: 3
 ```
 
-#### 5b — stay-service (frontdesk-service): check-out con fattura
+#### 5b — frontdesk-service: check-out con fattura
 
 Il `StayServiceImpl.checkOut()` già chiama `billingClient` (F1).
 Dopo la chiamata a `billingClient.closeInvoice()`:
@@ -305,7 +305,7 @@ Dopo la chiamata a `billingClient.closeInvoice()`:
 Se step 3 fallisce (billing down): inviare email ugualmente ma con `lines = emptyList()`.
 Il guest riceve email col totale ma senza dettaglio — meglio di bloccare il checkout.
 
-#### 5c — stay-service: check-in (opzionale, bassa priorità)
+#### 5c — frontdesk-service: check-in (opzionale, bassa priorità)
 
 Semplice: dopo `checkIn()` salvato, `notificationClient.sendCheckin(...)`.
 Nessun dato fattura richiesto — solo camera e data atteso check-out.

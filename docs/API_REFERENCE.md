@@ -1,6 +1,7 @@
 # API Reference — Hotel PMS
 
-**Versione:** 0.1 — 2026-05-17  
+**Versione:** 0.2 — 2026-08-04 (aggiunti endpoint FatturaPA export singolo/batch e
+riferimenti servizio aggiornati a `frontdesk-service` post ADR-001)  
 **Base URL:** `http://localhost:8080` (sviluppo) / `https://pms.tuohotel.com` (produzione)  
 **Autenticazione:** JWT in cookie httpOnly (vedere §1)
 
@@ -189,10 +190,25 @@ GET    /api/v1/stays/reports/alloggiati/json?date=YYYY-MM-DD
 ### 4.5 Fatture e pagamenti
 
 ```
-GET    /api/v1/invoices               Lista fatture (paginata)
-GET    /api/v1/invoices/{id}          Dettaglio fattura con charges e payments
-GET    /api/v1/invoices/{id}/pdf      Scarica PDF fattura (application/pdf)
-POST   /api/v1/invoices/{id}/payments Registra pagamento
+GET    /api/v1/invoices                    Lista fatture (paginata)
+GET    /api/v1/invoices/search             Ricerca fatture (status/query/dateFrom/dateTo)
+GET    /api/v1/invoices/{id}               Dettaglio fattura con charges e payments
+GET    /api/v1/invoices/{id}/pdf           Scarica PDF fattura (application/pdf)
+POST   /api/v1/invoices/{id}/payments      Registra pagamento
+PATCH  /api/v1/invoices/{id}/document-type Cambia tipo documento (FATTURA/RICEVUTA)
+GET    /api/v1/invoices/{id}/fatturaPA     Scarica XML FatturaPA FPR12 (application/xml)
+                                            → valida contro XSD ufficiale AE, registra uno
+                                              snapshot immutabile in invoice_fiscal_exports
+                                            → da quel momento la fattura è locked sui campi
+                                              fiscali: ulteriori addCharge/document-type
+                                              rispondono 409 INVOICE_LOCKED_AFTER_EXPORT
+PATCH  /api/v1/invoices/{id}/sdi-status    Aggiorna stato invio SDI (manuale, non è un
+                                            invio automatico — vedi backup/DECISIONS.md §2.5)
+GET    /api/v1/invoices/export?from=&to=   Export ZIP con un XML FatturaPA per fattura
+                                            eleggibile nel periodo + index.csv — hand-off
+                                            batch al commercialista. Fatture con dati
+                                            incompleti sono escluse e riportate come ERROR
+                                            nell'indice, non bloccano l'intero export
 ```
 
 **Payload pagamento:**
@@ -268,7 +284,7 @@ PATCH  /api/v1/auth/users/{id}/reset-password       Reset password (ADMIN/OWNER)
 
 ### 4.11 Notifiche email transazionali (notification-service, solo interno)
 
-Non esposti tramite API Gateway — chiamati via OpenFeign da reservation-service/stay-service
+Non esposti tramite API Gateway — chiamati via OpenFeign da frontdesk-service
 (frontdesk-service) con `@CircuitBreaker` (fallback: log WARN, nessun blocco della transazione
 business). Autenticazione: header `X-Internal-Signature` HMAC-SHA256 obbligatorio, stesso pattern
 di FeignHeaderConfig. Risposta `204 No Content` su successo, `500` su errore SMTP.

@@ -1,3 +1,9 @@
+> **STATO: STORICO.** Audit del 2026-05-05/15 sul branch `feature/frontend-development`,
+> che non esiste più. Architettura pre-consolidamento ADR-001 e pre-FatturaPA export.
+> I numeri di coverage in §5b sono superati — vedi `README.md` "Coverage" per i valori
+> correnti (misurati 2026-08-04). Conservato come riferimento storico del processo di
+> audit, non come stato attuale del progetto.
+
 # Audit Tecnico-Funzionale — Hotel PMS Pilot Readiness
 
 **Data audit iniziale:** 2026-05-05  

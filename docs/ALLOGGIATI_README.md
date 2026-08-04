@@ -103,7 +103,7 @@ awk '{ if (length($0) != 168) print NR": "length($0)" chars" }' alloggiati-2026-
 
 ## 6. Interpretazione dei log
 
-I log del `stay-service` contengono prefisso `[STAY]`. Messaggi rilevanti:
+I log del `frontdesk-service` contengono prefisso `[STAY]`. Messaggi rilevanti:
 
 | Pattern log | Significato | Azione |
 |---|---|---|
@@ -131,15 +131,15 @@ I log del `stay-service` contengono prefisso `[STAY]`. Messaggi rilevanti:
 
 ## 7. Aggiornamento delle lookup tables
 
-Le tabelle ufficiali (comuni, stati, documenti) vengono scaricate automaticamente dal portale PS al primo avvio del `stay-service`. Per forzare un aggiornamento:
+Le tabelle ufficiali (comuni, stati, documenti) vengono scaricate automaticamente dal portale PS al primo avvio del `frontdesk-service`. Per forzare un aggiornamento:
 
 ```bash
 # 1. Svuotare le tabelle nel DB
 docker exec -it postgres psql -U postgres -d hotel_stay -c \
   "TRUNCATE alloggiati_stati, alloggiati_comuni, alloggiati_tipdoc;"
 
-# 2. Riavviare lo stay-service
-docker restart stay-service
+# 2. Riavviare lo frontdesk-service
+docker restart frontdesk-service
 # Il DataLoader rileva le tabelle vuote e ri-scarica i CSV dal portale PS
 ```
 

@@ -1,3 +1,9 @@
+> **STATO: STORICO.** Snapshot del 2026-05-06 sul branch `feature/frontend-development`,
+> che non esiste più (mergiato/superato). Architettura pre-consolidamento ADR-001
+> (`inventory-service`/`reservation-service`/`stay-service` erano ancora servizi
+> separati). Tutti i 17 item erano risolti già alla data dell'audit — conservato come
+> riferimento storico del processo, non come stato attuale del progetto.
+
 # Gap Analysis — Hotel PMS
 # Analisi completa dello stato del progetto
 

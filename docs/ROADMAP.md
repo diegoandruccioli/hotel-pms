@@ -1,6 +1,6 @@
 # Roadmap — Hotel PMS
 
-**Versione:** 1.3 — 2026-07-25 (audit completo Sprint 1: numeri stale corretti, P1/P10/E0bis riformulati onestamente)  
+**Versione:** 1.4 — 2026-08-04 (FatturaPA export chiuso, E3/E3bis; audit normativo aggiunge E18/E19/E20 — imposta di soggiorno, corrispettivi telematici, antiriciclaggio)  
 **Branch:** `main`
 
 Questo documento raccoglie le implementazioni future pianificate,
@@ -21,7 +21,7 @@ mono-hotel Docker Compose. La roadmap descrive il percorso verso
 | Scalabilità | 7.0/10 | 8 servizi, GIN pg_trgm, frontdesk consolidato (ADR-001 ✅), Dependabot (P9 ✅) — SimpleDiscovery statico, no K8s (E5) |
 | Qualità codice | 9.0/10 | PMD zero, Testcontainers billing+frontdesk (P7 ✅), coverage gate 90/80/88/92% (P15 ✅), Zod validation (P11 ✅), SRP refactor (P10 ✅) |
 | Operabilità | 7.5/10 | Docker Compose prod hardening (P0 ✅), backup automatizzato locale (P3 parz.), alert+runbook (P4/P5 ✅), branch protection+CodeQL (P12/P13 ✅) — no K8s, no secrets manager |
-| Conformità normativa | 9.5/10 | Alloggiati SOAP nativo, GDPR, numerazione fattura YYYY/NNNN (C2 ✅), IVA disaggregata (C3 ✅), dati fiscali ospite (E12 parz. ✅), export FatturaPA FPR12 validato XSD, immutabile post-export, batch per commercialista (E3 ✅) — trasmissione diretta SDI (E3bis) e audit log immutabile generico (E13) ancora aperti |
+| Conformità normativa | 7.5/10 | Alloggiati SOAP nativo, GDPR (backend), numerazione fattura YYYY/NNNN (C2 ✅), IVA disaggregata (C3 ✅), dati fiscali ospite (E12 parz. ✅), export FatturaPA FPR12 validato XSD, immutabile post-export, batch per commercialista (E3 ✅) — trasmissione diretta SDI (E3bis) e audit log immutabile generico (E13) ancora aperti. Voto abbassato da 9.5 dopo `docs/COMPLIANCE_AUDIT_2026-08.md` (2026-08-04): due obblighi di legge in vigore, mai tracciati prima, risultati completamente assenti — imposta di soggiorno (E18) e corrispettivi telematici Horeca, obbligatorio dal 2026-01-01 (E19) |
 | UX e funzionalità | 8.5/10 | Flussi core completi (prenotazione→check-in→F&B→fattura→checkout), dashboard KPI+room-grid, sort/filter, WCAG 2.2 AA, settings multi-pagina, verticale billing (C2/C3/FatturaPA), email conferma/checkout con personalizzazione (C1 ✅) — no mobile, no SMS |
 
 **Punto di forza unico rispetto ai competitor:**
@@ -107,6 +107,9 @@ Feature che abilitano la competizione con PMS commerciali.
 | E15 | SLA monitoring e status page | 🟢 Media | M | Prometheus già presente | Contratto SaaS richiede uptime dichiarato |
 | E16 | Google Hotel Ads integration | 🟡 Media | 2-3 sett | E2 (Booking Engine) | Google Hotels mostra il "prezzo diretto" se il booking engine è accreditato |
 | E17 | ROSS1000 — rilevazione statistica turistica regionale (ISTAT/SISTAN) | 🟢 Bassa | 3-5gg | Cliente reale in una regione coperta | Obbligo di legge (D.Lgs. 322/1989 art. 7, sanzioni fino a €2.500/mese) ma copre solo ~13/20 regioni italiane via piattaforma GIES (Piemonte, Veneto, Emilia-Romagna, Marche, Lombardia, Calabria, Sardegna, Liguria, Basilicata, Lazio, Molise, Abruzzo, Toscana-Firenze/Pistoia/Prato) — le altre regioni usano sistemi diversi non ancora ricercati. Oggi l'adempimento manuale via portale regionale resta legale e sufficiente. Protocollo verificato: SOAP, un WSDL pubblico per regione (`.../ws/checkinV2?wsdl`), autenticazione HTTP Basic, payload giornaliero (apertura/camere occupate-disponibili/letti + arrivi/partenze/prenotazioni/rettifiche idempotenti) — riusa le stesse tabelle Comuni/Nazioni/TipoAlloggiato Polizia di Stato già implementate per Alloggiati Web (`AlloggiatiCsvParser` + repository). Mancano 6 campi dominio (tipoturismo, mezzotrasporto, canaleprenotazione, titolostudio, professione, esenzioneimposta) in Guest/Reservation. **Non implementare finché non c'è un cliente pagante in una delle regioni coperte che lo richiede esplicitamente** — verdetto LLM Council 2026-06-22: costo di opportunità pre-revenue troppo alto, copertura regionale parziale, nessuna libreria terza disponibile (stesso caso Alloggiati: stub generabile da WSDL reale invece di XML a mano, quando attivato) |
+| E18 | Imposta di soggiorno (tassa di soggiorno comunale) | 🔴 Alta | 1-2 sett | C2 (numerazione fattura) | Trovato da `docs/COMPLIANCE_AUDIT_2026-08.md` §4 — **gap mai tracciato prima**, non un'ipotesi. Il gestore è responsabile diretto della riscossione e del versamento (Cassazione 1527/2026, Modello 21 abolito), dichiarazione telematica annuale entro il 30 giugno, versamento mensile via portale comunale. `ChargeType` non ha alcuna voce dedicata, nessun calcolo per notte/ospite, nessuna esenzione, nessuna configurazione per-comune (le regole variano per regolamento comunale, nessuno standard nazionale unico) |
+| E19 | Corrispettivi telematici (Horeca) | 🔴 Alta | Da definire con un commercialista prima di stimare | Nessuna | Trovato da `docs/COMPLIANCE_AUDIT_2026-08.md` §5 — **obbligo di legge già in vigore dal 2026-01-01** per l'intero settore Horeca (hotel+ristorazione), non un gap futuro. Prima verificare con un commercialista se/come il pernottamento stesso vi ricade (oggi il sistema non ha comunque un caso d'uso "vendita F&B diretta a non alloggiato", `stayId` è `NOT NULL` su ogni ordine) — poi eventualmente implementare collegamento POS↔registratore telematico via portale "Fatture e Corrispettivi" AE |
+| E20 | Antiriciclaggio (D.Lgs. 231/2007) — valutazione scritta | 🟢 Bassa | Poche ore (solo valutazione, non implementazione) | Nessuna | Trovato da `docs/COMPLIANCE_AUDIT_2026-08.md` §9 — rischio sostanziale basso (identificazione ospite già coperta da TULPS/Alloggiati, che vieta pure la conservazione di copie documento), ma **zero valutazione scritta** in tutto il progetto, a differenza di conservazione sostitutiva e PCI-DSS che hanno entrambe una decisione esplicita motivata. Item quasi gratuito: basta produrre e archiviare la stessa valutazione già fatta qui, non serve altro codice |
 
 ---
 
@@ -229,6 +232,6 @@ arriva è ~1-2h (componente pagina + route + 2 link), non bloccante.
 
 ---
 
-*Documento aggiornato 2026-05-17. Fare riferimento a
+*Documento aggiornato 2026-08-04. Fare riferimento a
 [`docs/FINAL_AUDIT_ULTRA_SEVERE.md`](FINAL_AUDIT_ULTRA_SEVERE.md)
 per i gap tecnici specifici e le evidenze da codice.*
