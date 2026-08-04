@@ -2,7 +2,7 @@
 
 **Metodologia**: STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege)  
 **Branch di riferimento**: `feature/secure-coding-hardening`  
-**Data ultima revisione**: 2026-07-30  
+**Data ultima revisione**: 2026-08-03  
 **Autore**: Diego Andruccioli
 
 ---

@@ -1,7 +1,8 @@
-> **STATO: SBLOCCATO** (2026-07-27) — `docs/LIVE_E2E_AUDIT_2026-07.md` chiuso, tutti e 14 gli item
-> risolti. Piano riverificato sul codice reale alla stessa data: 1 item già fatto (Blocco 0,
-> coincide col fix di `LIVE_E2E_AUDIT_2026-07.md` §8.5), 1 parziale (item 7), 18 ancora da fare.
-> Marcature ✅/🟡 inline sotto.
+> **STATO: STORICO — piano chiuso.** Sbloccato il 2026-07-27, eseguito integralmente nelle
+> Fasi 1-8 tra il 2026-07-28 e il 2026-07-30 (vedi `backup/SUMMARY.md`, voci "piano di
+> rifinitura"). Le marcature ✅/🟡 inline sotto riflettono lo stato al momento dello
+> sblocco, non lo stato attuale — per lo stato reale di ciascun item fare riferimento a
+> `backup/SUMMARY.md` e a `docs/ROADMAP.md`, non a questo documento.
 
 # Analisi hotel-pms — verifica indipendente di 4 analisi esterne
 

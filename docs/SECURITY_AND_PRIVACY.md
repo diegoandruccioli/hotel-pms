@@ -24,7 +24,7 @@ Il sistema adotta un modello di difesa in profondità (defense-in-depth) su più
 
 ### Meccanismo
 
-Le credenziali (username + password bcrypt) vengono scambiate **una sola volta** al login. Il server emette due token:
+Le credenziali (username + password Argon2id) vengono scambiate **una sola volta** al login. Il server emette due token:
 
 | Token | Durata | Cookie |
 |-------|--------|--------|
@@ -213,7 +213,7 @@ Springdoc (Swagger UI) è disabilitato in produzione tramite `api-gateway-prod.y
 | Data leakage tra hotel | GDPR Art. 5(1)(f) | hotel_id isolation + HMAC |
 | Accesso non autorizzato a PII | GDPR Art. 32 | RBAC + JWT + HTTPS |
 | Mancata comunicazione PS | TULPS Art. 109 | Auto-submit SOAP + audit flag |
-| Furto credenziali admin | OWASP A7 | mustChangePassword + bcrypt |
+| Furto credenziali admin | OWASP A7 | mustChangePassword + Argon2id |
 | Brute force | OWASP A4 | Rate limiting Redis |
 | Secret in repository | OWASP A2 | .gitignore + Spring Cloud Config |
 
