@@ -138,7 +138,7 @@ inutile per l'operatore in UI.
 
 ## Finding di sicurezza/conformità (non un "bug" in senso stretto)
 
-### 7. `GuestController` senza alcun `@PreAuthorize`
+### 7. `GuestController` senza alcun `@PreAuthorize` — ✅ RISOLTO (T-GST-07, Fase A piano fix-order)
 
 Nessun controllo di ruolo su nessun metodo del controller, incluso `GET
 /guests/{id}/export` (dump GDPR Art. 20 completo: anagrafica, documento, storico
@@ -215,7 +215,7 @@ del round 1), esattamente come la userebbe un ADMIN reale.
 
 ## Bug trovati
 
-### 1. 🔴 Guardia legale GDPR (TULPS/fiscale) completamente non funzionante — anonimizzazione riuscita nonostante vincoli attivi (il più grave)
+### 1. 🔴 Guardia legale GDPR (TULPS/fiscale) completamente non funzionante — anonimizzazione riuscita nonostante vincoli attivi (il più grave) — ✅ RISOLTO (T-GST-06, Fase A piano fix-order)
 
 **Dove**: catena di 3 cause indipendenti che si sommano:
 - `guest-service/.../client/BillingServiceClient.java:29` — il metodo Feign
@@ -388,7 +388,7 @@ cablarlo.
 
 ---
 
-### 5. 🟠 Il ruolo RECEPTIONIST ha accesso libero a tutte le operazioni fiscali sulle fatture (nessun RBAC su `InvoiceController`/gateway)
+### 5. 🟠 Il ruolo RECEPTIONIST ha accesso libero a tutte le operazioni fiscali sulle fatture (nessun RBAC su `InvoiceController`/gateway) — ✅ RISOLTO (T-BILL-07, Fase A piano fix-order)
 
 **Dove**: `billing-service/.../controller/InvoiceController.java` non ha alcun
 `@PreAuthorize` (a differenza di `OwnerReportController.java:45`, che lo usa
@@ -412,7 +412,7 @@ almeno sugli endpoint fiscalmente sensibili (`document-type`, `fatturaPA`, `expo
 
 ---
 
-### 6. 🟡 RECEPTIONIST può modificare la policy di retention GDPR dell'hotel
+### 6. 🟡 RECEPTIONIST può modificare la policy di retention GDPR dell'hotel — ✅ RISOLTO (T-GST-07, Fase A piano fix-order)
 
 **Dove**: `guest-service/.../controller/GuestPrivacySettingsController.java`, nessun
 `@PreAuthorize` su classe o metodo.

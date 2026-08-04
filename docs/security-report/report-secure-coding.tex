@@ -4567,6 +4567,106 @@ internal:
 \paragraph{Riferimento} Commit: \commitref{6dc6ea4}{fix(security): T-CFG-02 --- rimuovi fallback JWT\_SECRET hardcoded da api-gateway JwtUtil}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Regressione della guardia legale GDPR TULPS/fiscale \threat{T-GST-06}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato dal secondo giro di test esplorativo dal vivo
+(\texttt{docs/EXPLORATORY\_TEST\_2026-08.md}, Round 2 bug \#1). La guardia
+legale già corretta con T-GST-05 --- che deve bloccare l'anonimizzazione
+GDPR di un ospite finché sono attivi vincoli TULPS (5 anni) o fiscali
+(10 anni) --- si era di nuovo rotta, con una tripla causa indipendente
+accumulata su refactoring successivi (consolidamento ADR-001,
+introduzione di \texttt{@EnableMethodSecurity}). Riprodotto dal vivo su
+un ospite reale con due fatture \texttt{PAID} del 2026, ben dentro la
+finestra fiscale decennale: \texttt{DELETE /guests/\{id\}} restituiva
+\texttt{204~No~Content} invece del \texttt{451} atteso, distruggendo in
+modo irreversibile l'identità dell'ospite nonostante l'obbligo di
+conservazione fosse ancora attivo. Classificato OWASP A04:2025 ---
+Insecure Design: tre difetti indipendenti che si compensavano a vicenda
+nel non-far-scattare mai il blocco, nessuno dei quali un singolo bug
+ovvio isolatamente.
+
+\begin{enumerate}
+  \item \textbf{Path Feign errato}: \texttt{BillingServiceClient.getLastInvoiceDate}
+        chiamava \texttt{/api/v1/invoices/guest/\{guestId\}/last-invoice-date},
+        ma la rotta reale del controller è \texttt{.../last-date} --- 404
+        garantito ad ogni chiamata.
+  \item \textbf{Metodi \texttt{final} sotto proxy CGLIB}: \texttt{InvoiceServiceImpl.getLastInvoiceDateForGuest}
+        e \texttt{StayServiceImpl.getLastStayDateForGuest} erano gli unici
+        due metodi \texttt{public final} nelle rispettive classi. Con
+        \texttt{proxy-target-class=true} (introdotto da
+        \texttt{@EnableMethodSecurity}, T-FB-03/GAP-8), Spring genera un
+        proxy CGLIB per sottoclassamento: un metodo \texttt{final} non è
+        overridabile dalla sottoclasse proxy, quindi la chiamata esegue il
+        bytecode originale su un'istanza-guscio mai inizializzata via
+        dependency injection --- \texttt{NullPointerException} garantita
+        su \texttt{stayRepository}/\texttt{invoiceRepository}.
+  \item \textbf{Fallback dichiarato fail-safe, di fatto fail-open}: il
+        fallback del circuit breaker (Javadoc: ``fail-safe... block
+        deletion'') ritorna \texttt{hasStays/hasInvoices=true} con data
+        \texttt{null}. Ma la logica che lo consuma
+        (\texttt{computeTulpsExpiry}/\texttt{computeFiscalExpiry} in
+        \texttt{GuestServiceImpl}, \texttt{shouldAnonymise} in
+        \texttt{GuestRetentionJobServiceImpl}) leggeva
+        \texttt{lastStayDate()==null} come ``nessun vincolo'' --- esattamente
+        l'esito opposto a quello dichiarato nel commento.
+\end{enumerate}
+
+\begin{insecurebox}[title={Codice Vulnerabile --- GuestServiceImpl.java (prima del fix)}]
+\begin{lstlisting}[style=java]
+// INSICURO: se il fallback ritorna hasStays=true con data null
+// (dependent service degradato), tulpsExpiry resta null e il vincolo
+// e' letto come "nessun blocco" -- l'opposto del fail-safe dichiarato
+private static LocalDate computeTulpsExpiry(
+        GuestLastStayClientResponse info, int retentionYears) {
+    if (!info.hasStays() || info.lastStayDate() == null) {
+        return null;   // <-- qui: indeterminato trattato come "libero"
+    }
+    return info.lastStayDate().plusYears(retentionYears);
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Tre correzioni indipendenti, tutte necessarie contemporaneamente: (1)
+path Feign allineato a \texttt{/last-date}; (2) \texttt{final} rimosso
+da entrambi i metodi (con \texttt{/** \{@inheritDoc\} */} per soddisfare
+la regola Checkstyle \texttt{DesignForExtension} sul metodo ora
+overridabile); (3) \texttt{verifyLegalHolds} e \texttt{shouldAnonymise}
+ora distinguono esplicitamente il caso indeterminato (\texttt{hasStays()=true}
+con data \texttt{null}) dal caso ``nessun vincolo'' (\texttt{hasStays()=false}),
+trattando il primo come bloccante.
+
+\begin{securebox}[title={Codice Sicuro --- GuestServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: l'indeterminazione blocca, non libera
+final boolean tulpsIndeterminate =
+        stayInfo.hasStays() && stayInfo.lastStayDate() == null;
+final boolean tulpsBlocked = tulpsIndeterminate
+        || tulpsExpiry != null && !LocalDate.now().isAfter(tulpsExpiry);
+// analogo per fiscalIndeterminate/fiscalBlocked; l'eccezione 451
+// riporta un messaggio esplicito "unable to verify... blocked as
+// a precaution" e unlocksAt=null quando la causa e' indeterminazione
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+4 nuovi test boundary-value: due sul guard sincrono
+(\texttt{GuestServiceImplDeleteGuardTest.shouldThrow451WhenTulpsStatusIndeterminate}/
+\texttt{...FiscalStatusIndeterminate}, riproducono esattamente la risposta
+del fallback) e due sul job notturno
+(\texttt{GuestRetentionJobServiceImplTest.shouldSkipGuestWhenTulpsStatusIndeterminate}/
+\texttt{...FiscalStatusIndeterminate}, verificano \texttt{guestRepository.save}
+mai invocato). Verificato dal vivo contro lo stack Docker reale: guest con
+2 fatture \texttt{PAID} 2026 → \texttt{DELETE} → \texttt{451 LEGAL\_HOLD\_ACTIVE}
+con \texttt{unlocksAt=2036-08-04}, \texttt{legalBasis=FISCAL}; guest senza
+storico → \texttt{DELETE} → \texttt{204} invariato (nessuna regressione sul
+percorso felice).
+
+\paragraph{Riferimento} Commit: \commitref{4db09fc}{fix(security): T-GST-06 --- GDPR legal-hold guard fail-open regression (Feign path, final under CGLIB, fallback semantics)}
+
+% ─────────────────────────────────────────────────────────────────────────────
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Analisi SAST con CodeQL e Supply Chain Security \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
 % ═════════════════════════════════════════════════════════════════════════════
@@ -5819,6 +5919,54 @@ Key resolver aggiornato per leggere \texttt{X-Forwarded-For} anziché l'IP TCP
 (dietro un proxy tutti i client condividerebbero un unico bucket).
 Rate limiting esteso a tutte le route business, non solo \texttt{/auth/**}.
 Commit: \commitref{3f8a1c2}{fix(security): T-GW-02 --- proxy-aware rate limiting all routes}
+
+\paragraph{T-GST-07 --- \texttt{@PreAuthorize} mai applicato su GuestController e GuestPrivacySettingsController}
+Trovato dal secondo giro di test esplorativo dal vivo (round~1 finding~\#7 +
+round~2 bug~\#6), stesso pattern di T-FB-03: nessuna \texttt{@PreAuthorize}
+né a livello classe né metodo su \texttt{GuestController} (delete/
+anonimizzazione, export Art.~20 GDPR) né su
+\texttt{GuestPrivacySettingsController} (periodo di retention GDPR
+dell'hotel). L'unica protezione era la whitelist per-prefisso
+nell'api-gateway, che autorizza qualunque ruolo operativo (incluso
+RECEPTIONIST) su \texttt{/api/v1/guests/**}. Riprodotto dal vivo: un
+RECEPTIONIST cancellava/anonimizzava un ospite, esportava il dump PII
+completo e modificava la retention policy dell'hotel, tutte operazioni
+di primo livello mai pensate per quel ruolo.
+Fix: \texttt{@PreAuthorize("hasAnyRole('ADMIN','OWNER')")} su
+\texttt{deleteGuest}/\texttt{exportGuestData} in \texttt{GuestController}
+e a livello classe su \texttt{GuestPrivacySettingsController} ---
+CRUD/ricerca/allegati documento restano invece aperti a RECEPTIONIST,
+operatività quotidiana del front desk. Nuovi
+\texttt{GuestControllerSecurityTest}/\texttt{GuestPrivacySettingsControllerSecurityTest}
+(\texttt{@WebMvcTest} con \texttt{SecurityConfig} reale, stesso pattern di
+\texttt{MenuItemControllerSecurityTest}). Verificato dal vivo: RECEPTIONIST
+→ \texttt{403} sui 4 endpoint ristretti, \texttt{200} invariato su lettura.
+Commit: \commitref{a87d329}{fix(security): T-GST-07/T-BILL-07 --- missing RBAC on guest/invoice controllers}
+
+\paragraph{T-BILL-07 --- \texttt{@PreAuthorize} mai applicato su InvoiceController}
+Stesso pattern di T-GST-07, trovato dal round~2 bug~\#5: nessuna
+\texttt{@PreAuthorize} sulle operazioni fiscalmente sensibili di
+\texttt{InvoiceController}. Riprodotto dal vivo con un RECEPTIONIST:
+cambio \texttt{documentType} FATTURA↔RICEVUTA, generazione (e blocco
+permanente) di un export FatturaPA, impostazione dello stato di
+trasmissione SDI, e lancio dell'export batch per il commercialista,
+tutte riuscite senza alcun controllo oltre l'autenticazione.
+Fix: \texttt{@PreAuthorize("hasAnyRole('ADMIN','OWNER')")} sui quattro
+endpoint (\texttt{document-type}, \texttt{fatturaPA}, \texttt{sdi-status},
+\texttt{export} batch). Lasciati aperti a RECEPTIONIST: lettura/ricerca
+fatture, download PDF di cortesia, e i tre endpoint di chiamata
+interservizio (\texttt{createInvoiceForStay}, \texttt{addCharge},
+\texttt{getLastInvoiceDateForGuest}) --- questi ultimi propagano via HMAC
+il ruolo dell'utente che ha originato l'azione reale (check-in, conferma
+ordine F\&B, cancellazione ospite: quest'ultimo è proprio il chiamante
+del fix T-GST-06 sopra), non l'operatore che chiama \texttt{InvoiceController}
+direttamente --- restringerli a ADMIN/OWNER avrebbe rotto il check-in di
+un RECEPTIONIST. Nuovo \texttt{InvoiceControllerSecurityTest}. Verificato
+dal vivo: RECEPTIONIST → \texttt{403} sui 4 endpoint, \texttt{200}
+invariato su lettura; ADMIN invariato (un tentativo di \texttt{document-type}
+su fattura \texttt{PAID} resta \texttt{409} per un guard di business
+preesistente, non \texttt{403} --- nessuna regressione introdotta da questo fix).
+Commit: \commitref{a87d329}{fix(security): T-GST-07/T-BILL-07 --- missing RBAC on guest/invoice controllers}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Configurazione e SDLC avanzati}
