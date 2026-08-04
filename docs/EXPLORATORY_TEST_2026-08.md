@@ -183,3 +183,348 @@ Già segnalato in `docs/COMPLIANCE_AUDIT_2026-08.md` §3.
 6. **#6 (500 invece di 409 su delete ospite)** — cosmetico/osservabilità, bassa urgenza
 7. **#7 (GuestController senza `@PreAuthorize`)** — già in coda con le altre voci di
    `docs/COMPLIANCE_AUDIT_2026-08.md`
+
+---
+
+## Round 2 (2026-08-04)
+
+## Context
+
+Secondo giro di test esplorativo, richiesto dopo la chiusura del lavoro FatturaPA e
+l'aggiornamento di `docs/COMPLIANCE_AUDIT_2026-08.md` (4 nuovi gap normativi). Copertura:
+export FatturaPA e vicolo cieco nota di credito (priorità massima — è la parte appena
+sviluppata), verifiche live dei due gap GDPR appena scritti nell'audit normativo, aree UI
+mai toccate dal round 1 (dashboard, calendario, Owner Analytics + CSV, profilo hotel),
+ricerca con query anomale, concorrenza. Metodo: sessione autenticata via cookie
+(`admin` + tre utenti creati ad hoc `r2admin0804`/`r2owner0804`/`r2receptionist0804`,
+stesso hotelId di `admin`), chiamate HTTP dirette (`curl`) per la maggior parte dei test —
+più affidabili e ripetibili di un browser per fuzzing/concorrenza — più un passaggio
+browser reale (Claude in Chrome) per le aree puramente UI. Verifiche di stato DB via
+`docker exec hotel_postgres psql`. Ogni bug è riprodotto dal vivo con richiesta/risposta
+HTTP reale e, dove rilevante, log di servizio o query SQL a supporto. Nessun fix
+applicato (per decisione esplicita dell'utente, invariata dal round 1). HEAD al momento
+del test: `fd91fbb`.
+
+**Nota metodologica**: per il test di anonimizzazione GDPR (bug #1 sotto) è stato
+necessario un guest reale con soggiorni/fatture recenti (2026) ancora entro le finestre
+legali TULPS (5 anni) e fiscale (10 anni) — cioè qualunque guest normale nel sistema,
+dato che tutti i dati risalgono al 2026. Non è stata fatta alcuna manipolazione diretta
+del database per aggirare i vincoli legali: l'anonimizzazione è stata invocata tramite
+la vera API (`DELETE /api/v1/guests/{id}`) su un guest reale (Mario Rossi, dati residui
+del round 1), esattamente come la userebbe un ADMIN reale.
+
+## Bug trovati
+
+### 1. 🔴 Guardia legale GDPR (TULPS/fiscale) completamente non funzionante — anonimizzazione riuscita nonostante vincoli attivi (il più grave)
+
+**Dove**: catena di 3 cause indipendenti che si sommano:
+- `guest-service/.../client/BillingServiceClient.java:29` — il metodo Feign
+  `getLastInvoiceDate` chiama `/api/v1/invoices/guest/{guestId}/last-invoice-date`, ma la
+  rotta reale del controller è `/api/v1/invoices/guest/{guestId}/last-date`
+  (`billing-service/.../controller/InvoiceController.java:176`) — **mismatch di path,
+  404 garantito ad ogni chiamata**.
+- `frontdesk-service/.../stays/service/impl/StayServiceImpl.java:611` (metodo
+  `getLastStayDateForGuest`) e `billing-service/.../service/impl/InvoiceServiceImpl.java:343`
+  (metodo `getLastInvoiceDateForGuest`) sono gli **unici due metodi `public final`** nelle
+  rispettive classi (tutti gli altri metodi sono `public` semplice) — con il proxying
+  CGLIB di default di Spring Boot (`proxy-target-class=true`), un metodo `final` non può
+  essere sovrascritto dalla sottoclasse proxy: la chiamata finisce per eseguire il bytecode
+  originale su un'istanza proxy mai inizializzata via dependency injection, con
+  `this.stayRepository`/`this.invoiceRepository` **null** → `NullPointerException` → `500`,
+  riprodotto al 100% su ogni guestId testato (log reali sotto).
+- Il fallback del circuit breaker (`StayServiceClient.java:41-44`,
+  `BillingServiceClient.java:41-44`) dichiara nel Javadoc di essere "fail-safe... block
+  deletion" (ritorna `hasStays/hasInvoices=true`), ma la logica che lo consuma
+  (`GuestServiceImpl.computeTulpsExpiry:265-271`, `computeFiscalExpiry:273-278`, e
+  `GuestRetentionJobServiceImpl.shouldAnonymise:114,125`) tratta `lastStayDate()==null`
+  (sempre vero nel fallback) come "nessun vincolo" — **il "fail-safe" dichiarato è in
+  realtà fail-open**: il vincolo non viene mai applicato quando il fallback scatta.
+
+**Riprodotto**: guest `Mario Rossi` (`45ebe6ff-ab3a-4eb9-a338-5ba367e3441b`, dati residui
+round 1) con 2 soggiorni `CHECKED_OUT` reali e 2 fatture `PAID` reali, tutti datati 2026
+(quindi ben dentro sia la finestra TULPS 5 anni sia quella fiscale 10 anni) →
+`DELETE /api/v1/guests/45ebe6ff-ab3a-4eb9-a338-5ba367e3441b` come ADMIN →
+**`204 No Content`** (atteso: `451` con `unlocksAt`/`legalBasis`). Verificato in DB:
+
+```
+hotel_guest.guests: first_name=GDPR, last_name=ERASED_45ebe6ff, email=NULL,
+                     phone=NULL, address=NULL, active=f
+```
+
+Log `frontdesk-service` al momento della chiamata:
+```
+ERROR ... Unhandled exception: Cannot invoke
+"StayRepository.findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(...)"
+because "this.stayRepository" is null
+	at StayServiceImpl.getLastStayDateForGuest(StayServiceImpl.java:614)
+```
+Log `billing-service` (stesso pattern, causa diversa — mismatch di path, non NPE):
+```
+ERROR ... NoResourceFoundException: No static resource
+api/v1/invoices/guest/45ebe6ff-ab3a-4eb9-a338-5ba367e3441b/last-invoice-date
+```
+Riprodotto anche direttamente (`GET /api/v1/stays/guest/{qualunque-guestId}/last-date` →
+sempre `500`, testato su 3 guest diversi, incluso uno mai toccato prima da questo round).
+
+**Bonus — conferma dal vivo del gap `COMPLIANCE_AUDIT_2026-08.md` §3 "Retention
+automatica"**: nonostante l'anonimizzazione lato `guest-service`, `hotel_frontdesk.stay_guests`
+per gli stessi due soggiorni conserva **ancora** `first_name=Mario, last_name=Rossi,
+document_number=AB1234567, citizenship=100000100` — invariato prima e dopo la DELETE.
+
+**Impatto**: la doppia guardia legale che `COMPLIANCE_AUDIT_2026-08.md` §3 valuta
+✅ Implementato ("blocco esplicito HTTP 451... doppia guardia legale TULPS 5 anni +
+fiscale 10 anni") **non protegge nulla nel sistema live attuale**: qualunque ADMIN può
+cancellare irreversibilmente l'identità di un ospite in qualunque momento, anche con
+soggiorni/fatture recentissimi, esponendo l'hotel a sanzioni per mancato rispetto degli
+obblighi di conservazione TULPS/civilistici. La stessa logica rotta è usata dal job
+notturno `GuestRetentionJobServiceImpl` (`@Scheduled 0 0 2 * * *`) — oggi dormiente
+perché pre-filtra su `gdprConsentDate < oggi-10anni` (nessun guest esistente lo supera
+ancora), ma quando lo supererà userà la stessa catena rotta.
+
+**Fix suggerito (non applicato)**: (1) correggere il path Feign in
+`BillingServiceClient.java` per farlo combaciare con `/last-date`; (2) rimuovere `final`
+da entrambi i metodi (o comunque evitare il self-proxy CGLIB su questi bean); (3) — il
+fix concettualmente più importante — quando `hasStays()`/`hasInvoices()` è `true` ma la
+data è sconosciuta (incluso da fallback), il vincolo legale va trattato come *bloccante
+per indeterminazione*, mai come "nessun vincolo": la semantica attuale converte un fail
+dichiaratamente fail-closed in un fail-open silenzioso.
+
+---
+
+### 2. 🔴 Export FatturaPA genera un documento fiscalmente non valido (Partita IVA fittizia) senza bloccare l'operazione
+
+**Dove**: `billing-service/.../service/impl/FatturaPAServiceImpl.java`,
+`validateFiscalAddress()` (righe 255-262) controlla solo `hotel.cap()/comune()/provincia()`,
+mai `hotel.vatNumber()/hotelName()/address()`. I fallback di `sanitize()` (righe 303, 329,
+337, 341) sostituiscono silenziosamente placeholder (`"HOTELPMS"`, `"00000000000"`,
+`"Hotel"`, `"-"`) quando i dati reali sono `null`.
+
+**Riprodotto**: `hotel_settings` per l'hotel corrente ha `vat_number`, `fiscal_code`,
+`hotel_name`, `address` tutti `NULL` (verificato via `psql`; solo `cap/comune/provincia`
+sono valorizzati). `GET /api/v1/invoices/{id}/fatturaPA` → **`200 OK`**, XML
+schema-valido (passa la validazione XSD ufficiale AE) con:
+```xml
+<CedentePrestatore>
+  <IdFiscaleIVA><IdPaese>IT</IdPaese><IdCodice>00000000000</IdCodice></IdFiscaleIVA>
+  <Anagrafica><Denominazione>Hotel</Denominazione></Anagrafica>
+  ...
+  <Sede><Indirizzo>-</Indirizzo>...
+```
+L'export viene registrato e la fattura bloccata (`invoice_fiscal_exports`, hash SHA-256
+persistito) esattamente come se fosse un export legittimo.
+
+**Impatto**: un hotel che non ha ancora completato il proprio profilo fiscale (plausibile
+in fase di onboarding/pilot — è esattamente lo stato dell'hotel di test corrente) può
+generare e **bloccare permanentemente** (via `INVOICE_LOCKED_AFTER_EXPORT`, vedi bug #3)
+quello che sembra un export fiscale riuscito, ma porta una Partita IVA fittizia — nella
+realtà un documento del genere sarebbe respinto da SDI, ma l'applicazione non segnala
+nulla e considera l'operazione conclusa con successo.
+
+**Fix suggerito (non applicato)**: estendere `validateFiscalAddress` (o una nuova
+`validateFiscalIdentity`) a richiedere anche `hotel.vatNumber()` (o `fiscalCode()`) e
+`hotel.hotelName()` non vuoti, con un errore esplicito (es. `HOTEL_FISCAL_IDENTITY_INCOMPLETE`)
+prima di generare/bloccare l'export.
+
+---
+
+### 3. 🟠 Il blocco `INVOICE_LOCKED_AFTER_EXPORT` è incompleto: pagamenti e stato SDI restano mutabili dopo l'export, producendo ri-export divergenti sullo stesso numero fattura
+
+**Dove**: `billing-service/.../service/impl/InvoiceServiceImpl.java` — `assertNotFiscallyLocked()`
+è invocato solo da `addCharge()` (riga 111) e `updateDocumentType()` (riga 289);
+`PaymentServiceImpl.addPayment()` (nessun controllo) e `updateSdiStatus()` (nessun
+controllo) restano completamente liberi.
+
+**Riprodotto** (fattura di test 2026/0024, 200,00€, `ROOM_NIGHT`): export FatturaPA
+(blocca) → `addCharge` → **`409 INVOICE_LOCKED_AFTER_EXPORT`** (corretto) →
+`updateDocumentType` → **`409`** (corretto) → `addPayment 200,00€ CASH` →
+**`201 Created`**, l'invoice passa `ISSUED`→`PAID` (**non bloccato — atteso invece**) →
+`updateSdiStatus` → **`200 OK`** (**non bloccato**). Ri-esportando la stessa fattura dopo
+il pagamento: `DatiPagamento` cambia da un placeholder (`MP05`/importo pieno non pagato)
+a `MP01 CASH 200.00` — hash SHA-256 **diverso** dal primo export, ma `invoice_fiscal_exports`
+conserva **entrambi** gli snapshot senza alcun flag su quale sia (o sia mai stato)
+davvero trasmesso. Inoltre: **nessun endpoint `DELETE`/cancellazione esiste affatto** su
+`InvoiceController` — una fattura non può mai essere annullata via API, a prescindere
+dallo stato di lock.
+
+**Impatto**: è la misurazione precisa del "vicolo cieco nota di credito" (T-BILL-06).
+Contrariamente a quanto lascia intendere `COMPLIANCE_AUDIT_2026-08.md` §2
+("immutabile post export"), il contenuto finanziario della fattura **non è affatto
+congelato** all'export: un operatore può continuare a registrare pagamenti dopo lo
+snapshot fiscale, e l'insieme degli export ufficiali per "fattura 2026/0024" contiene ora
+due versioni fiscalmente incoerenti tra loro, senza modo di stabilire quale sia quella
+davvero trasmessa al commercialista/SDI.
+
+**Fix suggerito (non applicato)**: estendere `assertNotFiscallyLocked()` anche a
+`addPayment()` e `updateSdiStatus()` (oppure, se i pagamenti post-export devono restare
+possibili per il cash-flow, marcare esplicitamente lo snapshot precedente come
+superato/stale invece di lasciarlo coesistere silenziosamente).
+
+---
+
+### 4. 🟠 `GET /invoices/export` (batch) blocca fiscalmente in modo permanente e silenzioso ogni fattura toccata, senza dry-run né conferma
+
+**Dove**: `billing-service/.../service/impl/FatturaPAServiceImpl.java`,
+`generateBatchZip()`/`appendInvoiceToBatch()` (righe 166-220) chiama `generateXml()` per
+ogni fattura eleggibile nel periodo, e `generateXml()` chiama incondizionatamente
+`recordExport()` (blocca la fattura) alla fine.
+
+**Riprodotto**: `GET /api/v1/invoices/export?from=2000-01-01&to=2030-12-31` come ADMIN →
+`200`, ZIP con XML per ogni fattura FATTURA con indirizzo hotel/ospite completo nel
+periodo; ciascuna di queste fatture ha ricevuto una **nuova riga** in
+`invoice_fiscal_exports` (confermato per `2026/0019`, che aveva già 1 export da una
+sessione precedente e ne ha ricevuto un secondo da questa singola chiamata batch).
+In più: il frontend (`frontend/src/services/billingService.ts`) non espone alcun metodo
+verso questo endpoint — oggi è raggiungibile solo via API/Postman diretta, non da alcun
+pulsante UI (riduce ma non elimina il rischio per script/integrazioni future).
+
+**Impatto**: una singola chiamata `GET` (che si presenta come un'azione di sola lettura,
+"vediamo come sarebbe un export dell'anno") blocca irreversibilmente ogni fattura che
+riesce a processare, senza alcun avviso, conferma o modalità anteprima.
+
+**Fix suggerito (non applicato)**: aggiungere una modalità dry-run/preview esplicita,
+o quantomeno richiedere una conferma esplicita per questo endpoint (es. `POST` invece di
+`GET`, parametro di intento esplicito), ed esporlo in UI con un dialog di avviso prima di
+cablarlo.
+
+---
+
+### 5. 🟠 Il ruolo RECEPTIONIST ha accesso libero a tutte le operazioni fiscali sulle fatture (nessun RBAC su `InvoiceController`/gateway)
+
+**Dove**: `billing-service/.../controller/InvoiceController.java` non ha alcun
+`@PreAuthorize` (a differenza di `OwnerReportController.java:45`, che lo usa
+correttamente); `api-gateway/.../AuthenticationFilter.java` — `WRITE_RESTRICTED_PREFIXES`
+(riga 81) e `FULLY_RESTRICTED_PREFIXES` (riga 89) non includono `/api/v1/invoices`.
+
+**Riprodotto dal vivo** con `r2receptionist0804` (ruolo RECEPTIONIST): `PATCH
+/invoices/{id}/document-type` → `200`; `GET /invoices/{id}/fatturaPA` → `200`, genera e
+blocca un vero export fiscale; `GET /invoices/export` (batch) → `200`. Per confronto,
+`GET /api/v1/reports/owner` con lo stesso utente → correttamente `403` (qui il gateway
+funziona, `FULLY_RESTRICTED_PREFIXES` include `/api/v1/reports`).
+
+**Impatto**: qualunque receptionist può generare/bloccare documenti fiscali ufficiali,
+cambiare FATTURA↔RICEVUTA e impostare lo stato di trasmissione SDI, senza alcun controllo
+di autorizzazione aggiuntivo lungo tutto il percorso.
+
+**Fix suggerito (non applicato)**: aggiungere `@PreAuthorize("hasAnyRole('ADMIN','OWNER')")`
+almeno sugli endpoint fiscalmente sensibili (`document-type`, `fatturaPA`, `export`,
+`sdi-status`) in `InvoiceController`, e/o aggiungere `/api/v1/invoices` a
+`WRITE_RESTRICTED_PREFIXES` nel gateway.
+
+---
+
+### 6. 🟡 RECEPTIONIST può modificare la policy di retention GDPR dell'hotel
+
+**Dove**: `guest-service/.../controller/GuestPrivacySettingsController.java`, nessun
+`@PreAuthorize` su classe o metodo.
+
+**Riprodotto**: `r2receptionist0804` → `PUT /api/v1/guests/settings
+{"guestRetentionYears":7}` → **`200 OK`** (era 5, diventa 7). Conferma dal vivo il delta
+#4 di `COMPLIANCE_AUDIT_2026-08.md` §3 (aggiornamento 2026-08-04). Il floor TULPS di 5
+anni resta comunque garantito lato service (`Math.max`), quindi non è possibile scendere
+sotto il minimo legale, ma la configurazione hotel-wide resta modificabile da un ruolo
+non amministrativo.
+
+**Fix suggerito (non applicato)**: `@PreAuthorize("hasAnyRole('ADMIN','OWNER')")` su
+`GuestPrivacySettingsController`.
+
+---
+
+### 7. 🟡 Export CSV di Owner Analytics: header in inglese hardcoded, stato non tradotto, nessun BOM UTF-8/separatore adatto a Excel-IT
+
+**Dove**: `frontend/src/services/billingReportService.ts`, `exportToCsv()` (righe 17-38).
+
+**Riprodotto**: header hardcoded in inglese (`"Invoice #"`, `"Amount (€)"`, `"Status"`,
+...) — viola la regola i18n del progetto ("ALL user-facing strings via i18n keys — zero
+hardcoded text"); `inv.status` scritto grezzo (`PAID`/`ISSUED`/`CANCELLED`) invece
+dell'etichetta tradotta — confermato anche a schermo: la tabella Owner Analytics mostra
+gli stessi badge grezzi "PAID"/"ISSUED" (screenshot), a differenza per esempio del
+Calendario che mostra correttamente "Confermata"/"In Attesa"/ecc. Il `Blob` è costruito
+con `type: 'text/csv;charset=utf-8;'` ma **senza BOM** (`﻿`) e con separatore virgola
+— su Excel Windows in locale italiano (dove la virgola è il separatore decimale),
+l'apertura diretta del file tipicamente produce sia caratteri accentati/€ illeggibili sia
+il mancato riconoscimento delle colonne (tutto finisce in una singola colonna A).
+
+**Fix suggerito (non applicato)**: instradare header ed etichette di stato via i18n;
+anteporre `﻿` al contenuto del `Blob`; valutare separatore `;` o documentare
+l'importazione come "UTF-8 delimitato da virgola".
+
+---
+
+### 8. 🟡 Widget "Stato Camere" in dashboard: testo di numero camera e stato sovrapposto e illeggibile per nomi camera lunghi
+
+**Dove**: pagina Bacheca (`/`), componente griglia stato camere. Confrontato con
+`/calendar` (Calendario Planning), che gestisce correttamente gli stessi nomi camera
+lunghi andando a capo su due righe, senza sovrapposizioni.
+
+**Riprodotto**: screenshot dal vivo — le celle per camere con nomi generati lunghi (es.
+`E2E-LIVE-1785431995278`, dato di test da sessioni E2E precedenti) sovrappongono il testo
+sulla cella adiacente, rendendo la griglia illeggibile. Stessa causa radice dei nomi
+camera lunghi già nota dal round 1 (bug #3, mismatch `VARCHAR(20)` in fb-service), ma
+sintomo nuovo e distinto: qui è un problema di layout/CSS lato frontend nella dashboard,
+non un crash backend.
+
+**Fix suggerito (non applicato)**: applicare alle celle della griglia stato camere in
+dashboard lo stesso trattamento di wrap/troncamento già usato nel Planning board
+(`/calendar`), oppure `max-width` + ellissi con tooltip.
+
+---
+
+### 9. 🟢 `MissingServletRequestParameterException` mappata a 500 invece di 400 (sistemico, common-web-lib)
+
+**Dove**: `common-web-lib/.../exception/AbstractProblemDetailAdvice.java` — nessun
+`@ExceptionHandler(MissingServletRequestParameterException.class)` dedicato; ricade sul
+catch-all generico `@ExceptionHandler(Exception.class)` (riga 142) → `500`.
+
+**Riprodotto**: `GET /api/v1/reports/owner` senza i parametri obbligatori
+`startDate`/`endDate` → **`500 Internal Server Error`** invece di `400 Bad Request` (log
+billing-service: `Required request parameter 'startDate'... is not present`). Stesso
+pattern del bug #6 del round 1 (eccezioni di validazione mappate a 500 anziché al codice
+corretto), qui a livello della libreria condivisa quindi potenzialmente presente su
+qualunque endpoint `@RequestParam` obbligatorio di qualunque servizio.
+
+**Fix suggerito (non applicato)**: aggiungere un handler dedicato per
+`MissingServletRequestParameterException` (e simili eccezioni di binding Spring) che
+ritorni `400`, nella `AbstractProblemDetailAdvice` condivisa.
+
+---
+
+## Verificato corretto (nessun bug, per completezza)
+
+| Scenario | Esito |
+|---|---|
+| Numerazione fattura sotto concorrenza reale (6 `POST /invoices/stay` paralleli) | ✅ `2026/0025`..`2026/0030`, nessun buco/duplicato (lock pessimistico tenuto) |
+| Doppio pagamento concorrente (5 richieste parallele da 100€ su fattura da 100€) | ✅ 1 sola `201`, 3× `400 INVOICE_ALREADY_PAID`, 1× `409 CONCURRENT_MODIFICATION`; DB conferma un solo pagamento registrato |
+| Export batch con periodo invertito (`from > to`) | ✅ `400 EXPORT_PERIOD_INVALID` |
+| Export batch con periodo senza fatture eleggibili | ✅ `200`, ZIP con solo `index.csv` header, nessun crash |
+| Export FatturaPA forzato su documento `RICEVUTA` | ✅ Bloccato, `409 SDI_ONLY_VALID_FOR_FATTURA` |
+| Export FatturaPA su fattura a importo 0 | ⚠️ Riesce (`200`), XML schema-valido con riga fittizia "Soggiorno" a 0,00€ — non blocca ma non è un vero bug (nessun crash/corruzione), solo un varco di validazione minore |
+| Ricerca ospiti/fatture con query SQLi-style, `%`, accentate, stringa lunghissima | ✅ Nessun crash, query parametrizzate correttamente; stringa >URI-limite → `414` gestito a livello HTTP |
+| IVA disaggregata: `ROOM_NIGHT` (10%) + `FB_ORDER` (10%) + `EXTRA` (22%) sullo stesso soggiorno | ✅ Raggruppamento corretto per aliquota in 2 righe `DatiRiepilogo` nell'XML, importi riconciliati esattamente; nota: `FB_ORDER` è tassato al 10% come `ROOM_NIGHT` (non 22%) per scelta del codice (`InvoiceServiceImpl.vatRateFor`) — coerente con la somministrazione di alimenti/bevande in hotel, ma vale la pena chiarirlo esplicitamente dove il gap E12 di `ROADMAP.md` lo presenta come "10% camere / 22% F&B" |
+| Generazione PDF per fattura multi-aliquota | ✅ `200`, PDF valido, nessun crash |
+| Gate ADMIN/OWNER su `/api/v1/reports/owner` da RECEPTIONIST | ✅ `403` (gateway `FULLY_RESTRICTED_PREFIXES` funziona correttamente qui) |
+
+---
+
+## Priorità consigliate (nessun fix applicato qui)
+
+1. **#1 (guardia legale GDPR completamente bypassata)** — il più grave in assoluto tra i
+   due round: distrugge irreversibilmente PII di ospiti reali senza rispettare obblighi
+   di legge, root cause tripla (path Feign errato + metodo `final` sotto CGLIB + logica
+   fail-open), tocca guest-service, frontdesk-service e billing-service insieme
+2. **#2 (Partita IVA fittizia in export FatturaPA)** — genera documenti fiscalmente non
+   validi che vengono trattati e bloccati come se fossero corretti
+3. **#3 (blocco post-export incompleto — pagamenti/SDI status)** — misura precisa del
+   vicolo cieco nota di credito già noto (T-BILL-06), ma qui si dimostra che il problema
+   è più ampio: la fattura non è nemmeno davvero "congelata" come dichiarato
+4. **#5 (RECEPTIONIST senza restrizioni su operazioni fiscali)** — stesso pattern del
+   bug #7 del round 1 (`GuestController`), qui su superficie ancora più sensibile
+5. **#4 (batch export blocca silenziosamente)** — basso rischio di esposizione reale
+   (non cablato in UI oggi), ma comportamento pericoloso se mai esposto o scriptato
+6. **#6 (RECEPTIONIST può cambiare retention settings)** — stesso pattern di RBAC
+   mancante, impatto minore grazie al floor TULPS server-side
+7. **#7 (CSV Owner Analytics — i18n/encoding)** — impatto pratico immediato per l'utente
+   finale italiano (hotel owner), bassa complessità di fix
+8. **#8 (overlap grafico dashboard)** — cosmetico ma visibile, stessa causa radice di
+   dati di test già nota dal round 1
+9. **#9 (500 invece di 400 su parametri mancanti)** — cosmetico/osservabilità, bassa
+   urgenza, sistemico
