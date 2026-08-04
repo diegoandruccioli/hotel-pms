@@ -8,12 +8,16 @@
 
 ## Context
 
-Verifica indipendente su 11 aree normative, condotta con 3 agenti di esplorazione sul
-codice reale (non sulle intenzioni dichiarate in `backup/DECISIONS.md`/`docs/ROADMAP.md`)
-più ricerca web per la normativa corrente (fonti citate in fondo a ogni sezione dove
-pertinente). Il verdetto per ciascuna area è: ✅ implementato, 🟡 parziale, 🔴 assente
-(e non tracciato come gap noto in nessun documento di progetto), ⚫ deciso esplicitamente
-di non implementare (con motivazione già documentata altrove).
+Verifica indipendente su 12 aree normative (§9bis aggiunta nell'aggiornamento del
+2026-08-04), condotta con agenti di esplorazione sul codice reale (non sulle intenzioni
+dichiarate in `backup/DECISIONS.md`/`docs/ROADMAP.md`) più ricerca web per la normativa
+corrente (fonti citate in fondo a ogni sezione dove pertinente). Il verdetto per ciascuna
+area è: ✅ implementato, 🟡 parziale, 🔴 assente (e non tracciato come gap noto in nessun
+documento di progetto), ⚫ deciso esplicitamente di non implementare (con motivazione già
+documentata altrove), ⚪ non applicabile allo scope attuale del prodotto. **Aggiornato
+2026-08-04** con un secondo giro di verifica indipendente (agente separato, stessa
+metodologia) — 4 delta integrati (vedi fondo "Priorità consigliate"), nessuna conclusione
+precedente ribaltata.
 
 **I tre gap più rilevanti trovati, perché nessuno dei tre risultava tracciato da nessuna
 parte prima di questo audit** (non in `DECISIONS.md`, non in `ROADMAP.md`, non in
@@ -102,19 +106,25 @@ livello — ma restano gap concreti soprattutto lato UI e procedure organizzativ
 | Consenso | 🟡 Solo campo data (`gdpr_consent_date`), nessuna raccolta esplicita | `guest-service/.../model/Guest.java:141-145`, backfill da `created_at` come proxy legalmente difendibile ma non un vero flusso di consenso; nessuna checkbox nel frontend |
 | Art. 20 — portabilità | 🟡 Backend ✅, UI ❌ | `GuestController.java:174-185` → `GET /api/v1/guests/{id}/export`, `GuestServiceImpl.java:373`, aggrega stay+invoice. **`frontend/src/services/guestService.ts` non ha alcun metodo di export** — l'endpoint esiste ma non è raggiungibile da nessuna pagina |
 | Art. 17 — oblio/anonimizzazione | ✅ Implementato | `GuestServiceImpl.java:176-218`, doppia guardia legale (TULPS 5 anni + fiscale 10 anni via Art. 2220 CC), blocco esplicito HTTP 451 con `unlocksAt`/`legalBasis` se i vincoli sono ancora attivi |
-| Retention automatica | ✅ Implementato | `GuestRetentionJobServiceImpl` — job notturno (`@Scheduled 0 0 2 * * *`), anonimizza (non cancella fisicamente, preserva integrità referenziale fatture/soggiorni), configurabile per-hotel via `GuestPrivacySettingsController` |
+| Retention automatica | 🟡 Parziale — copre solo `Guest`, non la copia in `frontdesk-service` | `GuestRetentionJobServiceImpl` (job notturno `@Scheduled 0 0 2 * * *`) anonimizza `guest-service.Guest`. Ma `frontdesk-service/.../stays/domain/StayGuest.java:51-80` tiene una copia **completa e indipendente** della PII Alloggiati per ogni soggiorno (nome, nascita, cittadinanza, tipo+numero documento) — grep `anonym\|retention\|@Scheduled` su tutto `frontdesk-service/src/main/java` → **zero risultati**. Anonimizzare un `Guest` non tocca mai i suoi `StayGuest` storici: la PII sensibile resta in chiaro per sempre in un secondo DB |
+| Art. 32 — cifratura a riposo della PII | 🔴 Assente | `documentNumber` in chiaro in due punti: `guest-service/.../model/IdentityDocument.java:59` e `frontdesk-service/.../StayGuest.java:75`. Grep `AttributeConverter` su tutto il repo → zero convertitori di cifratura per dati ospite. Per contrasto, le credenziali Alloggiati Web **sono** cifrate (`AlloggiatiCredentialEncryptor`, AES-256-GCM) — la stessa cura non è stata applicata al dato dell'interessato, che è la categoria più sensibile qui trattata |
 | Art. 30 — registro trattamenti/audit log | 🟡 Log strutturati, non immutabili | Prefissi `[AUTH]`/`[STAY]`/`[BILLING]`/`[GDPR]`, aggregati su Loki con dashboard dedicata. Gap dichiarato: `docs/ROADMAP.md` E13 "audit log immutabile append-only" — non implementato |
 | DPO | ❌ Domanda aperta, non risolvibile tecnicamente | `docs/legal/PRIVACY_DPA_COOKIE_BRIEF.md:207-208` la pone esplicitamente al consulente legale |
 | Data breach (Art. 33/34) | ❌ Nessuna procedura | Citato solo come contenuto atteso nel DPA; nessun runbook in `docs/OPERATIONS_RUNBOOK.md` né in `SECURITY.md` |
 | Privacy/Cookie Policy, ToS | ❌ Deliberatamente non pubblicate | `docs/legal/PRIVACY_DPA_COOKIE_BRIEF.md` già pronto e completo per il consulente (dati per categoria, basi giuridiche, sub-processor incluso Backblaze extra-UE, misure Art. 32, inventario cookie). Decisione esplicita: *"un placeholder legale in produzione è un rischio maggiore di nessun link"*. Route `/legal/privacy`, `/legal/cookies` non esistono ancora, scoping-ready (~1-2h di cablaggio una volta arrivato il testo) |
 
-**Osservazione di sicurezza collaterale, non solo di conformità**: `GuestController.java`
-**non ha alcuna `@PreAuthorize`**, né a livello classe né metodo — inclusi l'export Art. 20
-e la delete/anonimizzazione. L'autorizzazione dipende interamente dalla whitelist per
-path-prefix nell'api-gateway (`docs/SECURITY_AND_PRIVACY.md:96`). Funziona finché quella
-whitelist resta corretta, ma è un singolo punto di fallimento invisibile al codice del
-servizio stesso — **da riverificare end-to-end nella fase di test esplorativo** di questo
-stesso lavoro (accesso diretto alle API con un ruolo non autorizzato).
+**Osservazione di sicurezza collaterale, non solo di conformità**: sia `GuestController.java`
+sia `GuestPrivacySettingsController.java:25,49` **non hanno alcuna `@PreAuthorize`**, né a
+livello classe né metodo — inclusi l'export Art. 20, la delete/anonimizzazione, e ora anche
+la modifica della **retention policy dell'hotel** (`PUT /api/v1/guests/settings`, il periodo
+minimo resta comunque 5 anni per il floor TULPS lato service, ma il controller non impedisce
+a un ruolo qualsiasi di provarci). L'autorizzazione dipende interamente dalla whitelist per
+path-prefix nell'api-gateway (`AuthenticationFilter.java:81-101` — `/api/v1/guests/**` non
+compare in `WRITE_RESTRICTED_PREFIXES` né `FULLY_RESTRICTED_PREFIXES`,
+`docs/SECURITY_AND_PRIVACY.md:96`). Funziona finché quella whitelist resta corretta, ma è un
+singolo punto di fallimento invisibile al codice del servizio stesso — **da riverificare
+end-to-end nella fase di test esplorativo** di questo stesso lavoro (accesso diretto alle API
+con un ruolo non autorizzato).
 
 ---
 
@@ -230,18 +240,31 @@ SaaS B2B non pubblico non è comunque un obbligo diretto, a differenza della PA)
 
 ## 9. Antiriciclaggio (D.Lgs. 231/2007) — 🔴 Mai citato, rischio basso ma non documentato
 
-**Normativa** (verificata via ricerca web, 2026-08-03): il D.Lgs. 231/2007 impone, tra
+**Normativa** (verificata via ricerca web, 2026-08-03 + 2026-08-04): il D.Lgs. 231/2007 impone, tra
 gli obbligati, adeguata verifica della clientela, conservazione dati/documenti per 10
 anni, segnalazione di operazioni sospette a UIF Banca d'Italia. Per le strutture
 ricettive, l'identificazione dell'ospite è già imposta autonomamente dal TULPS
 (Alloggiati Web) — normativa che **vieta esplicitamente** la conservazione di copie
 (fisiche o digitali) dei documenti d'identità, permettendo solo la raccolta e
-trasmissione dei dati identificativi.
+trasmissione dei dati identificativi. **Soglie concrete verificate**: limite ordinario
+all'uso del contante €5.000 (2026); deroga specifica per le strutture ricettive fino a
+**€15.000** per pagamenti da turisti stranieri non residenti (art. 3 D.L. 16/2012), a
+condizione di acquisire copia del passaporto/documento + autocertificazione di non
+residenza, versare l'importo in banca entro il primo giorno lavorativo successivo, e
+presentare una **comunicazione telematica annuale all'Agenzia delle Entrate** (finestra
+10-20 aprile) di tutte le operazioni in contanti pari o superiori alla soglia ordinaria.
 
 **Verificato sul codice**: grep esaustivo su riciclaggio/antiriciclaggio/231-2007/soglia
 contanti in tutto il repo (`.java`/`.ts`/`.tsx`/`.md`/`.tex`) → **zero risultati
 pertinenti**. Nessun limite all'uso del contante (`PaymentMethod.CASH` accetta qualsiasi
-importo, l'unica validazione in `PaymentServiceImpl.java` è `PAYMENT_EXCEEDS_BALANCE`).
+importo, l'unica validazione in `PaymentServiceImpl.java:52-71` è
+`PAYMENT_EXCEEDS_BALANCE`). I dati grezzi per un'eventuale estrazione esistono già
+(`Payment.java:49-59`: `amount`, `paymentDate`, `paymentMethod`) ma **nessun report li
+aggrega** (`OwnerReportController.java` copre solo KPI finanziari operativi, non
+compliance) — e comunque non basterebbero da soli per la deroga turisti, perché la
+cittadinanza dell'ospite (`StayGuest.citizenship`, `frontdesk-service`) non è collegata al
+pagamento (`Payment`, `billing-service`): sono due servizi diversi senza join su questo
+campo.
 
 **Verifica da fare, non risolvibile solo dal codice**: se `guest-service` conserva copie
 scansionate dei documenti d'identità caricati (`POST /api/v1/guests/{id}/documents`) oltre
@@ -256,6 +279,29 @@ contante risulta specificamente applicabile a un hotel al di sotto degli importi
 di una permanenza), ma **zero documentazione** significa che nessuno ha mai fatto questa
 valutazione esplicitamente — a differenza di conservazione sostitutiva e PCI-DSS, che
 hanno entrambi una decisione scritta e motivata.
+
+---
+
+## 9bis. Allergeni F&B (Reg. UE 1169/2011) — 🔴 Assente, non tracciata
+
+**Normativa**: il Regolamento UE 1169/2011 impone l'informazione obbligatoria sui 14
+allergeni maggiori (glutine, crostacei, uova, pesce, arachidi, soia, latte, frutta a
+guscio, sedano, senape, sesamo, solfiti, lupini, molluschi) per qualunque alimento non
+preimballato somministrato al pubblico — quindi ogni voce di un menu bar/ristorante.
+Obbligo del gestore, non solo raccomandazione.
+
+**Verificato sul codice**: `fb-service/.../domain/MenuItem.java:41-79` ha solo `name`,
+`price`, `category`, `description` (testo libero, non strutturato), `available`, `active`
+— **nessun campo allergeni/ingredienti**, né come lista strutturata né come flag. Nessuna
+colonna corrispondente nel Flyway di `fb-service`. Il campo `description` potrebbe in
+teoria ospitare l'informazione come testo libero digitato dall'operatore, ma non è un
+campo dedicato, non è validato, e non compare in nessuna verifica del frontend
+(`Restaurant.tsx`, `OrderFormModal.tsx`) come informazione a sé.
+
+**Stato della consapevolezza nel progetto**: zero — mai citato in `DECISIONS.md`,
+`ROADMAP.md`, `THREAT_MODEL.md`. A differenza di HACCP (procedurale, fuori scope
+software), questo è un obbligo informativo che un menu digitale deve strutturalmente
+supportare.
 
 ---
 
@@ -280,6 +326,9 @@ coperta che lo richiede esplicitamente. Decisione coerente, nessuna azione richi
 | Terms of Service | ❌ Non scritti | `docs/ROADMAP.md:202` — 🟡 Media priorità, atteso da clienti enterprise |
 | Licenze OSS (ADR-002) | ✅ Processo attivo | verifica maintenance/CVE/licenza prima di ogni adozione libreria |
 | Garante Privacy (notifica 72h) | Solo citato come impatto teorico | `docs/PILOT_READINESS_AUDIT.md:291` — vedi §3 (data breach, nessuna procedura reale) |
+| European Accessibility Act (Dir. UE 2019/882, in vigore dal 28/06/2025) | ⚪ Fuori scope oggi, mai valutato per iscritto | Copre servizi e-commerce **B2C**; il PMS è B2B puro (nessuna vendita diretta all'ospite, `DECISIONS.md §2.3`), oltretutto sotto soglia microimpresa (&lt;10 dipendenti, &lt;€2M fatturato). **Trigger di riapertura**: se si costruisce il booking engine diretto (E2/E16) — a quel punto si applica EN 301 549/WCAG 2.1 AA, già ampiamente coperto dal WCAG 2.2 AA con contrasto 7:1 già adottato (§8) |
+| NIS2 (Dir. UE 2022/2555) | ⚪ Fuori scope, mai valutato per iscritto | Settore ricettivo/gestionali PMS non è tra i servizi essenziali/importanti degli Allegati I/II; soglie dimensionali (≥50 dipendenti/€10M) non raggiunte. Da rivalutare solo se il prodotto diventasse fornitore di infrastruttura cloud gestita per terzi su scala |
+| Codice del Consumo / Codice del Turismo (obblighi precontrattuali, diritto di recesso) | ⚪ Fuori scope oggi | Non applicabile senza vendita diretta al consumatore — diventa rilevante solo insieme a un futuro booking engine (stesso trigger di EAA sopra) |
 
 ---
 
@@ -303,6 +352,19 @@ coperta che lo richiede esplicitamente. Decisione coerente, nessuna azione richi
   testo legale dal consulente
 - Export GDPR Art. 20 — manca solo il cablaggio UI, il backend è già pronto (§3)
 
+**Aggiornamento post-audit (2026-08-04, verifica indipendente)** — 4 delta nuovi, non
+presenti alla prima stesura:
+1. **Retention GDPR incompleta** (§3) — il job notturno anonimizza solo `Guest`, mai i
+   `StayGuest` (copia PII Alloggiati per soggiorno) in `frontdesk-service`: PII sensibile
+   (documento, cittadinanza) resta in chiaro per sempre lì anche dopo l'anonimizzazione
+   dell'ospite. Severità alta — è il caso d'uso principale dell'Art. 17 mancato a metà.
+2. **Cifratura a riposo assente per `documentNumber`** (§3) — due DB, zero
+   `AttributeConverter`, incoerente con la cura già messa sulle credenziali Alloggiati.
+3. **Allergeni F&B** (§9bis, nuova) — `MenuItem` senza alcun campo dedicato, obbligo
+   Reg. UE 1169/2011 mai valutato.
+4. **RBAC ospiti più ampio del previsto** (§3) — anche `GuestPrivacySettingsController`
+   senza `@PreAuthorize`, non solo `GuestController`.
+
 **Osservazione di sicurezza da portare in Fase 2 (test esplorativo)**: `GuestController`
 senza `@PreAuthorize` (§3) — verificare end-to-end che la protezione via gateway regga
 davvero su ogni chiamata, in particolare export dati e cancellazione/anonimizzazione.
@@ -321,3 +383,9 @@ davvero su ogni chiamata, in particolare export dati e cancellazione/anonimizzaz
 - [Antiriciclaggio: guida 2026 - adempimenti D.Lgs. 231/2007](https://leggeinchiaro.it/antiriciclaggio-guida-completa/)
 - [L'identificazione degli ospiti nelle strutture ricettive](https://www.studioallievi.com/identificazione-degli-ospiti-nelle-strutture-ricettive/)
 - [GDPR Data Breach Notification: The 72-Hour Rule Explained](https://www.recordinglaw.com/world-laws/world-data-privacy-laws/eu-data-privacy-laws/gdpr-breach-notification-72-hour-rule/)
+
+**Fonti aggiuntive (aggiornamento 2026-08-04)**:
+- [Ipsoa — limiti uso contante e adempimenti antiriciclaggio 2026](https://www.ipsoa.it/guide/limiti-uso-contante-regole-adempimenti-antiriciclaggio)
+- [Baker Tilly — pagamenti in contanti da turisti esteri, comunicazione AdE](https://www.bakertilly.it/en/insights/pagamenti-in-contanti-da-turisti-esteri-nuovo-limite-per-la-comunicazione-allagenzia-delle-entrate)
+- [AccessibilityChecker — EAA compliance for B2B organisations](https://accessibilitychecker.com/news/eaa-compliance-for-b2b-organisations/)
+- [Studio Legale Delli Ponti — European Accessibility Act dal 28 giugno 2025](https://www.studiolegaledelliponti.eu/european-accessibility-act-cosa-cambia-dal-28-giugno-2025-e-per-chi/)
