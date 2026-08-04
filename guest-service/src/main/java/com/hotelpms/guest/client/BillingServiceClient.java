@@ -26,7 +26,7 @@ public interface BillingServiceClient {
      * @param guestId the guest UUID
      * @return last invoice information
      */
-    @GetMapping("/api/v1/invoices/guest/{guestId}/last-invoice-date")
+    @GetMapping("/api/v1/invoices/guest/{guestId}/last-date")
     @CircuitBreaker(name = "billingService", fallbackMethod = "lastInvoiceDateFallback")
     GuestInvoiceClientResponse getLastInvoiceDate(@PathVariable("guestId") UUID guestId);
 

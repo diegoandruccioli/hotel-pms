@@ -170,6 +170,55 @@ class GuestRetentionJobServiceImplTest {
     }
 
     @Test
+    void shouldSkipGuestWhenTulpsStatusIndeterminate() {
+        // hasStays=true but lastStayDate=null reproduces the circuit-breaker
+        // fallback response (T-GST-06 regression guard): must skip the guest,
+        // never be read as "no constraint" and anonymised anyway.
+        final UUID hotelId = UUID.randomUUID();
+        final Guest guest = buildGuest(hotelId);
+        final UUID guestId = Objects.requireNonNull(guest.getId());
+        final GuestPrivacySettings settings = GuestPrivacySettings.builder()
+                .hotelId(hotelId).guestRetentionYears(YEARS_5).build();
+
+        when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
+                .thenReturn(List.of(guest));
+        when(settingsRepository.findById(Objects.requireNonNull(hotelId)))
+                .thenReturn(Optional.of(settings));
+        when(stayServiceClient.getLastStayDate(guestId))
+                .thenReturn(new GuestLastStayClientResponse(true, null));
+
+        job.runRetentionJob();
+
+        assertEquals(FIRST_NAME_MARIO, guest.getFirstName());
+        assertTrue(guest.isActive());
+        verify(guestRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldSkipGuestWhenFiscalStatusIndeterminate() {
+        final UUID hotelId = UUID.randomUUID();
+        final Guest guest = buildGuest(hotelId);
+        final UUID guestId = Objects.requireNonNull(guest.getId());
+        final GuestPrivacySettings settings = GuestPrivacySettings.builder()
+                .hotelId(hotelId).guestRetentionYears(YEARS_5).build();
+
+        when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
+                .thenReturn(List.of(guest));
+        when(settingsRepository.findById(Objects.requireNonNull(hotelId)))
+                .thenReturn(Optional.of(settings));
+        when(stayServiceClient.getLastStayDate(guestId))
+                .thenReturn(new GuestLastStayClientResponse(false, null));
+        when(billingServiceClient.getLastInvoiceDate(guestId))
+                .thenReturn(new GuestInvoiceClientResponse(true, null));
+
+        job.runRetentionJob();
+
+        assertEquals(FIRST_NAME_MARIO, guest.getFirstName());
+        assertTrue(guest.isActive());
+        verify(guestRepository, never()).save(any());
+    }
+
+    @Test
     void shouldDoNothingWhenNoCandidatesFound() {
         when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
                 .thenReturn(List.of());

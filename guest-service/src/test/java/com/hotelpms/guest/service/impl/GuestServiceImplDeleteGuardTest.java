@@ -245,6 +245,45 @@ class GuestServiceImplDeleteGuardTest {
     }
 
     @Test
+    void shouldThrow451WhenTulpsStatusIndeterminate() {
+        // hasStays=true but lastStayDate=null reproduces the circuit-breaker
+        // fallback response (T-GST-06 regression guard): must block, never be
+        // read as "no constraint".
+        when(guestRepository.findByIdAndHotelId(
+                Objects.requireNonNull(guestId), Objects.requireNonNull(hotelId)))
+                .thenReturn(Optional.of(guest));
+        when(reservationClient.hasActiveReservations(guestId)).thenReturn(false);
+        when(privacySettingsService.getOrCreateEntity(hotelId)).thenReturn(defaultSettings);
+        when(stayServiceClient.getLastStayDate(guestId))
+                .thenReturn(new GuestLastStayClientResponse(true, null));
+        when(billingServiceClient.getLastInvoiceDate(guestId))
+                .thenReturn(new GuestInvoiceClientResponse(false, null));
+
+        final GdprLegalHoldException ex = assertThrows(
+                GdprLegalHoldException.class, () -> service.deleteGuest(guestId));
+
+        assertEquals(GdprLegalHoldException.LegalBasis.TULPS, ex.getLegalBasis());
+    }
+
+    @Test
+    void shouldThrow451WhenFiscalStatusIndeterminate() {
+        when(guestRepository.findByIdAndHotelId(
+                Objects.requireNonNull(guestId), Objects.requireNonNull(hotelId)))
+                .thenReturn(Optional.of(guest));
+        when(reservationClient.hasActiveReservations(guestId)).thenReturn(false);
+        when(privacySettingsService.getOrCreateEntity(hotelId)).thenReturn(defaultSettings);
+        when(stayServiceClient.getLastStayDate(guestId))
+                .thenReturn(new GuestLastStayClientResponse(false, null));
+        when(billingServiceClient.getLastInvoiceDate(guestId))
+                .thenReturn(new GuestInvoiceClientResponse(true, null));
+
+        final GdprLegalHoldException ex = assertThrows(
+                GdprLegalHoldException.class, () -> service.deleteGuest(guestId));
+
+        assertEquals(GdprLegalHoldException.LegalBasis.FISCAL, ex.getLegalBasis());
+    }
+
+    @Test
     void shouldRespectCustomRetentionYearsFromHotelSettings() {
         final LocalDate lastStay = LocalDate.now().minusYears(YEARS_6);
         final GuestPrivacySettings customSettings = GuestPrivacySettings.builder()

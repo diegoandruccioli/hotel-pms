@@ -234,31 +234,48 @@ public class GuestServiceImpl implements GuestService {
         final GuestLastStayClientResponse stayInfo =
                 stayServiceClient.getLastStayDate(guestId);
         final LocalDate tulpsExpiry = computeTulpsExpiry(stayInfo, retentionYears);
+        // hasStays()=true with a null date means the source is known to have a stay on
+        // record but its date could not be determined (e.g. the circuit-breaker fallback
+        // fired) — indeterminate must block, never be read as "no constraint".
+        final boolean tulpsIndeterminate = stayInfo.hasStays() && stayInfo.lastStayDate() == null;
 
         final GuestInvoiceClientResponse invoiceInfo =
                 billingServiceClient.getLastInvoiceDate(guestId);
         final LocalDate fiscalExpiry = computeFiscalExpiry(invoiceInfo);
+        final boolean fiscalIndeterminate = invoiceInfo.hasInvoices() && invoiceInfo.lastInvoiceDate() == null;
 
-        final boolean tulpsBlocked = tulpsExpiry != null && !LocalDate.now().isAfter(tulpsExpiry);
-        final boolean fiscalBlocked = fiscalExpiry != null && !LocalDate.now().isAfter(fiscalExpiry);
+        final boolean tulpsBlocked = tulpsIndeterminate
+                || tulpsExpiry != null && !LocalDate.now().isAfter(tulpsExpiry);
+        final boolean fiscalBlocked = fiscalIndeterminate
+                || fiscalExpiry != null && !LocalDate.now().isAfter(fiscalExpiry);
 
         if (tulpsBlocked && fiscalBlocked) {
-            final LocalDate unlocksAt = Objects.requireNonNull(tulpsExpiry)
-                    .isAfter(Objects.requireNonNull(fiscalExpiry))
-                    ? tulpsExpiry : fiscalExpiry;
+            final LocalDate unlocksAt = tulpsIndeterminate || fiscalIndeterminate
+                    ? null
+                    : Objects.requireNonNull(tulpsExpiry).isAfter(Objects.requireNonNull(fiscalExpiry))
+                            ? tulpsExpiry : fiscalExpiry;
             throw new GdprLegalHoldException(
-                    "LEGAL_HOLD_ACTIVE: TULPS and fiscal obligations pending",
+                    tulpsIndeterminate || fiscalIndeterminate
+                            ? "LEGAL_HOLD_ACTIVE: unable to verify TULPS/fiscal retention status "
+                                    + "(dependent service degraded) - deletion blocked as a precaution"
+                            : "LEGAL_HOLD_ACTIVE: TULPS and fiscal obligations pending",
                     unlocksAt, LegalBasis.TULPS_AND_FISCAL);
         }
         if (tulpsBlocked) {
             throw new GdprLegalHoldException(
-                    "LEGAL_HOLD_ACTIVE: TULPS obligation pending until " + tulpsExpiry,
-                    tulpsExpiry, LegalBasis.TULPS);
+                    tulpsIndeterminate
+                            ? "LEGAL_HOLD_ACTIVE: unable to verify TULPS retention status "
+                                    + "(frontdesk-service degraded) - deletion blocked as a precaution"
+                            : "LEGAL_HOLD_ACTIVE: TULPS obligation pending until " + tulpsExpiry,
+                    tulpsIndeterminate ? null : tulpsExpiry, LegalBasis.TULPS);
         }
         if (fiscalBlocked) {
             throw new GdprLegalHoldException(
-                    "LEGAL_HOLD_ACTIVE: fiscal obligation pending until " + fiscalExpiry,
-                    fiscalExpiry, LegalBasis.FISCAL);
+                    fiscalIndeterminate
+                            ? "LEGAL_HOLD_ACTIVE: unable to verify fiscal retention status "
+                                    + "(billing-service degraded) - deletion blocked as a precaution"
+                            : "LEGAL_HOLD_ACTIVE: fiscal obligation pending until " + fiscalExpiry,
+                    fiscalIndeterminate ? null : fiscalExpiry, LegalBasis.FISCAL);
         }
     }
 

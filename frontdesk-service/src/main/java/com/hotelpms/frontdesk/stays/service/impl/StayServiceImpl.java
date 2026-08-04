@@ -606,9 +606,10 @@ public class StayServiceImpl implements StayService {
         reservationService.updateStatusAndGuests(reservationId, status, actualGuests);
     }
 
+    /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
-    public final GuestLastStayResponse getLastStayDateForGuest(
+    public GuestLastStayResponse getLastStayDateForGuest(
             @NonNull final UUID guestId, @NonNull final UUID hotelId) {
         final Optional<Stay> latest = stayRepository
                 .findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(guestId, hotelId);

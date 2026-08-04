@@ -111,7 +111,16 @@ public class GuestRetentionJobServiceImpl {
         try {
             final GuestLastStayClientResponse stayInfo =
                     stayServiceClient.getLastStayDate(guestId);
-            if (stayInfo.hasStays() && stayInfo.lastStayDate() != null) {
+            if (stayInfo.hasStays()) {
+                if (stayInfo.lastStayDate() == null) {
+                    // hasStays()=true with no date means the source is known to have a
+                    // stay on record but the date could not be determined (e.g. the
+                    // circuit-breaker fallback fired) — indeterminate must block, never
+                    // be silently skipped as "no hold".
+                    log.warn("{} guest={} TULPS status indeterminate (frontdesk-service "
+                            + "degraded) — skipping this run as a precaution", LOG_PREFIX, guestId);
+                    return false;
+                }
                 final LocalDate tulpsExpiry = stayInfo.lastStayDate().plusYears(retentionYears);
                 if (!LocalDate.now().isAfter(tulpsExpiry)) {
                     log.debug("{} guest={} blocked by TULPS hold (expires {})",
@@ -122,7 +131,12 @@ public class GuestRetentionJobServiceImpl {
 
             final GuestInvoiceClientResponse invoiceInfo =
                     billingServiceClient.getLastInvoiceDate(guestId);
-            if (invoiceInfo.hasInvoices() && invoiceInfo.lastInvoiceDate() != null) {
+            if (invoiceInfo.hasInvoices()) {
+                if (invoiceInfo.lastInvoiceDate() == null) {
+                    log.warn("{} guest={} FISCAL status indeterminate (billing-service "
+                            + "degraded) — skipping this run as a precaution", LOG_PREFIX, guestId);
+                    return false;
+                }
                 final LocalDate fiscalExpiry = invoiceInfo.lastInvoiceDate()
                         .plusYears(GuestPrivacySettings.FISCAL_MIN_YEARS);
                 if (!LocalDate.now().isAfter(fiscalExpiry)) {

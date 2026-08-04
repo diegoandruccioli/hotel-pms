@@ -338,9 +338,10 @@ public class InvoiceServiceImpl implements InvoiceService {
         return String.format("%d/%04d", year, seq.getLastSeq());
     }
 
+    /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
-    public final GuestInvoiceCheckResponse getLastInvoiceDateForGuest(
+    public GuestInvoiceCheckResponse getLastInvoiceDateForGuest(
             @NonNull final UUID guestId, @NonNull final UUID hotelId) {
         final Optional<Invoice> latest = invoiceRepository
                 .findTopByGuestIdAndHotelIdOrderByIssueDateDesc(guestId, hotelId);
