@@ -92,13 +92,28 @@ public class FatturaPAServiceImpl implements FatturaPAService {
     @Override
     @Transactional
     public byte[] generateXml(@NonNull final UUID invoiceId) {
-        log.info("Generating FatturaPA XML for invoice {}", invoiceId);
+        return generateXmlInternal(invoiceId, true);
+    }
+
+    /**
+     * Builds and schema-validates the FatturaPA XML for an invoice, optionally
+     * recording (and thereby permanently locking) the export.
+     *
+     * @param invoiceId    the invoice UUID
+     * @param recordExport {@code true} to persist the immutable export snapshot
+     *                     and lock the invoice's fiscally-relevant fields;
+     *                     {@code false} for a preview that touches nothing
+     * @return UTF-8 encoded XML bytes, schema-conformant to FPR12
+     */
+    private byte[] generateXmlInternal(final UUID invoiceId, final boolean recordExport) {
+        log.info("Generating FatturaPA XML for invoice {} (recordExport={})", invoiceId, recordExport);
         final InvoiceResponse invoice = invoiceService.getInvoice(invoiceId);
         validateEligibility(invoice);
         vatBreakdownCalculator.assertReconciles(invoice.totalAmount(), invoice.charges());
 
         final HotelSettingsResponse hotel = hotelSettingsClient.getSettings();
         final GuestResponse guest = guestClient.getGuestById(invoice.guestId());
+        validateFiscalIdentity(hotel);
         validateFiscalAddress(hotel, guest);
 
         final byte[] xml;
@@ -121,7 +136,9 @@ public class FatturaPAServiceImpl implements FatturaPAService {
             throw new IllegalStateException("FATTURAPA_XML_SCHEMA_INVALID: " + validationErrors);
         }
 
-        recordExport(invoice, xml);
+        if (recordExport) {
+            recordExport(invoice, xml);
+        }
         return xml;
     }
 
@@ -163,11 +180,12 @@ public class FatturaPAServiceImpl implements FatturaPAService {
     /** {@inheritDoc} */
     @Override
     @Transactional
-    public byte[] generateBatchZip(@NonNull final LocalDate from, @NonNull final LocalDate to) {
+    public byte[] generateBatchZip(@NonNull final LocalDate from, @NonNull final LocalDate to,
+                                    final boolean dryRun) {
         if (from.isAfter(to)) {
             throw new BillingValidationException("EXPORT_PERIOD_INVALID");
         }
-        log.info("Generating FatturaPA batch export from {} to {}", from, to);
+        log.info("Generating FatturaPA batch export from {} to {} (dryRun={})", from, to, dryRun);
 
         final List<InvoiceResponse> eligibleInvoices = invoiceService.getInvoicesInPeriod(from, to).stream()
                 .filter(invoice -> invoice.status() != InvoiceStatus.CANCELLED)
@@ -176,9 +194,12 @@ public class FatturaPAServiceImpl implements FatturaPAService {
 
         final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(buffer)) {
-            final StringBuilder index = new StringBuilder("invoiceNumber,issueDate,totalAmount,status,export\n");
+            final StringBuilder index = new StringBuilder(dryRun
+                    ? "# DRY RUN — nothing recorded, no invoice locked\n"
+                    : "# CONFIRMED — every OK invoice below is now permanently locked\n");
+            index.append("invoiceNumber,issueDate,totalAmount,status,export\n");
             for (final InvoiceResponse invoice : eligibleInvoices) {
-                appendInvoiceToBatch(zip, index, invoice);
+                appendInvoiceToBatch(zip, index, invoice, dryRun);
             }
             zip.putNextEntry(new ZipEntry("index.csv"));
             zip.write(index.toString().getBytes(StandardCharsets.UTF_8));
@@ -198,13 +219,14 @@ public class FatturaPAServiceImpl implements FatturaPAService {
      * @param zip     the batch ZIP being written
      * @param index   the CSV index being built
      * @param invoice the invoice to export
+     * @param dryRun  {@code true} to generate a preview without recording/locking
      * @throws IOException if writing to the ZIP itself fails
      */
     private void appendInvoiceToBatch(final ZipOutputStream zip, final StringBuilder index,
-                                       final InvoiceResponse invoice) throws IOException {
-        String exportResult = "OK";
+                                       final InvoiceResponse invoice, final boolean dryRun) throws IOException {
+        String exportResult = dryRun ? "OK (preview)" : "OK";
         try {
-            final byte[] xml = generateXml(invoice.id());
+            final byte[] xml = generateXmlInternal(invoice.id(), !dryRun);
             zip.putNextEntry(new ZipEntry(zipEntryName(invoice)));
             zip.write(xml);
             zip.closeEntry();
@@ -237,6 +259,23 @@ public class FatturaPAServiceImpl implements FatturaPAService {
         }
         if (invoice.documentType() != DocumentType.FATTURA) {
             throw new InvoiceConflictException("SDI_ONLY_VALID_FOR_FATTURA");
+        }
+    }
+
+    /**
+     * Verifies that the hotel (CedentePrestatore) has a real fiscal identity —
+     * a VAT-registered business name and Partita IVA — before generating an
+     * XML that would otherwise silently fall back to placeholder values
+     * ({@code "Hotel"}/{@code "00000000000"}), producing a schema-valid but
+     * legally fake document that SDI would reject and that this system would
+     * nonetheless treat, and permanently lock, as a genuine export.
+     *
+     * @param hotel the hotel settings
+     * @throws BillingValidationException if the hotel's name or VAT number is missing
+     */
+    private static void validateFiscalIdentity(final HotelSettingsResponse hotel) {
+        if (isBlank(hotel.hotelName()) || isBlank(hotel.vatNumber())) {
+            throw new BillingValidationException("HOTEL_FISCAL_IDENTITY_INCOMPLETE");
         }
     }
 

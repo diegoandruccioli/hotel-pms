@@ -286,6 +286,9 @@ public class InvoiceServiceImpl implements InvoiceService {
         if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
             throw new InvoiceConflictException("CANNOT_UPDATE_CANCELLED_INVOICE");
         }
+        if (invoice.getStatus() == InvoiceStatus.PAID) {
+            throw new InvoiceConflictException("CANNOT_UPDATE_PAID_INVOICE");
+        }
         assertNotFiscallyLocked(invoice);
         invoice.setDocumentType(documentType);
         final Invoice saved = invoiceRepository.save(Objects.requireNonNull(invoice));
@@ -307,6 +310,11 @@ public class InvoiceServiceImpl implements InvoiceService {
         if (invoice.getDocumentType() != DocumentType.FATTURA) {
             throw new InvoiceConflictException("SDI_ONLY_VALID_FOR_FATTURA");
         }
+        // Deliberately NOT behind assertNotFiscallyLocked: sdiStatus is transmission
+        // bookkeeping (NOT_SENT/SENT/ACCEPTED/REJECTED), never read by
+        // FatturaPAServiceImpl when building the XML — recording it is the operator's
+        // natural *next* step right after generateXml() locks the invoice, so blocking
+        // it here would make the field permanently stuck at its default forever.
         invoice.setSdiStatus(sdiStatus);
         final Invoice saved = invoiceRepository.save(Objects.requireNonNull(invoice));
         return invoiceMapper.toResponse(Objects.requireNonNull(saved));

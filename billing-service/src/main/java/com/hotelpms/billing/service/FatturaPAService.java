@@ -25,13 +25,20 @@ public interface FatturaPAService {
      * Builds a ZIP archive containing one FatturaPA XML per eligible (FATTURA,
      * non-CANCELLED) invoice issued within the given period for the caller's hotel,
      * plus a CSV index — the batch hand-off to the commercialista/third-party
-     * accounting software for a full period at once. Each included invoice is
-     * individually schema-validated and fiscally recorded exactly as a
-     * single-invoice export via {@link #generateXml}.
+     * accounting software for a full period at once.
      *
-     * @param from inclusive lower bound (day) on invoice issue date
-     * @param to   inclusive upper bound (day) on invoice issue date
+     * <p>When {@code dryRun} is {@code false}, each included invoice is
+     * individually schema-validated and fiscally recorded (permanently locked)
+     * exactly as a single-invoice export via {@link #generateXml}. When
+     * {@code dryRun} is {@code true}, the same XML is generated and validated
+     * for preview purposes only — nothing is recorded and no invoice is locked,
+     * so the caller can inspect the would-be export before committing to it.
+     *
+     * @param from   inclusive lower bound (day) on invoice issue date
+     * @param to     inclusive upper bound (day) on invoice issue date
+     * @param dryRun {@code true} for a preview that locks nothing; {@code false}
+     *               to actually record and lock every eligible invoice
      * @return ZIP archive bytes
      */
-    byte[] generateBatchZip(@NonNull LocalDate from, @NonNull LocalDate to);
+    byte[] generateBatchZip(@NonNull LocalDate from, @NonNull LocalDate to, boolean dryRun);
 }

@@ -7,8 +7,10 @@ import com.hotelpms.billing.domain.PaymentMethod;
 import com.hotelpms.billing.dto.PaymentRequest;
 import com.hotelpms.billing.dto.PaymentResponse;
 import com.hotelpms.billing.exception.BillingValidationException;
+import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.exception.NotFoundException;
 import com.hotelpms.billing.mapper.PaymentMapper;
+import com.hotelpms.billing.repository.InvoiceFiscalExportRepository;
 import com.hotelpms.billing.repository.InvoiceRepository;
 import com.hotelpms.billing.repository.PaymentRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -53,6 +55,9 @@ class PaymentServiceImplTest {
 
     @Mock
     private PaymentMapper paymentMapper;
+
+    @Mock
+    private InvoiceFiscalExportRepository invoiceFiscalExportRepository;
 
     @InjectMocks
     private PaymentServiceImpl paymentService;
@@ -193,6 +198,23 @@ class PaymentServiceImplTest {
         final Exception exception = assertThrows(BillingValidationException.class,
                 () -> paymentService.addPayment(Objects.requireNonNull(invoiceId), Objects.requireNonNull(request)));
         assertEquals("INVOICE_ALREADY_PAID", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should throw InvoiceConflictException when invoice was already fiscally exported (round 2 bug #3)")
+    void shouldThrowWhenInvoiceIsFiscallyLocked() {
+        // Arrange — a payment feeds DatiPagamento in the FatturaPA XML, so allowing
+        // one after export would make a re-export diverge under the same invoice
+        // number with no way to tell which was really transmitted
+        when(invoiceRepository.findByIdAndHotelId(Objects.requireNonNull(invoiceId), hotelId))
+                .thenReturn(Optional.of(invoice));
+        when(invoiceFiscalExportRepository.existsByInvoiceId(invoiceId)).thenReturn(true);
+
+        // Act & Assert
+        final Exception exception = assertThrows(InvoiceConflictException.class,
+                () -> paymentService.addPayment(Objects.requireNonNull(invoiceId), Objects.requireNonNull(request)));
+        assertEquals("INVOICE_LOCKED_AFTER_EXPORT", exception.getMessage());
+        verify(invoiceRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
     }
 
     @Test

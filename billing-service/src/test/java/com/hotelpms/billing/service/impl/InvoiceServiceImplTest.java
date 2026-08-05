@@ -536,6 +536,26 @@ class InvoiceServiceImplTest {
         }
 
         @Test
+        @DisplayName("Should throw ConflictException when updating document type on PAID invoice")
+        void shouldThrowWhenUpdatingPaidInvoiceDocumentType() {
+                // Arrange — round 1 bug #5: FATTURA->RICEVUTA silently succeeded on a
+                // PAID invoice, even without a fiscal export, integrity gap on a settled
+                // fiscal document
+                final UUID invoiceId = UUID.randomUUID();
+                final Invoice invoice = new Invoice();
+                invoice.setId(invoiceId);
+                invoice.setStatus(InvoiceStatus.PAID);
+
+                when(invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)).thenReturn(Optional.of(invoice));
+
+                // Act & Assert
+                final Exception exception = assertThrows(InvoiceConflictException.class,
+                                () -> invoiceService.updateDocumentType(invoiceId, DocumentType.RICEVUTA));
+                assertEquals("CANNOT_UPDATE_PAID_INVOICE", exception.getMessage());
+                verify(invoiceRepository, never()).save(any(Invoice.class));
+        }
+
+        @Test
         @DisplayName("Should throw InvoiceConflictException when updating document type on an already-exported invoice")
         void shouldThrowLockedWhenUpdatingDocumentTypeOnExportedInvoice() {
                 // Arrange

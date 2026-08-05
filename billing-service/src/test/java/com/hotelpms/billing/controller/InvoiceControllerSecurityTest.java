@@ -27,6 +27,7 @@ import java.util.HexFormat;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -174,7 +175,7 @@ class InvoiceControllerSecurityTest {
 
     @Test
     void exportBatchReturnsOkForAdmin() throws Exception {
-        when(fatturaPAService.generateBatchZip(any(), any())).thenReturn(new byte[0]);
+        when(fatturaPAService.generateBatchZip(any(), any(), anyBoolean())).thenReturn(new byte[0]);
 
         mockMvc.perform(withAuthHeaders(
                         get(BASE_URL + "/export?from=2026-01-01&to=2026-12-31"),

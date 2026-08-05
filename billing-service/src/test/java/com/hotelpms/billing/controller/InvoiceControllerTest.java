@@ -258,13 +258,28 @@ class InvoiceControllerTest {
     }
 
     @Test
-    void shouldGetBatchExportZipReturn200() throws Exception {
+    void shouldGetBatchExportZipDefaultsToDryRun() throws Exception {
         final byte[] zipBytes = {0x50, 0x4B, 0x03, 0x04}; // PK.. — ZIP magic bytes
-        when(fatturaPAService.generateBatchZip(SEARCH_DATE_FROM, SEARCH_DATE_TO)).thenReturn(zipBytes);
+        when(fatturaPAService.generateBatchZip(SEARCH_DATE_FROM, SEARCH_DATE_TO, true)).thenReturn(zipBytes);
 
         mockMvc.perform(get(BASE_URL + PATH_EXPORT)
                         .param("from", SEARCH_DATE_FROM.toString())
                         .param("to", SEARCH_DATE_TO.toString()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HEADER_CONTENT_DISPOSITION,
+                        org.hamcrest.Matchers.containsString(ATTACHMENT)))
+                .andExpect(content().bytes(zipBytes));
+    }
+
+    @Test
+    void shouldGetBatchExportZipConfirmedReturn200() throws Exception {
+        final byte[] zipBytes = {0x50, 0x4B, 0x03, 0x04}; // PK.. — ZIP magic bytes
+        when(fatturaPAService.generateBatchZip(SEARCH_DATE_FROM, SEARCH_DATE_TO, false)).thenReturn(zipBytes);
+
+        mockMvc.perform(get(BASE_URL + PATH_EXPORT)
+                        .param("from", SEARCH_DATE_FROM.toString())
+                        .param("to", SEARCH_DATE_TO.toString())
+                        .param("confirm", "true"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HEADER_CONTENT_DISPOSITION,
                         org.hamcrest.Matchers.containsString(ATTACHMENT)))

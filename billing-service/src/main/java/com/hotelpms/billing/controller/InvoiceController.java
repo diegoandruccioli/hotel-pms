@@ -279,17 +279,25 @@ public class InvoiceController {
      * the given period for the caller's hotel, plus a CSV index — the batch hand-off
      * to the commercialista/third-party accounting software.
      *
-     * @param from inclusive lower bound (day) on invoice issue date
-     * @param to   inclusive upper bound (day) on invoice issue date
+     * <p>Defaults to a dry-run preview: nothing is recorded and no invoice is
+     * locked unless {@code confirm=true} is passed explicitly. A single {@code GET}
+     * without that flag can therefore never surprise an operator by permanently
+     * locking a whole period's invoices.
+     *
+     * @param from    inclusive lower bound (day) on invoice issue date
+     * @param to      inclusive upper bound (day) on invoice issue date
+     * @param confirm {@code true} to actually record and lock every eligible
+     *                invoice; omitted or {@code false} for a preview
      * @return ZIP bytes with {@code Content-Disposition: attachment} header
      */
     @GetMapping(value = "/export", produces = "application/zip")
     @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     public ResponseEntity<byte[]> exportBatch(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate from,
-            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate to) {
-        log.info("REST request for FatturaPA batch export from {} to {}", from, to);
-        final byte[] zip = fatturaPAService.generateBatchZip(from, to);
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate to,
+            @RequestParam(defaultValue = "false") final boolean confirm) {
+        log.info("REST request for FatturaPA batch export from {} to {} (confirm={})", from, to, confirm);
+        final byte[] zip = fatturaPAService.generateBatchZip(from, to, !confirm);
         final ContentDisposition disposition = ContentDisposition.attachment()
                 .filename(ZIP_FILENAME_PREFIX + from + "_" + to + ZIP_EXTENSION)
                 .build();

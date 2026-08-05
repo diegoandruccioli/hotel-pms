@@ -60,6 +60,12 @@ class FatturaPAServiceImplTest {
     private static final int ISSUE_YEAR = 2026;
     private static final int ISSUE_DAY = 15;
     private static final String HOTEL_NAME = "Hotel Test";
+    private static final String HOTEL_ADDRESS = "Via Roma 1";
+    private static final String HOTEL_VAT_NUMBER = "12345678901";
+    private static final String HOTEL_FISCAL_CODE = "TSTDNL80A01H501W";
+    private static final String HOTEL_CAP = "00100";
+    private static final String HOTEL_COMUNE = "Roma";
+    private static final String HOTEL_PROVINCIA = "RM";
     private static final String GUEST_FIRST_NAME = "Mario";
     private static final String GUEST_LAST_NAME = "Rossi";
     private static final String GUEST_EMAIL = "mario@rossi.it";
@@ -67,6 +73,7 @@ class FatturaPAServiceImplTest {
     private static final String INVOICE_NUMBER_1 = "2026/0001";
     private static final String INVOICE_NUMBER_2 = "2026/0002";
     private static final String INDEX_CSV = "index.csv";
+    private static final String INVOICE_1_XML = "2026-0001.xml";
 
     @Mock
     private InvoiceService invoiceService;
@@ -93,8 +100,8 @@ class FatturaPAServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        hotel = new HotelSettingsResponse(HOTEL_ID, HOTEL_NAME, "Via Roma 1", "12345678901", "TSTDNL80A01H501W", null,
-                "00100", "Roma", "RM");
+        hotel = new HotelSettingsResponse(HOTEL_ID, HOTEL_NAME, HOTEL_ADDRESS, HOTEL_VAT_NUMBER, HOTEL_FISCAL_CODE,
+                null, HOTEL_CAP, HOTEL_COMUNE, HOTEL_PROVINCIA);
         guest = new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL,
                 "RSSMRA80A01H501T", null, null, "ABC1234", null,
                 GUEST_ADDRESS, "20100", "Milano", "MI");
@@ -179,7 +186,7 @@ class FatturaPAServiceImplTest {
     @Test
     void shouldRejectExportWhenHotelStructuredAddressIsIncomplete() {
         final HotelSettingsResponse incompleteHotel = new HotelSettingsResponse(
-                HOTEL_ID, HOTEL_NAME, "Via Roma 1", "12345678901", "TSTDNL80A01H501W", null,
+                HOTEL_ID, HOTEL_NAME, HOTEL_ADDRESS, HOTEL_VAT_NUMBER, HOTEL_FISCAL_CODE, null,
                 null, null, null);
         final InvoiceResponse invoice = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
         when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
@@ -189,6 +196,35 @@ class FatturaPAServiceImplTest {
         assertThatThrownBy(() -> service.generateXml(INVOICE_ID))
                 .isInstanceOf(BillingValidationException.class)
                 .hasMessageContaining("HOTEL_STRUCTURED_ADDRESS_INCOMPLETE");
+    }
+
+    @Test
+    void shouldRejectExportWhenHotelVatNumberIsMissing() {
+        final HotelSettingsResponse noVat = new HotelSettingsResponse(
+                HOTEL_ID, HOTEL_NAME, HOTEL_ADDRESS, null, HOTEL_FISCAL_CODE, null,
+                HOTEL_CAP, HOTEL_COMUNE, HOTEL_PROVINCIA);
+        final InvoiceResponse invoice = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+        when(hotelSettingsClient.getSettings()).thenReturn(noVat);
+
+        assertThatThrownBy(() -> service.generateXml(INVOICE_ID))
+                .isInstanceOf(BillingValidationException.class)
+                .hasMessageContaining("HOTEL_FISCAL_IDENTITY_INCOMPLETE");
+        verify(invoiceFiscalExportRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectExportWhenHotelNameIsMissing() {
+        final HotelSettingsResponse noName = new HotelSettingsResponse(
+                HOTEL_ID, null, HOTEL_ADDRESS, HOTEL_VAT_NUMBER, HOTEL_FISCAL_CODE, null,
+                HOTEL_CAP, HOTEL_COMUNE, HOTEL_PROVINCIA);
+        final InvoiceResponse invoice = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+        when(hotelSettingsClient.getSettings()).thenReturn(noName);
+
+        assertThatThrownBy(() -> service.generateXml(INVOICE_ID))
+                .isInstanceOf(BillingValidationException.class)
+                .hasMessageContaining("HOTEL_FISCAL_IDENTITY_INCOMPLETE");
     }
 
     @Test
@@ -275,10 +311,10 @@ class FatturaPAServiceImplTest {
         when(hotelSettingsClient.getSettings()).thenReturn(hotel);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
 
-        final byte[] zip = service.generateBatchZip(from, to);
+        final byte[] zip = service.generateBatchZip(from, to, false);
         final ZipContents contents = readZip(zip);
 
-        assertThat(contents.entryNames).containsExactlyInAnyOrder("2026-0001.xml", "2026-0002.xml", INDEX_CSV);
+        assertThat(contents.entryNames).containsExactlyInAnyOrder(INVOICE_1_XML, "2026-0002.xml", INDEX_CSV);
         assertThat(contents.index).contains(INVOICE_NUMBER_1).contains(INVOICE_NUMBER_2);
         verify(invoiceFiscalExportRepository, org.mockito.Mockito.times(2)).save(any());
     }
@@ -307,10 +343,10 @@ class FatturaPAServiceImplTest {
         when(guestClient.getGuestById(brokenGuestId)).thenReturn(incompleteGuest);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
 
-        final byte[] zip = service.generateBatchZip(from, to);
+        final byte[] zip = service.generateBatchZip(from, to, false);
         final ZipContents contents = readZip(zip);
 
-        assertThat(contents.entryNames).containsExactlyInAnyOrder("2026-0001.xml", INDEX_CSV);
+        assertThat(contents.entryNames).containsExactlyInAnyOrder(INVOICE_1_XML, INDEX_CSV);
         assertThat(contents.index).contains("ERROR: GUEST_STRUCTURED_ADDRESS_INCOMPLETE");
         verify(invoiceFiscalExportRepository, org.mockito.Mockito.times(1)).save(any());
     }
@@ -324,10 +360,29 @@ class FatturaPAServiceImplTest {
 
         when(invoiceService.getInvoicesInPeriod(from, to)).thenReturn(List.of(cancelled, ricevuta));
 
-        final byte[] zip = service.generateBatchZip(from, to);
+        final byte[] zip = service.generateBatchZip(from, to, false);
         final ZipContents contents = readZip(zip);
 
         assertThat(contents.entryNames).containsExactly(INDEX_CSV);
+        verify(invoiceFiscalExportRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldGenerateDryRunBatchZipWithoutRecordingOrLockingAnything() throws java.io.IOException {
+        final InvoiceResponse only = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
+        final LocalDate from = LocalDate.of(ISSUE_YEAR, 1, 1);
+        final LocalDate to = LocalDate.of(ISSUE_YEAR, 1, 31);
+
+        when(invoiceService.getInvoicesInPeriod(from, to)).thenReturn(List.of(only));
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(only);
+        when(hotelSettingsClient.getSettings()).thenReturn(hotel);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
+
+        final byte[] zip = service.generateBatchZip(from, to, true);
+        final ZipContents contents = readZip(zip);
+
+        assertThat(contents.entryNames).containsExactlyInAnyOrder(INVOICE_1_XML, INDEX_CSV);
+        assertThat(contents.index).contains("DRY RUN").contains("OK (preview)");
         verify(invoiceFiscalExportRepository, never()).save(any());
     }
 
@@ -336,7 +391,7 @@ class FatturaPAServiceImplTest {
         final LocalDate from = LocalDate.of(ISSUE_YEAR, 2, 1);
         final LocalDate to = LocalDate.of(ISSUE_YEAR, 1, 1);
 
-        assertThatThrownBy(() -> service.generateBatchZip(from, to))
+        assertThatThrownBy(() -> service.generateBatchZip(from, to, false))
                 .isInstanceOf(BillingValidationException.class)
                 .hasMessageContaining("EXPORT_PERIOD_INVALID");
     }

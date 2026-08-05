@@ -100,7 +100,7 @@ attualmente occupata da un ospite pagante, con conseguenze operative dirette
 
 ---
 
-### 5. 🟡 `documentType` modificabile su fattura già `PAID`
+### 5. 🟡 `documentType` modificabile su fattura già `PAID` — ✅ RISOLTO (Fase B2 piano fix-order)
 
 **Dove**: `billing-service/.../service/impl/InvoiceServiceImpl.java`
 (`updateDocumentType`).
@@ -291,7 +291,7 @@ dichiaratamente fail-closed in un fail-open silenzioso.
 
 ---
 
-### 2. 🔴 Export FatturaPA genera un documento fiscalmente non valido (Partita IVA fittizia) senza bloccare l'operazione
+### 2. 🔴 Export FatturaPA genera un documento fiscalmente non valido (Partita IVA fittizia) senza bloccare l'operazione — ✅ RISOLTO (Fase B2 piano fix-order)
 
 **Dove**: `billing-service/.../service/impl/FatturaPAServiceImpl.java`,
 `validateFiscalAddress()` (righe 255-262) controlla solo `hotel.cap()/comune()/provincia()`,
@@ -327,7 +327,18 @@ prima di generare/bloccare l'export.
 
 ---
 
-### 3. 🟠 Il blocco `INVOICE_LOCKED_AFTER_EXPORT` è incompleto: pagamenti e stato SDI restano mutabili dopo l'export, producendo ri-export divergenti sullo stesso numero fattura
+### 3. 🟠 Il blocco `INVOICE_LOCKED_AFTER_EXPORT` è incompleto: pagamenti e stato SDI restano mutabili dopo l'export, producendo ri-export divergenti sullo stesso numero fattura — 🟡 PARZIALMENTE RISOLTO (Fase B2 piano fix-order)
+
+> **Nota di chiusura**: `addPayment` ora bloccato dopo l'export (`INVOICE_LOCKED_AFTER_EXPORT`,
+> verificato dal vivo) — i pagamenti alimentano `DatiPagamento` nell'XML, quindi un pagamento
+> post-export causerebbe davvero un ri-export divergente sullo stesso numero fattura.
+> `updateSdiStatus` **deliberatamente lasciato non bloccato**: verificato che `sdiStatus` non è
+> mai letto da `FatturaPAServiceImpl` in fase di generazione XML — è puro metadata di
+> tracciamento trasmissione (NOT_SENT/SENT/ACCEPTED/REJECTED), ed è esattamente il passo che
+> l'operatore deve compiere **subito dopo** che `generateXml()` blocca la fattura (registrare
+> l'esito della trasmissione appena fatta). Bloccarlo anche lì avrebbe reso il campo bloccato per
+> sempre al suo default, rompendo il flusso invece di proteggerlo — correzione rispetto alla
+> lettura letterale del bug report originale.
 
 **Dove**: `billing-service/.../service/impl/InvoiceServiceImpl.java` — `assertNotFiscallyLocked()`
 è invocato solo da `addCharge()` (riga 111) e `updateDocumentType()` (riga 289);
@@ -361,7 +372,7 @@ superato/stale invece di lasciarlo coesistere silenziosamente).
 
 ---
 
-### 4. 🟠 `GET /invoices/export` (batch) blocca fiscalmente in modo permanente e silenzioso ogni fattura toccata, senza dry-run né conferma
+### 4. 🟠 `GET /invoices/export` (batch) blocca fiscalmente in modo permanente e silenzioso ogni fattura toccata, senza dry-run né conferma — ✅ RISOLTO (Fase B2 piano fix-order)
 
 **Dove**: `billing-service/.../service/impl/FatturaPAServiceImpl.java`,
 `generateBatchZip()`/`appendInvoiceToBatch()` (righe 166-220) chiama `generateXml()` per

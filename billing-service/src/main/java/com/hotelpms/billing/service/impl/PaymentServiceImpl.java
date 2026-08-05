@@ -6,8 +6,10 @@ import com.hotelpms.billing.domain.Payment;
 import com.hotelpms.billing.dto.PaymentRequest;
 import com.hotelpms.billing.dto.PaymentResponse;
 import com.hotelpms.billing.exception.BillingValidationException;
+import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.exception.NotFoundException;
 import com.hotelpms.billing.mapper.PaymentMapper;
+import com.hotelpms.billing.repository.InvoiceFiscalExportRepository;
 import com.hotelpms.billing.repository.InvoiceRepository;
 import com.hotelpms.billing.repository.PaymentRepository;
 import com.hotelpms.billing.service.PaymentService;
@@ -35,6 +37,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final InvoiceRepository invoiceRepository;
     private final PaymentMapper paymentMapper;
+    private final InvoiceFiscalExportRepository invoiceFiscalExportRepository;
 
     /** {@inheritDoc} */
     @Override
@@ -56,6 +59,16 @@ public class PaymentServiceImpl implements PaymentService {
             log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={} | reason=INVOICE_CANCELLED",
                     invoiceId, hotelId);
             throw new BillingValidationException("INVOICE_CANCELLED");
+        }
+
+        // A payment changes the invoice's PAID/ISSUED status, a fiscally-relevant field
+        // once a FatturaPA export exists — same guard as addCharge/updateDocumentType in
+        // InvoiceServiceImpl, kept here as its own check because PaymentServiceImpl is a
+        // separate class with its own Invoice lookup (T-BILL-06/round 2 bug #3).
+        if (invoiceFiscalExportRepository.existsByInvoiceId(invoice.getId())) {
+            log.warn("[BILLING] PAYMENT_REJECTED | invoiceId={} | hotelId={} | reason=INVOICE_LOCKED_AFTER_EXPORT",
+                    invoiceId, hotelId);
+            throw new InvoiceConflictException("INVOICE_LOCKED_AFTER_EXPORT");
         }
 
         final BigDecimal currentTotalPaid = invoice.getPayments().stream()
