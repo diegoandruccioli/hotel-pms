@@ -82,7 +82,7 @@ validare/troncare esplicitamente lato applicazione con un errore leggibile invec
 
 ---
 
-### 4. 🟠 Nessun enforcement sulle transizioni di stato camera
+### 4. 🟠 Nessun enforcement sulle transizioni di stato camera — ✅ RISOLTO (Fase B4 piano fix-order)
 
 **Dove**: `frontdesk-service/.../rooms/controller/RoomController.java` (`PATCH
 /{id}/status`), `RoomStatus.java` (il commento javadoc dichiara: *"OCCUPIED ... set by
@@ -97,6 +97,17 @@ reale**, nonostante la documentazione nel codice dichiari il contrario.
 **Impatto**: un receptionist/housekeeping può mettere fuori servizio una camera
 attualmente occupata da un ospite pagante, con conseguenze operative dirette
 (disponibilità, planning, confusione booking).
+
+**Fix applicato**: `RoomService` ora espone due metodi distinti — `updateRoomStatus`
+(invariato, entry point fidato riservato alla Saga di check-in/check-out in
+`StayServiceImpl`) e il nuovo `updateHousekeepingStatus` (usato da `PATCH
+/rooms/{id}/status`), che rifiuta `OCCUPIED` come target (400
+`OCCUPIED_SET_BY_CHECKIN_SAGA_ONLY`) e rifiuta qualunque cambio quando la camera è già
+`OCCUPIED` (409 `ROOM_OCCUPIED_CLEARED_BY_CHECKOUT_SAGA_ONLY`). Verificato dal vivo:
+camera `OCCUPIED` reale → `MAINTENANCE` ora risponde `409`; impostazione manuale di
+`OCCUPIED` su camera `CLEAN` ora risponde `400`; una normale transizione housekeeping
+(`DIRTY` → `CLEAN`) continua a funzionare (`200`); la Saga di check-in/check-out non è
+stata toccata e resta l'unico percorso abilitato a impostare/rimuovere `OCCUPIED`.
 
 ---
 

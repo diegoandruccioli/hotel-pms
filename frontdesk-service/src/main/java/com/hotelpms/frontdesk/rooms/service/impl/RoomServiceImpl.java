@@ -5,6 +5,8 @@ import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.domain.RoomType;
 import com.hotelpms.frontdesk.rooms.dto.RoomRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
+import com.hotelpms.frontdesk.exception.BadRequestException;
+import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.rooms.mapper.RoomMapper;
 import com.hotelpms.frontdesk.rooms.repository.RoomRepository;
@@ -163,6 +165,42 @@ public class RoomServiceImpl implements RoomService {
         Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
         final Room room = roomRepository.findByIdAndActiveTrueAndHotelId(id, hotelId)
                 .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
+
+        room.setStatus(status);
+
+        final Room updated = roomRepository.saveAndFlush(Objects.requireNonNull(room));
+        return roomMapper.toResponse(updated);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Round 1 bug #4: {@code RoomStatus.OCCUPIED}'s own Javadoc declares
+     * "Housekeeping staff cannot change this status directly", but nothing
+     * previously enforced it — verified live, a room with a real CHECKED_IN
+     * stay could be moved straight to MAINTENANCE via this endpoint, and
+     * OCCUPIED could be set manually here too, bypassing the check-in Saga
+     * entirely.
+     *
+     * @throws BadRequestException if {@code status} is {@code OCCUPIED} — that
+     *                              transition belongs exclusively to the
+     *                              check-in Saga ({@link #updateRoomStatus})
+     * @throws ConflictException   if the room is currently {@code OCCUPIED} —
+     *                              only the check-out Saga may change it away
+     */
+    @Override
+    @Transactional
+    public RoomResponse updateHousekeepingStatus(final UUID id, final UUID hotelId, final RoomStatus status) {
+        Objects.requireNonNull(id, ROOM_ID_NULL_MSG);
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
+        if (status == RoomStatus.OCCUPIED) {
+            throw new BadRequestException("OCCUPIED_SET_BY_CHECKIN_SAGA_ONLY");
+        }
+        final Room room = roomRepository.findByIdAndActiveTrueAndHotelId(id, hotelId)
+                .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
+        if (room.getStatus() == RoomStatus.OCCUPIED) {
+            throw new ConflictException("ROOM_OCCUPIED_CLEARED_BY_CHECKOUT_SAGA_ONLY");
+        }
 
         room.setStatus(status);
 

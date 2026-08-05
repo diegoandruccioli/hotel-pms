@@ -59,7 +59,11 @@ public interface RoomService {
     RoomResponse updateRoom(UUID id, UUID hotelId, RoomRequest request);
 
     /**
-     * Updates only the housekeeping status of a room scoped to the authenticated hotel.
+     * Updates a room's status without restriction — the trusted, Saga-internal
+     * entry point. Used by {@code StayServiceImpl} to set {@code OCCUPIED} at
+     * check-in and {@code DIRTY} at check-out; both legitimately transition a
+     * room into or out of {@code OCCUPIED}, which is exactly what
+     * {@link #updateHousekeepingStatus} must refuse from any other caller.
      *
      * @param id      the room UUID
      * @param hotelId the hotel UUID (from the authenticated user's JWT)
@@ -67,6 +71,22 @@ public interface RoomService {
      * @return the updated room response
      */
     RoomResponse updateRoomStatus(UUID id, UUID hotelId, RoomStatus status);
+
+    /**
+     * Updates a room's housekeeping status on behalf of front-desk/housekeeping
+     * staff via {@code PATCH /rooms/{id}/status} (round 1 bug #4). Unlike
+     * {@link #updateRoomStatus}, this enforces the invariant documented on
+     * {@link RoomStatus#OCCUPIED} itself: {@code OCCUPIED} can never be set
+     * through this path, and a room that is currently {@code OCCUPIED} cannot
+     * be reassigned to any other status — only the check-in Saga sets it, only
+     * the check-out Saga clears it.
+     *
+     * @param id      the room UUID
+     * @param hotelId the hotel UUID (from the authenticated user's JWT)
+     * @param status  the requested housekeeping status
+     * @return the updated room response
+     */
+    RoomResponse updateHousekeepingStatus(UUID id, UUID hotelId, RoomStatus status);
 
     /**
      * Deletes a room scoped to the authenticated hotel.

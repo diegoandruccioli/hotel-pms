@@ -130,7 +130,7 @@ public class RoomController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'RECEPTIONIST')")
     public ResponseEntity<RoomResponse> updateRoomStatus(@NonNull @PathVariable final UUID id,
             @NonNull @Valid @RequestBody final RoomStatusRequest request) {
-        return ResponseEntity.ok(roomService.updateRoomStatus(id, resolveHotelId(), request.status()));
+        return ResponseEntity.ok(roomService.updateHousekeepingStatus(id, resolveHotelId(), request.status()));
     }
 
     /**

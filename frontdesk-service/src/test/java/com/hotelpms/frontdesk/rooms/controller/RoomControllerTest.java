@@ -190,7 +190,7 @@ class RoomControllerTest {
         final RoomResponse dirtyResponse = new RoomResponse(
                 roomId, HOTEL_ID, ROOM_NUMBER_101, null, RoomStatus.DIRTY, true, null, null);
 
-        when(roomService.updateRoomStatus(any(UUID.class), any(UUID.class), any(RoomStatus.class)))
+        when(roomService.updateHousekeepingStatus(any(UUID.class), any(UUID.class), any(RoomStatus.class)))
                 .thenReturn(dirtyResponse);
 
         mockMvc.perform(patch(BASE_URL + PATH_STATUS, roomId)

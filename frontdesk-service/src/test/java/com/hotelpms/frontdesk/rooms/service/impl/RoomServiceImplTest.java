@@ -5,6 +5,8 @@ import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.domain.RoomType;
 import com.hotelpms.frontdesk.rooms.dto.RoomRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
+import com.hotelpms.frontdesk.exception.BadRequestException;
+import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.rooms.mapper.RoomMapper;
 import com.hotelpms.frontdesk.rooms.repository.RoomRepository;
@@ -276,6 +278,60 @@ class RoomServiceImplTest {
 
         assertThrows(NotFoundException.class,
                 () -> roomService.updateRoomStatus(roomId, hotelId, RoomStatus.MAINTENANCE));
+    }
+
+    @Test
+    void testUpdateHousekeepingStatusSuccess() {
+        final Room maintenanceRoom = Room.builder()
+                .id(roomId)
+                .hotelId(hotelId)
+                .roomNumber(ROOM_101)
+                .roomType(roomType)
+                .status(RoomStatus.MAINTENANCE)
+                .active(true)
+                .build();
+        final RoomResponse maintenanceResponse = new RoomResponse(
+                roomId, hotelId, ROOM_101, null, RoomStatus.MAINTENANCE, true, null, null);
+
+        when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.of(room));
+        when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(maintenanceRoom);
+        when(roomMapper.toResponse(Objects.requireNonNull(maintenanceRoom))).thenReturn(maintenanceResponse);
+
+        final RoomResponse result = roomService.updateHousekeepingStatus(roomId, hotelId, RoomStatus.MAINTENANCE);
+
+        assertEquals(RoomStatus.MAINTENANCE, result.status());
+        verify(roomRepository).saveAndFlush(Objects.requireNonNull(room));
+    }
+
+    @Test
+    void testUpdateHousekeepingStatusRejectsOccupiedTarget() {
+        assertThrows(BadRequestException.class,
+                () -> roomService.updateHousekeepingStatus(roomId, hotelId, RoomStatus.OCCUPIED));
+    }
+
+    @Test
+    void testUpdateHousekeepingStatusRejectsWhenRoomCurrentlyOccupied() {
+        final Room occupiedRoom = Room.builder()
+                .id(roomId)
+                .hotelId(hotelId)
+                .roomNumber(ROOM_101)
+                .roomType(roomType)
+                .status(RoomStatus.OCCUPIED)
+                .active(true)
+                .build();
+
+        when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.of(occupiedRoom));
+
+        assertThrows(ConflictException.class,
+                () -> roomService.updateHousekeepingStatus(roomId, hotelId, RoomStatus.MAINTENANCE));
+    }
+
+    @Test
+    void testUpdateHousekeepingStatusNotFound() {
+        when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> roomService.updateHousekeepingStatus(roomId, hotelId, RoomStatus.MAINTENANCE));
     }
 
     @Test
