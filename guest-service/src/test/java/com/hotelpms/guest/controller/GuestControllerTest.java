@@ -9,6 +9,7 @@ import com.hotelpms.guest.dto.response.GuestDataExportResponse;
 import com.hotelpms.guest.dto.response.GuestResponse;
 import com.hotelpms.guest.dto.response.IdentityDocumentResponseDTO;
 import com.hotelpms.guest.exception.GlobalExceptionHandler;
+import com.hotelpms.guest.exception.GuestConflictException;
 import com.hotelpms.guest.exception.NotFoundException;
 import com.hotelpms.guest.model.enums.DocumentType;
 import com.hotelpms.guest.service.GuestService;
@@ -36,6 +37,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -174,6 +176,16 @@ class GuestControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(guestService).deleteGuest(guestId);
+    }
+
+    @Test
+    void shouldDeleteGuestWithActiveReservationsReturn409() throws Exception {
+        doThrow(new GuestConflictException("GUEST_HAS_ACTIVE_RESERVATIONS"))
+                .when(guestService).deleteGuest(guestId);
+
+        mockMvc.perform(delete(BASE_URL + PATH_BY_ID, guestId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("GUEST_HAS_ACTIVE_RESERVATIONS"));
     }
 
     @Test

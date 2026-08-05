@@ -12,6 +12,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -27,6 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ProblemDetailAdviceTest {
 
+    private static final String BAD_REQUEST_TYPE = "https://hotel-pms.com/errors/bad-request";
+
     private final TestAdvice advice = new TestAdvice();
 
     @Test
@@ -38,7 +41,7 @@ class ProblemDetailAdviceTest {
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
         assertThat(result.getTitle()).isEqualTo("Request Validation Error");
-        assertThat(result.getType().toString()).isEqualTo("https://hotel-pms.com/errors/bad-request");
+        assertThat(result.getType().toString()).isEqualTo(BAD_REQUEST_TYPE);
         assertThat(result.getDetail()).isEqualTo("INVALID_JSON_PAYLOAD");
         assertThat(result.getProperties()).containsKey("timestamp");
     }
@@ -54,11 +57,25 @@ class ProblemDetailAdviceTest {
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
         assertThat(result.getDetail()).isEqualTo("VALIDATION_FAILED");
-        assertThat(result.getType().toString()).isEqualTo("https://hotel-pms.com/errors/bad-request");
+        assertThat(result.getType().toString()).isEqualTo(BAD_REQUEST_TYPE);
         final Object errorsProperty = Objects.requireNonNull(result.getProperties()).get("errors");
         @SuppressWarnings("unchecked")
         final List<String> errors = (List<String>) Objects.requireNonNull(errorsProperty);
         assertThat(errors).containsExactly("must not be blank");
+    }
+
+    @Test
+    void handlesMissingServletRequestParameterExceptionAs400() {
+        final MissingServletRequestParameterException ex =
+                new MissingServletRequestParameterException("startDate", "LocalDate");
+
+        final ProblemDetail result = advice.handleMissingServletRequestParameterException(ex);
+
+        assertThat(result.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(result.getTitle()).isEqualTo("Request Validation Error");
+        assertThat(result.getType().toString()).isEqualTo(BAD_REQUEST_TYPE);
+        assertThat(result.getDetail()).isEqualTo("MISSING_REQUIRED_PARAMETER: startDate");
+        assertThat(result.getProperties()).containsKey("timestamp");
     }
 
     @Test

@@ -11,6 +11,7 @@ import com.hotelpms.guest.dto.request.GuestRequest;
 import com.hotelpms.guest.dto.request.IdentityDocumentRequestDTO;
 import com.hotelpms.guest.dto.response.GuestResponse;
 import com.hotelpms.guest.dto.response.IdentityDocumentResponseDTO;
+import com.hotelpms.guest.exception.GuestConflictException;
 import com.hotelpms.guest.exception.GuestValidationException;
 import com.hotelpms.guest.exception.NotFoundException;
 import com.hotelpms.guest.mapper.GuestMapper;
@@ -340,7 +341,7 @@ class GuestServiceImplTest {
                 .thenReturn(Optional.of(Objects.requireNonNull(guest)));
         when(reservationClient.hasActiveReservations(guestId)).thenReturn(true);
 
-        assertThrows(IllegalStateException.class, () -> guestService.deleteGuest(guestId));
+        assertThrows(GuestConflictException.class, () -> guestService.deleteGuest(guestId));
         verify(guestRepository, never()).delete(any(Guest.class));
     }
 

@@ -15,6 +15,7 @@ import com.hotelpms.guest.dto.response.GuestResponse;
 import com.hotelpms.guest.dto.response.IdentityDocumentResponseDTO;
 import com.hotelpms.guest.exception.GdprLegalHoldException;
 import com.hotelpms.guest.exception.GdprLegalHoldException.LegalBasis;
+import com.hotelpms.guest.exception.GuestConflictException;
 import com.hotelpms.guest.exception.GuestValidationException;
 import com.hotelpms.guest.exception.NotFoundException;
 import com.hotelpms.guest.mapper.GuestMapper;
@@ -186,7 +187,7 @@ public class GuestServiceImpl implements GuestService {
      * </ul>
      *
      * @param id the guest UUID; must not be {@code null}
-     * @throws IllegalStateException    if the guest has active reservations
+     * @throws GuestConflictException   if the guest has active reservations
      * @throws GdprLegalHoldException   if a TULPS or fiscal legal hold is active
      *                                  (HTTP 451)
      * @throws NotFoundException        if no guest with the given ID exists in this hotel
@@ -198,7 +199,7 @@ public class GuestServiceImpl implements GuestService {
         final Guest guest = resolveGuest(id, hotelId);
 
         if (reservationClient.hasActiveReservations(id)) {
-            throw new IllegalStateException("GUEST_HAS_ACTIVE_RESERVATIONS");
+            throw new GuestConflictException("GUEST_HAS_ACTIVE_RESERVATIONS");
         }
 
         verifyLegalHolds(id, hotelId);

@@ -10,6 +10,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.net.URI;
@@ -47,6 +48,7 @@ public abstract class AbstractProblemDetailAdvice {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractProblemDetailAdvice.class);
     private static final String ERRORS_BASE_URI = "https://hotel-pms.com/errors/";
     private static final String BAD_REQUEST_TITLE = "Request Validation Error";
+    private static final String BAD_REQUEST_SLUG = "bad-request";
 
     /**
      * Builds the {@code type} URI for a given error slug, rooted at the
@@ -71,7 +73,7 @@ public abstract class AbstractProblemDetailAdvice {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
                 "INVALID_JSON_PAYLOAD");
         problemDetail.setTitle(BAD_REQUEST_TITLE);
-        problemDetail.setType(errorType("bad-request"));
+        problemDetail.setType(errorType(BAD_REQUEST_SLUG));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
@@ -87,7 +89,7 @@ public abstract class AbstractProblemDetailAdvice {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
                 "VALIDATION_FAILED");
         problemDetail.setTitle(BAD_REQUEST_TITLE);
-        problemDetail.setType(errorType("bad-request"));
+        problemDetail.setType(errorType(BAD_REQUEST_SLUG));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
 
         final List<String> errors = ex.getBindingResult()
@@ -97,6 +99,27 @@ public abstract class AbstractProblemDetailAdvice {
                 .collect(Collectors.toList());
         problemDetail.setProperty("errors", errors);
 
+        return problemDetail;
+    }
+
+    /**
+     * Handles a missing required {@code @RequestParam} (e.g. a mandatory query
+     * parameter such as {@code startDate}/{@code endDate} omitted from the
+     * request). Must be explicit so the generic 500 catch-all below does not
+     * swallow it — this is always a client input error, never a server fault,
+     * regardless of which endpoint or service raises it.
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 400 status
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ProblemDetail handleMissingServletRequestParameterException(
+            final MissingServletRequestParameterException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+                "MISSING_REQUIRED_PARAMETER: " + ex.getParameterName());
+        problemDetail.setTitle(BAD_REQUEST_TITLE);
+        problemDetail.setType(errorType(BAD_REQUEST_SLUG));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 

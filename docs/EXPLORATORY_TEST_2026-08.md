@@ -118,7 +118,7 @@ fiscale pregresso per essere colpiti, basta lo stato `PAID`).
 
 ---
 
-### 6. 🟢 Cancellazione ospite con prenotazioni attive: 500 invece di 409
+### 6. 🟢 Cancellazione ospite con prenotazioni attive: 500 invece di 409 — ✅ RISOLTO (Fase B1 piano fix-order)
 
 **Dove**: `guest-service` (handler generico, log: `Unhandled exception:
 GUEST_HAS_ACTIVE_RESERVATIONS`, `java.lang.IllegalStateException`).
@@ -469,7 +469,7 @@ dashboard lo stesso trattamento di wrap/troncamento già usato nel Planning boar
 
 ---
 
-### 9. 🟢 `MissingServletRequestParameterException` mappata a 500 invece di 400 (sistemico, common-web-lib)
+### 9. 🟢 `MissingServletRequestParameterException` mappata a 500 invece di 400 (sistemico, common-web-lib) — ✅ RISOLTO (Fase B1 piano fix-order)
 
 **Dove**: `common-web-lib/.../exception/AbstractProblemDetailAdvice.java` — nessun
 `@ExceptionHandler(MissingServletRequestParameterException.class)` dedicato; ricade sul

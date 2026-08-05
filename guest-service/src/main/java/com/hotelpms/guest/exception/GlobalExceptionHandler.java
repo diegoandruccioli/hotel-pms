@@ -68,4 +68,20 @@ public class GlobalExceptionHandler extends AbstractProblemDetailAdvice {
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
+
+    /**
+     * Handles GuestConflictException — an operation conflicts with the guest's
+     * current state (e.g. deleting a guest with active reservations).
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 409 status
+     */
+    @ExceptionHandler(GuestConflictException.class)
+    public ProblemDetail handleGuestConflictException(final GuestConflictException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problemDetail.setTitle("Guest Conflict");
+        problemDetail.setType(errorType("conflict"));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
 }

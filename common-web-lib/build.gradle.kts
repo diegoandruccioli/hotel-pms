@@ -34,9 +34,14 @@ dependencies {
     api("org.springframework.security:spring-security-core")
     api("io.github.openfeign:feign-core")
     implementation("org.slf4j:slf4j-api")
+    // MissingServletRequestParameterException extends jakarta.servlet.ServletException;
+    // every consuming service already has jakarta.servlet-api on its runtime classpath
+    // via spring-boot-starter-web, so compileOnly is enough here.
+    compileOnly("jakarta.servlet:jakarta.servlet-api")
 
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core")
+    testImplementation("jakarta.servlet:jakarta.servlet-api")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
