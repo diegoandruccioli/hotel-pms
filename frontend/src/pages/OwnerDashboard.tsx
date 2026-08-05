@@ -31,21 +31,23 @@ const getTodayString = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
-const InvoiceRow = memo(({ 
-  inv, 
-  formatDate, 
-  formatCurrency 
-}: { 
+const InvoiceRow = memo(({
+  inv,
+  formatDate,
+  formatCurrency,
+  formatStatus,
+}: {
   inv: InvoiceResponse;
   formatDate: (d?: string) => string;
   formatCurrency: (amount: number) => string;
+  formatStatus: (status: InvoiceResponse['status']) => string;
 }) => (
   <M3TableRow key={inv.id}>
     <M3TableCell className="font-medium">{inv.invoiceNumber}</M3TableCell>
     <M3TableCell className="text-on-surface-variant">{formatDate(inv.issueDate)}</M3TableCell>
     <M3TableCell className="font-medium">{formatCurrency(inv.totalAmount)}</M3TableCell>
     <M3TableCell>
-      <M3StatusChip label={inv.status} tone={getStatusTone(inv.status)} />
+      <M3StatusChip label={formatStatus(inv.status)} tone={getStatusTone(inv.status)} />
     </M3TableCell>
   </M3TableRow>
 ));
@@ -71,6 +73,10 @@ export const OwnerDashboard = memo(() => {
     return new Date(dateStr).toLocaleDateString(i18n.language);
   }, [i18n.language]);
 
+  const formatStatus = useCallback((status: InvoiceResponse['status']) =>
+    t(`invoice_status_${status}`),
+  [t]);
+
   const isAuthorized = user?.role === 'OWNER' || user?.role === 'ADMIN';
 
   const loadReport = useCallback(async () => {
@@ -90,7 +96,7 @@ export const OwnerDashboard = memo(() => {
 
   const handleExport = useCallback(() => {
     if (!report) return;
-    billingReportService.exportToCsv(report);
+    billingReportService.exportToCsv(report, t);
     addToast(t('csv_export_started'), 'success');
   }, [report, addToast, t]);
 
@@ -218,11 +224,12 @@ export const OwnerDashboard = memo(() => {
               <tr><td colSpan={4} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_invoices_period')}</td></tr>
             ) : (
               report.invoices.map((inv) => (
-                <InvoiceRow 
-                  key={inv.id} 
-                  inv={inv} 
+                <InvoiceRow
+                  key={inv.id}
+                  inv={inv}
                   formatDate={formatDate}
                   formatCurrency={formatCurrency}
+                  formatStatus={formatStatus}
                 />
               ))
             )}

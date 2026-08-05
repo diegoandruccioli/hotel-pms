@@ -473,7 +473,7 @@ non amministrativo.
 
 ---
 
-### 7. 🟡 Export CSV di Owner Analytics: header in inglese hardcoded, stato non tradotto, nessun BOM UTF-8/separatore adatto a Excel-IT
+### 7. 🟡 Export CSV di Owner Analytics: header in inglese hardcoded, stato non tradotto, nessun BOM UTF-8/separatore adatto a Excel-IT — ✅ RISOLTO (Fase B5 piano fix-order)
 
 **Dove**: `frontend/src/services/billingReportService.ts`, `exportToCsv()` (righe 17-38).
 
@@ -488,13 +488,20 @@ con `type: 'text/csv;charset=utf-8;'` ma **senza BOM** (`﻿`) e con separatore 
 l'apertura diretta del file tipicamente produce sia caratteri accentati/€ illeggibili sia
 il mancato riconoscimento delle colonne (tutto finisce in una singola colonna A).
 
-**Fix suggerito (non applicato)**: instradare header ed etichette di stato via i18n;
-anteporre `﻿` al contenuto del `Blob`; valutare separatore `;` o documentare
-l'importazione come "UTF-8 delimitato da virgola".
+**Fix applicato**: `exportToCsv` ora accetta la funzione `t` di i18next e la usa per
+header (`invoice_number`/`issue_date`/`amount`/`status`/`guest_id`) ed etichette di stato
+(`invoice_status_PAID`/`ISSUED`/`CANCELLED`, chiavi già esistenti in `common.json`, prima
+usate solo altrove); stessa traduzione applicata anche alla tabella a schermo
+(`OwnerDashboard.tsx`, badge stato) per chiudere del tutto il gap i18n descritto sopra, non
+solo l'export. Separatore cambiato da `,` a `;` e anteposto un BOM UTF-8 (`﻿`) al contenuto
+del `Blob`. Verificato con test automatici (`billingReportService.test.ts`): il contenuto
+generato inizia col BOM, l'header è `"N° Fattura";"Data Emissione";"Importo";"Stato";"ID
+Ospite"`, lo stato è tradotto (`"Pagata"`); 743/743 test del frontend passano,
+`npm run lint`/`tsc --noEmit` puliti.
 
 ---
 
-### 8. 🟡 Widget "Stato Camere" in dashboard: testo di numero camera e stato sovrapposto e illeggibile per nomi camera lunghi
+### 8. 🟡 Widget "Stato Camere" in dashboard: testo di numero camera e stato sovrapposto e illeggibile per nomi camera lunghi — ✅ RISOLTO (Fase B5 piano fix-order)
 
 **Dove**: pagina Bacheca (`/`), componente griglia stato camere. Confrontato con
 `/calendar` (Calendario Planning), che gestisce correttamente gli stessi nomi camera
@@ -507,9 +514,13 @@ camera lunghi già nota dal round 1 (bug #3, mismatch `VARCHAR(20)` in fb-servic
 sintomo nuovo e distinto: qui è un problema di layout/CSS lato frontend nella dashboard,
 non un crash backend.
 
-**Fix suggerito (non applicato)**: applicare alle celle della griglia stato camere in
-dashboard lo stesso trattamento di wrap/troncamento già usato nel Planning board
-(`/calendar`), oppure `max-width` + ellissi con tooltip.
+**Fix applicato**: opzione ellissi + tooltip (`Dashboard.tsx`, `RoomCell`) — `truncate` sul
+numero camera più `min-w-0` sulla cella (necessario perché in CSS Grid, a differenza di
+flex, i figli non si restringono sotto la loro `min-width` implicita senza di questo, quindi
+`truncate` da solo non avrebbe avuto effetto). Il testo completo resta disponibile via il
+`title`/`aria-label` già presenti sulla cella. Verificato dal vivo sulla dashboard reale (`/`)
+con i dati di test esistenti (`E2E-LIVE-...`, `B3-CONFLICT-301`, ecc.): nomi lunghi ora
+troncano puliti con ellissi, nessuna sovrapposizione su nessuna delle celle della griglia.
 
 ---
 

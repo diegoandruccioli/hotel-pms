@@ -20,11 +20,11 @@ const ROOM_STATUS_COLORS: Record<RoomStatus, string> = {
 
 const RoomCell = memo(({ room, statusLabel }: { room: RoomResponse; statusLabel: string }) => (
   <div
-    className={`border rounded-shape-sm p-2 text-center ${ROOM_STATUS_COLORS[room.status]}`}
+    className={`border rounded-shape-sm p-2 text-center min-w-0 ${ROOM_STATUS_COLORS[room.status]}`}
     title={`${room.roomNumber} — ${statusLabel}`}
     aria-label={`${room.roomNumber} ${statusLabel}`}
   >
-    <div className="text-sm font-display font-semibold leading-tight">{room.roomNumber}</div>
+    <div className="text-sm font-display font-semibold leading-tight truncate">{room.roomNumber}</div>
     <div className="text-[10px] font-body mt-0.5 truncate">{statusLabel}</div>
   </div>
 ));

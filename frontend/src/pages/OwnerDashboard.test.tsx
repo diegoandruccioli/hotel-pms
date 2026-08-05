@@ -97,15 +97,15 @@ describe('OwnerDashboard', () => {
     expect(billingReportService.getOwnerFinancialReport).toHaveBeenCalledWith(
       expect.any(String), expect.any(String),
     );
-    expect(screen.getByText('PAID')).toBeInTheDocument();
-    expect(screen.getByText('ISSUED')).toBeInTheDocument();
-    expect(screen.getByText('CANCELLED')).toBeInTheDocument();
-    expect(screen.getByText('DRAFT')).toBeInTheDocument();
+    expect(screen.getByText('invoice_status_PAID')).toBeInTheDocument();
+    expect(screen.getByText('invoice_status_ISSUED')).toBeInTheDocument();
+    expect(screen.getByText('invoice_status_CANCELLED')).toBeInTheDocument();
+    expect(screen.getByText('invoice_status_DRAFT')).toBeInTheDocument();
     expect(screen.getByText(/75% collection_rate/)).toBeInTheDocument();
     expect(screen.getByText('export_csv')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('export_csv'));
-    expect(billingReportService.exportToCsv).toHaveBeenCalledWith(REPORT);
+    expect(billingReportService.exportToCsv).toHaveBeenCalledWith(REPORT, expect.any(Function));
   });
 
   it('shows the no_invoices_period message when the report has zero invoices', async () => {
