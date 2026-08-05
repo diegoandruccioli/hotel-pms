@@ -49,6 +49,7 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
 
     private static final String CHARGE_TYPE_FB_ORDER = "FB_ORDER";
     private static final Set<OrderStatus> CONFIRMABLE_STATUSES = Set.of(OrderStatus.PENDING, OrderStatus.PREPARED);
+    private static final String STAY_STATUS_CHECKED_IN = "CHECKED_IN";
 
     private final RestaurantOrderRepository orderRepository;
     private final RestaurantOrderMapper orderMapper;
@@ -75,6 +76,14 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
         } catch (final feign.FeignException e) {
             log.error("Error communicating with Stay Service for ID: {}", request.stayId(), e);
             throw new StayNotFoundException("STAY_NOT_FOUND", e);
+        }
+        // Round 1 bug #2: nothing previously stopped an order against a stay that
+        // hasn't checked in yet or has already checked out — the charge would then
+        // fail silently at confirm time (bug #1) with no order-level signal either.
+        if (!STAY_STATUS_CHECKED_IN.equals(stayResponse.status())) {
+            log.warn("[FB] ORDER_REJECTED | stayId={} | reason=STAY_NOT_CHECKED_IN | stayStatus={}",
+                    request.stayId(), stayResponse.status());
+            throw new OrderValidationException("STAY_NOT_CHECKED_IN");
         }
 
         // Build the order shell (no items yet)
@@ -151,6 +160,16 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
             throw new OrderValidationException("INVALID_ORDER_STATUS");
         }
 
+        // Round 1 bug #2 (race): the stay was CHECKED_IN when the order was created,
+        // but confirmation can happen much later — re-check here so a checkout that
+        // landed in between doesn't bill a room the guest already left.
+        final String stayStatus = stayClient.getStayById(order.getStayId()).status();
+        if (!STAY_STATUS_CHECKED_IN.equals(stayStatus)) {
+            log.warn("[FB] CONFIRM_FAILED | orderId={} | stayId={} | reason=STAY_NOT_CHECKED_IN | stayStatus={}",
+                    orderId, order.getStayId(), stayStatus);
+            throw new OrderValidationException("STAY_NOT_CHECKED_IN");
+        }
+
         order.setStatus(OrderStatus.BILLED_TO_ROOM);
         final RestaurantOrder savedOrder = orderRepository.save(order);
 
@@ -159,12 +178,25 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
                 buildChargeDescription(savedOrder),
                 savedOrder.getTotalAmount(),
                 orderId);
-        final ChargeResponse chargeResp = billingClient.addCharge(savedOrder.getStayId(), chargeReq);
-        if (chargeResp == null) {
-            log.warn("[FB] CHARGE_FAILED | orderId={} | stayId={} | reason=BILLING_SERVICE_UNAVAILABLE",
-                    orderId, savedOrder.getStayId());
-        } else {
-            log.info("[FB] CHARGE_ADDED | orderId={} | chargeId={}", orderId, chargeResp.id());
+        // Round 1 bug #1: addChargeFallback used to fire — and swallow the failure as a
+        // plain WARN — for legitimate 4xx billing-service rejections (e.g. 409
+        // INVOICE_LOCKED_AFTER_EXPORT), not just real outages.
+        // resilience4j.circuitbreaker.instances.billingService.ignoreExceptions keeps
+        // 4xx out of the fallback so it surfaces here instead, with the real reason
+        // logged at ERROR. The order still confirms either way (backup/DECISIONS.md
+        // §2.2: "se billing-service è down al confirm → ordine confermato comunque") —
+        // this fixes the silent misclassification, not the non-blocking design itself.
+        try {
+            final ChargeResponse chargeResp = billingClient.addCharge(savedOrder.getStayId(), chargeReq);
+            if (chargeResp == null) {
+                log.warn("[FB] CHARGE_FAILED | orderId={} | stayId={} | reason=BILLING_SERVICE_UNAVAILABLE",
+                        orderId, savedOrder.getStayId());
+            } else {
+                log.info("[FB] CHARGE_ADDED | orderId={} | chargeId={}", orderId, chargeResp.id());
+            }
+        } catch (final feign.FeignException ex) {
+            log.error("[FB] CHARGE_FAILED | orderId={} | stayId={} | reason=BILLING_REJECTED | detail={}",
+                    orderId, savedOrder.getStayId(), ex.getMessage());
         }
 
         return orderMapper.toResponse(savedOrder);

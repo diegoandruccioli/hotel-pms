@@ -14,6 +14,22 @@ spring:
       host: ${INTERNAL_REDIS_HOST:redis}
       port: ${INTERNAL_REDIS_PORT:6379}
 
+resilience4j:
+  circuitbreaker:
+    instances:
+      billingService:
+        # A legitimate 4xx rejection from billing-service (e.g. 409
+        # INVOICE_LOCKED_AFTER_EXPORT) is a real business conflict, not
+        # downstream unavailability — it must never be recorded as a circuit-
+        # breaker failure nor trigger addChargeFallback, or the caller can
+        # never distinguish "billing-service is down" from "billing-service
+        # said no" (round 1 bug #1). FeignClientException groups every 4xx
+        # Feign exception; ignoring it here means those propagate as real
+        # exceptions instead, while genuine outages (5xx/timeout, in
+        # FeignServerException/RetryableException) still hit the fallback.
+        ignoreExceptions:
+          - feign.FeignException$FeignClientException
+
 management:
   server:
     port: 8090

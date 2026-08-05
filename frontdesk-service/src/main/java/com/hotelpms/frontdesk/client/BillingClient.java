@@ -6,6 +6,7 @@ import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
+import feign.FeignException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,12 @@ public interface BillingClient {
      * Status placeholder returned by fallback methods when billing-service is unreachable.
      */
     String STATUS_UNAVAILABLE = "UNAVAILABLE";
+
+    /** Lower bound (inclusive) of the HTTP client-error range. */
+    int CLIENT_ERROR_MIN = 400;
+
+    /** Upper bound (exclusive) of the HTTP client-error range. */
+    int CLIENT_ERROR_MAX = 500;
 
     /**
      * Resilience4j circuit breaker instance name shared by all methods of this client.
@@ -140,14 +147,25 @@ public interface BillingClient {
      * Fallback for createInvoiceForStay — returns {@code null} so check-in completes
      * even when billing-service is unavailable.
      *
+     * <p>Round 1 bug #1: this fallback fires for <em>any</em> exception, including a
+     * legitimate 4xx rejection from billing-service (e.g. a stale-retry race on
+     * INVOICE_ALREADY_EXISTS_FOR_STAY), not just real unavailability — rethrow those
+     * instead of swallowing them as {@code null}; {@code openInvoiceForStay} in
+     * {@code StayServiceImpl} catches them and records the real reason via
+     * {@code markInvoiceFlowFailed}, without blocking check-in itself
+     * (backup/DECISIONS.md §2.2).
+     *
      * @param request   the original request
      * @param throwable the cause
-     * @return null
+     * @return null, only when the cause is genuine unavailability
      */
     default InvoiceCreatedResponse createInvoiceForStayFallback(
             final StayInvoiceRequest request, final Throwable throwable) {
         LOG.error("[BillingClient] createInvoiceForStay fallback | stayId={} | cause={}: {}",
                 request.stayId(), throwable.getClass().getSimpleName(), throwable.getMessage());
+        if (throwable instanceof FeignException fe && fe.status() >= CLIENT_ERROR_MIN && fe.status() < CLIENT_ERROR_MAX) {
+            throw fe;
+        }
         return null;
     }
 
@@ -155,15 +173,22 @@ public interface BillingClient {
      * Fallback for addCharge — returns {@code null} so the caller can mark the stay's
      * invoice flow as failed and offer a retry, instead of losing the failure silently.
      *
+     * <p>Round 1 bug #1: same distinction as {@link #createInvoiceForStayFallback} —
+     * a legitimate 4xx (e.g. 409 INVOICE_LOCKED_AFTER_EXPORT) is rethrown rather than
+     * absorbed as mere unavailability.
+     *
      * @param stayId    the stay UUID
      * @param request   the original charge request
      * @param throwable the cause
-     * @return null
+     * @return null, only when the cause is genuine unavailability
      */
     default ChargeResponse addChargeFallback(
             final UUID stayId, final ChargeRequest request, final Throwable throwable) {
         LOG.error("[BillingClient] addCharge fallback | stayId={} | type={} | cause={}: {}",
                 stayId, request.type(), throwable.getClass().getSimpleName(), throwable.getMessage());
+        if (throwable instanceof FeignException fe && fe.status() >= CLIENT_ERROR_MIN && fe.status() < CLIENT_ERROR_MAX) {
+            throw fe;
+        }
         return null;
     }
 }

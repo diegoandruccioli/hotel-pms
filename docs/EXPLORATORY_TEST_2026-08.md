@@ -19,7 +19,7 @@ servizio a supporto.
 
 ## Bug trovati
 
-### 1. 🔴 Fallimento silenzioso degli addebiti su rifiuto legittimo di billing-service (il più grave)
+### 1. 🔴 Fallimento silenzioso degli addebiti su rifiuto legittimo di billing-service (il più grave) — ✅ RISOLTO (Fase B3 piano fix-order)
 
 **Dove**: `fb-service/.../client/BillingClient.java` (`addChargeFallback`) e
 `frontdesk-service/.../client/BillingClient.java` (stesso pattern, `addChargeFallback` +
@@ -51,7 +51,7 @@ propagate come errore reale al chiamante, non assorbite in silenzio).
 
 ---
 
-### 2. 🟠 Nessuna validazione dello stato del soggiorno negli ordini F&B
+### 2. 🟠 Nessuna validazione dello stato del soggiorno negli ordini F&B — ✅ RISOLTO (Fase B3 piano fix-order)
 
 **Dove**: `fb-service/.../service/impl/RestaurantOrderServiceImpl.java` (creazione e
 conferma ordine).
@@ -64,7 +64,7 @@ risulta né bloccato né fatturato.
 
 ---
 
-### 3. 🟠 Crash 500 su camere con nome > 20 caratteri
+### 3. 🟠 Crash 500 su camere con nome > 20 caratteri — ✅ RISOLTO (Fase B3 piano fix-order)
 
 **Dove**: `fb-service/src/main/resources/db/migration/...` (`restaurant_orders.room_number
 VARCHAR(20)`) vs `frontdesk-service/.../V1__frontdesk_baseline.sql`

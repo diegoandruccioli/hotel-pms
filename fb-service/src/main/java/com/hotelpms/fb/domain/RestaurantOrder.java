@@ -46,6 +46,9 @@ public class RestaurantOrder {
     /** Max length for status column. */
     public static final int MAX_STATUS_LENGTH = 20;
 
+    /** Max length for room_number column — matches frontdesk-service's rooms/stays.room_number. */
+    public static final int MAX_ROOM_NUMBER_LENGTH = 50;
+
     /** Unique identifier for the Order. */
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -60,7 +63,7 @@ public class RestaurantOrder {
      * order always shows the room it was charged to even after the guest checks
      * out or the room is later reassigned to a different stay.
      */
-    @Column(name = "room_number")
+    @Column(name = "room_number", length = MAX_ROOM_NUMBER_LENGTH)
     private String roomNumber;
 
     /**

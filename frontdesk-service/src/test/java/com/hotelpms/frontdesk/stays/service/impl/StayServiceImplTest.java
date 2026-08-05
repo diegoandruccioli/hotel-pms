@@ -835,6 +835,40 @@ class StayServiceImplTest {
     }
 
     @Test
+    void shouldRecordRealReasonWhenBillingRejectsInvoiceCreation() {
+        // Arrange — round 1 bug #1: a legitimate 4xx from billing-service (e.g. a
+        // stale-retry race on INVOICE_ALREADY_EXISTS_FOR_STAY) must be recorded with
+        // its real reason, not the generic BILLING_SERVICE_UNAVAILABLE — check-in
+        // still completes (backup/DECISIONS.md §2.2), only the failure reason changes.
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+        final Stay saved = Objects.requireNonNull(savedStay);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationService.getReservationById(reservation))
+                .thenReturn(reservationResponse(ReservationStatus.CONFIRMED, null));
+        when(roomService.getRoomById(room, hotelId)).thenReturn(room());
+
+        final Stay unmappedStay = new Stay();
+        when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(saved);
+        final feign.FeignException.Conflict conflict = mock(feign.FeignException.Conflict.class);
+        when(conflict.getMessage()).thenReturn("INVOICE_ALREADY_EXISTS_FOR_STAY");
+        when(billingClient.createInvoiceForStay(anyNonNull(StayInvoiceRequest.class))).thenThrow(conflict);
+        when(stayMapper.toDto(saved)).thenReturn(Objects.requireNonNull(validResponse));
+
+        // Act
+        stayService.checkIn(request);
+
+        // Assert
+        assertTrue(saved.isInvoiceCreationFailed());
+        assertEquals("INVOICE_ALREADY_EXISTS_FOR_STAY", saved.getInvoiceCreationFailureReason());
+    }
+
+    @Test
     void shouldRetryInvoiceCreationAndClearFailedFlag() {
         // Arrange
         final Stay stay = Objects.requireNonNull(savedStay);

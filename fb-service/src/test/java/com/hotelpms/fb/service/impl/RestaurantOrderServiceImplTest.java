@@ -304,6 +304,8 @@ class RestaurantOrderServiceImplTest {
 
         when(orderRepository.findByIdAndHotelId(orderId, hotelId)).thenReturn(Optional.of(pendingOrder));
         when(orderRepository.save(Objects.requireNonNull(pendingOrder))).thenReturn(pendingOrder);
+        when(stayClient.getStayById(stayId)).thenReturn(
+                new StayResponse(stayId, STATUS_CHECKED_IN, ROOM_NUMBER, GUEST_DISPLAY_NAME));
         when(billingClient.addCharge(any(UUID.class), any(ChargeRequest.class)))
                 .thenReturn(new ChargeResponse(UUID.randomUUID()));
         when(orderMapper.toResponse(pendingOrder)).thenReturn(confirmedResponse);
@@ -339,6 +341,8 @@ class RestaurantOrderServiceImplTest {
 
         when(orderRepository.findByIdAndHotelId(orderId, hotelId)).thenReturn(Optional.of(preparedOrder));
         when(orderRepository.save(Objects.requireNonNull(preparedOrder))).thenReturn(preparedOrder);
+        when(stayClient.getStayById(stayId)).thenReturn(
+                new StayResponse(stayId, STATUS_CHECKED_IN, ROOM_NUMBER, GUEST_DISPLAY_NAME));
         when(billingClient.addCharge(any(UUID.class), any(ChargeRequest.class)))
                 .thenReturn(new ChargeResponse(UUID.randomUUID()));
         when(orderMapper.toResponse(preparedOrder)).thenReturn(confirmedResponse);
@@ -404,6 +408,8 @@ class RestaurantOrderServiceImplTest {
 
         when(orderRepository.findByIdAndHotelId(orderId, hotelId)).thenReturn(Optional.of(pendingOrder));
         when(orderRepository.save(Objects.requireNonNull(pendingOrder))).thenReturn(pendingOrder);
+        when(stayClient.getStayById(stayId)).thenReturn(
+                new StayResponse(stayId, STATUS_CHECKED_IN, ROOM_NUMBER, GUEST_DISPLAY_NAME));
         when(billingClient.addCharge(any(UUID.class), any(ChargeRequest.class))).thenReturn(null);
         when(orderMapper.toResponse(pendingOrder)).thenReturn(confirmedResponse);
 
@@ -414,5 +420,80 @@ class RestaurantOrderServiceImplTest {
         assertNotNull(result);
         assertEquals(OrderStatus.BILLED_TO_ROOM, result.status());
         verify(billingClient).addCharge(any(UUID.class), any(ChargeRequest.class));
+    }
+
+    @Test
+    void shouldRejectOrderCreationWhenStayIsNotCheckedIn() {
+        // Arrange — round 1 bug #2: an order against a stay that hasn't checked in
+        // yet (or already checked out) must never be accepted
+        when(stayClient.getStayById(stayId)).thenReturn(
+                new StayResponse(stayId, "CHECKED_OUT", ROOM_NUMBER, GUEST_DISPLAY_NAME));
+
+        // Act & Assert
+        final OrderValidationException exception = assertThrows(OrderValidationException.class,
+                () -> orderService.createOrder(request));
+        assertEquals("STAY_NOT_CHECKED_IN", exception.getMessage());
+        verifyNoInteractions(orderRepository);
+    }
+
+    @Test
+    void shouldRejectConfirmationWhenStayCheckedOutAfterOrderCreation() {
+        // Arrange — round 1 bug #2 race: stay was CHECKED_IN when the order was
+        // created, but has since checked out by the time confirm is attempted
+        final UUID orderId = UUID.randomUUID();
+        final RestaurantOrder pendingOrder = RestaurantOrder.builder()
+                .id(orderId)
+                .stayId(stayId)
+                .hotelId(hotelId)
+                .totalAmount(new BigDecimal(AMOUNT_30))
+                .status(OrderStatus.PENDING)
+                .build();
+
+        when(orderRepository.findByIdAndHotelId(orderId, hotelId)).thenReturn(Optional.of(pendingOrder));
+        when(stayClient.getStayById(stayId)).thenReturn(
+                new StayResponse(stayId, "CHECKED_OUT", ROOM_NUMBER, GUEST_DISPLAY_NAME));
+
+        // Act & Assert
+        final OrderValidationException exception = assertThrows(OrderValidationException.class,
+                () -> orderService.confirmOrder(orderId));
+        assertEquals("STAY_NOT_CHECKED_IN", exception.getMessage());
+        verifyNoInteractions(billingClient);
+    }
+
+    @Test
+    void shouldLogRealReasonWithoutFailingConfirmWhenBillingRejects() {
+        // Arrange — round 1 bug #1: a legitimate 4xx rejection from billing-service
+        // (e.g. INVOICE_LOCKED_AFTER_EXPORT) must not be swallowed as generic
+        // unavailability, but the order still confirms (backup/DECISIONS.md §2.2)
+        final UUID orderId = UUID.randomUUID();
+        final RestaurantOrder pendingOrder = RestaurantOrder.builder()
+                .id(orderId)
+                .stayId(stayId)
+                .hotelId(hotelId)
+                .totalAmount(new BigDecimal(AMOUNT_30))
+                .status(OrderStatus.PENDING)
+                .build();
+        final RestaurantOrderResponse confirmedResponse = RestaurantOrderResponse.builder()
+                .id(orderId)
+                .stayId(stayId)
+                .totalAmount(new BigDecimal(AMOUNT_30))
+                .status(OrderStatus.BILLED_TO_ROOM)
+                .build();
+
+        when(orderRepository.findByIdAndHotelId(orderId, hotelId)).thenReturn(Optional.of(pendingOrder));
+        when(orderRepository.save(Objects.requireNonNull(pendingOrder))).thenReturn(pendingOrder);
+        when(stayClient.getStayById(stayId)).thenReturn(
+                new StayResponse(stayId, STATUS_CHECKED_IN, ROOM_NUMBER, GUEST_DISPLAY_NAME));
+        when(billingClient.addCharge(any(UUID.class), any(ChargeRequest.class)))
+                .thenThrow(org.mockito.Mockito.mock(feign.FeignException.Conflict.class));
+        when(orderMapper.toResponse(pendingOrder)).thenReturn(confirmedResponse);
+
+        // Act
+        final RestaurantOrderResponse result = orderService.confirmOrder(orderId);
+
+        // Assert: order still confirms despite the billing conflict
+        assertNotNull(result);
+        assertEquals(OrderStatus.BILLED_TO_ROOM, result.status());
+        assertEquals(OrderStatus.BILLED_TO_ROOM, pendingOrder.getStatus());
     }
 }

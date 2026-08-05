@@ -35,6 +35,7 @@ import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
 import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import com.hotelpms.frontdesk.stays.service.StayService;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -274,7 +275,7 @@ public class StayServiceImpl implements StayService {
         final GuestResponse guest;
         try {
             guest = guestClient.getGuestById(guestId);
-        } catch (final feign.FeignException ex) {
+        } catch (final FeignException ex) {
             // Fail-safe: guest-service unreachable or guest profile not found/anonymised — skip pre-fill.
             log.warn("[STAY] PRE_FILL_SKIPPED | guestId={} | reason=GUEST_SERVICE_UNAVAILABLE_OR_NOT_FOUND | detail={}",
                     guestId, ex.getMessage());
@@ -291,7 +292,7 @@ public class StayServiceImpl implements StayService {
     /**
      * Validates the guest (via guest-service), reservation (status must be in
      * {@code CHECKIN_ALLOWED_STATUSES}), and room, then returns the reservation's
-     * expected check-out date. Wraps a guest-service {@link feign.FeignException}
+     * expected check-out date. Wraps a guest-service {@link FeignException}
      * in an {@link ExternalServiceException}; a missing/invalid room or reservation
      * propagates directly as {@link NotFoundException} / {@link IllegalStateException}.
      *
@@ -307,7 +308,7 @@ public class StayServiceImpl implements StayService {
         final GuestResponse guest;
         try {
             guest = guestClient.getGuestById(guestId);
-        } catch (final feign.FeignException ex) {
+        } catch (final FeignException ex) {
             log.warn("[STAY] CHECK_IN_FAILED | reservationId={} | reason=GUEST_SERVICE_UNAVAILABLE | detail={}",
                     reservationId, ex.getMessage());
             throw new ExternalServiceException("EXTERNAL_SERVICE_UNAVAILABLE: " + ex.getMessage(), ex);
@@ -344,7 +345,7 @@ public class StayServiceImpl implements StayService {
         final GuestResponse guest;
         try {
             guest = guestClient.getGuestById(guestId);
-        } catch (final feign.FeignException ex) {
+        } catch (final FeignException ex) {
             log.warn("[STAY] WALK_IN_FAILED | reason=GUEST_SERVICE_UNAVAILABLE | detail={}", ex.getMessage());
             throw new ExternalServiceException("EXTERNAL_SERVICE_UNAVAILABLE: " + ex.getMessage(), ex);
         }
@@ -485,9 +486,22 @@ public class StayServiceImpl implements StayService {
         if (invoiceId == null) {
             final StayInvoiceRequest invoiceReq = new StayInvoiceRequest(
                     stay.getId(), stay.getGuestId(), stay.getReservationId());
-            final InvoiceCreatedResponse invoiceResp = billingClient.createInvoiceForStay(invoiceReq);
+            final InvoiceCreatedResponse invoiceResp;
+            try {
+                invoiceResp = billingClient.createInvoiceForStay(invoiceReq);
+            } catch (final FeignException ex) {
+                // A 4xx here is a real billing-service rejection (e.g. a stale retry
+                // racing INVOICE_ALREADY_EXISTS_FOR_STAY), not mere unavailability —
+                // resilience4j.circuitbreaker.instances.billingService.ignoreExceptions
+                // keeps it out of the fallback so it reaches this catch instead of being
+                // silently absorbed (round 1 bug #1). Check-in itself still must not be
+                // blocked by a billing problem (backup/DECISIONS.md §2.2), so it's
+                // recorded for staff visibility/retry rather than rolling back the Saga.
+                markInvoiceFlowFailed(stay, truncateFailureReason(ex.getMessage()));
+                return;
+            }
             if (invoiceResp == null || invoiceResp.id() == null) {
-                markInvoiceFlowFailed(stay);
+                markInvoiceFlowFailed(stay, BILLING_SERVICE_UNAVAILABLE_REASON);
                 return;
             }
             invoiceId = invoiceResp.id();
@@ -500,13 +514,19 @@ public class StayServiceImpl implements StayService {
         } catch (final NotFoundException ex) {
             log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason=ROOM_NOT_FOUND | detail={}",
                     stay.getId(), ex.getMessage());
-            markInvoiceFlowFailed(stay);
+            markInvoiceFlowFailed(stay, "ROOM_NOT_FOUND");
             return;
         }
 
-        final ChargeResponse chargeResp = billingClient.addCharge(stay.getId(), chargeReq);
+        final ChargeResponse chargeResp;
+        try {
+            chargeResp = billingClient.addCharge(stay.getId(), chargeReq);
+        } catch (final FeignException ex) {
+            markInvoiceFlowFailed(stay, truncateFailureReason(ex.getMessage()));
+            return;
+        }
         if (chargeResp == null || chargeResp.id() == null) {
-            markInvoiceFlowFailed(stay);
+            markInvoiceFlowFailed(stay, BILLING_SERVICE_UNAVAILABLE_REASON);
             return;
         }
 
@@ -517,12 +537,11 @@ public class StayServiceImpl implements StayService {
                 stay.getId(), invoiceId, chargeResp.id());
     }
 
-    private void markInvoiceFlowFailed(final Stay stay) {
+    private void markInvoiceFlowFailed(final Stay stay, final String reason) {
         stay.setInvoiceCreationFailed(true);
-        stay.setInvoiceCreationFailureReason(BILLING_SERVICE_UNAVAILABLE_REASON);
+        stay.setInvoiceCreationFailureReason(reason);
         stayRepository.save(stay);
-        log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason=BILLING_SERVICE_UNAVAILABLE",
-                stay.getId());
+        log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason={}", stay.getId(), reason);
     }
 
     private ChargeRequest buildRoomChargeRequest(final Stay stay) {
@@ -573,7 +592,7 @@ public class StayServiceImpl implements StayService {
             stay.setCheckoutEmailFailed(!sent);
             stay.setCheckoutEmailFailureReason(sent ? null : NOTIFICATION_SERVICE_UNAVAILABLE_REASON);
             stayRepository.save(stay);
-        } catch (final feign.FeignException | DataAccessException ex) {
+        } catch (final FeignException | DataAccessException ex) {
             log.warn("[STAY] CHECKOUT_EMAIL_SKIPPED | stayId={} | reason={}", stay.getId(), ex.getMessage());
             stay.setCheckoutEmailFailed(true);
             stay.setCheckoutEmailFailureReason(truncateFailureReason(ex.getMessage()));
