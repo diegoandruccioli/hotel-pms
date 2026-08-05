@@ -197,7 +197,7 @@ class RoomServiceImplTest {
         final RoomResponse updateResponse = new RoomResponse(roomId, hotelId, ROOM_102, null, RoomStatus.DIRTY, true,
                 null, null);
 
-        when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.of(room));
         when(roomTypeRepository.findByIdAndHotelId(Objects.requireNonNull(roomTypeId), Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(roomType));
         when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(updatedRoom);
@@ -215,7 +215,7 @@ class RoomServiceImplTest {
         final UUID requestHotelId = UUID.randomUUID();
         final RoomRequest crossTenantRequest = new RoomRequest(requestHotelId, ROOM_102, roomTypeId, RoomStatus.DIRTY);
 
-        when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.of(room));
         when(roomTypeRepository.findByIdAndHotelId(Objects.requireNonNull(roomTypeId), Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(roomType));
         when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(room);
@@ -224,6 +224,60 @@ class RoomServiceImplTest {
         roomService.updateRoom(roomId, hotelId, crossTenantRequest);
 
         assertEquals(hotelId, room.getHotelId());
+    }
+
+    @Test
+    void testUpdateRoomRejectsOccupiedTarget() {
+        final RoomRequest occupiedRequest = new RoomRequest(hotelId, ROOM_101, roomTypeId, RoomStatus.OCCUPIED);
+
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.of(room));
+
+        assertThrows(BadRequestException.class, () -> roomService.updateRoom(roomId, hotelId, occupiedRequest));
+    }
+
+    @Test
+    void testUpdateRoomRejectsWhenRoomCurrentlyOccupied() {
+        final Room occupiedRoom = Room.builder()
+                .id(roomId)
+                .hotelId(hotelId)
+                .roomNumber(ROOM_101)
+                .roomType(roomType)
+                .status(RoomStatus.OCCUPIED)
+                .active(true)
+                .build();
+        final RoomRequest maintenanceRequest = new RoomRequest(hotelId, ROOM_101, roomTypeId, RoomStatus.MAINTENANCE);
+
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId))
+                .thenReturn(Optional.of(occupiedRoom));
+
+        assertThrows(ConflictException.class, () -> roomService.updateRoom(roomId, hotelId, maintenanceRequest));
+    }
+
+    @Test
+    void testUpdateRoomAllowsNonStatusChangesWhileOccupied() {
+        final Room occupiedRoom = Room.builder()
+                .id(roomId)
+                .hotelId(hotelId)
+                .roomNumber(ROOM_101)
+                .roomType(roomType)
+                .status(RoomStatus.OCCUPIED)
+                .active(true)
+                .build();
+        final RoomRequest sameStatusRequest = new RoomRequest(hotelId, ROOM_102, roomTypeId, RoomStatus.OCCUPIED);
+        final RoomResponse renamedResponse = new RoomResponse(roomId, hotelId, ROOM_102, null, RoomStatus.OCCUPIED,
+                true, null, null);
+
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId))
+                .thenReturn(Optional.of(occupiedRoom));
+        when(roomTypeRepository.findByIdAndHotelId(Objects.requireNonNull(roomTypeId), Objects.requireNonNull(hotelId)))
+                .thenReturn(Optional.of(roomType));
+        when(roomRepository.saveAndFlush(Objects.requireNonNull(occupiedRoom))).thenReturn(occupiedRoom);
+        when(roomMapper.toResponse(Objects.requireNonNull(occupiedRoom))).thenReturn(renamedResponse);
+
+        final RoomResponse result = roomService.updateRoom(roomId, hotelId, sameStatusRequest);
+
+        assertEquals(ROOM_102, result.roomNumber());
+        assertEquals(RoomStatus.OCCUPIED, result.status());
     }
 
     @Test
@@ -293,7 +347,7 @@ class RoomServiceImplTest {
         final RoomResponse maintenanceResponse = new RoomResponse(
                 roomId, hotelId, ROOM_101, null, RoomStatus.MAINTENANCE, true, null, null);
 
-        when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.of(room));
         when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(maintenanceRoom);
         when(roomMapper.toResponse(Objects.requireNonNull(maintenanceRoom))).thenReturn(maintenanceResponse);
 
@@ -320,7 +374,7 @@ class RoomServiceImplTest {
                 .active(true)
                 .build();
 
-        when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.of(occupiedRoom));
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.of(occupiedRoom));
 
         assertThrows(ConflictException.class,
                 () -> roomService.updateHousekeepingStatus(roomId, hotelId, RoomStatus.MAINTENANCE));
@@ -328,7 +382,7 @@ class RoomServiceImplTest {
 
     @Test
     void testUpdateHousekeepingStatusNotFound() {
-        when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.empty());
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class,
                 () -> roomService.updateHousekeepingStatus(roomId, hotelId, RoomStatus.MAINTENANCE));

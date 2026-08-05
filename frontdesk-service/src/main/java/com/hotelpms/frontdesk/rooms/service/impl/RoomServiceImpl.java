@@ -116,20 +116,43 @@ public class RoomServiceImpl implements RoomService {
     /**
      * Updates the full details of an existing active room, scoped to the authenticated hotel.
      *
+     * <p>Round 1 bug #4 follow-up: this endpoint can also set {@code status}, so it is
+     * exposed to the exact same bypass {@link #updateHousekeepingStatus} was built to
+     * close — an admin could set {@code OCCUPIED} manually via {@code PUT}, or knock a
+     * room with a real stay out of {@code OCCUPIED}, without ever going through {@code
+     * PATCH /status}. The same two guards apply here, but only when {@code status} is
+     * actually changing: a room that is already {@code OCCUPIED} can still have its
+     * {@code roomNumber}/{@code roomType} corrected without touching status.
+     *
      * @param id      the room UUID; must not be {@code null}
      * @param hotelId the hotel UUID; must not be {@code null}
      * @param request the update request; must not be {@code null}
      * @return the updated room as a response DTO
-     * @throws NotFoundException if the room or the referenced {@code RoomType} is
-     *                           not found
+     * @throws NotFoundException   if the room or the referenced {@code RoomType} is
+     *                             not found
+     * @throws BadRequestException if {@code status} requests a transition into
+     *                             {@code OCCUPIED} — that belongs to the check-in Saga
+     * @throws ConflictException   if the room is currently {@code OCCUPIED} and
+     *                             {@code status} requests a transition away from it
      */
     @Override
     @Transactional
     public RoomResponse updateRoom(final UUID id, final UUID hotelId, final RoomRequest request) {
         Objects.requireNonNull(id, ROOM_ID_NULL_MSG);
         Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
-        final Room room = roomRepository.findByIdAndActiveTrueAndHotelId(id, hotelId)
+        final Room room = roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(id, hotelId)
                 .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
+
+        final RoomStatus currentStatus = room.getStatus();
+        final RoomStatus requestedStatus = request.status();
+        if (requestedStatus != currentStatus) {
+            if (requestedStatus == RoomStatus.OCCUPIED) {
+                throw new BadRequestException("OCCUPIED_SET_BY_CHECKIN_SAGA_ONLY");
+            }
+            if (currentStatus == RoomStatus.OCCUPIED) {
+                throw new ConflictException("ROOM_OCCUPIED_CLEARED_BY_CHECKOUT_SAGA_ONLY");
+            }
+        }
 
         final UUID roomTypeId = Objects.requireNonNull(request.roomTypeId(), ROOM_TYPE_ID_NULL_MSG);
         final RoomType roomType = roomTypeRepository.findByIdAndHotelId(roomTypeId, hotelId)
@@ -137,7 +160,7 @@ public class RoomServiceImpl implements RoomService {
                 .orElseThrow(() -> new NotFoundException(TYPE_NOT_FOUND_MSG + roomTypeId));
 
         room.setRoomNumber(request.roomNumber());
-        room.setStatus(request.status());
+        room.setStatus(requestedStatus);
         room.setRoomType(roomType);
         // hotelId always comes from the authenticated context (T-ROOM-01), never
         // from the request body — otherwise a caller could move a room to a
@@ -196,7 +219,7 @@ public class RoomServiceImpl implements RoomService {
         if (status == RoomStatus.OCCUPIED) {
             throw new BadRequestException("OCCUPIED_SET_BY_CHECKIN_SAGA_ONLY");
         }
-        final Room room = roomRepository.findByIdAndActiveTrueAndHotelId(id, hotelId)
+        final Room room = roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(id, hotelId)
                 .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
         if (room.getStatus() == RoomStatus.OCCUPIED) {
             throw new ConflictException("ROOM_OCCUPIED_CLEARED_BY_CHECKOUT_SAGA_ONLY");

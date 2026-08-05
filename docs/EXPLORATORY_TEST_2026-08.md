@@ -109,6 +109,28 @@ camera `OCCUPIED` reale → `MAINTENANCE` ora risponde `409`; impostazione manua
 (`DIRTY` → `CLEAN`) continua a funzionare (`200`); la Saga di check-in/check-out non è
 stata toccata e resta l'unico percorso abilitato a impostare/rimuovere `OCCUPIED`.
 
+**Follow-up (revisione di sicurezza sul commit `64917ce`)**: la revisione automatica del
+commit ha trovato due gap sul fix appena descritto, entrambi corretti nello stesso
+passaggio:
+- **Sibling-path gate parity**: `PUT /rooms/{id}` (`updateRoom`, aggiornamento completo)
+  poteva impostare `status` in `RoomRequest` con **zero enforcement**, riaprendo esattamente
+  lo stesso bypass appena chiuso su `PATCH /status` — bastava usare l'endpoint sbagliato.
+  Stessi due guard ora applicati anche lì, ma solo quando `status` cambia realmente
+  (un aggiornamento di `roomNumber`/`roomType` su una camera già `OCCUPIED`, senza toccare
+  lo status, resta permesso).
+- **TOCTOU race**: né `Room` ha un campo `@Version` né la lettura di guardia usava un lock,
+  quindi tra il controllo "la camera non è `OCCUPIED`" e la scrittura della Saga di
+  check-in poteva intercorrere un commit concorrente che imposta `OCCUPIED` — l'update di
+  housekeeping, già in volo, l'avrebbe sovrascritto senza mai vederlo. Aggiunto
+  `RoomRepository.findByIdAndActiveTrueAndHotelIdForUpdate` (`SELECT ... FOR UPDATE`,
+  `@Lock(PESSIMISTIC_WRITE)`), usato da entrambi i path guardati: Postgres blocca la
+  `UPDATE` della Saga finché la transazione di guardia non committa, eliminando la finestra.
+
+Verificato dal vivo dopo il follow-up: `PUT` su camera `OCCUPIED` → `MAINTENANCE` ora
+risponde `409`; `PUT` su camera `CLEAN` → `OCCUPIED` ora risponde `400`; `PUT` che lascia
+lo status invariato su una camera `OCCUPIED` (solo rename) resta `200`; `PATCH /status`
+riverificato senza regressioni.
+
 ---
 
 ### 5. 🟡 `documentType` modificabile su fattura già `PAID` — ✅ RISOLTO (Fase B2 piano fix-order)
