@@ -35,7 +35,8 @@
     "zustand": "^5.0.11"
   },
   "overrides": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "undici": "^7.29.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",
