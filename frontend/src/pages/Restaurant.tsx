@@ -173,11 +173,11 @@ export const Restaurant = memo(() => {
       await loadOrders();
     } catch (err: unknown) {
       const e = err as {response?: {data?: {detail?: string}}, message?: string};
-      setError(e.response?.data?.detail || e.message || t('confirm_order_failed'));
+      addToast(e.response?.data?.detail || e.message || t('confirm_order_failed'), 'error');
     } finally {
       setConfirmingId(null);
     }
-  }, [loadOrders, t]);
+  }, [loadOrders, t, addToast]);
 
   const loadMenu = useCallback(async () => {
     if (!isAdminOrOwner) return;

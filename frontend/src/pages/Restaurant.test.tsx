@@ -166,9 +166,11 @@ describe('Restaurant', () => {
     expect(fbService.confirmOrder).toHaveBeenCalledWith('order-12345678');
   });
 
-  it('should show error when confirmOrder fails', async () => {
+  it('should show an error toast and keep the order list visible when confirmOrder fails', async () => {
     vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([PENDING_ORDER]);
-    vi.mocked(fbService.confirmOrder).mockRejectedValueOnce(new Error('Server error'));
+    vi.mocked(fbService.confirmOrder).mockRejectedValueOnce({
+      response: { data: { detail: 'STAY_NOT_CHECKED_IN' } },
+    });
     render(<Restaurant />);
 
     await waitFor(() => {
@@ -178,8 +180,11 @@ describe('Restaurant', () => {
     fireEvent.click(screen.getByRole('button', { name: /confirm_order/ }));
 
     await waitFor(() => {
-      expect(screen.getByText('error_loading_orders')).toBeInTheDocument();
+      expect(mockAddToast).toHaveBeenCalledWith('STAY_NOT_CHECKED_IN', 'error');
     });
+    expect(screen.queryByText('error_loading_orders')).not.toBeInTheDocument();
+    expect(screen.getByText('101')).toBeInTheDocument();
+    expect(screen.getByText('Rossi Mario')).toBeInTheDocument();
   });
 
   it('should open order detail modal when view button is clicked', async () => {
