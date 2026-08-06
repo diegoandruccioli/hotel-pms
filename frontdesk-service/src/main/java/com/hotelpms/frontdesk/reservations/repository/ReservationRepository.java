@@ -152,25 +152,60 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
     boolean existsByGuestIdAndHotelIdAndStatusNotIn(UUID guestId, UUID hotelId, List<ReservationStatus> terminalStatuses);
 
     /**
-     * Combinable search over a hotel's reservations (C12): optional lower bound on
-     * check-in date, and an optional set of guest IDs pre-resolved from a free-text
-     * query (guest name/email search happens in guest-service — this repository
-     * only knows guestId, see {@code ReservationServiceImpl.searchReservations}).
-     * Any filter left {@code null} is skipped entirely rather than excluding results.
+     * Combinable search over a hotel's reservations (C12): optional set of guest IDs
+     * pre-resolved from a free-text query (guest name/email search happens in
+     * guest-service — this repository only knows guestId, see
+     * {@code ReservationServiceImpl.searchReservations}). Left with no check-in-date
+     * lower bound — see {@link #searchUpcomingReservationsByHotelId} for that case,
+     * kept as a separate query rather than an optional parameter here (see that
+     * method's javadoc for why).
      *
-     * @param hotelId      the hotel UUID from the authenticated request (always applied)
-     * @param checkInFrom  optional lower bound on check-in date (inclusive), or {@code null}
-     * @param query        non-null marker that a guest query was requested (drives the
-     *                     {@code guestIds} filter); {@code null} to skip it entirely
-     * @param guestIds     guest IDs matching the query in guest-service; must be non-null
-     *                     (empty when {@code query} is null, or when no guest matched)
-     * @param pageable     pagination and sorting parameters
+     * @param hotelId  the hotel UUID from the authenticated request (always applied)
+     * @param query    non-null marker that a guest query was requested (drives the
+     *                 {@code guestIds} filter); {@code null} to skip it entirely
+     * @param guestIds guest IDs matching the query in guest-service; must be non-null
+     *                 (empty when {@code query} is null, or when no guest matched)
+     * @param pageable pagination and sorting parameters
      * @return a page of matching reservations scoped to the hotel
      */
     @Query("SELECT r FROM Reservation r WHERE r.hotelId = :hotelId "
-            + "AND (:checkInFrom IS NULL OR r.checkInDate >= :checkInFrom) "
             + "AND (:query IS NULL OR r.guestId IN :guestIds)")
     Page<Reservation> searchReservationsByHotelId(
+            @Param("hotelId") UUID hotelId,
+            @Param("query") String query,
+            @Param("guestIds") List<UUID> guestIds,
+            Pageable pageable);
+
+    /**
+     * Same search as {@link #searchReservationsByHotelId}, plus a mandatory lower
+     * bound on check-in date (used for {@code upcomingOnly}).
+     *
+     * <p>Deliberately a separate query rather than an optional {@code checkInFrom}
+     * parameter on the method above: an earlier single-query version used
+     * {@code (:checkInFrom IS NULL OR r.checkInDate >= :checkInFrom)}, which binds
+     * {@code :checkInFrom} to two separate JDBC parameter positions. With a real date
+     * value, Postgres can't infer the first position's type from the second at
+     * PREPARE time (it's only ever compared via {@code IS NULL}) and fails with
+     * "could not determine data type of parameter". Wrapping both positions in an
+     * explicit {@code CAST(... AS date)} "fixes" that but breaks the null case
+     * instead — Hibernate binds the null parameter with a generic/bytea JDBC type
+     * that Postgres then refuses to cast to {@code date}. Here {@code checkInFrom} is
+     * always non-null, so it's a single ordinary bind position compared directly to
+     * a typed column — no branching, no ambiguity, no cast needed.
+     *
+     * @param hotelId     the hotel UUID from the authenticated request (always applied)
+     * @param checkInFrom lower bound on check-in date (inclusive); must be non-null
+     * @param query       non-null marker that a guest query was requested (drives the
+     *                    {@code guestIds} filter); {@code null} to skip it entirely
+     * @param guestIds    guest IDs matching the query in guest-service; must be non-null
+     *                    (empty when {@code query} is null, or when no guest matched)
+     * @param pageable    pagination and sorting parameters
+     * @return a page of matching reservations scoped to the hotel
+     */
+    @Query("SELECT r FROM Reservation r WHERE r.hotelId = :hotelId "
+            + "AND r.checkInDate >= :checkInFrom "
+            + "AND (:query IS NULL OR r.guestId IN :guestIds)")
+    Page<Reservation> searchUpcomingReservationsByHotelId(
             @Param("hotelId") UUID hotelId,
             @Param("checkInFrom") LocalDate checkInFrom,
             @Param("query") String query,

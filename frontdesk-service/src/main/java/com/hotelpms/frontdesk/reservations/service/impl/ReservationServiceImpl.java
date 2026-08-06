@@ -141,10 +141,11 @@ public class ReservationServiceImpl implements ReservationService {
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
         final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
         final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
-        final LocalDate checkInFrom = upcomingOnly ? LocalDate.now() : null;
-
-        final Page<Reservation> results = reservationRepository.searchReservationsByHotelId(
-                hotelId, checkInFrom, trimmedQuery, guestIds, safePageable);
+        final Page<Reservation> results = upcomingOnly
+                ? reservationRepository.searchUpcomingReservationsByHotelId(
+                        hotelId, LocalDate.now(), trimmedQuery, guestIds, safePageable)
+                : reservationRepository.searchReservationsByHotelId(
+                        hotelId, trimmedQuery, guestIds, safePageable);
 
         final List<UUID> pageGuestIds = results.getContent().stream()
                 .map((@NonNull Reservation r) -> r.getGuestId())

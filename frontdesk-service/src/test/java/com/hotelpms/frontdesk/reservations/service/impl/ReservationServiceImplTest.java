@@ -407,7 +407,7 @@ class ReservationServiceImplTest {
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
 
-        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, null, List.of(), pageable))
+        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
                 .thenReturn(reservationPage);
         when(guestClient.getGuestsBatch(List.of(GUEST_ID))).thenReturn(List.of(mockGuestResponse));
         when(reservationMapper.toResponse(entity)).thenReturn(response);
@@ -422,7 +422,7 @@ class ReservationServiceImplTest {
     @Test
     void testSearchReservationsWithBlankQueryIsTreatedAsNoQuery() {
         final Pageable pageable = PageRequest.of(0, 20);
-        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, null, List.of(), pageable))
+        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
                 .thenReturn(Page.empty(pageable));
 
         reservationService.searchReservations("   ", false, pageable);
@@ -440,32 +440,32 @@ class ReservationServiceImplTest {
         when(guestClient.searchGuests(QUERY_MARIO, GUEST_SEARCH_CAP))
                 .thenReturn(new GuestSearchPageResponse(List.of(matched)));
         when(reservationRepository.searchReservationsByHotelId(
-                HOTEL_ID, null, QUERY_MARIO, List.of(otherGuestId), pageable))
+                HOTEL_ID, QUERY_MARIO, List.of(otherGuestId), pageable))
                 .thenReturn(Page.empty(pageable));
 
         reservationService.searchReservations("  " + QUERY_MARIO + "  ", false, pageable);
 
         verify(reservationRepository).searchReservationsByHotelId(
-                HOTEL_ID, null, QUERY_MARIO, List.of(otherGuestId), pageable);
+                HOTEL_ID, QUERY_MARIO, List.of(otherGuestId), pageable);
     }
 
     @Test
     void testSearchReservationsUpcomingOnlyAppliesTodayAsLowerBound() {
         final Pageable pageable = PageRequest.of(0, 20);
-        when(reservationRepository.searchReservationsByHotelId(
+        when(reservationRepository.searchUpcomingReservationsByHotelId(
                 eq(HOTEL_ID), eq(LocalDate.now()), eq(null), eq(List.of()), eq(pageable)))
                 .thenReturn(Page.empty(pageable));
 
         reservationService.searchReservations(null, true, pageable);
 
-        verify(reservationRepository).searchReservationsByHotelId(
+        verify(reservationRepository).searchUpcomingReservationsByHotelId(
                 eq(HOTEL_ID), eq(LocalDate.now()), eq(null), eq(List.of()), eq(pageable));
     }
 
     @Test
     void testSearchReservationsEmptyResultSkipsGuestBatchResolution() {
         final Pageable pageable = PageRequest.of(0, 20);
-        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, null, List.of(), pageable))
+        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
                 .thenReturn(Page.empty(pageable));
 
         final Page<ReservationResponse> result = reservationService.searchReservations(null, false, pageable);
