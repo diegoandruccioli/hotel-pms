@@ -95,6 +95,13 @@ public class FatturaPAServiceImpl implements FatturaPAService {
         return generateXmlInternal(invoiceId, true);
     }
 
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public void validateXmlGeneration(@NonNull final UUID invoiceId) {
+        generateXmlInternal(invoiceId, false);
+    }
+
     /**
      * Builds and schema-validates the FatturaPA XML for an invoice, optionally
      * recording (and thereby permanently locking) the export.

@@ -66,6 +66,21 @@ describe('billingService', () => {
     expect(api.get).toHaveBeenCalledWith('/api/v1/invoices/search?page=0&size=20');
   });
 
+  it('should call the FatturaPA validate endpoint', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: undefined });
+
+    await billingService.validateFatturaPAXml('inv1');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/invoices/inv1/fatturaPA/validate');
+  });
+
+  it('should propagate a rejection from the FatturaPA validate endpoint', async () => {
+    const error = { response: { data: { detail: 'GUEST_STRUCTURED_ADDRESS_INCOMPLETE' } } };
+    vi.mocked(api.get).mockRejectedValueOnce(error);
+
+    await expect(billingService.validateFatturaPAXml('inv1')).rejects.toEqual(error);
+  });
+
   it('should trigger the invoice PDF download via a hidden iframe', () => {
     vi.useFakeTimers();
     const iframe = { style: {} as CSSStyleDeclaration, src: '' } as HTMLIFrameElement;

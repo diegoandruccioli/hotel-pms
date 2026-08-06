@@ -45,14 +45,33 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
   const { t, i18n } = useTranslation(['billing', 'common']);
   const addToast = useToastStore((s) => s.addToast);
   const [switchingType, setSwitchingType] = useState(false);
+  const [validatingXml, setValidatingXml] = useState(false);
 
   const handleDownloadPdf = useCallback(() => {
     billingService.downloadPdf(invoice.id);
   }, [invoice.id]);
 
-  const handleDownloadFatturaPAXml = useCallback(() => {
-    billingService.downloadFatturaPAXml(invoice.id);
-  }, [invoice.id]);
+  // The actual download (below) fires via a hidden iframe (see billingService), which has
+  // no way to observe an HTTP error response — a legitimate rejection (e.g. incomplete
+  // guest address) would otherwise fail completely silently. Validate first, over a real
+  // XHR that can surface the error as a toast, and only trigger the iframe on success.
+  const handleDownloadFatturaPAXml = useCallback(async () => {
+    setValidatingXml(true);
+    try {
+      await billingService.validateFatturaPAXml(invoice.id);
+      billingService.downloadFatturaPAXml(invoice.id);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
+      addToast(e.response?.data?.detail ?? e.message ?? t('toast_error', { ns: 'common' }), 'error');
+    } finally {
+      setValidatingXml(false);
+    }
+  }, [invoice.id, addToast, t]);
+
+  const handleDownloadFatturaPAXmlVoid = useCallback(
+    () => { void handleDownloadFatturaPAXml(); },
+    [handleDownloadFatturaPAXml],
+  );
 
   const handleToggleDocumentType = useCallback(async () => {
     const next: DocumentType = invoice.documentType === 'FATTURA' ? 'RICEVUTA' : 'FATTURA';
@@ -133,8 +152,9 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
             </div>
             <button
               type="button"
-              onClick={handleDownloadFatturaPAXml}
-              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded min-h-[40px] px-2"
+              onClick={handleDownloadFatturaPAXmlVoid}
+              disabled={validatingXml}
+              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded min-h-[40px] px-2"
             >
               <span className="material-symbols-outlined" style={ICON_STYLE} aria-hidden="true">download</span>
               {t('download_fattura_pa', { ns: 'billing' })}

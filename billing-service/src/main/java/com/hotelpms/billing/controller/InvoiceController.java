@@ -257,6 +257,25 @@ public class InvoiceController {
     }
 
     /**
+     * Preflight check for {@link #getFatturaPAXml}: runs every validation that
+     * endpoint would run, without generating a recorded export or locking the
+     * invoice. The real download is triggered via a hidden iframe (see the
+     * frontend's {@code billingService.downloadFatturaPAXml}), which has no way to
+     * observe an HTTP error response — the frontend calls this endpoint first so a
+     * legitimate rejection (e.g. incomplete guest address) surfaces as a visible
+     * error instead of a silent no-op.
+     *
+     * @param id the invoice UUID
+     * @return 200 with no body if generation would succeed
+     */
+    @GetMapping("/{id}/fatturaPA/validate")
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
+    public ResponseEntity<Void> validateFatturaPAXml(@NonNull @PathVariable final UUID id) {
+        fatturaPAService.validateXmlGeneration(id);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
      * Updates the SDI transmission status for a FATTURA invoice.
      * Returns 409 if the invoice is CANCELLED or has documentType=RICEVUTA.
      *

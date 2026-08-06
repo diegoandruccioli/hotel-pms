@@ -22,6 +22,21 @@ public interface FatturaPAService {
     byte[] generateXml(@NonNull UUID invoiceId);
 
     /**
+     * Runs every check {@link #generateXml} would run — eligibility, VAT reconciliation,
+     * hotel fiscal identity, guest structured address, schema validation — without
+     * generating a recorded export or locking the invoice. A side-effect-free preflight
+     * so a caller (the frontend's hidden-iframe download, which can't observe an HTTP
+     * error response) can surface a real error before committing to the recording
+     * download.
+     *
+     * @param invoiceId the invoice UUID
+     * @throws com.hotelpms.billing.exception.BillingValidationException if any fiscal
+     *                                                                   identity/address/eligibility check fails
+     * @throws com.hotelpms.billing.exception.InvoiceConflictException  if the invoice is CANCELLED or RICEVUTA
+     */
+    void validateXmlGeneration(@NonNull UUID invoiceId);
+
+    /**
      * Builds a ZIP archive containing one FatturaPA XML per eligible (FATTURA,
      * non-CANCELLED) invoice issued within the given period for the caller's hotel,
      * plus a CSV index — the batch hand-off to the commercialista/third-party

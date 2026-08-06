@@ -70,6 +70,7 @@ class FatturaPAServiceImplTest {
     private static final String GUEST_LAST_NAME = "Rossi";
     private static final String GUEST_EMAIL = "mario@rossi.it";
     private static final String GUEST_ADDRESS = "Via Milano 5";
+    private static final String GUEST_SDI_CODE = "ABC1234";
     private static final String INVOICE_NUMBER_1 = "2026/0001";
     private static final String INVOICE_NUMBER_2 = "2026/0002";
     private static final String INDEX_CSV = "index.csv";
@@ -103,7 +104,7 @@ class FatturaPAServiceImplTest {
         hotel = new HotelSettingsResponse(HOTEL_ID, HOTEL_NAME, HOTEL_ADDRESS, HOTEL_VAT_NUMBER, HOTEL_FISCAL_CODE,
                 null, HOTEL_CAP, HOTEL_COMUNE, HOTEL_PROVINCIA);
         guest = new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL,
-                "RSSMRA80A01H501T", null, null, "ABC1234", null,
+                "RSSMRA80A01H501T", null, null, GUEST_SDI_CODE, null,
                 GUEST_ADDRESS, "20100", "Milano", "MI");
     }
 
@@ -123,7 +124,7 @@ class FatturaPAServiceImplTest {
         assertThat(xmlStr).contains("TD01");
         assertThat(xmlStr).contains("EUR");
         assertThat(xmlStr).contains(HOTEL_NAME);
-        assertThat(xmlStr).contains("ABC1234");
+        assertThat(xmlStr).contains(GUEST_SDI_CODE);
         // invoice total must appear in the fallback line (no charges → use totalAmount)
         assertThat(xmlStr).contains("100.00"); // imponibile of 110.00 at 10% VAT
         // no payments → default MP05 with the full invoice amount
@@ -139,6 +140,34 @@ class FatturaPAServiceImplTest {
         assertThat(export.getXmlPayload()).isEqualTo(xml);
         assertThat(export.getPayloadSha256()).hasSize(64);
         assertThat(export.getExportedAt()).isNotNull();
+    }
+
+    @Test
+    void validateXmlGenerationSucceedsWithoutRecordingOrLockingAnything() {
+        final InvoiceResponse invoice = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+        when(hotelSettingsClient.getSettings()).thenReturn(hotel);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
+
+        service.validateXmlGeneration(INVOICE_ID);
+
+        verify(invoiceFiscalExportRepository, never()).save(any());
+    }
+
+    @Test
+    void validateXmlGenerationThrowsOnIncompleteGuestAddressWithoutRecordingAnything() {
+        final InvoiceResponse invoice = fattura(InvoiceStatus.ISSUED, DocumentType.FATTURA);
+        final GuestResponse guestMissingAddress = new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME,
+                GUEST_EMAIL, "RSSMRA80A01H501T", null, null, GUEST_SDI_CODE, null,
+                null, null, null, null);
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+        when(hotelSettingsClient.getSettings()).thenReturn(hotel);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(guestMissingAddress);
+
+        assertThatThrownBy(() -> service.validateXmlGeneration(INVOICE_ID))
+                .isInstanceOf(BillingValidationException.class)
+                .hasMessageContaining("GUEST_STRUCTURED_ADDRESS_INCOMPLETE");
+        verify(invoiceFiscalExportRepository, never()).save(any());
     }
 
     @Test
