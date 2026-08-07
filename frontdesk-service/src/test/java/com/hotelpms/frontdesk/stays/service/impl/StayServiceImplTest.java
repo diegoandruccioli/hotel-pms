@@ -33,7 +33,6 @@ import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -121,7 +120,11 @@ class StayServiceImplTest {
     @Mock
     private NotificationClient notificationClient;
 
-    @InjectMocks
+    // Not mocked: StayServiceImpl now delegates to these collaborators instead of
+    // doing the work inline (P10 SRP refactor). Building them for real out of the
+    // same 9 leaf mocks above — rather than mocking the collaborators themselves —
+    // means every existing test below keeps verifying the real behavior (e.g.
+    // billingClient.createInvoiceForStay(...)) two hops down, unchanged.
     private StayServiceImpl stayService;
 
     private UUID stayId = UUID.randomUUID();
@@ -161,6 +164,15 @@ class StayServiceImplTest {
                 StayStatus.CHECKED_IN, savedStay.getActualCheckInTime(), null,
                 LocalDateTime.now(), LocalDateTime.now(), null, false, false, null, new ArrayList<>(), null, null,
                 null, false, null, false, null);
+
+        stayService = new StayServiceImpl(
+                stayRepository, stayMapper, guestClient, roomService,
+                new StayCheckInValidator(guestClient, reservationService, roomService),
+                new StayBillingCoordinator(billingClient, roomService, stayRepository),
+                new StayAlloggiatiCoordinator(alloggiatiWebSenderService, hotelSettingsService, stayRepository),
+                new StayNotificationCoordinator(
+                        notificationClient, guestClient, billingClient, hotelSettingsService, stayRepository),
+                new StayReservationSync(reservationService, stayRepository));
     }
 
     private ReservationResponse reservationResponse(

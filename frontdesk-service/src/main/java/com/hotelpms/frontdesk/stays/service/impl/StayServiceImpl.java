@@ -1,44 +1,25 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
-import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.GuestClient;
-import com.hotelpms.frontdesk.client.NotificationClient;
-import com.hotelpms.frontdesk.client.dto.ChargeLineDto;
-import com.hotelpms.frontdesk.client.dto.ChargeRequest;
-import com.hotelpms.frontdesk.client.dto.ChargeResponse;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
-import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
-import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
-import com.hotelpms.frontdesk.client.dto.NotificationChargeLineDto;
-import com.hotelpms.frontdesk.client.dto.NotificationCheckoutRequest;
-import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
-import com.hotelpms.frontdesk.exception.ExternalServiceException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
-import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
-import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
-import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
-import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomService;
 import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
-import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
 import com.hotelpms.frontdesk.stays.dto.StaySummaryResponse;
 import com.hotelpms.frontdesk.stays.mapper.StayMapper;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
-import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
-import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import com.hotelpms.frontdesk.stays.service.StayService;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -46,25 +27,32 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.lang.NonNull;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.Objects;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 /**
  * Implementation of the StayService interface.
  *
+ * <p>Orchestrates the check-in/check-out saga; each concern that isn't core stay
+ * state has its own collaborator in this package: {@link StayCheckInValidator}
+ * (guest/reservation/room validation), {@link StayBillingCoordinator} (folio +
+ * room charge), {@link StayAlloggiatiCoordinator} (Alloggiati Web submission),
+ * {@link StayNotificationCoordinator} (checkout email), and
+ * {@link StayReservationSync} (parent-reservation status reconciliation). This
+ * class stays the single {@code @Service} implementing {@link StayService} — the
+ * public contract doesn't change, only how the work behind it is organized.
+ *
  * <p>Room and reservation lookups/updates are in-process calls to
- * {@link RoomService} / {@link ReservationService} (formerly Feign clients to
+ * {@link RoomService} / the reservation service (formerly Feign clients to
  * inventory-service / reservation-service — see ADR-001 in
  * {@code backup/DECISIONS.md}). Guest and billing remain genuinely external
- * (Feign, via {@link GuestClient} / {@link BillingClient}).
+ * (Feign), reached today via {@link GuestClient} directly here and via the
+ * billing/notification collaborators for their respective flows.
  */
 @Service
 @RequiredArgsConstructor
@@ -72,23 +60,17 @@ import java.util.UUID;
 public class StayServiceImpl implements StayService {
 
     private static final String PAID_STATUS = "PAID";
-    private static final String BILLING_SERVICE_UNAVAILABLE_REASON = "BILLING_SERVICE_UNAVAILABLE";
-    private static final String ROOM_NIGHT_CHARGE_TYPE = "ROOM_NIGHT";
-    private static final String NOTIFICATION_SERVICE_UNAVAILABLE_REASON = "NOTIFICATION_SERVICE_UNAVAILABLE";
     private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
-    private static final Set<ReservationStatus> CHECKIN_ALLOWED_STATUSES =
-            Set.of(ReservationStatus.CONFIRMED, ReservationStatus.PARTIALLY_CHECKED_IN);
-    private static final int MAX_FAILURE_REASON_LENGTH = 500;
 
     private final StayRepository stayRepository;
     private final StayMapper stayMapper;
     private final GuestClient guestClient;
-    private final ReservationService reservationService;
     private final RoomService roomService;
-    private final BillingClient billingClient;
-    private final AlloggiatiWebSenderService alloggiatiWebSenderService;
-    private final HotelSettingsService hotelSettingsService;
-    private final NotificationClient notificationClient;
+    private final StayCheckInValidator stayCheckInValidator;
+    private final StayBillingCoordinator stayBillingCoordinator;
+    private final StayAlloggiatiCoordinator stayAlloggiatiCoordinator;
+    private final StayNotificationCoordinator stayNotificationCoordinator;
+    private final StayReservationSync stayReservationSync;
 
     /** {@inheritDoc} */
     @Override
@@ -98,10 +80,10 @@ public class StayServiceImpl implements StayService {
                 request.reservationId(), request.reservationId() == null);
 
         final CheckInContext ctx = request.reservationId() == null
-                ? validateWalkInAndGetCheckOutDate(request.guestId(), request.roomId(),
+                ? stayCheckInValidator.validateWalkInAndGetCheckOutDate(request.guestId(), request.roomId(),
                         request.expectedCheckOutDate(), request.hotelId())
-                : validateAndGetCheckOutDate(request.reservationId(), request.guestId(), request.roomId(),
-                        request.hotelId());
+                : stayCheckInValidator.validateAndGetCheckOutDate(request.reservationId(), request.guestId(),
+                        request.roomId(), request.hotelId());
 
         final Stay newStay = stayMapper.toEntity(request);
         newStay.setExpectedCheckOutDate(ctx.checkOutDate());
@@ -129,13 +111,13 @@ public class StayServiceImpl implements StayService {
         markRoomOccupied(savedStay);
 
         // Non-blocking steps: execute only after OCCUPIED is confirmed
-        openInvoiceForStay(savedStay);
-        sendAlloggiatiIfEnabled(savedStay);
+        stayBillingCoordinator.openInvoiceForStay(savedStay);
+        stayAlloggiatiCoordinator.sendAlloggiatiIfEnabled(savedStay);
 
         // Non-blocking: only update reservation if this is a reservation-based check-in
         if (savedStay.getReservationId() != null) {
             try {
-                updateReservationGuests(savedStay.getReservationId());
+                stayReservationSync.updateReservationGuests(savedStay.getReservationId());
             } catch (final NotFoundException ex) {
                 log.warn("[STAY] RESERVATION_UPDATE_FAILED | stayId={} | reason={}",
                         savedStay.getId(), ex.getMessage());
@@ -162,7 +144,7 @@ public class StayServiceImpl implements StayService {
 
         // 1. Verify billing folio is PAID. Walk-in stays have no reservationId — the
         // only way to find their invoice is the invoiceId stored on the Stay itself.
-        final InvoiceStatusResponse invoice = resolveInvoiceForCheckOut(stay);
+        final InvoiceStatusResponse invoice = stayBillingCoordinator.resolveInvoiceForCheckOut(stay);
         if (invoice == null || !PAID_STATUS.equalsIgnoreCase(invoice.status())) {
             log.warn("[STAY] CHECK_OUT_FAILED | stayId={} | reservationId={} | reason=BILLING_NOT_PAID",
                     stayId, stay.getReservationId());
@@ -181,58 +163,10 @@ public class StayServiceImpl implements StayService {
         log.info("[STAY] CHECK_OUT_SUCCESS | stayId={} | reservationId={} | roomId={}",
                 stayId, stay.getReservationId(), stay.getRoomId());
 
-        updateReservationStatusAfterCheckOut(updatedStay.getReservationId());
-        sendCheckoutEmailIfPossible(updatedStay, invoice);
+        stayReservationSync.updateReservationStatusAfterCheckOut(updatedStay.getReservationId());
+        stayNotificationCoordinator.sendCheckoutEmailIfPossible(updatedStay, invoice);
 
         return stayMapper.toDto(updatedStay);
-    }
-
-    /**
-     * Reconciles the parent reservation's status once one of its stays checks out.
-     *
-     * <p>Mirrors {@link #updateReservationGuests}, but for the opposite direction of the
-     * lifecycle: a reservation only moves to {@code CHECKED_OUT} once every room on it has
-     * been checked out, so multi-room reservations don't flip early just because one guest
-     * left. No-op for walk-ins, which have no {@code reservationId}.
-     *
-     * @param reservationId the reservation owning the just-checked-out stay; may be {@code null}
-     */
-    private void updateReservationStatusAfterCheckOut(final UUID reservationId) {
-        if (reservationId == null) {
-            return;
-        }
-        final ReservationResponse reservation = reservationService.getReservationById(reservationId);
-        final int totalRooms = reservation.lineItems() == null ? 0 : reservation.lineItems().size();
-        final long checkedOutRooms = stayRepository.findAllByReservationId(reservationId).stream()
-                .filter(s -> s.getStatus() == StayStatus.CHECKED_OUT)
-                .count();
-
-        if (totalRooms > 0 && checkedOutRooms >= totalRooms) {
-            reservationService.updateStatusAndGuests(reservationId, ReservationStatus.CHECKED_OUT, null);
-        }
-    }
-
-    /**
-     * Resolves the invoice to verify at check-out. Reservation-based stays are looked
-     * up by reservationId (existing, unchanged path); walk-in stays (reservationId is
-     * always {@code null} by definition) are looked up by the invoiceId stored on the
-     * Stay at check-in time. A walk-in whose invoice was never created (billing-service
-     * was unavailable at check-in) has no invoiceId to look up — returns {@code null},
-     * which the caller already treats as BILLING_NOT_PAID.
-     *
-     * @param stay the stay being checked out
-     * @return the invoice status response, or {@code null} if it cannot be resolved
-     */
-    private InvoiceStatusResponse resolveInvoiceForCheckOut(final Stay stay) {
-        log.debug("Verifying billing folio for stay: {} | reservationId={} | invoiceId={}",
-                stay.getId(), stay.getReservationId(), stay.getInvoiceId());
-        if (stay.getReservationId() != null) {
-            return billingClient.getLatestInvoiceByReservation(stay.getReservationId());
-        }
-        if (stay.getInvoiceId() != null) {
-            return billingClient.getInvoiceById(stay.getInvoiceId());
-        }
-        return null;
     }
 
     /** {@inheritDoc} */
@@ -290,113 +224,6 @@ public class StayServiceImpl implements StayService {
     }
 
     /**
-     * Validates the guest (via guest-service), reservation (status must be in
-     * {@code CHECKIN_ALLOWED_STATUSES}), and room, then returns the reservation's
-     * expected check-out date. Wraps a guest-service {@link FeignException}
-     * in an {@link ExternalServiceException}; a missing/invalid room or reservation
-     * propagates directly as {@link NotFoundException} / {@link IllegalStateException}.
-     *
-     * @param reservationId the reservation to validate
-     * @param guestId       the guest to validate
-     * @param roomId        the room to validate
-     * @param hotelId       the authenticated hotel, for multi-tenant room scoping
-     * @return check-in context with check-out date, guest display name, room number
-     */
-    private CheckInContext validateAndGetCheckOutDate(
-            final UUID reservationId, final UUID guestId, final UUID roomId, final UUID hotelId) {
-        log.debug("Validating guest ID: {}", guestId);
-        final GuestResponse guest;
-        try {
-            guest = guestClient.getGuestById(guestId);
-        } catch (final FeignException ex) {
-            log.warn("[STAY] CHECK_IN_FAILED | reservationId={} | reason=GUEST_SERVICE_UNAVAILABLE | detail={}",
-                    reservationId, ex.getMessage());
-            throw new ExternalServiceException("EXTERNAL_SERVICE_UNAVAILABLE: " + ex.getMessage(), ex);
-        }
-
-        log.debug("Validating reservation ID: {}", reservationId);
-        final ReservationResponse reservation = reservationService.getReservationById(reservationId);
-        if (!CHECKIN_ALLOWED_STATUSES.contains(reservation.status())) {
-            log.warn("[STAY] CHECK_IN_FAILED | reservationId={} | reason=INVALID_RESERVATION_STATUS | currentStatus={}",
-                    reservationId, reservation.status());
-            throw new IllegalStateException("INVALID_RESERVATION_STATUS");
-        }
-
-        log.debug("Validating room ID: {}", roomId);
-        final RoomResponse room = roomService.getRoomById(roomId, hotelId);
-
-        final String displayName = guest.lastName() + " " + guest.firstName();
-        return new CheckInContext(reservation.checkOutDate(), displayName, room.roomNumber());
-    }
-
-    /**
-     * Validates a walk-in check-in by confirming guest and room exist, then returns
-     * a context with the provided checkout date and denormalized display info.
-     *
-     * @param guestId              the guest to validate
-     * @param roomId               the room to validate
-     * @param expectedCheckOutDate the operator-supplied check-out date; may be null
-     * @param hotelId              the authenticated hotel, for multi-tenant room scoping
-     * @return context with checkout date, guest display name, room number
-     */
-    private CheckInContext validateWalkInAndGetCheckOutDate(
-            final UUID guestId, final UUID roomId, final LocalDate expectedCheckOutDate, final UUID hotelId) {
-        log.debug("[STAY] WALK_IN validating guest={}", guestId);
-        final GuestResponse guest;
-        try {
-            guest = guestClient.getGuestById(guestId);
-        } catch (final FeignException ex) {
-            log.warn("[STAY] WALK_IN_FAILED | reason=GUEST_SERVICE_UNAVAILABLE | detail={}", ex.getMessage());
-            throw new ExternalServiceException("EXTERNAL_SERVICE_UNAVAILABLE: " + ex.getMessage(), ex);
-        }
-        log.debug("[STAY] WALK_IN validating room={}", roomId);
-        final RoomResponse room = roomService.getRoomById(roomId, hotelId);
-        final String displayName = guest.lastName() + " " + guest.firstName();
-        return new CheckInContext(expectedCheckOutDate, displayName, room.roomNumber());
-    }
-
-    private void sendAlloggiatiIfEnabled(final Stay stay) {
-        if (stay.getHotelId() == null) {
-            return;
-        }
-        final HotelSettingsResponse settings = hotelSettingsService.getOrCreate(stay.getHotelId());
-        if (!settings.alloggiatiAutoSend()) {
-            return;
-        }
-        final LocalDate checkInDate = stay.getActualCheckInTime().toLocalDate();
-        try {
-            alloggiatiWebSenderService.submitReport(checkInDate, stay.getHotelId());
-            stay.setAlloggiatiSent(true);
-            stay.setAlloggiatiSendFailed(false);
-            stay.setAlloggiatiFailureReason(null);
-            stayRepository.save(stay);
-            log.info("[STAY] ALLOGGIATI_SENT | stayId={} | date={}", stay.getId(), checkInDate);
-        } catch (final ExternalServiceException ex) {
-            log.error("[STAY] ALLOGGIATI_SEND_FAILED | stayId={} | date={} | reason={}",
-                    stay.getId(), checkInDate, ex.getMessage());
-            stay.setAlloggiatiSendFailed(true);
-            stay.setAlloggiatiFailureReason(truncateFailureReason(ex.getMessage()));
-            stayRepository.save(stay);
-        }
-    }
-
-    /**
-     * Truncates an Alloggiati failure message to fit the
-     * {@code stays.alloggiati_failure_reason} column ({@value #MAX_FAILURE_REASON_LENGTH} chars).
-     *
-     * @param message the raw exception message; may be null
-     * @return a column-safe string, never longer than the column limit
-     */
-    private static String truncateFailureReason(final String message) {
-        if (message == null) {
-            return null;
-        }
-        return message.length() > MAX_FAILURE_REASON_LENGTH
-                ? message.substring(0, MAX_FAILURE_REASON_LENGTH)
-                : message;
-    }
-
-    /**
      * Marks every stay checked in on {@code date} for {@code hotelId} as successfully sent,
      * clearing any prior failure state. Called after a successful manual
      * "Invia a Questura" submission ({@code POST /reports/alloggiati/submit}), which today
@@ -429,7 +256,7 @@ public class StayServiceImpl implements StayService {
     public StayResponse retryInvoiceCreation(@NonNull final UUID stayId, @NonNull final UUID hotelId) {
         final Stay stay = stayRepository.findByIdAndHotelId(stayId, hotelId)
                 .orElseThrow(() -> new NotFoundException(STAY_NOT_FOUND_MSG));
-        openInvoiceForStay(stay);
+        stayBillingCoordinator.openInvoiceForStay(stay);
         return stayMapper.toDto(stay);
     }
 
@@ -442,11 +269,11 @@ public class StayServiceImpl implements StayService {
         if (stay.getStatus() != StayStatus.CHECKED_OUT) {
             throw new IllegalStateException("INVALID_STAY_STATUS");
         }
-        final InvoiceStatusResponse invoice = resolveInvoiceForCheckOut(stay);
+        final InvoiceStatusResponse invoice = stayBillingCoordinator.resolveInvoiceForCheckOut(stay);
         if (invoice == null) {
             throw new NotFoundException("INVOICE_NOT_FOUND");
         }
-        sendCheckoutEmailIfPossible(stay, invoice);
+        stayNotificationCoordinator.sendCheckoutEmailIfPossible(stay, invoice);
         return stayMapper.toDto(stay);
     }
 
@@ -473,156 +300,6 @@ public class StayServiceImpl implements StayService {
                     stay.getId(), stay.getRoomId(), ex.getMessage());
             throw ex;
         }
-    }
-
-    private void openInvoiceForStay(final Stay stay) {
-        if (stay.getInvoiceId() != null && !stay.isInvoiceCreationFailed()) {
-            // Invoice + room charge already recorded on a previous call; a stray retry
-            // (e.g. double-click) must not re-add the room charge and double-bill it.
-            return;
-        }
-
-        UUID invoiceId = stay.getInvoiceId();
-        if (invoiceId == null) {
-            final StayInvoiceRequest invoiceReq = new StayInvoiceRequest(
-                    stay.getId(), stay.getGuestId(), stay.getReservationId());
-            final InvoiceCreatedResponse invoiceResp;
-            try {
-                invoiceResp = billingClient.createInvoiceForStay(invoiceReq);
-            } catch (final FeignException ex) {
-                // A 4xx here is a real billing-service rejection (e.g. a stale retry
-                // racing INVOICE_ALREADY_EXISTS_FOR_STAY), not mere unavailability —
-                // resilience4j.circuitbreaker.instances.billingService.ignoreExceptions
-                // keeps it out of the fallback so it reaches this catch instead of being
-                // silently absorbed (round 1 bug #1). Check-in itself still must not be
-                // blocked by a billing problem (backup/DECISIONS.md §2.2), so it's
-                // recorded for staff visibility/retry rather than rolling back the Saga.
-                markInvoiceFlowFailed(stay, truncateFailureReason(ex.getMessage()));
-                return;
-            }
-            if (invoiceResp == null || invoiceResp.id() == null) {
-                markInvoiceFlowFailed(stay, BILLING_SERVICE_UNAVAILABLE_REASON);
-                return;
-            }
-            invoiceId = invoiceResp.id();
-            stay.setInvoiceId(invoiceId);
-        }
-
-        final ChargeRequest chargeReq;
-        try {
-            chargeReq = buildRoomChargeRequest(stay);
-        } catch (final NotFoundException ex) {
-            log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason=ROOM_NOT_FOUND | detail={}",
-                    stay.getId(), ex.getMessage());
-            markInvoiceFlowFailed(stay, "ROOM_NOT_FOUND");
-            return;
-        }
-
-        final ChargeResponse chargeResp;
-        try {
-            chargeResp = billingClient.addCharge(stay.getId(), chargeReq);
-        } catch (final FeignException ex) {
-            markInvoiceFlowFailed(stay, truncateFailureReason(ex.getMessage()));
-            return;
-        }
-        if (chargeResp == null || chargeResp.id() == null) {
-            markInvoiceFlowFailed(stay, BILLING_SERVICE_UNAVAILABLE_REASON);
-            return;
-        }
-
-        stay.setInvoiceCreationFailed(false);
-        stay.setInvoiceCreationFailureReason(null);
-        stayRepository.save(stay);
-        log.info("[STAY] INVOICE_CREATED | stayId={} | invoiceId={} | roomChargeId={}",
-                stay.getId(), invoiceId, chargeResp.id());
-    }
-
-    private void markInvoiceFlowFailed(final Stay stay, final String reason) {
-        stay.setInvoiceCreationFailed(true);
-        stay.setInvoiceCreationFailureReason(reason);
-        stayRepository.save(stay);
-        log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason={}", stay.getId(), reason);
-    }
-
-    private ChargeRequest buildRoomChargeRequest(final Stay stay) {
-        final RoomResponse room = roomService.getRoomById(stay.getRoomId(), stay.getHotelId());
-        final BigDecimal nightlyRate = room.roomType().basePrice();
-        final long nights = Math.max(1, ChronoUnit.DAYS.between(
-                stay.getActualCheckInTime().toLocalDate(), stay.getExpectedCheckOutDate()));
-        final BigDecimal amount = nightlyRate.multiply(BigDecimal.valueOf(nights));
-        final String description = "Room " + stay.getRoomNumber() + " - " + nights + " night(s)";
-        return new ChargeRequest(ROOM_NIGHT_CHARGE_TYPE, description, amount, stay.getId());
-    }
-
-    private void sendCheckoutEmailIfPossible(final Stay stay, final InvoiceStatusResponse invoice) {
-        try {
-            final HotelSettingsResponse settings = hotelSettingsService.getOrCreate(stay.getHotelId());
-            if (!settings.sendCheckoutEmail()) {
-                return;
-            }
-            final GuestResponse guest = guestClient.getGuestById(stay.getGuestId());
-            final List<NotificationChargeLineDto> lines;
-            final String currency;
-            if (invoice.id() != null) {
-                final InvoiceForEmailResponse detail = billingClient.getInvoiceForEmail(invoice.id());
-                lines = detail.charges() != null
-                        ? detail.charges().stream()
-                                .map((ChargeLineDto c) -> new NotificationChargeLineDto(c.description(), c.amount()))
-                                .toList()
-                        : List.of();
-                currency = detail.currency() != null ? detail.currency() : "EUR";
-            } else {
-                lines = List.of();
-                currency = "EUR";
-            }
-            final boolean sent = notificationClient.sendCheckout(new NotificationCheckoutRequest(
-                    guest.email(),
-                    guest.firstName() + " " + guest.lastName(),
-                    settings.hotelName(),
-                    stay.getRoomNumber(),
-                    stay.getActualCheckInTime(),
-                    stay.getActualCheckOutTime(),
-                    lines,
-                    invoice.totalAmount(),
-                    currency,
-                    "it",
-                    settings.emailSubjectCheckout(),
-                    settings.emailGreetingText(),
-                    settings.logoUrl()));
-            stay.setCheckoutEmailFailed(!sent);
-            stay.setCheckoutEmailFailureReason(sent ? null : NOTIFICATION_SERVICE_UNAVAILABLE_REASON);
-            stayRepository.save(stay);
-        } catch (final FeignException | DataAccessException ex) {
-            log.warn("[STAY] CHECKOUT_EMAIL_SKIPPED | stayId={} | reason={}", stay.getId(), ex.getMessage());
-            stay.setCheckoutEmailFailed(true);
-            stay.setCheckoutEmailFailureReason(truncateFailureReason(ex.getMessage()));
-            stayRepository.save(stay);
-        }
-    }
-
-    private void updateReservationGuests(final UUID reservationId) {
-        if (reservationId == null) {
-            return;
-        }
-        final ReservationResponse res = reservationService.getReservationById(reservationId);
-        final List<Stay> stays = stayRepository.findAllByReservationId(reservationId);
-
-        final int actualGuests = stays.stream()
-                .mapToInt(stay -> stay.getGuests() == null ? 0 : stay.getGuests().size())
-                .sum();
-        ReservationStatus status = null;
-        if (res.lineItems() != null) {
-            final int totalRooms = res.lineItems().size();
-            final int checkedInRooms = stays.size();
-
-            if (checkedInRooms >= totalRooms && totalRooms > 0) {
-                status = ReservationStatus.CHECKED_IN;
-            } else if (checkedInRooms > 0) {
-                status = ReservationStatus.PARTIALLY_CHECKED_IN;
-            }
-        }
-
-        reservationService.updateStatusAndGuests(reservationId, status, actualGuests);
     }
 
     /** {@inheritDoc} */
