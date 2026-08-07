@@ -14,7 +14,7 @@ import type {
   TravellerType,
 } from '../../types/stay.types';
 import type { DocumentType } from '../../types/guest.types';
-import { GuestFieldSection } from './StayGuestFieldSection';
+import { GuestFieldSection } from './GuestFieldSection';
 import {
   emptyGuest,
   TYPES_WITHOUT_DOC,

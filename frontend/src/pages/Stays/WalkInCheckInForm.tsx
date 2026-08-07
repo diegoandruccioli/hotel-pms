@@ -7,7 +7,7 @@ import { guestService } from '../../services/guestService';
 import type { AvailableRoom, AlloggiatiStato, AlloggiatiTipdoc, StayGuestRequest, TravellerType } from '../../types/stay.types';
 import type { GuestResponseDTO } from '../../types/guest.types';
 import { useToastStore } from '../../store/toastStore';
-import { GuestFieldSection } from './StayGuestFieldSection';
+import { GuestFieldSection } from './GuestFieldSection';
 import {
   emptyGuest,
   TYPES_WITHOUT_DOC,

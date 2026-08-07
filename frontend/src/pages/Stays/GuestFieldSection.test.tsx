@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
-import { GuestFieldSection } from './StayGuestFieldSection';
+import { GuestFieldSection } from './GuestFieldSection';
 import { emptyGuest } from './stayGuestFieldHelpers';
 import { stayService } from '../../services/stayService';
 
