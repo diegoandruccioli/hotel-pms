@@ -44,4 +44,20 @@ export interface RoomRequest {
   status: RoomStatus;
 }
 
+export interface RateSeasonResponse {
+  id: string;
+  roomTypeId: string;
+  name?: string;
+  startDate: string;
+  endDate: string;
+  nightlyPrice: number;
+}
+
+export interface RateSeasonRequest {
+  name?: string;
+  startDate: string;
+  endDate: string;
+  nightlyPrice: number;
+}
+
 

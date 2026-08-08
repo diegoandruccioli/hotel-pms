@@ -8,15 +8,21 @@ import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
 import { M3TableActionLink } from '../../components/m3/M3TableActionLink';
 import { useToastStore } from '../../store/toastStore';
 import { RoomTypeFormModal } from './RoomTypeFormModal';
+import { RateSeasonManagerModal } from './RateSeasonManagerModal';
 
-const RoomTypeRow = memo(({ rt, onEdit, t }: {
+const RoomTypeRow = memo(({ rt, onEdit, onManageSeasons, t }: {
   rt: RoomTypeResponse;
   onEdit: (rt: RoomTypeResponse) => void;
+  onManageSeasons: (rt: RoomTypeResponse) => void;
   t: (k: string) => string;
 }) => {
   const handleEdit = useCallback(() => {
     onEdit(rt);
   }, [onEdit, rt]);
+
+  const handleManageSeasons = useCallback(() => {
+    onManageSeasons(rt);
+  }, [onManageSeasons, rt]);
 
   return (
     <M3TableRow key={rt.id}>
@@ -25,6 +31,9 @@ const RoomTypeRow = memo(({ rt, onEdit, t }: {
       <M3TableCell className="text-on-surface-variant font-medium">€ {rt.basePrice.toFixed(2)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant max-w-xs truncate" title={rt.description}>{rt.description || '-'}</M3TableCell>
       <M3TableCell className="text-right">
+        <M3TableActionLink onClick={handleManageSeasons} className="lg:mr-4">
+          {t('rate_seasons')}
+        </M3TableActionLink>
         <M3TableActionLink onClick={handleEdit} className="lg:mr-4">
           {t('edit')}
         </M3TableActionLink>
@@ -42,6 +51,7 @@ export const RoomTypeList = memo(() => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingType, setEditingType] = useState<RoomTypeResponse | undefined>();
+  const [seasonsRoomType, setSeasonsRoomType] = useState<RoomTypeResponse | undefined>();
 
   const loadTypes = useCallback(async () => {
     try {
@@ -75,6 +85,14 @@ export const RoomTypeList = memo(() => {
 
   const closeModal = useCallback(() => {
     setIsModalOpen(false);
+  }, []);
+
+  const openSeasonsModal = useCallback((roomType: RoomTypeResponse) => {
+    setSeasonsRoomType(roomType);
+  }, []);
+
+  const closeSeasonsModal = useCallback(() => {
+    setSeasonsRoomType(undefined);
   }, []);
 
   const handleSaved = useCallback(() => {
@@ -118,7 +136,7 @@ export const RoomTypeList = memo(() => {
             <tr><td colSpan={5} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_rooms_found')}</td></tr>
           ) : (
             types.map((rt) => (
-              <RoomTypeRow key={rt.id} rt={rt} onEdit={openEditModal} t={t} />
+              <RoomTypeRow key={rt.id} rt={rt} onEdit={openEditModal} onManageSeasons={openSeasonsModal} t={t} />
             ))
           )}
         </M3Table>
@@ -129,6 +147,13 @@ export const RoomTypeList = memo(() => {
           roomType={editingType}
           onClose={closeModal}
           onSaved={handleSaved}
+        />
+      )}
+
+      {seasonsRoomType && (
+        <RateSeasonManagerModal
+          roomType={seasonsRoomType}
+          onClose={closeSeasonsModal}
         />
       )}
     </div>

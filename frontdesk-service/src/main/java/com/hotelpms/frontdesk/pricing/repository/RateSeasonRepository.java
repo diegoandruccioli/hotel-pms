@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,4 +34,23 @@ public interface RateSeasonRepository extends JpaRepository<RateSeason, UUID> {
             @Param("roomTypeId") UUID roomTypeId,
             @Param("hotelId") UUID hotelId,
             @Param("date") LocalDate date);
+
+    /**
+     * Lists every active season for a room type, scoped to a hotel, oldest first.
+     *
+     * @param roomTypeId the room type UUID
+     * @param hotelId    the hotel UUID (multi-tenant scoping)
+     * @return the seasons in start-date order
+     */
+    List<RateSeason> findAllByRoomTypeIdAndHotelIdOrderByStartDateAsc(UUID roomTypeId, UUID hotelId);
+
+    /**
+     * Finds a season by id, scoped to a hotel — a season belonging to another
+     * hotel must be invisible (T-ROOM-02 pattern), not just filtered from lists.
+     *
+     * @param id      the season UUID
+     * @param hotelId the hotel UUID (multi-tenant scoping)
+     * @return the season, if it exists and belongs to this hotel
+     */
+    Optional<RateSeason> findByIdAndHotelId(UUID id, UUID hotelId);
 }

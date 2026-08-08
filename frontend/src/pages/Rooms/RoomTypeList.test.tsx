@@ -22,6 +22,12 @@ vi.mock('./RoomTypeFormModal', () => ({
   RoomTypeFormModal: () => null,
 }));
 
+vi.mock('./RateSeasonManagerModal', () => ({
+  RateSeasonManagerModal: ({ roomType }: { roomType: { name: string } }) => (
+    <div data-testid="rate-season-modal">{roomType.name}</div>
+  ),
+}));
+
 const ROOM_TYPE = {
   id: 'rt1', name: 'Single', maxOccupancy: 1, basePrice: 50,
   description: 'A single room', active: true,
@@ -68,6 +74,14 @@ describe('RoomTypeList', () => {
     render(<RoomTypeList />);
     await waitFor(() => expect(screen.getByText('edit')).toBeInTheDocument());
     fireEvent.click(screen.getByText('edit'));
+  });
+
+  it('rate_seasons action opens the seasons modal for the row', async () => {
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
+    render(<RoomTypeList />);
+    await waitFor(() => expect(screen.getByText('rate_seasons')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('rate_seasons'));
+    expect(await screen.findByTestId('rate-season-modal')).toHaveTextContent('Single');
   });
 
   it('passes axe accessibility check', async () => {
