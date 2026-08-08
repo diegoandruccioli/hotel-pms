@@ -1,6 +1,11 @@
+/**
+ * Deliberately has no `price` field: the price is always resolved server-side
+ * (RatePricingService) and snapshotted onto the line item at creation/update
+ * time — a client-supplied price was never validated against anything and was
+ * silently ignored downstream.
+ */
 export interface ReservationLineItemRequest {
   roomId: string;
-  price: number;
 }
 
 export interface ReservationLineItemResponse {

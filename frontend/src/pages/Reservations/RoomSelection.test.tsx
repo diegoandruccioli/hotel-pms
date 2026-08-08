@@ -23,11 +23,11 @@ vi.mock('react-i18next', () => ({
 const ROOM_TYPE = { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 90, active: true, createdAt: '', updatedAt: '' };
 
 const ROOM_101: RoomResponse = {
-  id: 'r1', hotelId: 'h1', roomNumber: '101', roomType: ROOM_TYPE, pricePerNight: 90,
+  id: 'r1', hotelId: 'h1', roomNumber: '101', roomType: ROOM_TYPE,
   status: 'CLEAN', active: true, createdAt: '', updatedAt: '',
 };
 const ROOM_102: RoomResponse = {
-  id: 'r2', hotelId: 'h1', roomNumber: '102', roomType: ROOM_TYPE, pricePerNight: 100,
+  id: 'r2', hotelId: 'h1', roomNumber: '102', roomType: { ...ROOM_TYPE, basePrice: 100 },
   status: 'CLEAN', active: true, createdAt: '', updatedAt: '',
 };
 const ROOMS = [ROOM_101, ROOM_102];
@@ -220,6 +220,44 @@ describe('RoomSelection', () => {
 
     fireEvent.change(screen.getByLabelText('label_expected_guests'), { target: { value: '4' } });
     expect(onExpectedGuestsChange).toHaveBeenCalledWith(4);
+  });
+
+  it('shows the flat basePrice when no resolved price is available for the room', () => {
+    render(
+      <RoomSelection
+        checkInDate="2026-08-01"
+        checkOutDate="2026-08-05"
+        expectedGuests={2}
+        availableRooms={ROOMS}
+        selectedRoomIds={EMPTY_IDS}
+        allReservations={NO_RESERVATIONS}
+        onCheckInChange={noop}
+        onCheckOutChange={noop}
+        onExpectedGuestsChange={noop}
+        onToggleRoom={noop}
+      />,
+    );
+    expect(screen.getByText('€90')).toBeInTheDocument();
+  });
+
+  it('shows the date-aware resolved total price when available for the room', () => {
+    const resolvedPrices = new Map([['r1', 360]]);
+    render(
+      <RoomSelection
+        checkInDate="2026-08-01"
+        checkOutDate="2026-08-05"
+        expectedGuests={2}
+        availableRooms={ROOMS}
+        selectedRoomIds={EMPTY_IDS}
+        allReservations={NO_RESERVATIONS}
+        resolvedPrices={resolvedPrices}
+        onCheckInChange={noop}
+        onCheckOutChange={noop}
+        onExpectedGuestsChange={noop}
+        onToggleRoom={noop}
+      />,
+    );
+    expect(screen.getByText('reservations:price_total_stay')).toBeInTheDocument();
   });
 
   it('has no accessibility violations', async () => {

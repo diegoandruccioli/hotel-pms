@@ -81,6 +81,6 @@ class VatBreakdownCalculatorTest {
 
     private static ChargeResponse charge(final BigDecimal amount, final BigDecimal vatRate) {
         return new ChargeResponse(UUID.randomUUID(), INVOICE_ID, ChargeType.ROOM_NIGHT,
-                "Test charge", amount, vatRate, null, LocalDateTime.now());
+                "Test charge", amount, vatRate, null, null, null, LocalDateTime.now());
     }
 }

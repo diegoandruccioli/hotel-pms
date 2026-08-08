@@ -240,7 +240,8 @@ describe('CalendarPlanning', () => {
       await waitFor(() => {
         expect(reservationService.updateReservation).toHaveBeenCalledWith('r1', expect.objectContaining({
           guestId: 'g1',
-          lineItems: [{ roomId: 'room-C', price: 80 }],
+          // price is resolved server-side, no longer sent by the client (see CalendarPlanning.tsx).
+          lineItems: [{ roomId: 'room-C' }],
         }));
       });
       expect(mockAddToast).toHaveBeenCalledWith('room_moved_success', 'success');

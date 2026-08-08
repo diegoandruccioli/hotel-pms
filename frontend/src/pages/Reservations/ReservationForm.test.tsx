@@ -108,7 +108,6 @@ const mockRoom = (overrides: Partial<RoomResponse> = {}): RoomResponse => ({
   id: 'r1',
   roomNumber: '101',
   type: 'SINGLE',
-  pricePerNight: 100,
   status: 'CLEAN',
   active: true,
   createdAt: '2026-01-01T00:00:00',
@@ -154,6 +153,10 @@ describe('ReservationForm', () => {
       totalElements: 2,
     } as never);
     vi.mocked(reservationService.getAllReservations).mockResolvedValue([]);
+    // Resolved-price lookup (RoomSelection is mocked out in this file, so nothing
+    // asserts on the actual prices — this just keeps the effect's promise from
+    // resolving to undefined and throwing on `.then`).
+    vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue([]);
   });
 
   it('renders correctly and loads rooms in "New" mode', async () => {

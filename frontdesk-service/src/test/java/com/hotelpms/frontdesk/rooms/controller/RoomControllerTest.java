@@ -98,7 +98,7 @@ class RoomControllerTest {
         roomTypeId = UUID.randomUUID();
 
         roomResponse = new RoomResponse(
-                roomId, HOTEL_ID, ROOM_NUMBER_101, null, RoomStatus.CLEAN, true, null, null);
+                roomId, HOTEL_ID, ROOM_NUMBER_101, null, RoomStatus.CLEAN, true, null, null, null);
     }
 
     @AfterEach
@@ -188,7 +188,7 @@ class RoomControllerTest {
     void shouldUpdateRoomStatusReturn200() throws Exception {
         final RoomStatusRequest statusRequest = new RoomStatusRequest(RoomStatus.DIRTY);
         final RoomResponse dirtyResponse = new RoomResponse(
-                roomId, HOTEL_ID, ROOM_NUMBER_101, null, RoomStatus.DIRTY, true, null, null);
+                roomId, HOTEL_ID, ROOM_NUMBER_101, null, RoomStatus.DIRTY, true, null, null, null);
 
         when(roomService.updateHousekeepingStatus(any(UUID.class), any(UUID.class), any(RoomStatus.class)))
                 .thenReturn(dirtyResponse);

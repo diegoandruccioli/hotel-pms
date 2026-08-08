@@ -116,6 +116,8 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .amount(request.amount())
                 .vatRate(vatRateFor(request.type()))
                 .referenceId(request.referenceId())
+                .unitPrice(request.unitPrice())
+                .nights(request.nights())
                 .build();
 
         invoice.addCharge(charge);

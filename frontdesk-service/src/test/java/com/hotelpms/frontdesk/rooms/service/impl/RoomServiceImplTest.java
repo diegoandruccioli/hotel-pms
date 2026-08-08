@@ -84,7 +84,7 @@ class RoomServiceImplTest {
 
         request = new RoomRequest(hotelId, ROOM_101, roomTypeId, RoomStatus.CLEAN);
 
-        response = new RoomResponse(roomId, hotelId, ROOM_101, null, RoomStatus.CLEAN, true, null, null);
+        response = new RoomResponse(roomId, hotelId, ROOM_101, null, RoomStatus.CLEAN, true, null, null, null);
     }
 
     @Test
@@ -195,7 +195,7 @@ class RoomServiceImplTest {
                 .active(true)
                 .build();
         final RoomResponse updateResponse = new RoomResponse(roomId, hotelId, ROOM_102, null, RoomStatus.DIRTY, true,
-                null, null);
+                null, null, null);
 
         when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.of(room));
         when(roomTypeRepository.findByIdAndHotelId(Objects.requireNonNull(roomTypeId), Objects.requireNonNull(hotelId)))
@@ -265,7 +265,7 @@ class RoomServiceImplTest {
                 .build();
         final RoomRequest sameStatusRequest = new RoomRequest(hotelId, ROOM_102, roomTypeId, RoomStatus.OCCUPIED);
         final RoomResponse renamedResponse = new RoomResponse(roomId, hotelId, ROOM_102, null, RoomStatus.OCCUPIED,
-                true, null, null);
+                true, null, null, null);
 
         when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId))
                 .thenReturn(Optional.of(occupiedRoom));
@@ -291,7 +291,7 @@ class RoomServiceImplTest {
                 .active(true)
                 .build();
         final RoomResponse dirtyResponse = new RoomResponse(roomId, hotelId, ROOM_101, null, RoomStatus.DIRTY, true,
-                null, null);
+                null, null, null);
 
         when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.of(room));
         when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(dirtyRoom);
@@ -314,7 +314,7 @@ class RoomServiceImplTest {
                 .active(true)
                 .build();
         final RoomResponse occupiedResponse = new RoomResponse(
-                roomId, hotelId, ROOM_101, null, RoomStatus.OCCUPIED, true, null, null);
+                roomId, hotelId, ROOM_101, null, RoomStatus.OCCUPIED, true, null, null, null);
 
         when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.of(room));
         when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(occupiedRoom);
@@ -345,7 +345,7 @@ class RoomServiceImplTest {
                 .active(true)
                 .build();
         final RoomResponse maintenanceResponse = new RoomResponse(
-                roomId, hotelId, ROOM_101, null, RoomStatus.MAINTENANCE, true, null, null);
+                roomId, hotelId, ROOM_101, null, RoomStatus.MAINTENANCE, true, null, null, null);
 
         when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.of(room));
         when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(maintenanceRoom);

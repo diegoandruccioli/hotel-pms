@@ -10,10 +10,11 @@ interface RoomButtonProps {
   isSelected: boolean;
   isOccupied: boolean;
   readOnly: boolean;
+  resolvedTotalPrice?: number;
   onToggle: (id: string) => void;
 }
 
-const RoomButton = memo(({ room, isSelected, isOccupied, readOnly, onToggle }: RoomButtonProps) => {
+const RoomButton = memo(({ room, isSelected, isOccupied, readOnly, resolvedTotalPrice, onToggle }: RoomButtonProps) => {
   const { t } = useTranslation(['reservations', 'common']);
 
   const handleClick = useCallback(() => {
@@ -47,7 +48,9 @@ const RoomButton = memo(({ room, isSelected, isOccupied, readOnly, onToggle }: R
       </div>
       <span className="text-xs text-on-surface-variant">{room.roomType?.name || room.type}</span>
       <span className={`text-sm font-medium mt-1 ${isOccupied ? 'text-on-surface-variant' : ''}`}>
-        €{room.pricePerNight ?? room.roomType?.basePrice}
+        {resolvedTotalPrice !== undefined
+          ? t('reservations:price_total_stay', { amount: resolvedTotalPrice })
+          : `€${room.roomType?.basePrice}`}
       </span>
       {isOccupied && (
         <span className="text-xs text-on-surface-variant italic">{t('common:room_occupied')}</span>
@@ -66,6 +69,8 @@ interface RoomSelectionProps {
   selectedRoomIds: string[];
   allReservations: ReservationResponse[];
   currentReservationId?: string;
+  /** roomId -> resolved total price for the selected dates (RatePricingService). */
+  resolvedPrices?: Map<string, number>;
   onCheckInChange: (val: string) => void;
   onCheckOutChange: (val: string) => void;
   onExpectedGuestsChange: (val: number | string) => void;
@@ -81,6 +86,7 @@ export const RoomSelection = memo(({
   selectedRoomIds,
   allReservations,
   currentReservationId,
+  resolvedPrices,
   onCheckInChange,
   onCheckOutChange,
   onExpectedGuestsChange,
@@ -165,6 +171,7 @@ export const RoomSelection = memo(({
                 isSelected={selectedRoomIds.includes(room.id)}
                 isOccupied={occupiedRoomIds.has(room.id)}
                 readOnly={readOnly}
+                resolvedTotalPrice={resolvedPrices?.get(room.id)}
                 onToggle={onToggleRoom}
               />
             ))}

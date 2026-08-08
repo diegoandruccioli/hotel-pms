@@ -19,4 +19,18 @@
       RedisNonceStore's own EI_EXPOSE_REP2 exclude now lives in
       internal-auth-lib's config/spotbugs/exclude.xml — the class moved there.
     -->
+    <!--
+      NP_LOAD_OF_KNOWN_NULL_VALUE on the generated RoomMapperImpl:
+      RoomResponse.resolvedTotalPrice has no source on the Room entity (it's
+      attached afterward, only by the availability search — see
+      RoomMapper.toResponse's @Mapping(ignore = true)). MapStruct's generated
+      code always declares an ignored target as a local `= null` and passes it
+      straight into the constructor; SpotBugs reads that as "known null passed
+      to constructor". This is MapStruct's normal codegen shape for any ignored
+      target with no source, not a null-safety bug in code we wrote.
+    -->
+    <Match>
+        <Class name="com.hotelpms.frontdesk.rooms.mapper.RoomMapperImpl"/>
+        <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE"/>
+    </Match>
 </FindBugsFilter>

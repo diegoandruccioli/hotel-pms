@@ -7,6 +7,10 @@ import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
 import com.hotelpms.frontdesk.exception.NotFoundException;
+import com.hotelpms.frontdesk.pricing.dto.NightlyRate;
+import com.hotelpms.frontdesk.pricing.service.RatePricingService;
+import com.hotelpms.frontdesk.reservations.dto.ReservedRoomCharge;
+import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomService;
 import com.hotelpms.frontdesk.stays.domain.Stay;
@@ -17,7 +21,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -38,6 +45,8 @@ class StayBillingCoordinator {
     private final BillingClient billingClient;
     private final RoomService roomService;
     private final StayRepository stayRepository;
+    private final ReservationService reservationService;
+    private final RatePricingService ratePricingService;
 
     /**
      * Resolves the invoice to verify at check-out. Reservation-based stays are looked
@@ -136,13 +145,70 @@ class StayBillingCoordinator {
         log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason={}", stay.getId(), reason);
     }
 
+    /**
+     * Builds the room-night charge for a just-checked-in stay.
+     *
+     * <p>Reservation-based stays bill exactly the price snapshotted on the
+     * reservation's line item at booking time (via {@link ReservationService
+     * #getReservedRoomCharge}) — read once, never recomputed, which is the
+     * reconciliation fix: what the guest was quoted at booking is what they're
+     * billed at check-in, even if {@code RoomType.basePrice} or the {@code
+     * rate_seasons} configuration changed in between. {@code nights} for that
+     * charge comes from the same reservation snapshot (the reservation's own
+     * {@code checkInDate}/{@code checkOutDate}) rather than from {@code
+     * stay.getActualCheckInTime()} — a late or early arrival must not make the
+     * night count on the invoice disagree with the amount actually billed.
+     *
+     * <p>Walk-ins (no reservation to snapshot from), and the defensive fallback
+     * for a reservation-based stay whose snapshot is somehow missing, resolve
+     * live via {@link RatePricingService} instead of reading {@code
+     * RoomType.basePrice} directly — so walk-ins get season-aware pricing too;
+     * for that path {@code nights} is necessarily derived from the stay's own
+     * actual/expected dates, since there is no reservation to read it from.
+     *
+     * @param stay the just-checked-in stay
+     * @return the charge request to post to billing-service
+     */
     private ChargeRequest buildRoomChargeRequest(final Stay stay) {
         final RoomResponse room = roomService.getRoomById(stay.getRoomId(), stay.getHotelId());
-        final BigDecimal nightlyRate = room.roomType().basePrice();
-        final long nights = Math.max(1, ChronoUnit.DAYS.between(
-                stay.getActualCheckInTime().toLocalDate(), stay.getExpectedCheckOutDate()));
-        final BigDecimal amount = nightlyRate.multiply(BigDecimal.valueOf(nights));
+
+        final Optional<ReservedRoomCharge> reservedCharge = stay.getReservationId() == null
+                ? Optional.empty()
+                : reservationService.getReservedRoomCharge(stay.getReservationId(), stay.getRoomId(), stay.getHotelId());
+
+        final BigDecimal amount;
+        final long nights;
+        BigDecimal unitPrice = null;
+        if (reservedCharge.isPresent()) {
+            amount = reservedCharge.get().price();
+            nights = reservedCharge.get().nights();
+        } else {
+            final LocalDate checkInDate = stay.getActualCheckInTime().toLocalDate();
+            nights = Math.max(1, ChronoUnit.DAYS.between(checkInDate, stay.getExpectedCheckOutDate()));
+            final LocalDate checkOutForPricing = checkInDate.plusDays(nights);
+            final List<NightlyRate> nightlyRates = ratePricingService.resolveStayRates(
+                    room.roomType().id(), stay.getHotelId(), checkInDate, checkOutForPricing);
+            amount = nightlyRates.stream().map(NightlyRate::nightlyPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+            unitPrice = uniformRate(nightlyRates);
+        }
+
         final String description = "Room " + stay.getRoomNumber() + " - " + nights + " night(s)";
-        return new ChargeRequest(ROOM_NIGHT_CHARGE_TYPE, description, amount, stay.getId());
+        return new ChargeRequest(ROOM_NIGHT_CHARGE_TYPE, description, amount, stay.getId(), unitPrice, (int) nights);
+    }
+
+    /**
+     * Returns the common nightly price when every night of the stay resolved to
+     * the same rate, or {@code null} when they differ (e.g. the stay crosses a
+     * rate-season boundary) — {@code amount} above is always correct either way,
+     * this is display/audit metadata only.
+     *
+     * @param nightlyRates the resolved rate for each night of the stay; never empty
+     * @return the uniform nightly price, or {@code null} if rates vary by night
+     */
+    private static BigDecimal uniformRate(final List<NightlyRate> nightlyRates) {
+        final BigDecimal first = nightlyRates.get(0).nightlyPrice();
+        final boolean allEqual = nightlyRates.stream()
+                .allMatch(rate -> rate.nightlyPrice().compareTo(first) == 0);
+        return allEqual ? first : null;
     }
 }

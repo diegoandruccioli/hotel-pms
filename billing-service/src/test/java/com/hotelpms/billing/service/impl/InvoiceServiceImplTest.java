@@ -231,7 +231,7 @@ class InvoiceServiceImplTest {
                 final UUID orderId = UUID.randomUUID();
                 final BigDecimal chargeAmount = BigDecimal.valueOf(11);
                 final ChargeRequest chargeRequest = new ChargeRequest(
-                                ChargeType.FB_ORDER, "Espresso x2, Tiramisù x1", chargeAmount, orderId);
+                                ChargeType.FB_ORDER, "Espresso x2, Tiramisù x1", chargeAmount, orderId, null, null);
 
                 final Invoice openInvoice = Invoice.builder()
                                 .id(UUID.randomUUID())
@@ -245,7 +245,7 @@ class InvoiceServiceImplTest {
                 final ChargeResponse expectedCharge = new ChargeResponse(
                                 UUID.randomUUID(), openInvoice.getId(), ChargeType.FB_ORDER,
                                 "Espresso x2, Tiramisù x1", chargeAmount, new BigDecimal("0.10"),
-                                orderId, LocalDateTime.now());
+                                orderId, null, null, LocalDateTime.now());
 
                 when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId))
                                 .thenReturn(Optional.of(openInvoice));
@@ -270,7 +270,7 @@ class InvoiceServiceImplTest {
                 // Arrange
                 final UUID stayId = UUID.randomUUID();
                 final ChargeRequest chargeRequest = new ChargeRequest(
-                                ChargeType.FB_ORDER, SIMPLE_DRINK, BigDecimal.valueOf(3), null);
+                                ChargeType.FB_ORDER, SIMPLE_DRINK, BigDecimal.valueOf(3), null, null, null);
 
                 when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
 
@@ -286,7 +286,7 @@ class InvoiceServiceImplTest {
                 // Arrange
                 final UUID stayId = UUID.randomUUID();
                 final ChargeRequest chargeRequest = new ChargeRequest(
-                                ChargeType.FB_ORDER, SIMPLE_DRINK, BigDecimal.valueOf(3), null);
+                                ChargeType.FB_ORDER, SIMPLE_DRINK, BigDecimal.valueOf(3), null, null, null);
 
                 final Invoice paidInvoice = new Invoice();
                 paidInvoice.setStatus(InvoiceStatus.PAID);
@@ -307,7 +307,7 @@ class InvoiceServiceImplTest {
                 // Arrange
                 final UUID stayId = UUID.randomUUID();
                 final ChargeRequest chargeRequest = new ChargeRequest(
-                                ChargeType.FB_ORDER, SIMPLE_DRINK, BigDecimal.valueOf(3), null);
+                                ChargeType.FB_ORDER, SIMPLE_DRINK, BigDecimal.valueOf(3), null, null, null);
 
                 final Invoice exportedInvoice = Invoice.builder()
                                 .id(UUID.randomUUID())
@@ -336,7 +336,7 @@ class InvoiceServiceImplTest {
                 // Arrange — stayId from another hotel; findByStayIdAndHotelId returns empty (hotel scoping)
                 final UUID foreignStayId = UUID.randomUUID();
                 final ChargeRequest chargeRequest = new ChargeRequest(
-                                ChargeType.FB_ORDER, SIMPLE_DRINK, BigDecimal.valueOf(3), null);
+                                ChargeType.FB_ORDER, SIMPLE_DRINK, BigDecimal.valueOf(3), null, null, null);
 
                 when(invoiceRepository.findByStayIdAndHotelId(foreignStayId, hotelId))
                                 .thenReturn(Optional.empty());
@@ -395,7 +395,7 @@ class InvoiceServiceImplTest {
                 final UUID stayId = UUID.randomUUID();
                 final BigDecimal chargeAmount = BigDecimal.valueOf(11);
                 final ChargeRequest chargeRequest = new ChargeRequest(
-                                ChargeType.FB_ORDER, SIMPLE_DRINK, chargeAmount, null);
+                                ChargeType.FB_ORDER, SIMPLE_DRINK, chargeAmount, null, null, null);
                 final Invoice openInvoice = Invoice.builder()
                                 .id(UUID.randomUUID()).stayId(stayId).hotelId(hotelId)
                                 .totalAmount(BigDecimal.ZERO).status(InvoiceStatus.ISSUED)
@@ -410,7 +410,7 @@ class InvoiceServiceImplTest {
                                         final InvoiceCharge c = inv.getArgument(0);
                                         return new ChargeResponse(UUID.randomUUID(), openInvoice.getId(),
                                                         c.getType(), c.getDescription(), c.getAmount(),
-                                                        c.getVatRate(), c.getReferenceId(), null);
+                                                        c.getVatRate(), c.getReferenceId(), null, null, null);
                                 });
 
                 // Act
@@ -428,7 +428,7 @@ class InvoiceServiceImplTest {
                 // Arrange
                 final UUID stayId = UUID.randomUUID();
                 final ChargeRequest chargeRequest = new ChargeRequest(
-                                ChargeType.EXTRA, "Minibar", BigDecimal.TEN, null);
+                                ChargeType.EXTRA, "Minibar", BigDecimal.TEN, null, null, null);
                 final Invoice openInvoice = Invoice.builder()
                                 .id(UUID.randomUUID()).stayId(stayId).hotelId(hotelId)
                                 .totalAmount(BigDecimal.ZERO).status(InvoiceStatus.ISSUED)
@@ -443,7 +443,7 @@ class InvoiceServiceImplTest {
                                         final InvoiceCharge c = inv.getArgument(0);
                                         return new ChargeResponse(UUID.randomUUID(), openInvoice.getId(),
                                                         c.getType(), c.getDescription(), c.getAmount(),
-                                                        c.getVatRate(), c.getReferenceId(), null);
+                                                        c.getVatRate(), c.getReferenceId(), null, null, null);
                                 });
 
                 // Act

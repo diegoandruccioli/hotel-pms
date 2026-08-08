@@ -4,6 +4,8 @@ import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.GuestSearchPageResponse;
+import com.hotelpms.frontdesk.pricing.dto.NightlyRate;
+import com.hotelpms.frontdesk.pricing.service.RatePricingService;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
 import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import com.hotelpms.frontdesk.reservations.domain.Reservation;
@@ -12,6 +14,7 @@ import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
 import com.hotelpms.frontdesk.reservations.dto.ReservationLineItemRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
+import com.hotelpms.frontdesk.reservations.dto.ReservedRoomCharge;
 import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
@@ -20,6 +23,7 @@ import com.hotelpms.frontdesk.reservations.mapper.ReservationMapper;
 import com.hotelpms.frontdesk.reservations.repository.ReservationRepository;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
+import com.hotelpms.frontdesk.rooms.dto.RoomTypeResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,6 +61,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -75,6 +80,10 @@ class ReservationServiceImplTest {
     private static final Reservation ANY_RESERVATION = new Reservation();
     private static final UUID ANY_UUID = Objects.requireNonNull(UUID.randomUUID());
     private static final String ERR_CHECKOUT_AFTER_CHECKIN = "CHECKOUT_MUST_BE_AFTER_CHECKIN";
+    private static final UUID ROOM_TYPE_ID = Objects.requireNonNull(UUID.randomUUID());
+    private static final BigDecimal PRICE_100 = BigDecimal.valueOf(100);
+    private static final BigDecimal PRICE_120 = BigDecimal.valueOf(120);
+    private static final BigDecimal PRICE_240 = BigDecimal.valueOf(240);
     private static final String QUERY_MARIO = "mario";
     private static final int GUEST_SEARCH_CAP = 200;
 
@@ -102,6 +111,9 @@ class ReservationServiceImplTest {
     @Mock
     private NotificationClient notificationClient;
 
+    @Mock
+    private RatePricingService ratePricingService;
+
     @InjectMocks
     private ReservationServiceImpl reservationService;
 
@@ -128,8 +140,9 @@ class ReservationServiceImplTest {
         auth.setDetails(HOTEL_ID.toString());
         SecurityContextHolder.getContext().setAuthentication(auth);
 
-        final ReservationLineItemRequest lineItemRequest = new ReservationLineItemRequest(roomId,
-                BigDecimal.valueOf(100));
+        final ReservationLineItemRequest lineItemRequest = new ReservationLineItemRequest(roomId);
+        org.mockito.Mockito.lenient().when(ratePricingService.resolveStayRates(any(), any(), any(), any()))
+                .thenReturn(List.of(new NightlyRate(LocalDate.now(), BigDecimal.valueOf(100), null)));
         request = new ReservationRequest(
                 GUEST_ID,
                 EXPECTED_GUESTS,
@@ -157,12 +170,16 @@ class ReservationServiceImplTest {
                 STATUS_CONFIRMED, null, true, null, null, false, null);
     }
 
+    private static RoomTypeResponse roomType() {
+        return new RoomTypeResponse(ROOM_TYPE_ID, "Standard", null, 2, BigDecimal.valueOf(100), true, null, null);
+    }
+
     private static RoomResponse activeRoom(final UUID room) {
-        return new RoomResponse(room, HOTEL_ID, ROOM_NUMBER_101, null, RoomStatus.CLEAN, true, null, null);
+        return new RoomResponse(room, HOTEL_ID, ROOM_NUMBER_101, roomType(), RoomStatus.CLEAN, true, null, null, null);
     }
 
     private static RoomResponse inactiveRoom(final UUID room) {
-        return new RoomResponse(room, HOTEL_ID, ROOM_NUMBER_101, null, RoomStatus.CLEAN, false, null, null);
+        return new RoomResponse(room, HOTEL_ID, ROOM_NUMBER_101, roomType(), RoomStatus.CLEAN, false, null, null, null);
     }
 
     @Test
@@ -267,7 +284,7 @@ class ReservationServiceImplTest {
                 LocalDate.now().plusDays(1),
                 LocalDate.now().plusDays(3),
                 null,
-                List.of(new ReservationLineItemRequest(roomId, BigDecimal.valueOf(100))));
+                List.of(new ReservationLineItemRequest(roomId)));
 
         final Reservation entityWithNullStatus = Reservation.builder().id(UUID.randomUUID()).build();
         entityWithNullStatus.setGuestId(GUEST_ID);
@@ -495,6 +512,62 @@ class ReservationServiceImplTest {
     }
 
     @Test
+    void testUpdateReservationRecomputesPriceViaRatePricingServiceNotFromRequest() {
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(ratePricingService.resolveStayRates(ROOM_TYPE_ID, HOTEL_ID, request.checkInDate(), request.checkOutDate()))
+                .thenReturn(List.of(
+                        new NightlyRate(request.checkInDate(), PRICE_120, null),
+                        new NightlyRate(request.checkInDate().plusDays(1), PRICE_120, null)));
+        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationMapper.toResponse(entity)).thenReturn(response);
+        // The real MapStruct mapper repopulates lineItems from the request when
+        // updateEntityFromRequest runs; simulate that here since reservationMapper is a
+        // plain mock (a no-op by default), to exercise applyResolvedPrices realistically.
+        doAnswer(invocation -> {
+            final ReservationLineItem newItem = new ReservationLineItem();
+            newItem.setRoomId(roomId);
+            entity.getLineItems().add(newItem);
+            return null;
+        }).when(reservationMapper).updateEntityFromRequest(request, entity);
+
+        reservationService.updateReservation(reservationId, request);
+
+        assertEquals(PRICE_240, entity.getLineItems().get(0).getPrice());
+    }
+
+    @Test
+    void reservedRoomChargeIsTheSnapshottedPriceAndReservationNightsForTheMatchingRoom() {
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        final Optional<ReservedRoomCharge> result =
+                reservationService.getReservedRoomCharge(reservationId, roomId, HOTEL_ID);
+
+        assertTrue(result.isPresent());
+        assertEquals(PRICE_100, result.get().price());
+        // entity.checkInDate/checkOutDate (set in setUp) are 2 nights apart.
+        assertEquals(2, result.get().nights());
+    }
+
+    @Test
+    void reservedRoomChargeIsEmptyWhenReservationDoesNotExist() {
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.empty());
+
+        assertFalse(reservationService.getReservedRoomCharge(reservationId, roomId, HOTEL_ID).isPresent());
+    }
+
+    @Test
+    void reservedRoomChargeIsEmptyWhenNoLineItemMatchesTheRoom() {
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        final UUID otherRoomId = Objects.requireNonNull(UUID.randomUUID());
+        assertFalse(reservationService.getReservedRoomCharge(reservationId, otherRoomId, HOTEL_ID).isPresent());
+    }
+
+    @Test
     void testDeleteReservationSuccess() {
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
 
@@ -661,7 +734,7 @@ class ReservationServiceImplTest {
                 LocalDate.now().plusDays(1),
                 LocalDate.now().plusDays(1),
                 STATUS_CONFIRMED,
-                List.of(new ReservationLineItemRequest(roomId, BigDecimal.valueOf(100))));
+                List.of(new ReservationLineItemRequest(roomId)));
 
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.createReservation(sameDayRequest));
@@ -678,7 +751,7 @@ class ReservationServiceImplTest {
                 LocalDate.now().plusDays(5),
                 LocalDate.now().plusDays(2),
                 STATUS_CONFIRMED,
-                List.of(new ReservationLineItemRequest(roomId, BigDecimal.valueOf(100))));
+                List.of(new ReservationLineItemRequest(roomId)));
 
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.createReservation(invertedRequest));
@@ -695,7 +768,7 @@ class ReservationServiceImplTest {
                 LocalDate.now().plusDays(3),
                 LocalDate.now().plusDays(3),
                 STATUS_CONFIRMED,
-                List.of(new ReservationLineItemRequest(roomId, BigDecimal.valueOf(100))));
+                List.of(new ReservationLineItemRequest(roomId)));
 
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.updateReservation(reservationId, sameDayRequest));

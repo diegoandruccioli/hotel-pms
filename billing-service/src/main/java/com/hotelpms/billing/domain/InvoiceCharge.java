@@ -62,6 +62,20 @@ public class InvoiceCharge {
     @Column(name = "reference_id")
     private UUID referenceId;
 
+    /**
+     * Optional per-night price, display/audit only — {@code amount} above
+     * remains the sole fiscally authoritative field. {@code null} when the
+     * caller has no single uniform per-night rate to report.
+     */
+    @Column(name = "unit_price")
+    private BigDecimal unitPrice;
+
+    /**
+     * Optional number of nights this charge covers, display/audit only.
+     */
+    @Column(name = "nights")
+    private Integer nights;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

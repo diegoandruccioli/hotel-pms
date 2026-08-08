@@ -8,12 +8,15 @@ import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
+import com.hotelpms.frontdesk.pricing.dto.NightlyRate;
+import com.hotelpms.frontdesk.pricing.service.RatePricingService;
 import com.hotelpms.frontdesk.reservations.domain.Reservation;
 import com.hotelpms.frontdesk.reservations.domain.ReservationLineItem;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
 import com.hotelpms.frontdesk.reservations.dto.ReservationLineItemRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
+import com.hotelpms.frontdesk.reservations.dto.ReservedRoomCharge;
 import com.hotelpms.frontdesk.reservations.mapper.ReservationMapper;
 import com.hotelpms.frontdesk.reservations.repository.ReservationRepository;
 import com.hotelpms.frontdesk.reservations.service.ReservationService;
@@ -32,6 +35,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -64,6 +68,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final GuestClient guestClient;
     private final HotelSettingsService hotelSettingsService;
     private final NotificationClient notificationClient;
+    private final RatePricingService ratePricingService;
 
     /** {@inheritDoc} */
     @Override
@@ -72,7 +77,7 @@ public class ReservationServiceImpl implements ReservationService {
         verifyDateRange(request);
         final UUID hotelId = resolveHotelId();
         final GuestResponse guest = verifyGuestExists(request.guestId());
-        final java.util.Map<UUID, String> roomNumbers = verifyRoomsAvailability(request.lineItems(), hotelId);
+        final java.util.Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(request.lineItems(), hotelId);
         verifyNoOverlappingReservations(null, request);
 
         final Reservation reservation = reservationMapper.toEntity(request);
@@ -86,9 +91,10 @@ public class ReservationServiceImpl implements ReservationService {
         if (reservation.getLineItems() != null) {
             reservation.getLineItems().forEach(lineItem -> lineItem.setReservation(reservation));
         }
+        applyResolvedPrices(reservation, roomsById, hotelId, request.checkInDate(), request.checkOutDate());
 
         final Reservation savedReservation = reservationRepository.save(Objects.requireNonNull(reservation));
-        sendReservationConfirmedEmail(savedReservation, hotelId, guest, roomNumbers);
+        sendReservationConfirmedEmail(savedReservation, hotelId, guest, roomNumbersOf(roomsById));
         return enrichWithGuestName(reservationMapper.toResponse(savedReservation), guest);
     }
 
@@ -191,7 +197,7 @@ public class ReservationServiceImpl implements ReservationService {
         final Reservation existingReservation = findReservationByIdAndHotelOrThrow(id, hotelId);
 
         final GuestResponse guest = verifyGuestExists(request.guestId());
-        verifyRoomsAvailability(request.lineItems(), hotelId);
+        final java.util.Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(request.lineItems(), hotelId);
         verifyNoOverlappingReservations(id, request);
 
         // For simplicity, we recreate line items on update
@@ -202,6 +208,7 @@ public class ReservationServiceImpl implements ReservationService {
         if (existingReservation.getLineItems() != null) {
             existingReservation.getLineItems().forEach(lineItem -> lineItem.setReservation(existingReservation));
         }
+        applyResolvedPrices(existingReservation, roomsById, hotelId, request.checkInDate(), request.checkOutDate());
 
         final Reservation updatedReservation = reservationRepository.save(Objects.requireNonNull(existingReservation));
         return enrichWithGuestName(reservationMapper.toResponse(updatedReservation), guest);
@@ -263,6 +270,26 @@ public class ReservationServiceImpl implements ReservationService {
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
+    public java.util.Optional<ReservedRoomCharge> getReservedRoomCharge(
+            final UUID reservationId, final UUID roomId, final UUID hotelId) {
+        Objects.requireNonNull(reservationId, "Reservation ID cannot be null");
+        Objects.requireNonNull(roomId, "Room ID cannot be null");
+        Objects.requireNonNull(hotelId, HOTEL_ID_NOT_NULL_MSG);
+        return reservationRepository.findByIdAndHotelId(reservationId, hotelId)
+                .flatMap(reservation -> reservation.getLineItems().stream()
+                        .filter(li -> roomId.equals(li.getRoomId()))
+                        .findFirst()
+                        .map(li -> new ReservedRoomCharge(li.getPrice(), reservationNights(reservation))));
+    }
+
+    private static int reservationNights(final Reservation reservation) {
+        return (int) Math.max(1,
+                ChronoUnit.DAYS.between(reservation.getCheckInDate(), reservation.getCheckOutDate()));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
     public boolean hasActiveReservations(final UUID guestId) {
         Objects.requireNonNull(guestId, "Guest ID cannot be null");
         final UUID hotelId = resolveHotelId();
@@ -291,7 +318,27 @@ public class ReservationServiceImpl implements ReservationService {
 
         return cleanRooms.stream()
                 .filter(room -> !bookedRoomIds.contains(room.id()))
+                .map(room -> room.withResolvedTotalPrice(resolveTotalPrice(room, hotelId, checkIn, checkOut)))
                 .toList();
+    }
+
+    /**
+     * Resolves the total price of {@code room}'s room type for the requested
+     * stay, via {@link RatePricingService} — this is what lets the availability
+     * search show a date-aware price instead of the flat {@code
+     * RoomType.basePrice} the frontend used to fall back to.
+     *
+     * @param room    the candidate room (already known to be clean and unbooked)
+     * @param hotelId the authenticated hotel, for multi-tenant pricing scope
+     * @param checkIn the check-in date
+     * @param checkOut the check-out date (exclusive)
+     * @return the resolved total price for the stay
+     */
+    private BigDecimal resolveTotalPrice(
+            final RoomResponse room, final UUID hotelId, final LocalDate checkIn, final LocalDate checkOut) {
+        return ratePricingService.resolveStayRates(room.roomType().id(), hotelId, checkIn, checkOut).stream()
+                .map(NightlyRate::nightlyPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /**
@@ -405,27 +452,69 @@ public class ReservationServiceImpl implements ReservationService {
      *
      * @param lineItems the requested reservation line items
      * @param hotelId   the authenticated hotel, for multi-tenant room scoping
-     * @return a map of roomId to roomNumber for each verified room, reused by the
-     *         reservation-confirmed email to avoid a second lookup
+     * @return a map of roomId to the full room response for each verified room,
+     *         reused both for the reservation-confirmed email (room number) and
+     *         for {@link #applyResolvedPrices} (room type, to resolve the price)
+     *         to avoid a second lookup
      * @throws NotFoundException        when a room does not exist for this hotel
      * @throws ExternalServiceException when a room exists but is inactive
      *                                  (soft-deleted)
      */
-    private java.util.Map<UUID, String> verifyRoomsAvailability(
+    private java.util.Map<UUID, RoomResponse> verifyRoomsAvailability(
             final List<ReservationLineItemRequest> lineItems, final UUID hotelId) {
         if (lineItems == null || lineItems.isEmpty()) {
             return java.util.Map.of();
         }
 
-        final java.util.Map<UUID, String> roomNumbers = new java.util.HashMap<>();
+        final java.util.Map<UUID, RoomResponse> roomsById = new java.util.HashMap<>();
         for (final ReservationLineItemRequest item : lineItems) {
             final RoomResponse room = roomService.getRoomById(item.roomId(), hotelId);
             if (!room.active()) {
                 throw new ExternalServiceException("ROOM_UNAVAILABLE");
             }
-            roomNumbers.put(item.roomId(), room.roomNumber());
+            roomsById.put(item.roomId(), room);
         }
+        return roomsById;
+    }
+
+    private static java.util.Map<UUID, String> roomNumbersOf(final java.util.Map<UUID, RoomResponse> roomsById) {
+        final java.util.Map<UUID, String> roomNumbers = new java.util.HashMap<>();
+        roomsById.forEach((roomId, room) -> roomNumbers.put(roomId, room.roomNumber()));
         return roomNumbers;
+    }
+
+    /**
+     * Resolves and snapshots the price of every line item onto {@code
+     * reservation.getLineItems()}, closing the gap where a client-supplied price
+     * was accepted without ever being checked against anything (T-RES / booking↔
+     * invoice reconciliation). Each line item's price is the sum of
+     * {@link RatePricingService#resolveStayRates} across the whole stay for that
+     * room's room type — the same function {@code StayBillingCoordinator} reads
+     * back (never recomputes) at check-in for reservation-based stays.
+     *
+     * @param reservation the reservation whose line items need a price (already
+     *                    has {@code roomId} set on each, from the mapper)
+     * @param roomsById   the rooms verified by {@link #verifyRoomsAvailability},
+     *                    keyed by roomId — carries the room type needed to resolve a price
+     * @param hotelId     the authenticated hotel, for multi-tenant pricing scope
+     * @param checkIn     the reservation's check-in date
+     * @param checkOut    the reservation's check-out date (exclusive)
+     */
+    private void applyResolvedPrices(
+            final Reservation reservation, final java.util.Map<UUID, RoomResponse> roomsById,
+            final UUID hotelId, final LocalDate checkIn, final LocalDate checkOut) {
+        if (reservation.getLineItems() == null) {
+            return;
+        }
+        for (final ReservationLineItem lineItem : reservation.getLineItems()) {
+            final RoomResponse room = roomsById.get(lineItem.getRoomId());
+            final List<NightlyRate> nightlyRates = ratePricingService.resolveStayRates(
+                    room.roomType().id(), hotelId, checkIn, checkOut);
+            final BigDecimal total = nightlyRates.stream()
+                    .map(NightlyRate::nightlyPrice)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            lineItem.setPrice(total);
+        }
     }
 
     /**

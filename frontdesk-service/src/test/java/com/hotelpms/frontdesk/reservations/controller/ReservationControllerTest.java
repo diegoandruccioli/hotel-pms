@@ -27,7 +27,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -254,8 +253,7 @@ class ReservationControllerTest {
     }
 
     private ReservationRequest buildValidRequest() {
-        final ReservationLineItemRequest lineItem =
-                new ReservationLineItemRequest(roomId, BigDecimal.valueOf(100));
+        final ReservationLineItemRequest lineItem = new ReservationLineItemRequest(roomId);
         return new ReservationRequest(
                 GUEST_ID, 2,
                 LocalDate.now().plusDays(1),

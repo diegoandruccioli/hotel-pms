@@ -306,10 +306,10 @@ class InvoiceControllerTest {
     @Test
     void shouldAddChargeReturn201() throws Exception {
         final ChargeRequest chargeRequest = new ChargeRequest(
-                ChargeType.FB_ORDER, "Espresso x2", BigDecimal.valueOf(6), null);
+                ChargeType.FB_ORDER, "Espresso x2", BigDecimal.valueOf(6), null, null, null);
         final ChargeResponse chargeResponse = new ChargeResponse(
                 UUID.randomUUID(), INVOICE_ID, ChargeType.FB_ORDER,
-                "Espresso x2", BigDecimal.valueOf(6), null, null, null);
+                "Espresso x2", BigDecimal.valueOf(6), null, null, null, null, null);
         when(invoiceService.addCharge(eq(STAY_ID), any(ChargeRequest.class))).thenReturn(chargeResponse);
 
         mockMvc.perform(post(BASE_URL + PATH_STAY_CHARGES, STAY_ID)

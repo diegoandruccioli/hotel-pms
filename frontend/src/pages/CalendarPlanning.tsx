@@ -129,10 +129,10 @@ export const CalendarPlanning = () => {
           checkOutDate: updatedReservation.checkOutDate,
           status: updatedReservation.status,
           expectedGuests: updatedReservation.expectedGuests,
-          lineItems: updatedReservation.lineItems.map(li => ({
-            roomId: li.roomId,
-            price: li.price
-          }))
+          // price is resolved server-side (RatePricingService) on every update —
+          // moving a reservation to a different room now correctly re-prices it,
+          // instead of carrying the old room's price along.
+          lineItems: updatedReservation.lineItems.map(li => ({ roomId: li.roomId }))
         });
         addToast(t('room_moved_success', { name: updatedReservation.guestFullName || `Guest ${reservation.guestId.substring(0, 8)}` }), 'success');
       } catch {

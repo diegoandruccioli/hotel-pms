@@ -30,6 +30,7 @@ export const ReservationForm = () => {
   // Data
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [allReservations, setAllReservations] = useState<ReservationResponse[]>([]);
+  const [resolvedPrices, setResolvedPrices] = useState<Map<string, number>>(new Map());
 
   // Step 1: Guest Selection/Creation State
   const [selectedGuest, setSelectedGuest] = useState<GuestResponseDTO | null>(null);
@@ -99,6 +100,33 @@ export const ReservationForm = () => {
     loadInitialData();
   }, [loadInitialData]);
 
+  // Resolves a date-aware price per room once both dates are set (RatePricingService,
+  // via the same availability endpoint). Display-only: the server always recomputes
+  // the authoritative price on submit, this just shows staff a real number up front
+  // instead of the flat, date-blind RoomType.basePrice.
+  useEffect(() => {
+    if (!checkInDate || !checkOutDate || new Date(checkOutDate) <= new Date(checkInDate)) {
+      setResolvedPrices(new Map());
+      return;
+    }
+    let cancelled = false;
+    inventoryService.getAvailableRooms(checkInDate, checkOutDate)
+      .then(availableRooms => {
+        if (cancelled) return;
+        const priceMap = new Map<string, number>();
+        availableRooms.forEach(room => {
+          if (room.resolvedTotalPrice !== undefined) {
+            priceMap.set(room.id, room.resolvedTotalPrice);
+          }
+        });
+        setResolvedPrices(priceMap);
+      })
+      .catch(() => {
+        if (!cancelled) setResolvedPrices(new Map());
+      });
+    return () => { cancelled = true; };
+  }, [checkInDate, checkOutDate]);
+
   const handleSubmitReservation = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (isView) return;
@@ -147,13 +175,9 @@ export const ReservationForm = () => {
         checkOutDate: parsed.data.checkOutDate,
         status: status,
         expectedGuests: parsed.data.expectedGuests,
-        lineItems: selectedRoomIds.map(roomId => {
-          const room = rooms.find(r => r.id === roomId);
-          return {
-            roomId: roomId,
-            price: room?.pricePerNight ?? room?.roomType?.basePrice ?? 0
-          };
-        })
+        // price is resolved server-side (RatePricingService) and never
+        // accepted from the client — see ReservationLineItemRequest.
+        lineItems: selectedRoomIds.map(roomId => ({ roomId }))
       };
 
       if (id) {
@@ -172,7 +196,7 @@ export const ReservationForm = () => {
     } finally {
       setLoading(false);
     }
-  }, [isView, selectedGuest, selectedRoomIds, checkInDate, checkOutDate, status, expectedGuests, rooms, allReservations, id, t, navigate, reservationSchema]);
+  }, [isView, selectedGuest, selectedRoomIds, checkInDate, checkOutDate, status, expectedGuests, allReservations, id, t, navigate, reservationSchema]);
 
   const toggleRoomSelection = useCallback((roomId: string) => {
     if (isView) return;
@@ -255,6 +279,7 @@ export const ReservationForm = () => {
           selectedRoomIds={selectedRoomIds}
           allReservations={allReservations}
           currentReservationId={id}
+          resolvedPrices={resolvedPrices}
           onCheckInChange={setCheckInDate}
           onCheckOutChange={setCheckOutDate}
           onExpectedGuestsChange={setExpectedGuests}

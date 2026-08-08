@@ -3,6 +3,7 @@ package com.hotelpms.frontdesk.stays.service.impl;
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
+import com.hotelpms.frontdesk.client.dto.ChargeRequest;
 import com.hotelpms.frontdesk.client.dto.ChargeResponse;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
@@ -12,9 +13,12 @@ import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
+import com.hotelpms.frontdesk.pricing.dto.NightlyRate;
+import com.hotelpms.frontdesk.pricing.service.RatePricingService;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
 import com.hotelpms.frontdesk.reservations.dto.ReservationLineItemResponse;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
+import com.hotelpms.frontdesk.reservations.dto.ReservedRoomCharge;
 import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
@@ -33,6 +37,7 @@ import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -43,6 +48,7 @@ import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -60,6 +66,7 @@ import org.mockito.InOrder;
 import org.springframework.lang.NonNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -83,6 +90,7 @@ class StayServiceImplTest {
     private static final String GUEST_LAST_NAME = "Doe";
     private static final String GUEST_EMAIL = "john@example.com";
     private static final String ROOM_NUMBER_101 = "101";
+    private static final BigDecimal RESERVED_PRICE_310 = BigDecimal.valueOf(310);
     private static final String ROOM_NOT_FOUND = "ROOM_NOT_FOUND";
     private static final String PS_PORTAL_DOWN = "PS portal down";
     private static final String PAID_STATUS = "PAID";
@@ -119,6 +127,9 @@ class StayServiceImplTest {
 
     @Mock
     private NotificationClient notificationClient;
+
+    @Mock
+    private RatePricingService ratePricingService;
 
     // Not mocked: StayServiceImpl now delegates to these collaborators instead of
     // doing the work inline (P10 SRP refactor). Building them for real out of the
@@ -165,10 +176,37 @@ class StayServiceImplTest {
                 LocalDateTime.now(), LocalDateTime.now(), null, false, false, null, new ArrayList<>(), null, null,
                 null, false, null, false, null);
 
+        // StayBillingCoordinator now prefers a reservation's snapshotted price over a
+        // live resolve (the P10-follow-up reconciliation fix); defaulting the snapshot
+        // lookup to "not found" here makes every existing test below fall through to
+        // live resolution via ratePricingService — same code path StayBillingCoordinator
+        // always used before this fix, so the basePrice=90-based assertions below are
+        // unchanged. resolveStayRates mirrors the old "basePrice * nights" math exactly
+        // (uniform 90/night for however many nights are requested) rather than a fixed
+        // list, since different tests use different check-in/check-out spans.
+        lenient()
+                .when(reservationService.getReservedRoomCharge(ArgumentMatchers.any(),
+                        ArgumentMatchers.any(), ArgumentMatchers.any()))
+                .thenReturn(Optional.empty());
+        lenient()
+                .when(ratePricingService.resolveStayRates(ArgumentMatchers.any(),
+                        ArgumentMatchers.any(), ArgumentMatchers.any(),
+                        ArgumentMatchers.any()))
+                .thenAnswer(invocation -> {
+                    final LocalDate checkIn = invocation.getArgument(2);
+                    final LocalDate checkOut = invocation.getArgument(3);
+                    final long nights = Math.max(1, ChronoUnit.DAYS.between(checkIn, checkOut));
+                    final List<NightlyRate> rates = new ArrayList<>();
+                    for (long i = 0; i < nights; i++) {
+                        rates.add(new NightlyRate(checkIn.plusDays(i), BigDecimal.valueOf(90), null));
+                    }
+                    return rates;
+                });
+
         stayService = new StayServiceImpl(
                 stayRepository, stayMapper, guestClient, roomService,
                 new StayCheckInValidator(guestClient, reservationService, roomService),
-                new StayBillingCoordinator(billingClient, roomService, stayRepository),
+                new StayBillingCoordinator(billingClient, roomService, stayRepository, reservationService, ratePricingService),
                 new StayAlloggiatiCoordinator(alloggiatiWebSenderService, hotelSettingsService, stayRepository),
                 new StayNotificationCoordinator(
                         notificationClient, guestClient, billingClient, hotelSettingsService, stayRepository),
@@ -184,7 +222,7 @@ class StayServiceImplTest {
     private RoomResponse room() {
         final RoomTypeResponse roomType = new RoomTypeResponse(
                 UUID.randomUUID(), "Standard", null, 2, BigDecimal.valueOf(90), true, null, null);
-        return new RoomResponse(roomId, hotelId, ROOM_NUMBER_101, roomType, RoomStatus.CLEAN, true, null, null);
+        return new RoomResponse(roomId, hotelId, ROOM_NUMBER_101, roomType, RoomStatus.CLEAN, true, null, null, null);
     }
 
     @Test
@@ -814,6 +852,61 @@ class StayServiceImplTest {
         assertEquals(invoiceId, saved.getInvoiceId());
         assertFalse(saved.isInvoiceCreationFailed());
         verify(stayRepository, times(2)).save(anyNonNull(Stay.class));
+    }
+
+    /**
+     * Regression test for a bug found during live smoke-testing of the P10
+     * follow-up reconciliation fix: a guest checking in later or earlier than
+     * the reservation's booked check-in date (a completely ordinary late/early
+     * arrival) must still see the room-charge {@code nights} match the
+     * reservation's own dates — the same dates {@code amount} was computed
+     * from — not the actual check-in moment. Before this fix, {@code nights}
+     * was derived from {@code stay.actualCheckInTime}, which can legitimately
+     * differ from the reservation's {@code checkInDate}, producing an invoice
+     * description ("N night(s)") inconsistent with the amount actually billed.
+     */
+    @Test
+    void shouldUseReservationNightsNotActualCheckInTimeWhenBillingAReservationBasedStay() {
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+        final Stay saved = Objects.requireNonNull(savedStay);
+        saved.setHotelId(hotelId);
+        // Actual check-in is "now"; expectedCheckOutDate (set in setUp) is 3 days
+        // out from "now" — if nights were (still, buggily) derived from these two,
+        // it would compute 3, not the reservation's real 2-night span asserted below.
+        saved.setActualCheckInTime(LocalDateTime.now());
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationService.getReservationById(reservation))
+                .thenReturn(reservationResponse(ReservationStatus.CONFIRMED, null));
+        when(roomService.getRoomById(room, hotelId)).thenReturn(room());
+        when(reservationService.getReservedRoomCharge(reservation, room, hotelId))
+                .thenReturn(Optional.of(new ReservedRoomCharge(RESERVED_PRICE_310, 2)));
+
+        final Stay unmappedStay = new Stay();
+        when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(saved);
+
+        final UUID invoiceId = UUID.randomUUID();
+        when(billingClient.createInvoiceForStay(anyNonNull(StayInvoiceRequest.class)))
+                .thenReturn(new InvoiceCreatedResponse(invoiceId));
+        final ArgumentCaptor<ChargeRequest> chargeCaptor = ArgumentCaptor.forClass(ChargeRequest.class);
+        when(billingClient.addCharge(ArgumentMatchers.eq(stayId), chargeCaptor.capture()))
+                .thenReturn(new ChargeResponse(UUID.randomUUID()));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null));
+        when(stayMapper.toDto(saved)).thenReturn(Objects.requireNonNull(validResponse));
+
+        stayService.checkIn(request);
+
+        final ChargeRequest charge = chargeCaptor.getValue();
+        assertEquals(RESERVED_PRICE_310, charge.amount());
+        assertEquals(2, charge.nights());
+        assertTrue(charge.description().contains("2 night(s)"));
     }
 
     @Test

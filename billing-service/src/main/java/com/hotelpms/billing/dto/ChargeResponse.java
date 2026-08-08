@@ -16,6 +16,8 @@ import java.util.UUID;
  * @param amount      the charge amount
  * @param vatRate     the VAT rate applied (e.g. 0.10 = 10%, 0.22 = 22%)
  * @param referenceId optional cross-service reference (order UUID, stay UUID, etc.)
+ * @param unitPrice   optional per-night price, display/audit only; may be {@code null}
+ * @param nights      optional number of nights this charge covers; may be {@code null}
  * @param createdAt   the timestamp when the charge was recorded
  */
 public record ChargeResponse(
@@ -26,5 +28,7 @@ public record ChargeResponse(
         BigDecimal amount,
         BigDecimal vatRate,
         UUID referenceId,
+        BigDecimal unitPrice,
+        Integer nights,
         LocalDateTime createdAt) {
 }

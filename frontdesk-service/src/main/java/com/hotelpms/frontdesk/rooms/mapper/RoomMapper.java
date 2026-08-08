@@ -14,11 +14,15 @@ import org.mapstruct.MappingConstants;
 public interface RoomMapper {
 
     /**
-     * Converts entity to response.
+     * Converts entity to response. {@code resolvedTotalPrice} has no source on
+     * {@code Room} — it's attached afterward, only by the availability search,
+     * via {@link RoomResponse#withResolvedTotalPrice}.
      *
      * @param entity the entity
      * @return the response
      */
+    @Mapping(target = "resolvedTotalPrice", ignore = true)
+    @Mapping(target = "withResolvedTotalPrice", ignore = true)
     RoomResponse toResponse(Room entity);
 
     /**

@@ -1,4 +1,5 @@
 {
   "room_prefix": "Room",
-  "no_rooms_available": "No available rooms loaded."
+  "no_rooms_available": "No available rooms loaded.",
+  "price_total_stay": "€{{amount}} total"
 }

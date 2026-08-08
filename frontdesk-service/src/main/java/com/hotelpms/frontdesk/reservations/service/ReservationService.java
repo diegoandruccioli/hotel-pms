@@ -3,12 +3,14 @@ package com.hotelpms.frontdesk.reservations.service;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
 import com.hotelpms.frontdesk.reservations.dto.ReservationRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
+import com.hotelpms.frontdesk.reservations.dto.ReservedRoomCharge;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -114,4 +116,27 @@ public interface ReservationService {
      * @return the updated reservation response
      */
     ReservationResponse retryConfirmationEmail(UUID id);
+
+    /**
+     * Returns the snapshotted price and night count for a specific room within a
+     * reservation, resolved once by {@code RatePricingService} and stored on the
+     * {@code ReservationLineItem} at booking time. Consumed by {@code
+     * StayBillingCoordinator} at check-in: reading this (instead of recomputing
+     * a price live from {@code RoomType.basePrice}) is what guarantees a guest is
+     * billed exactly what they were quoted at booking — the reconciliation this
+     * closes.
+     *
+     * <p>{@code nights} is derived from the reservation's own {@code
+     * checkInDate}/{@code checkOutDate} — the same dates the price was computed
+     * from — deliberately not from the stay's {@code actualCheckInTime}, which
+     * can differ (late/early arrival) and would otherwise make the invoice
+     * description disagree with the amount actually charged.
+     *
+     * @param reservationId the reservation UUID
+     * @param roomId        the room UUID (one reservation may have several rooms/line items)
+     * @param hotelId       the hotel UUID (multi-tenant scoping)
+     * @return the snapshotted price and nights, or empty if the reservation or a
+     *         matching active line item for that room does not exist
+     */
+    Optional<ReservedRoomCharge> getReservedRoomCharge(UUID reservationId, UUID roomId, UUID hotelId);
 }

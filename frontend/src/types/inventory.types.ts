@@ -25,11 +25,16 @@ export interface RoomResponse {
   roomNumber: string;
   roomType: RoomTypeResponse;
   type?: string;
-  pricePerNight?: number;
   status: RoomStatus;
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  /**
+   * The total price for a specific stay, resolved server-side (RatePricingService);
+   * only present when this response comes from `getAvailableRooms` (the one
+   * endpoint that knows the stay's dates) — undefined otherwise.
+   */
+  resolvedTotalPrice?: number;
 }
 
 export interface RoomRequest {

@@ -1,14 +1,11 @@
-package com.hotelpms.frontdesk.reservations.domain;
+package com.hotelpms.frontdesk.pricing.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -23,43 +20,57 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * ReservationLineItem Domain Entity.
+ * A date-range price override for a room type (RoomType.basePrice remains the
+ * fallback for any date not covered by an active RateSeason).
  */
 @Entity
-@Table(name = "reservation_line_items")
+@Table(name = "rate_seasons")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
-@SQLDelete(sql = "UPDATE reservation_line_items SET active = false WHERE id = ?")
+@SQLDelete(sql = "UPDATE rate_seasons SET active = false WHERE id = ?")
 @SQLRestriction("active = true")
-public class ReservationLineItem {
+public class RateSeason {
+
+    private static final int MAX_NAME_LENGTH = 100;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Setter(AccessLevel.NONE)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "reservation_id", nullable = false)
-    private Reservation reservation;
+    /**
+     * The hotel this season belongs to (multi-tenancy), same convention as
+     * {@code RoomType.hotelId}.
+     */
+    @Column(name = "hotel_id", nullable = false)
+    private UUID hotelId;
 
-    @Column(nullable = false)
-    private UUID roomId;
+    @Column(name = "room_type_id", nullable = false)
+    private UUID roomTypeId;
 
     /**
-     * Total price for this room across the whole reservation stay, resolved
-     * server-side by {@code RatePricingService} and snapshotted here at
-     * creation/update time — never client-supplied.
+     * Optional display label (e.g. "Alta stagione"). Not used in price resolution.
      */
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
+    @Column(length = MAX_NAME_LENGTH)
+    private String name;
+
+    @Column(name = "start_date", nullable = false)
+    private LocalDate startDate;
+
+    @Column(name = "end_date", nullable = false)
+    private LocalDate endDate;
+
+    @Column(name = "nightly_price", nullable = false, precision = 10, scale = 2)
+    private BigDecimal nightlyPrice;
 
     @Column(nullable = false)
     @Builder.Default
