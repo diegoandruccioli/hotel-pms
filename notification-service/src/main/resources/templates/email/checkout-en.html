@@ -66,7 +66,7 @@
                     <td style="font-size:13px;color:#424242;border-bottom:1px solid #f0f0f0;"
                         th:text="${line.description}">—</td>
                     <td style="font-size:13px;color:#424242;text-align:right;border-bottom:1px solid #f0f0f0;"
-                        th:text="${#numbers.formatDecimal(line.amount,1,'COMMA',2,'POINT')} + ' ' + (req.currency != null ? req.currency : 'EUR')">—</td>
+                        th:text="${#numbers.formatDecimal(line.amount,1,'COMMA',2,'POINT') + ' ' + (req.currency != null ? req.currency : 'EUR')}">—</td>
                   </tr>
                 </tbody>
               </table>
