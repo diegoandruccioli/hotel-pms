@@ -11,6 +11,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -81,6 +82,18 @@ public interface BillingClient {
     InvoiceForEmailResponse getInvoiceForEmail(@PathVariable("invoiceId") UUID invoiceId);
 
     /**
+     * Retrieves the invoice PDF bytes for use as a checkout email attachment.
+     * The attachment is optional — a failure here must never block the checkout
+     * email itself, so the fallback returns {@code null} instead of propagating.
+     *
+     * @param invoiceId the invoice UUID
+     * @return the PDF bytes, or {@code null} when the circuit is open or the call fails
+     */
+    @GetMapping(value = "/api/v1/invoices/{invoiceId}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "getInvoicePdfFallback")
+    byte[] getInvoicePdf(@PathVariable("invoiceId") UUID invoiceId);
+
+    /**
      * Creates an invoice folio in billing-service at check-in.
      *
      * @param request the stay invoice request
@@ -141,6 +154,21 @@ public interface BillingClient {
                 invoiceId, throwable.getClass().getSimpleName(), throwable.getMessage());
         return new InvoiceForEmailResponse(invoiceId, null, null, STATUS_UNAVAILABLE,
                 java.math.BigDecimal.ZERO, "EUR", Collections.emptyList());
+    }
+
+    /**
+     * Fallback for getInvoicePdf — the attachment is optional, so this never
+     * throws; the caller sends the checkout email without an attachment.
+     *
+     * @param invoiceId the invoice id
+     * @param throwable the cause
+     * @return null
+     */
+    @SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
+    default byte[] getInvoicePdfFallback(final UUID invoiceId, final Throwable throwable) {
+        LOG.warn("[BillingClient] getInvoicePdf fallback | invoiceId={} | cause={}: {}",
+                invoiceId, throwable.getClass().getSimpleName(), throwable.getMessage());
+        return null;
     }
 
     /**

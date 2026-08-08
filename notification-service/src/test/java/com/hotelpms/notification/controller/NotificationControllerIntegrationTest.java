@@ -110,7 +110,7 @@ class NotificationControllerIntegrationTest {
                 BigDecimal.valueOf(320),
                 "EUR",
                 "en",
-                null, null, null);
+                null, null, null, null, null);
 
         mockMvc.perform(post(BASE_URL + "/checkout")
                         .contentType(MediaType.APPLICATION_JSON)

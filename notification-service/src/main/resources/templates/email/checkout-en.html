@@ -51,34 +51,9 @@
               </tr>
             </table>
 
-            <div th:if="${req.lines != null and not #lists.isEmpty(req.lines)}">
-              <p style="margin:0 0 8px;font-size:14px;font-weight:bold;color:#212121;">Invoice details</p>
-              <table width="100%" cellpadding="6" cellspacing="0"
-                     style="border-collapse:collapse;margin-bottom:16px;">
-                <thead>
-                  <tr style="background-color:#e8eaf6;">
-                    <th style="text-align:left;font-size:12px;color:#424242;border-bottom:1px solid #c5cae9;">Description</th>
-                    <th style="text-align:right;font-size:12px;color:#424242;border-bottom:1px solid #c5cae9;">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr th:each="line : ${req.lines}">
-                    <td style="font-size:13px;color:#424242;border-bottom:1px solid #f0f0f0;"
-                        th:text="${line.description}">—</td>
-                    <td style="font-size:13px;color:#424242;text-align:right;border-bottom:1px solid #f0f0f0;"
-                        th:text="${#numbers.formatDecimal(line.amount,1,'COMMA',2,'POINT') + ' ' + (req.currency != null ? req.currency : 'EUR')}">—</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-              <tr>
-                <td style="font-size:15px;font-weight:bold;color:#212121;">Total</td>
-                <td style="font-size:15px;font-weight:bold;color:#1a237e;text-align:right;"
-                    th:text="${req.totalAmount != null ? #numbers.formatDecimal(req.totalAmount,1,'COMMA',2,'POINT') + ' ' + (req.currency != null ? req.currency : 'EUR') : '—'}">—</td>
-              </tr>
-            </table>
+            <p th:if="${req.invoicePdf != null}" style="margin:0 0 24px;font-size:15px;color:#424242;">
+              You will find the invoice attached to this email.
+            </p>
 
             <p style="margin:0;font-size:14px;color:#616161;">
               We hope to see you again soon. Please contact the front desk for any questions about your invoice.

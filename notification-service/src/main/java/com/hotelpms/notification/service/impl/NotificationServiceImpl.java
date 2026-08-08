@@ -10,6 +10,8 @@ import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.MediaType;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -63,7 +65,7 @@ public class NotificationServiceImpl implements NotificationService {
         final String html = templateEngine.process(template, ctx);
         final String subject = buildSubject("Conferma prenotazione", "Booking confirmation", request.locale(),
                 request.hotelName(), request.customSubject());
-        sendHtmlEmail(request.guestEmail(), subject, html, request.hotelName());
+        sendHtmlEmail(request.guestEmail(), subject, html, request.hotelName(), null, null);
         log.info("[NOTIFY] reservation-confirmed sent | to={}", EmailMasker.mask(request.guestEmail()));
     }
 
@@ -76,7 +78,7 @@ public class NotificationServiceImpl implements NotificationService {
         final String html = templateEngine.process(template, ctx);
         final String subject = buildSubject("Benvenuto al check-in", "Welcome — Check-in confirmed",
                 request.locale(), request.hotelName(), null);
-        sendHtmlEmail(request.guestEmail(), subject, html, request.hotelName());
+        sendHtmlEmail(request.guestEmail(), subject, html, request.hotelName(), null, null);
         log.info("[NOTIFY] checkin sent | to={}", EmailMasker.mask(request.guestEmail()));
     }
 
@@ -89,21 +91,26 @@ public class NotificationServiceImpl implements NotificationService {
         final String html = templateEngine.process(template, ctx);
         final String subject = buildSubject("Riepilogo soggiorno e fattura", "Stay summary and invoice",
                 request.locale(), request.hotelName(), request.customSubject());
-        sendHtmlEmail(request.guestEmail(), subject, html, request.hotelName());
+        sendHtmlEmail(request.guestEmail(), subject, html, request.hotelName(),
+                request.invoicePdf(), request.invoiceFileName());
         log.info("[NOTIFY] checkout sent | to={}", EmailMasker.mask(request.guestEmail()));
     }
 
     /**
-     * Creates and sends a MIME HTML email message.
+     * Creates and sends a MIME HTML email message, with an optional attachment.
      *
-     * @param to        the recipient address
-     * @param subject   the email subject
-     * @param html      the rendered HTML body
-     * @param hotelName the hotel display name for the "From" header (ADR-005: the
-     *                  technical address stays platform-wide — no per-hotel domain
-     *                  exists yet — but the guest-visible sender name is the hotel's)
+     * @param to                 the recipient address
+     * @param subject            the email subject
+     * @param html               the rendered HTML body
+     * @param hotelName          the hotel display name for the "From" header (ADR-005: the
+     *                           technical address stays platform-wide — no per-hotel domain
+     *                           exists yet — but the guest-visible sender name is the hotel's)
+     * @param attachment         optional attachment bytes (e.g. the invoice PDF); {@code null}
+     *                           sends the email without an attachment — never blocking on its absence
+     * @param attachmentFileName the attachment file name; required when {@code attachment} is present
      */
-    private void sendHtmlEmail(final String to, final String subject, final String html, final String hotelName) {
+    private void sendHtmlEmail(final String to, final String subject, final String html, final String hotelName,
+            final byte[] attachment, final String attachmentFileName) {
         try {
             final MimeMessage message = mailSender.createMimeMessage();
             final MimeMessageHelper helper = new MimeMessageHelper(message, true, CHARSET);
@@ -111,6 +118,9 @@ public class NotificationServiceImpl implements NotificationService {
             helper.setTo(java.util.Objects.requireNonNull(to));
             helper.setSubject(java.util.Objects.requireNonNull(subject));
             helper.setText(java.util.Objects.requireNonNull(html), true);
+            if (attachment != null) {
+                helper.addAttachment(attachmentFileName, new ByteArrayResource(attachment), MediaType.APPLICATION_PDF_VALUE);
+            }
             mailSender.send(message);
         } catch (final MessagingException | UnsupportedEncodingException e) {
             throw new IllegalStateException("EMAIL_SEND_FAILED: " + e.getMessage(), e);

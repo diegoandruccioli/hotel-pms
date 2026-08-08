@@ -9,6 +9,7 @@ import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
+import com.hotelpms.frontdesk.client.dto.NotificationCheckoutRequest;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
@@ -519,6 +520,98 @@ class StayServiceImplTest {
         verify(reservationService, times(1))
                 .updateStatusAndGuests(reservationId, ReservationStatus.CHECKED_OUT, null);
         verify(notificationClient, times(1)).sendCheckout(ArgumentMatchers.any());
+    }
+
+    @Test
+    void shouldAttachInvoicePdfToCheckoutEmailWhenBillingServiceProvidesIt() {
+        // Arrange
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay checkedInStay = Objects.requireNonNull(savedStay);
+        checkedInStay.setRoomId(roomId);
+        checkedInStay.setReservationId(reservationId);
+        checkedInStay.setHotelId(hotelId);
+
+        final UUID invoiceId = UUID.randomUUID();
+        final InvoiceStatusResponse paidInvoice = new InvoiceStatusResponse(
+                invoiceId, reservationId, PAID_STATUS, BigDecimal.valueOf(200));
+        final ReservationLineItemResponse lineItem =
+                new ReservationLineItemResponse(UUID.randomUUID(), roomId, BigDecimal.TEN, true, null, null);
+        final byte[] pdfBytes = {1, 2, 3};
+
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(checkedInStay));
+        when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
+                .thenReturn(paidInvoice);
+        when(stayRepository.save(checkedInStay)).thenReturn(checkedInStay);
+        when(stayMapper.toDto(checkedInStay)).thenReturn(validResponse);
+        when(reservationService.getReservationById(reservationId))
+                .thenReturn(reservationResponse(ReservationStatus.CHECKED_IN, List.of(lineItem)));
+        when(stayRepository.findAllByReservationId(reservationId)).thenReturn(List.of(checkedInStay));
+        when(guestClient.getGuestById(guestId))
+                .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null));
+        when(billingClient.getInvoiceForEmail(invoiceId))
+                .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, PAID_STATUS,
+                        INVOICE_TOTAL_200, CURRENCY_EUR, List.of()));
+        when(billingClient.getInvoicePdf(invoiceId)).thenReturn(pdfBytes);
+        when(notificationClient.sendCheckout(ArgumentMatchers.any())).thenReturn(true);
+        final ArgumentCaptor<NotificationCheckoutRequest> captor =
+                ArgumentCaptor.forClass(NotificationCheckoutRequest.class);
+
+        // Act
+        stayService.checkOut(id, hotelId);
+
+        // Assert
+        verify(notificationClient).sendCheckout(captor.capture());
+        assertNotNull(captor.getValue().invoicePdf());
+        assertEquals("fattura-" + invoiceId + ".pdf", captor.getValue().invoiceFileName());
+    }
+
+    @Test
+    void shouldSendCheckoutEmailWithoutAttachmentWhenBillingServiceCannotProducePdf() {
+        // Arrange
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay checkedInStay = Objects.requireNonNull(savedStay);
+        checkedInStay.setRoomId(roomId);
+        checkedInStay.setReservationId(reservationId);
+        checkedInStay.setHotelId(hotelId);
+
+        final UUID invoiceId = UUID.randomUUID();
+        final InvoiceStatusResponse paidInvoice = new InvoiceStatusResponse(
+                invoiceId, reservationId, PAID_STATUS, BigDecimal.valueOf(200));
+        final ReservationLineItemResponse lineItem =
+                new ReservationLineItemResponse(UUID.randomUUID(), roomId, BigDecimal.TEN, true, null, null);
+
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(checkedInStay));
+        when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
+                .thenReturn(paidInvoice);
+        when(stayRepository.save(checkedInStay)).thenReturn(checkedInStay);
+        when(stayMapper.toDto(checkedInStay)).thenReturn(validResponse);
+        when(reservationService.getReservationById(reservationId))
+                .thenReturn(reservationResponse(ReservationStatus.CHECKED_IN, List.of(lineItem)));
+        when(stayRepository.findAllByReservationId(reservationId)).thenReturn(List.of(checkedInStay));
+        when(guestClient.getGuestById(guestId))
+                .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null));
+        when(billingClient.getInvoiceForEmail(invoiceId))
+                .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, PAID_STATUS,
+                        INVOICE_TOTAL_200, CURRENCY_EUR, List.of()));
+        when(billingClient.getInvoicePdf(invoiceId)).thenReturn(null);
+        when(notificationClient.sendCheckout(ArgumentMatchers.any())).thenReturn(true);
+        final ArgumentCaptor<NotificationCheckoutRequest> captor =
+                ArgumentCaptor.forClass(NotificationCheckoutRequest.class);
+
+        // Act
+        final StayResponse response = stayService.checkOut(id, hotelId);
+
+        // Assert — the missing attachment never blocks the checkout email itself
+        assertNotNull(response);
+        verify(notificationClient).sendCheckout(captor.capture());
+        assertNull(captor.getValue().invoicePdf());
+        assertNull(captor.getValue().invoiceFileName());
     }
 
     @Test

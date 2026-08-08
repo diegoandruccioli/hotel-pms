@@ -116,7 +116,7 @@ class NotificationControllerTest {
                 LocalDateTime.of(2026, 8, 5, 11, 0),
                 List.of(new InvoiceLineItemDto("Room charge", BigDecimal.valueOf(400))),
                 BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT,
-                null, null, null);
+                null, null, null, null, null);
 
         mockMvc.perform(post(BASE_URL + "/checkout")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -134,7 +134,7 @@ class NotificationControllerTest {
                 LocalDateTime.of(2026, 8, 1, 14, 0),
                 LocalDateTime.of(2026, 8, 5, 11, 0),
                 List.of(), BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT,
-                null, null, null);
+                null, null, null, null, null);
 
         mockMvc.perform(post(BASE_URL + "/checkout")
                         .contentType(MediaType.APPLICATION_JSON)

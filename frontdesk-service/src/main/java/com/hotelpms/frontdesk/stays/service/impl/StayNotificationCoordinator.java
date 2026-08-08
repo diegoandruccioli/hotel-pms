@@ -33,6 +33,8 @@ class StayNotificationCoordinator {
 
     private static final String NOTIFICATION_SERVICE_UNAVAILABLE_REASON = "NOTIFICATION_SERVICE_UNAVAILABLE";
     private static final String DEFAULT_CURRENCY = "EUR";
+    private static final String INVOICE_FILE_PREFIX = "fattura-";
+    private static final String INVOICE_FILE_EXTENSION = ".pdf";
 
     private final NotificationClient notificationClient;
     private final GuestClient guestClient;
@@ -57,6 +59,7 @@ class StayNotificationCoordinator {
             final GuestResponse guest = guestClient.getGuestById(stay.getGuestId());
             final List<NotificationChargeLineDto> lines;
             final String currency;
+            final byte[] invoicePdf;
             if (invoice.id() != null) {
                 final InvoiceForEmailResponse detail = billingClient.getInvoiceForEmail(invoice.id());
                 lines = detail.charges() != null
@@ -65,10 +68,15 @@ class StayNotificationCoordinator {
                                 .toList()
                         : List.of();
                 currency = detail.currency() != null ? detail.currency() : DEFAULT_CURRENCY;
+                invoicePdf = billingClient.getInvoicePdf(invoice.id());
             } else {
                 lines = List.of();
                 currency = DEFAULT_CURRENCY;
+                invoicePdf = null;
             }
+            final String invoiceFileName = invoicePdf == null
+                    ? null
+                    : INVOICE_FILE_PREFIX + invoice.id() + INVOICE_FILE_EXTENSION;
             final boolean sent = notificationClient.sendCheckout(new NotificationCheckoutRequest(
                     guest.email(),
                     guest.firstName() + " " + guest.lastName(),
@@ -82,7 +90,9 @@ class StayNotificationCoordinator {
                     "it",
                     settings.emailSubjectCheckout(),
                     settings.emailGreetingText(),
-                    settings.logoUrl()));
+                    settings.logoUrl(),
+                    invoicePdf,
+                    invoiceFileName));
             stay.setCheckoutEmailFailed(!sent);
             stay.setCheckoutEmailFailureReason(sent ? null : NOTIFICATION_SERVICE_UNAVAILABLE_REASON);
             stayRepository.save(stay);

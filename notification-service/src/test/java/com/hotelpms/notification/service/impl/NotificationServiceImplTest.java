@@ -111,7 +111,7 @@ class NotificationServiceImplTest {
                 LocalDateTime.of(2026, 8, 5, 11, 0),
                 List.of(new InvoiceLineItemDto("Room charge", BigDecimal.valueOf(400))),
                 BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT,
-                null, null, null);
+                null, null, null, null, null);
 
         service.sendCheckout(req);
 
@@ -126,7 +126,7 @@ class NotificationServiceImplTest {
                 LocalDateTime.of(2026, 8, 1, 14, 0),
                 LocalDateTime.of(2026, 8, 5, 11, 0),
                 List.of(), BigDecimal.valueOf(200), CURRENCY_EUR, LOCALE_EN,
-                null, null, null);
+                null, null, null, null, null);
 
         service.sendCheckout(req);
 
@@ -243,7 +243,7 @@ class NotificationServiceImplTest {
                 LocalDateTime.of(2026, 8, 1, 14, 0),
                 LocalDateTime.of(2026, 8, 5, 11, 0),
                 List.of(), BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT,
-                "   ", null, null);
+                "   ", null, null, null, null);
 
         service.sendCheckout(req);
 
@@ -255,5 +255,45 @@ class NotificationServiceImplTest {
         } catch (final jakarta.mail.MessagingException e) {
             throw new AssertionError(SUBJECT_READ_ERROR, e);
         }
+    }
+
+    @Test
+    void sendCheckoutWithInvoicePdfAttachesIt() throws jakarta.mail.MessagingException, java.io.IOException {
+        final ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        final byte[] pdfBytes = {1, 2, 3, 4};
+        final CheckoutNotificationRequest req = new CheckoutNotificationRequest(
+                GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, ROOM_NUMBER_101,
+                LocalDateTime.of(2026, 8, 1, 14, 0),
+                LocalDateTime.of(2026, 8, 5, 11, 0),
+                List.of(), BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT,
+                null, null, null, pdfBytes, "fattura-101.pdf");
+
+        service.sendCheckout(req);
+
+        verify(mailSender).send(captor.capture());
+        final Object content = captor.getValue().getContent();
+        assertTrue(content instanceof jakarta.mail.Multipart,
+                "Message with an attachment should be multipart but was: " + content.getClass());
+        final jakarta.mail.Multipart multipart = (jakarta.mail.Multipart) content;
+        org.junit.jupiter.api.Assertions.assertEquals(2, multipart.getCount());
+        org.junit.jupiter.api.Assertions.assertEquals("fattura-101.pdf", multipart.getBodyPart(1).getFileName());
+    }
+
+    @Test
+    void sendCheckoutWithoutInvoicePdfSendsPlainMessage() throws jakarta.mail.MessagingException, java.io.IOException {
+        final ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        final CheckoutNotificationRequest req = new CheckoutNotificationRequest(
+                GUEST_EMAIL, GUEST_NAME, HOTEL_NAME, ROOM_NUMBER_101,
+                LocalDateTime.of(2026, 8, 1, 14, 0),
+                LocalDateTime.of(2026, 8, 5, 11, 0),
+                List.of(), BigDecimal.valueOf(400), CURRENCY_EUR, LOCALE_IT,
+                null, null, null, null, null);
+
+        service.sendCheckout(req);
+
+        verify(mailSender).send(captor.capture());
+        final Object content = captor.getValue().getContent();
+        assertTrue(!(content instanceof jakarta.mail.Multipart) || ((jakarta.mail.Multipart) content).getCount() == 1,
+                "Message without an attachment should not carry a second body part");
     }
 }
