@@ -5719,6 +5719,21 @@ una finestra di tolleranza di 60s sul timestamp e reclama il nonce su un
 stesso nonce entro la finestra viene rifiutato come replay.
 Commit: \commitref{5dd8ed8}{feat(security): T-GW-08 --- timestamp+nonce anti-replay on internal HMAC auth}
 
+\paragraph{T-GW-09 --- Seconda barriera gateway mancante su una nuova risorsa admin-only}
+Ogni risorsa la cui scrittura è riservata ad ADMIN/OWNER (es. \texttt{/api/v1/room-types})
+è protetta da due barriere indipendenti: il controller applica
+\texttt{@PreAuthorize("hasAnyRole('ADMIN','OWNER')")}, e l'API Gateway rifiuta a monte
+qualunque scrittura verso quel prefisso per un ruolo diverso, tramite
+\texttt{WRITE\_RESTRICTED\_PREFIXES} in \texttt{AuthenticationFilter}. La nuova risorsa
+\texttt{/api/v1/rate-calendar} (bulk-apply prezzi su più tipologie camera) è nata con la
+sola barriera a livello controller: non uno sfruttabile isolato (\texttt{RECEPTIONIST}
+resta comunque bloccato dal \texttt{@PreAuthorize}), ma una rottura del pattern a due
+livelli che rende l'enforcement dipendente da un solo punto di fallimento invece di due.
+Aggiunto \texttt{"/api/v1/rate-calendar"} a \texttt{WRITE\_RESTRICTED\_PREFIXES}, allineando
+la risorsa al resto delle scritture admin-only; la lettura (\texttt{GET}) resta aperta a
+tutti i ruoli operativi, invariata.
+Commit: \commitref{2bf58be}{fix(security): T-GW-09 --- gateway-level RBAC on /api/v1/rate-calendar bulk-apply}
+
 \paragraph{T-NOTIF-01 --- notification-service mai censito nel modello delle minacce}
 notification-service (non instradato dal gateway, raggiungibile solo dalla rete
 Docker interna, 3 endpoint solo-scrittura che innescano invio email transazionali
