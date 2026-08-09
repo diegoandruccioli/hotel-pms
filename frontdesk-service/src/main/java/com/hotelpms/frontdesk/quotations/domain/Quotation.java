@@ -102,10 +102,14 @@ public class Quotation {
     @Column(name = "send_failure_reason", length = MAX_FAILURE_REASON_LENGTH)
     private String sendFailureReason;
 
+    /** The option the guest accepted at conversion time; unset until then. */
+    @Column(name = "accepted_option_id")
+    private UUID acceptedOptionId;
+
     @OneToMany(mappedBy = "quotation", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     @SQLRestriction("active = true")
-    private List<QuotationLineItem> lineItems = new ArrayList<>();
+    private List<QuotationOption> options = new ArrayList<>();
 
     @Column(nullable = false)
     @Builder.Default

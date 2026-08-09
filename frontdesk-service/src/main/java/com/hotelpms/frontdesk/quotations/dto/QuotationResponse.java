@@ -22,8 +22,10 @@ import java.util.UUID;
  * @param status             the effective status — {@code EXPIRED} is computed here,
  *                           never persisted (see {@code Quotation#isExpired})
  * @param validUntil         the last date this quotation is honored at its quoted price
- * @param totalPrice         the total price across all line items
- * @param lineItems          the priced rooms
+ * @param totalPrice         the lowest {@code totalPrice} across {@code options} — used
+ *                           for list sorting/display; each option carries its own total
+ * @param options            the alternative room combinations offered (1-5)
+ * @param acceptedOptionId   the option accepted at conversion time, or {@code null}
  * @param sendFailed         whether the last email-send attempt failed
  * @param sendFailureReason  the reason for the last failed send, if any
  * @param createdAt          creation timestamp
@@ -40,26 +42,27 @@ public record QuotationResponse(
         QuotationStatus status,
         LocalDate validUntil,
         BigDecimal totalPrice,
-        List<QuotationLineItemResponse> lineItems,
+        List<QuotationOptionResponse> options,
+        UUID acceptedOptionId,
         boolean sendFailed,
         String sendFailureReason,
         LocalDateTime createdAt,
         LocalDateTime updatedAt) {
 
     /**
-     * Compact constructor — defensive copy of the line items list.
+     * Compact constructor — defensive copy of the options list.
      */
     public QuotationResponse {
-        lineItems = lineItems == null ? List.of() : List.copyOf(lineItems);
+        options = options == null ? List.of() : List.copyOf(options);
     }
 
     /**
-     * Returns a copy of the line items list to prevent external modification.
+     * Returns a copy of the options list to prevent external modification.
      *
-     * @return the priced rooms
+     * @return the alternative room combinations offered
      */
     @Override
-    public List<QuotationLineItemResponse> lineItems() {
-        return List.copyOf(lineItems);
+    public List<QuotationOptionResponse> options() {
+        return List.copyOf(options);
     }
 }

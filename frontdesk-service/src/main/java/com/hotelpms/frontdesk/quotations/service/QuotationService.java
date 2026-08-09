@@ -83,14 +83,17 @@ public interface QuotationService {
 
     /**
      * Converts an accepted quotation into a {@code Reservation}, honoring the
-     * price frozen on each line item regardless of current seasonal rates.
-     * If the quotation was made for a prospect (no {@code guestId}), a
-     * {@code Guest} is created first. Marks the quotation {@code ACCEPTED}.
+     * price frozen on the chosen option's line items regardless of current
+     * seasonal rates. If the quotation was made for a prospect (no
+     * {@code guestId}), a {@code Guest} is created first. Marks the quotation
+     * {@code ACCEPTED} and records {@code optionId} as the accepted option.
      *
-     * @param id the quotation UUID
+     * @param id       the quotation UUID
+     * @param optionId the option to convert, or {@code null} if the quotation
+     *                 has exactly one option (required when it has more than one)
      * @return the created reservation
      */
-    ReservationResponse convertToReservation(UUID id);
+    ReservationResponse convertToReservation(UUID id, UUID optionId);
 
     /**
      * Marks a quotation as declined.

@@ -179,6 +179,7 @@
   "save": "Save",
   "cancel": "Cancel",
   "confirm": "Confirm",
+  "selected": "Selected",
   "confirm_order": "Confirm order",
   "confirm_order_failed": "Failed to confirm order. Please try again.",
   "close": "Close",

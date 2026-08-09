@@ -50,11 +50,41 @@ const DRAFT_QUOTATION = {
   status: 'DRAFT',
   validUntil: '2026-08-25',
   totalPrice: 200,
-  lineItems: [{ id: 'li1', roomId: 'r1', roomNumber: '101', roomTypeName: 'Standard', price: 200 }],
+  options: [
+    {
+      id: 'opt1',
+      label: 'Opzione 1',
+      position: 0,
+      totalPrice: 200,
+      lineItems: [{ id: 'li1', roomId: 'r1', roomNumber: '101', roomTypeName: 'Standard', price: 200 }],
+    },
+  ],
+  acceptedOptionId: null,
   sendFailed: false,
   sendFailureReason: null,
   createdAt: '2026-08-01T00:00:00',
   updatedAt: '2026-08-01T00:00:00',
+};
+
+const MULTI_OPTION_QUOTATION = {
+  ...DRAFT_QUOTATION,
+  totalPrice: 200,
+  options: [
+    {
+      id: 'opt1',
+      label: 'Opzione 1',
+      position: 0,
+      totalPrice: 200,
+      lineItems: [{ id: 'li1', roomId: 'r1', roomNumber: '101', roomTypeName: 'Standard', price: 200 }],
+    },
+    {
+      id: 'opt2',
+      label: 'Opzione 2',
+      position: 1,
+      totalPrice: 260,
+      lineItems: [{ id: 'li2', roomId: 'r2', roomNumber: '202', roomTypeName: 'Suite', price: 260 }],
+    },
+  ],
 };
 
 const INITIAL_ENTRIES = ['/quotations/q1'];
@@ -162,6 +192,35 @@ describe('QuotationDetail', () => {
     fireEvent.click(screen.getByText('common:confirm'));
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/quotations'));
+  });
+
+  it('converts directly without a dialog when there is only one option', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    vi.mocked(quotationService.convertToReservation).mockResolvedValue({ id: 'res1' } as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_convert'));
+    await waitFor(() => expect(quotationService.convertToReservation).toHaveBeenCalledWith('q1', 'opt1'));
+    expect(mockNavigate).toHaveBeenCalledWith('/reservations/res1');
+  });
+
+  it('shows both options side by side and asks which one to convert when there are multiple', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(MULTI_OPTION_QUOTATION as never);
+    vi.mocked(quotationService.convertToReservation).mockResolvedValue({ id: 'res1' } as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('Opzione 1')).toBeInTheDocument());
+    expect(screen.getByText('Opzione 2')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('action_convert'));
+    await waitFor(() => expect(screen.getByText('label_choose_option_to_convert')).toBeInTheDocument());
+
+    // opt1 is pre-selected (no acceptedOptionId yet, defaults to the first option), so only
+    // opt2's button still reads action_choose_option — clicking it switches the choice to opt2.
+    fireEvent.click(screen.getByText('action_choose_option'));
+    fireEvent.click(screen.getByText('common:confirm'));
+
+    await waitFor(() => expect(quotationService.convertToReservation).toHaveBeenCalledWith('q1', 'opt2'));
   });
 
   it('passes axe accessibility check', async () => {

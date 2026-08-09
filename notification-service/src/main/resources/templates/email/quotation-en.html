@@ -45,9 +45,10 @@
               </tr>
               <tr>
                 <td style="padding:4px 0;">
-                  <span style="color:#616161;font-size:13px;">Quoted total</span><br>
+                  <span style="color:#616161;font-size:13px;" th:text="${req.optionsCount > 1 ? 'Starting from' : 'Quoted total'}">Quoted total</span><br>
                   <strong style="font-size:14px;color:#212121;"
                           th:text="${#numbers.formatDecimal(req.totalAmount,1,'COMMA',2,'POINT') + ' ' + (req.currency != null ? req.currency : 'EUR')}">—</strong>
+                  <span th:if="${req.optionsCount > 1}" style="font-size:12px;color:#616161;" th:text="${req.optionsCount + ' options available — see the attached PDF to compare'}"> </span>
                 </td>
               </tr>
               <tr>

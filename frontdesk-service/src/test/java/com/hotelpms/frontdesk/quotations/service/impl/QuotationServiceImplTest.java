@@ -4,13 +4,16 @@ import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.GuestCreateRequest;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
+import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.pricing.dto.NightlyRate;
 import com.hotelpms.frontdesk.pricing.service.RatePricingService;
 import com.hotelpms.frontdesk.quotations.domain.Quotation;
 import com.hotelpms.frontdesk.quotations.domain.QuotationLineItem;
+import com.hotelpms.frontdesk.quotations.domain.QuotationOption;
 import com.hotelpms.frontdesk.quotations.domain.QuotationStatus;
+import com.hotelpms.frontdesk.quotations.dto.QuotationOptionRequest;
 import com.hotelpms.frontdesk.quotations.dto.QuotationRequest;
 import com.hotelpms.frontdesk.quotations.dto.QuotationResponse;
 import com.hotelpms.frontdesk.quotations.repository.QuotationRepository;
@@ -38,6 +41,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -60,13 +64,23 @@ class QuotationServiceImplTest {
     private static final UUID GUEST_ID = Objects.requireNonNull(UUID.randomUUID());
     private static final UUID ROOM_ID = Objects.requireNonNull(UUID.randomUUID());
     private static final UUID ROOM_TYPE_ID = Objects.requireNonNull(UUID.randomUUID());
+    private static final UUID ROOM_ID_2 = Objects.requireNonNull(UUID.randomUUID());
+    private static final UUID ROOM_TYPE_ID_2 = Objects.requireNonNull(UUID.randomUUID());
     private static final UUID QUOTATION_ID = Objects.requireNonNull(UUID.randomUUID());
+    private static final UUID OPTION_ID = Objects.requireNonNull(UUID.randomUUID());
+    private static final UUID OPTION_ID_2 = Objects.requireNonNull(UUID.randomUUID());
     private static final String ROOM_NUMBER = "101";
+    private static final String ROOM_NUMBER_2 = "202";
     private static final String GUEST_FIRST_NAME = "Mario";
     private static final String GUEST_LAST_NAME = "Rossi";
     private static final String GUEST_EMAIL = "mario@example.com";
     private static final String HOTEL_NAME = "Hotel Test";
     private static final BigDecimal NIGHTLY_PRICE = BigDecimal.valueOf(100);
+    private static final BigDecimal NIGHTLY_PRICE_2 = BigDecimal.valueOf(150);
+    private static final BigDecimal SUITE_BASE_PRICE = BigDecimal.valueOf(140);
+    private static final String ROOM_TYPE_NAME = "Standard";
+    private static final String ROOM_TYPE_NAME_2 = "Suite";
+    private static final String DEFAULT_OPTION_LABEL = "Opzione 1";
     private static final LocalDate CHECK_IN = LocalDate.now().plusDays(10);
     private static final LocalDate CHECK_OUT = LocalDate.now().plusDays(13);
     private static final LocalDate VALID_UNTIL = LocalDate.now().plusDays(5);
@@ -105,6 +119,7 @@ class QuotationServiceImplTest {
         lenient().when(pdfTemplateRenderer.render(eq("quotation"), any()))
                 .thenReturn(PDF_BYTES);
         lenient().when(roomService.getRoomById(ROOM_ID, HOTEL_ID)).thenReturn(room());
+        lenient().when(roomService.getRoomById(ROOM_ID_2, HOTEL_ID)).thenReturn(room2());
     }
 
     @AfterEach
@@ -113,14 +128,43 @@ class QuotationServiceImplTest {
     }
 
     private static RoomTypeResponse roomType() {
-        return new RoomTypeResponse(ROOM_TYPE_ID, "Standard", null, 2, BigDecimal.valueOf(90), true, null, null);
+        return new RoomTypeResponse(ROOM_TYPE_ID, ROOM_TYPE_NAME, null, 2, BigDecimal.valueOf(90), true, null, null);
+    }
+
+    private static RoomTypeResponse roomType2() {
+        return new RoomTypeResponse(ROOM_TYPE_ID_2, ROOM_TYPE_NAME_2, null, 3, SUITE_BASE_PRICE, true, null, null);
     }
 
     private static RoomResponse room() {
         return new RoomResponse(ROOM_ID, HOTEL_ID, ROOM_NUMBER, roomType(), RoomStatus.CLEAN, true, null, null, null);
     }
 
+    private static RoomResponse room2() {
+        return new RoomResponse(ROOM_ID_2, HOTEL_ID, ROOM_NUMBER_2, roomType2(), RoomStatus.CLEAN, true, null, null, null);
+    }
+
+    private static QuotationOptionRequest optionRequest(final String label, final UUID... roomIds) {
+        return new QuotationOptionRequest(label, List.of(roomIds));
+    }
+
+    private static QuotationRequest requestWithOptions(final List<QuotationOptionRequest> options) {
+        return new QuotationRequest(GUEST_ID, null, null, null, CHECK_IN, CHECK_OUT, 2, options, VALID_UNTIL);
+    }
+
+    /**
+     * A single-option quotation entity, mirroring the pre-multi-option shape for existing tests.
+     *
+     * @param status     the quotation status
+     * @param validUntil the quotation's valid-until date
+     * @return the built entity
+     */
     private static Quotation quotationEntity(final QuotationStatus status, final LocalDate validUntil) {
+        return quotationEntityWithOptions(status, validUntil, List.of(DEFAULT_OPTION_LABEL));
+    }
+
+    private static Quotation quotationEntityWithOptions(
+            final QuotationStatus status, final LocalDate validUntil, final List<String> optionLabels) {
+        final BigDecimal optionTotal = NIGHTLY_PRICE.multiply(BigDecimal.valueOf(3));
         final Quotation quotation = Quotation.builder()
                 .id(QUOTATION_ID)
                 .hotelId(HOTEL_ID)
@@ -130,19 +174,42 @@ class QuotationServiceImplTest {
                 .expectedGuests(2)
                 .status(status)
                 .validUntil(validUntil)
-                .totalPrice(NIGHTLY_PRICE.multiply(BigDecimal.valueOf(3)))
+                .totalPrice(optionTotal)
                 .build();
-        final QuotationLineItem lineItem = QuotationLineItem.builder()
-                .roomId(ROOM_ID)
-                .price(NIGHTLY_PRICE.multiply(BigDecimal.valueOf(3)))
-                .build();
-        lineItem.setQuotation(quotation);
-        quotation.setLineItems(new java.util.ArrayList<>(List.of(lineItem)));
+        final List<QuotationOption> options = new ArrayList<>();
+        int position = 0;
+        for (final String label : optionLabels) {
+            final QuotationOption option = QuotationOption.builder()
+                    .id(position == 0 ? OPTION_ID : OPTION_ID_2)
+                    .quotation(quotation)
+                    .label(label)
+                    .position(position)
+                    .totalPrice(optionTotal)
+                    .build();
+            final QuotationLineItem lineItem = QuotationLineItem.builder()
+                    .roomId(ROOM_ID)
+                    .price(optionTotal)
+                    .build();
+            lineItem.setQuotation(quotation);
+            lineItem.setQuotationOption(option);
+            option.setLineItems(new ArrayList<>(List.of(lineItem)));
+            options.add(option);
+            position++;
+        }
+        quotation.setOptions(options);
         return quotation;
     }
 
     private void stubRates(final BigDecimal nightlyPrice) {
         when(ratePricingService.resolveStayRates(ROOM_TYPE_ID, HOTEL_ID, CHECK_IN, CHECK_OUT))
+                .thenReturn(List.of(
+                        new NightlyRate(CHECK_IN, nightlyPrice, null),
+                        new NightlyRate(CHECK_IN.plusDays(1), nightlyPrice, null),
+                        new NightlyRate(CHECK_IN.plusDays(2), nightlyPrice, null)));
+    }
+
+    private void stubRatesForRoomType2(final BigDecimal nightlyPrice) {
+        when(ratePricingService.resolveStayRates(ROOM_TYPE_ID_2, HOTEL_ID, CHECK_IN, CHECK_OUT))
                 .thenReturn(List.of(
                         new NightlyRate(CHECK_IN, nightlyPrice, null),
                         new NightlyRate(CHECK_IN.plusDays(1), nightlyPrice, null),
@@ -156,16 +223,40 @@ class QuotationServiceImplTest {
         stubRates(NIGHTLY_PRICE);
         when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        final QuotationRequest request = new QuotationRequest(GUEST_ID, null, null, null,
-                CHECK_IN, CHECK_OUT, 2, List.of(ROOM_ID), VALID_UNTIL);
+        final QuotationRequest request = requestWithOptions(List.of(optionRequest(DEFAULT_OPTION_LABEL, ROOM_ID)));
 
         final QuotationResponse response = quotationService.createQuotation(request);
 
         assertNotNull(response);
-        assertEquals(NIGHTLY_PRICE.multiply(BigDecimal.valueOf(3)), response.totalPrice());
+        assertEquals(1, response.options().size());
+        final BigDecimal expectedTotal = NIGHTLY_PRICE.multiply(BigDecimal.valueOf(3));
+        assertEquals(expectedTotal, response.totalPrice());
+        assertEquals(expectedTotal, response.options().get(0).totalPrice());
         assertEquals(QuotationStatus.DRAFT, response.status());
-        assertEquals(ROOM_NUMBER, response.lineItems().get(0).roomNumber());
-        assertEquals("Standard", response.lineItems().get(0).roomTypeName());
+        assertEquals(ROOM_NUMBER, response.options().get(0).lineItems().get(0).roomNumber());
+    }
+
+    @Test
+    void createQuotationWithMultipleOptionsPricesEachIndependently() {
+        final GuestResponse guest = new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
+        stubRates(NIGHTLY_PRICE);
+        stubRatesForRoomType2(NIGHTLY_PRICE_2);
+        when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        final QuotationRequest request = requestWithOptions(List.of(
+                optionRequest(ROOM_TYPE_NAME, ROOM_ID),
+                optionRequest(ROOM_TYPE_NAME_2, ROOM_ID_2)));
+
+        final QuotationResponse response = quotationService.createQuotation(request);
+
+        assertEquals(2, response.options().size());
+        final BigDecimal standardTotal = NIGHTLY_PRICE.multiply(BigDecimal.valueOf(3));
+        final BigDecimal suiteTotal = NIGHTLY_PRICE_2.multiply(BigDecimal.valueOf(3));
+        assertEquals(standardTotal, response.options().get(0).totalPrice());
+        assertEquals(suiteTotal, response.options().get(1).totalPrice());
+        // totalPrice at the top level is the lowest of the two options.
+        assertEquals(standardTotal, response.totalPrice());
     }
 
     @Test
@@ -197,14 +288,13 @@ class QuotationServiceImplTest {
         stubRates(newNightlyPrice);
         when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        final QuotationRequest request = new QuotationRequest(GUEST_ID, null, null, null,
-                CHECK_IN, CHECK_OUT, 3, List.of(ROOM_ID), VALID_UNTIL);
+        final QuotationRequest request = requestWithOptions(List.of(optionRequest(DEFAULT_OPTION_LABEL, ROOM_ID)));
 
         final QuotationResponse response = quotationService.updateQuotation(QUOTATION_ID, request);
 
         assertEquals(newNightlyPrice.multiply(BigDecimal.valueOf(3)), response.totalPrice());
-        assertEquals(3, response.expectedGuests());
-        assertEquals(1, quotation.getLineItems().size());
+        assertEquals(1, quotation.getOptions().size());
+        assertEquals(1, quotation.getOptions().get(0).getLineItems().size());
     }
 
     @Test
@@ -212,8 +302,7 @@ class QuotationServiceImplTest {
         final Quotation quotation = quotationEntity(QuotationStatus.SENT, VALID_UNTIL);
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
 
-        final QuotationRequest request = new QuotationRequest(GUEST_ID, null, null, null,
-                CHECK_IN, CHECK_OUT, 2, List.of(ROOM_ID), VALID_UNTIL);
+        final QuotationRequest request = requestWithOptions(List.of(optionRequest(DEFAULT_OPTION_LABEL, ROOM_ID)));
 
         assertThrows(ConflictException.class, () -> quotationService.updateQuotation(QUOTATION_ID, request));
         verify(quotationRepository, never()).save(any());
@@ -221,7 +310,6 @@ class QuotationServiceImplTest {
 
     @Test
     void duplicateQuotationReResolvesPriceAtCurrentRatesNotTheFrozenOne() {
-        // The source was frozen at NIGHTLY_PRICE; rates have since changed.
         final Quotation source = quotationEntity(QuotationStatus.SENT, VALID_UNTIL);
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(source));
         when(guestClient.getGuestById(GUEST_ID))
@@ -234,6 +322,7 @@ class QuotationServiceImplTest {
 
         assertEquals(currentNightlyPrice.multiply(BigDecimal.valueOf(3)), response.totalPrice());
         assertEquals(QuotationStatus.DRAFT, response.status());
+        assertEquals(1, response.options().size());
     }
 
     @Test
@@ -275,7 +364,7 @@ class QuotationServiceImplTest {
     }
 
     @Test
-    void convertToReservationHonorsTheFrozenPriceForAnExistingGuest() {
+    void convertToReservationWithASingleOptionAndNoExplicitChoiceHonorsTheFrozenPrice() {
         final Quotation quotation = quotationEntity(QuotationStatus.SENT, VALID_UNTIL);
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
         final ReservationResponse reservationResponse = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null,
@@ -286,11 +375,51 @@ class QuotationServiceImplTest {
                 .thenReturn(reservationResponse);
         when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        final ReservationResponse result = quotationService.convertToReservation(QUOTATION_ID);
+        final ReservationResponse result = quotationService.convertToReservation(QUOTATION_ID, null);
 
         assertNotNull(result);
         assertEquals(QuotationStatus.ACCEPTED, quotation.getStatus());
+        assertEquals(OPTION_ID, quotation.getAcceptedOptionId());
         verify(guestClient, never()).createGuest(any());
+    }
+
+    @Test
+    void convertToReservationWithMultipleOptionsAndNoExplicitChoiceThrowsBadRequest() {
+        final Quotation quotation = quotationEntityWithOptions(
+                QuotationStatus.SENT, VALID_UNTIL, List.of(ROOM_TYPE_NAME, ROOM_TYPE_NAME_2));
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+
+        assertThrows(BadRequestException.class, () -> quotationService.convertToReservation(QUOTATION_ID, null));
+        verify(reservationService, never()).createReservationFromPricedRooms(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void convertToReservationWithAnUnknownOptionIdThrowsBadRequest() {
+        final Quotation quotation = quotationEntityWithOptions(
+                QuotationStatus.SENT, VALID_UNTIL, List.of(ROOM_TYPE_NAME, ROOM_TYPE_NAME_2));
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+
+        assertThrows(BadRequestException.class,
+                () -> quotationService.convertToReservation(QUOTATION_ID, UUID.randomUUID()));
+    }
+
+    @Test
+    void convertToReservationWithExplicitOptionIdHonorsThatOptionsFrozenPrice() {
+        final Quotation quotation = quotationEntityWithOptions(
+                QuotationStatus.SENT, VALID_UNTIL, List.of(ROOM_TYPE_NAME, ROOM_TYPE_NAME_2));
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        final ReservationResponse reservationResponse = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null,
+                2, 0, CHECK_IN, CHECK_OUT, com.hotelpms.frontdesk.reservations.domain.ReservationStatus.CONFIRMED,
+                null, true, null, null, false, null);
+        when(reservationService.createReservationFromPricedRooms(
+                eq(GUEST_ID), eq(CHECK_IN), eq(CHECK_OUT), eq(2), any()))
+                .thenReturn(reservationResponse);
+        when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        final ReservationResponse result = quotationService.convertToReservation(QUOTATION_ID, OPTION_ID_2);
+
+        assertNotNull(result);
+        assertEquals(OPTION_ID_2, quotation.getAcceptedOptionId());
     }
 
     @Test
@@ -308,10 +437,15 @@ class QuotationServiceImplTest {
                 .validUntil(VALID_UNTIL)
                 .totalPrice(NIGHTLY_PRICE.multiply(BigDecimal.valueOf(3)))
                 .build();
+        final QuotationOption option = QuotationOption.builder()
+                .id(OPTION_ID).quotation(quotation).label(DEFAULT_OPTION_LABEL).position(0)
+                .totalPrice(NIGHTLY_PRICE.multiply(BigDecimal.valueOf(3))).build();
         final QuotationLineItem lineItem = QuotationLineItem.builder()
                 .roomId(ROOM_ID).price(NIGHTLY_PRICE.multiply(BigDecimal.valueOf(3))).build();
         lineItem.setQuotation(quotation);
-        quotation.setLineItems(List.of(lineItem));
+        lineItem.setQuotationOption(option);
+        option.setLineItems(List.of(lineItem));
+        quotation.setOptions(List.of(option));
 
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
         final UUID newGuestId = UUID.randomUUID();
@@ -325,7 +459,7 @@ class QuotationServiceImplTest {
                 .thenReturn(reservationResponse);
         when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        final ReservationResponse result = quotationService.convertToReservation(QUOTATION_ID);
+        final ReservationResponse result = quotationService.convertToReservation(QUOTATION_ID, null);
 
         assertNotNull(result);
         assertEquals(newGuestId, quotation.getGuestId());
@@ -337,7 +471,7 @@ class QuotationServiceImplTest {
         final Quotation quotation = quotationEntity(QuotationStatus.SENT, LocalDate.now().minusDays(1));
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
 
-        assertThrows(ConflictException.class, () -> quotationService.convertToReservation(QUOTATION_ID));
+        assertThrows(ConflictException.class, () -> quotationService.convertToReservation(QUOTATION_ID, null));
     }
 
     @Test
@@ -345,7 +479,7 @@ class QuotationServiceImplTest {
         final Quotation quotation = quotationEntity(QuotationStatus.ACCEPTED, VALID_UNTIL);
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
 
-        assertThrows(ConflictException.class, () -> quotationService.convertToReservation(QUOTATION_ID));
+        assertThrows(ConflictException.class, () -> quotationService.convertToReservation(QUOTATION_ID, null));
     }
 
     @Test
@@ -409,7 +543,7 @@ class QuotationServiceImplTest {
                 .status(QuotationStatus.DRAFT)
                 .validUntil(VALID_UNTIL)
                 .totalPrice(NIGHTLY_PRICE)
-                .lineItems(List.of())
+                .options(List.of())
                 .build();
         final Page<Quotation> page = new PageImpl<>(List.of(prospectQuotation));
         when(quotationRepository.findAllByHotelId(eq(HOTEL_ID), any())).thenReturn(page);

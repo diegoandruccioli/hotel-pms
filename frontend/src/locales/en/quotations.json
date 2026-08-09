@@ -56,5 +56,13 @@
   "action_preview_pdf": "Preview PDF",
   "action_duplicate": "Duplicate",
   "pdf_preview_title": "Quotation preview",
-  "error_loading_pdf_preview": "Error loading PDF preview"
+  "error_loading_pdf_preview": "Error loading PDF preview",
+  "label_options": "Options",
+  "action_add_option": "Add option",
+  "action_remove_option": "Remove option",
+  "label_option_name": "Option name",
+  "price_range": "from € {{min}} to € {{max}}",
+  "label_accepted_option": "Accepted",
+  "action_choose_option": "Choose",
+  "label_choose_option_to_convert": "This quotation has multiple options — choose which one to convert to a reservation."
 }

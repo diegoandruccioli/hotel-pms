@@ -3,10 +3,13 @@ package com.hotelpms.frontdesk.quotations.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.GlobalExceptionHandler;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.quotations.domain.QuotationStatus;
+import com.hotelpms.frontdesk.quotations.dto.ConvertQuotationRequest;
+import com.hotelpms.frontdesk.quotations.dto.QuotationOptionRequest;
 import com.hotelpms.frontdesk.quotations.dto.QuotationRequest;
 import com.hotelpms.frontdesk.quotations.dto.QuotationResponse;
 import com.hotelpms.frontdesk.quotations.service.QuotationService;
@@ -30,6 +33,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -46,6 +50,7 @@ class QuotationControllerTest {
     private static final String BASE_URL = "/api/v1/quotations";
     private static final String PATH_BY_ID = "/{id}";
     private static final String JSON_ID = "$.id";
+    private static final String CONVERT_PATH = "/{id}/convert";
     private static final UUID GUEST_ID = UUID.randomUUID();
     private static final UUID ROOM_ID = UUID.randomUUID();
     private static final LocalDate CHECK_IN = LocalDate.now().plusDays(10);
@@ -81,12 +86,12 @@ class QuotationControllerTest {
         quotationId = UUID.randomUUID();
         quotationResponse = new QuotationResponse(quotationId, GUEST_ID, "Mario Rossi", null,
                 CHECK_IN, CHECK_OUT, 2, QuotationStatus.DRAFT, VALID_UNTIL, TOTAL_PRICE,
-                List.of(), false, null, null, null);
+                List.of(), null, false, null, null, null);
     }
 
     private static QuotationRequest validRequest() {
         return new QuotationRequest(GUEST_ID, null, null, null,
-                CHECK_IN, CHECK_OUT, 2, List.of(ROOM_ID), VALID_UNTIL);
+                CHECK_IN, CHECK_OUT, 2, List.of(new QuotationOptionRequest("Opzione 1", List.of(ROOM_ID))), VALID_UNTIL);
     }
 
     @Test
@@ -103,7 +108,18 @@ class QuotationControllerTest {
     @Test
     void shouldRejectQuotationWithoutGuestOrProspectReturn400() throws Exception {
         final QuotationRequest invalid = new QuotationRequest(null, null, null, null,
-                CHECK_IN, CHECK_OUT, 2, List.of(ROOM_ID), VALID_UNTIL);
+                CHECK_IN, CHECK_OUT, 2, List.of(new QuotationOptionRequest("Opzione 1", List.of(ROOM_ID))), VALID_UNTIL);
+
+        mockMvc.perform(post(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRejectQuotationWithNoOptionsReturn400() throws Exception {
+        final QuotationRequest invalid = new QuotationRequest(GUEST_ID, null, null, null,
+                CHECK_IN, CHECK_OUT, 2, List.of(), VALID_UNTIL);
 
         mockMvc.perform(post(BASE_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -176,20 +192,43 @@ class QuotationControllerTest {
     }
 
     @Test
-    void shouldConvertToReservationReturn200() throws Exception {
+    void shouldConvertToReservationWithNoBodyReturn200() throws Exception {
         final ReservationResponse reservationResponse = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null,
                 2, 0, CHECK_IN, CHECK_OUT, ReservationStatus.CONFIRMED, null, true, null, null, false, null);
-        when(quotationService.convertToReservation(quotationId)).thenReturn(reservationResponse);
+        when(quotationService.convertToReservation(eq(quotationId), isNull())).thenReturn(reservationResponse);
 
-        mockMvc.perform(post(BASE_URL + "/{id}/convert", quotationId))
+        mockMvc.perform(post(BASE_URL + CONVERT_PATH, quotationId))
                 .andExpect(status().isOk());
     }
 
     @Test
-    void shouldReturn409WhenConvertingAnExpiredQuotation() throws Exception {
-        when(quotationService.convertToReservation(quotationId)).thenThrow(new ConflictException("QUOTATION_EXPIRED"));
+    void shouldConvertToReservationWithExplicitOptionIdReturn200() throws Exception {
+        final UUID optionId = UUID.randomUUID();
+        final ReservationResponse reservationResponse = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null,
+                2, 0, CHECK_IN, CHECK_OUT, ReservationStatus.CONFIRMED, null, true, null, null, false, null);
+        when(quotationService.convertToReservation(quotationId, optionId)).thenReturn(reservationResponse);
 
-        mockMvc.perform(post(BASE_URL + "/{id}/convert", quotationId))
+        mockMvc.perform(post(BASE_URL + CONVERT_PATH, quotationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ConvertQuotationRequest(optionId))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldReturn400WhenConvertingWithoutChoosingAmongMultipleOptions() throws Exception {
+        when(quotationService.convertToReservation(eq(quotationId), isNull()))
+                .thenThrow(new BadRequestException("QUOTATION_OPTION_REQUIRED"));
+
+        mockMvc.perform(post(BASE_URL + CONVERT_PATH, quotationId))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturn409WhenConvertingAnExpiredQuotation() throws Exception {
+        when(quotationService.convertToReservation(eq(quotationId), isNull()))
+                .thenThrow(new ConflictException("QUOTATION_EXPIRED"));
+
+        mockMvc.perform(post(BASE_URL + CONVERT_PATH, quotationId))
                 .andExpect(status().isConflict());
     }
 

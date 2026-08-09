@@ -141,9 +141,48 @@ describe('QuotationForm', () => {
       prospectEmail: 'mario@example.com',
       checkInDate: '2026-09-01',
       checkOutDate: '2026-09-03',
-      roomIds: ['r1'],
+      options: [{ label: 'Opzione 1', roomIds: ['r1'] }],
     })));
     expect(mockNavigate).toHaveBeenCalledWith('/quotations');
+  });
+
+  it('supports adding a second option, selecting rooms independently per option, and submits both', async () => {
+    vi.mocked(quotationService.createQuotation).mockResolvedValue({ id: 'q1' } as never);
+    renderForm();
+    await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('toggle_new_prospect'));
+    fireEvent.change(screen.getByLabelText('label_prospect_first_name'), { target: { value: 'Mario' } });
+    fireEvent.change(screen.getByLabelText('label_prospect_last_name'), { target: { value: 'Rossi' } });
+    fireEvent.change(screen.getByLabelText('label_prospect_email'), { target: { value: 'mario@example.com' } });
+    fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-09-03' } });
+
+    fireEvent.click(screen.getByText('Toggle Room r1'));
+
+    fireEvent.click(screen.getByText('action_add_option'));
+    fireEvent.change(screen.getByLabelText('label_option_name'), { target: { value: 'Suite deluxe' } });
+    fireEvent.click(screen.getByText('Toggle Room r1'));
+
+    fireEvent.click(screen.getByText('common:save'));
+
+    await waitFor(() => expect(quotationService.createQuotation).toHaveBeenCalledWith(expect.objectContaining({
+      options: [
+        { label: 'Opzione 1', roomIds: ['r1'] },
+        { label: 'Suite deluxe', roomIds: ['r1'] },
+      ],
+    })));
+  });
+
+  it('removes an option via its tab close button', async () => {
+    renderForm();
+    await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_add_option'));
+    const removeButtons = screen.getAllByLabelText(/^Rimuovi /);
+    expect(removeButtons.length).toBeGreaterThan(0);
+    fireEvent.click(removeButtons[0]);
+    expect(screen.queryAllByLabelText(/^Rimuovi /).length).toBe(0);
   });
 
   it('passes axe accessibility check', async () => {
@@ -164,7 +203,14 @@ describe('QuotationForm', () => {
       status: 'DRAFT',
       validUntil: '2026-08-25',
       totalPrice: 200,
-      lineItems: [{ id: 'li1', roomId: 'r1', roomNumber: '101', roomTypeName: 'Standard', price: 200 }],
+      options: [{
+        id: 'opt1',
+        label: 'Opzione 1',
+        position: 0,
+        totalPrice: 200,
+        lineItems: [{ id: 'li1', roomId: 'r1', roomNumber: '101', roomTypeName: 'Standard', price: 200 }],
+      }],
+      acceptedOptionId: null,
       sendFailed: false,
       sendFailureReason: null,
       createdAt: '2026-08-01T00:00:00',
@@ -197,7 +243,7 @@ describe('QuotationForm', () => {
         guestId: 'g1',
         checkInDate: '2026-09-01',
         checkOutDate: '2026-09-03',
-        roomIds: ['r1'],
+        options: [{ label: 'Opzione 1', roomIds: ['r1'] }],
       })));
       expect(quotationService.createQuotation).not.toHaveBeenCalled();
       expect(mockNavigate).toHaveBeenCalledWith('/quotations/q1');

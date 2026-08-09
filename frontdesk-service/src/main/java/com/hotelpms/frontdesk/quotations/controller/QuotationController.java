@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.quotations.controller;
 
+import com.hotelpms.frontdesk.quotations.dto.ConvertQuotationRequest;
 import com.hotelpms.frontdesk.quotations.dto.QuotationRequest;
 import com.hotelpms.frontdesk.quotations.dto.QuotationResponse;
 import com.hotelpms.frontdesk.quotations.service.QuotationService;
@@ -129,14 +130,19 @@ public class QuotationController {
 
     /**
      * Converts an accepted quotation into a reservation, honoring the frozen
-     * quoted price.
+     * quoted price of the chosen option.
      *
-     * @param id the quotation UUID
+     * @param id      the quotation UUID
+     * @param request the chosen option, required only when the quotation has
+     *                more than one; an absent body is valid otherwise
      * @return the created reservation
      */
     @PostMapping("/{id}/convert")
-    public ResponseEntity<ReservationResponse> convertToReservation(@NonNull @PathVariable final UUID id) {
-        return ResponseEntity.ok(quotationService.convertToReservation(id));
+    public ResponseEntity<ReservationResponse> convertToReservation(
+            @NonNull @PathVariable final UUID id,
+            @RequestBody(required = false) final ConvertQuotationRequest request) {
+        final UUID optionId = request != null ? request.optionId() : null;
+        return ResponseEntity.ok(quotationService.convertToReservation(id, optionId));
     }
 
     /**

@@ -56,5 +56,13 @@
   "action_preview_pdf": "Anteprima PDF",
   "action_duplicate": "Duplica",
   "pdf_preview_title": "Anteprima preventivo",
-  "error_loading_pdf_preview": "Errore caricamento anteprima PDF"
+  "error_loading_pdf_preview": "Errore caricamento anteprima PDF",
+  "label_options": "Opzioni",
+  "action_add_option": "Aggiungi opzione",
+  "action_remove_option": "Rimuovi opzione",
+  "label_option_name": "Nome opzione",
+  "price_range": "da € {{min}} a € {{max}}",
+  "label_accepted_option": "Accettata",
+  "action_choose_option": "Scegli",
+  "label_choose_option_to_convert": "Questo preventivo ha più opzioni: scegli quale convertire in prenotazione."
 }

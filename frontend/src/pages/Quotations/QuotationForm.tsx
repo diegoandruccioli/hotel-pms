@@ -13,12 +13,20 @@ import { quotationService } from '../../services/quotationService';
 import type { GuestResponseDTO } from '../../types/guest.types';
 import type { RoomResponse } from '../../types/inventory.types';
 import type { ReservationResponse } from '../../types/reservation.types';
-import type { QuotationRequest } from '../../types/quotation.types';
+import type { QuotationOptionRequest, QuotationRequest } from '../../types/quotation.types';
 import { RoomSelection } from '../Reservations/RoomSelection';
 import { getErrorMessage } from '../../utils/errorMessage';
 import { useToastStore } from '../../store/toastStore';
 
 const DEFAULT_VALID_DAYS = 7;
+const MAX_OPTIONS = 5;
+
+interface OptionDraft {
+  label: string;
+  selectedRoomIds: string[];
+}
+
+const defaultOptionLabel = (index: number) => `Opzione ${index + 1}`;
 
 const GuestSuggestionRow = memo(({ guest, onSelect }: { guest: GuestResponseDTO; onSelect: (guest: GuestResponseDTO) => void }) => {
   const handleClick = useCallback(() => onSelect(guest), [onSelect, guest]);
@@ -36,6 +44,42 @@ const GuestSuggestionRow = memo(({ guest, onSelect }: { guest: GuestResponseDTO;
   );
 });
 GuestSuggestionRow.displayName = 'GuestSuggestionRow';
+
+const OptionTab = memo(({ option, index, isActive, canRemove, total, onSelect, onRemove }: {
+  option: OptionDraft;
+  index: number;
+  isActive: boolean;
+  canRemove: boolean;
+  total: number;
+  onSelect: (index: number) => void;
+  onRemove: (index: number) => void;
+}) => {
+  const handleSelect = useCallback(() => onSelect(index), [onSelect, index]);
+  const handleRemove = useCallback(() => onRemove(index), [onRemove, index]);
+  return (
+    <div className={`flex items-center rounded-shape-full border ${isActive ? 'border-primary bg-primary-container' : 'border-outline-variant'}`}>
+      <button
+        type="button"
+        onClick={handleSelect}
+        aria-pressed={isActive}
+        className={`px-4 py-2 text-sm font-medium font-body rounded-shape-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isActive ? 'text-on-primary-container' : 'text-on-surface-variant'}`}
+      >
+        {option.label || defaultOptionLabel(index)} · € {total.toFixed(2)}
+      </button>
+      {canRemove && (
+        <button
+          type="button"
+          onClick={handleRemove}
+          aria-label={`Rimuovi ${option.label || defaultOptionLabel(index)}`}
+          className="pr-3 pl-1 text-on-surface-variant hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-shape-full"
+        >
+          <MaterialIcon name="close" size={16} />
+        </button>
+      )}
+    </div>
+  );
+});
+OptionTab.displayName = 'OptionTab';
 
 const todayPlusDays = (days: number): string => {
   const d = new Date();
@@ -69,7 +113,8 @@ export const QuotationForm = () => {
   const [checkInDate, setCheckInDate] = useState('');
   const [checkOutDate, setCheckOutDate] = useState('');
   const [expectedGuests, setExpectedGuests] = useState<number | string>(1);
-  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
+  const [options, setOptions] = useState<OptionDraft[]>([{ label: defaultOptionLabel(0), selectedRoomIds: [] }]);
+  const [activeOptionIndex, setActiveOptionIndex] = useState(0);
   const [validUntil, setValidUntil] = useState(() => todayPlusDays(DEFAULT_VALID_DAYS));
 
   const quotationSchema = useMemo(() => z.object({
@@ -98,8 +143,11 @@ export const QuotationForm = () => {
         setCheckInDate(quotation.checkInDate);
         setCheckOutDate(quotation.checkOutDate);
         setExpectedGuests(quotation.expectedGuests ?? 1);
-        setSelectedRoomIds(quotation.lineItems.map((li) => li.roomId));
         setValidUntil(quotation.validUntil);
+        setOptions(quotation.options.map((opt) => ({
+          label: opt.label,
+          selectedRoomIds: opt.lineItems.map((li) => li.roomId),
+        })));
 
         if (quotation.guestId) {
           setRecipientMode('guest');
@@ -163,13 +211,50 @@ export const QuotationForm = () => {
     return () => clearTimeout(delay);
   }, [guestQuery]);
 
-  const estimatedTotal = useMemo(() => {
-    return selectedRoomIds.reduce((sum, roomId) => sum + (resolvedPrices.get(roomId) || 0), 0);
-  }, [selectedRoomIds, resolvedPrices]);
+  const optionTotal = useCallback(
+    (option: OptionDraft) => option.selectedRoomIds.reduce((sum, roomId) => sum + (resolvedPrices.get(roomId) || 0), 0),
+    [resolvedPrices],
+  );
+
+  const activeOption = options[activeOptionIndex] ?? options[0];
 
   const toggleRoomSelection = useCallback((roomId: string) => {
-    setSelectedRoomIds((prev) => (prev.includes(roomId) ? prev.filter((id) => id !== roomId) : [...prev, roomId]));
+    setOptions((prev) => prev.map((option, index) => (
+      index === activeOptionIndex
+        ? {
+          ...option,
+          selectedRoomIds: option.selectedRoomIds.includes(roomId)
+            ? option.selectedRoomIds.filter((id) => id !== roomId)
+            : [...option.selectedRoomIds, roomId],
+        }
+        : option
+    )));
+  }, [activeOptionIndex]);
+
+  const handleSelectOptionTab = useCallback((index: number) => setActiveOptionIndex(index), []);
+
+  const handleAddOption = useCallback(() => {
+    setOptions((prev) => {
+      if (prev.length >= MAX_OPTIONS) return prev;
+      const next = [...prev, { label: defaultOptionLabel(prev.length), selectedRoomIds: [] }];
+      setActiveOptionIndex(next.length - 1);
+      return next;
+    });
   }, []);
+
+  const handleRemoveOption = useCallback((index: number) => {
+    setOptions((prev) => {
+      if (prev.length <= 1) return prev;
+      const next = prev.filter((_, i) => i !== index);
+      setActiveOptionIndex((current) => Math.min(current, next.length - 1));
+      return next;
+    });
+  }, []);
+
+  const handleActiveOptionLabelChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setOptions((prev) => prev.map((option, index) => (index === activeOptionIndex ? { ...option, label: value } : option)));
+  }, [activeOptionIndex]);
 
   const handleGuestModeClick = useCallback(() => setRecipientMode('guest'), []);
   const handleProspectModeClick = useCallback(() => setRecipientMode('prospect'), []);
@@ -199,7 +284,7 @@ export const QuotationForm = () => {
       setError(t('err_select_recipient'));
       return;
     }
-    if (selectedRoomIds.length === 0) {
+    if (options.some((option) => option.selectedRoomIds.length === 0)) {
       setError(t('err_select_room'));
       return;
     }
@@ -214,6 +299,11 @@ export const QuotationForm = () => {
       setLoading(true);
       setError(null);
 
+      const optionRequests: QuotationOptionRequest[] = options.map((option, index) => ({
+        label: option.label.trim() || defaultOptionLabel(index),
+        roomIds: option.selectedRoomIds,
+      }));
+
       const request: QuotationRequest = {
         guestId: recipientMode === 'guest' ? selectedGuest!.id : null,
         prospectFirstName: recipientMode === 'prospect' ? prospectFirstName.trim() : null,
@@ -222,7 +312,7 @@ export const QuotationForm = () => {
         checkInDate: parsed.data.checkInDate,
         checkOutDate: parsed.data.checkOutDate,
         expectedGuests: parsed.data.expectedGuests,
-        roomIds: selectedRoomIds,
+        options: optionRequests,
         validUntil: parsed.data.validUntil,
       };
 
@@ -241,7 +331,7 @@ export const QuotationForm = () => {
       setLoading(false);
     }
   }, [recipientMode, selectedGuest, prospectFirstName, prospectLastName, prospectEmail,
-      selectedRoomIds, checkInDate, checkOutDate, validUntil, expectedGuests,
+      options, checkInDate, checkOutDate, validUntil, expectedGuests,
       quotationSchema, addToast, t, navigate, isEditMode, id]);
 
   if (fetching) {
@@ -342,16 +432,46 @@ export const QuotationForm = () => {
       </M3Card>
 
       <M3Card className="p-6 space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <MaterialIcon name="event_seat" className="text-primary" />
-          <h2 className="text-lg font-medium text-on-surface">{t('step_stay_details')}</h2>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2">
+            <MaterialIcon name="event_seat" className="text-primary" />
+            <h2 className="text-lg font-medium text-on-surface">{t('step_stay_details')}</h2>
+          </div>
         </div>
+
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t('label_options')}>
+          {options.map((option, index) => (
+            <OptionTab
+              key={index}
+              option={option}
+              index={index}
+              isActive={index === activeOptionIndex}
+              canRemove={options.length > 1}
+              total={optionTotal(option)}
+              onSelect={handleSelectOptionTab}
+              onRemove={handleRemoveOption}
+            />
+          ))}
+          {options.length < MAX_OPTIONS && (
+            <M3Button type="button" variant="text" icon="add" onClick={handleAddOption}>
+              {t('action_add_option')}
+            </M3Button>
+          )}
+        </div>
+
+        <M3TextField
+          label={t('label_option_name')}
+          value={activeOption.label}
+          onChange={handleActiveOptionLabelChange}
+          className="max-w-xs"
+        />
+
         <RoomSelection
           checkInDate={checkInDate}
           checkOutDate={checkOutDate}
           expectedGuests={expectedGuests}
           availableRooms={rooms}
-          selectedRoomIds={selectedRoomIds}
+          selectedRoomIds={activeOption.selectedRoomIds}
           allReservations={allReservations}
           resolvedPrices={resolvedPrices}
           onCheckInChange={setCheckInDate}
@@ -367,9 +487,9 @@ export const QuotationForm = () => {
           required
           className="max-w-xs"
         />
-        {selectedRoomIds.length > 0 && (
+        {activeOption.selectedRoomIds.length > 0 && (
           <p className="text-sm font-medium text-on-surface">
-            {t('quotation_total', { amount: `€ ${estimatedTotal.toFixed(2)}` })}
+            {t('quotation_total', { amount: `€ ${optionTotal(activeOption).toFixed(2)}` })}
           </p>
         )}
       </M3Card>

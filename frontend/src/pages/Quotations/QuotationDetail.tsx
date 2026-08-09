@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { quotationService } from '../../services/quotationService';
-import type { QuotationResponse, QuotationStatus } from '../../types/quotation.types';
+import type { QuotationResponse, QuotationOptionResponse, QuotationStatus } from '../../types/quotation.types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Card } from '../../components/m3/M3Card';
@@ -21,6 +21,46 @@ const STATUS_TONE: Record<QuotationStatus, 'success' | 'warning' | 'error' | 'ne
   EXPIRED: 'warning',
 };
 
+const OptionCard = ({ option, isAccepted, isConvertChoice, selectable, onChoose }: {
+  option: QuotationOptionResponse;
+  isAccepted: boolean;
+  isConvertChoice: boolean;
+  selectable: boolean;
+  onChoose?: (optionId: string) => void;
+}) => {
+  const { t } = useTranslation(['quotations', 'common']);
+  const handleChoose = useCallback(() => onChoose?.(option.id), [onChoose, option.id]);
+
+  return (
+    <M3Card
+      variant="outlined"
+      className={`p-4 space-y-3 ${isAccepted ? 'border-tertiary border-2' : ''} ${isConvertChoice ? 'border-primary border-2' : ''}`}
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="font-medium text-on-surface">{option.label}</h3>
+        {isAccepted && <M3StatusChip label={t('label_accepted_option')} tone="success" icon="check_circle" />}
+      </div>
+      <table className="w-full text-sm">
+        <tbody>
+          {option.lineItems.map((li) => (
+            <tr key={li.id} className="border-b border-outline-variant last:border-0">
+              <td className="py-1.5 pr-2 text-on-surface">{li.roomNumber}</td>
+              <td className="py-1.5 pr-2 text-on-surface-variant">{li.roomTypeName}</td>
+              <td className="py-1.5 text-right text-on-surface-variant">€ {li.price.toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="text-right font-medium text-on-surface">€ {option.totalPrice.toFixed(2)}</p>
+      {selectable && (
+        <M3Button type="button" variant={isConvertChoice ? 'filled' : 'outlined'} onClick={handleChoose} className="w-full">
+          {isConvertChoice ? t('common:selected') : t('action_choose_option')}
+        </M3Button>
+      )}
+    </M3Card>
+  );
+};
+
 export const QuotationDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation(['quotations', 'common']);
@@ -34,6 +74,8 @@ export const QuotationDetail = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [declineConfirmOpen, setDeclineConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [convertChoiceId, setConvertChoiceId] = useState<string | null>(null);
 
   const loadQuotation = useCallback(async () => {
     if (!id) return;
@@ -75,19 +117,33 @@ export const QuotationDetail = () => {
     }
   }, [id, addToast, t]);
 
-  const handleConvert = useCallback(async () => {
+  const performConvert = useCallback(async (optionId: string | null) => {
     if (!id) return;
     setBusy(true);
     try {
-      const reservation = await quotationService.convertToReservation(id);
+      const reservation = await quotationService.convertToReservation(id, optionId ?? undefined);
       addToast(t('toast_converted'), 'success');
       navigate(`/reservations/${reservation.id}`);
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('toast_converted')), 'error');
     } finally {
       setBusy(false);
+      setConvertDialogOpen(false);
     }
   }, [id, addToast, t, navigate]);
+
+  const handleConvertClick = useCallback(() => {
+    if (!quotation) return;
+    if (quotation.options.length === 1) {
+      performConvert(quotation.options[0].id);
+      return;
+    }
+    setConvertChoiceId(quotation.acceptedOptionId ?? quotation.options[0]?.id ?? null);
+    setConvertDialogOpen(true);
+  }, [quotation, performConvert]);
+
+  const closeConvertDialog = useCallback(() => setConvertDialogOpen(false), []);
+  const confirmConvert = useCallback(() => performConvert(convertChoiceId), [performConvert, convertChoiceId]);
 
   const handleDuplicate = useCallback(async () => {
     if (!id) return;
@@ -136,9 +192,15 @@ export const QuotationDetail = () => {
     }
   }, [id, addToast, t, navigate]);
 
-  const tableHeaders = useMemo(() => [
-    t('col_room'), t('col_room_type'), t('col_price'),
-  ], [t]);
+  const sortedOptions = useMemo(
+    () => (quotation ? [...quotation.options].sort((a, b) => a.position - b.position) : []),
+    [quotation],
+  );
+
+  const lineItemHeaders = useMemo(
+    () => [t('col_room'), t('col_room_type'), t('col_price')],
+    [t],
+  );
 
   if (loading) {
     return (
@@ -216,15 +278,29 @@ export const QuotationDetail = () => {
           </div>
         </div>
 
-        <M3Table headers={tableHeaders}>
-          {quotation.lineItems.map((li) => (
-            <M3TableRow key={li.id}>
-              <M3TableCell className="font-medium">{li.roomNumber}</M3TableCell>
-              <M3TableCell className="text-on-surface-variant">{li.roomTypeName}</M3TableCell>
-              <M3TableCell className="text-on-surface-variant">€ {li.price.toFixed(2)}</M3TableCell>
-            </M3TableRow>
-          ))}
-        </M3Table>
+        {sortedOptions.length > 1 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {sortedOptions.map((option) => (
+              <OptionCard
+                key={option.id}
+                option={option}
+                isAccepted={quotation.acceptedOptionId === option.id}
+                isConvertChoice={false}
+                selectable={false}
+              />
+            ))}
+          </div>
+        ) : sortedOptions[0] ? (
+          <M3Table headers={lineItemHeaders}>
+            {sortedOptions[0].lineItems.map((li) => (
+              <M3TableRow key={li.id}>
+                <M3TableCell className="font-medium">{li.roomNumber}</M3TableCell>
+                <M3TableCell className="text-on-surface-variant">{li.roomTypeName}</M3TableCell>
+                <M3TableCell className="text-on-surface-variant">€ {li.price.toFixed(2)}</M3TableCell>
+              </M3TableRow>
+            ))}
+          </M3Table>
+        ) : null}
 
         <p className="text-right text-lg font-medium text-on-surface">
           {t('quotation_total', { amount: `€ ${quotation.totalPrice.toFixed(2)}` })}
@@ -252,7 +328,7 @@ export const QuotationDetail = () => {
           </M3Button>
         )}
         {canConvert && (
-          <M3Button variant="outlined" icon="check_circle" onClick={handleConvert} loading={busy} disabled={busy}>
+          <M3Button variant="outlined" icon="check_circle" onClick={handleConvertClick} loading={busy} disabled={busy}>
             {t('action_convert')}
           </M3Button>
         )}
@@ -273,6 +349,30 @@ export const QuotationDetail = () => {
       </div>
 
       {previewOpen && id && <QuotationPdfPreviewDialog quotationId={id} onClose={closePreview} />}
+
+      {convertDialogOpen && (
+        <M3Dialog open title={t('action_convert')} titleId="convert-quotation-choose-option-dialog" onClose={closeConvertDialog}>
+          <p className="text-sm font-body text-on-surface mb-4">{t('label_choose_option_to_convert')}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {sortedOptions.map((option) => (
+              <OptionCard
+                key={option.id}
+                option={option}
+                isAccepted={quotation.acceptedOptionId === option.id}
+                isConvertChoice={convertChoiceId === option.id}
+                selectable
+                onChoose={setConvertChoiceId}
+              />
+            ))}
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <M3Button type="button" variant="outlined" onClick={closeConvertDialog} disabled={busy}>{t('common:cancel')}</M3Button>
+            <M3Button type="button" onClick={confirmConvert} loading={busy} disabled={busy || !convertChoiceId}>
+              {t('common:confirm')}
+            </M3Button>
+          </div>
+        </M3Dialog>
+      )}
 
       {declineConfirmOpen && (
         <M3Dialog open title={t('action_decline')} titleId="confirm-decline-quotation-detail-dialog" onClose={closeDeclineConfirm}>

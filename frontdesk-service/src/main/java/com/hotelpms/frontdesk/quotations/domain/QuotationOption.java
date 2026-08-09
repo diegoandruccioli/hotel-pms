@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.quotations.domain;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
@@ -9,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -24,31 +26,28 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
- * A single room offered within one {@link QuotationOption}, with the price
- * resolved (and frozen) server-side at creation time via
- * {@code RatePricingService} — same snapshot-once, never-recompute pattern as
- * {@code ReservationLineItem}.
- *
- * <p>Carries both {@code quotation} and {@code quotationOption}: the option
- * is the real parent (cascade/orphanRemoval lives on that side, V11), but
- * {@code quotation_id} is kept populated too — it predates options (V10) and
- * dropping it would be a schema rewrite for a merely-redundant column, not a
- * behavior change.
+ * One alternative room combination within a {@link Quotation} — a quotation
+ * offers 1 to 5 of these for the guest to compare (e.g. "Standard Double" at
+ * one price vs "Suite" at another). Conversion picks exactly one.
  */
 @Entity
-@Table(name = "quotation_line_items")
+@Table(name = "quotation_options")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
-@SQLDelete(sql = "UPDATE quotation_line_items SET active = false WHERE id = ?")
+@SQLDelete(sql = "UPDATE quotation_options SET active = false WHERE id = ?")
 @SQLRestriction("active = true")
-public class QuotationLineItem {
+public class QuotationOption {
+
+    private static final int MAX_LABEL_LENGTH = 100;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -59,15 +58,20 @@ public class QuotationLineItem {
     @JoinColumn(name = "quotation_id", nullable = false)
     private Quotation quotation;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "quotation_option_id", nullable = false)
-    private QuotationOption quotationOption;
+    @Column(nullable = false, length = MAX_LABEL_LENGTH)
+    private String label;
 
-    @Column(name = "room_id", nullable = false)
-    private UUID roomId;
+    /** Display order, 0-based, as chosen at creation time. */
+    @Column(nullable = false)
+    private int position;
 
-    @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal price;
+    @Column(name = "total_price", nullable = false, precision = 10, scale = 2)
+    private BigDecimal totalPrice;
+
+    @OneToMany(mappedBy = "quotationOption", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    @SQLRestriction("active = true")
+    private List<QuotationLineItem> lineItems = new ArrayList<>();
 
     @Column(nullable = false)
     @Builder.Default

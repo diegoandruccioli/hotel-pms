@@ -37,8 +37,11 @@ export const quotationService = {
     return response.data;
   },
 
-  convertToReservation: async (id: string): Promise<ReservationResponse> => {
-    const response = await api.post<ReservationResponse>(`${BASE_PATH}/${id}/convert`, {});
+  convertToReservation: async (id: string, optionId?: string): Promise<ReservationResponse> => {
+    const response = await api.post<ReservationResponse>(
+      `${BASE_PATH}/${id}/convert`,
+      optionId ? { optionId } : {},
+    );
     return response.data;
   },
 

@@ -22,6 +22,19 @@ const STATUS_TONE: Record<QuotationStatus, 'success' | 'warning' | 'error' | 'ne
   EXPIRED: 'warning',
 };
 
+const formatTotal = (quotation: QuotationResponse, t: (key: string, opts?: Record<string, unknown>) => string): string => {
+  if (quotation.options.length <= 1) {
+    return `€ ${quotation.totalPrice.toFixed(2)}`;
+  }
+  const totals = quotation.options.map((o) => o.totalPrice);
+  const min = Math.min(...totals);
+  const max = Math.max(...totals);
+  if (min === max) {
+    return `€ ${min.toFixed(2)}`;
+  }
+  return t('price_range', { min: min.toFixed(2), max: max.toFixed(2) });
+};
+
 interface QuotationRowProps {
   quotation: QuotationResponse;
   onSend: (id: string) => void;
@@ -53,7 +66,7 @@ const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, 
       </M3TableCell>
       <M3TableCell className="text-on-surface-variant">{quotation.checkInDate}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{quotation.checkOutDate}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant font-medium">€ {quotation.totalPrice.toFixed(2)}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant font-medium">{formatTotal(quotation, t)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{quotation.validUntil}</M3TableCell>
       <M3TableCell>
         <div className="flex flex-col items-start gap-1">
@@ -142,6 +155,11 @@ export const Quotations = () => {
   }, [addToast, t]);
 
   const handleConvert = useCallback(async (id: string) => {
+    const target = quotations.find((q) => q.id === id);
+    if (target && target.options.length > 1) {
+      navigate(`/quotations/${id}`);
+      return;
+    }
     try {
       await quotationService.convertToReservation(id);
       addToast(t('toast_converted'), 'success');
@@ -149,7 +167,7 @@ export const Quotations = () => {
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('toast_converted')), 'error');
     }
-  }, [addToast, t, loadQuotations]);
+  }, [addToast, t, loadQuotations, quotations, navigate]);
 
   const handleDownload = useCallback((id: string) => {
     quotationService.downloadPdf(id);

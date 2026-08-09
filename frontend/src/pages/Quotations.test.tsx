@@ -55,11 +55,25 @@ const DRAFT_QUOTATION = {
   status: 'DRAFT',
   validUntil: '2026-08-20',
   totalPrice: 200,
-  lineItems: [],
+  options: [
+    { id: 'opt1', label: 'Opzione 1', position: 0, totalPrice: 200, lineItems: [] },
+  ],
+  acceptedOptionId: null,
   sendFailed: false,
   sendFailureReason: null,
   createdAt: '2026-08-01T00:00:00',
   updatedAt: '2026-08-01T00:00:00',
+};
+
+const MULTI_OPTION_QUOTATION = {
+  ...DRAFT_QUOTATION,
+  id: 'q2',
+  guestFullName: 'Luigi Verdi',
+  totalPrice: 150,
+  options: [
+    { id: 'opt1', label: 'Opzione 1', position: 0, totalPrice: 150, lineItems: [] },
+    { id: 'opt2', label: 'Opzione 2', position: 1, totalPrice: 220, lineItems: [] },
+  ],
 };
 
 const page = (content: unknown[], totalPages = 1) => ({ content, totalPages, totalElements: content.length });
@@ -142,6 +156,22 @@ describe('Quotations', () => {
     expect(screen.getByText('confirm_delete')).toBeInTheDocument();
     fireEvent.click(screen.getByText('common:confirm'));
     await waitFor(() => expect(quotationService.deleteQuotation).toHaveBeenCalledWith('q1'));
+  });
+
+  it('shows a price range for a quotation with multiple options', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([MULTI_OPTION_QUOTATION]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Luigi Verdi')).toBeInTheDocument());
+    expect(screen.getByText('price_range')).toBeInTheDocument();
+  });
+
+  it('action_convert on a multi-option quotation navigates to detail instead of converting directly', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([MULTI_OPTION_QUOTATION]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('action_convert'));
+    expect(mockNavigate).toHaveBeenCalledWith('/quotations/q2');
+    expect(quotationService.convertToReservation).not.toHaveBeenCalled();
   });
 
   it('passes axe accessibility check', async () => {

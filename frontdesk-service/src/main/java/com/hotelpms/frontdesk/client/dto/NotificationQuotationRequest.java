@@ -12,7 +12,11 @@ import java.time.LocalDate;
  * @param checkInDate    the quoted stay's check-in date
  * @param checkOutDate   the quoted stay's check-out date
  * @param expectedGuests expected number of guests, if known
- * @param totalAmount    total quoted price
+ * @param totalAmount    the lowest option's total price — a "starting from" price
+ *                       when {@code optionsCount > 1}, the flat total otherwise
+ * @param optionsCount   how many alternative options this quotation offers (1-5);
+ *                       the email body shows a range/count instead of a single
+ *                       total when greater than 1, full detail lives in the PDF
  * @param currency       ISO 4217 currency code (e.g. EUR)
  * @param validUntil     the last date the quoted price is honored
  * @param locale         BCP 47 locale tag (e.g. "it", "en")
@@ -30,6 +34,7 @@ public record NotificationQuotationRequest(
         LocalDate checkOutDate,
         Integer expectedGuests,
         BigDecimal totalAmount,
+        int optionsCount,
         String currency,
         LocalDate validUntil,
         String locale,
