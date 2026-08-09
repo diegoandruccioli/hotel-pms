@@ -43,5 +43,18 @@
   "step_stay_details": "2. Stay details",
   "err_select_recipient": "Select an existing guest or enter the contact details",
   "err_select_room": "Select at least one room",
-  "quotation_total": "Quotation total: {{amount}}"
+  "quotation_total": "Quotation total: {{amount}}",
+  "edit_quotation": "Edit quotation",
+  "toast_updated": "Quotation updated",
+  "toast_duplicated": "Quotation duplicated",
+  "error_loading_quotation": "Error loading quotation",
+  "send_failed_banner": "The last send attempt failed — the email service was unavailable.",
+  "col_room": "Room",
+  "col_room_type": "Room type",
+  "col_price": "Price",
+  "label_expected_guests": "Expected guests",
+  "action_preview_pdf": "Preview PDF",
+  "action_duplicate": "Duplicate",
+  "pdf_preview_title": "Quotation preview",
+  "error_loading_pdf_preview": "Error loading PDF preview"
 }

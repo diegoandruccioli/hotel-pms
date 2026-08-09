@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -50,6 +51,30 @@ public class QuotationController {
     public ResponseEntity<QuotationResponse> createQuotation(
             @NonNull @Valid @RequestBody final QuotationRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(quotationService.createQuotation(request));
+    }
+
+    /**
+     * Replaces a quotation's details, only while it is still {@code DRAFT}.
+     *
+     * @param id      the quotation UUID
+     * @param request the replacement quotation details
+     * @return the updated quotation
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<QuotationResponse> updateQuotation(
+            @NonNull @PathVariable final UUID id, @NonNull @Valid @RequestBody final QuotationRequest request) {
+        return ResponseEntity.ok(quotationService.updateQuotation(id, request));
+    }
+
+    /**
+     * Duplicates a quotation into a new draft with current-rate prices.
+     *
+     * @param id the source quotation UUID
+     * @return the newly created draft
+     */
+    @PostMapping("/{id}/duplicate")
+    public ResponseEntity<QuotationResponse> duplicateQuotation(@NonNull @PathVariable final UUID id) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(quotationService.duplicateQuotation(id));
     }
 
     /**

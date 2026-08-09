@@ -20,4 +20,27 @@ public record RateCalendarRow(
         String roomTypeName,
         BigDecimal basePrice,
         List<RateCalendarDay> days) {
+
+    /**
+     * Defensive copy — a mutable {@code List} field on a record is otherwise a
+     * shared-reference leak.
+     *
+     * @param roomTypeId   the room type UUID
+     * @param roomTypeName the room type display name
+     * @param basePrice    the room type's fallback price
+     * @param days         the resolved price for each day
+     */
+    public RateCalendarRow {
+        days = days == null ? null : List.copyOf(days);
+    }
+
+    /**
+     * Defensive accessor mirroring the compact constructor's copy.
+     *
+     * @return an unmodifiable copy of the days
+     */
+    @Override
+    public List<RateCalendarDay> days() {
+        return days == null ? null : List.copyOf(days);
+    }
 }

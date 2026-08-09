@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { quotationService } from '../services/quotationService';
 import type { QuotationResponse, QuotationStatus } from '../types/quotation.types';
@@ -46,7 +46,11 @@ const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, 
 
   return (
     <M3TableRow>
-      <M3TableCell className="font-medium">{quotation.guestFullName}</M3TableCell>
+      <M3TableCell className="font-medium">
+        <Link to={`/quotations/${quotation.id}`} className="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs">
+          {quotation.guestFullName}
+        </Link>
+      </M3TableCell>
       <M3TableCell className="text-on-surface-variant">{quotation.checkInDate}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{quotation.checkOutDate}</M3TableCell>
       <M3TableCell className="text-on-surface-variant font-medium">€ {quotation.totalPrice.toFixed(2)}</M3TableCell>

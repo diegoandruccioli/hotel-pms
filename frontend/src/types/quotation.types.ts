@@ -17,6 +17,8 @@ export interface QuotationRequest {
 export interface QuotationLineItemResponse {
   id: string;
   roomId: string;
+  roomNumber: string;
+  roomTypeName: string;
   price: number;
 }
 

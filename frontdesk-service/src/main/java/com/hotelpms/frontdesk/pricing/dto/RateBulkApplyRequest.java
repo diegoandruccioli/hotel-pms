@@ -27,15 +27,18 @@ import java.util.UUID;
  *                     to every created season
  */
 public record RateBulkApplyRequest(
-        @NotEmpty(message = "Required") List<UUID> roomTypeIds,
+        @NotEmpty(message = REQUIRED_MSG) List<UUID> roomTypeIds,
 
-        @NotNull(message = "Required") LocalDate startDate,
+        @NotNull(message = REQUIRED_MSG) LocalDate startDate,
 
-        @NotNull(message = "Required") LocalDate endDate,
+        @NotNull(message = REQUIRED_MSG) LocalDate endDate,
 
-        @NotNull(message = "Required") @Positive BigDecimal nightlyPrice,
+        @NotNull(message = REQUIRED_MSG) @Positive BigDecimal nightlyPrice,
 
         @Size(max = 100) String name) {
+
+    /** Shared validation message for required fields. */
+    static final String REQUIRED_MSG = "Required";
 
     /**
      * Defensive copy — a mutable {@code List} field on a record is otherwise a

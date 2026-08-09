@@ -10,4 +10,24 @@ import java.util.List;
  *             {@code RoomTypeService.getAllRoomTypes}
  */
 public record RateCalendarResponse(List<RateCalendarRow> rows) {
+
+    /**
+     * Defensive copy — a mutable {@code List} field on a record is otherwise a
+     * shared-reference leak.
+     *
+     * @param rows the room type rows
+     */
+    public RateCalendarResponse {
+        rows = rows == null ? null : List.copyOf(rows);
+    }
+
+    /**
+     * Defensive accessor mirroring the compact constructor's copy.
+     *
+     * @return an unmodifiable copy of the rows
+     */
+    @Override
+    public List<RateCalendarRow> rows() {
+        return rows == null ? null : List.copyOf(rows);
+    }
 }

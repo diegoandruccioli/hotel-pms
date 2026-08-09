@@ -29,11 +29,13 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,6 +45,7 @@ class QuotationControllerTest {
 
     private static final String BASE_URL = "/api/v1/quotations";
     private static final String PATH_BY_ID = "/{id}";
+    private static final String JSON_ID = "$.id";
     private static final UUID GUEST_ID = UUID.randomUUID();
     private static final UUID ROOM_ID = UUID.randomUUID();
     private static final LocalDate CHECK_IN = LocalDate.now().plusDays(10);
@@ -94,7 +97,7 @@ class QuotationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest())))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(quotationId.toString()));
+                .andExpect(jsonPath(JSON_ID).value(quotationId.toString()));
     }
 
     @Test
@@ -109,12 +112,43 @@ class QuotationControllerTest {
     }
 
     @Test
+    void shouldUpdateQuotationReturn200() throws Exception {
+        when(quotationService.updateQuotation(eq(quotationId), any(QuotationRequest.class))).thenReturn(quotationResponse);
+
+        mockMvc.perform(put(BASE_URL + PATH_BY_ID, quotationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_ID).value(quotationId.toString()));
+    }
+
+    @Test
+    void shouldReturn409WhenUpdatingANonDraftQuotation() throws Exception {
+        when(quotationService.updateQuotation(eq(quotationId), any(QuotationRequest.class)))
+                .thenThrow(new ConflictException("QUOTATION_NOT_EDITABLE"));
+
+        mockMvc.perform(put(BASE_URL + PATH_BY_ID, quotationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest())))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void shouldDuplicateQuotationReturn201() throws Exception {
+        when(quotationService.duplicateQuotation(quotationId)).thenReturn(quotationResponse);
+
+        mockMvc.perform(post(BASE_URL + "/{id}/duplicate", quotationId))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath(JSON_ID).value(quotationId.toString()));
+    }
+
+    @Test
     void shouldGetQuotationByIdReturn200() throws Exception {
         when(quotationService.getQuotationById(quotationId)).thenReturn(quotationResponse);
 
         mockMvc.perform(get(BASE_URL + PATH_BY_ID, quotationId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(quotationId.toString()));
+                .andExpect(jsonPath(JSON_ID).value(quotationId.toString()));
     }
 
     @Test

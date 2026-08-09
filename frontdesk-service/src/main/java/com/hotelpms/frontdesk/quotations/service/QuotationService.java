@@ -25,6 +25,29 @@ public interface QuotationService {
     QuotationResponse createQuotation(QuotationRequest request);
 
     /**
+     * Replaces a quotation's recipient, stay details and rooms, re-resolving
+     * prices via {@code RatePricingService} at current rates. Only permitted
+     * while the quotation is still {@code DRAFT} — once sent, a quotation is
+     * immutable and {@link #duplicateQuotation} is the way to offer a revised
+     * price.
+     *
+     * @param id      the quotation UUID
+     * @param request the replacement quotation details
+     * @return the updated quotation
+     */
+    QuotationResponse updateQuotation(UUID id, QuotationRequest request);
+
+    /**
+     * Creates a new {@code DRAFT} quotation with the same recipient, rooms and
+     * dates as the source, with prices re-resolved at current rates (it is a
+     * new offer, not a copy of the frozen one) and a fresh {@code validUntil}.
+     *
+     * @param id the source quotation UUID
+     * @return the newly created draft
+     */
+    QuotationResponse duplicateQuotation(UUID id);
+
+    /**
      * Retrieves a quotation by id, scoped to the caller's hotel.
      *
      * @param id the quotation UUID

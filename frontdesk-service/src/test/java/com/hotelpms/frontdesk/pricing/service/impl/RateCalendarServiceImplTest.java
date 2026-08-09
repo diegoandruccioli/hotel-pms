@@ -42,7 +42,10 @@ class RateCalendarServiceImplTest {
     private static final LocalDate JUL_10 = LocalDate.of(2026, 7, 10);
     private static final LocalDate JUL_20 = LocalDate.of(2026, 7, 20);
     private static final LocalDate AUG_1 = LocalDate.of(2026, 8, 1);
+    private static final LocalDate AUG_15 = LocalDate.of(2026, 8, 15);
     private static final LocalDate AUG_31 = LocalDate.of(2026, 8, 31);
+    private static final int AUGUST_DAY_COUNT = 31;
+    private static final int OVERSIZED_RANGE_DAYS = 200;
 
     @Mock
     private RateSeasonRepository rateSeasonRepository;
@@ -73,7 +76,7 @@ class RateCalendarServiceImplTest {
     // ------------------------------------------------------------------
 
     @Test
-    void getCalendarResolvesBasePriceWhenNoSeasonCoversTheDate() {
+    void calendarResolvesBasePriceWhenNoSeasonCoversTheDate() {
         when(roomTypeService.getAllRoomTypes(hotelId)).thenReturn(List.of(roomType));
         when(rateSeasonRepository.findAllByHotelIdAndDateRangeOverlapping(hotelId, AUG_1, AUG_31))
                 .thenReturn(List.of());
@@ -81,7 +84,7 @@ class RateCalendarServiceImplTest {
         final RateCalendarResponse result = rateCalendarService.getCalendar(hotelId, AUG_1, AUG_31);
 
         assertEquals(1, result.rows().size());
-        assertEquals(31, result.rows().get(0).days().size());
+        assertEquals(AUGUST_DAY_COUNT, result.rows().get(0).days().size());
         result.rows().get(0).days().forEach(day -> {
             assertEquals(new BigDecimal(PRICE_100), day.price());
             assertNull(day.rateSeasonId());
@@ -89,11 +92,11 @@ class RateCalendarServiceImplTest {
     }
 
     @Test
-    void getCalendarResolvesSeasonPriceOnCoveredDaysAndBasePriceOnBoundary() {
+    void calendarResolvesSeasonPriceOnCoveredDaysAndBasePriceOnBoundary() {
         final UUID seasonId = UUID.randomUUID();
         final RateSeason season = RateSeason.builder()
                 .id(seasonId).hotelId(hotelId).roomTypeId(roomTypeId).name("Alta")
-                .startDate(AUG_1).endDate(LocalDate.of(2026, 8, 15))
+                .startDate(AUG_1).endDate(AUG_15)
                 .nightlyPrice(new BigDecimal(PRICE_150)).active(true).build();
 
         when(roomTypeService.getAllRoomTypes(hotelId)).thenReturn(List.of(roomType));
@@ -112,14 +115,14 @@ class RateCalendarServiceImplTest {
     }
 
     @Test
-    void getCalendarWithEndBeforeStartThrowsBadRequest() {
+    void calendarWithEndBeforeStartThrowsBadRequest() {
         assertThrows(BadRequestException.class, () -> rateCalendarService.getCalendar(hotelId, AUG_31, AUG_1));
     }
 
     @Test
-    void getCalendarWithRangeTooLargeThrowsBadRequest() {
+    void calendarWithRangeTooLargeThrowsBadRequest() {
         assertThrows(BadRequestException.class,
-                () -> rateCalendarService.getCalendar(hotelId, AUG_1, AUG_1.plusDays(200)));
+                () -> rateCalendarService.getCalendar(hotelId, AUG_1, AUG_1.plusDays(OVERSIZED_RANGE_DAYS)));
     }
 
     // ------------------------------------------------------------------

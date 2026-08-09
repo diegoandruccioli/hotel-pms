@@ -43,5 +43,18 @@
   "step_stay_details": "2. Dettagli soggiorno",
   "err_select_recipient": "Seleziona un ospite esistente o inserisci i dati del contatto",
   "err_select_room": "Seleziona almeno una camera",
-  "quotation_total": "Totale preventivo: {{amount}}"
+  "quotation_total": "Totale preventivo: {{amount}}",
+  "edit_quotation": "Modifica preventivo",
+  "toast_updated": "Preventivo aggiornato",
+  "toast_duplicated": "Preventivo duplicato",
+  "error_loading_quotation": "Errore caricamento preventivo",
+  "send_failed_banner": "L'ultimo invio non è riuscito — il servizio email non era disponibile.",
+  "col_room": "Camera",
+  "col_room_type": "Tipo camera",
+  "col_price": "Prezzo",
+  "label_expected_guests": "Ospiti previsti",
+  "action_preview_pdf": "Anteprima PDF",
+  "action_duplicate": "Duplica",
+  "pdf_preview_title": "Anteprima preventivo",
+  "error_loading_pdf_preview": "Errore caricamento anteprima PDF"
 }

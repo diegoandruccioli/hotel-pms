@@ -45,6 +45,8 @@ class RateCalendarControllerTest {
     private static final String CALENDAR_URL = "/api/v1/rate-calendar";
     private static final String BULK_APPLY_URL = "/api/v1/rate-calendar/bulk-apply";
     private static final String PRICE_150 = "150.00";
+    private static final double PRICE_150_VALUE = 150.00;
+    private static final String SEASON_NAME = "Alta stagione";
     private static final LocalDate AUG_1 = LocalDate.of(2026, 8, 1);
     private static final LocalDate AUG_31 = LocalDate.of(2026, 8, 31);
     private static final UUID HOTEL_ID = UUID.randomUUID();
@@ -96,7 +98,7 @@ class RateCalendarControllerTest {
         mockMvc.perform(get(CALENDAR_URL).param("from", AUG_1.toString()).param("to", AUG_31.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rows[0].roomTypeName").value("Double"))
-                .andExpect(jsonPath("$.rows[0].days[0].price").value(150.00));
+                .andExpect(jsonPath("$.rows[0].days[0].price").value(PRICE_150_VALUE));
     }
 
     @Test
@@ -111,9 +113,9 @@ class RateCalendarControllerTest {
     @Test
     void shouldBulkApplyReturn200() throws Exception {
         final RateSeasonResponse created = new RateSeasonResponse(
-                UUID.randomUUID(), roomTypeId, "Alta stagione", AUG_1, AUG_31, new BigDecimal(PRICE_150));
+                UUID.randomUUID(), roomTypeId, SEASON_NAME, AUG_1, AUG_31, new BigDecimal(PRICE_150));
         final RateBulkApplyRequest request = new RateBulkApplyRequest(
-                List.of(roomTypeId), AUG_1, AUG_31, new BigDecimal(PRICE_150), "Alta stagione");
+                List.of(roomTypeId), AUG_1, AUG_31, new BigDecimal(PRICE_150), SEASON_NAME);
 
         when(rateCalendarService.bulkApply(eq(HOTEL_ID), any(RateBulkApplyRequest.class)))
                 .thenReturn(List.of(created));
@@ -122,13 +124,13 @@ class RateCalendarControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Alta stagione"));
+                .andExpect(jsonPath("$[0].name").value(SEASON_NAME));
     }
 
     @Test
     void shouldRejectBulkApplyWithEndDateBeforeStartDateReturn400() throws Exception {
         final RateBulkApplyRequest invalidRequest = new RateBulkApplyRequest(
-                List.of(roomTypeId), AUG_31, AUG_1, new BigDecimal(PRICE_150), "Alta stagione");
+                List.of(roomTypeId), AUG_31, AUG_1, new BigDecimal(PRICE_150), SEASON_NAME);
 
         mockMvc.perform(post(BULK_APPLY_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -139,7 +141,7 @@ class RateCalendarControllerTest {
     @Test
     void shouldRejectBulkApplyWithNoRoomTypesReturn400() throws Exception {
         final RateBulkApplyRequest invalidRequest = new RateBulkApplyRequest(
-                List.of(), AUG_1, AUG_31, new BigDecimal(PRICE_150), "Alta stagione");
+                List.of(), AUG_1, AUG_31, new BigDecimal(PRICE_150), SEASON_NAME);
 
         mockMvc.perform(post(BULK_APPLY_URL)
                         .contentType(MediaType.APPLICATION_JSON)

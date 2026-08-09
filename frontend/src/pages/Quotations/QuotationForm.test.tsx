@@ -8,6 +8,7 @@ import { QuotationForm } from './QuotationForm';
 import { inventoryService } from '../../services/inventoryService';
 import { reservationService } from '../../services/reservationService';
 import { quotationService } from '../../services/quotationService';
+import { guestService } from '../../services/guestService';
 
 vi.mock('../../services/inventoryService');
 vi.mock('../../services/reservationService');
@@ -79,6 +80,14 @@ describe('QuotationForm', () => {
     </MemoryRouter>
   );
 
+  const renderEditForm = () => render(
+    <MemoryRouter initialEntries={['/quotations/q1/edit']}>
+      <Routes>
+        <Route path="/quotations/:id/edit" element={<QuotationForm />} />
+      </Routes>
+    </MemoryRouter>
+  );
+
   it('renders heading and room mock after data loads', async () => {
     renderForm();
     await waitFor(() => {
@@ -89,7 +98,7 @@ describe('QuotationForm', () => {
 
   it('defaults to existing-guest recipient mode', async () => {
     renderForm();
-    await waitFor(() => expect(screen.getByText('common:search_guest_placeholder')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('guests:search_guest_placeholder')).toBeInTheDocument());
   });
 
   it('toggle_new_prospect switches to prospect fields', async () => {
@@ -141,5 +150,57 @@ describe('QuotationForm', () => {
     const { container } = renderForm();
     await waitFor(() => screen.getByTestId('room-mock'));
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  describe('edit mode', () => {
+    const existingQuotation = {
+      id: 'q1',
+      guestId: 'g1',
+      guestFullName: 'Mario Rossi',
+      prospectEmail: null,
+      checkInDate: '2026-09-01',
+      checkOutDate: '2026-09-03',
+      expectedGuests: 2,
+      status: 'DRAFT',
+      validUntil: '2026-08-25',
+      totalPrice: 200,
+      lineItems: [{ id: 'li1', roomId: 'r1', roomNumber: '101', roomTypeName: 'Standard', price: 200 }],
+      sendFailed: false,
+      sendFailureReason: null,
+      createdAt: '2026-08-01T00:00:00',
+      updatedAt: '2026-08-01T00:00:00',
+    };
+
+    beforeEach(() => {
+      vi.mocked(quotationService.getQuotationById).mockResolvedValue(existingQuotation as never);
+      vi.mocked(guestService.getGuestById).mockResolvedValue(
+        { id: 'g1', firstName: 'Mario', lastName: 'Rossi', email: 'mario@example.com' } as never,
+      );
+    });
+
+    it('shows the edit title and pre-fills the selected room from the existing quotation', async () => {
+      renderEditForm();
+      await waitFor(() => {
+        expect(screen.getByText('edit_quotation')).toBeInTheDocument();
+        expect(screen.getByText('Selected: r1')).toBeInTheDocument();
+      });
+    });
+
+    it('calls updateQuotation instead of createQuotation and navigates to the detail page', async () => {
+      vi.mocked(quotationService.updateQuotation).mockResolvedValue({ id: 'q1' } as never);
+      renderEditForm();
+      await waitFor(() => expect(screen.getByText('Selected: r1')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('common:save'));
+
+      await waitFor(() => expect(quotationService.updateQuotation).toHaveBeenCalledWith('q1', expect.objectContaining({
+        guestId: 'g1',
+        checkInDate: '2026-09-01',
+        checkOutDate: '2026-09-03',
+        roomIds: ['r1'],
+      })));
+      expect(quotationService.createQuotation).not.toHaveBeenCalled();
+      expect(mockNavigate).toHaveBeenCalledWith('/quotations/q1');
+    });
   });
 });

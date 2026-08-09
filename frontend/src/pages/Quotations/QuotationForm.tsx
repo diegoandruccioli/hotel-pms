@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { MaterialIcon } from '../../components/MaterialIcon';
@@ -46,6 +46,8 @@ const todayPlusDays = (days: number): string => {
 export const QuotationForm = () => {
   const { t } = useTranslation(['quotations', 'guests', 'common']);
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const isEditMode = !!id;
   const addToast = useToastStore((s) => s.addToast);
 
   const [fetching, setFetching] = useState(false);
@@ -84,18 +86,39 @@ export const QuotationForm = () => {
     try {
       setFetching(true);
       setError(null);
-      const [roomsData, allRes] = await Promise.all([
+      const [roomsData, allRes, quotation] = await Promise.all([
         inventoryService.getAllRooms(),
         reservationService.getAllReservations(),
+        isEditMode && id ? quotationService.getQuotationById(id) : Promise.resolve(null),
       ]);
       setRooms(roomsData.content);
       setAllReservations(allRes);
+
+      if (quotation) {
+        setCheckInDate(quotation.checkInDate);
+        setCheckOutDate(quotation.checkOutDate);
+        setExpectedGuests(quotation.expectedGuests ?? 1);
+        setSelectedRoomIds(quotation.lineItems.map((li) => li.roomId));
+        setValidUntil(quotation.validUntil);
+
+        if (quotation.guestId) {
+          setRecipientMode('guest');
+          const guest = await guestService.getGuestById(quotation.guestId);
+          setSelectedGuest(guest);
+        } else {
+          setRecipientMode('prospect');
+          const [first, ...rest] = quotation.guestFullName.split(' ');
+          setProspectFirstName(first ?? '');
+          setProspectLastName(rest.join(' '));
+          setProspectEmail(quotation.prospectEmail ?? '');
+        }
+      }
     } catch (err: unknown) {
       setError(getErrorMessage(err, t('common:failed_load_data')));
     } finally {
       setFetching(false);
     }
-  }, [t]);
+  }, [t, isEditMode, id]);
 
   useEffect(() => {
     loadInitialData();
@@ -161,7 +184,10 @@ export const QuotationForm = () => {
   const handleProspectLastNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setProspectLastName(e.target.value), []);
   const handleProspectEmailChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setProspectEmail(e.target.value), []);
   const handleValidUntilChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setValidUntil(e.target.value), []);
-  const handleBack = useCallback(() => navigate('/quotations'), [navigate]);
+  const handleBack = useCallback(
+    () => navigate(isEditMode && id ? `/quotations/${id}` : '/quotations'),
+    [navigate, isEditMode, id],
+  );
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,17 +226,23 @@ export const QuotationForm = () => {
         validUntil: parsed.data.validUntil,
       };
 
-      await quotationService.createQuotation(request);
-      addToast(t('toast_created'), 'success');
-      navigate('/quotations');
+      if (isEditMode && id) {
+        await quotationService.updateQuotation(id, request);
+        addToast(t('toast_updated'), 'success');
+        navigate(`/quotations/${id}`);
+      } else {
+        await quotationService.createQuotation(request);
+        addToast(t('toast_created'), 'success');
+        navigate('/quotations');
+      }
     } catch (err: unknown) {
-      setError(getErrorMessage(err, t('toast_created')));
+      setError(getErrorMessage(err, isEditMode ? t('toast_updated') : t('toast_created')));
     } finally {
       setLoading(false);
     }
   }, [recipientMode, selectedGuest, prospectFirstName, prospectLastName, prospectEmail,
       selectedRoomIds, checkInDate, checkOutDate, validUntil, expectedGuests,
-      quotationSchema, addToast, t, navigate]);
+      quotationSchema, addToast, t, navigate, isEditMode, id]);
 
   if (fetching) {
     return (
@@ -232,7 +264,9 @@ export const QuotationForm = () => {
           <MaterialIcon name="arrow_back" />
         </button>
         <div>
-          <h1 className="text-2xl font-display font-bold text-on-surface">{t('new_quotation')}</h1>
+          <h1 className="text-2xl font-display font-bold text-on-surface">
+            {isEditMode ? t('edit_quotation') : t('new_quotation')}
+          </h1>
         </div>
       </div>
 

@@ -22,6 +22,16 @@ export const quotationService = {
     return response.data;
   },
 
+  updateQuotation: async (id: string, data: QuotationRequest): Promise<QuotationResponse> => {
+    const response = await api.put<QuotationResponse>(`${BASE_PATH}/${id}`, data);
+    return response.data;
+  },
+
+  duplicateQuotation: async (id: string): Promise<QuotationResponse> => {
+    const response = await api.post<QuotationResponse>(`${BASE_PATH}/${id}/duplicate`, {});
+    return response.data;
+  },
+
   sendQuotation: async (id: string): Promise<QuotationResponse> => {
     const response = await api.post<QuotationResponse>(`${BASE_PATH}/${id}/send`, {});
     return response.data;
@@ -52,5 +62,17 @@ export const quotationService = {
     iframe.src = `${BASE_PATH}/${id}/pdf`;
     document.body.appendChild(iframe);
     setTimeout(() => document.body.removeChild(iframe), IFRAME_CLEANUP_DELAY_MS);
+  },
+
+  /**
+   * Fetches the quotation PDF as a Blob for inline preview (an `<iframe>` on a
+   * blob: URL, revoked by the caller when the preview closes). Unlike
+   * `downloadPdf`, this is meant to be *rendered*, not saved, so the iframe
+   * pointed straight at the endpoint isn't a fit — `Content-Disposition:
+   * attachment` would just trigger a second, unwanted download.
+   */
+  getPdfBlob: async (id: string): Promise<Blob> => {
+    const response = await api.get(`${BASE_PATH}/${id}/pdf`, { responseType: 'blob' });
+    return response.data;
   },
 };

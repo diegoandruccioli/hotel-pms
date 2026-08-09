@@ -14,9 +14,9 @@ import com.hotelpms.frontdesk.pricing.service.RatePricingService;
 import com.hotelpms.frontdesk.quotations.domain.Quotation;
 import com.hotelpms.frontdesk.quotations.domain.QuotationLineItem;
 import com.hotelpms.frontdesk.quotations.domain.QuotationStatus;
+import com.hotelpms.frontdesk.quotations.dto.QuotationLineItemResponse;
 import com.hotelpms.frontdesk.quotations.dto.QuotationRequest;
 import com.hotelpms.frontdesk.quotations.dto.QuotationResponse;
-import com.hotelpms.frontdesk.quotations.mapper.QuotationMapper;
 import com.hotelpms.frontdesk.quotations.repository.QuotationRepository;
 import com.hotelpms.frontdesk.quotations.service.QuotationService;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
@@ -62,10 +62,10 @@ public class QuotationServiceImpl implements QuotationService {
     private static final String PDF_TEMPLATE = "quotation";
     private static final String PDF_FILE_PREFIX = "preventivo-";
     private static final String PDF_FILE_EXTENSION = ".pdf";
+    private static final int DUPLICATE_VALID_DAYS = 7;
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final QuotationRepository quotationRepository;
-    private final QuotationMapper quotationMapper;
     private final RoomService roomService;
     private final RatePricingService ratePricingService;
     private final GuestClient guestClient;
@@ -80,24 +80,9 @@ public class QuotationServiceImpl implements QuotationService {
     public QuotationResponse createQuotation(final QuotationRequest request) {
         final UUID hotelId = resolveHotelId();
         final GuestResponse guest = request.guestId() != null ? verifyGuestExists(request.guestId()) : null;
-
-        final Map<UUID, RoomResponse> roomsById = new HashMap<>();
-        for (final UUID roomId : request.roomIds()) {
-            roomsById.put(roomId, roomService.getRoomById(roomId, hotelId));
-        }
-
-        final List<QuotationLineItem> lineItems = new ArrayList<>();
-        BigDecimal total = BigDecimal.ZERO;
-        for (final UUID roomId : request.roomIds()) {
-            final RoomResponse room = roomsById.get(roomId);
-            final List<NightlyRate> nightlyRates = ratePricingService.resolveStayRates(
-                    room.roomType().id(), hotelId, request.checkInDate(), request.checkOutDate());
-            final BigDecimal price = nightlyRates.stream()
-                    .map(NightlyRate::nightlyPrice)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            total = total.add(price);
-            lineItems.add(QuotationLineItem.builder().roomId(roomId).price(price).build());
-        }
+        final Map<UUID, RoomResponse> roomsById = resolveRooms(request.roomIds(), hotelId);
+        final ResolvedLineItems priced = resolveLineItems(
+                request.roomIds(), roomsById, hotelId, request.checkInDate(), request.checkOutDate());
 
         final Quotation quotation = Quotation.builder()
                 .hotelId(hotelId)
@@ -110,13 +95,85 @@ public class QuotationServiceImpl implements QuotationService {
                 .expectedGuests(request.expectedGuests())
                 .status(QuotationStatus.DRAFT)
                 .validUntil(request.validUntil())
-                .totalPrice(total)
+                .totalPrice(priced.total())
                 .build();
-        lineItems.forEach(lineItem -> lineItem.setQuotation(quotation));
-        quotation.setLineItems(lineItems);
+        priced.lineItems().forEach(lineItem -> lineItem.setQuotation(quotation));
+        quotation.setLineItems(priced.lineItems());
 
         final Quotation saved = quotationRepository.save(quotation);
-        return toResponse(saved, guest);
+        return toResponse(saved, guest, roomsById);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public QuotationResponse updateQuotation(final UUID id, final QuotationRequest request) {
+        final UUID hotelId = resolveHotelId();
+        final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
+        if (quotation.getStatus() != QuotationStatus.DRAFT) {
+            throw new ConflictException("QUOTATION_NOT_EDITABLE");
+        }
+
+        final GuestResponse guest = request.guestId() != null ? verifyGuestExists(request.guestId()) : null;
+        final Map<UUID, RoomResponse> roomsById = resolveRooms(request.roomIds(), hotelId);
+        final ResolvedLineItems priced = resolveLineItems(
+                request.roomIds(), roomsById, hotelId, request.checkInDate(), request.checkOutDate());
+
+        quotation.setGuestId(request.guestId());
+        quotation.setProspectFirstName(request.guestId() == null ? request.prospectFirstName() : null);
+        quotation.setProspectLastName(request.guestId() == null ? request.prospectLastName() : null);
+        quotation.setProspectEmail(request.guestId() == null ? request.prospectEmail() : null);
+        quotation.setCheckInDate(request.checkInDate());
+        quotation.setCheckOutDate(request.checkOutDate());
+        quotation.setExpectedGuests(request.expectedGuests());
+        quotation.setValidUntil(request.validUntil());
+        quotation.setTotalPrice(priced.total());
+
+        // Mutate the managed collection in place (orphanRemoval=true tracks the
+        // removed rows) — replacing the field reference would not.
+        quotation.getLineItems().clear();
+        priced.lineItems().forEach(lineItem -> lineItem.setQuotation(quotation));
+        quotation.getLineItems().addAll(priced.lineItems());
+
+        final Quotation saved = quotationRepository.save(quotation);
+        return toResponse(saved, guest, roomsById);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public QuotationResponse duplicateQuotation(final UUID id) {
+        final UUID hotelId = resolveHotelId();
+        final Quotation source = findByIdAndHotelOrThrow(id, hotelId);
+        final List<UUID> roomIds = source.getLineItems().stream().map(QuotationLineItem::getRoomId).toList();
+        final Map<UUID, RoomResponse> roomsById = resolveRooms(roomIds, hotelId);
+        final ResolvedLineItems priced = resolveLineItems(
+                roomIds, roomsById, hotelId, source.getCheckInDate(), source.getCheckOutDate());
+
+        final LocalDate proposedValidUntil = LocalDate.now().plusDays(DUPLICATE_VALID_DAYS);
+        final LocalDate validUntil = proposedValidUntil.isBefore(source.getCheckInDate())
+                ? proposedValidUntil : source.getCheckInDate();
+
+        final Quotation duplicate = Quotation.builder()
+                .hotelId(hotelId)
+                .guestId(source.getGuestId())
+                .prospectFirstName(source.getProspectFirstName())
+                .prospectLastName(source.getProspectLastName())
+                .prospectEmail(source.getProspectEmail())
+                .checkInDate(source.getCheckInDate())
+                .checkOutDate(source.getCheckOutDate())
+                .expectedGuests(source.getExpectedGuests())
+                .status(QuotationStatus.DRAFT)
+                .validUntil(validUntil)
+                .totalPrice(priced.total())
+                .build();
+        priced.lineItems().forEach(lineItem -> lineItem.setQuotation(duplicate));
+        duplicate.setLineItems(priced.lineItems());
+
+        final Quotation saved = quotationRepository.save(duplicate);
+        final GuestResponse guest = saved.getGuestId() != null
+                ? guestClient.getGuestById(saved.getGuestId()) : null;
+        return toResponse(saved, guest, roomsById);
     }
 
     /** {@inheritDoc} */
@@ -127,7 +184,7 @@ public class QuotationServiceImpl implements QuotationService {
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        return toResponse(quotation, guest);
+        return toResponse(quotation, guest, resolveRoomsForLineItems(quotation.getLineItems(), hotelId));
     }
 
     /** {@inheritDoc} */
@@ -148,8 +205,10 @@ public class QuotationServiceImpl implements QuotationService {
                 : guestClient.getGuestsBatch(guestIds).stream()
                         .collect(java.util.stream.Collectors.toMap(GuestResponse::id, g -> g));
 
-        return page.map(quotation -> toResponse(quotation,
-                quotation.getGuestId() == null ? null : guestsById.get(quotation.getGuestId())));
+        return page.map(quotation -> toResponse(
+                quotation,
+                quotation.getGuestId() == null ? null : guestsById.get(quotation.getGuestId()),
+                resolveRoomsForLineItems(quotation.getLineItems(), hotelId)));
     }
 
     /** {@inheritDoc} */
@@ -160,7 +219,7 @@ public class QuotationServiceImpl implements QuotationService {
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        return renderPdf(quotation, guest);
+        return renderPdf(quotation, guest, resolveRoomsForLineItems(quotation.getLineItems(), hotelId));
     }
 
     /** {@inheritDoc} */
@@ -175,12 +234,13 @@ public class QuotationServiceImpl implements QuotationService {
 
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
+        final Map<UUID, RoomResponse> roomsById = resolveRoomsForLineItems(quotation.getLineItems(), hotelId);
         final String recipientEmail = guest != null ? guest.email() : quotation.getProspectEmail();
         final String recipientName = guest != null
                 ? guest.firstName() + " " + guest.lastName()
                 : quotation.getProspectFirstName() + " " + quotation.getProspectLastName();
 
-        final byte[] pdf = renderPdf(quotation, guest);
+        final byte[] pdf = renderPdf(quotation, guest, roomsById);
         final HotelSettingsResponse settings = hotelSettingsService.getOrCreate(hotelId);
         final boolean sent = notificationClient.sendQuotation(new NotificationQuotationRequest(
                 recipientEmail,
@@ -204,7 +264,7 @@ public class QuotationServiceImpl implements QuotationService {
             quotation.setStatus(QuotationStatus.SENT);
         }
         final Quotation saved = quotationRepository.save(quotation);
-        return toResponse(saved, guest);
+        return toResponse(saved, guest, roomsById);
     }
 
     /** {@inheritDoc} */
@@ -249,11 +309,14 @@ public class QuotationServiceImpl implements QuotationService {
     public QuotationResponse declineQuotation(final UUID id) {
         final UUID hotelId = resolveHotelId();
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
+        if (quotation.getStatus() == QuotationStatus.ACCEPTED) {
+            throw new ConflictException("QUOTATION_ALREADY_ACCEPTED");
+        }
         quotation.setStatus(QuotationStatus.DECLINED);
         final Quotation saved = quotationRepository.save(quotation);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        return toResponse(saved, guest);
+        return toResponse(saved, guest, resolveRoomsForLineItems(quotation.getLineItems(), hotelId));
     }
 
     /** {@inheritDoc} */
@@ -282,7 +345,51 @@ public class QuotationServiceImpl implements QuotationService {
         }
     }
 
-    private byte[] renderPdf(final Quotation quotation, final GuestResponse guest) {
+    /**
+     * Resolves and freezes the price of every room in {@code roomIds} for the
+     * given stay — the single price-resolution routine shared by
+     * {@link #createQuotation}, {@link #updateQuotation} and
+     * {@link #duplicateQuotation}.
+     *
+     * @param roomIds   the rooms to price
+     * @param roomsById each room's details, already resolved (see {@link #resolveRooms})
+     * @param hotelId   the caller's hotel
+     * @param checkIn   the stay's check-in date
+     * @param checkOut  the stay's check-out date (exclusive)
+     * @return the priced line items and their total
+     */
+    private ResolvedLineItems resolveLineItems(
+            final List<UUID> roomIds, final Map<UUID, RoomResponse> roomsById, final UUID hotelId,
+            final LocalDate checkIn, final LocalDate checkOut) {
+        final List<QuotationLineItem> lineItems = new ArrayList<>();
+        BigDecimal total = BigDecimal.ZERO;
+        for (final UUID roomId : roomIds) {
+            final RoomResponse room = roomsById.get(roomId);
+            final List<NightlyRate> nightlyRates = ratePricingService.resolveStayRates(
+                    room.roomType().id(), hotelId, checkIn, checkOut);
+            final BigDecimal price = nightlyRates.stream()
+                    .map(NightlyRate::nightlyPrice)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            total = total.add(price);
+            lineItems.add(QuotationLineItem.builder().roomId(roomId).price(price).build());
+        }
+        return new ResolvedLineItems(lineItems, total);
+    }
+
+    private Map<UUID, RoomResponse> resolveRooms(final List<UUID> roomIds, final UUID hotelId) {
+        final Map<UUID, RoomResponse> roomsById = new HashMap<>();
+        for (final UUID roomId : roomIds) {
+            roomsById.computeIfAbsent(roomId, id -> roomService.getRoomById(id, hotelId));
+        }
+        return roomsById;
+    }
+
+    private Map<UUID, RoomResponse> resolveRoomsForLineItems(
+            final List<QuotationLineItem> lineItems, final UUID hotelId) {
+        return resolveRooms(lineItems.stream().map(QuotationLineItem::getRoomId).toList(), hotelId);
+    }
+
+    private byte[] renderPdf(final Quotation quotation, final GuestResponse guest, final Map<UUID, RoomResponse> roomsById) {
         final HotelSettingsResponse settings = hotelSettingsService.getOrCreate(quotation.getHotelId());
         final Map<String, Object> context = new HashMap<>();
         context.put("docTitle", "PREVENTIVO");
@@ -294,17 +401,18 @@ public class QuotationServiceImpl implements QuotationService {
         context.put("guestDisplayName", guest != null
                 ? guest.firstName() + " " + guest.lastName()
                 : quotation.getProspectFirstName() + " " + quotation.getProspectLastName());
-        context.put("rooms", toRoomRows(quotation.getLineItems()));
+        context.put("rooms", toRoomRows(quotation.getLineItems(), roomsById));
         context.put("totalFormatted", formatAmount(quotation.getTotalPrice()));
         context.put("validUntil", quotation.getValidUntil().format(DATE_FMT));
         return pdfTemplateRenderer.render(PDF_TEMPLATE, context);
     }
 
-    private List<Map<String, String>> toRoomRows(final List<QuotationLineItem> lineItems) {
+    private List<Map<String, String>> toRoomRows(
+            final List<QuotationLineItem> lineItems, final Map<UUID, RoomResponse> roomsById) {
         final List<Map<String, String>> rows = new ArrayList<>();
         for (final QuotationLineItem lineItem : lineItems) {
+            final RoomResponse room = roomsById.get(lineItem.getRoomId());
             final Map<String, String> row = new HashMap<>();
-            final RoomResponse room = roomService.getRoomById(lineItem.getRoomId(), lineItem.getQuotation().getHotelId());
             row.put("label", room.roomNumber() + " — " + room.roomType().name());
             row.put("priceFormatted", formatAmount(lineItem.getPrice()));
             rows.add(row);
@@ -316,7 +424,8 @@ public class QuotationServiceImpl implements QuotationService {
         return amount == null ? "EUR 0,00" : String.format("EUR %,.2f", amount);
     }
 
-    private QuotationResponse toResponse(final Quotation quotation, final GuestResponse guest) {
+    private QuotationResponse toResponse(
+            final Quotation quotation, final GuestResponse guest, final Map<UUID, RoomResponse> roomsById) {
         final String guestFullName = guest != null
                 ? guest.firstName() + " " + guest.lastName()
                 : quotation.getGuestId() != null
@@ -324,6 +433,14 @@ public class QuotationServiceImpl implements QuotationService {
                         : quotation.getProspectFirstName() + " " + quotation.getProspectLastName();
         final QuotationStatus effectiveStatus = quotation.isExpired() ? QuotationStatus.EXPIRED : quotation.getStatus();
         final String prospectEmail = quotation.getGuestId() == null ? quotation.getProspectEmail() : null;
+
+        final List<QuotationLineItemResponse> lineItems = quotation.getLineItems().stream()
+                .map(li -> {
+                    final RoomResponse room = roomsById.get(li.getRoomId());
+                    return new QuotationLineItemResponse(
+                            li.getId(), li.getRoomId(), room.roomNumber(), room.roomType().name(), li.getPrice());
+                })
+                .toList();
 
         return new QuotationResponse(
                 quotation.getId(),
@@ -336,7 +453,7 @@ public class QuotationServiceImpl implements QuotationService {
                 effectiveStatus,
                 quotation.getValidUntil(),
                 quotation.getTotalPrice(),
-                quotationMapper.toLineItemResponses(quotation.getLineItems()),
+                lineItems,
                 quotation.isSendFailed(),
                 quotation.getSendFailureReason(),
                 quotation.getCreatedAt(),
@@ -346,5 +463,15 @@ public class QuotationServiceImpl implements QuotationService {
     private UUID resolveHotelId() {
         final Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
         return UUID.fromString(String.valueOf(details));
+    }
+
+    /**
+     * A priced set of line items and their combined total — the shared result
+     * of {@link #resolveLineItems}.
+     *
+     * @param lineItems the priced, not-yet-persisted line items
+     * @param total     the sum of every line item's price
+     */
+    private record ResolvedLineItems(List<QuotationLineItem> lineItems, BigDecimal total) {
     }
 }
