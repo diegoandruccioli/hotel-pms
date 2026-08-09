@@ -412,6 +412,47 @@ class AuthenticationFilterTest {
                 }
 
                 @Test
+                @DisplayName("RECEPTIONIST is blocked from POST /api/v1/rate-calendar/bulk-apply with 403")
+                void receptionistBlockedFromRateCalendarBulkApply() {
+                        final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.post("/api/v1/rate-calendar/bulk-apply")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                }
+
+                @Test
+                @DisplayName("RECEPTIONIST can GET /api/v1/rate-calendar (read is allowed)")
+                void receptionistCanReadRateCalendar() {
+                        when(chainMock.filter(any())).thenReturn(Mono.empty());
+                        final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/rate-calendar")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        verify(chainMock).filter(any());
+                }
+
+                @Test
+                @DisplayName("ADMIN can POST to /api/v1/rate-calendar/bulk-apply")
+                void adminCanBulkApplyRateCalendar() {
+                        when(chainMock.filter(any())).thenReturn(Mono.empty());
+                        final String token = buildJwt(ONE_HOUR_MS, "admin", "ADMIN");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.post("/api/v1/rate-calendar/bulk-apply")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        verify(chainMock).filter(any());
+                }
+
+                @Test
                 @DisplayName("RECEPTIONIST is blocked from POST /api/v1/rooms with 403")
                 void receptionistBlockedFromRoomCreate() {
                         final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST");

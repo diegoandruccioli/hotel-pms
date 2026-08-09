@@ -79,7 +79,8 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
      * during check-in).
      */
     private static final Set<String> WRITE_RESTRICTED_PREFIXES = Set.of(
-            "/api/v1/room-types"
+            "/api/v1/room-types",
+            "/api/v1/rate-calendar"
     );
 
     /**
