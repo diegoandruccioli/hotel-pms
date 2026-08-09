@@ -10,6 +10,7 @@ import guestsEn from './locales/en/guests.json';
 import staysEn from './locales/en/stays.json';
 import roomsEn from './locales/en/rooms.json';
 import reservationsEn from './locales/en/reservations.json';
+import quotationsEn from './locales/en/quotations.json';
 import calendarEn from './locales/en/calendar.json';
 import billingEn from './locales/en/billing.json';
 import restaurantEn from './locales/en/restaurant.json';
@@ -25,6 +26,7 @@ import guestsIt from './locales/it/guests.json';
 import staysIt from './locales/it/stays.json';
 import roomsIt from './locales/it/rooms.json';
 import reservationsIt from './locales/it/reservations.json';
+import quotationsIt from './locales/it/quotations.json';
 import calendarIt from './locales/it/calendar.json';
 import billingIt from './locales/it/billing.json';
 import restaurantIt from './locales/it/restaurant.json';
@@ -42,6 +44,7 @@ const resources = {
     stays: staysEn,
     rooms: roomsEn,
     reservations: reservationsEn,
+    quotations: quotationsEn,
     calendar: calendarEn,
     billing: billingEn,
     restaurant: restaurantEn,
@@ -58,6 +61,7 @@ const resources = {
     stays: staysIt,
     rooms: roomsIt,
     reservations: reservationsIt,
+    quotations: quotationsIt,
     calendar: calendarIt,
     billing: billingIt,
     restaurant: restaurantIt,

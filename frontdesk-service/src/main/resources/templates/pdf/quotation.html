@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8"/>
+<title th:text="${docTitle}">Preventivo</title>
+<style>
+    @page { size: A4; margin: 2.2cm 1.8cm; }
+    body { font-family: 'Noto Sans', sans-serif; font-size: 9pt; color: #1a1a1a; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start;
+        border-bottom: 1px solid #333; padding-bottom: 8pt; margin-bottom: 12pt; }
+    .hotel-name { font-size: 15pt; font-weight: bold; }
+    .doc-title { font-size: 15pt; font-weight: bold; text-align: right; margin: 0; }
+    .meta-section { display: flex; justify-content: space-between;
+        border-bottom: 1px solid #333; padding-bottom: 8pt; margin-bottom: 12pt; }
+    .meta-label { font-weight: bold; }
+    table.rows { width: 100%; border-collapse: collapse; margin-bottom: 12pt; }
+    table.rows caption { text-align: left; font-weight: bold; font-size: 10pt;
+        margin-bottom: 4pt; caption-side: top; }
+    table.rows th { text-align: left; font-size: 8pt; font-weight: bold;
+        border-bottom: 1px solid #333; padding: 3pt 4pt; }
+    table.rows td { font-size: 9pt; padding: 3pt 4pt; border-bottom: 0.5px solid #ccc; }
+    table.rows td.amount, table.rows th.amount { text-align: right; }
+    .totals { width: 100%; border-top: 1px solid #333; padding-top: 8pt; }
+    .totals .row { display: flex; justify-content: flex-end; gap: 12pt; padding: 2pt 0; }
+    .totals .row .label { width: 160pt; text-align: right; }
+    .totals .row .value { width: 90pt; text-align: right; }
+    .totals .row.grand-total { font-weight: bold; font-size: 10pt;
+        border-top: 1px solid #333; padding-top: 4pt; }
+    .validity { margin-top: 16pt; padding-top: 8pt; border-top: 0.5px solid #ccc;
+        font-size: 8.5pt; color: #444; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div class="hotel-name" th:text="${hotelName}">Hotel Name</div>
+    <h1 class="doc-title" th:text="${docTitle}">PREVENTIVO</h1>
+</div>
+
+<div class="meta-section">
+    <div>
+        <div><span class="meta-label">Data emissione:</span> <span th:text="${issueDate}">01/01/2026</span></div>
+        <div><span class="meta-label">Check-in:</span> <span th:text="${checkInDate}">01/01/2026</span></div>
+        <div><span class="meta-label">Check-out:</span> <span th:text="${checkOutDate}">02/01/2026</span></div>
+        <div th:if="${expectedGuests != null}"><span class="meta-label">Ospiti:</span> <span th:text="${expectedGuests}">2</span></div>
+    </div>
+    <div>
+        <div><span class="meta-label">Destinatario:</span> <span th:text="${guestDisplayName}">Guest</span></div>
+    </div>
+</div>
+
+<table class="rows">
+    <caption>CAMERE</caption>
+    <thead>
+    <tr><th>Camera</th><th class="amount">Prezzo soggiorno</th></tr>
+    </thead>
+    <tbody>
+    <tr th:each="room : ${rooms}">
+        <td th:text="${room.label}">Camera</td>
+        <td class="amount" th:text="${room.priceFormatted}">EUR 0,00</td>
+    </tr>
+    </tbody>
+</table>
+
+<div class="totals">
+    <div class="row grand-total">
+        <span class="label">Totale</span>
+        <span class="value" th:text="${totalFormatted}">EUR 0,00</span>
+    </div>
+</div>
+
+<p class="validity">
+    Preventivo valido fino al <strong th:text="${validUntil}">01/01/2026</strong> —
+    il prezzo indicato è garantito solo entro tale data.
+</p>
+
+</body>
+</html>

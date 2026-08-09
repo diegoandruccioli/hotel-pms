@@ -2,6 +2,7 @@ package com.hotelpms.notification.controller;
 
 import com.hotelpms.notification.dto.CheckinNotificationRequest;
 import com.hotelpms.notification.dto.CheckoutNotificationRequest;
+import com.hotelpms.notification.dto.QuotationNotificationRequest;
 import com.hotelpms.notification.dto.ReservationConfirmedRequest;
 import com.hotelpms.notification.service.NotificationService;
 import jakarta.validation.Valid;
@@ -73,6 +74,19 @@ public class NotificationController {
     public ResponseEntity<Boolean> checkout(@Valid @RequestBody final CheckoutNotificationRequest request) {
         log.debug("[NOTIFY] checkout request received");
         notificationService.sendCheckout(request);
+        return ResponseEntity.ok(Boolean.TRUE);
+    }
+
+    /**
+     * Sends a quotation email with the priced offer PDF attached.
+     *
+     * @param request the notification payload
+     * @return 200 OK with body {@code true} on success
+     */
+    @PostMapping("/quotation")
+    public ResponseEntity<Boolean> quotation(@Valid @RequestBody final QuotationNotificationRequest request) {
+        log.debug("[NOTIFY] quotation request received");
+        notificationService.sendQuotation(request);
         return ResponseEntity.ok(Boolean.TRUE);
     }
 }

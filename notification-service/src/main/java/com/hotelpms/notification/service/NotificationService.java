@@ -2,6 +2,7 @@ package com.hotelpms.notification.service;
 
 import com.hotelpms.notification.dto.CheckinNotificationRequest;
 import com.hotelpms.notification.dto.CheckoutNotificationRequest;
+import com.hotelpms.notification.dto.QuotationNotificationRequest;
 import com.hotelpms.notification.dto.ReservationConfirmedRequest;
 
 /**
@@ -29,4 +30,11 @@ public interface NotificationService {
      * @param request the notification payload
      */
     void sendCheckout(CheckoutNotificationRequest request);
+
+    /**
+     * Sends a quotation email with the priced offer PDF attached.
+     *
+     * @param request the notification payload
+     */
+    void sendQuotation(QuotationNotificationRequest request);
 }

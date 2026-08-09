@@ -2,6 +2,7 @@ package com.hotelpms.notification.service.impl;
 
 import com.hotelpms.notification.dto.CheckinNotificationRequest;
 import com.hotelpms.notification.dto.CheckoutNotificationRequest;
+import com.hotelpms.notification.dto.QuotationNotificationRequest;
 import com.hotelpms.notification.dto.ReservationConfirmedRequest;
 import com.hotelpms.notification.service.NotificationService;
 import com.hotelpms.notification.util.EmailMasker;
@@ -94,6 +95,20 @@ public class NotificationServiceImpl implements NotificationService {
         sendHtmlEmail(request.guestEmail(), subject, html, request.hotelName(),
                 request.invoicePdf(), request.invoiceFileName());
         log.info("[NOTIFY] checkout sent | to={}", EmailMasker.mask(request.guestEmail()));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void sendQuotation(final QuotationNotificationRequest request) {
+        final String template = "email/quotation-" + sanitizeLocale(request.locale());
+        final Context ctx = new Context();
+        ctx.setVariable(TEMPLATE_VAR_REQUEST, request);
+        final String html = templateEngine.process(template, ctx);
+        final String subject = buildSubject("Il tuo preventivo", "Your quotation",
+                request.locale(), request.hotelName(), null);
+        sendHtmlEmail(request.guestEmail(), subject, html, request.hotelName(),
+                request.quotationPdf(), request.quotationFileName());
+        log.info("[NOTIFY] quotation sent | to={}", EmailMasker.mask(request.guestEmail()));
     }
 
     /**

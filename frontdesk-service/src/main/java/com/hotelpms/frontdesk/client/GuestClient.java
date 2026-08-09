@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.client;
 
+import com.hotelpms.frontdesk.client.dto.GuestCreateRequest;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.GuestSearchPageResponse;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -57,6 +58,16 @@ public interface GuestClient {
      */
     @GetMapping("/api/v1/guests/{id}")
     GuestResponse getGuestById(@PathVariable("id") UUID id);
+
+    /**
+     * Creates a new guest profile. Used when converting a quotation made for
+     * a prospect (no {@code guestId} yet) into a reservation.
+     *
+     * @param request the guest details
+     * @return the created guest
+     */
+    @PostMapping("/api/v1/guests")
+    GuestResponse createGuest(@RequestBody GuestCreateRequest request);
 
     /**
      * Gets a list of guests by their IDs.

@@ -8,8 +8,10 @@ import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -139,4 +141,22 @@ public interface ReservationService {
      *         matching active line item for that room does not exist
      */
     Optional<ReservedRoomCharge> getReservedRoomCharge(UUID reservationId, UUID roomId, UUID hotelId);
+
+    /**
+     * Creates a reservation using prices already resolved and frozen elsewhere
+     * (an accepted {@code Quotation}) instead of resolving them live via
+     * {@code RatePricingService} — the price a guest was quoted must be
+     * exactly the price they're booked at, even if seasonal rates changed
+     * since the quotation was sent. Availability is still verified at
+     * creation time (a quotation does not hold inventory).
+     *
+     * @param guestId        the guest UUID
+     * @param checkInDate    the check-in date (inclusive)
+     * @param checkOutDate   the check-out date (exclusive)
+     * @param expectedGuests expected number of guests; defaults to 1 if null
+     * @param roomPrices     the frozen price for each room id
+     * @return the created reservation response
+     */
+    ReservationResponse createReservationFromPricedRooms(UUID guestId, LocalDate checkInDate,
+            LocalDate checkOutDate, Integer expectedGuests, Map<UUID, BigDecimal> roomPrices);
 }

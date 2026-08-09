@@ -69,7 +69,7 @@ spring:
         - id: frontdesk-service
           uri: "${GW_FRONTDESK_SERVICE_URI:http://frontdesk-service:8081}"
           predicates:
-            - Path=/api/v1/rooms/**, /api/v1/room-types/**, /api/v1/reservations/**, /api/v1/stays/**
+            - Path=/api/v1/rooms/**, /api/v1/room-types/**, /api/v1/reservations/**, /api/v1/stays/**, /api/v1/quotations/**
           filters:
             - AuthenticationFilter
             - name: RequestRateLimiter

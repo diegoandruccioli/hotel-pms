@@ -13,6 +13,7 @@ const navigation = [
   { nameKey: 'dashboard', href: '/', icon: 'dashboard' },
   { nameKey: 'guests', href: '/guests', icon: 'group' },
   { nameKey: 'reservations', href: '/reservations', icon: 'event' },
+  { nameKey: 'quotations', href: '/quotations', icon: 'request_quote' },
   { nameKey: 'calendar', href: '/calendar', icon: 'date_range' },
   { nameKey: 'stays', href: '/stays', icon: 'hotel' },
   { nameKey: 'housekeeping', href: '/housekeeping', icon: 'cleaning_services' },

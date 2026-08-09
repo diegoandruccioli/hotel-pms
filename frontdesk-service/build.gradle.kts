@@ -39,6 +39,8 @@ ext {
 
 dependencies {
     implementation(project(":internal-auth-lib"))
+    // Quotation PDF export — same renderer billing-service uses for invoices.
+    implementation(project(":pdf-template-engine"))
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")

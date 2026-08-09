@@ -228,6 +228,29 @@ class ReservationServiceImplTest {
     }
 
     @Test
+    void createReservationFromPricedRoomsUsesTheGivenPriceNotRatePricingService() {
+        final BigDecimal frozenPrice = BigDecimal.valueOf(310);
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(reservationMapper.toEntity(any(ReservationRequest.class))).thenReturn(entity);
+        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationMapper.toResponse(entity)).thenReturn(response);
+        when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
+                new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null));
+        when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
+
+        final ReservationResponse result = reservationService.createReservationFromPricedRooms(
+                GUEST_ID, LocalDate.now().plusDays(1), LocalDate.now().plusDays(3), EXPECTED_GUESTS,
+                java.util.Map.of(roomId, frozenPrice));
+
+        assertNotNull(result);
+        assertEquals(frozenPrice, entity.getLineItems().get(0).getPrice());
+    }
+
+    @Test
     void testRetryConfirmationEmailClearsFailedFlag() {
         entity.setConfirmationEmailFailed(true);
         entity.setConfirmationEmailFailureReason("NOTIFICATION_SERVICE_UNAVAILABLE");

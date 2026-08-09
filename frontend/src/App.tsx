@@ -14,6 +14,8 @@ const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default:
 const Guests = lazy(() => import('./pages/Guests').then((m) => ({ default: m.Guests })));
 const Reservations = lazy(() => import('./pages/Reservations').then((m) => ({ default: m.Reservations })));
 const ReservationForm = lazy(() => import('./pages/Reservations/ReservationForm').then((m) => ({ default: m.ReservationForm })));
+const Quotations = lazy(() => import('./pages/Quotations').then((m) => ({ default: m.Quotations })));
+const QuotationForm = lazy(() => import('./pages/Quotations/QuotationForm').then((m) => ({ default: m.QuotationForm })));
 const CheckInForm = lazy(() => import('./pages/Stays/CheckInForm').then((m) => ({ default: m.CheckInForm })));
 const WalkInCheckInForm = lazy(() => import('./pages/Stays/WalkInCheckInForm').then((m) => ({ default: m.WalkInCheckInForm })));
 const AdminUsers = lazy(() => import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })));
@@ -86,6 +88,8 @@ function App() {
               <Route path="/reservations/new" element={<ReservationForm />} />
               <Route path="/reservations/:id" element={<ReservationForm />} />
               <Route path="/reservations/edit/:id" element={<ReservationForm />} />
+              <Route path="/quotations" element={<Quotations />} />
+              <Route path="/quotations/new" element={<QuotationForm />} />
               <Route path="/stays" element={<Stays />} />
               <Route path="/stays/check-in/:reservationId" element={<CheckInForm />} />
               <Route path="/stays/walk-in" element={<WalkInCheckInForm />} />

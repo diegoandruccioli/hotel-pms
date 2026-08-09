@@ -587,6 +587,41 @@ public class ReservationServiceImpl implements ReservationService {
                 : message;
     }
 
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public ReservationResponse createReservationFromPricedRooms(
+            final UUID guestId, final LocalDate checkInDate, final LocalDate checkOutDate,
+            final Integer expectedGuests, final java.util.Map<UUID, BigDecimal> roomPrices) {
+        Objects.requireNonNull(roomPrices, "Room prices cannot be null");
+        final UUID hotelId = resolveHotelId();
+        final GuestResponse guest = verifyGuestExists(guestId);
+
+        final List<ReservationLineItemRequest> lineItemRequests = roomPrices.keySet().stream()
+                .map(ReservationLineItemRequest::new)
+                .toList();
+        final java.util.Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(lineItemRequests, hotelId);
+
+        final ReservationRequest pseudoRequest = new ReservationRequest(
+                guestId, Objects.requireNonNullElse(expectedGuests, 1), checkInDate, checkOutDate,
+                ReservationStatus.CONFIRMED, lineItemRequests);
+        verifyNoOverlappingReservations(null, pseudoRequest);
+
+        final Reservation reservation = reservationMapper.toEntity(pseudoRequest);
+        reservation.setHotelId(hotelId);
+        reservation.setActualGuests(0);
+        if (reservation.getLineItems() != null) {
+            reservation.getLineItems().forEach(lineItem -> {
+                lineItem.setReservation(reservation);
+                lineItem.setPrice(roomPrices.get(lineItem.getRoomId()));
+            });
+        }
+
+        final Reservation saved = reservationRepository.save(Objects.requireNonNull(reservation));
+        sendReservationConfirmedEmail(saved, hotelId, guest, roomNumbersOf(roomsById));
+        return enrichWithGuestName(reservationMapper.toResponse(saved), guest);
+    }
+
     private void verifyNoOverlappingReservations(final UUID excludeId, final ReservationRequest request) {
         if (request.lineItems() == null || request.lineItems().isEmpty()) {
             return;
