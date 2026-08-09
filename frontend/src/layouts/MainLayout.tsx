@@ -20,6 +20,7 @@ const navigation = [
   { nameKey: 'billing', href: '/billing', icon: 'receipt_long' },
   { nameKey: 'restaurant', href: '/restaurant', icon: 'restaurant' },
   { nameKey: 'rooms', href: '/rooms', icon: 'meeting_room' },
+  { nameKey: 'rates', href: '/rates', icon: 'payments' },
 ];
 
 const ownerNavigation = [

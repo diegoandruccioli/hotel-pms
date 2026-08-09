@@ -68,5 +68,7 @@
   "INVALID_INTERNAL_SIGNATURE": "Errore di autenticazione interna tra servizi. Riprova più tardi.",
   "MISSING_INTERNAL_HEADERS": "Errore di autenticazione interna tra servizi. Riprova più tardi.",
   "REPLAYED_INTERNAL_SIGNATURE": "Errore di autenticazione interna tra servizi. Riprova più tardi.",
-  "STALE_INTERNAL_SIGNATURE": "Errore di autenticazione interna tra servizi. Riprova più tardi."
+  "STALE_INTERNAL_SIGNATURE": "Errore di autenticazione interna tra servizi. Riprova più tardi.",
+  "INVALID_DATE_RANGE": "L'intervallo di date non è valido.",
+  "DATE_RANGE_TOO_LARGE": "L'intervallo richiesto è troppo ampio — riduci il periodo."
 }

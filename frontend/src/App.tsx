@@ -27,6 +27,7 @@ const CalendarPlanning = lazy(() => import('./pages/CalendarPlanning').then((m) 
 const Housekeeping = lazy(() => import('./pages/Housekeeping').then((m) => ({ default: m.Housekeeping })));
 const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard').then((m) => ({ default: m.OwnerDashboard })));
 const Rooms = lazy(() => import('./pages/Rooms').then((m) => ({ default: m.Rooms })));
+const RateCalendar = lazy(() => import('./pages/Rates/RateCalendar').then((m) => ({ default: m.RateCalendar })));
 const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
 const SettingsProfile = lazy(() => import('./pages/Settings/SettingsProfile').then((m) => ({ default: m.SettingsProfile })));
 const SettingsPassword = lazy(() => import('./pages/Settings/SettingsPassword').then((m) => ({ default: m.SettingsPassword })));
@@ -98,6 +99,7 @@ function App() {
               <Route path="/calendar" element={<CalendarPlanning />} />
               <Route path="/housekeeping" element={<Housekeeping />} />
               <Route path="/rooms" element={<Rooms />} />
+              <Route path="/rates" element={<RateCalendar />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/profile" element={<SettingsProfile />} />
               <Route path="/settings/password" element={<SettingsPassword />} />

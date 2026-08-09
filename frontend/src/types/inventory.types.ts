@@ -60,4 +60,31 @@ export interface RateSeasonRequest {
   nightlyPrice: number;
 }
 
+export interface RateCalendarDay {
+  date: string;
+  price: number;
+  /** The covering season's id, or null when this day uses the room type's base price. */
+  rateSeasonId: string | null;
+  seasonName: string | null;
+}
+
+export interface RateCalendarRow {
+  roomTypeId: string;
+  roomTypeName: string;
+  basePrice: number;
+  days: RateCalendarDay[];
+}
+
+export interface RateCalendarResponse {
+  rows: RateCalendarRow[];
+}
+
+export interface RateBulkApplyRequest {
+  roomTypeIds: string[];
+  startDate: string;
+  endDate: string;
+  nightlyPrice: number;
+  name?: string;
+}
+
 

@@ -68,5 +68,7 @@
   "INVALID_INTERNAL_SIGNATURE": "Internal service authentication error. Please try again later.",
   "MISSING_INTERNAL_HEADERS": "Internal service authentication error. Please try again later.",
   "REPLAYED_INTERNAL_SIGNATURE": "Internal service authentication error. Please try again later.",
-  "STALE_INTERNAL_SIGNATURE": "Internal service authentication error. Please try again later."
+  "STALE_INTERNAL_SIGNATURE": "Internal service authentication error. Please try again later.",
+  "INVALID_DATE_RANGE": "The date range is not valid.",
+  "DATE_RANGE_TOO_LARGE": "The requested range is too wide — narrow the period."
 }

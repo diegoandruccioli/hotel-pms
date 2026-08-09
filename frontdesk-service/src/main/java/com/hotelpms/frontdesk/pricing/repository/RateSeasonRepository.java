@@ -53,4 +53,47 @@ public interface RateSeasonRepository extends JpaRepository<RateSeason, UUID> {
      * @return the season, if it exists and belongs to this hotel
      */
     Optional<RateSeason> findByIdAndHotelId(UUID id, UUID hotelId);
+
+    /**
+     * Finds every active season for a room type, scoped to a hotel, whose range
+     * overlaps {@code [startDate, endDate]} (both inclusive). Unlike
+     * {@link #findCovering}, this can return more than one row — used by the
+     * rate calendar's bulk-apply split/trim logic to find every existing season
+     * a newly-applied range would collide with.
+     *
+     * @param roomTypeId the room type UUID
+     * @param hotelId    the hotel UUID (multi-tenant scoping)
+     * @param startDate  the overlap range start (inclusive)
+     * @param endDate    the overlap range end (inclusive)
+     * @return the overlapping seasons, oldest first
+     */
+    @Query("SELECT s FROM RateSeason s "
+            + "WHERE s.roomTypeId = :roomTypeId AND s.hotelId = :hotelId "
+            + "AND s.startDate <= :endDate AND s.endDate >= :startDate "
+            + "ORDER BY s.startDate")
+    List<RateSeason> findOverlapping(
+            @Param("roomTypeId") UUID roomTypeId,
+            @Param("hotelId") UUID hotelId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
+    /**
+     * Finds every active season for a hotel (across all room types) whose range
+     * overlaps {@code [startDate, endDate]} (both inclusive) — one query for the
+     * whole rate calendar grid, instead of one {@link #findCovering} call per
+     * night per room type.
+     *
+     * @param hotelId   the hotel UUID (multi-tenant scoping)
+     * @param startDate the overlap range start (inclusive)
+     * @param endDate   the overlap range end (inclusive)
+     * @return the overlapping seasons, grouped by room type, oldest first within each
+     */
+    @Query("SELECT s FROM RateSeason s "
+            + "WHERE s.hotelId = :hotelId "
+            + "AND s.startDate <= :endDate AND s.endDate >= :startDate "
+            + "ORDER BY s.roomTypeId, s.startDate")
+    List<RateSeason> findAllByHotelIdAndDateRangeOverlapping(
+            @Param("hotelId") UUID hotelId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }
