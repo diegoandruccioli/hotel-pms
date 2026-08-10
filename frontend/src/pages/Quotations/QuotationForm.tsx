@@ -20,6 +20,7 @@ import { useToastStore } from '../../store/toastStore';
 
 const DEFAULT_VALID_DAYS = 7;
 const MAX_OPTIONS = 5;
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 interface OptionDraft {
   label: string;
@@ -211,9 +212,20 @@ export const QuotationForm = () => {
     return () => clearTimeout(delay);
   }, [guestQuery]);
 
+  const nights = useMemo(() => {
+    if (!checkInDate || !checkOutDate) return 0;
+    const diff = new Date(checkOutDate).getTime() - new Date(checkInDate).getTime();
+    return diff > 0 ? Math.round(diff / MS_PER_DAY) : 0;
+  }, [checkInDate, checkOutDate]);
+
   const optionTotal = useCallback(
-    (option: OptionDraft) => option.selectedRoomIds.reduce((sum, roomId) => sum + (resolvedPrices.get(roomId) || 0), 0),
-    [resolvedPrices],
+    (option: OptionDraft) => option.selectedRoomIds.reduce((sum, roomId) => {
+      const resolved = resolvedPrices.get(roomId);
+      if (resolved !== undefined) return sum + resolved;
+      const room = rooms.find((r) => r.id === roomId);
+      return sum + (room ? room.roomType.basePrice * nights : 0);
+    }, 0),
+    [resolvedPrices, rooms, nights],
   );
 
   const activeOption = options[activeOptionIndex] ?? options[0];

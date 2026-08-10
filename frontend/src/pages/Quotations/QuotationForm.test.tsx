@@ -185,6 +185,35 @@ describe('QuotationForm', () => {
     expect(screen.queryAllByLabelText(/^Rimuovi /).length).toBe(0);
   });
 
+  it('falls back to basePrice x nights when a selected room has no resolved price', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue({
+      content: [{
+        id: 'r1',
+        hotelId: 'h1',
+        roomNumber: '101',
+        roomType: { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 100, active: true, createdAt: '', updatedAt: '' },
+        status: 'CLEAN',
+        active: true,
+        createdAt: '',
+        updatedAt: '',
+      }],
+      totalElements: 1,
+    } as never);
+    // getAvailableRooms deliberately returns no entry for r1 (e.g. stale/conflicting test data) —
+    // resolvedPrices.get('r1') is undefined, so the total must fall back to basePrice x nights
+    // instead of silently contributing 0.
+    vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue([]);
+
+    renderForm();
+    await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-09-04' } });
+    fireEvent.click(screen.getByText('Toggle Room r1'));
+
+    await waitFor(() => expect(screen.getByText('quotation_total:€ 300.00')).toBeInTheDocument());
+  });
+
   it('passes axe accessibility check', async () => {
     const { container } = renderForm();
     await waitFor(() => screen.getByTestId('room-mock'));
