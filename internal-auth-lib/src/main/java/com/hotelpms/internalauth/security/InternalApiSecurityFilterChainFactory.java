@@ -42,13 +42,12 @@ public final class InternalApiSecurityFilterChainFactory {
     @SuppressWarnings({"PMD.SignatureDeclareThrowsException", "null"})
     public static SecurityFilterChain build(final HttpSecurity http, final String hmacSecret,
             final NonceStore nonceStore, final List<String> exemptPathPrefixes) throws Exception {
+        // codeql[java/spring-disabled-csrf-protection]: no browser ever reaches this chain — it gates
+        // only internal, gateway-fronted service-to-service calls, stateless (no session cookie, the
+        // CSRF attack vector this rule protects against) and authenticated by an HMAC signature
+        // (InternalAuthFilter) an attacker-controlled page cannot forge. This is exactly Spring's own
+        // documented carve-out: "only for services used only by non-browser clients."
         http
-                // codeql[java/spring-disabled-csrf-protection]: no browser ever reaches this chain — it
-                // gates only internal, gateway-fronted service-to-service calls, stateless (no session
-                // cookie, the CSRF attack vector this rule protects against) and authenticated by an
-                // HMAC signature (InternalAuthFilter) an attacker-controlled page cannot forge. This is
-                // exactly Spring's own documented carve-out: "only for services used only by non-browser
-                // clients."
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
