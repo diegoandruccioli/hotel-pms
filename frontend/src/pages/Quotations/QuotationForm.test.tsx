@@ -118,6 +118,124 @@ describe('QuotationForm', () => {
     expect(quotationService.createQuotation).not.toHaveBeenCalled();
   });
 
+  it('blocks submission and shows an error when a recipient is set but no room is selected', async () => {
+    renderForm();
+    await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('toggle_new_prospect'));
+    fireEvent.change(screen.getByLabelText('label_prospect_first_name'), { target: { value: 'Mario' } });
+    fireEvent.change(screen.getByLabelText('label_prospect_last_name'), { target: { value: 'Rossi' } });
+    fireEvent.change(screen.getByLabelText('label_prospect_email'), { target: { value: 'mario@example.com' } });
+
+    fireEvent.click(screen.getByText('common:save'));
+    expect(await screen.findByText('err_select_room')).toBeInTheDocument();
+    expect(quotationService.createQuotation).not.toHaveBeenCalled();
+  });
+
+  it('blocks submission and shows a validation error when checkout is not after checkin', async () => {
+    renderForm();
+    await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('toggle_new_prospect'));
+    fireEvent.change(screen.getByLabelText('label_prospect_first_name'), { target: { value: 'Mario' } });
+    fireEvent.change(screen.getByLabelText('label_prospect_last_name'), { target: { value: 'Rossi' } });
+    fireEvent.change(screen.getByLabelText('label_prospect_email'), { target: { value: 'mario@example.com' } });
+    fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-09-03' } });
+    fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-09-01' } });
+    fireEvent.click(screen.getByText('Toggle Room r1'));
+
+    fireEvent.click(screen.getByText('common:save'));
+    expect(await screen.findByText('common:msg_valid_dates')).toBeInTheDocument();
+    expect(quotationService.createQuotation).not.toHaveBeenCalled();
+  });
+
+  it('shows an error when createQuotation rejects', async () => {
+    vi.mocked(quotationService.createQuotation).mockRejectedValue(new Error('boom'));
+    renderForm();
+    await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('toggle_new_prospect'));
+    fireEvent.change(screen.getByLabelText('label_prospect_first_name'), { target: { value: 'Mario' } });
+    fireEvent.change(screen.getByLabelText('label_prospect_last_name'), { target: { value: 'Rossi' } });
+    fireEvent.change(screen.getByLabelText('label_prospect_email'), { target: { value: 'mario@example.com' } });
+    fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-09-03' } });
+    fireEvent.click(screen.getByText('Toggle Room r1'));
+
+    fireEvent.click(screen.getByText('common:save'));
+    await waitFor(() => expect(screen.getByText('toast_created')).toBeInTheDocument());
+    expect(mockNavigate).not.toHaveBeenCalledWith('/quotations');
+  });
+
+  it('toggling a selected room again deselects it', async () => {
+    renderForm();
+    await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('Toggle Room r1'));
+    expect(screen.getByText('Selected: r1')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Toggle Room r1'));
+    expect(screen.getByText('Selected:')).toBeInTheDocument();
+  });
+
+  it('cancel navigates back to the quotations list', async () => {
+    renderForm();
+    await waitFor(() => expect(screen.getByText('common:cancel')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('common:cancel'));
+    expect(mockNavigate).toHaveBeenCalledWith('/quotations');
+  });
+
+  it('searches guests on input change and selects a suggestion', async () => {
+    vi.mocked(guestService.searchGuests).mockResolvedValue(
+      [{ id: 'g9', firstName: 'John', lastName: 'Doe', email: 'john@example.com' }] as never,
+    );
+    renderForm();
+    await waitFor(() => expect(screen.getByLabelText('guests:search_guest_placeholder')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('guests:search_guest_placeholder'), { target: { value: 'John' } });
+    await waitFor(() => expect(guestService.searchGuests).toHaveBeenCalledWith('John'), { timeout: 1000 });
+
+    const suggestion = await screen.findByText('John Doe');
+    fireEvent.click(suggestion);
+
+    await waitFor(() => expect(screen.getByText('john@example.com')).toBeInTheDocument());
+    expect(screen.queryByLabelText('guests:search_guest_placeholder')).not.toBeInTheDocument();
+  });
+
+  it('resolves the true nightly price from getAvailableRooms once dates are set', async () => {
+    vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue(
+      [{ id: 'r1', resolvedTotalPrice: 200 }] as never,
+    );
+    renderForm();
+    await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-09-03' } });
+    await waitFor(() => expect(inventoryService.getAvailableRooms).toHaveBeenCalledWith('2026-09-01', '2026-09-03'));
+
+    fireEvent.click(screen.getByText('Toggle Room r1'));
+    await waitFor(() => expect(screen.getByText('quotation_total:€ 200.00')).toBeInTheDocument());
+  });
+
+  it('resets resolved prices when getAvailableRooms rejects', async () => {
+    vi.mocked(inventoryService.getAvailableRooms).mockRejectedValue(new Error('boom'));
+    renderForm();
+    await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-09-03' } });
+    await waitFor(() => expect(inventoryService.getAvailableRooms).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByText('Toggle Room r1'));
+    await waitFor(() => expect(screen.getByText('quotation_total:€ 0.00')).toBeInTheDocument());
+  });
+
+  it('shows an error banner when the initial data fails to load', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockRejectedValue(new Error('boom'));
+    renderForm();
+    await waitFor(() => expect(screen.getByText('common:failed_load_data')).toBeInTheDocument());
+  });
+
   it('creates a quotation for a prospect and navigates to the list', async () => {
     vi.mocked(quotationService.createQuotation).mockResolvedValue({ id: 'q1' } as never);
     renderForm();
@@ -172,6 +290,62 @@ describe('QuotationForm', () => {
         { label: 'Suite deluxe', roomIds: ['r1'] },
       ],
     })));
+  });
+
+  it('switches back to an already-created option by clicking its tab', async () => {
+    renderForm();
+    await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('Toggle Room r1'));
+    fireEvent.click(screen.getByText('action_add_option'));
+    expect(screen.getByText('Selected:')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(/Opzione 1/));
+    expect(screen.getByText('Selected: r1')).toBeInTheDocument();
+  });
+
+  it('toggling back to existing-guest mode shows the guest search field again', async () => {
+    renderForm();
+    await waitFor(() => expect(screen.getByLabelText('guests:search_guest_placeholder')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('toggle_new_prospect'));
+    expect(screen.queryByLabelText('guests:search_guest_placeholder')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('toggle_existing_guest'));
+    expect(screen.getByLabelText('guests:search_guest_placeholder')).toBeInTheDocument();
+  });
+
+  it('clears the selected guest and shows the search field again', async () => {
+    vi.mocked(guestService.searchGuests).mockResolvedValue(
+      [{ id: 'g9', firstName: 'John', lastName: 'Doe', email: 'john@example.com' }] as never,
+    );
+    renderForm();
+    await waitFor(() => expect(screen.getByLabelText('guests:search_guest_placeholder')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('guests:search_guest_placeholder'), { target: { value: 'John' } });
+    const suggestion = await screen.findByText('John Doe');
+    fireEvent.click(suggestion);
+    await waitFor(() => expect(screen.getByText('john@example.com')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('guests:btn_change'));
+    expect(screen.getByLabelText('guests:search_guest_placeholder')).toBeInTheDocument();
+  });
+
+  it('shows no suggestions when searchGuests rejects', async () => {
+    vi.mocked(guestService.searchGuests).mockRejectedValue(new Error('boom'));
+    renderForm();
+    await waitFor(() => expect(screen.getByLabelText('guests:search_guest_placeholder')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('guests:search_guest_placeholder'), { target: { value: 'John' } });
+    await waitFor(() => expect(guestService.searchGuests).toHaveBeenCalledWith('John'), { timeout: 1000 });
+    await waitFor(() => expect(screen.getByText('guests:no_guests_search')).toBeInTheDocument());
+  });
+
+  it('updates the valid-until date field', async () => {
+    renderForm();
+    await waitFor(() => expect(screen.getByLabelText('label_valid_until')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('label_valid_until'), { target: { value: '2026-10-01' } });
+    expect(screen.getByLabelText('label_valid_until')).toHaveValue('2026-10-01');
   });
 
   it('removes an option via its tab close button', async () => {
@@ -276,6 +450,27 @@ describe('QuotationForm', () => {
       })));
       expect(quotationService.createQuotation).not.toHaveBeenCalled();
       expect(mockNavigate).toHaveBeenCalledWith('/quotations/q1');
+    });
+
+    it('cancel in edit mode navigates back to the quotation detail page', async () => {
+      renderEditForm();
+      await waitFor(() => expect(screen.getByText('common:cancel')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('common:cancel'));
+      expect(mockNavigate).toHaveBeenCalledWith('/quotations/q1');
+    });
+
+    it('prefills prospect fields when the quotation has no linked guest', async () => {
+      vi.mocked(quotationService.getQuotationById).mockResolvedValue({
+        ...existingQuotation,
+        guestId: null,
+        guestFullName: 'Luigi Verdi',
+        prospectEmail: 'luigi@example.com',
+      } as never);
+
+      renderEditForm();
+      await waitFor(() => expect(screen.getByLabelText('label_prospect_first_name')).toHaveValue('Luigi'));
+      expect(screen.getByLabelText('label_prospect_last_name')).toHaveValue('Verdi');
+      expect(screen.getByLabelText('label_prospect_email')).toHaveValue('luigi@example.com');
     });
   });
 });

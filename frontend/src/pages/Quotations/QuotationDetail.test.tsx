@@ -157,13 +157,113 @@ describe('QuotationDetail', () => {
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/quotations/q2'));
   });
 
-  it('opens the PDF preview dialog', async () => {
+  it('shows an error toast when duplicateQuotation rejects', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    vi.mocked(quotationService.duplicateQuotation).mockRejectedValue(new Error('boom'));
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_duplicate')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_duplicate'));
+    await waitFor(() => expect(mockNavigate).not.toHaveBeenCalledWith(expect.stringContaining('/quotations/q2')));
+  });
+
+  it('downloads the PDF via the hidden-iframe pattern', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_download_pdf')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_download_pdf'));
+    expect(quotationService.downloadPdf).toHaveBeenCalledWith('q1');
+  });
+
+  it('shows an error toast when sendQuotation rejects', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    vi.mocked(quotationService.sendQuotation).mockRejectedValue(new Error('boom'));
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_send')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_send'));
+    await waitFor(() => expect(quotationService.sendQuotation).toHaveBeenCalledWith('q1'));
+  });
+
+  it('shows an error toast when convertToReservation rejects', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    vi.mocked(quotationService.convertToReservation).mockRejectedValue(new Error('boom'));
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_convert'));
+    await waitFor(() => expect(quotationService.convertToReservation).toHaveBeenCalledWith('q1', 'opt1'));
+    expect(mockNavigate).not.toHaveBeenCalledWith(expect.stringContaining('/reservations/'));
+  });
+
+  it('opens and closes the PDF preview dialog', async () => {
     vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
     renderDetail();
     await waitFor(() => expect(screen.getByText('action_preview_pdf')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('action_preview_pdf'));
     expect(screen.getByTestId('pdf-preview-dialog')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('close-preview'));
+    expect(screen.queryByTestId('pdf-preview-dialog')).not.toBeInTheDocument();
+  });
+
+  it('back arrow navigates to the quotations list', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText('common:back'));
+    expect(mockNavigate).toHaveBeenCalledWith('/quotations');
+  });
+
+  it('edit button navigates to the edit form for a DRAFT quotation', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('common:edit')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('common:edit'));
+    expect(mockNavigate).toHaveBeenCalledWith('/quotations/q1/edit');
+  });
+
+  it('cancelling the convert-choice dialog closes it without converting', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(MULTI_OPTION_QUOTATION as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_convert'));
+    await waitFor(() => expect(screen.getByText('label_choose_option_to_convert')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('common:cancel'));
+
+    expect(screen.queryByText('label_choose_option_to_convert')).not.toBeInTheDocument();
+    expect(quotationService.convertToReservation).not.toHaveBeenCalled();
+  });
+
+  it('cancelling the decline dialog closes it without declining', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_decline'));
+    expect(screen.getByText('confirm_decline')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('common:cancel'));
+
+    expect(screen.queryByText('confirm_decline')).not.toBeInTheDocument();
+    expect(quotationService.declineQuotation).not.toHaveBeenCalled();
+  });
+
+  it('cancelling the delete dialog closes it without deleting', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_delete'));
+    expect(screen.getByText('confirm_delete')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('common:cancel'));
+
+    expect(screen.queryByText('confirm_delete')).not.toBeInTheDocument();
+    expect(quotationService.deleteQuotation).not.toHaveBeenCalled();
   });
 
   it('declining an already-accepted quotation shows a friendly error', async () => {
@@ -181,6 +281,22 @@ describe('QuotationDetail', () => {
     await waitFor(() => expect(quotationService.declineQuotation).toHaveBeenCalledWith('q1'));
   });
 
+  it('declines a quotation successfully and shows a success toast', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(
+      { ...DRAFT_QUOTATION, status: 'SENT' } as never,
+    );
+    vi.mocked(quotationService.declineQuotation).mockResolvedValue(
+      { ...DRAFT_QUOTATION, status: 'DECLINED' } as never,
+    );
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_decline'));
+    fireEvent.click(screen.getByText('common:confirm'));
+
+    await waitFor(() => expect(quotationService.declineQuotation).toHaveBeenCalledWith('q1'));
+  });
+
   it('deletes the quotation and navigates back to the list', async () => {
     vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
     vi.mocked(quotationService.deleteQuotation).mockResolvedValue(undefined);
@@ -192,6 +308,20 @@ describe('QuotationDetail', () => {
     fireEvent.click(screen.getByText('common:confirm'));
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/quotations'));
+  });
+
+  it('shows an error toast when deleteQuotation rejects', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    vi.mocked(quotationService.deleteQuotation).mockRejectedValue(new Error('boom'));
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_delete'));
+    await waitFor(() => expect(screen.getByText('confirm_delete')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('common:confirm'));
+
+    await waitFor(() => expect(quotationService.deleteQuotation).toHaveBeenCalledWith('q1'));
+    expect(mockNavigate).not.toHaveBeenCalledWith('/quotations');
   });
 
   it('converts directly without a dialog when there is only one option', async () => {

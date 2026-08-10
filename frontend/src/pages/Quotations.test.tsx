@@ -139,12 +139,124 @@ describe('Quotations', () => {
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_send_failed', 'error'));
   });
 
+  it('action_send shows error toast when sendQuotation rejects', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    vi.mocked(quotationService.sendQuotation).mockRejectedValue(new Error('boom'));
+    renderPage();
+    await waitFor(() => expect(screen.getByText('action_send')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('action_send'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_send_failed', 'error'));
+  });
+
+  it('action_convert on a single-option quotation converts directly and reloads', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    vi.mocked(quotationService.convertToReservation).mockResolvedValue({ id: 'res1' } as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('action_convert'));
+    await waitFor(() => expect(quotationService.convertToReservation).toHaveBeenCalledWith('q1'));
+    expect(mockAddToast).toHaveBeenCalledWith('toast_converted', 'success');
+    expect(mockNavigate).not.toHaveBeenCalledWith('/quotations/q1');
+  });
+
+  it('action_convert on a single-option quotation shows an error toast when conversion fails', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    vi.mocked(quotationService.convertToReservation).mockRejectedValue(new Error('boom'));
+    renderPage();
+    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('action_convert'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_converted', 'error'));
+  });
+
+  it('action_decline shows confirmation dialog then declines', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    vi.mocked(quotationService.declineQuotation).mockResolvedValue({ ...DRAFT_QUOTATION, status: 'DECLINED' } as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('action_decline'));
+    expect(screen.getByText('confirm_decline')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('common:confirm'));
+    await waitFor(() => expect(quotationService.declineQuotation).toHaveBeenCalledWith('q1'));
+    expect(mockAddToast).toHaveBeenCalledWith('toast_declined', 'success');
+  });
+
+  it('action_decline shows an error toast when declineQuotation rejects', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    vi.mocked(quotationService.declineQuotation).mockRejectedValue(new Error('boom'));
+    renderPage();
+    await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('action_decline'));
+    fireEvent.click(screen.getByText('common:confirm'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_declined', 'error'));
+  });
+
+  it('action_delete shows an error toast when deleteQuotation rejects', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    vi.mocked(quotationService.deleteQuotation).mockRejectedValue(new Error('boom'));
+    renderPage();
+    await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('action_delete'));
+    fireEvent.click(screen.getByText('common:confirm'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_deleted', 'error'));
+  });
+
+  it('shows a single price (not a range) when all options happen to total the same amount', async () => {
+    const equalOptionsQuotation = {
+      ...MULTI_OPTION_QUOTATION,
+      id: 'q3',
+      guestFullName: 'Anna Neri',
+      options: [
+        { id: 'opt1', label: 'Opzione 1', position: 0, totalPrice: 90, lineItems: [] },
+        { id: 'opt2', label: 'Opzione 2', position: 1, totalPrice: 90, lineItems: [] },
+      ],
+    };
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([equalOptionsQuotation]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Anna Neri')).toBeInTheDocument());
+    expect(screen.getByText('€ 90.00')).toBeInTheDocument();
+    expect(screen.queryByText('price_range')).not.toBeInTheDocument();
+  });
+
   it('action_download_pdf calls quotationService.downloadPdf', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     renderPage();
     await waitFor(() => expect(screen.getByText('action_download_pdf')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_download_pdf'));
     expect(quotationService.downloadPdf).toHaveBeenCalledWith('q1');
+  });
+
+  it('paginates forward and back', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION], 3) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('common:page_x_of_y')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText('common:next_page'));
+    await waitFor(() => expect(quotationService.getAllQuotations).toHaveBeenCalledWith(1, 20));
+
+    fireEvent.click(screen.getByLabelText('common:prev_page'));
+    await waitFor(() => expect(quotationService.getAllQuotations).toHaveBeenCalledWith(0, 20));
+  });
+
+  it('cancelling the decline dialog closes it without declining', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('action_decline'));
+    expect(screen.getByText('confirm_decline')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('common:cancel'));
+    expect(screen.queryByText('confirm_decline')).not.toBeInTheDocument();
+    expect(quotationService.declineQuotation).not.toHaveBeenCalled();
+  });
+
+  it('cancelling the delete dialog closes it without deleting', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('action_delete'));
+    expect(screen.getByText('confirm_delete')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('common:cancel'));
+    expect(screen.queryByText('confirm_delete')).not.toBeInTheDocument();
+    expect(quotationService.deleteQuotation).not.toHaveBeenCalled();
   });
 
   it('action_delete shows confirmation dialog then deletes', async () => {
