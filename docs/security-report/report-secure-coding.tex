@@ -5846,6 +5846,36 @@ warning PMD/checkstyle/SpotBugs) più i test di regressione esistenti su
 ciascun servizio toccato.
 Commit: \commitref{79cd3b1}{refactor(security): single HMAC Feign header config in internal-auth-lib}, \commitref{bdce1e5}{fix(security): shared internal API security filter chain + missing RBAC enforcement}, \commitref{54575ec}{refactor: shared RFC 7807 problem detail advice, normalize error-type host}
 
+\paragraph{GAP-9 --- Falso positivo CodeQL: CSRF ``disabilitato'' sulla filter chain interna}
+CodeQL (regola \texttt{java/spring-disabled-csrf-protection}, severità HIGH)
+segnalava \texttt{csrf(AbstractHttpConfigurer::disable)} in
+\texttt{InternalApiSecurityFilterChainFactory} (\texttt{internal-auth-lib},
+condivisa da billing/fb/frontdesk/guest/notification-service, estratta in
+GAP-8) come protezione CSRF disabilitata. Analisi confermata come falso
+positivo, non un fix applicativo: questa filter chain protegge
+esclusivamente chiamate interne service-to-service dietro il gateway, mai
+raggiungibili da un browser. La protezione CSRF esiste per contrastare
+richieste automaticamente corredate di credenziali (tipicamente cookie di
+sessione) inviate da un sito malevolo per conto di un utente autenticato ---
+qui non si applica su due assi indipendenti: \texttt{sessionCreationPolicy(STATELESS)}
+non emette mai un cookie di sessione, e l'autenticazione avviene tramite
+firma HMAC (\texttt{InternalAuthFilter}, stesso meccanismo di T-GW-08) che
+una pagina web attaccante non può calcolare senza il segreto condiviso ---
+esattamente il caso che la stessa documentazione Spring esclude
+esplicitamente (``only for services used only by non-browser clients''). Il
+traffico browser-facing reale ha una protezione CSRF distinta e corretta sul
+gateway (\texttt{CsrfFilter}, T-GW-05, double-submit cookie).
+
+Verificato con revisione indipendente (agente \texttt{security-auditor}, non
+solo lettura del commento di soppressione): confermato che nessuno dei 5
+servizi espone questi endpoint direttamente a un browser (tutti raggiungibili
+solo attraverso l'API Gateway) e che non esiste alcuna credenziale
+auto-allegata sfruttabile su questo percorso. Aggiunto un commento di
+soppressione \texttt{codeql[...]} inline sopra la chiamata --- stesso pattern
+già usato per il falso positivo log-injection di GAP-7 --- e alert dismissato
+su GitHub con motivazione.
+Commit: \commitref{f8c139a}{docs(security): GAP-9 --- suppress CodeQL false-positive CSRF alert on internal-only filter chain}
+
 \paragraph{T-OPS-01 --- RPO fisso a 24h: da dump pianificato a WAL archiving continuo}
 Il meccanismo di backup originale (\texttt{docker/db-backup/}, \texttt{pg\_dumpall}
 giornaliero, gzip, cifratura \texttt{age}, upload via \texttt{mc}) aveva un RPO
