@@ -3130,6 +3130,77 @@ il vettore XSS principale.
 
 \paragraph{Riferimento} Commit: \commitref{b901a9f}{fix(security): T-GW-03 + T-FE-04 --- security headers and CSP}
 
+\paragraph{GAP-10 --- L'ereditarietà silenziosa di nginx rompeva ogni download dell'app}
+Gli header di sicurezza T-GW-03/T-FE-04 sopra (\texttt{X-Frame-Options},
+CSP con \texttt{frame-ancestors}) erano dichiarati solo nel server block di
+\texttt{frontend/nginx.conf}. La location \texttt{/api/} non definisce un proprio
+blocco \texttt{add\_header}, quindi li eredita silenziosamente --- lo stesso
+comportamento di ereditarietà di nginx già documentato nel commento del file per le
+location \texttt{/} e \texttt{/assets/}, ma mai esteso a \texttt{/api/}. La
+conseguenza non è solo un gap di hardening: fattura PDF, XML FatturaPA e preventivo
+PDF si scaricano tutti tramite un \texttt{<iframe src="/api/...">} nascosto
+same-origin, e una risposta con \texttt{X-Frame-Options: DENY} fa sì che il browser
+rifiuti di caricarla in quell'iframe --- ogni download falliva silenziosamente,
+senza errore visibile e senza file scaricato.
+
+Scoperto durante un audit dal vivo con click reali sul bottone ``Scarica PDF''
+(non solo apertura di modal o esecuzione dei test unitari, che mockano l'iframe e
+non attraversano mai nginx reale), innescato da una segnalazione diretta
+dell'utente. Isolata la causa confrontando i percorsi: \texttt{curl} e
+\texttt{fetch()} diretti sullo stesso URL restituivano sempre \texttt{200} con
+\texttt{Content-Disposition} corretto --- solo il caricamento reale nell'iframe
+falliva, confermando che il blocco avveniva lato browser sull'header ereditato, non
+lato server.
+
+\begin{insecurebox}[title={frontend/nginx.conf --- \texttt{/api/} eredita gli header del server block (baseline)}]
+\begin{lstlisting}[style=bash]
+location /api/ {
+    set $upstream       http://api-gateway:8080;
+    proxy_pass         $upstream;
+    proxy_http_version 1.1;
+    proxy_set_header   Host              $host;
+    proxy_set_header   X-Real-IP         $remote_addr;
+    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+    # Nessun add_header qui: eredita X-Frame-Options: DENY e
+    # frame-ancestors 'none' dal server block, bloccando l'iframe
+    # same-origin che il download di PDF/XML usa deliberatamente.
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={frontend/nginx.conf --- \texttt{/api/} dichiara i propri header (main)}]
+\begin{lstlisting}[style=bash]
+location /api/ {
+    set $upstream       http://api-gateway:8080;
+    proxy_pass         $upstream;
+    proxy_http_version 1.1;
+    proxy_set_header   Host              $host;
+    proxy_set_header   X-Real-IP         $remote_addr;
+    proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header   X-Forwarded-Proto $scheme;
+
+    add_header Content-Security-Policy
+        "default-src 'self' blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; form-action 'self'; base-uri 'self'"
+        always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+}
+\end{lstlisting}
+\end{securebox}
+
+\texttt{SAMEORIGIN}/\texttt{frame-ancestors 'self'} permette l'iframe same-origin
+che l'app usa deliberatamente per i download, mantenendo bloccato l'embedding da
+qualunque origine esterna --- la minaccia reale contro cui l'header esiste.
+Verificato dal vivo dopo rebuild e redeploy del container \texttt{frontend}: un
+click reale su ``Scarica PDF'' produce ora il file sul disco (25149 byte,
+corrispondenti alla dimensione generata dal backend).
+
+\paragraph{Riferimento} Commit: \commitref{41bedde}{fix(security): stop inheriting X-Frame-Options: DENY on /api/, it broke every download}
+
 % ─────────────────────────────────────────────────────────────────────────────
 
 \subsection{Output Encoding e Protezione XSS \threat{T-FE-01}}
