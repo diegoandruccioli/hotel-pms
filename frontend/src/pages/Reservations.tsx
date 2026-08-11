@@ -288,8 +288,8 @@ export const Reservations = () => {
       await reservationService.deleteReservation(reservationToDelete);
       await loadReservations();
       addToast(t('reservation_deleted_success'), 'success');
-    } catch {
-      addToast(t('delete_reservation_failed'), 'error');
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('delete_reservation_failed')), 'error');
     } finally {
       setDeleting(false);
       setReservationToDelete(null);

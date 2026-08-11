@@ -9,6 +9,7 @@ import { M3Card } from '../components/m3/M3Card';
 import { PasswordVisibilityToggle } from '../components/m3/PasswordVisibilityToggle';
 import { StructuredAddressFields } from '../components/StructuredAddressFields';
 import { useToastStore } from '../store/toastStore';
+import { getErrorMessage } from '../utils/errorMessage';
 
 const VAT_NUMBER_REGEX = /^\d{11}$/;
 const FISCAL_CODE_REGEX = /^(\d{11}|[A-Za-z]{6}\d{2}[A-Za-z]\d{2}[A-Za-z]\d{3}[A-Za-z])$/;
@@ -183,8 +184,8 @@ export function HotelProfile() {
       setForm((prev) => ({ ...prev, alloggiatiPassword: '', alloggiatiWsKey: '' }));
       setCredentialsConfigured(updated.alloggiatiCredentialsConfigured);
       addToast(t('toast_profile_saved'), 'success');
-    } catch {
-      addToast(t('err_profile_save'), 'error');
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('err_profile_save')), 'error');
     } finally {
       setSaving(false);
     }

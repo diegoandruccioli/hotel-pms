@@ -5,6 +5,7 @@ import { M3Button } from '../../components/m3/M3Button';
 import { M3TextField } from '../../components/m3/M3TextField';
 import { billingService } from '../../services/billingService';
 import { useToastStore } from '../../store/toastStore';
+import { getErrorMessage } from '../../utils/errorMessage';
 import type { InvoiceResponse, PaymentMethod } from '../../types/billing.types';
 
 interface Props {
@@ -82,8 +83,8 @@ export const PaymentModal = memo(({ invoice, onClose, onPaid }: Props) => {
         });
         addToast(t('payment_registered', { ns: 'billing' }), 'success');
         onClose();
-      } catch {
-        addToast(t('payment_failed', { ns: 'billing' }), 'error');
+      } catch (err: unknown) {
+        addToast(getErrorMessage(err, t('payment_failed', { ns: 'billing' })), 'error');
       } finally {
         setLoading(false);
       }

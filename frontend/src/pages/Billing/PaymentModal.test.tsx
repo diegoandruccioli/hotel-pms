@@ -3,6 +3,9 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { PaymentModal } from './PaymentModal';
 import { billingService } from '../../services/billingService';
+import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
+
+const mockAddToast = vi.hoisted(() => vi.fn());
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
@@ -15,7 +18,7 @@ vi.mock('../../services/billingService', () => ({
 
 vi.mock('../../store/toastStore', () => ({
   useToastStore: (sel: unknown) =>
-    (sel as (s: { addToast: () => void }) => unknown)({ addToast: vi.fn() }),
+    (sel as (s: { addToast: typeof mockAddToast }) => unknown)({ addToast: mockAddToast }),
 }));
 
 vi.mock('../../components/m3/M3Dialog', () => ({
@@ -83,5 +86,22 @@ describe('PaymentModal', () => {
   it('passes axe accessibility check', async () => {
     const { container } = render(<PaymentModal invoice={INVOICE} onClose={onClose} onPaid={onPaid} />);
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('shows the backend detail (e.g. invoice locked after export) instead of the generic fallback', async () => {
+    vi.mocked(billingService.processPayment).mockRejectedValue(
+      mockAxiosErrorWithDetail('INVOICE_LOCKED_AFTER_EXPORT', 409),
+    );
+    render(<PaymentModal invoice={INVOICE} onClose={onClose} onPaid={onPaid} />);
+    fireEvent.submit(document.querySelector('form')!);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('INVOICE_LOCKED_AFTER_EXPORT', 'error'));
+    expect(onPaid).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the generic message when the error carries no detail', async () => {
+    vi.mocked(billingService.processPayment).mockRejectedValue(new Error('network blip'));
+    render(<PaymentModal invoice={INVOICE} onClose={onClose} onPaid={onPaid} />);
+    fireEvent.submit(document.querySelector('form')!);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('payment_failed', 'error'));
   });
 });

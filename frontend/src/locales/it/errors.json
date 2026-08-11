@@ -43,6 +43,7 @@
   "INVOICE_NOT_FOUND_FOR_STAY": "Nessuna fattura trovata per questo soggiorno.",
   "INVOICE_NOT_OPEN": "Questa operazione richiede una fattura ancora aperta.",
   "INVOICE_CANCELLED": "Questa fattura è stata annullata.",
+  "INVOICE_LOCKED_AFTER_EXPORT": "Questa fattura è stata esportata per la Fattura Elettronica e non può più essere modificata.",
   "CANNOT_UPDATE_CANCELLED_INVOICE": "Non è possibile modificare una fattura annullata.",
   "CANNOT_EXPORT_CANCELLED_INVOICE": "Non è possibile esportare una fattura annullata.",
   "FATTURAPA_XML_BUILD_FAILED": "Generazione del file XML FatturaPA non riuscita.",

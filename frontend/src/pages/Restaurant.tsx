@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
+import { getErrorMessage } from '../utils/errorMessage';
 import { OrderFormModal } from './Restaurant/OrderFormModal';
 import { OrderDetailModal } from './Restaurant/OrderDetailModal';
 import { MenuFormModal } from './Restaurant/MenuFormModal';
@@ -206,8 +207,8 @@ export const Restaurant = memo(() => {
       await fbService.deleteMenuItem(item.id);
       addToast(tMenu('menu_delete_success'), 'success');
       await loadMenu();
-    } catch {
-      addToast(tMenu('menu_delete_error'), 'error');
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, tMenu('menu_delete_error')), 'error');
     } finally {
       setDeletingMenuId(null);
     }

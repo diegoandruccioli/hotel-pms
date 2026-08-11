@@ -4,6 +4,7 @@ import { fbService } from '../../services/fbService';
 import { useToastStore } from '../../store/toastStore';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Dialog } from '../../components/m3/M3Dialog';
+import { getErrorMessage } from '../../utils/errorMessage';
 import type { MenuItemRequest, MenuItemResponse } from '../../types/fb.types';
 
 interface Props {
@@ -55,8 +56,8 @@ export const MenuFormModal = memo(({ item, onClose, onSaved }: Props) => {
       }
       addToast(t('menu_save_success'), 'success');
       onSaved();
-    } catch {
-      addToast(t('menu_save_error'), 'error');
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('menu_save_error')), 'error');
     } finally {
       setLoading(false);
     }

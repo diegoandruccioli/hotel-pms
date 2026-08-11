@@ -5,6 +5,7 @@ import type { UserResponse, CreateUserRequest } from '../../types/user.types';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { PasswordVisibilityToggle } from '../../components/m3/PasswordVisibilityToggle';
+import { getErrorMessage } from '../../utils/errorMessage';
 import type { Role } from '../../types/auth.types';
 
 interface CreateUserModalProps {
@@ -43,8 +44,8 @@ export const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProp
     try {
       const created = await userService.createUser(form);
       onCreated(created);
-    } catch {
-      setError(t('err_create_failed'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('err_create_failed')));
     } finally {
       setLoading(false);
     }

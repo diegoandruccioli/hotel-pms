@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { Restaurant } from './Restaurant';
 import { fbService } from '../services/fbService';
+import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
 import type { MenuItemResponse, RestaurantOrderResponse } from '../types/fb.types';
 
 vi.mock('react-i18next', () => {
@@ -390,6 +391,21 @@ describe('Restaurant', () => {
       fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
 
       await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('menu_delete_error', 'error'));
+    });
+
+    it('shows the backend detail instead of the generic fallback when deleting a menu item fails', async () => {
+      vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
+      vi.mocked(fbService.getMenuItems).mockResolvedValue([MENU_ITEM]);
+      vi.mocked(fbService.deleteMenuItem).mockRejectedValueOnce(
+        mockAxiosErrorWithDetail('MENU_ITEM_IN_USE', 409),
+      );
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      render(<Restaurant />);
+      await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('MENU_ITEM_IN_USE', 'error'));
     });
   });
 

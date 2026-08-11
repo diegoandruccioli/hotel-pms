@@ -4,6 +4,7 @@ import { axe } from 'vitest-axe';
 import type { Role } from '../types/auth.types';
 import { AdminUsers } from './AdminUsers';
 import { userService } from '../services/userService';
+import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -151,6 +152,17 @@ describe('AdminUsers', () => {
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_toggle_failed', 'error'));
   });
 
+  it('shows the backend detail instead of the generic fallback when activate/deactivate fails', async () => {
+    vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
+    vi.mocked(userService.deactivateUser).mockRejectedValue(
+      mockAxiosErrorWithDetail('CANNOT_DEACTIVATE_LAST_ADMIN', 409),
+    );
+    render(<AdminUsers />);
+    await waitFor(() => screen.getByText('alice'));
+    fireEvent.click(screen.getByText('btn_deactivate'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('CANNOT_DEACTIVATE_LAST_ADMIN', 'error'));
+  });
+
   describe('CreateUserModal', () => {
     it('shows a validation error when required fields are missing', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([]);
@@ -197,6 +209,23 @@ describe('AdminUsers', () => {
       fireEvent.click(screen.getByText('btn_create'));
 
       expect(await screen.findByText('err_create_failed')).toBeInTheDocument();
+    });
+
+    it('shows the backend detail instead of the generic fallback when createUser fails', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([]);
+      vi.mocked(userService.createUser).mockRejectedValue(
+        mockAxiosErrorWithDetail('USERNAME_ALREADY_EXISTS', 409),
+      );
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('btn_new_user'));
+      fireEvent.click(screen.getByText('btn_new_user'));
+
+      fireEvent.change(screen.getByLabelText('label_username'), { target: { value: 'carol' } });
+      fireEvent.change(screen.getByLabelText('label_email'), { target: { value: 'carol@hotel.com' } });
+      fireEvent.change(screen.getByLabelText('label_password'), { target: { value: 'Secret123!' } });
+      fireEvent.click(screen.getByText('btn_create'));
+
+      expect(await screen.findByText('USERNAME_ALREADY_EXISTS')).toBeInTheDocument();
     });
 
     it('toggles password visibility in the create user form', async () => {
@@ -323,6 +352,23 @@ describe('AdminUsers', () => {
       fireEvent.click(screen.getByRole('button', { name: 'btn_reset_password' }));
 
       expect(await screen.findByText('err_reset_failed')).toBeInTheDocument();
+    });
+
+    it('shows the backend detail instead of the generic fallback when resetUserPassword fails', async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
+      vi.mocked(userService.resetUserPassword).mockRejectedValue(
+        mockAxiosErrorWithDetail('USER_NOT_FOUND', 404),
+      );
+      render(<AdminUsers />);
+      await waitFor(() => screen.getByText('alice'));
+      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+
+      const strongPw = 'Secret123!!ABCDEF';
+      fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: strongPw } });
+      fireEvent.change(screen.getByLabelText('label_confirm_password'), { target: { value: strongPw } });
+      fireEvent.click(screen.getByRole('button', { name: 'btn_reset_password' }));
+
+      expect(await screen.findByText('USER_NOT_FOUND')).toBeInTheDocument();
     });
 
     it('closes via cancel and Escape', async () => {

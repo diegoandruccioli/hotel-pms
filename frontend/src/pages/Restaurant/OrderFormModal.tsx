@@ -6,6 +6,7 @@ import { MaterialIcon } from '../../components/MaterialIcon';
 import { fbService } from '../../services/fbService';
 import { stayService } from '../../services/stayService';
 import { useToastStore } from '../../store/toastStore';
+import { getErrorMessage } from '../../utils/errorMessage';
 import type { MenuItemResponse } from '../../types/fb.types';
 import type { StayResponse } from '../../types/stay.types';
 
@@ -161,8 +162,8 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
         addToast(t('order_created_success'), 'success');
         onCreated();
         onClose();
-      } catch {
-        addToast(t('order_creation_failed'), 'error');
+      } catch (err: unknown) {
+        addToast(getErrorMessage(err, t('order_creation_failed')), 'error');
       } finally {
         setLoading(false);
       }

@@ -6,6 +6,7 @@ import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
+import { getErrorMessage } from '../utils/errorMessage';
 import { CreateUserModal } from './AdminUsers/CreateUserModal';
 import { ResetPasswordModal } from './AdminUsers/ResetPasswordModal';
 import { UserRow } from './AdminUsers/UserRow';
@@ -63,8 +64,8 @@ export function AdminUsers() {
             : t('toast_activated', { username: u.username }),
           'success',
         );
-      } catch {
-        addToast(t('err_toggle_failed'), 'error');
+      } catch (err: unknown) {
+        addToast(getErrorMessage(err, t('err_toggle_failed')), 'error');
       }
     },
     [addToast, t],

@@ -5,6 +5,7 @@ import type { UserResponse } from '../../types/user.types';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { PasswordVisibilityToggle } from '../../components/m3/PasswordVisibilityToggle';
+import { getErrorMessage } from '../../utils/errorMessage';
 
 interface ResetPasswordModalProps {
   user: UserResponse;
@@ -38,8 +39,8 @@ export const ResetPasswordModal = memo(({ user, onClose, onSuccess }: ResetPassw
     try {
       await userService.resetUserPassword(user.id, newPw);
       onSuccess();
-    } catch {
-      setError(t('err_reset_failed'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('err_reset_failed')));
     } finally {
       setLoading(false);
     }

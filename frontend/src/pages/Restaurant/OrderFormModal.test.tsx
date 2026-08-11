@@ -5,6 +5,7 @@ import { OrderFormModal } from './OrderFormModal';
 import { fbService } from '../../services/fbService';
 import { stayService } from '../../services/stayService';
 import { useToastStore } from '../../store/toastStore';
+import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
@@ -158,6 +159,30 @@ describe('OrderFormModal', () => {
 
     await waitFor(() => {
       expect(mockAddToast).toHaveBeenCalledWith('order_creation_failed', 'error');
+    });
+  });
+
+  it('should show the backend detail instead of the generic fallback when createOrder fails', async () => {
+    vi.mocked(fbService.getMenuItems).mockResolvedValueOnce(MENU_ITEMS);
+    vi.mocked(fbService.createOrder).mockRejectedValueOnce(
+      mockAxiosErrorWithDetail('MENU_ITEM_NOT_AVAILABLE', 409),
+    );
+    render(<OrderFormModal onClose={onClose} onCreated={onCreated} />);
+
+    await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText(/room_label/i), {
+      target: { value: 'stay-uuid-1' },
+    });
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'increase_quantity Espresso' }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /create_order/ }));
+
+    await waitFor(() => {
+      expect(mockAddToast).toHaveBeenCalledWith('MENU_ITEM_NOT_AVAILABLE', 'error');
     });
   });
 

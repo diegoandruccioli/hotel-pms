@@ -4,6 +4,7 @@ import { axe } from 'vitest-axe';
 import { MenuFormModal } from './MenuFormModal';
 import { fbService } from '../../services/fbService';
 import { useToastStore } from '../../store/toastStore';
+import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -122,6 +123,20 @@ describe('MenuFormModal', () => {
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('menu_save_error', 'error'));
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('shows the backend detail instead of the generic fallback when the save request fails', async () => {
+    vi.mocked(fbService.createMenuItem).mockRejectedValueOnce(
+      mockAxiosErrorWithDetail('DUPLICATE_MENU_ITEM_NAME', 409),
+    );
+    render(<MenuFormModal onClose={onClose} onSaved={onSaved} />);
+
+    fireEvent.change(screen.getByLabelText(/menu_name/), { target: { value: 'Tiramisù' } });
+    fireEvent.change(screen.getByLabelText(/menu_category/), { target: { value: 'Dolci' } });
+    fireEvent.change(screen.getByLabelText(/menu_price/), { target: { value: '6' } });
+    fireEvent.click(screen.getByRole('button', { name: /salva|save/i }));
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('DUPLICATE_MENU_ITEM_NAME', 'error'));
   });
 
   it('toggles the available checkbox', () => {

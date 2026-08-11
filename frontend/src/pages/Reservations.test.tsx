@@ -11,6 +11,7 @@ vi.mock('react-router-dom', async () => {
 });
 import { Reservations } from './Reservations';
 import { reservationService } from '../services/reservationService';
+import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
 import { inventoryService } from '../services/inventoryService';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
@@ -229,6 +230,21 @@ describe('Reservations', () => {
       expect(mockAddToast).toHaveBeenCalledWith('reservation_deleted_success', 'success');
       expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
     });
+  });
+
+  it('shows the backend detail instead of the generic fallback when deleteReservation fails', async () => {
+    vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
+    vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
+    vi.mocked(reservationService.deleteReservation).mockRejectedValueOnce(
+      mockAxiosErrorWithDetail('RESERVATION_HAS_INVOICE', 409),
+    );
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /delete_reservation res-1/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /delete_reservation res-1/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('RESERVATION_HAS_INVOICE', 'error'));
   });
 
   it('should search reservations server-side on search input', async () => {

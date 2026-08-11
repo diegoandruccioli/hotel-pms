@@ -153,8 +153,8 @@ export const Housekeeping = memo(() => {
       const updated = await inventoryService.updateRoomStatus(id, newStatus);
       setRooms((prev) => prev.map((r) => (r.id === id ? updated : r)));
       addToast(t('room_updated', { status: t(STATUS_KEYS[newStatus]) }), 'success');
-    } catch {
-      addToast(t('failed_update_room'), 'error');
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('failed_update_room')), 'error');
     }
   }, [addToast, t]);
 

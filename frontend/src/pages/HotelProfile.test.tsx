@@ -5,6 +5,7 @@ import { axe } from 'vitest-axe';
 import userEvent from '@testing-library/user-event';
 import { HotelProfile } from './HotelProfile';
 import { stayService } from '../services/stayService';
+import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
 import type { HotelSettingsResponse } from '../types/stay.types';
 
 // `t`/`i18n` must be module-level stable references: HotelProfile's settings-load
@@ -247,6 +248,17 @@ describe('HotelProfile', () => {
 
     expect(await screen.findByText('common:err_invalid_vat')).toBeInTheDocument();
     expect(stayService.updateHotelSettings).not.toHaveBeenCalled();
+  });
+
+  it('shows the backend detail instead of the generic fallback when saving fails', async () => {
+    vi.mocked(stayService.updateHotelSettings).mockRejectedValueOnce(
+      mockAxiosErrorWithDetail('INVALID_VAT_NUMBER', 400),
+    );
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /btn_save_profile/i }));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('INVALID_VAT_NUMBER', 'error'));
   });
 
   it('should have no accessibility violations', async () => {

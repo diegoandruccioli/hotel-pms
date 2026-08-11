@@ -43,6 +43,7 @@
   "INVOICE_NOT_FOUND_FOR_STAY": "No invoice was found for this stay.",
   "INVOICE_NOT_OPEN": "This action requires an invoice that is still open.",
   "INVOICE_CANCELLED": "This invoice has been cancelled.",
+  "INVOICE_LOCKED_AFTER_EXPORT": "This invoice has been exported for electronic invoicing and can no longer be modified.",
   "CANNOT_UPDATE_CANCELLED_INVOICE": "A cancelled invoice cannot be modified.",
   "CANNOT_EXPORT_CANCELLED_INVOICE": "A cancelled invoice cannot be exported.",
   "FATTURAPA_XML_BUILD_FAILED": "Failed to generate the FatturaPA XML file.",

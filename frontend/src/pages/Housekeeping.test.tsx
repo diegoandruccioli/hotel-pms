@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { Housekeeping } from './Housekeeping';
 import { inventoryService } from '../services/inventoryService';
+import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
 
 // `t` must be a module-level stable reference: Housekeeping's loadRooms useCallback
 // depends on `t`, and that callback is the sole effect dependency triggering the
@@ -125,6 +126,23 @@ describe('Housekeeping', () => {
     const actionButton = dirtyButtons.find((b) => b.textContent?.startsWith('→'))!;
     fireEvent.click(actionButton);
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('failed_update_room', 'error'));
+  });
+
+  it('shows the backend detail instead of the generic fallback when the status update fails', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
+      content: [{ id: '1', roomNumber: '101', type: 'Standard', status: 'CLEAN', pricePerNight: 100 }],
+      totalElements: 1,
+    } as never);
+    vi.mocked(inventoryService.updateRoomStatus).mockRejectedValueOnce(
+      mockAxiosErrorWithDetail('ROOM_STATUS_TRANSITION_NOT_ALLOWED', 409),
+    );
+    render(<Housekeeping />);
+    await waitFor(() => expect(screen.getByText('room_number')).toBeInTheDocument());
+
+    const dirtyButtons = screen.getAllByRole('button', { name: /room_status_dirty/i });
+    const actionButton = dirtyButtons.find((b) => b.textContent?.startsWith('→'))!;
+    fireEvent.click(actionButton);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('ROOM_STATUS_TRANSITION_NOT_ALLOWED', 'error'));
   });
 
   it('does not render an action button for the room\'s own current status', async () => {
