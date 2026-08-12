@@ -5,14 +5,20 @@ import feign.Request;
 import feign.RequestTemplate;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -29,6 +35,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProblemDetailAdviceTest {
 
     private static final String BAD_REQUEST_TYPE = "https://hotel-pms.com/errors/bad-request";
+    private static final String REQUEST_VALIDATION_ERROR_TITLE = "Request Validation Error";
+    private static final String TIMESTAMP_KEY = "timestamp";
 
     private final TestAdvice advice = new TestAdvice();
 
@@ -40,10 +48,10 @@ class ProblemDetailAdviceTest {
         final ProblemDetail result = advice.handleHttpMessageNotReadableException(ex);
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
-        assertThat(result.getTitle()).isEqualTo("Request Validation Error");
+        assertThat(result.getTitle()).isEqualTo(REQUEST_VALIDATION_ERROR_TITLE);
         assertThat(result.getType().toString()).isEqualTo(BAD_REQUEST_TYPE);
         assertThat(result.getDetail()).isEqualTo("INVALID_JSON_PAYLOAD");
-        assertThat(result.getProperties()).containsKey("timestamp");
+        assertThat(result.getProperties()).containsKey(TIMESTAMP_KEY);
     }
 
     @Test
@@ -72,10 +80,10 @@ class ProblemDetailAdviceTest {
         final ProblemDetail result = advice.handleMissingServletRequestParameterException(ex);
 
         assertThat(result.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
-        assertThat(result.getTitle()).isEqualTo("Request Validation Error");
+        assertThat(result.getTitle()).isEqualTo(REQUEST_VALIDATION_ERROR_TITLE);
         assertThat(result.getType().toString()).isEqualTo(BAD_REQUEST_TYPE);
         assertThat(result.getDetail()).isEqualTo("MISSING_REQUIRED_PARAMETER: startDate");
-        assertThat(result.getProperties()).containsKey("timestamp");
+        assertThat(result.getProperties()).containsKey(TIMESTAMP_KEY);
     }
 
     @Test
@@ -110,6 +118,54 @@ class ProblemDetailAdviceTest {
         assertThat(result.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
         assertThat(result.getDetail()).isEqualTo("INTERNAL_SERVER_ERROR");
         assertThat(result.getType().toString()).isEqualTo("https://hotel-pms.com/errors/internal-server-error");
+    }
+
+    @Test
+    void handlesNoResourceFoundExceptionAs404() {
+        final NoResourceFoundException ex = new NoResourceFoundException(HttpMethod.GET, "actuator/health");
+
+        final ProblemDetail result = advice.handleNoResourceFoundException(ex);
+
+        assertThat(result.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+        assertThat(result.getDetail()).isEqualTo("NOT_FOUND");
+        assertThat(result.getType().toString()).isEqualTo("https://hotel-pms.com/errors/not-found");
+        assertThat(result.getProperties()).containsKey(TIMESTAMP_KEY);
+    }
+
+    @Test
+    void handlesMethodArgumentTypeMismatchExceptionAs400() throws NoSuchMethodException {
+        final MethodArgumentTypeMismatchException ex = new MethodArgumentTypeMismatchException(
+                "not-a-valid-uuid", java.util.UUID.class, "id", new MethodParameterStub(), null);
+
+        final ProblemDetail result = advice.handleMethodArgumentTypeMismatchException(ex);
+
+        assertThat(result.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(result.getTitle()).isEqualTo(REQUEST_VALIDATION_ERROR_TITLE);
+        assertThat(result.getType().toString()).isEqualTo(BAD_REQUEST_TYPE);
+        assertThat(result.getDetail()).isEqualTo("INVALID_PARAMETER_TYPE: id");
+    }
+
+    @Test
+    void handlesHttpRequestMethodNotSupportedExceptionAs405() {
+        final HttpRequestMethodNotSupportedException ex = new HttpRequestMethodNotSupportedException("DELETE");
+
+        final ProblemDetail result = advice.handleHttpRequestMethodNotSupportedException(ex);
+
+        assertThat(result.getStatus()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED.value());
+        assertThat(result.getDetail()).isEqualTo("METHOD_NOT_ALLOWED");
+        assertThat(result.getType().toString()).isEqualTo("https://hotel-pms.com/errors/method-not-allowed");
+    }
+
+    @Test
+    void handlesHttpMediaTypeNotSupportedExceptionAs415() {
+        final HttpMediaTypeNotSupportedException ex = new HttpMediaTypeNotSupportedException(
+                MediaType.APPLICATION_XML, List.of(MediaType.APPLICATION_JSON));
+
+        final ProblemDetail result = advice.handleHttpMediaTypeNotSupportedException(ex);
+
+        assertThat(result.getStatus()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
+        assertThat(result.getDetail()).isEqualTo("UNSUPPORTED_MEDIA_TYPE");
+        assertThat(result.getType().toString()).isEqualTo("https://hotel-pms.com/errors/unsupported-media-type");
     }
 
     private static final class TestAdvice extends AbstractProblemDetailAdvice {

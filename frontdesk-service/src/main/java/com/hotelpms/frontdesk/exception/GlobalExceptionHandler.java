@@ -1,42 +1,36 @@
 package com.hotelpms.frontdesk.exception;
 
+import com.hotelpms.commonweb.exception.AbstractProblemDetailAdvice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.validation.FieldError;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.lang.NonNull;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.net.URI;
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Global exception handler for the Frontdesk Service (rooms, reservations, stays).
+ * Exception handling specific to Frontdesk Service (rooms, reservations,
+ * stays). Shared handlers (malformed bodies, bean validation, {@code
+ * @PreAuthorize} denials, downstream Feign failures, the generic Spring
+ * native 404/400/405/415 handlers) live in {@link AbstractProblemDetailAdvice}.
  *
- * <p>All handlers return a {@link ProblemDetail} body (RFC 7807/9457). The
- * generic catch-all ({@link #handleGenericException}) additionally generates a
- * {@code traceId} (UUID) so the caller can correlate their error response with
- * the corresponding server-side stack trace in the application logs.
+ * <p>{@link #handleGenericException} is the one override: this service
+ * additionally generates a {@code traceId} on the generic 500 path so callers
+ * can correlate their error response with the corresponding server-side
+ * stack trace — no other service does this, so it cannot live in the shared
+ * base without adding it everywhere.
  */
-@ControllerAdvice
-public class GlobalExceptionHandler {
+@RestControllerAdvice
+public class GlobalExceptionHandler extends AbstractProblemDetailAdvice {
 
     private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    private static final String TIMESTAMP_PROPERTY = "timestamp";
     private static final String TRACE_ID_PROPERTY = "traceId";
-    private static final String ERRORS_BASE_URI = "https://hotel-pms.com/errors/";
     private static final String TITLE_BAD_REQUEST = "Bad Request";
     private static final String SLUG_CONFLICT = "conflict";
     private static final String SLUG_BAD_REQUEST = "bad-request";
@@ -54,7 +48,7 @@ public class GlobalExceptionHandler {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problemDetail.setTitle("Resource Not Found");
         problemDetail.setType(errorType("not-found"));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
@@ -69,7 +63,7 @@ public class GlobalExceptionHandler {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problemDetail.setTitle(TITLE_BAD_REQUEST);
         problemDetail.setType(errorType(SLUG_BAD_REQUEST));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
@@ -84,7 +78,7 @@ public class GlobalExceptionHandler {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problemDetail.setTitle("Conflict");
         problemDetail.setType(errorType(SLUG_CONFLICT));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
@@ -102,7 +96,7 @@ public class GlobalExceptionHandler {
                 ex.getMessage());
         problemDetail.setTitle("External Service Error");
         problemDetail.setType(errorType("external-service"));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
@@ -117,7 +111,7 @@ public class GlobalExceptionHandler {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problemDetail.setTitle("Billing Not Paid");
         problemDetail.setType(errorType("billing-not-paid"));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
@@ -134,7 +128,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
         problemDetail.setTitle("Alloggiati Row Limit Exceeded");
         problemDetail.setType(errorType("alloggiati-row-limit-exceeded"));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
@@ -151,7 +145,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
         problemDetail.setTitle("Alloggiati Validation Error");
         problemDetail.setType(errorType("alloggiati-validation"));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
@@ -167,70 +161,15 @@ public class GlobalExceptionHandler {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problemDetail.setTitle("Invalid State");
         problemDetail.setType(errorType("invalid-state"));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
-    /**
-     * Handles AccessDeniedException thrown by {@code @PreAuthorize} when the
-     * caller's role is not in the allowed set. Must be explicit so the catch-all
-     * handler does not swallow it and return 500 instead of 403.
-     *
-     * @param ex the exception
-     * @return the problem detail
-     */
-    @ExceptionHandler(AccessDeniedException.class)
-    public ProblemDetail handleAccessDeniedException(final AccessDeniedException ex) {
-        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        problemDetail.setTitle("Forbidden");
-        problemDetail.setType(errorType("access-denied"));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
-        return problemDetail;
-    }
-
-    /**
-     * Handles unreadable HTTP messages (malformed JSON payload, invalid enum value).
-     *
-     * @param ex the exception
-     * @return the problem detail
-     */
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ProblemDetail handleHttpMessageNotReadableException(final HttpMessageNotReadableException ex) {
-        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
-                "INVALID_JSON_PAYLOAD");
-        problemDetail.setTitle(TITLE_BAD_REQUEST);
-        problemDetail.setType(errorType("invalid-json-payload"));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
-        return problemDetail;
-    }
-
-    /**
-     * Handles Bean Validation errors, attaching a per-field error map.
-     *
-     * @param ex the exception
-     * @return the problem detail with a {@code errors} field-error map
-     */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidationExceptions(final MethodArgumentNotValidException ex) {
-        final String fieldErrors = ex.getBindingResult().getFieldErrors().stream()
-                .map(f -> f.getField() + ": " + f.getDefaultMessage())
-                .reduce("", (a, b) -> a + " " + b);
-        LOG.warn("[ValidationException] Details: {}", fieldErrors);
-
-        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
-                "VALIDATION_FAILED");
-        problemDetail.setTitle(TITLE_BAD_REQUEST);
-        problemDetail.setType(errorType(SLUG_BAD_REQUEST));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
-
-        final Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getAllErrors().forEach(error -> {
-            final String fieldName = ((FieldError) error).getField();
-            errors.put(fieldName, error.getDefaultMessage());
-        });
-        problemDetail.setProperty("errors", errors);
-        return problemDetail;
-    }
+    // AccessDeniedException (403, @PreAuthorize denials) and FeignException (502,
+    // downstream guest-service/billing-service/notification-service failures) are
+    // handled by the inherited AbstractProblemDetailAdvice — this service used to
+    // duplicate both locally with identical behavior; removed now that this class
+    // extends the base.
 
     /**
      * Handles data integrity violations (unique constraint, not-null constraint, ...).
@@ -253,7 +192,7 @@ public class GlobalExceptionHandler {
                     "REQUIRED_FIELD_MISSING");
             problemDetail.setTitle(TITLE_BAD_REQUEST);
             problemDetail.setType(errorType(SLUG_BAD_REQUEST));
-            problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+            problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
             return problemDetail;
         }
 
@@ -262,7 +201,7 @@ public class GlobalExceptionHandler {
                 "RESOURCE_ALREADY_EXISTS");
         problemDetail.setTitle("Conflict: Resource Already Exists");
         problemDetail.setType(errorType(SLUG_CONFLICT));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
@@ -288,20 +227,22 @@ public class GlobalExceptionHandler {
                 "CONCURRENT_MODIFICATION");
         problemDetail.setTitle("Conflict");
         problemDetail.setType(errorType(SLUG_CONFLICT));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
     /**
-     * Catch-all handler for any unhandled {@link Exception}.
-     *
-     * <p>Generates a unique {@code traceId} (UUID v4), logs the full stack trace
-     * tagged with that ID, and includes the {@code traceId} in the response body
-     * so the client can report it when contacting support.
+     * Overrides the base catch-all to additionally generate a unique {@code
+     * traceId} (UUID v4), log the full stack trace tagged with that ID, and
+     * include the {@code traceId} in the response body so the client can
+     * report it when contacting support. No other service in the project
+     * does this, so it cannot be hoisted into {@link AbstractProblemDetailAdvice}
+     * without adding it everywhere.
      *
      * @param ex the unhandled exception
      * @return the problem detail containing a correlatable traceId
      */
+    @Override
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGenericException(final Exception ex) {
         final String traceId = UUID.randomUUID().toString();
@@ -311,13 +252,8 @@ public class GlobalExceptionHandler {
                 "INTERNAL_SERVER_ERROR");
         problemDetail.setTitle("Internal Server Error");
         problemDetail.setType(errorType("internal-server-error"));
-        problemDetail.setProperty(TIMESTAMP_PROPERTY, Instant.now());
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         problemDetail.setProperty(TRACE_ID_PROPERTY, traceId);
         return problemDetail;
-    }
-
-    @NonNull
-    private static URI errorType(final String slug) {
-        return Objects.requireNonNull(URI.create(ERRORS_BASE_URI + slug));
     }
 }

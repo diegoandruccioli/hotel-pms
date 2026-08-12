@@ -31,6 +31,9 @@ dependencyManagement {
 
 dependencies {
     api("org.springframework:spring-web")
+    // NoResourceFoundException lives in org.springframework.web.servlet.resource
+    // (spring-webmvc), not spring-web itself.
+    api("org.springframework:spring-webmvc")
     api("org.springframework.security:spring-security-core")
     api("io.github.openfeign:feign-core")
     implementation("org.slf4j:slf4j-api")

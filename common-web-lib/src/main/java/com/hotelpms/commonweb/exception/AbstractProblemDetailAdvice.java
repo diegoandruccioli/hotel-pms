@@ -9,9 +9,13 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.net.URI;
 import java.time.Instant;
@@ -152,6 +156,79 @@ public abstract class AbstractProblemDetailAdvice {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "ACCESS_DENIED");
         problemDetail.setTitle("Forbidden");
         problemDetail.setType(errorType("access-denied"));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
+
+    /**
+     * Handles a request path that matches no controller mapping and no static
+     * resource. Must be explicit so the generic 500 catch-all below does not
+     * swallow it and return 500 instead of 404 — same rationale as
+     * {@link #handleAccessDeniedException(AccessDeniedException)}.
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 404 status
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ProblemDetail handleNoResourceFoundException(final NoResourceFoundException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "NOT_FOUND");
+        problemDetail.setTitle("Not Found");
+        problemDetail.setType(errorType("not-found"));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
+
+    /**
+     * Handles a path variable or request parameter that could not be
+     * converted to its target type (e.g. a malformed UUID). Must be explicit
+     * so the generic 500 catch-all below does not swallow it — this is
+     * always a client input error, never a server fault.
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 400 status
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail handleMethodArgumentTypeMismatchException(final MethodArgumentTypeMismatchException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+                "INVALID_PARAMETER_TYPE: " + ex.getName());
+        problemDetail.setTitle(BAD_REQUEST_TITLE);
+        problemDetail.setType(errorType(BAD_REQUEST_SLUG));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
+
+    /**
+     * Handles a request made with an HTTP method the matched endpoint does
+     * not support. Must be explicit so the generic 500 catch-all below does
+     * not swallow it.
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 405 status
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ProblemDetail handleHttpRequestMethodNotSupportedException(final HttpRequestMethodNotSupportedException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.METHOD_NOT_ALLOWED,
+                "METHOD_NOT_ALLOWED");
+        problemDetail.setTitle("Method Not Allowed");
+        problemDetail.setType(errorType("method-not-allowed"));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
+
+    /**
+     * Handles a request whose {@code Content-Type} is not supported by the
+     * matched endpoint. Must be explicit so the generic 500 catch-all below
+     * does not swallow it.
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 415 status
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ProblemDetail handleHttpMediaTypeNotSupportedException(final HttpMediaTypeNotSupportedException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                "UNSUPPORTED_MEDIA_TYPE");
+        problemDetail.setTitle("Unsupported Media Type");
+        problemDetail.setType(errorType("unsupported-media-type"));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
