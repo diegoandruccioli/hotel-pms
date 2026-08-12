@@ -1,27 +1,20 @@
 package com.hotelpms.auth.exception;
 
+import com.hotelpms.commonweb.exception.AbstractProblemDetailAdvice;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.validation.FieldError;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import java.net.URI;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
 
 /**
- * Centralized exception handler for throwing standard Problem Details (RFC
- * 7807).
+ * Exception handling specific to Auth Service. Shared handlers (malformed
+ * bodies, bean validation, Feign failures, {@code @PreAuthorize} denials,
+ * the generic 500 catch-all) live in {@link AbstractProblemDetailAdvice}.
  */
-@ControllerAdvice
-@lombok.extern.slf4j.Slf4j
-public class GlobalExceptionHandler {
-
-    private static final String TIMESTAMP = "timestamp";
+@RestControllerAdvice
+public class GlobalExceptionHandler extends AbstractProblemDetailAdvice {
 
     /**
      * Handles AccountLockedException (HTTP 429 Too Many Requests).
@@ -33,8 +26,8 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleAccountLockedException(final AccountLockedException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
         problemDetail.setTitle("Account Temporarily Locked");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/too-many-requests")));
-        problemDetail.setProperty(TIMESTAMP, Instant.now());
+        problemDetail.setType(errorType("too-many-requests"));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
@@ -48,8 +41,8 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleBadCredentialsException(final BadCredentialsException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
         problemDetail.setTitle("Authentication Failed");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/unauthorized")));
-        problemDetail.setProperty(TIMESTAMP, Instant.now());
+        problemDetail.setType(errorType("unauthorized"));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
@@ -63,31 +56,8 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleDuplicateResourceException(final DuplicateResourceException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problemDetail.setTitle("Resource Conflict");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/conflict")));
-        problemDetail.setProperty(TIMESTAMP, Instant.now());
-        return problemDetail;
-    }
-
-    /**
-     * Handles MethodArgumentNotValidException.
-     *
-     * @param ex the exception
-     * @return the problem detail mapping
-     */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidationException(final MethodArgumentNotValidException ex) {
-        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
-                "VALIDATION_FAILED");
-        problemDetail.setTitle("Bad Request");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/bad-request")));
-        problemDetail.setProperty(TIMESTAMP, Instant.now());
-
-        final Map<String, String> errors = new HashMap<>();
-        for (final FieldError error : ex.getBindingResult().getFieldErrors()) {
-            errors.put(error.getField(), error.getDefaultMessage());
-        }
-        problemDetail.setProperty("errors", errors);
-
+        problemDetail.setType(errorType("conflict"));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
 
@@ -101,8 +71,8 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleNotFoundException(final NotFoundException ex) {
         final ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         detail.setTitle("Not Found");
-        detail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/not-found")));
-        detail.setProperty(TIMESTAMP, Instant.now());
+        detail.setType(errorType("not-found"));
+        detail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return detail;
     }
 
@@ -116,42 +86,8 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleIllegalStateException(final IllegalStateException ex) {
         final ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         detail.setTitle("Conflict");
-        detail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/conflict")));
-        detail.setProperty(TIMESTAMP, Instant.now());
+        detail.setType(errorType("conflict"));
+        detail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return detail;
-    }
-
-    /**
-     * Handles malformed request bodies (invalid JSON, unparseable enum values, etc.).
-     *
-     * @param ex the exception
-     * @return the problem detail mapping
-     */
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ProblemDetail handleHttpMessageNotReadableException(final HttpMessageNotReadableException ex) {
-        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
-                "INVALID_JSON_PAYLOAD");
-        problemDetail.setTitle("Bad Request");
-        problemDetail.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/bad-request")));
-        problemDetail.setProperty(TIMESTAMP, Instant.now());
-        return problemDetail;
-    }
-
-    /**
-     * Handles generic Exception.
-     *
-     * @param ex the exception
-     * @return the problem detail mapping
-     */
-    @ExceptionHandler(Exception.class)
-    public ProblemDetail handleGenericException(final Exception ex) {
-        log.error("Unhandled Exception caught: ", ex);
-        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
-                "INTERNAL_SERVER_ERROR");
-        problemDetail.setTitle("Internal Server Error");
-        problemDetail
-                .setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/internal-server-error")));
-        problemDetail.setProperty(TIMESTAMP, Instant.now());
-        return problemDetail;
     }
 }

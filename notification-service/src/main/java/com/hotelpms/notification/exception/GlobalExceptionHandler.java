@@ -1,9 +1,9 @@
 package com.hotelpms.notification.exception;
 
+import com.hotelpms.commonweb.exception.AbstractProblemDetailAdvice;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -11,28 +11,18 @@ import java.net.URI;
 import java.util.Objects;
 
 /**
- * Centralized error handling — maps exceptions to RFC 7807 problem detail responses.
+ * Exception handling specific to Notification Service. Shared handlers
+ * (malformed bodies, bean validation, {@code @PreAuthorize} denials, Feign
+ * failures, the generic 500 catch-all) live in {@link AbstractProblemDetailAdvice}.
+ *
+ * <p>Bean-validation errors ({@code MethodArgumentNotValidException}) used to
+ * have a bespoke shape here (a single concatenated {@code detail} string,
+ * different {@code type}/{@code title}) — now inherited from the base for the
+ * same RFC 7807 shape every other service returns.
  */
 @RestControllerAdvice
 @Slf4j
-public class GlobalExceptionHandler {
-
-    /**
-     * Handles Bean Validation failures on request bodies.
-     *
-     * @param ex the validation exception
-     * @return a 400 problem detail listing all constraint violations
-     */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidation(final MethodArgumentNotValidException ex) {
-        final ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
-        problem.setType(Objects.requireNonNull(URI.create("https://hotel-pms.com/errors/validation-error")));
-        problem.setTitle("Validation Error");
-        problem.setDetail(ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
-                .reduce("", (a, b) -> a.isEmpty() ? b : a + "; " + b));
-        return problem;
-    }
+public class GlobalExceptionHandler extends AbstractProblemDetailAdvice {
 
     /**
      * Handles SMTP send failures and other unexpected errors.

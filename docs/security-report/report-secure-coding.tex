@@ -5805,6 +5805,28 @@ la risorsa al resto delle scritture admin-only; la lettura (\texttt{GET}) resta 
 tutti i ruoli operativi, invariata.
 Commit: \commitref{2bf58be}{fix(security): T-GW-09 --- gateway-level RBAC on /api/v1/rate-calendar bulk-apply}
 
+\paragraph{T-AUTH-10 --- AccessDeniedException mai gestita in auth-service, 500 invece di 403}
+\texttt{UserManagementController} applica \texttt{@PreAuthorize}, ma il
+\texttt{GlobalExceptionHandler} di auth-service non aveva mai un \texttt{@ExceptionHandler}
+esplicito per \texttt{AccessDeniedException}: il diniego cadeva nel catch-all generico
+\texttt{Exception.class} e tornava HTTP 500 invece di 403. Non uno sfruttabile isolato
+(\texttt{@PreAuthorize} ha sempre negato correttamente l'accesso), ma un client o un
+sistema di monitoring non può distinguere un diniego di autorizzazione legittimo da un
+guasto server reale, e lo status HTTP standard viene nascosto dietro un errore generico.
+Trovato analizzando un finding OSINT non correlato (endpoint Actuator che tornava 500
+invece di 404): la causa comune era un catch-all troppo largo, duplicato in 5 dei 6
+microservizi invece di vivere nella classe condivisa \texttt{AbstractProblemDetailAdvice}
+(\texttt{common-web-lib}). Corretto completando la migrazione di auth-service,
+frontdesk-service e notification-service a estendere quella classe condivisa invece di
+duplicare gli handler localmente — \texttt{AccessDeniedException} ora eredita l'handler
+già corretto usato da billing/fb/guest-service, senza codice nuovo in auth-service.
+Aggiunti alla base condivisa anche quattro handler per eccezioni Spring native mai gestite
+esplicitamente in nessun servizio (\texttt{NoResourceFoundException}$\to$404,
+\texttt{MethodArgumentTypeMismatchException}$\to$400,
+\texttt{HttpRequestMethodNotSupportedException}$\to$405,
+\texttt{HttpMediaTypeNotSupportedException}$\to$415).
+Commit: \commitref{8c0fa2c}{fix(security): T-AUTH-10 --- auth-service inherits AccessDeniedException(403) handling}
+
 \paragraph{T-NOTIF-01 --- notification-service mai censito nel modello delle minacce}
 notification-service (non instradato dal gateway, raggiungibile solo dalla rete
 Docker interna, 3 endpoint solo-scrittura che innescano invio email transazionali
