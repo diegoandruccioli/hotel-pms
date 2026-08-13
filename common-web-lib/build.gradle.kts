@@ -35,6 +35,10 @@ dependencies {
     // (spring-webmvc), not spring-web itself.
     api("org.springframework:spring-webmvc")
     api("org.springframework.security:spring-security-core")
+    // PropertyReferenceException (invalid Pageable/Sort property) lives here — every JPA
+    // consumer already has this on the classpath transitively via spring-boot-starter-data-jpa;
+    // notification-service (no DB) gets only the compile-time class, no runtime weight added.
+    api("org.springframework.data:spring-data-commons")
     api("io.github.openfeign:feign-core")
     implementation("org.slf4j:slf4j-api")
     // MissingServletRequestParameterException extends jakarta.servlet.ServletException;

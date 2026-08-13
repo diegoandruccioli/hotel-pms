@@ -28,6 +28,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import com.hotelpms.billing.domain.PaymentMethod;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -317,6 +318,11 @@ public class FatturaPAServiceImpl implements FatturaPAService {
             throws ParserConfigurationException {
         final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setNamespaceAware(true);
+        // XXE hardening (defense in depth): this factory only ever builds a fresh, empty
+        // Document below — it never parses untrusted XML — but disabling DOCTYPE outright
+        // costs nothing and matches the same rule already applied in
+        // AlloggiatiWebSenderServiceImpl.
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         final DocumentBuilder builder = factory.newDocumentBuilder();
         final Document doc = builder.newDocument();
 
@@ -529,6 +535,11 @@ public class FatturaPAServiceImpl implements FatturaPAService {
 
     private static byte[] serialize(final Document doc) throws TransformerException {
         final TransformerFactory tf = TransformerFactory.newInstance();
+        // XXE hardening (defense in depth): this transformer only serializes an in-memory
+        // DOM built by buildDocument() above — it never resolves an external stylesheet —
+        // but locking down external DTD/stylesheet access costs nothing.
+        tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
         final Transformer transformer = tf.newTransformer();
         transformer.setOutputProperty(OutputKeys.ENCODING, StandardCharsets.UTF_8.name());
         transformer.setOutputProperty(OutputKeys.INDENT, "yes");

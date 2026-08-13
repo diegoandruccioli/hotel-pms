@@ -5,6 +5,8 @@ import feign.Request;
 import feign.RequestTemplate;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
+import org.springframework.data.mapping.PropertyPath;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -26,6 +28,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 /**
  * Unit tests for {@link AbstractProblemDetailAdvice} via a trivial concrete
@@ -166,6 +169,28 @@ class ProblemDetailAdviceTest {
         assertThat(result.getStatus()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
         assertThat(result.getDetail()).isEqualTo("UNSUPPORTED_MEDIA_TYPE");
         assertThat(result.getType().toString()).isEqualTo("https://hotel-pms.com/errors/unsupported-media-type");
+    }
+
+    /**
+     * {@code ?sort=doesNotExist} on a paginated endpoint (e.g. InvoiceController,
+     * RestaurantOrderController) used to fall through to the generic 500 catch-all
+     * before this handler existed. Uses a real {@link PropertyReferenceException},
+     * obtained the same way Spring Data itself produces one — resolving a
+     * {@link PropertyPath} against a type that has no such property — rather than
+     * hand-constructing it, since the exact constructor is an internal API detail.
+     */
+    @Test
+    void handlesPropertyReferenceExceptionAs400() {
+        final PropertyReferenceException ex = catchThrowableOfType(
+                () -> PropertyPath.from("doesNotExist", TestAdvice.class),
+                PropertyReferenceException.class);
+
+        final ProblemDetail result = advice.handlePropertyReferenceException(ex);
+
+        assertThat(result.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(result.getTitle()).isEqualTo(REQUEST_VALIDATION_ERROR_TITLE);
+        assertThat(result.getType().toString()).isEqualTo(BAD_REQUEST_TYPE);
+        assertThat(result.getDetail()).isEqualTo("INVALID_SORT_PROPERTY: doesNotExist");
     }
 
     private static final class TestAdvice extends AbstractProblemDetailAdvice {
