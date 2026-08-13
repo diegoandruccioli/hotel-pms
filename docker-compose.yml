@@ -713,12 +713,14 @@ services:
     container_name: frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      # nginx-unprivileged base image listens on 8080 internally (non-root
+      # can't bind <1024) — published host port stays 80, no external change.
+      - "80:8080"
     depends_on:
       api-gateway:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -T10 -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
+      test: ["CMD-SHELL", "wget -T10 -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 10
