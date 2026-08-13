@@ -19,10 +19,14 @@ management:
   endpoints:
     web:
       exposure:
-        include: "*"
+        # Local-file leftover: this was "*" (every actuator endpoint, incl.
+        # /actuator/env and /actuator/heapdump) while config-service already
+        # serves the correct restricted value for fb-service — aligned here so
+        # both property sources agree regardless of which one wins at runtime.
+        include: "prometheus,health,info"
   endpoint:
     health:
-      show-details: always
+      show-details: when-authorized
 
 
 # Internal HMAC security - injected by setup-hmac-secret script
