@@ -5827,6 +5827,82 @@ esplicitamente in nessun servizio (\texttt{NoResourceFoundException}$\to$404,
 \texttt{HttpMediaTypeNotSupportedException}$\to$415).
 Commit: \commitref{8c0fa2c}{fix(security): T-AUTH-10 --- auth-service inherits AccessDeniedException(403) handling}
 
+\paragraph{GAP-11 --- XXE hardening mancante su FatturaPAServiceImpl}
+Uno scan Semgrep mirato su injection/XXE (595 regole Java+OWASP su 905 file) ha
+segnalato \texttt{DocumentBuilderFactory} e \texttt{TransformerFactory} in
+\texttt{FatturaPAServiceImpl} (billing-service, generazione XML FatturaPA) privi di
+hardening DOCTYPE/entità esterne. Non sfruttabile allo stato attuale: il factory
+costruisce solo un \texttt{Document} vuoto in memoria, mai un parsing di input esterno;
+il transformer serializza quel DOM, mai uno stylesheet esterno. Corretto comunque come
+difesa in profondità, stesso standard già applicato in \texttt{AlloggiatiWebSenderServiceImpl}
+(T-STAY-03): \texttt{disallow-doctype-decl} sul factory,
+\texttt{ACCESS\_EXTERNAL\_DTD}/\texttt{ACCESS\_EXTERNAL\_STYLESHEET} vuoti sul
+transformer. Zero cambio di comportamento osservabile.
+Commit: \commitref{3fc4b07}{fix(security): GAP-11 --- XXE hardening on FatturaPAServiceImpl}
+
+\paragraph{GAP-12 --- PropertyReferenceException mai gestita, 500 invece di 400}
+Lo stesso audit Semgrep ha portato a verificare manualmente ogni endpoint paginato:
+un \texttt{sort} su una property inesistente (es. \texttt{?sort=nonEsiste}) fa fallire
+la validazione di Spring Data contro il metamodello JPA \emph{prima} che venga generato
+SQL — non è injection — ma nessuno dei 6 \texttt{GlobalExceptionHandler} gestiva
+\texttt{PropertyReferenceException}, che cadeva nel catch-all generico e tornava 500.
+Stesso pattern di T-AUTH-10 (eccezione client-side mascherata da errore server). Fix:
+nuovo handler condiviso in \texttt{AbstractProblemDetailAdvice}, ereditato
+automaticamente da tutti e 6 i servizi senza modifiche per-servizio.
+Commit: \commitref{3fc4b07}{fix(security): GAP-12 --- PropertyReferenceException(400) shared handler}
+
+\paragraph{GAP-13 --- Actuator fb-service esposto per intero in config locale}
+\texttt{fb-service/application-fb-service.yml} (config locale, non quella servita da
+config-service) esponeva l'intero Actuator (\texttt{include: "*"}, incluso
+\texttt{/actuator/env} e \texttt{/actuator/heapdump}) mentre config-service serve già
+per lo stesso servizio il valore corretto (\texttt{prometheus,health,info}, identico
+agli altri 6 servizi) — residuo locale mai allineato, unico dei 4 file
+\texttt{application-<service>.yml} a toccare la config actuator. Trovato dalla regola
+Semgrep \texttt{spring-actuator-fully-enabled-yaml}. Fix: allineato al valore già
+corretto in config-service.
+Commit: \commitref{c2992c2}{fix(security): GAP-13 --- fb-service local actuator exposure aligned}
+
+\paragraph{GAP-14 --- nginx gira come root nell'immagine frontend}
+\texttt{frontend/Dockerfile} non dichiarava alcun \texttt{USER}: il processo master
+nginx girava come root (immagine base \texttt{nginx:alpine} standard). Fix: swap a
+\texttt{nginxinc/nginx-unprivileged:alpine} (immagine ufficiale non-root, ascolto
+interno su 8080 — le porte $<$1024 richiedono root per il bind), \texttt{USER nginx}
+esplicito, \texttt{nginx.conf} aggiornato (\texttt{listen 8080}),
+\texttt{docker-compose.yml} porte \texttt{"80:8080"}. La porta host pubblicata resta 80
+— nessun impatto esterno o sulla CI. Verificato dal vivo: rebuild, container healthy,
+\texttt{curl} dall'host su :80 risponde 200 come prima del cambio.
+Commit: \commitref{a4df5c2}{fix(security): GAP-14 --- frontend nginx runs as non-root (nginx-unprivileged)}
+
+\paragraph{GAP-15 --- GitHub Actions non pinnate a SHA, Dependabot senza cooldown}
+\texttt{.github/workflows/ci.yml} referenziava 7 Action per tag mutabile
+(\texttt{actions/checkout@v7}, \texttt{setup-java@v5}, \texttt{cache@v6},
+\texttt{upload-artifact@v7}, \texttt{setup-node@v7}, \texttt{download-artifact@v8},
+\texttt{codeql-action/upload-sarif@v4}) — un tag può essere ripuntato dal maintainer
+senza preavviso (supply-chain; incidente reale di riferimento:
+\texttt{tj-actions/changed-files}, 2025). Il progetto pinnava già a SHA
+\texttt{aquasecurity/trivy-action} e \texttt{docker/setup-buildx-action}; le altre 7
+erano rimaste sul pattern precedente. \texttt{.github/dependabot.yml} non impostava
+alcun \texttt{cooldown} sugli 11 blocchi \texttt{package-ecosystem} — una dipendenza
+appena pubblicata (potenzialmente compromessa) veniva proposta in PR immediatamente.
+Fix: le 7 Action pinnate a SHA (stesso pattern \texttt{@<sha40> \# vX.Y.Z} già in uso,
+SHA risolti dal tag corrente — zero cambio di comportamento);
+\texttt{cooldown: default-days: 7} aggiunto a tutti gli 11 blocchi Dependabot.
+Commit: \commitref{0cfbe60}{fix(security): GAP-15 --- pin GitHub Actions to SHA, add Dependabot cooldown}
+
+\paragraph{GAP-16 --- postgres gira come root: rischio accettato, non una fix}
+Stessa regola Semgrep di GAP-14 segnala anche \texttt{docker/postgres/Dockerfile} privo
+di \texttt{USER}. A differenza di nginx, qui la fix ``ovvia'' romperebbe funzionalità
+esistente: \texttt{entrypoint-wrapper.sh} scrive \texttt{/etc/pgbackrest/pgbackrest.conf}
+e ne fa \texttt{chown postgres:postgres} (un processo non-root non può cambiare
+proprietario a un altro utente), poi ogni comando verso Postgres/pgbackrest passa già
+per \texttt{gosu postgres ...} — esattamente il pattern privilege-drop dell'immagine
+ufficiale \texttt{postgres:15-alpine} upstream (il suo stesso
+\texttt{docker-entrypoint.sh}, quando parte come root, fa \texttt{gosu postgres}
+internamente prima di avviare il server; Postgres stesso rifiuta di girare come root).
+Non esiste un'immagine ``unprivileged'' equivalente: pgBackRest richiede root
+transitorio per sistemare i permessi di un volume montato al primo avvio. Nessuna
+modifica di codice — rischio residuo accettato, stesso trattamento di T-OPS-02.
+
 \paragraph{T-NOTIF-01 --- notification-service mai censito nel modello delle minacce}
 notification-service (non instradato dal gateway, raggiungibile solo dalla rete
 Docker interna, 3 endpoint solo-scrittura che innescano invio email transazionali

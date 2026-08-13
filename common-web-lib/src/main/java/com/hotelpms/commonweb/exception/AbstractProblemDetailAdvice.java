@@ -3,6 +3,7 @@ package com.hotelpms.commonweb.exception;
 import feign.FeignException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -191,6 +192,27 @@ public abstract class AbstractProblemDetailAdvice {
     public ProblemDetail handleMethodArgumentTypeMismatchException(final MethodArgumentTypeMismatchException ex) {
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
                 "INVALID_PARAMETER_TYPE: " + ex.getName());
+        problemDetail.setTitle(BAD_REQUEST_TITLE);
+        problemDetail.setType(errorType(BAD_REQUEST_SLUG));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
+
+    /**
+     * Handles a {@code Pageable}/{@code Sort} request parameter (e.g.
+     * {@code ?sort=noSuchField}) referencing a property that does not exist on the
+     * target entity. Spring Data validates the sort path against the JPA metamodel
+     * before any SQL is generated — this is a client input error, never a server
+     * fault or an injection vector — but without an explicit handler it fell
+     * through the generic 500 catch-all below.
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 400 status
+     */
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ProblemDetail handlePropertyReferenceException(final PropertyReferenceException ex) {
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
+                "INVALID_SORT_PROPERTY: " + ex.getPropertyName());
         problemDetail.setTitle(BAD_REQUEST_TITLE);
         problemDetail.setType(errorType(BAD_REQUEST_SLUG));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
