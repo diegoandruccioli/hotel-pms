@@ -154,6 +154,7 @@ public class GuestController {
      */
     @DeleteMapping("/{id}/documents/{documentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public void removeIdentityDocument(
             @NonNull @PathVariable final UUID id,
             @NonNull @PathVariable final UUID documentId) {
