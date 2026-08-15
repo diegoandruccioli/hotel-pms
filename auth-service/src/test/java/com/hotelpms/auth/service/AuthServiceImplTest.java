@@ -35,6 +35,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -53,6 +54,7 @@ class AuthServiceImplTest {
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final long FUTURE_TTL_SECONDS = 3600L;
     private static final String TEST_IP = "test-client-ip";
+    private static final String DUMMY_HASH_VALUE = "dummy-hash-value";
     private static final UUID TEST_HOTEL_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final int TEST_TOKEN_VERSION = 0;
     private static final String NEW_PASSWORD = "newpassword";
@@ -137,9 +139,24 @@ class AuthServiceImplTest {
     @Test
     void loginThrowsWhenUserNotFound() {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(anyString())).thenReturn(DUMMY_HASH_VALUE);
 
         assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest, TEST_IP),
                 "Should throw BadCredentialsException when user is not found");
+
+        verify(passwordEncoder).matches(eq(RAW_PASSWORD), eq(DUMMY_HASH_VALUE));
+    }
+
+    @Test
+    void loginReusesTheSameDummyHashAcrossMultipleUnknownUsernames() {
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(anyString())).thenReturn(DUMMY_HASH_VALUE);
+
+        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest, TEST_IP));
+        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest, TEST_IP));
+
+        verify(passwordEncoder, times(1)).encode(anyString());
+        verify(passwordEncoder, times(2)).matches(eq(RAW_PASSWORD), eq(DUMMY_HASH_VALUE));
     }
 
     @Test
@@ -154,7 +171,7 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void loginThrowsWhenAccountIsLocked() {
+    void loginThrowsWhenAccountIsLockedButStillPaysArgon2idCost() {
         when(userRepository.findByUsername(TEST_USER)).thenReturn(Optional.of(testUser));
         when(loginAttemptService.getLockedUntil(TEST_USER, TEST_IP))
                 .thenReturn(Optional.of(Instant.now().plus(Duration.ofMinutes(10))));
@@ -162,7 +179,12 @@ class AuthServiceImplTest {
         assertThrows(AccountLockedException.class, () -> authService.login(loginRequest, TEST_IP),
                 "Should throw AccountLockedException when account is locked");
 
-        verifyNoMoreInteractions(passwordEncoder);
+        // Locked-vs-wrong-password timing follow-up (to #8/#9): the password check
+        // now runs unconditionally even on the locked branch, so timing doesn't
+        // distinguish "locked" from "wrong password" — but its result must never
+        // be used to decide anything here (no recordFailure on this branch).
+        verify(passwordEncoder).matches(RAW_PASSWORD, HASHED_PASSWORD);
+        verify(loginAttemptService, never()).recordFailure(anyString(), anyString());
     }
 
     @Test

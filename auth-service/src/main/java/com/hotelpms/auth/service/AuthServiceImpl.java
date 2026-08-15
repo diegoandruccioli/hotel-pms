@@ -28,6 +28,7 @@ public class AuthServiceImpl implements AuthService {
 
     private static final String INVALID_REFRESH_TOKEN = "INVALID_REFRESH_TOKEN";
     private static final String INVALID_CREDENTIALS = "INVALID_CREDENTIALS";
+    private static final String DUMMY_PASSWORD_FOR_TIMING = "dummy-password-for-constant-time-check";
 
     /**
      * TTL for the Redis token-version key {@code user:tv:<username>}.
@@ -43,6 +44,14 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final LoginAttemptService loginAttemptService;
+
+    /**
+     * Lazily-memoized throwaway hash (Finding #9, security-report.md) — computed
+     * once against {@link #passwordEncoder}, so its cost/format always matches
+     * whatever encoder is actually configured, with no hardcoded hash to keep in
+     * sync by hand.
+     */
+    private volatile String dummyPasswordHash;
 
     /**
      * Authenticates a user, enforcing a brute-force lockout policy keyed on
@@ -63,11 +72,23 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional(noRollbackFor = {BadCredentialsException.class, AccountLockedException.class})
     public AuthResponse login(final LoginRequest request, final String clientIp) {
-        final UserAccount user = userRepository.findByUsername(request.username())
-                .orElseThrow(() -> {
-                    log.warn("[AUTH] LOGIN_FAILED | user={} | reason=USER_NOT_FOUND", request.username());
-                    return new BadCredentialsException(INVALID_CREDENTIALS);
-                });
+        final Optional<UserAccount> maybeUser = userRepository.findByUsername(request.username());
+        final UserAccount user = maybeUser.orElse(null);
+
+        // Constant-time defense (Finding #9, plus the locked-vs-wrong-password
+        // follow-up): pay the same Argon2id cost for every outcome — unknown user,
+        // locked account, or wrong password — computed unconditionally, before any
+        // branch below decides which exception to throw, so none of them can be
+        // distinguished by response time. The result is discarded whenever the
+        // user doesn't exist or the account is locked; it only ever drives a
+        // decision in the "user found and not locked" branch further down.
+        final boolean passwordMatches = passwordEncoder.matches(
+                request.password(), user != null ? user.getPasswordHash() : dummyHash());
+
+        if (user == null) {
+            log.warn("[AUTH] LOGIN_FAILED | user={} | reason=USER_NOT_FOUND", request.username());
+            throw new BadCredentialsException(INVALID_CREDENTIALS);
+        }
 
         final Optional<Instant> lockedUntil = loginAttemptService.getLockedUntil(user.getUsername(), clientIp);
         if (lockedUntil.isPresent() && Instant.now().isBefore(lockedUntil.get())) {
@@ -76,7 +97,7 @@ public class AuthServiceImpl implements AuthService {
             throw new AccountLockedException("ACCOUNT_TEMPORARILY_LOCKED");
         }
 
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        if (!passwordMatches) {
             final LoginAttemptResult result = loginAttemptService.recordFailure(user.getUsername(), clientIp);
             if (result.locked()) {
                 log.warn("[AUTH] ACCOUNT_LOCKED | user={} | ip={} | attempts={} | until={}",
@@ -238,5 +259,21 @@ public class AuthServiceImpl implements AuthService {
         } catch (final JwtException | IllegalArgumentException e) {
             log.debug("[AUTH] REFRESH_TOKEN_INVALIDATION_SKIPPED | reason=INVALID_TOKEN");
         }
+    }
+
+    /**
+     * Returns a throwaway password hash for the constant-time defense in
+     * {@link #login}, computing it once on first use and reusing it afterward.
+     *
+     * @return a valid hash under whatever encoding {@link #passwordEncoder} is
+     *         currently configured with
+     */
+    private String dummyHash() {
+        String hash = dummyPasswordHash;
+        if (hash == null) {
+            hash = passwordEncoder.encode(DUMMY_PASSWORD_FOR_TIMING);
+            dummyPasswordHash = hash;
+        }
+        return hash;
     }
 }
