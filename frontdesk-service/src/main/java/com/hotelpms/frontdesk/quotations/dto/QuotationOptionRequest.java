@@ -18,7 +18,14 @@ import java.util.UUID;
 public record QuotationOptionRequest(
         @NotBlank(message = "Required") @Size(max = 100) String label,
 
-        @NotEmpty(message = "Required") List<UUID> roomIds) {
+        @NotEmpty(message = "Required") @Size(max = MAX_ROOM_IDS, message = "Too many rooms") List<UUID> roomIds) {
+
+    /**
+     * Upper bound on rooms bundled in a single option (Finding #18,
+     * security-report.md — LOW) — same cap as {@code ReservationRequest.lineItems},
+     * since an option is a candidate room block of the same realistic scale.
+     */
+    static final int MAX_ROOM_IDS = 50;
 
     /**
      * Compact constructor — defensive copy of the room id list.

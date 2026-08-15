@@ -1,5 +1,6 @@
 package com.hotelpms.fb.dto;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Builder;
@@ -20,5 +21,14 @@ import java.util.UUID;
 public record OrderItemRequest(
                 @NotNull(message = "Menu item ID is required") UUID menuItemId,
 
-                @NotNull(message = "Required") @Positive(message = "Must be > 0") Integer quantity) {
+                @NotNull(message = "Required") @Positive(message = "Must be > 0")
+                @Max(value = MAX_QUANTITY, message = "Quantity too large") Integer quantity) {
+
+        /**
+         * Upper bound on a single order line's quantity (Finding #18,
+         * security-report.md — LOW). A line for more portions than this is
+         * already an operational anomaly worth a validation error rather than
+         * silent acceptance.
+         */
+        static final int MAX_QUANTITY = 100;
 }

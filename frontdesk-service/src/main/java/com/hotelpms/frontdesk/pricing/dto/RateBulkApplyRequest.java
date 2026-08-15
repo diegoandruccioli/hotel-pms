@@ -27,7 +27,8 @@ import java.util.UUID;
  *                     to every created season
  */
 public record RateBulkApplyRequest(
-        @NotEmpty(message = REQUIRED_MSG) List<UUID> roomTypeIds,
+        @NotEmpty(message = REQUIRED_MSG)
+        @Size(max = MAX_ROOM_TYPE_IDS, message = "Too many room types") List<UUID> roomTypeIds,
 
         @NotNull(message = REQUIRED_MSG) LocalDate startDate,
 
@@ -39,6 +40,15 @@ public record RateBulkApplyRequest(
 
     /** Shared validation message for required fields. */
     static final String REQUIRED_MSG = "Required";
+
+    /**
+     * Upper bound on room types per bulk-apply (Finding #18, security-report.md
+     * — LOW) — room types have a naturally small cardinality (rarely more than a
+     * couple dozen even in large hotels), but kept at the same 50 as the other
+     * list caps in this batch for consistency rather than a separately-justified
+     * tighter number.
+     */
+    static final int MAX_ROOM_TYPE_IDS = 50;
 
     /**
      * Defensive copy — a mutable {@code List} field on a record is otherwise a
