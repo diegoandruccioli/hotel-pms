@@ -336,7 +336,7 @@ services:
       - GW_BILLING_SERVICE_URI=http://billing-service:8085
       - GW_FB_SERVICE_URI=http://fb-service:8086
       # CORS – override for production frontend URL
-      - GW_CORS_ALLOWED_ORIGINS=http://localhost:5173
+      - GW_CORS_ALLOWED_ORIGINS=${GW_CORS_ALLOWED_ORIGINS:-http://localhost:5173}
     depends_on:
       postgres:
         condition: service_healthy
