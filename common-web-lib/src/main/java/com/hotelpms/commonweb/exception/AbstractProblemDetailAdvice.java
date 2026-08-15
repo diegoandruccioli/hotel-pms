@@ -137,7 +137,13 @@ public abstract class AbstractProblemDetailAdvice {
      */
     @ExceptionHandler(FeignException.class)
     public ProblemDetail handleFeignException(final FeignException ex) {
-        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, ex.getMessage());
+        // Finding #17 (security-report.md, LOW): ex.getMessage() typically includes
+        // the internal Docker service URL the call targeted (e.g.
+        // http://frontdesk-service:8081/...) -- log it server-side only, return a
+        // generic detail to the client.
+        LOG.warn("Downstream service call failed: {}", ex.getMessage(), ex);
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY,
+                "EXTERNAL_SERVICE_ERROR");
         problemDetail.setTitle("External Service Error");
         problemDetail.setType(errorType("external-service-error"));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
