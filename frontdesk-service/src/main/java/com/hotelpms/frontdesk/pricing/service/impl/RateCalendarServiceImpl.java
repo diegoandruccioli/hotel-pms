@@ -15,6 +15,7 @@ import com.hotelpms.frontdesk.rooms.dto.RoomTypeResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomTypeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -178,13 +179,13 @@ public class RateCalendarServiceImpl implements RateCalendarService {
         final boolean pokesRight = end.isAfter(newEnd);
 
         if (!pokesLeft && !pokesRight) {
-            rateSeasonRepository.delete(existing); // fully covered — @SQLDelete soft-deletes it
+            deleteTranslatingOverlap(existing); // fully covered — @SQLDelete soft-deletes it
         } else if (pokesLeft && !pokesRight) {
             existing.setEndDate(newStart.minusDays(1));
-            rateSeasonRepository.save(existing);
+            saveTranslatingOverlap(existing);
         } else if (!pokesLeft) {
             existing.setStartDate(newEnd.plusDays(1));
-            rateSeasonRepository.save(existing);
+            saveTranslatingOverlap(existing);
         } else {
             splitAroundNewRange(existing, newStart, newEnd);
         }
@@ -194,8 +195,8 @@ public class RateCalendarServiceImpl implements RateCalendarService {
         final LocalDate tailStart = newEnd.plusDays(1);
         final LocalDate tailEnd = existing.getEndDate();
         existing.setEndDate(newStart.minusDays(1));
-        rateSeasonRepository.save(existing);
-        rateSeasonRepository.save(RateSeason.builder()
+        saveTranslatingOverlap(existing);
+        saveTranslatingOverlap(RateSeason.builder()
                 .hotelId(existing.getHotelId())
                 .roomTypeId(existing.getRoomTypeId())
                 .name(existing.getName())
@@ -221,6 +222,23 @@ public class RateCalendarServiceImpl implements RateCalendarService {
                 throw new ConflictException("RATE_SEASON_OVERLAP", ex);
             }
             throw ex;
+        } catch (final ObjectOptimisticLockingFailureException ex) {
+            throw new ConflictException("RATE_SEASON_CONCURRENT_MODIFICATION", ex);
+        }
+    }
+
+    /**
+     * Same conflict-translation as {@link #saveTranslatingOverlap}, for the
+     * full-coverage soft-delete branch of {@link #applySplitTrim}.
+     *
+     * @param season the season to soft-delete
+     */
+    private void deleteTranslatingOverlap(final RateSeason season) {
+        try {
+            rateSeasonRepository.delete(season);
+            rateSeasonRepository.flush();
+        } catch (final ObjectOptimisticLockingFailureException ex) {
+            throw new ConflictException("RATE_SEASON_CONCURRENT_MODIFICATION", ex);
         }
     }
 
