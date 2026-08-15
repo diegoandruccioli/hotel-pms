@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * Implementation of {@link AuthService}.
@@ -25,8 +26,6 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
-    private static final int MAX_FAILED_ATTEMPTS = 5;
-    private static final Duration LOCKOUT_DURATION = Duration.ofMinutes(15);
     private static final String INVALID_REFRESH_TOKEN = "INVALID_REFRESH_TOKEN";
     private static final String INVALID_CREDENTIALS = "INVALID_CREDENTIALS";
 
@@ -43,60 +42,59 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final LoginAttemptService loginAttemptService;
 
     /**
-     * Authenticates a user, enforcing a brute-force lockout policy.
+     * Authenticates a user, enforcing a brute-force lockout policy keyed on
+     * (username, clientIp).
      *
-     * <p>After {@code MAX_FAILED_ATTEMPTS} consecutive failures the account is
-     * locked for {@code LOCKOUT_DURATION}.  A successful login resets the
-     * counter and clears the lock (T-AUTH-02).
+     * <p>After {@code MAX_FAILED_ATTEMPTS} consecutive failures for the same pair,
+     * that pair is locked for the configured lockout window (T-AUTH-02). Binding
+     * the lockout to the client IP as well as the username — rather than username
+     * alone — prevents an unauthenticated attacker from permanently denying a
+     * known account (e.g. {@code admin}) to its legitimate owner: the attacker's
+     * failures only lock out the attacker's own IP (Finding #4, security-report.md).
+     * A successful login resets the counter and clears the lock for that pair.
      *
-     * @param request the login request
+     * @param request  the login request
+     * @param clientIp the trusted client IP (gateway-injected {@code X-Client-IP})
      * @return the auth response containing a fresh access token and refresh token
      */
     @Override
     @Transactional(noRollbackFor = {BadCredentialsException.class, AccountLockedException.class})
-    public AuthResponse login(final LoginRequest request) {
+    public AuthResponse login(final LoginRequest request, final String clientIp) {
         final UserAccount user = userRepository.findByUsername(request.username())
                 .orElseThrow(() -> {
                     log.warn("[AUTH] LOGIN_FAILED | user={} | reason=USER_NOT_FOUND", request.username());
                     return new BadCredentialsException(INVALID_CREDENTIALS);
                 });
 
-        if (user.getLockedUntil() != null && Instant.now().isBefore(user.getLockedUntil())) {
-            log.warn("[AUTH] LOGIN_BLOCKED | user={} | reason=ACCOUNT_LOCKED | until={}",
-                    user.getUsername(), user.getLockedUntil());
+        final Optional<Instant> lockedUntil = loginAttemptService.getLockedUntil(user.getUsername(), clientIp);
+        if (lockedUntil.isPresent() && Instant.now().isBefore(lockedUntil.get())) {
+            log.warn("[AUTH] LOGIN_BLOCKED | user={} | ip={} | reason=ACCOUNT_LOCKED | until={}",
+                    user.getUsername(), clientIp, lockedUntil.get());
             throw new AccountLockedException("ACCOUNT_TEMPORARILY_LOCKED");
         }
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            final int newAttempts = user.getFailedAttempts() + 1;
-            final Instant lockedUntil = newAttempts >= MAX_FAILED_ATTEMPTS
-                    ? Instant.now().plus(LOCKOUT_DURATION)
-                    : null;
-            userRepository.updateFailedAttempts(user.getUsername(), newAttempts, lockedUntil);
-            if (lockedUntil != null) {
-                log.warn("[AUTH] ACCOUNT_LOCKED | user={} | attempts={} | until={}",
-                        user.getUsername(), newAttempts, lockedUntil);
+            final LoginAttemptResult result = loginAttemptService.recordFailure(user.getUsername(), clientIp);
+            if (result.locked()) {
+                log.warn("[AUTH] ACCOUNT_LOCKED | user={} | ip={} | attempts={} | until={}",
+                        user.getUsername(), clientIp, result.attempts(), result.lockedUntil());
             } else {
-                log.warn("[AUTH] LOGIN_FAILED | user={} | reason=BAD_PASSWORD | attempts={}",
-                        user.getUsername(), newAttempts);
+                log.warn("[AUTH] LOGIN_FAILED | user={} | ip={} | reason=BAD_PASSWORD | attempts={}",
+                        user.getUsername(), clientIp, result.attempts());
             }
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
 
+        loginAttemptService.reset(user.getUsername(), clientIp);
+
         // Lazy rehash: upgrade stored hash to current cost factor if needed (T-AUTH-03)
         final boolean needsRehash = passwordEncoder.upgradeEncoding(user.getPasswordHash());
-        final boolean needsReset = user.getFailedAttempts() > 0;
         if (needsRehash) {
             user.setPasswordHash(passwordEncoder.encode(request.password()));
             log.info("[AUTH] PASSWORD_REHASHED | user={}", user.getUsername());
-        }
-        if (needsReset) {
-            user.setFailedAttempts(0);
-            user.setLockedUntil(null);
-        }
-        if (needsRehash || needsReset) {
             userRepository.save(user);
         }
 

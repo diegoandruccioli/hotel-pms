@@ -27,9 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import org.mockito.ArgumentCaptor;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -54,6 +52,7 @@ class AuthServiceImplTest {
     private static final String TEST_JTI = "test-jti-uuid";
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final long FUTURE_TTL_SECONDS = 3600L;
+    private static final String TEST_IP = "test-client-ip";
     private static final UUID TEST_HOTEL_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final int TEST_TOKEN_VERSION = 0;
     private static final String NEW_PASSWORD = "newpassword";
@@ -70,6 +69,9 @@ class AuthServiceImplTest {
 
     @Mock
     private RefreshTokenService refreshTokenService;
+
+    @Mock
+    private LoginAttemptService loginAttemptService;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -100,7 +102,7 @@ class AuthServiceImplTest {
         when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_REFRESH_TOKEN);
 
-        final AuthResponse response = authService.login(loginRequest);
+        final AuthResponse response = authService.login(loginRequest, TEST_IP);
 
         assertNotNull(response, "Response should not be null");
         assertEquals(MOCK_TOKEN, response.token(), "Token should match mocked one");
@@ -125,7 +127,7 @@ class AuthServiceImplTest {
         when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), eq(true)))
                 .thenReturn(MOCK_REFRESH_TOKEN);
 
-        final AuthResponse response = authService.login(loginRequest);
+        final AuthResponse response = authService.login(loginRequest, TEST_IP);
 
         assertEquals(MOCK_TOKEN, response.token(),
                 "BUG-5: generateToken must be called with mustChangePassword=true so the gateway can enforce it");
@@ -136,7 +138,7 @@ class AuthServiceImplTest {
     void loginThrowsWhenUserNotFound() {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
 
-        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest),
+        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest, TEST_IP),
                 "Should throw BadCredentialsException when user is not found");
     }
 
@@ -144,63 +146,48 @@ class AuthServiceImplTest {
     void loginThrowsWhenPasswordMismatch() {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(false);
+        when(loginAttemptService.recordFailure(TEST_USER, TEST_IP))
+                .thenReturn(new LoginAttemptResult(1, null));
 
-        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest),
+        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest, TEST_IP),
                 "Should throw BadCredentialsException when password does not match");
     }
 
     @Test
     void loginThrowsWhenAccountIsLocked() {
-        final UserAccount lockedUser = UserAccount.builder()
-                .username(TEST_USER)
-                .email(TEST_EMAIL)
-                .passwordHash(HASHED_PASSWORD)
-                .role(Role.GUEST)
-                .active(true)
-                .failedAttempts(MAX_FAILED_ATTEMPTS)
-                .lockedUntil(Instant.now().plus(Duration.ofMinutes(10)))
-                .build();
+        when(userRepository.findByUsername(TEST_USER)).thenReturn(Optional.of(testUser));
+        when(loginAttemptService.getLockedUntil(TEST_USER, TEST_IP))
+                .thenReturn(Optional.of(Instant.now().plus(Duration.ofMinutes(10))));
 
-        when(userRepository.findByUsername(TEST_USER)).thenReturn(Optional.of(lockedUser));
-
-        assertThrows(AccountLockedException.class, () -> authService.login(loginRequest),
+        assertThrows(AccountLockedException.class, () -> authService.login(loginRequest, TEST_IP),
                 "Should throw AccountLockedException when account is locked");
 
         verifyNoMoreInteractions(passwordEncoder);
     }
 
     @Test
-    void loginIncrementsFailedAttemptsOnWrongPassword() {
+    void loginRecordsFailureOnWrongPassword() {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(false);
+        when(loginAttemptService.recordFailure(TEST_USER, TEST_IP))
+                .thenReturn(new LoginAttemptResult(1, null));
 
-        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
+        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest, TEST_IP));
 
-        verify(userRepository).updateFailedAttempts(TEST_USER, 1, null);
+        verify(loginAttemptService).recordFailure(TEST_USER, TEST_IP);
     }
 
     @Test
-    void loginLocksAccountAfterMaxFailedAttempts() {
-        final UserAccount nearLockUser = UserAccount.builder()
-                .username(TEST_USER)
-                .email(TEST_EMAIL)
-                .passwordHash(HASHED_PASSWORD)
-                .role(Role.GUEST)
-                .active(true)
-                .failedAttempts(MAX_FAILED_ATTEMPTS - 1)
-                .build();
-
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(nearLockUser));
+    void loginLocksPairAfterMaxFailedAttempts() {
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(false);
+        final Instant lockedUntil = Instant.now().plus(Duration.ofMinutes(15));
+        when(loginAttemptService.recordFailure(TEST_USER, TEST_IP))
+                .thenReturn(new LoginAttemptResult(MAX_FAILED_ATTEMPTS, lockedUntil));
 
-        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
+        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest, TEST_IP));
 
-        final ArgumentCaptor<Instant> lockCaptor = ArgumentCaptor.forClass(Instant.class);
-        verify(userRepository).updateFailedAttempts(
-                eq(TEST_USER),
-                eq(MAX_FAILED_ATTEMPTS),
-                lockCaptor.capture());
-        assertNotNull(lockCaptor.getValue(), "Account must be locked after reaching MAX_FAILED_ATTEMPTS");
+        verify(loginAttemptService).recordFailure(TEST_USER, TEST_IP);
     }
 
     @Test
@@ -214,7 +201,7 @@ class AuthServiceImplTest {
         when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_REFRESH_TOKEN);
 
-        final AuthResponse response = authService.login(loginRequest);
+        final AuthResponse response = authService.login(loginRequest, TEST_IP);
 
         assertNotNull(response);
         assertEquals(MOCK_TOKEN, response.token());
@@ -233,41 +220,28 @@ class AuthServiceImplTest {
         when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_REFRESH_TOKEN);
 
-        authService.login(loginRequest);
+        authService.login(loginRequest, TEST_IP);
 
         verify(userRepository).findByUsername(anyString());
         verifyNoMoreInteractions(userRepository);
     }
 
     @Test
-    void loginResetsCounterOnSuccess() {
-        final UserAccount userWithPriorFailures = UserAccount.builder()
-                .username(TEST_USER)
-                .email(TEST_EMAIL)
-                .passwordHash(HASHED_PASSWORD)
-                .role(Role.GUEST)
-                .hotelId(TEST_HOTEL_ID)
-                .active(true)
-                .failedAttempts(3)
-                .build();
-
-        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(userWithPriorFailures));
+    void loginResetsAttemptsOnSuccess() {
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(true);
         when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_TOKEN);
         when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
                 .thenReturn(MOCK_REFRESH_TOKEN);
 
-        final AuthResponse response = authService.login(loginRequest);
+        final AuthResponse response = authService.login(loginRequest, TEST_IP);
 
         assertNotNull(response);
         assertEquals(MOCK_TOKEN, response.token());
 
-        verify(userRepository).save(Objects.requireNonNull(userWithPriorFailures));
-        assertEquals(0, userWithPriorFailures.getFailedAttempts(),
-                "Failed attempts counter must be reset to 0 on successful login");
-        assertNull(userWithPriorFailures.getLockedUntil(),
-                "Locked-until must be cleared on successful login");
+        verify(loginAttemptService).reset(TEST_USER, TEST_IP);
+        verify(userRepository, never()).save(any(UserAccount.class));
     }
 
     // ─── T-AUTH-04: Refresh Token Rotation ───────────────────────────────────

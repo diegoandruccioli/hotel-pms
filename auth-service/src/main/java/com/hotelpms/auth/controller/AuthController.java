@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -66,12 +67,18 @@ public class AuthController {
      * Returns a body with {@code mustChangePassword} so the SPA can immediately
      * redirect to the change-password page when the flag is set.
      *
-     * @param request the login request
+     * @param request  the login request
+     * @param clientIp the trusted client IP injected by the gateway's
+     *                 {@code ClientIpFilter} ({@code X-Client-IP}), used to bind the
+     *                 brute-force lockout to more than just the username
+     *                 (Finding #4, security-report.md)
      * @return HTTP 200 with access and refresh cookies and a JSON body
      */
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@NonNull final @Valid @RequestBody LoginRequest request) {
-        final AuthResponse response = authService.login(request);
+    public ResponseEntity<Map<String, Object>> login(
+            @NonNull final @Valid @RequestBody LoginRequest request,
+            @RequestHeader(value = "X-Client-IP", required = false) final String clientIp) {
+        final AuthResponse response = authService.login(request, clientIp);
 
         final Map<String, Object> body = new LinkedHashMap<>();
         body.put("mustChangePassword", response.mustChangePassword());

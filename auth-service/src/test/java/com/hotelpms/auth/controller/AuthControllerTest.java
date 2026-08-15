@@ -90,7 +90,7 @@ class AuthControllerTest {
     @Test
     void shouldLoginReturn200WithCookiesAndBody() throws Exception {
         final LoginRequest request = new LoginRequest(TEST_USERNAME, TEST_PASSWORD);
-        when(authService.login(any(LoginRequest.class))).thenReturn(authResponse);
+        when(authService.login(any(LoginRequest.class), any())).thenReturn(authResponse);
 
         mockMvc.perform(post(BASE_URL + PATH_LOGIN)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -103,7 +103,7 @@ class AuthControllerTest {
     @Test
     void shouldLoginReturn401OnBadCredentials() throws Exception {
         final LoginRequest request = new LoginRequest(TEST_USERNAME, TEST_PASSWORD);
-        when(authService.login(any(LoginRequest.class)))
+        when(authService.login(any(LoginRequest.class), any()))
                 .thenThrow(new BadCredentialsException("INVALID_CREDENTIALS"));
 
         mockMvc.perform(post(BASE_URL + PATH_LOGIN)
