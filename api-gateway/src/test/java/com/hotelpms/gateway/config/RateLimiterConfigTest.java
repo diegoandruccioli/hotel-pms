@@ -36,8 +36,8 @@ class RateLimiterConfigTest {
     class RemoteAddrKeyResolverTests {
 
         @Test
-        @DisplayName("uses leftmost IP from X-Forwarded-For when header is present")
-        void usesForwardedForFirstIp() {
+        @DisplayName("ignores X-Forwarded-For and uses the TCP remote address (Finding #3, security-report.md)")
+        void ignoresForwardedForHeader() {
             final KeyResolver resolver = config.remoteAddrKeyResolver();
             final MockServerHttpRequest request = MockServerHttpRequest
                     .get("/api/v1/auth/login")
@@ -47,7 +47,7 @@ class RateLimiterConfigTest {
             final MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
             StepVerifier.create(resolver.resolve(exchange))
-                    .assertNext(key -> assertThat(key).isEqualTo("203.0.113.5"))
+                    .assertNext(key -> assertThat(key).isEqualTo("10.0.0.1"))
                     .verifyComplete();
         }
 
@@ -106,8 +106,8 @@ class RateLimiterConfigTest {
         }
 
         @Test
-        @DisplayName("falls back to 'ip:<xff>' when X-Auth-User absent and X-Forwarded-For present")
-        void fallsBackToForwardedForWhenUserAbsent() {
+        @DisplayName("ignores X-Forwarded-For and falls back to 'ip:<remoteAddr>' when X-Auth-User absent (Finding #3, security-report.md)")
+        void ignoresForwardedForWhenUserAbsent() {
             final KeyResolver resolver = config.userKeyResolver();
             final MockServerHttpRequest request = MockServerHttpRequest
                     .get("/api/v1/reservations")
@@ -117,7 +117,7 @@ class RateLimiterConfigTest {
             final MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
             StepVerifier.create(resolver.resolve(exchange))
-                    .assertNext(key -> assertThat(key).isEqualTo("ip:203.0.113.7"))
+                    .assertNext(key -> assertThat(key).isEqualTo("ip:10.0.0.1"))
                     .verifyComplete();
         }
 
