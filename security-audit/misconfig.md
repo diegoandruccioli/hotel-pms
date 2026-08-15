@@ -195,6 +195,28 @@ only.
 
 ## 5. Default credentials
 
+**UPDATE (feature/secure-coding-hardening, fix round) — verified non-reproducible.**
+This finding read `V5__add_owner_role_and_must_change_password.sql:23` (the
+`ALTER TABLE ... ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE`
+statement) but stopped there — the same migration file, lines 29-32, immediately
+follows with:
+```sql
+UPDATE user_account SET must_change_password = TRUE
+WHERE id = '00000000-0000-0000-0000-000000000000';
+```
+which forces the seed admin's flag to `TRUE` in the same migration that adds the
+column. `data.sql` (re-run on every startup) only touches `password_hash` via
+`ON CONFLICT DO UPDATE SET password_hash = EXCLUDED.password_hash` — it never
+resets `must_change_password`. No migration after V5 (V6, V7) touches this field.
+Real end-state on any fresh database: `must_change_password = TRUE` for the seed
+admin, and the existing, already-working enforcement path (gateway blocks all but
+`/change-password`, `/me`, `/logout`, `/refresh` until cleared; frontend
+`Login.tsx` redirects to `/settings/password` on `mustChangePassword: true`)
+already applies to it. No code change required — closed as a false positive from
+a partial read of V5.
+
+**Original finding text below, left for audit-trail purposes:**
+
 **Finding (MEDIUM) — the `admin`/`password` seed is not a "leaked secret"
 (correctly triaged as such previously) but IS a genuine default-credential
 misconfiguration risk with no rotation safety net, confirmed by tracing the
