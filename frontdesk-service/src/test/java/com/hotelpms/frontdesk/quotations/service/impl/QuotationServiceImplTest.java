@@ -373,7 +373,7 @@ class QuotationServiceImplTest {
         when(reservationService.createReservationFromPricedRooms(
                 eq(GUEST_ID), eq(CHECK_IN), eq(CHECK_OUT), eq(2), any()))
                 .thenReturn(reservationResponse);
-        when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(quotationRepository.saveAndFlush(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
 
         final ReservationResponse result = quotationService.convertToReservation(QUOTATION_ID, null);
 
@@ -414,7 +414,7 @@ class QuotationServiceImplTest {
         when(reservationService.createReservationFromPricedRooms(
                 eq(GUEST_ID), eq(CHECK_IN), eq(CHECK_OUT), eq(2), any()))
                 .thenReturn(reservationResponse);
-        when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(quotationRepository.saveAndFlush(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
 
         final ReservationResponse result = quotationService.convertToReservation(QUOTATION_ID, OPTION_ID_2);
 
@@ -457,7 +457,7 @@ class QuotationServiceImplTest {
         when(reservationService.createReservationFromPricedRooms(
                 eq(newGuestId), eq(CHECK_IN), eq(CHECK_OUT), eq(2), any()))
                 .thenReturn(reservationResponse);
-        when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(quotationRepository.saveAndFlush(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
 
         final ReservationResponse result = quotationService.convertToReservation(QUOTATION_ID, null);
 
