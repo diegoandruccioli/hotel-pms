@@ -1,6 +1,17 @@
 # Shared configuration inherited by ALL microservices via Spring Cloud Config.
 # Service-specific overrides live in their own {service-name}.yml files.
 
+spring:
+  data:
+    redis:
+      # Finding #13 (security-report.md, MEDIUM): redis had no requirepass/ACL.
+      # One shared property instead of repeating it in all 7 per-service ymls
+      # that connect to Redis (api-gateway rate limiter, every other service's
+      # InternalAuthFilter nonce store). Empty default so a service started
+      # without INTERNAL_REDIS_PASSWORD fails the same way POSTGRES_PASSWORD
+      # already does — no silent fallback to an unauthenticated connection.
+      password: ${INTERNAL_REDIS_PASSWORD:}
+
 management:
   metrics:
     distribution:
