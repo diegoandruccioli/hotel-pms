@@ -27,6 +27,7 @@ import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
@@ -36,6 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -58,6 +60,7 @@ public class ReservationServiceImpl implements ReservationService {
     private static final List<ReservationStatus> DELETABLE_STATUSES =
             List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
     private static final String NOTIFICATION_SERVICE_UNAVAILABLE_REASON = "NOTIFICATION_SERVICE_UNAVAILABLE";
+    private static final String SQLSTATE_EXCLUSION_VIOLATION = "23P01";
     private static final int MAX_FAILURE_REASON_LENGTH = 500;
     private static final int GUEST_SEARCH_MATCH_CAP = 200;
     private static final String UNKNOWN_GUEST = "Unknown Guest";
@@ -93,7 +96,7 @@ public class ReservationServiceImpl implements ReservationService {
         }
         applyResolvedPrices(reservation, roomsById, hotelId, request.checkInDate(), request.checkOutDate());
 
-        final Reservation savedReservation = reservationRepository.save(Objects.requireNonNull(reservation));
+        final Reservation savedReservation = saveTranslatingOverlap(Objects.requireNonNull(reservation));
         sendReservationConfirmedEmail(savedReservation, hotelId, guest, roomNumbersOf(roomsById));
         return enrichWithGuestName(reservationMapper.toResponse(savedReservation), guest);
     }
@@ -210,7 +213,7 @@ public class ReservationServiceImpl implements ReservationService {
         }
         applyResolvedPrices(existingReservation, roomsById, hotelId, request.checkInDate(), request.checkOutDate());
 
-        final Reservation updatedReservation = reservationRepository.save(Objects.requireNonNull(existingReservation));
+        final Reservation updatedReservation = saveTranslatingOverlap(Objects.requireNonNull(existingReservation));
         return enrichWithGuestName(reservationMapper.toResponse(updatedReservation), guest);
     }
 
@@ -243,7 +246,7 @@ public class ReservationServiceImpl implements ReservationService {
             recalculateActualGuests(reservation, actualGuests);
         }
 
-        final Reservation saved = reservationRepository.save(Objects.requireNonNull(reservation));
+        final Reservation saved = saveTranslatingOverlap(Objects.requireNonNull(reservation));
         final GuestResponse guest = guestClient.getGuestById(saved.getGuestId());
         return enrichWithGuestName(reservationMapper.toResponse(saved), guest);
     }
@@ -617,7 +620,7 @@ public class ReservationServiceImpl implements ReservationService {
             });
         }
 
-        final Reservation saved = reservationRepository.save(Objects.requireNonNull(reservation));
+        final Reservation saved = saveTranslatingOverlap(Objects.requireNonNull(reservation));
         sendReservationConfirmedEmail(saved, hotelId, guest, roomNumbersOf(roomsById));
         return enrichWithGuestName(reservationMapper.toResponse(saved), guest);
     }
@@ -644,5 +647,31 @@ public class ReservationServiceImpl implements ReservationService {
             throw new BadRequestException("ROOM_UNAVAILABLE_DATES",
                     new IllegalArgumentException("Overlapping reservation exists"));
         }
+    }
+
+    /**
+     * Persists a reservation, translating a room/date exclusion-constraint
+     * violation (SQLSTATE 23P01) into a clean 409 instead of a raw 500 — the
+     * rare case where two requests race past the application-level overlap
+     * check (Finding #5, security-report.md).
+     *
+     * @param reservation the reservation to persist
+     * @return the persisted reservation
+     */
+    private Reservation saveTranslatingOverlap(final Reservation reservation) {
+        try {
+            return reservationRepository.saveAndFlush(reservation);
+        } catch (final DataIntegrityViolationException ex) {
+            if (isExclusionViolation(ex)) {
+                throw new ConflictException("ROOM_UNAVAILABLE_DATES", ex);
+            }
+            throw ex;
+        }
+    }
+
+    private static boolean isExclusionViolation(final DataIntegrityViolationException ex) {
+        final Throwable cause = ex.getMostSpecificCause();
+        return cause instanceof final SQLException sqlException
+                && SQLSTATE_EXCLUSION_VIOLATION.equals(sqlException.getSQLState());
     }
 }
