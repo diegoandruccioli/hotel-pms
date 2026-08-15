@@ -22,7 +22,7 @@ import java.util.Set;
  *
  * <h2>How it works</h2>
  * <ol>
- *   <li>On login / register / refresh the {@code auth-service} sets a
+ *   <li>On login / refresh the {@code auth-service} sets a
  *       non-httpOnly {@code csrf_token} cookie alongside the httpOnly JWT.
  *       The SPA JavaScript can read this cookie via {@code document.cookie}.</li>
  *   <li>For every mutating request the frontend reads the cookie value and echoes
@@ -39,13 +39,12 @@ import java.util.Set;
  * header value.
  *
  * <h2>Excluded paths</h2>
- * {@code /api/v1/auth/login} and {@code /api/v1/auth/register} are excluded
- * because the CSRF cookie does not exist yet at that point (the session has not
- * been established). These endpoints are protected by other means (rate limiting,
- * account lockout — T-AUTH-02).
+ * {@code /api/v1/auth/login} is excluded because the CSRF cookie does not exist
+ * yet at that point (the session has not been established). This endpoint is
+ * protected by other means (rate limiting, account lockout — T-AUTH-02).
  *
- * <p>{@code /api/v1/auth/refresh} is excluded for the same reason login/register
- * are: it does not depend on this filter for protection. The refresh cookie is
+ * <p>{@code /api/v1/auth/refresh} is excluded for the same reason login is:
+ * it does not depend on this filter for protection. The refresh cookie is
  * httpOnly, path-scoped to {@code /api/v1/auth}, and — like every session cookie
  * in this app — {@code SameSite=Strict}, which already prevents the browser from
  * attaching it to a cross-site request before this filter ever runs. Requiring a
@@ -78,7 +77,6 @@ public class CsrfFilter implements GlobalFilter, Ordered {
      */
     private static final Set<String> EXCLUDED_PATHS = Set.of(
             "/api/v1/auth/login",
-            "/api/v1/auth/register",
             "/api/v1/auth/refresh");
 
     /**

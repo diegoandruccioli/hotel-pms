@@ -3,7 +3,6 @@ package com.hotelpms.auth.controller;
 import com.hotelpms.auth.dto.AuthResponse;
 import com.hotelpms.auth.dto.ChangePasswordRequest;
 import com.hotelpms.auth.dto.LoginRequest;
-import com.hotelpms.auth.dto.RegisterRequest;
 import com.hotelpms.auth.exception.BadCredentialsException;
 import com.hotelpms.auth.service.AuthService;
 import com.hotelpms.auth.service.JwtService;
@@ -61,27 +60,6 @@ public class AuthController {
     private final AuthService authService;
     private final JwtService jwtService;
     private final com.hotelpms.auth.repository.UserAccountRepository userRepository;
-
-    /**
-     * Endpoint for user registration.
-     *
-     * @param request the registration request
-     * @return HTTP 201 with access and refresh cookies
-     */
-    @PostMapping("/register")
-    public ResponseEntity<Void> register(@NonNull final @Valid @RequestBody RegisterRequest request) {
-        final AuthResponse response = authService.register(request);
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .header(HttpHeaders.SET_COOKIE,
-                        createCookie(COOKIE_NAME, response.token(), ACCESS_COOKIE_MAX_AGE, COOKIE_PATH).toString())
-                .header(HttpHeaders.SET_COOKIE,
-                        createCookie(REFRESH_COOKIE_NAME, response.refreshToken(),
-                                REFRESH_COOKIE_MAX_AGE, REFRESH_COOKIE_PATH).toString())
-                .header(HttpHeaders.SET_COOKIE,
-                        createCsrfCookie(UUID.randomUUID().toString(), REFRESH_COOKIE_MAX_AGE).toString())
-                .build();
-    }
 
     /**
      * Endpoint for user login.

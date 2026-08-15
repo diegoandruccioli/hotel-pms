@@ -1,5 +1,6 @@
 import { test, expect, request as playwrightRequest, type APIRequestContext } from '@playwright/test';
 import { csrfHeader, createCleanRoom, createGuest, createWalkInStay } from './fixtures/api';
+import { OTHER_HOTEL_ADMIN } from './fixtures/hotel';
 
 // IDOR / RBAC cross-tenant isolation against the real backend (Fase 7 /
 // item 20). This is exactly the class of bug (T-GST-01, T-BILL-01, T-STAY-04,
@@ -8,8 +9,6 @@ import { csrfHeader, createCleanRoom, createGuest, createWalkInStay } from './fi
 // since the mock never has two tenants' data to confuse in the first place.
 // This spec creates a second real hotel identity and proves the real
 // backend actually enforces the boundary, not an assumption about it.
-
-const OTHER_HOTEL_ID = '99999999-9999-9999-9999-999999999999';
 
 test.describe('Cross-tenant IDOR and RBAC against the real backend', () => {
     let hotelARoomId: string;
@@ -30,15 +29,14 @@ test.describe('Cross-tenant IDOR and RBAC against the real backend', () => {
 
         // A second, independent identity for a DIFFERENT hotel — its own
         // browser-less API context, deliberately not sharing the "live"
-        // project's storageState (that's Hotel A's session).
+        // project's storageState (that's Hotel A's session). Seeded directly
+        // in V7__seed_second_hotel_admin_for_e2e_tests.sql, must_change_password
+        // already FALSE, so a plain login is enough — no register, no
+        // change-password dance.
         otherHotelContext = await playwrightRequest.newContext({ baseURL });
-        const username = `e2e-live-other-hotel-${Date.now()}`;
-        const password = 'OtherHotelAdmin!2026#run';
-        const registerResponse = await otherHotelContext.post('/api/v1/auth/register', {
-            data: { username, password, email: `${username}@hotel-pms.local`, role: 'ADMIN', hotelId: OTHER_HOTEL_ID },
+        const loginResponse = await otherHotelContext.post('/api/v1/auth/login', {
+            data: { username: OTHER_HOTEL_ADMIN.username, password: OTHER_HOTEL_ADMIN.password },
         });
-        expect(registerResponse.status(), await registerResponse.text()).toBe(201);
-        const loginResponse = await otherHotelContext.post('/api/v1/auth/login', { data: { username, password } });
         expect(loginResponse.status(), await loginResponse.text()).toBe(200);
     });
 
@@ -81,17 +79,41 @@ test.describe('Cross-tenant IDOR and RBAC against the real backend', () => {
     test('RECEPTIONIST role is rejected from the OWNER/ADMIN-only financial report endpoint', async ({ baseURL }) => {
         const username = `e2e-live-receptionist-${Date.now()}`;
         const password = 'ReceptionistUser!2026#run';
+        const otherHotelAdminContext = await playwrightRequest.newContext({ baseURL });
         const receptionistContext = await playwrightRequest.newContext({ baseURL });
         try {
-            const registerResponse = await receptionistContext.post('/api/v1/auth/register', {
-                data: {
-                    username, password, email: `${username}@hotel-pms.local`,
-                    role: 'RECEPTIONIST', hotelId: OTHER_HOTEL_ID,
-                },
+            const adminLoginResponse = await otherHotelAdminContext.post('/api/v1/auth/login', {
+                data: { username: OTHER_HOTEL_ADMIN.username, password: OTHER_HOTEL_ADMIN.password },
             });
-            expect(registerResponse.status(), await registerResponse.text()).toBe(201);
+            expect(adminLoginResponse.status(), await adminLoginResponse.text()).toBe(200);
+            const adminCsrf = (await otherHotelAdminContext.storageState()).cookies
+                .find((c) => c.name === 'csrf_token');
+            expect(adminCsrf, 'csrf_token missing for the other-hotel admin session').toBeTruthy();
+
+            const createUserResponse = await otherHotelAdminContext.post('/api/v1/auth/users', {
+                headers: { 'X-CSRF-Token': adminCsrf!.value },
+                data: { username, password, email: `${username}@hotel-pms.local`, role: 'RECEPTIONIST' },
+            });
+            expect(createUserResponse.status(), await createUserResponse.text()).toBe(201);
+
             const loginResponse = await receptionistContext.post('/api/v1/auth/login', { data: { username, password } });
             expect(loginResponse.status()).toBe(200);
+
+            // createUser() flags new accounts mustChangePassword=true, which
+            // AuthenticationFilter also enforces as a 403 — clear it first so
+            // the 403 asserted below unambiguously comes from RBAC, not from
+            // the password-change gate (both use the same status code).
+            const loginBody = (await loginResponse.json()) as { mustChangePassword?: boolean };
+            if (loginBody.mustChangePassword) {
+                const receptionistCsrf = (await receptionistContext.storageState()).cookies
+                    .find((c) => c.name === 'csrf_token');
+                expect(receptionistCsrf, 'csrf_token missing for the receptionist session').toBeTruthy();
+                const changePasswordResponse = await receptionistContext.post('/api/v1/auth/change-password', {
+                    headers: { 'X-CSRF-Token': receptionistCsrf!.value },
+                    data: { currentPassword: password, newPassword: password },
+                });
+                expect(changePasswordResponse.status(), await changePasswordResponse.text()).toBe(200);
+            }
 
             const reportResponse = await receptionistContext.get(
                 '/api/v1/reports/owner?startDate=2000-01-01&endDate=2099-12-31',
@@ -99,6 +121,7 @@ test.describe('Cross-tenant IDOR and RBAC against the real backend', () => {
             expect(reportResponse.status()).toBe(403);
         } finally {
             await receptionistContext.dispose();
+            await otherHotelAdminContext.dispose();
         }
     });
 });

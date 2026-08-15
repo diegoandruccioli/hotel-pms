@@ -5,11 +5,8 @@ import com.hotelpms.auth.domain.UserAccount;
 import com.hotelpms.auth.dto.AuthResponse;
 import com.hotelpms.auth.dto.ChangePasswordRequest;
 import com.hotelpms.auth.dto.LoginRequest;
-import com.hotelpms.auth.dto.RegisterRequest;
 import com.hotelpms.auth.exception.AccountLockedException;
 import com.hotelpms.auth.exception.BadCredentialsException;
-import com.hotelpms.auth.exception.DuplicateResourceException;
-import com.hotelpms.auth.mapper.UserAccountMapper;
 import com.hotelpms.auth.repository.UserAccountRepository;
 import io.jsonwebtoken.JwtException;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,9 +63,6 @@ class AuthServiceImplTest {
     private UserAccountRepository userRepository;
 
     @Mock
-    private UserAccountMapper userMapper;
-
-    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -81,7 +75,6 @@ class AuthServiceImplTest {
     private AuthServiceImpl authService;
 
     private UserAccount testUser;
-    private RegisterRequest registerRequest;
     private LoginRequest loginRequest;
 
     @BeforeEach
@@ -95,53 +88,7 @@ class AuthServiceImplTest {
                 .active(true)
                 .build();
 
-        registerRequest = new RegisterRequest(TEST_USER, RAW_PASSWORD, TEST_EMAIL, Role.GUEST, TEST_HOTEL_ID);
         loginRequest = new LoginRequest(TEST_USER, RAW_PASSWORD);
-    }
-
-    @Test
-    void registerSuccess() {
-        when(userRepository.existsByUsername(anyString())).thenReturn(false);
-        when(userRepository.existsByEmail(anyString())).thenReturn(false);
-        when(userMapper.toEntity(any(RegisterRequest.class))).thenReturn(testUser);
-        when(passwordEncoder.encode(anyString())).thenReturn(HASHED_PASSWORD);
-        when(jwtService.generateToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
-                .thenReturn(MOCK_TOKEN);
-        when(jwtService.generateRefreshToken(anyString(), any(Role.class), any(UUID.class), anyInt(), anyBoolean()))
-                .thenReturn(MOCK_REFRESH_TOKEN);
-
-        final AuthResponse response = authService.register(registerRequest);
-
-        assertNotNull(response, "Response should not be null");
-        assertEquals(MOCK_TOKEN, response.token(), "Token should match the mocked one");
-        assertEquals(MOCK_REFRESH_TOKEN, response.refreshToken(), "Refresh token should match the mocked one");
-
-        verify(userRepository).save(Objects.requireNonNull(testUser));
-        verify(passwordEncoder).encode(RAW_PASSWORD);
-    }
-
-    @Test
-    void registerThrowsWhenUsernameExists() {
-        when(userRepository.existsByUsername(anyString())).thenReturn(true);
-
-        assertThrows(DuplicateResourceException.class, () -> authService.register(registerRequest),
-                "Should throw DuplicateResourceException when username is taken");
-
-        verify(userRepository).existsByUsername(registerRequest.username());
-        verifyNoMoreInteractions(userRepository);
-    }
-
-    @Test
-    void registerThrowsWhenEmailExists() {
-        when(userRepository.existsByUsername(anyString())).thenReturn(false);
-        when(userRepository.existsByEmail(anyString())).thenReturn(true);
-
-        assertThrows(DuplicateResourceException.class, () -> authService.register(registerRequest),
-                "Should throw DuplicateResourceException when email is taken");
-
-        verify(userRepository).existsByUsername(registerRequest.username());
-        verify(userRepository).existsByEmail(registerRequest.email());
-        verifyNoMoreInteractions(userRepository);
     }
 
     @Test

@@ -4,11 +4,8 @@ import com.hotelpms.auth.domain.UserAccount;
 import com.hotelpms.auth.dto.AuthResponse;
 import com.hotelpms.auth.dto.ChangePasswordRequest;
 import com.hotelpms.auth.dto.LoginRequest;
-import com.hotelpms.auth.dto.RegisterRequest;
 import com.hotelpms.auth.exception.AccountLockedException;
 import com.hotelpms.auth.exception.BadCredentialsException;
-import com.hotelpms.auth.exception.DuplicateResourceException;
-import com.hotelpms.auth.mapper.UserAccountMapper;
 import com.hotelpms.auth.repository.UserAccountRepository;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
@@ -43,44 +40,9 @@ public class AuthServiceImpl implements AuthService {
     private static final Duration REFRESH_TOKEN_TTL = Duration.ofDays(7);
 
     private final UserAccountRepository userRepository;
-    private final UserAccountMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
-
-    /**
-     * Registers a new user and issues a token pair.
-     *
-     * @param request the registration request
-     * @return the auth response containing access + refresh tokens
-     */
-    @Override
-    @Transactional
-    public AuthResponse register(final RegisterRequest request) {
-        if (userRepository.existsByUsername(request.username())) {
-            throw new DuplicateResourceException("USERNAME_ALREADY_EXISTS");
-        }
-        if (userRepository.existsByEmail(request.email())) {
-            throw new DuplicateResourceException("EMAIL_ALREADY_EXISTS");
-        }
-
-        final UserAccount user = userMapper.toEntity(request);
-        user.setPasswordHash(passwordEncoder.encode(request.password()));
-
-        userRepository.save(user);
-
-        // Cache the initial token version (0) so the tv check in refresh() is active
-        // from the very first token rotation.
-        refreshTokenService.storeTokenVersion(user.getUsername(), user.getTokenVersion(),
-                REFRESH_TOKEN_TTL);
-
-        log.info("[AUTH] REGISTER_SUCCESS | user={}", user.getUsername());
-        final String accessToken = jwtService.generateToken(user.getUsername(), user.getRole(),
-                user.getHotelId(), user.getTokenVersion(), user.isMustChangePassword());
-        final String refreshToken = jwtService.generateRefreshToken(user.getUsername(), user.getRole(),
-                user.getHotelId(), user.getTokenVersion(), user.isMustChangePassword());
-        return new AuthResponse(accessToken, refreshToken, user.isMustChangePassword());
-    }
 
     /**
      * Authenticates a user, enforcing a brute-force lockout policy.

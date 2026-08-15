@@ -24,22 +24,6 @@ describe('authService', () => {
     });
   });
 
-  it('should call register correctly', async () => {
-    vi.mocked(api.post).mockResolvedValueOnce({ data: undefined });
-    await authService.register({
-      username: 'test',
-      password: 'password',
-      email: 'test@example.com',
-      role: 'ADMIN'
-    });
-    expect(api.post).toHaveBeenCalledWith('/api/v1/auth/register', {
-      username: 'test',
-      password: 'password',
-      email: 'test@example.com',
-      role: 'ADMIN'
-    });
-  });
-
   it('should call logout correctly', async () => {
     vi.mocked(api.post).mockResolvedValueOnce({ data: undefined });
     await authService.logout();
