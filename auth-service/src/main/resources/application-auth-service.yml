@@ -11,4 +11,4 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/hotel_auth
     username: pms_user
-    password: pms_password
+    password: ${POSTGRES_PASSWORD:pms_password}

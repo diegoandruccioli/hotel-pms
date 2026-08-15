@@ -5,7 +5,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/hotel_fb
     username: root
-    password: root
+    password: ${POSTGRES_PASSWORD:root}
   jpa:
     hibernate:
       ddl-auto: validate
