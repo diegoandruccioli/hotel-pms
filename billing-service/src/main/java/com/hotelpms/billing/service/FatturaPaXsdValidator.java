@@ -6,6 +6,8 @@ import org.w3c.dom.ls.LSInput;
 import org.w3c.dom.ls.LSResourceResolver;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
+import org.xml.sax.SAXNotRecognizedException;
+import org.xml.sax.SAXNotSupportedException;
 import org.xml.sax.SAXParseException;
 
 import javax.xml.XMLConstants;
@@ -51,6 +53,14 @@ public class FatturaPaXsdValidator {
     public FatturaPaXsdValidator() {
         try {
             final SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+            // No ACCESS_EXTERNAL_* restriction here: this factory only ever compiles
+            // the one bundled, hardcoded FATTURAPA_XSD classpath resource — trusted
+            // input, never derived from anything a caller supplies. Restricting it
+            // also blocks the <xs:import> of the xmldsig schema even though
+            // resourceResolver() below redirects it to a local file: the JDK's
+            // built-in implementation rejects the import's external systemId before
+            // ever consulting the resolver. The attacker-facing surface is the
+            // per-call Validator below, which processes the caller-supplied xml.
             factory.setResourceResolver(resourceResolver());
             try (InputStream xsd = new ClassPathResource(FATTURAPA_XSD).getInputStream()) {
                 this.schema = factory.newSchema(new StreamSource(xsd));
@@ -71,6 +81,15 @@ public class FatturaPaXsdValidator {
     public List<String> validate(final byte[] xml) {
         final List<String> errors = new ArrayList<>();
         final Validator validator = schema.newValidator();
+        // Finding #16 (security-report.md, LOW) — same XXE/SSRF hardening as the
+        // SchemaFactory above, applied to the per-call Validator that actually
+        // processes the caller-supplied xml argument.
+        try {
+            validator.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            validator.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        } catch (final SAXNotRecognizedException | SAXNotSupportedException ex) {
+            throw new IllegalStateException("XXE_HARDENING_PROPERTY_UNSUPPORTED", ex);
+        }
         validator.setErrorHandler(new ErrorHandler() {
             @Override
             public void warning(final SAXParseException exception) {

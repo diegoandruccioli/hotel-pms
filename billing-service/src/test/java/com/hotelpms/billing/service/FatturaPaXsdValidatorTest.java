@@ -51,6 +51,22 @@ class FatturaPaXsdValidatorTest {
     }
 
     /**
+     * Finding #16 (security-report.md, LOW): a DOCTYPE referencing an external DTD
+     * must fail cleanly (rejected by ACCESS_EXTERNAL_DTD), not attempt to fetch it —
+     * an unauthenticated/blind SSRF vector if this ever gains an upload endpoint.
+     */
+    @Test
+    void shouldRejectDoctypeWithExternalDtdInsteadOfFetchingIt() {
+        final byte[] xml = ("<?xml version=\"1.0\"?>"
+                + "<!DOCTYPE NotAnInvoice SYSTEM \"http://169.254.169.254/should-not-be-fetched.dtd\">"
+                + "<NotAnInvoice/>").getBytes(StandardCharsets.UTF_8);
+
+        final List<String> errors = validator.validate(xml);
+
+        assertThat(errors).isNotEmpty();
+    }
+
+    /**
      * The smallest XML that satisfies every {@code minOccurs="1"} element in the schema
      * for a private-party invoice (FPR12) with one line item — built by hand against the
      * schema, not copied from {@code FatturaPAServiceImpl}, so this test does not simply
