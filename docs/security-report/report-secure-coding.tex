@@ -6182,6 +6182,102 @@ su fattura \texttt{PAID} resta \texttt{409} per un guard di business
 preesistente, non \texttt{403} --- nessuna regressione introdotta da questo fix).
 Commit: \commitref{a87d329}{fix(security): T-GST-07/T-BILL-07 --- missing RBAC on guest/invoice controllers}
 
+\paragraph{GAP-17 --- Trust boundary IP rotto dalla topologia reale nginx→gateway}
+Trovato durante la ri-verifica post-hardening del 2026-08-16 da due
+sotto-agenti indipendenti (categorie \emph{auth-jwt} e \emph{access-control}),
+che hanno segnalato separatamente lo stesso problema su T-AUTH-12 e T-GW-10:
+entrambi i fix avevano sostituito la fonte di trust da un header
+spoofabile (\texttt{X-Forwarded-For}) al TCP \texttt{remoteAddress} grezzo
+--- corretto in isolamento, ma nella topologia reale il browser non parla
+mai direttamente con \texttt{api-gateway}: passa sempre per \texttt{frontend}
+(nginx), \texttt{proxy\_pass http://api-gateway:8080} sulla stessa rete
+Docker (\texttt{dmz-network}), senza alcuna configurazione di trust sugli
+header forwarded lato gateway. Ogni richiesta dal front-door standard
+arrivava quindi al gateway con lo stesso peer TCP --- l'IP interno del
+container nginx, identico per \emph{ogni} utente reale --- collassando la
+chiave di lockout \texttt{(username, clientIp)} di T-AUTH-12 a
+\texttt{(username)} esattamente come prima del fix, e raggruppando tutti i
+client reali in un unico bucket di rate limiting condiviso (T-GW-10).
+Exploit concreto: 5 richieste \texttt{POST /api/v1/auth/login} con
+\texttt{username=admin} e password errata, dalla normale pagina di login
+pubblica, bloccavano il vero \texttt{admin} per 15 minuti, ripetibile
+indefinitamente.
+
+Fix: \texttt{docker-compose.prod.yml} non pubblica più \texttt{api-gateway:8080}
+sull'host --- solo \texttt{frontend:80} resta raggiungibile dall'esterno,
+verificato che \texttt{dmz-network} interno (condiviso da frontend e
+api-gateway) non dipende dal port publish tramite \texttt{docker compose
+config}. Nuovo flag \texttt{gateway.security.trust-forwarded-header}
+(\texttt{config-service}: \texttt{false} in \texttt{api-gateway.yml},
+\texttt{true} solo in \texttt{api-gateway-prod.yml}) fa sì che
+\texttt{ClientIpFilter} si fidi dell'header \texttt{X-Real-IP} di nginx
+(sempre impostato da \texttt{\$remote\_addr}, overwrite mai append) solo
+quando quel flag è vero --- cioè solo quando la porta diretta è
+effettivamente chiusa. \texttt{RateLimiterConfig} non ri-deriva più l'IP
+autonomamente: legge lo stesso header \texttt{X-Client-IP} già risolto da
+\texttt{ClientIpFilter}, eliminando la duplicazione di logica che aveva
+causato la regressione T-GW-10 in primo luogo.
+
+\textbf{Regressione trovata nello stesso giro di verifica}: la prima
+versione del fix impostava il flag a \texttt{true} in
+\texttt{api-gateway-prod.yml}, ma nessun file del repository settava mai
+\texttt{SPRING\_PROFILES\_ACTIVE=prod} per \texttt{api-gateway} --- unico
+servizio senza, a differenza degli altri 6 (che impostano
+\texttt{SPRING\_PROFILES\_ACTIVE=<nome-servizio>}). Spring Cloud Config non
+serve mai un file di profilo senza quel profilo attivo sul client: il
+flag restava \texttt{false} anche a porta chiusa, e GAP-17 restava di
+fatto aperto nonostante il fix. Aggiunto \texttt{SPRING\_PROFILES\_ACTIVE=prod}
+all'\texttt{environment} di \texttt{api-gateway} in
+\texttt{docker-compose.prod.yml}, verificato che il merge è additivo
+(tutte le variabili base restano) via \texttt{docker compose config}.
+Verificato anche: in dev (porta ancora aperta, flag \texttt{false}) un
+\texttt{X-Real-IP} o \texttt{X-Forwarded-For} forgiato inviato
+direttamente a \texttt{:8080} resta ignorato --- finding \#3
+(security-report.md) non riapre in quell'ambiente.
+Commit: \commitref{ff432e3}{fix(security): trust nginx X-Real-IP at gateway only once api-gateway:8080 is closed (GAP-17)}
+
+\paragraph{GAP-18 --- Version-check assente sul soft-delete di Quotation e RateSeason}
+Trovato durante la stessa ri-verifica post-hardening (sotto-agente
+\emph{business-logic}): l'override \texttt{@SQLDelete} di \texttt{Quotation}
+e \texttt{RateSeason} (\texttt{UPDATE ... SET active = false WHERE id = ?})
+non verificava né incrementava la colonna \texttt{version} aggiunta da
+T-QUOT-01/T-PRICE-01, a differenza di \texttt{Reservation} nello stesso
+codebase (\texttt{UPDATE ... SET active = false, version = version + 1
+WHERE id = ? AND version = ?}). Poiché l'\texttt{UPDATE} generato da
+Hibernate per un \texttt{save()} normale scrive comunque tutte le colonne
+mappate, incluso \texttt{active}, una race \texttt{UPDATE}-vs-\texttt{DELETE}
+concorrente sulla stessa riga non generava mai un conflitto: un
+\texttt{DELETE} (staff B) poteva essere silenziosamente annullato da un
+\texttt{save()} concorrente (staff A) ignaro della cancellazione,
+``resuscitando'' un preventivo appena cancellato come \texttt{ACCEPTED}
+con una prenotazione già creata, o riportando in vita una stagione
+tariffaria che un secondo admin credeva rimossa.
+
+Fix: entrambi gli \texttt{@SQLDelete} allineati esattamente al pattern già
+in uso su \texttt{Reservation.java}.
+
+\textbf{Regressione trovata nella riverifica dello stesso fix}: il
+pattern replicato da \texttt{Reservation} non enforcava mai davvero il
+controllo versione a runtime --- \texttt{@SQLDelete} di Hibernate usa
+\texttt{ResultCheckStyle.NONE} di default, quindi una \texttt{DELETE} con
+\texttt{version} disallineata aggiorna zero righe e Hibernate non se ne
+accorge, riportando successo pur non avendo cancellato nulla (race
+inversa: una \texttt{DELETE} stale sopravvive silenziosamente a un
+\texttt{save()} concorrente che ha vinto per primo). Lo stesso difetto
+latente era già presente in \texttt{Reservation.java} fin da T-RES-01, non
+introdotto da questo fix. Aggiunto \texttt{check = ResultCheckStyle.COUNT}
+a tutti e tre gli \texttt{@SQLDelete} (\texttt{Quotation}, \texttt{RateSeason}
+e \texttt{Reservation}) --- una \texttt{DELETE} a zero righe solleva ora la
+\texttt{StaleStateException} che \texttt{GlobalExceptionHandler} già mappa
+a \texttt{409 CONCURRENT\_MODIFICATION}. Nota di copertura: nessun test a
+livello repository esercita la SQL reale di delete per nessuna delle tre
+entità (i test di service mockano \texttt{repository.delete()}) --- il fix
+è verificato per compilazione e build (\texttt{./gradlew
+:frontdesk-service:test} verde) ma non da un test che dimostri
+esplicitamente il \texttt{409} su una delete stale, da pianificare in un
+giro successivo.
+Commit: \commitref{5f5a698}{fix(security): version-check soft-deletes on Quotation/RateSeason, enforce it on all three (GAP-18)}
+
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Configurazione e SDLC avanzati}
 % ─────────────────────────────────────────────────────────────────────────────
