@@ -6276,7 +6276,23 @@ entità (i test di service mockano \texttt{repository.delete()}) --- il fix
 :frontdesk-service:test} verde) ma non da un test che dimostri
 esplicitamente il \texttt{409} su una delete stale, da pianificare in un
 giro successivo.
-Commit: \commitref{5f5a698}{fix(security): version-check soft-deletes on Quotation/RateSeason, enforce it on all three (GAP-18)}
+
+\textbf{Chiuso 2026-08-16}: nuovo \texttt{SoftDeleteVersionCheckIntegrationTest}
+--- Testcontainers PostgreSQL reale, stesso setup di
+\texttt{RoomTypeServiceIntegrationTest}, nessun mock su
+\texttt{repository.delete()}. Per ciascuna delle tre entità: carica la
+riga, incrementa \texttt{version} nel database con una \texttt{UPDATE} SQL
+nativa (simula un salvataggio concorrente che l'istanza in memoria non
+vede), poi tenta la delete con la \texttt{version} ormai stale ---
+verifica che sollevi \texttt{ObjectOptimisticLockingFailureException}.
+Verificato che il test cattura davvero la regressione, non solo che
+compila: rimosso temporaneamente \texttt{check = ResultCheckStyle.COUNT}
+dalle tre entità e rieseguito --- tutti e 3 i test falliscono
+sull'asserzione (nessuna eccezione sollevata, la delete stale ``riesce''
+silenziosamente, esattamente il sintomo descritto sopra); ripristinato il
+fix e rieseguito --- tutti e 3 tornano verdi, insieme all'intera build
+(\texttt{checkstyle}/\texttt{PMD}/\texttt{SpotBugs}/\texttt{jacoco}).
+Commit: \commitref{5f5a698}{fix(security): version-check soft-deletes on Quotation/RateSeason, enforce it on all three (GAP-18)}, \commitref{83dfda4}{test(security): repository-level stale-delete race test for GAP-18}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Configurazione e SDLC avanzati}
