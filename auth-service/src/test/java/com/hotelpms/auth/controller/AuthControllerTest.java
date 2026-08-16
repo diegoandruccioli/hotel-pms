@@ -151,7 +151,7 @@ class AuthControllerTest {
     void shouldChangePasswordReturn200() throws Exception {
         final ChangePasswordRequest request = new ChangePasswordRequest("currentPw1", STRONG_PASSWORD);
         when(jwtService.extractUsername(TEST_TOKEN)).thenReturn(TEST_USERNAME);
-        when(jwtService.isTokenValid(TEST_TOKEN, TEST_USERNAME)).thenReturn(true);
+        when(jwtService.isTokenValid(TEST_TOKEN)).thenReturn(true);
         when(authService.changePassword(eq(TEST_USERNAME), any(ChangePasswordRequest.class)))
                 .thenReturn(authResponse);
 
@@ -177,7 +177,7 @@ class AuthControllerTest {
     void shouldGetMeReturn200WithUsernameAndRole() throws Exception {
         when(jwtService.extractUsername(TEST_TOKEN)).thenReturn(TEST_USERNAME);
         when(jwtService.extractClaim(eq(TEST_TOKEN), any())).thenReturn(ROLE_ADMIN);
-        when(jwtService.isTokenValid(TEST_TOKEN, TEST_USERNAME)).thenReturn(true);
+        when(jwtService.isTokenValid(TEST_TOKEN)).thenReturn(true);
         when(userRepository.findByUsername(TEST_USERNAME)).thenReturn(Optional.empty());
 
         mockMvc.perform(get(BASE_URL + PATH_ME)

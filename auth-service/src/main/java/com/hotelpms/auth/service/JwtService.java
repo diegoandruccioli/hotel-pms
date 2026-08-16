@@ -119,15 +119,24 @@ public class JwtService {
     }
 
     /**
-     * Validates an access JWT token against the given username.
+     * Returns {@code true} if the token is not expired.
      *
-     * @param token    the JWT token
-     * @param username the username to validate against
-     * @return {@code true} if the token is valid and not expired
+     * <p>Every caller of this method has already called {@link #extractUsername}
+     * (or another {@code extractClaim}) on the same token first, which throws
+     * {@link io.jsonwebtoken.JwtException} for a malformed/tampered/expired token
+     * before this method would ever run — so the only real, additional check
+     * left to perform here is expiration. Previously this method also took a
+     * {@code username} parameter and compared it against the token's own
+     * subject claim, but every call site passed in the value it had just
+     * extracted from that same token, making the comparison always true by
+     * construction (a tautology, not a real check) — removed rather than kept
+     * as dead code (security-report.md, INFO row).
+     *
+     * @param token the JWT token
+     * @return {@code true} if the token is not expired
      */
-    public boolean isTokenValid(final String token, final String username) {
-        final String tokenUsername = extractUsername(token);
-        return tokenUsername.equals(username) && !isTokenExpired(token);
+    public boolean isTokenValid(final String token) {
+        return !isTokenExpired(token);
     }
 
     /**

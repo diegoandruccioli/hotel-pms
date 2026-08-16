@@ -187,7 +187,7 @@ public class AuthController {
         }
         try {
             final String username = jwtService.extractUsername(token);
-            if (!jwtService.isTokenValid(token, username)) {
+            if (!jwtService.isTokenValid(token)) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
             final AuthResponse response = authService.changePassword(username, request);
@@ -225,7 +225,7 @@ public class AuthController {
             final String username = jwtService.extractUsername(token);
             final String role = jwtService.extractClaim(token, claims -> claims.get("role", String.class));
 
-            if (!jwtService.isTokenValid(token, username)) {
+            if (!jwtService.isTokenValid(token)) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
 
