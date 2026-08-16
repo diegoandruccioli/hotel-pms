@@ -98,9 +98,12 @@ public class StayServiceImpl implements StayService {
             newStay.setActualCheckInTime(LocalDateTime.now());
         }
 
-        if (newStay.getStatus() == null || newStay.getStatus() == StayStatus.EXPECTED) {
-            newStay.setStatus(StayStatus.CHECKED_IN);
-        }
+        // Never trust a client-supplied status at creation — checkIn() always
+        // produces a CHECKED_IN stay. A client sending e.g. CHECKED_OUT would
+        // otherwise skip checkOut()'s BILLING_NOT_PAID guard entirely and leave
+        // the room stuck OCCUPIED forever (only checkOut() ever clears it —
+        // see updateHousekeepingStatus/updateRoom in RoomServiceImpl).
+        newStay.setStatus(StayStatus.CHECKED_IN);
 
         final Stay savedStay = stayRepository.save(newStay);
         log.info("[STAY] CHECK_IN_SUCCESS | stayId={} | reservationId={} | guestId={} | roomId={}",

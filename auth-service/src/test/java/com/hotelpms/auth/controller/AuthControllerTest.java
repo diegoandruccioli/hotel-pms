@@ -3,11 +3,9 @@ package com.hotelpms.auth.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.hotelpms.auth.domain.Role;
 import com.hotelpms.auth.dto.AuthResponse;
 import com.hotelpms.auth.dto.ChangePasswordRequest;
 import com.hotelpms.auth.dto.LoginRequest;
-import com.hotelpms.auth.dto.RegisterRequest;
 import com.hotelpms.auth.exception.BadCredentialsException;
 import com.hotelpms.auth.exception.GlobalExceptionHandler;
 import com.hotelpms.auth.repository.UserAccountRepository;
@@ -27,7 +25,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -44,7 +41,6 @@ class AuthControllerTest {
 
     private static final String BASE_URL = "/api/v1/auth";
     private static final String PATH_LOGIN = "/login";
-    private static final String PATH_REGISTER = "/register";
     private static final String PATH_LOGOUT = "/logout";
     private static final String PATH_REFRESH = "/refresh";
     private static final String PATH_CHANGE_PASSWORD = "/change-password";
@@ -57,8 +53,6 @@ class AuthControllerTest {
     private static final String TEST_PASSWORD = "password123";
     private static final String STRONG_PASSWORD = "TestPassword@@22";
     private static final String ROLE_ADMIN = "ADMIN";
-    private static final String TEST_EMAIL = "test@example.com";
-    private static final UUID TEST_HOTEL_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @Mock
     private AuthService authService;
@@ -96,7 +90,7 @@ class AuthControllerTest {
     @Test
     void shouldLoginReturn200WithCookiesAndBody() throws Exception {
         final LoginRequest request = new LoginRequest(TEST_USERNAME, TEST_PASSWORD);
-        when(authService.login(any(LoginRequest.class))).thenReturn(authResponse);
+        when(authService.login(any(LoginRequest.class), any())).thenReturn(authResponse);
 
         mockMvc.perform(post(BASE_URL + PATH_LOGIN)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -109,7 +103,7 @@ class AuthControllerTest {
     @Test
     void shouldLoginReturn401OnBadCredentials() throws Exception {
         final LoginRequest request = new LoginRequest(TEST_USERNAME, TEST_PASSWORD);
-        when(authService.login(any(LoginRequest.class)))
+        when(authService.login(any(LoginRequest.class), any()))
                 .thenThrow(new BadCredentialsException("INVALID_CREDENTIALS"));
 
         mockMvc.perform(post(BASE_URL + PATH_LOGIN)
@@ -126,19 +120,6 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void shouldRegisterReturn201WithCookies() throws Exception {
-        final RegisterRequest request = new RegisterRequest(
-                TEST_USERNAME, STRONG_PASSWORD, TEST_EMAIL, Role.RECEPTIONIST, TEST_HOTEL_ID);
-        when(authService.register(any(RegisterRequest.class))).thenReturn(authResponse);
-
-        mockMvc.perform(post(BASE_URL + PATH_REGISTER)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(header().exists(HttpHeaders.SET_COOKIE));
     }
 
     @Test
@@ -170,7 +151,7 @@ class AuthControllerTest {
     void shouldChangePasswordReturn200() throws Exception {
         final ChangePasswordRequest request = new ChangePasswordRequest("currentPw1", STRONG_PASSWORD);
         when(jwtService.extractUsername(TEST_TOKEN)).thenReturn(TEST_USERNAME);
-        when(jwtService.isTokenValid(TEST_TOKEN, TEST_USERNAME)).thenReturn(true);
+        when(jwtService.isTokenValid(TEST_TOKEN)).thenReturn(true);
         when(authService.changePassword(eq(TEST_USERNAME), any(ChangePasswordRequest.class)))
                 .thenReturn(authResponse);
 
@@ -196,7 +177,7 @@ class AuthControllerTest {
     void shouldGetMeReturn200WithUsernameAndRole() throws Exception {
         when(jwtService.extractUsername(TEST_TOKEN)).thenReturn(TEST_USERNAME);
         when(jwtService.extractClaim(eq(TEST_TOKEN), any())).thenReturn(ROLE_ADMIN);
-        when(jwtService.isTokenValid(TEST_TOKEN, TEST_USERNAME)).thenReturn(true);
+        when(jwtService.isTokenValid(TEST_TOKEN)).thenReturn(true);
         when(userRepository.findByUsername(TEST_USERNAME)).thenReturn(Optional.empty());
 
         mockMvc.perform(get(BASE_URL + PATH_ME)

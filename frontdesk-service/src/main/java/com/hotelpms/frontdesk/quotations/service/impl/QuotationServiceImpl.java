@@ -34,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +59,7 @@ import java.util.UUID;
 public class QuotationServiceImpl implements QuotationService {
 
     private static final String NOT_FOUND_MSG = "QUOTATION_NOT_FOUND";
+    private static final String ALREADY_ACCEPTED_MSG = "QUOTATION_ALREADY_ACCEPTED";
     private static final String HOTEL_ID_NULL_MSG = "Hotel ID cannot be null";
     private static final String ID_NULL_MSG = "Quotation ID cannot be null";
     private static final String DEFAULT_CURRENCY = "EUR";
@@ -286,7 +288,7 @@ public class QuotationServiceImpl implements QuotationService {
             throw new ConflictException("QUOTATION_DECLINED");
         }
         if (quotation.getStatus() == QuotationStatus.ACCEPTED) {
-            throw new ConflictException("QUOTATION_ALREADY_ACCEPTED");
+            throw new ConflictException(ALREADY_ACCEPTED_MSG);
         }
         if (quotation.isExpired()) {
             throw new ConflictException("QUOTATION_EXPIRED");
@@ -310,7 +312,11 @@ public class QuotationServiceImpl implements QuotationService {
 
         quotation.setAcceptedOptionId(chosen.getId());
         quotation.setStatus(QuotationStatus.ACCEPTED);
-        quotationRepository.save(quotation);
+        try {
+            quotationRepository.saveAndFlush(quotation);
+        } catch (final ObjectOptimisticLockingFailureException ex) {
+            throw new ConflictException(ALREADY_ACCEPTED_MSG, ex);
+        }
         return reservation;
     }
 
@@ -344,7 +350,7 @@ public class QuotationServiceImpl implements QuotationService {
         final UUID hotelId = resolveHotelId();
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         if (quotation.getStatus() == QuotationStatus.ACCEPTED) {
-            throw new ConflictException("QUOTATION_ALREADY_ACCEPTED");
+            throw new ConflictException(ALREADY_ACCEPTED_MSG);
         }
         quotation.setStatus(QuotationStatus.DECLINED);
         final Quotation saved = quotationRepository.save(quotation);

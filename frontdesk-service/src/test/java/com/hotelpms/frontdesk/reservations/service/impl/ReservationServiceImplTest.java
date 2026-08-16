@@ -43,6 +43,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +51,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -80,6 +82,7 @@ class ReservationServiceImplTest {
     private static final Reservation ANY_RESERVATION = new Reservation();
     private static final UUID ANY_UUID = Objects.requireNonNull(UUID.randomUUID());
     private static final String ERR_CHECKOUT_AFTER_CHECKIN = "CHECKOUT_MUST_BE_AFTER_CHECKIN";
+    private static final String ROOM_UNAVAILABLE_DATES_MSG = "ROOM_UNAVAILABLE_DATES";
     private static final UUID ROOM_TYPE_ID = Objects.requireNonNull(UUID.randomUUID());
     private static final BigDecimal PRICE_100 = BigDecimal.valueOf(100);
     private static final BigDecimal PRICE_120 = BigDecimal.valueOf(120);
@@ -189,7 +192,7 @@ class ReservationServiceImplTest {
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
         when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
         when(reservationMapper.toEntity(request)).thenReturn(entity);
-        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
@@ -203,7 +206,8 @@ class ReservationServiceImplTest {
         assertFalse(entity.isConfirmationEmailFailed());
         verify(guestClient, times(1)).getGuestById(GUEST_ID);
         verify(roomService, times(1)).getRoomById(roomId, HOTEL_ID);
-        verify(reservationRepository, times(2)).save(entity);
+        verify(reservationRepository, times(1)).saveAndFlush(entity);
+        verify(reservationRepository, times(1)).save(entity);
         verify(notificationClient, times(1)).sendReservationConfirmed(any());
     }
 
@@ -214,7 +218,7 @@ class ReservationServiceImplTest {
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
         when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
         when(reservationMapper.toEntity(request)).thenReturn(entity);
-        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
@@ -235,7 +239,7 @@ class ReservationServiceImplTest {
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
         when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
         when(reservationMapper.toEntity(any(ReservationRequest.class))).thenReturn(entity);
-        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
@@ -287,7 +291,7 @@ class ReservationServiceImplTest {
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
         when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
         when(reservationMapper.toEntity(request)).thenReturn(entity);
-        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
@@ -319,7 +323,7 @@ class ReservationServiceImplTest {
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
         when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
         when(reservationMapper.toEntity(requestWithNullStatus)).thenReturn(entityWithNullStatus);
-        when(reservationRepository.save(anyReservation()))
+        when(reservationRepository.saveAndFlush(anyReservation()))
                 .thenReturn(entityWithNullStatus);
         when(reservationMapper.toResponse(entityWithNullStatus)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
@@ -522,7 +526,7 @@ class ReservationServiceImplTest {
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
         when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
-        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
 
         final ReservationResponse result = reservationService.updateReservation(reservationId, request);
@@ -531,7 +535,7 @@ class ReservationServiceImplTest {
         verify(reservationRepository, times(1)).findByIdAndHotelId(reservationId, HOTEL_ID);
         verify(roomService, times(1)).getRoomById(roomId, HOTEL_ID);
         verify(reservationMapper, times(1)).updateEntityFromRequest(request, entity);
-        verify(reservationRepository, times(1)).save(entity);
+        verify(reservationRepository, times(1)).saveAndFlush(entity);
     }
 
     @Test
@@ -545,7 +549,7 @@ class ReservationServiceImplTest {
                 .thenReturn(List.of(
                         new NightlyRate(request.checkInDate(), PRICE_120, null),
                         new NightlyRate(request.checkInDate().plusDays(1), PRICE_120, null)));
-        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         // The real MapStruct mapper repopulates lineItems from the request when
         // updateEntityFromRequest runs; simulate that here since reservationMapper is a
@@ -644,7 +648,7 @@ class ReservationServiceImplTest {
                 ReservationStatus.CHECKED_IN, null, true, null, null, false, null);
 
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
-        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
         when(reservationMapper.toResponse(entity)).thenReturn(checkedInResponse);
 
@@ -654,7 +658,7 @@ class ReservationServiceImplTest {
         assertNotNull(result);
         assertEquals(ReservationStatus.CHECKED_IN, entity.getStatus());
         assertEquals(2, entity.getActualGuests());
-        verify(reservationRepository).save(entity);
+        verify(reservationRepository).saveAndFlush(entity);
     }
 
     @Test
@@ -667,14 +671,14 @@ class ReservationServiceImplTest {
                 ReservationStatus.CANCELLED, null, true, null, null, false, null);
 
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
-        when(reservationRepository.save(entity)).thenReturn(entity);
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
         when(reservationMapper.toResponse(entity)).thenReturn(cancelledResponse);
 
         reservationService.updateStatusAndGuests(reservationId, ReservationStatus.CANCELLED, null);
 
         assertEquals(ReservationStatus.CANCELLED, entity.getStatus());
-        verify(reservationRepository).save(entity);
+        verify(reservationRepository).saveAndFlush(entity);
     }
 
     @Test
@@ -704,7 +708,7 @@ class ReservationServiceImplTest {
 
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.createReservation(request));
-        assertEquals("ROOM_UNAVAILABLE_DATES", ex.getMessage());
+        assertEquals(ROOM_UNAVAILABLE_DATES_MSG, ex.getMessage());
         verify(reservationRepository, never()).save(anyReservation());
     }
 
@@ -728,7 +732,7 @@ class ReservationServiceImplTest {
 
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.updateReservation(reservationId, request));
-        assertEquals("ROOM_UNAVAILABLE_DATES", ex.getMessage());
+        assertEquals(ROOM_UNAVAILABLE_DATES_MSG, ex.getMessage());
         verify(reservationRepository, never()).save(anyReservation());
     }
 
@@ -741,12 +745,34 @@ class ReservationServiceImplTest {
         when(reservationRepository.findOverlappingReservationsForNew(any(), any(), any()))
                 .thenReturn(List.of());
         when(reservationMapper.toEntity(request)).thenReturn(entity);
-        when(reservationRepository.save(entity))
+        when(reservationRepository.saveAndFlush(entity))
                 .thenThrow(new ObjectOptimisticLockingFailureException(Reservation.class,
                         Objects.requireNonNull(UUID.randomUUID())));
 
         assertThrows(ObjectOptimisticLockingFailureException.class,
                 () -> reservationService.createReservation(request));
+    }
+
+    @Test
+    void createReservationTranslatesResidualOverlapIntoConflict() {
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(reservationRepository.findOverlappingReservationsForNew(any(), any(), any()))
+                .thenReturn(List.of());
+        when(reservationMapper.toEntity(request)).thenReturn(entity);
+        when(reservationRepository.saveAndFlush(entity)).thenThrow(exclusionViolation());
+
+        final ConflictException ex = assertThrows(ConflictException.class,
+                () -> reservationService.createReservation(request),
+                "A concurrent request winning the DB-level race must surface a 409, not a raw 500");
+        assertEquals(ROOM_UNAVAILABLE_DATES_MSG, ex.getMessage());
+    }
+
+    private static DataIntegrityViolationException exclusionViolation() {
+        final SQLException sqlException = new SQLException("overlap", "23P01");
+        return new DataIntegrityViolationException("excl_reservation_line_items_no_overlap", sqlException);
     }
 
     @Test

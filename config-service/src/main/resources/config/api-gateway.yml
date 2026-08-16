@@ -182,3 +182,15 @@ jwt:
 internal:
   hmac:
     secret: ${INTERNAL_HMAC_SECRET}
+
+gateway:
+  security:
+    # GAP-17 (THREAT_MODEL.md): false by default. api-gateway:8080 stays
+    # published directly to the host in dev (docker-compose.yml), so nginx's
+    # X-Real-IP header is not yet a trustworthy channel here — a client can
+    # skip nginx and forge it. ClientIpFilter/RateLimiterConfig fall back to
+    # the raw TCP remote address in this profile, same as before GAP-17.
+    # Flipped to true only in api-gateway-prod.yml, where the host port
+    # publish is removed (docker-compose.prod.yml) and nginx becomes the
+    # only path to the gateway.
+    trust-forwarded-header: false

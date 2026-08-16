@@ -1,14 +1,10 @@
 import api from './api';
-import type { LoginRequest, RegisterRequest, UserPayload } from '../types/auth.types';
+import type { LoginRequest, UserPayload } from '../types/auth.types';
 
 export const authService = {
   login: async (data: LoginRequest): Promise<{ mustChangePassword: boolean }> => {
     const response = await api.post<{ mustChangePassword: boolean }>('/api/v1/auth/login', data);
     return response.data ?? { mustChangePassword: false };
-  },
-
-  register: async (data: RegisterRequest): Promise<void> => {
-    await api.post('/api/v1/auth/register', data);
   },
 
   logout: async (): Promise<void> => {

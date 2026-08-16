@@ -1,6 +1,7 @@
 package com.hotelpms.fb.exception;
 
 import com.hotelpms.commonweb.exception.AbstractProblemDetailAdvice;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +17,7 @@ import java.util.Objects;
  * {@code @PreAuthorize} denials, the generic 500 catch-all) live in
  * {@link AbstractProblemDetailAdvice}.
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends AbstractProblemDetailAdvice {
 
@@ -89,8 +91,12 @@ public class GlobalExceptionHandler extends AbstractProblemDetailAdvice {
      */
     @ExceptionHandler(ExternalServiceException.class)
     public ProblemDetail handleExternalServiceException(final ExternalServiceException ex) {
+        // Finding #17 (security-report.md, LOW): ex.getMessage() typically includes
+        // the internal Docker service URL the call targeted -- log it server-side
+        // only, return a generic detail to the client.
+        log.warn("Downstream service call failed: {}", ex.getMessage(), ex);
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY,
-                ex.getMessage());
+                "EXTERNAL_SERVICE_ERROR");
         problemDetail.setTitle("External Service Error");
         problemDetail.setType(errorType("external-service-error"));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());

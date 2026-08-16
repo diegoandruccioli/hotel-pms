@@ -101,6 +101,7 @@ class ProblemDetailAdviceTest {
         assertThat(result.getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY.value());
         assertThat(result.getTitle()).isEqualTo("External Service Error");
         assertThat(result.getType().toString()).isEqualTo("https://hotel-pms.com/errors/external-service-error");
+        assertThat(result.getDetail()).isEqualTo("EXTERNAL_SERVICE_ERROR");
     }
 
     @Test

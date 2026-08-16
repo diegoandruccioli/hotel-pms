@@ -92,8 +92,12 @@ public class GlobalExceptionHandler extends AbstractProblemDetailAdvice {
      */
     @ExceptionHandler(ExternalServiceException.class)
     public ProblemDetail handleExternalServiceException(final ExternalServiceException ex) {
+        // Finding #17 (security-report.md, LOW): ex.getMessage() typically includes
+        // the internal Docker service URL the call targeted -- log it server-side
+        // only, return a generic detail to the client.
+        LOG.warn("Downstream service call failed: {}", ex.getMessage(), ex);
         final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY,
-                ex.getMessage());
+                "EXTERNAL_SERVICE_ERROR");
         problemDetail.setTitle("External Service Error");
         problemDetail.setType(errorType("external-service"));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());

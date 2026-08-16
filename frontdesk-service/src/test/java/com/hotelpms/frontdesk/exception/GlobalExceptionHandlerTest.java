@@ -99,4 +99,20 @@ class GlobalExceptionHandlerTest {
         assertThat(Objects.requireNonNull(problemDetail.getType()).toString())
                 .isEqualTo("https://hotel-pms.com/errors/external-service-error");
     }
+
+    /**
+     * Finding #17 (security-report.md, LOW): ex.getMessage() used to be exposed
+     * verbatim in the 502 body, typically including the internal Docker service
+     * URL the call targeted — must now be a generic constant.
+     */
+    @Test
+    void handlesExternalServiceExceptionAs502WithGenericDetail() {
+        final ExternalServiceException ex =
+                new ExternalServiceException("call to http://guest-service:8083/api/v1/guests/123 failed");
+
+        final ProblemDetail problemDetail = handler.handleExternalServiceException(ex);
+
+        assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY.value());
+        assertThat(problemDetail.getDetail()).isEqualTo("EXTERNAL_SERVICE_ERROR");
+    }
 }

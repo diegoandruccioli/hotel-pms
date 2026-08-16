@@ -8,3 +8,15 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+gateway:
+  security:
+    # GAP-17 (THREAT_MODEL.md): safe only because docker-compose.prod.yml
+    # no longer publishes api-gateway:8080 to the host — nginx (frontend
+    # container) is the only path that can reach the gateway, so its
+    # X-Real-IP header (frontend/nginx.conf, always overwritten with
+    # $remote_addr, never appended) can't be forged by a client skipping
+    # the proxy. ClientIpFilter uses it instead of the TCP peer address,
+    # which would otherwise be nginx's own container IP for every real
+    # user (T-AUTH-12/T-GW-10 regression).
+    trust-forwarded-header: true

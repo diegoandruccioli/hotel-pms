@@ -51,7 +51,8 @@ public record HotelSettingsRequest(
         String address,
         String vatNumber,
         String fiscalCode,
-        String logoUrl,
+        @Size(max = MAX_LOGO_URL_LENGTH) @Pattern(regexp = "^$|https?://.+", message = "logoUrl must be a valid http(s) URL")
+                String logoUrl,
         @Size(max = 100) String alloggiatiUsername,
         @Size(max = MAX_CREDENTIAL_LENGTH) String alloggiatiPassword,
         @Size(max = MAX_CREDENTIAL_LENGTH) String alloggiatiWsKey,
@@ -63,6 +64,9 @@ public record HotelSettingsRequest(
         @Pattern(regexp = "^$|\\d{5}", message = "CAP must be 5 digits") String cap,
         @Size(max = 100) String comune,
         @Pattern(regexp = "^$|[A-Za-z]{2}", message = "Provincia must be 2 letters") String provincia) {
+
+    /** Maximum length accepted for the hotel logo URL — matches HotelSettings.LEN_LOGO_URL. */
+    public static final int MAX_LOGO_URL_LENGTH = 500;
 
     /** Maximum length accepted for the Alloggiati Web password/WsKey fields. */
     public static final int MAX_CREDENTIAL_LENGTH = 200;

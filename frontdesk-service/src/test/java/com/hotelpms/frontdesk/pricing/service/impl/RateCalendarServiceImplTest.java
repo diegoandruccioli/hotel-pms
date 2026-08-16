@@ -19,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.math.BigDecimal;
 import java.sql.SQLException;
@@ -196,7 +197,7 @@ class RateCalendarServiceImplTest {
         assertEquals(AUG_1.minusDays(1), existing.getEndDate());
 
         final ArgumentCaptor<RateSeason> savedCaptor = ArgumentCaptor.forClass(RateSeason.class);
-        verify(rateSeasonRepository, times(2)).save(savedCaptor.capture());
+        verify(rateSeasonRepository, times(3)).saveAndFlush(savedCaptor.capture());
         final RateSeason tail = savedCaptor.getAllValues().get(1);
         assertEquals(AUG_31.plusDays(1), tail.getStartDate());
         assertEquals(existingEnd, tail.getEndDate());
@@ -220,6 +221,18 @@ class RateCalendarServiceImplTest {
 
         assertThrows(ConflictException.class,
                 () -> rateCalendarService.bulkApply(hotelId, bulkRequest(AUG_1, AUG_31)));
+    }
+
+    @Test
+    void bulkApplyTranslatesLostUpdateOnTrimIntoConflict() {
+        final RateSeason existing = seasonFor(JUL_20, LocalDate.of(2026, 8, 10));
+        when(rateSeasonRepository.findOverlapping(roomTypeId, hotelId, AUG_1, AUG_31)).thenReturn(List.of(existing));
+        when(rateSeasonRepository.saveAndFlush(any(RateSeason.class)))
+                .thenThrow(new ObjectOptimisticLockingFailureException(RateSeason.class, existing.getId()));
+
+        assertThrows(ConflictException.class,
+                () -> rateCalendarService.bulkApply(hotelId, bulkRequest(AUG_1, AUG_31)),
+                "A concurrent admin trimming the same season must surface a 409, not overwrite silently");
     }
 
     private void stubNewSeasonCreation() {

@@ -1,0 +1,8 @@
+node_modules
+dist
+.git
+*.log
+.env
+.env.local
+coverage
+e2e-live/.auth

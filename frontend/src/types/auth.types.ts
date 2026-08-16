@@ -5,15 +5,6 @@ export interface LoginRequest {
   password?: string;
 }
 
-export interface RegisterRequest {
-  username: string;
-  password?: string;
-  email: string;
-  role: Role;
-}
-
-
-
 export interface UserPayload {
   sub: string;
   username: string;

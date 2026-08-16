@@ -3,7 +3,6 @@ package com.hotelpms.auth.controller;
 import com.hotelpms.auth.dto.AuthResponse;
 import com.hotelpms.auth.dto.ChangePasswordRequest;
 import com.hotelpms.auth.dto.LoginRequest;
-import com.hotelpms.auth.dto.RegisterRequest;
 import com.hotelpms.auth.exception.BadCredentialsException;
 import com.hotelpms.auth.service.AuthService;
 import com.hotelpms.auth.service.JwtService;
@@ -20,6 +19,7 @@ import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -63,37 +63,22 @@ public class AuthController {
     private final com.hotelpms.auth.repository.UserAccountRepository userRepository;
 
     /**
-     * Endpoint for user registration.
-     *
-     * @param request the registration request
-     * @return HTTP 201 with access and refresh cookies
-     */
-    @PostMapping("/register")
-    public ResponseEntity<Void> register(@NonNull final @Valid @RequestBody RegisterRequest request) {
-        final AuthResponse response = authService.register(request);
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .header(HttpHeaders.SET_COOKIE,
-                        createCookie(COOKIE_NAME, response.token(), ACCESS_COOKIE_MAX_AGE, COOKIE_PATH).toString())
-                .header(HttpHeaders.SET_COOKIE,
-                        createCookie(REFRESH_COOKIE_NAME, response.refreshToken(),
-                                REFRESH_COOKIE_MAX_AGE, REFRESH_COOKIE_PATH).toString())
-                .header(HttpHeaders.SET_COOKIE,
-                        createCsrfCookie(UUID.randomUUID().toString(), REFRESH_COOKIE_MAX_AGE).toString())
-                .build();
-    }
-
-    /**
      * Endpoint for user login.
      * Returns a body with {@code mustChangePassword} so the SPA can immediately
      * redirect to the change-password page when the flag is set.
      *
-     * @param request the login request
+     * @param request  the login request
+     * @param clientIp the trusted client IP injected by the gateway's
+     *                 {@code ClientIpFilter} ({@code X-Client-IP}), used to bind the
+     *                 brute-force lockout to more than just the username
+     *                 (Finding #4, security-report.md)
      * @return HTTP 200 with access and refresh cookies and a JSON body
      */
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@NonNull final @Valid @RequestBody LoginRequest request) {
-        final AuthResponse response = authService.login(request);
+    public ResponseEntity<Map<String, Object>> login(
+            @NonNull final @Valid @RequestBody LoginRequest request,
+            @RequestHeader(value = "X-Client-IP", required = false) final String clientIp) {
+        final AuthResponse response = authService.login(request, clientIp);
 
         final Map<String, Object> body = new LinkedHashMap<>();
         body.put("mustChangePassword", response.mustChangePassword());
@@ -202,7 +187,7 @@ public class AuthController {
         }
         try {
             final String username = jwtService.extractUsername(token);
-            if (!jwtService.isTokenValid(token, username)) {
+            if (!jwtService.isTokenValid(token)) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
             final AuthResponse response = authService.changePassword(username, request);
@@ -240,7 +225,7 @@ public class AuthController {
             final String username = jwtService.extractUsername(token);
             final String role = jwtService.extractClaim(token, claims -> claims.get("role", String.class));
 
-            if (!jwtService.isTokenValid(token, username)) {
+            if (!jwtService.isTokenValid(token)) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
 

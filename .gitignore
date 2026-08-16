@@ -37,6 +37,9 @@ frontend/.eslintcache
 .env.*.local
 *.pem
 *.key
+*.p12
+*.jks
+*.pfx
 
 # ── Logs & temp ──────────────────────────────────────────────────────────────
 *.log

@@ -145,6 +145,10 @@ jobs:
             dockerfile: fb-service/Dockerfile
             image: hotel-pms/fb-service
             context: "."
+          - service: notification-service
+            dockerfile: notification-service/Dockerfile
+            image: hotel-pms/notification-service
+            context: "."
           - service: frontend
             dockerfile: frontend/Dockerfile
             image: hotel-pms/frontend

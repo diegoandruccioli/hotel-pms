@@ -28,4 +28,16 @@ class GlobalExceptionHandlerTest {
         assertEquals(HttpStatus.CONFLICT.value(), problemDetail.getStatus());
         assertEquals("Conflict", problemDetail.getTitle());
     }
+
+    @Test
+    @DisplayName("ExternalServiceException detail is generic, never the raw downstream message (Finding #17)")
+    void externalServiceExceptionHasGenericDetailNotRawMessage() {
+        final ExternalServiceException ex =
+                new ExternalServiceException("call to http://frontdesk-service:8081/api/v1/rooms/123 failed");
+
+        final ProblemDetail problemDetail = handler.handleExternalServiceException(ex);
+
+        assertEquals(HttpStatus.BAD_GATEWAY.value(), problemDetail.getStatus());
+        assertEquals("EXTERNAL_SERVICE_ERROR", problemDetail.getDetail());
+    }
 }

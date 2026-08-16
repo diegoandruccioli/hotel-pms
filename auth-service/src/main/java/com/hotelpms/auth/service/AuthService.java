@@ -3,7 +3,6 @@ package com.hotelpms.auth.service;
 import com.hotelpms.auth.dto.AuthResponse;
 import com.hotelpms.auth.dto.ChangePasswordRequest;
 import com.hotelpms.auth.dto.LoginRequest;
-import com.hotelpms.auth.dto.RegisterRequest;
 
 /**
  * Service interface for authentication operations.
@@ -11,20 +10,19 @@ import com.hotelpms.auth.dto.RegisterRequest;
 public interface AuthService {
 
     /**
-     * Registers a new user.
-     *
-     * @param request the registration request containing user details
-     * @return an {@link AuthResponse} containing a fresh access token and refresh token
-     */
-    AuthResponse register(RegisterRequest request);
-
-    /**
      * Authenticates a user and returns a new token pair.
      *
-     * @param request the login request containing username and password
+     * <p>Enforces a brute-force lockout keyed on (username, clientIp) — see
+     * {@link LoginAttemptService} — so an attacker repeatedly failing a known
+     * username cannot lock that account out for its legitimate owner (Finding #4,
+     * security-report.md).</p>
+     *
+     * @param request  the login request containing username and password
+     * @param clientIp the trusted client IP (from the gateway-injected
+     *                 {@code X-Client-IP} header), used as the lockout's second factor
      * @return an {@link AuthResponse} containing a fresh access token and refresh token
      */
-    AuthResponse login(LoginRequest request);
+    AuthResponse login(LoginRequest request, String clientIp);
 
     /**
      * Validates the given refresh token, blacklists it, and issues a new token pair (rotation).

@@ -17,16 +17,24 @@ import java.time.Instant;
 public class GlobalExceptionHandler extends AbstractProblemDetailAdvice {
 
     /**
-     * Handles AccountLockedException (HTTP 429 Too Many Requests).
+     * Handles AccountLockedException.
+     *
+     * <p>Finding #8 (security-report.md, MEDIUM): previously mapped to 429 with a
+     * distinct "Account Temporarily Locked" body — that let an attacker confirm a
+     * username exists once it accumulated enough failed attempts to lock,
+     * reintroducing T-AUTH-01 user enumeration at the HTTP-status/body level. Now
+     * returns byte-for-byte the same response as {@link BadCredentialsException};
+     * the real reason is only visible server-side via the {@code ACCOUNT_LOCKED}
+     * log line at the throw site in {@code AuthServiceImpl.login()}.
      *
      * @param ex the exception
      * @return the problem detail mapping
      */
     @ExceptionHandler(AccountLockedException.class)
     public ProblemDetail handleAccountLockedException(final AccountLockedException ex) {
-        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
-        problemDetail.setTitle("Account Temporarily Locked");
-        problemDetail.setType(errorType("too-many-requests"));
+        final ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS");
+        problemDetail.setTitle("Authentication Failed");
+        problemDetail.setType(errorType("unauthorized"));
         problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
         return problemDetail;
     }
