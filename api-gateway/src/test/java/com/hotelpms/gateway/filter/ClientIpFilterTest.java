@@ -31,14 +31,14 @@ class ClientIpFilterTest {
 
     @BeforeEach
     void setUp() {
-        filter = new ClientIpFilter();
+        filter = new ClientIpFilter(false);
     }
 
-    private ServerWebExchange run(@NonNull final MockServerHttpRequest request) {
+    private ServerWebExchange run(final ClientIpFilter filterUnderTest, @NonNull final MockServerHttpRequest request) {
         final MockServerWebExchange exchange = MockServerWebExchange.from(request);
         final AtomicReference<ServerWebExchange> downstream = new AtomicReference<>();
         StepVerifier.create(
-                filter.filter(exchange, ex -> {
+                filterUnderTest.filter(exchange, ex -> {
                     downstream.set(ex);
                     ex.getResponse().setStatusCode(HttpStatus.OK);
                     return ex.getResponse().setComplete();
@@ -47,8 +47,12 @@ class ClientIpFilterTest {
         return downstream.get();
     }
 
+    private ServerWebExchange run(@NonNull final MockServerHttpRequest request) {
+        return run(filter, request);
+    }
+
     @Nested
-    @DisplayName("Header injection")
+    @DisplayName("Header injection (trust-forwarded-header=false, dev default)")
     class HeaderInjectionTests {
 
         @Test
@@ -74,6 +78,68 @@ class ClientIpFilterTest {
 
             assertThat(downstream.getRequest().getHeaders().get(ClientIpFilter.CLIENT_IP_HEADER))
                     .containsExactly("203.0.113.9");
+        }
+
+        @Test
+        @DisplayName("GAP-17: ignores a client-supplied X-Real-IP too — direct :8080 access can't spoof it")
+        void ignoresForwardedRealIpWhenTrustDisabled() {
+            final ServerWebExchange downstream = run(
+                    MockServerHttpRequest.post("/api/v1/auth/login")
+                            .remoteAddress(new InetSocketAddress("203.0.113.9", 0))
+                            .header("X-Real-IP", "1.2.3.4")
+                            .build());
+
+            assertThat(downstream.getRequest().getHeaders().getFirst(ClientIpFilter.CLIENT_IP_HEADER))
+                    .isEqualTo("203.0.113.9");
+        }
+    }
+
+    @Nested
+    @DisplayName("GAP-17: header injection with trust-forwarded-header=true (prod, api-gateway:8080 not host-published)")
+    class TrustForwardedHeaderTests {
+
+        private final ClientIpFilter trustingFilter = new ClientIpFilter(true);
+
+        @Test
+        @DisplayName("uses nginx's X-Real-IP instead of the TCP peer (nginx's own container IP) when present")
+        void usesXRealIpWhenTrusted() {
+            final ServerWebExchange downstream = run(
+                    trustingFilter,
+                    MockServerHttpRequest.post("/api/v1/auth/login")
+                            // TCP peer as seen by the gateway is nginx's container IP, not the real client.
+                            .remoteAddress(new InetSocketAddress("172.20.0.5", 0))
+                            .header("X-Real-IP", "203.0.113.9")
+                            .build());
+
+            assertThat(downstream.getRequest().getHeaders().getFirst(ClientIpFilter.CLIENT_IP_HEADER))
+                    .isEqualTo("203.0.113.9");
+        }
+
+        @Test
+        @DisplayName("falls back to the TCP remote address when X-Real-IP is absent")
+        void fallsBackToRemoteAddressWhenHeaderAbsent() {
+            final ServerWebExchange downstream = run(
+                    trustingFilter,
+                    MockServerHttpRequest.post("/api/v1/auth/login")
+                            .remoteAddress(new InetSocketAddress("203.0.113.9", 0))
+                            .build());
+
+            assertThat(downstream.getRequest().getHeaders().getFirst(ClientIpFilter.CLIENT_IP_HEADER))
+                    .isEqualTo("203.0.113.9");
+        }
+
+        @Test
+        @DisplayName("falls back to the TCP remote address when X-Real-IP is blank")
+        void fallsBackToRemoteAddressWhenHeaderBlank() {
+            final ServerWebExchange downstream = run(
+                    trustingFilter,
+                    MockServerHttpRequest.post("/api/v1/auth/login")
+                            .remoteAddress(new InetSocketAddress("203.0.113.9", 0))
+                            .header("X-Real-IP", "   ")
+                            .build());
+
+            assertThat(downstream.getRequest().getHeaders().getFirst(ClientIpFilter.CLIENT_IP_HEADER))
+                    .isEqualTo("203.0.113.9");
         }
     }
 

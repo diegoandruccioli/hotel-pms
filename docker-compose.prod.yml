@@ -12,21 +12,48 @@
 # backups are part of the always-on postgres service, not profile-gated —
 # see docker-compose.yml.)
 #
-# Removes host port publishing for every service except the two
-# meant to be reachable from outside the host: frontend (:80) and
-# api-gateway (:8080). All other services (Postgres, Redis, Loki,
-# Grafana, Zipkin, Alertmanager, Prometheus, config-server, and every
-# backend microservice incl. notification-service) stay reachable on
-# the internal compose networks — inter-container DNS resolution does
-# not depend on host port publishing — but are no longer bound to the
-# host's network interface. OWASP A05 — Security Misconfiguration
-# (ROADMAP P0). New services (e.g. Alertmanager/P4, notification-service/C1)
-# must be added here too, or they leak onto the host in "production".
+# Removes host port publishing for every service except the one
+# meant to be reachable from outside the host: frontend (:80). All
+# other services (Postgres, Redis, Loki, Grafana, Zipkin, Alertmanager,
+# Prometheus, config-server, api-gateway, and every backend microservice
+# incl. notification-service) stay reachable on the internal compose
+# networks — inter-container DNS resolution does not depend on host
+# port publishing — but are no longer bound to the host's network
+# interface. OWASP A05 — Security Misconfiguration (ROADMAP P0). New
+# services (e.g. Alertmanager/P4, notification-service/C1) must be
+# added here too, or they leak onto the host in "production".
+#
+# api-gateway (GAP-17, THREAT_MODEL.md): previously published on :8080
+# alongside frontend, reachable directly bypassing nginx. That let a
+# client skip the reverse proxy and forge X-Forwarded-For/X-Real-IP,
+# defeating the T-AUTH-12/T-GW-10 IP-based lockout and rate-limit keys
+# — and, worse, every request that DID go through nginx presented the
+# same TCP peer (nginx's container IP) to the gateway, collapsing the
+# lockout key to (username) for the entire real user population. Now
+# frontend is the sole host-reachable entrypoint; api-gateway is
+# reachable only via nginx on dmz-network (unaffected by removing the
+# host port publish — internal Docker DNS/networking doesn't use it).
+# This is what makes trusting nginx's X-Real-IP at the gateway safe
+# (see gateway.security.trust-forwarded-header in api-gateway-prod.yml,
+# config-service) — the header can no longer be forged by a client that
+# skips nginx, because there is no longer a way to skip nginx.
 # ============================================================
 
 services:
   postgres:
     ports: !reset []
+
+  api-gateway:
+    ports: !reset []
+    # GAP-17: api-gateway-prod.yml (config-service) is only served by Spring
+    # Cloud Config when this profile is active — without it, trust-forwarded-header
+    # silently stays false and X-Real-IP is never trusted even though :8080 is
+    # closed above, leaving the lockout/rate-limit key collapsed to nginx's IP
+    # exactly as before the fix. (Pre-existing gap: api-gateway-prod.yml's own
+    # "Activate with: SPRING_PROFILES_ACTIVE=prod" comment was never wired up
+    # anywhere — its springdoc-disable override was equally dead before this.)
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
 
   redis:
     ports: !reset []
