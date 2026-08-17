@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -35,24 +36,30 @@ public class VatBreakdownCalculator {
     }
 
     /**
-     * Groups charges by VAT rate, summing the taxable/VAT split of each line.
-     * Ordered by ascending rate for stable rendering in both the PDF summary
-     * table and the FatturaPA {@code DatiRiepilogo} blocks.
+     * Groups charges by VAT treatment — the {@code (rate, naturaCode)} pair, not rate
+     * alone — summing the taxable/VAT split of each line. FatturaPA requires one
+     * {@code DatiRiepilogo} block per distinct {@code (AliquotaIVA, Natura)}
+     * combination: two 0%-rate lines with different {@code Natura} codes (e.g. a
+     * future {@code N1} block and an {@code N4} block) are legally distinct and must
+     * never merge, even though they'd collide under a rate-only key. Ordered by
+     * ascending {@link VatGroupKey} (rate, then natura with nulls first) for stable
+     * rendering in both the PDF summary table and the FatturaPA blocks.
      *
      * @param charges the invoice charges — each charge's {@code vatRate} is trusted
      *                non-null, guaranteed by the {@code invoice_charges.vat_rate}
      *                {@code NOT NULL} constraint (the only charge-creation path,
      *                {@code InvoiceServiceImpl.addCharge}, always sets it)
-     * @return the per-rate breakdown, empty if {@code charges} is null or empty
+     * @return the per-treatment breakdown, empty if {@code charges} is null or empty
      */
-    public Map<BigDecimal, VatLine> groupByRate(final List<ChargeResponse> charges) {
-        final Map<BigDecimal, VatLine> breakdown = new TreeMap<>();
+    public Map<VatGroupKey, VatLine> groupByTreatment(final List<ChargeResponse> charges) {
+        final Map<VatGroupKey, VatLine> breakdown = new TreeMap<>();
         if (charges == null) {
             return breakdown;
         }
         for (final ChargeResponse charge : charges) {
             final VatLine line = splitLine(charge.amount(), charge.vatRate());
-            breakdown.merge(charge.vatRate(), line,
+            final VatGroupKey key = new VatGroupKey(charge.vatRate(), charge.naturaCode());
+            breakdown.merge(key, line,
                     (a, b) -> new VatLine(a.taxable().add(b.taxable()), a.vat().add(b.vat())));
         }
         return breakdown;
@@ -86,11 +93,35 @@ public class VatBreakdownCalculator {
     }
 
     /**
-     * Taxable base and VAT for one charge or one VAT-rate group.
+     * Taxable base and VAT for one charge or one VAT-treatment group.
      *
      * @param taxable the taxable base (imponibile)
      * @param vat     the VAT amount (imposta)
      */
     public record VatLine(BigDecimal taxable, BigDecimal vat) {
+    }
+
+    /**
+     * The FatturaPA {@code DatiRiepilogo} grouping key: VAT rate plus the optional
+     * {@code Natura} code. Two lines at the same rate but different (or absent)
+     * {@code naturaCode} are legally distinct treatments and must land in separate
+     * {@code DatiRiepilogo} blocks — this is why grouping can't key on rate alone.
+     * Ordered by rate first, then {@code naturaCode} with {@code null} (ordinary
+     * taxable lines) sorting before any natura code.
+     *
+     * @param rate       the VAT rate
+     * @param naturaCode the FatturaPA {@code Natura} code, or {@code null} for an
+     *                   ordinary taxable line
+     */
+    public record VatGroupKey(BigDecimal rate, String naturaCode) implements Comparable<VatGroupKey> {
+
+        private static final Comparator<VatGroupKey> ORDER = Comparator
+                .comparing(VatGroupKey::rate)
+                .thenComparing(VatGroupKey::naturaCode, Comparator.nullsFirst(Comparator.naturalOrder()));
+
+        @Override
+        public int compareTo(final VatGroupKey other) {
+            return ORDER.compare(this, other);
+        }
     }
 }

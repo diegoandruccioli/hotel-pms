@@ -244,7 +244,7 @@ class InvoiceServiceImplTest {
 
                 final ChargeResponse expectedCharge = new ChargeResponse(
                                 UUID.randomUUID(), openInvoice.getId(), ChargeType.FB_ORDER,
-                                "Espresso x2, Tiramisù x1", chargeAmount, new BigDecimal("0.10"),
+                                "Espresso x2, Tiramisù x1", chargeAmount, new BigDecimal("0.10"), null,
                                 orderId, null, null, LocalDateTime.now());
 
                 when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId))
@@ -410,7 +410,7 @@ class InvoiceServiceImplTest {
                                         final InvoiceCharge c = inv.getArgument(0);
                                         return new ChargeResponse(UUID.randomUUID(), openInvoice.getId(),
                                                         c.getType(), c.getDescription(), c.getAmount(),
-                                                        c.getVatRate(), c.getReferenceId(), null, null, null);
+                                                        c.getVatRate(), c.getNaturaCode(), c.getReferenceId(), null, null, null);
                                 });
 
                 // Act
@@ -443,7 +443,7 @@ class InvoiceServiceImplTest {
                                         final InvoiceCharge c = inv.getArgument(0);
                                         return new ChargeResponse(UUID.randomUUID(), openInvoice.getId(),
                                                         c.getType(), c.getDescription(), c.getAmount(),
-                                                        c.getVatRate(), c.getReferenceId(), null, null, null);
+                                                        c.getVatRate(), c.getNaturaCode(), c.getReferenceId(), null, null, null);
                                 });
 
                 // Act

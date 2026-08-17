@@ -4,10 +4,12 @@ import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.client.HotelSettingsClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.client.dto.HotelSettingsResponse;
+import com.hotelpms.billing.domain.ChargeType;
 import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.InvoiceFiscalExport;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.domain.SdiStatus;
+import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.exception.BillingValidationException;
 import com.hotelpms.billing.exception.InvoiceConflictException;
@@ -75,6 +77,10 @@ class FatturaPAServiceImplTest {
     private static final String INVOICE_NUMBER_2 = "2026/0002";
     private static final String INDEX_CSV = "index.csv";
     private static final String INVOICE_1_XML = "2026-0001.xml";
+    private static final BigDecimal AMOUNT_ROOM = new BigDecimal("110.00");
+    private static final BigDecimal AMOUNT_CITY_TAX = new BigDecimal("6.00");
+    private static final BigDecimal ROOM_VAT_RATE = new BigDecimal("0.10");
+    private static final String NATURA_N1 = "N1";
 
     @Mock
     private InvoiceService invoiceService;
@@ -416,6 +422,63 @@ class FatturaPAServiceImplTest {
     }
 
     @Test
+    void shouldEmitNaturaInDettaglioLineeAndDatiRiepilogoAtTheXsdMandatedPosition() {
+        final ChargeResponse room = chargeResponse(ChargeType.ROOM_NIGHT, "Camera doppia",
+                AMOUNT_ROOM, ROOM_VAT_RATE, null);
+        final ChargeResponse cityTax = chargeResponse(ChargeType.EXTRA, "Imposta di soggiorno",
+                AMOUNT_CITY_TAX, BigDecimal.ZERO, NATURA_N1);
+        final InvoiceResponse invoice = fatturaWithCharges(List.of(room, cityTax), AMOUNT_ROOM.add(AMOUNT_CITY_TAX));
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+        when(hotelSettingsClient.getSettings()).thenReturn(hotel);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
+
+        // Pretty-printed by the transformer (indentation/newlines between tags) — collapse
+        // inter-tag whitespace so adjacency assertions test element order, not formatting.
+        final String xmlStr = new String(service.generateXml(INVOICE_ID), StandardCharsets.UTF_8)
+                .replaceAll(">\\s+<", "><");
+
+        // DettaglioLineeType sequence: ... AliquotaIVA, Ritenuta(unused), Natura, ...
+        assertThat(xmlStr).contains("<AliquotaIVA>0.00</AliquotaIVA><Natura>N1</Natura>");
+        // DatiRiepilogoType sequence: AliquotaIVA, Natura, ..., ImponibileImporto, ...
+        assertThat(xmlStr).contains(
+                "<AliquotaIVA>0.00</AliquotaIVA><Natura>N1</Natura><ImponibileImporto>6.00</ImponibileImporto>");
+        // Ordinary 10% line must never carry a Natura element.
+        assertThat(xmlStr).contains("<AliquotaIVA>10.00</AliquotaIVA></DettaglioLinee>");
+    }
+
+    @Test
+    void shouldEmitRiferimentoNormativoForANaturaLineButNotForOrdinaryLines() {
+        final ChargeResponse room = chargeResponse(ChargeType.ROOM_NIGHT, "Camera doppia",
+                AMOUNT_ROOM, ROOM_VAT_RATE, null);
+        final ChargeResponse cityTax = chargeResponse(ChargeType.EXTRA, "Imposta di soggiorno",
+                AMOUNT_CITY_TAX, BigDecimal.ZERO, NATURA_N1);
+        final InvoiceResponse invoice = fatturaWithCharges(List.of(room, cityTax), AMOUNT_ROOM.add(AMOUNT_CITY_TAX));
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+        when(hotelSettingsClient.getSettings()).thenReturn(hotel);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
+
+        final String xmlStr = new String(service.generateXml(INVOICE_ID), StandardCharsets.UTF_8);
+
+        assertThat(xmlStr).contains("<RiferimentoNormativo>");
+        assertThat(xmlStr.split("<RiferimentoNormativo>", -1)).hasSize(2);
+    }
+
+    @Test
+    void shouldThrowWhenAChargeHasZeroVatRateWithoutNaturaCode() {
+        final ChargeResponse malformed = chargeResponse(ChargeType.EXTRA, "Riga malformata",
+                AMOUNT_CITY_TAX, BigDecimal.ZERO, null);
+        final InvoiceResponse invoice = fatturaWithCharges(List.of(malformed), AMOUNT_CITY_TAX);
+        when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
+        when(hotelSettingsClient.getSettings()).thenReturn(hotel);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(guest);
+
+        assertThatThrownBy(() -> service.generateXml(INVOICE_ID))
+                .isInstanceOf(BillingValidationException.class)
+                .hasMessageContaining("CHARGE_ZERO_VAT_RATE_WITHOUT_NATURA");
+        verify(invoiceFiscalExportRepository, never()).save(any());
+    }
+
+    @Test
     void shouldRejectBatchExportWhenFromIsAfterTo() {
         final LocalDate from = LocalDate.of(ISSUE_YEAR, 2, 1);
         final LocalDate to = LocalDate.of(ISSUE_YEAR, 1, 1);
@@ -429,9 +492,25 @@ class FatturaPAServiceImplTest {
         return new InvoiceResponse(
                 INVOICE_ID, HOTEL_ID, INVOICE_NUMBER_1,
                 LocalDateTime.of(ISSUE_YEAR, 1, ISSUE_DAY, 10, 0),
-                new BigDecimal("110.00"), status,
+                AMOUNT_ROOM, status,
                 RES_ID, GUEST_ID, null,
                 docType, SdiStatus.NOT_SENT, List.of(), List.of());
+    }
+
+    private InvoiceResponse fatturaWithCharges(final List<ChargeResponse> charges, final BigDecimal totalAmount) {
+        return new InvoiceResponse(
+                INVOICE_ID, HOTEL_ID, INVOICE_NUMBER_1,
+                LocalDateTime.of(ISSUE_YEAR, 1, ISSUE_DAY, 10, 0),
+                totalAmount, InvoiceStatus.ISSUED,
+                RES_ID, GUEST_ID, null,
+                DocumentType.FATTURA, SdiStatus.NOT_SENT, List.of(), charges);
+    }
+
+    private static ChargeResponse chargeResponse(final ChargeType type, final String description,
+                                                  final BigDecimal amount, final BigDecimal vatRate,
+                                                  final String naturaCode) {
+        return new ChargeResponse(UUID.randomUUID(), INVOICE_ID, type, description, amount, vatRate,
+                naturaCode, null, null, null, LocalDateTime.now());
     }
 
     private static ZipContents readZip(final byte[] zip) throws java.io.IOException {

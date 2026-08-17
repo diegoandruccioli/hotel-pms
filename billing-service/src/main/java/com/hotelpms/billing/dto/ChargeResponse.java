@@ -15,6 +15,8 @@ import java.util.UUID;
  * @param description human-readable description of the charge
  * @param amount      the charge amount
  * @param vatRate     the VAT rate applied (e.g. 0.10 = 10%, 0.22 = 22%)
+ * @param naturaCode  FatturaPA {@code Natura} code (e.g. {@code "N1"}) for a charge
+ *                    out of VAT scope; {@code null} for every ordinary taxable charge
  * @param referenceId optional cross-service reference (order UUID, stay UUID, etc.)
  * @param unitPrice   optional per-night price, display/audit only; may be {@code null}
  * @param nights      optional number of nights this charge covers; may be {@code null}
@@ -27,6 +29,7 @@ public record ChargeResponse(
         String description,
         BigDecimal amount,
         BigDecimal vatRate,
+        String naturaCode,
         UUID referenceId,
         BigDecimal unitPrice,
         Integer nights,

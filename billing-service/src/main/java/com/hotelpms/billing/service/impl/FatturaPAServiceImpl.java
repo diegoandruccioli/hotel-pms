@@ -79,6 +79,15 @@ public class FatturaPAServiceImpl implements FatturaPAService {
     private static final String ID_CODICE_TAG = "IdCodice";
     private static final String DEFAULT_MP = "MP05";
     private static final BigDecimal DEFAULT_VAT_RATE = new BigDecimal("0.10");
+    /**
+     * {@code RiferimentoNormativo} emitted alongside every {@code Natura} code today
+     * (currently only {@code N1}, the tourist-tax exclusion — see
+     * {@code InvoiceServiceImpl}). Some SdI validation profiles reject an
+     * {@code N1}/{@code N2.x} block with no normative reference. Revisit if a second
+     * {@code Natura} code is ever introduced with a different legal basis.
+     */
+    private static final String NATURA_RIFERIMENTO_NORMATIVO =
+            "Escluso ex art. 15 DPR 633/1972 - imposta di soggiorno riscossa per conto del Comune";
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final int INDIRIZZO_MAX_LEN = 60;
 
@@ -461,23 +470,25 @@ public class FatturaPAServiceImpl implements FatturaPAService {
         if (charges == null || charges.isEmpty()) {
             final BigDecimal fallbackAmount = totalAmount != null ? totalAmount : BigDecimal.ZERO;
             datiBeniServizi.appendChild(buildDettaglioLinea(doc, 1, "Soggiorno",
-                    fallbackAmount, DEFAULT_VAT_RATE));
+                    fallbackAmount, DEFAULT_VAT_RATE, null));
             final VatBreakdownCalculator.VatLine line =
                     vatBreakdownCalculator.splitLine(fallbackAmount, DEFAULT_VAT_RATE);
-            datiBeniServizi.appendChild(buildDatiRiepilogo(doc, DEFAULT_VAT_RATE, line.taxable(), line.vat()));
+            datiBeniServizi.appendChild(
+                    buildDatiRiepilogo(doc, DEFAULT_VAT_RATE, null, line.taxable(), line.vat()));
             return datiBeniServizi;
         }
 
         int lineNum = 1;
         for (final ChargeResponse charge : charges) {
             datiBeniServizi.appendChild(buildDettaglioLinea(doc, lineNum,
-                    sanitize(charge.description(), "Prestazione"), charge.amount(), charge.vatRate()));
+                    sanitize(charge.description(), "Prestazione"), charge.amount(), charge.vatRate(),
+                    charge.naturaCode()));
             lineNum++;
         }
 
-        for (final Map.Entry<BigDecimal, VatBreakdownCalculator.VatLine> entry
-                : vatBreakdownCalculator.groupByRate(charges).entrySet()) {
-            datiBeniServizi.appendChild(buildDatiRiepilogo(doc, entry.getKey(),
+        for (final Map.Entry<VatBreakdownCalculator.VatGroupKey, VatBreakdownCalculator.VatLine> entry
+                : vatBreakdownCalculator.groupByTreatment(charges).entrySet()) {
+            datiBeniServizi.appendChild(buildDatiRiepilogo(doc, entry.getKey().rate(), entry.getKey().naturaCode(),
                     entry.getValue().taxable(), entry.getValue().vat()));
         }
         return datiBeniServizi;
@@ -486,7 +497,9 @@ public class FatturaPAServiceImpl implements FatturaPAService {
     private Element buildDettaglioLinea(final Document doc, final int numero,
                                                 final String descrizione,
                                                 final BigDecimal prezzoUnitario,
-                                                final BigDecimal aliquotaIVA) {
+                                                final BigDecimal aliquotaIVA,
+                                                final String naturaCode) {
+        requireNaturaOnZeroRate(aliquotaIVA, naturaCode);
         final Element linea = doc.createElement("DettaglioLinee");
         linea.appendChild(el(doc, "NumeroLinea", String.valueOf(numero)));
         linea.appendChild(el(doc, "Descrizione", descrizione));
@@ -494,17 +507,49 @@ public class FatturaPAServiceImpl implements FatturaPAService {
         linea.appendChild(el(doc, "PrezzoUnitario", formatDecimal(imponibile(prezzoUnitario, aliquotaIVA))));
         linea.appendChild(el(doc, "PrezzoTotale", formatDecimal(imponibile(prezzoUnitario, aliquotaIVA))));
         linea.appendChild(el(doc, "AliquotaIVA", formatPercent(aliquotaIVA)));
+        // DettaglioLineeType sequence: AliquotaIVA, Ritenuta (never emitted), Natura, ...
+        if (naturaCode != null) {
+            linea.appendChild(el(doc, "Natura", naturaCode));
+        }
         return linea;
     }
 
     private static Element buildDatiRiepilogo(final Document doc, final BigDecimal aliquota,
+                                               final String naturaCode,
                                                final BigDecimal imponibile, final BigDecimal imposta) {
+        requireNaturaOnZeroRate(aliquota, naturaCode);
         final Element riepilogo = doc.createElement("DatiRiepilogo");
         riepilogo.appendChild(el(doc, "AliquotaIVA", formatPercent(aliquota)));
+        // DatiRiepilogoType sequence: AliquotaIVA, Natura, SpeseAccessorie, Arrotondamento,
+        // ImponibileImporto, Imposta, EsigibilitaIVA, RiferimentoNormativo.
+        if (naturaCode != null) {
+            riepilogo.appendChild(el(doc, "Natura", naturaCode));
+        }
         riepilogo.appendChild(el(doc, "ImponibileImporto", formatDecimal(imponibile)));
         riepilogo.appendChild(el(doc, "Imposta", formatDecimal(imposta)));
         riepilogo.appendChild(el(doc, "EsigibilitaIVA", ESIGIBILITA_IVA));
+        if (naturaCode != null) {
+            riepilogo.appendChild(el(doc, "RiferimentoNormativo", NATURA_RIFERIMENTO_NORMATIVO));
+        }
         return riepilogo;
+    }
+
+    /**
+     * A zero VAT rate with no {@code Natura} code is fiscally ambiguous: FatturaPA
+     * has no way to distinguish a legitimate 0%-VAT bracket from a charge that is
+     * simply out of scope, and the XSD alone can't catch the omission ({@code Natura}
+     * is {@code minOccurs="0"}, so an XSD-valid document can still be fiscally wrong).
+     * SdI itself rejects such lines at the business-rule validation layer.
+     *
+     * @param aliquotaIVA the VAT rate about to be emitted
+     * @param naturaCode  the Natura code for the same line, or {@code null}
+     * @throws BillingValidationException if the rate is zero and no Natura code is set
+     */
+    private static void requireNaturaOnZeroRate(final BigDecimal aliquotaIVA, final String naturaCode) {
+        if (aliquotaIVA.signum() == 0 && naturaCode == null) {
+            throw new BillingValidationException(
+                    "CHARGE_ZERO_VAT_RATE_WITHOUT_NATURA: a 0% VAT line must carry a Natura code");
+        }
     }
 
     private Element buildDatiPagamento(final Document doc, final List<PaymentResponse> payments,

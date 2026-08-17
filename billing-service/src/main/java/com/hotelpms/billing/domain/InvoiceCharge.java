@@ -59,6 +59,14 @@ public class InvoiceCharge {
     @Column(name = "vat_rate", nullable = false)
     private BigDecimal vatRate;
 
+    /**
+     * FatturaPA {@code Natura} code (e.g. {@code "N1"}) for a charge that is out of
+     * VAT scope — {@code null} for every ordinary taxable charge. When set,
+     * {@code vatRate} must be zero (enforced by {@code chk_charges_natura_requires_zero_rate}).
+     */
+    @Column(name = "natura_code")
+    private String naturaCode;
+
     @Column(name = "reference_id")
     private UUID referenceId;
 

@@ -105,7 +105,7 @@ class PdfInvoiceServiceImplTest {
     void selectsTheFatturaTemplateAndIncludesVatBreakdownForFattura() {
         final List<ChargeResponse> charges = List.of(
                 new ChargeResponse(UUID.randomUUID(), INVOICE_ID, ChargeType.ROOM_NIGHT,
-                        "Camera doppia", AMOUNT_100, VAT_RATE_10, null, null, null, LocalDateTime.now()));
+                        "Camera doppia", AMOUNT_100, VAT_RATE_10, null, null, null, null, LocalDateTime.now()));
         final InvoiceResponse invoice = buildInvoice(charges, List.of());
         when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
 
@@ -152,7 +152,7 @@ class PdfInvoiceServiceImplTest {
     void includesChargesAndPaymentsInTheContext() {
         final ChargeResponse charge = new ChargeResponse(
                 UUID.randomUUID(), INVOICE_ID, ChargeType.FB_ORDER,
-                "Cena ristorante", AMOUNT_50, VAT_RATE_10, null, null, null, LocalDateTime.now());
+                "Cena ristorante", AMOUNT_50, VAT_RATE_10, null, null, null, null, LocalDateTime.now());
         final PaymentResponse payment = new PaymentResponse(
                 UUID.randomUUID(), LocalDateTime.now(), AMOUNT_150,
                 PaymentMethod.CASH, "TXN-001", INVOICE_ID);
@@ -231,9 +231,9 @@ class PdfInvoiceServiceImplTest {
     void groupsVatBreakdownByRateForMixedCharges() {
         final List<ChargeResponse> charges = List.of(
                 new ChargeResponse(UUID.randomUUID(), INVOICE_ID, ChargeType.ROOM_NIGHT,
-                        "Camera doppia", AMOUNT_100, VAT_RATE_10, null, null, null, LocalDateTime.now()),
+                        "Camera doppia", AMOUNT_100, VAT_RATE_10, null, null, null, null, LocalDateTime.now()),
                 new ChargeResponse(UUID.randomUUID(), INVOICE_ID, ChargeType.EXTRA,
-                        "Minibar", BigDecimal.TEN, VAT_RATE_22, null, null, null, LocalDateTime.now()));
+                        "Minibar", BigDecimal.TEN, VAT_RATE_22, null, null, null, null, LocalDateTime.now()));
         final InvoiceResponse invoice = buildInvoice(charges, List.of());
         when(invoiceService.getInvoice(INVOICE_ID)).thenReturn(invoice);
 
