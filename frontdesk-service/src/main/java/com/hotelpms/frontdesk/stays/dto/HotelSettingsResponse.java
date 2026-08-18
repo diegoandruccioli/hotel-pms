@@ -31,6 +31,10 @@ import java.util.UUID;
  * @param cap                             CAP — Italian 5-digit postal code, or {@code null} if unset
  * @param comune                          Comune — municipality name, or {@code null} if unset
  * @param provincia                       Provincia — 2-letter province code, or {@code null} if unset
+ * @param comuneCodice                    Resolved stable comune code (Polizia di Stato,
+ *                                        not ISTAT/Belfiore), or {@code null} if comune/provincia
+ *                                        are unset. Read-only — derived from comune/provincia,
+ *                                        never accepted directly in a request
  */
 public record HotelSettingsResponse(
         UUID hotelId,
@@ -49,5 +53,6 @@ public record HotelSettingsResponse(
         String emailGreetingText,
         String cap,
         String comune,
-        String provincia) {
+        String provincia,
+        String comuneCodice) {
 }

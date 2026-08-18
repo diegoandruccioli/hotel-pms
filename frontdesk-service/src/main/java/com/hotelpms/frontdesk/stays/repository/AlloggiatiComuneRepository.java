@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Repository for {@link AlloggiatiComune} lookup records.
@@ -18,6 +19,9 @@ public interface AlloggiatiComuneRepository extends JpaRepository<AlloggiatiComu
 
     /** Named-parameter key shared by the {@code :today} placeholder across the queries below. */
     String TODAY_PARAM = "today";
+
+    /** Named-parameter key shared by the {@code :provincia} placeholder across the queries below. */
+    String PROVINCIA_PARAM = "provincia";
 
     /**
      * Returns all comuni whose validity has not expired.
@@ -38,7 +42,7 @@ public interface AlloggiatiComuneRepository extends JpaRepository<AlloggiatiComu
     @Query("SELECT c FROM AlloggiatiComune c WHERE c.provincia = :provincia "
             + "AND (c.dataFineVal IS NULL OR c.dataFineVal > :today)")
     List<AlloggiatiComune> findActiveByProvincia(
-            @Param("provincia") String provincia,
+            @Param(PROVINCIA_PARAM) String provincia,
             @Param(TODAY_PARAM) LocalDate today);
 
     /**
@@ -64,7 +68,7 @@ public interface AlloggiatiComuneRepository extends JpaRepository<AlloggiatiComu
             + "ELSE 2 END, c.descrizione")
     List<AlloggiatiComune> searchActive(
             @Param("term") String term,
-            @Param("provincia") String provincia,
+            @Param(PROVINCIA_PARAM) String provincia,
             @Param(TODAY_PARAM) LocalDate today,
             Pageable pageable);
 
@@ -83,6 +87,25 @@ public interface AlloggiatiComuneRepository extends JpaRepository<AlloggiatiComu
             + "AND (c.dataFineVal IS NULL OR c.dataFineVal > :today)")
     boolean existsActiveByComuneAndProvincia(
             @Param("comune") String comune,
-            @Param("provincia") String provincia,
+            @Param(PROVINCIA_PARAM) String provincia,
+            @Param(TODAY_PARAM) LocalDate today);
+
+    /**
+     * Resolves the stable {@code codice} for an active comune by name+provincia —
+     * same match as {@link #existsActiveByComuneAndProvincia}, but returning the
+     * row itself so callers (E18: {@code HotelSettingsServiceImpl}) can store the
+     * code instead of only confirming existence.
+     *
+     * @param comune    the comune name (case-insensitive exact match)
+     * @param provincia the 2-character province code
+     * @param today     today's date used for expiry check
+     * @return the matching active comune, if any
+     */
+    @Query("SELECT c FROM AlloggiatiComune c "
+            + "WHERE LOWER(c.descrizione) = LOWER(:comune) AND c.provincia = :provincia "
+            + "AND (c.dataFineVal IS NULL OR c.dataFineVal > :today)")
+    Optional<AlloggiatiComune> findActiveByComuneAndProvincia(
+            @Param("comune") String comune,
+            @Param(PROVINCIA_PARAM) String provincia,
             @Param(TODAY_PARAM) LocalDate today);
 }

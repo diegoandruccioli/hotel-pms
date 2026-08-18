@@ -141,6 +141,17 @@ public class Stay {
     private UUID invoiceId;
 
     /**
+     * The billing-service id of the {@code ROOM_NIGHT} charge posted at
+     * check-in, once posted. {@code null} means "not yet posted" — the
+     * per-charge idempotency guard for the check-in retry path (E18: paired
+     * with {@code CityTaxAssessment.billingChargeId} for the {@code CITY_TAX}
+     * charge, so a failure on one charge no longer causes a retry to
+     * re-post the other).
+     */
+    @Column(name = "room_charge_id")
+    private UUID roomChargeId;
+
+    /**
      * Whether the Alloggiati Web report for this stay has been successfully submitted
      * to the Polizia di Stato portal (either automatically at check-in or manually).
      */

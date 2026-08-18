@@ -115,7 +115,7 @@ class QuotationServiceImplTest {
 
         lenient().when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME, null, null, null, null, null, false,
-                        true, true, null, null, null, null, null, null));
+                        true, true, null, null, null, null, null, null, null));
         lenient().when(pdfTemplateRenderer.render(eq("quotation"), any()))
                 .thenReturn(PDF_BYTES);
         lenient().when(roomService.getRoomById(ROOM_ID, HOTEL_ID)).thenReturn(room());

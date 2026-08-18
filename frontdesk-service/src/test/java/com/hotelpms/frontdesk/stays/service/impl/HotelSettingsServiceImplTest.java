@@ -1,6 +1,7 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
 import com.hotelpms.frontdesk.exception.BadRequestException;
+import com.hotelpms.frontdesk.stays.domain.AlloggiatiComune;
 import com.hotelpms.frontdesk.stays.domain.HotelSettings;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsRequest;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
@@ -232,8 +233,10 @@ class HotelSettingsServiceImplTest {
 
         when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
         when(hotelSettingsRepository.save(existing)).thenReturn(existing);
-        when(alloggiatiComuneRepository.existsActiveByComuneAndProvincia(
-                COMUNE_ROMA, PROVINCIA_RM, LocalDate.now())).thenReturn(true);
+        when(alloggiatiComuneRepository.findActiveByComuneAndProvincia(
+                COMUNE_ROMA, PROVINCIA_RM, LocalDate.now())).thenReturn(Optional.of(
+                        AlloggiatiComune.builder().codice("058091000").descrizione(COMUNE_ROMA)
+                                .provincia(PROVINCIA_RM).build()));
 
         final HotelSettingsResponse result = hotelSettingsService.update(hotelId, new HotelSettingsRequest(
                 null, null, null, null, null, null, null, null, null,
@@ -251,8 +254,8 @@ class HotelSettingsServiceImplTest {
         existing.setHotelId(hotelId);
 
         when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
-        when(alloggiatiComuneRepository.existsActiveByComuneAndProvincia(
-                "Cittainesistente", PROVINCIA_RM, LocalDate.now())).thenReturn(false);
+        when(alloggiatiComuneRepository.findActiveByComuneAndProvincia(
+                "Cittainesistente", PROVINCIA_RM, LocalDate.now())).thenReturn(Optional.empty());
 
         final HotelSettingsRequest request = new HotelSettingsRequest(
                 null, null, null, null, null, null, null, null, null,
