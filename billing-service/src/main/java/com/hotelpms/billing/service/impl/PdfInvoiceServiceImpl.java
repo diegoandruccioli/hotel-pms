@@ -219,6 +219,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
             case "ROOM_NIGHT" -> "Camera";
             case "FB_ORDER" -> "F&B";
             case "EXTRA" -> "Extra";
+            case "CITY_TAX" -> "Imposta di soggiorno";
             default -> type;
         };
     }

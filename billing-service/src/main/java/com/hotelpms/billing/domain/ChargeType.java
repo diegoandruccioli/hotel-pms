@@ -12,5 +12,12 @@ public enum ChargeType {
     FB_ORDER,
 
     /** Miscellaneous extra charge (laundry, parking, minibar, etc.). */
-    EXTRA
+    EXTRA,
+
+    /**
+     * Municipal tourist tax (imposta di soggiorno, art. 4 D.Lgs. 23/2011) — collected
+     * by the operator in the comune's name, out of VAT scope (see
+     * {@code InvoiceServiceImpl.vatTreatmentFor}, FatturaPA {@code Natura} code N1).
+     */
+    CITY_TAX
 }
