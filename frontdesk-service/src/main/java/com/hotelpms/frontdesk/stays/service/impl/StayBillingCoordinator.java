@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
+import com.hotelpms.frontdesk.citytax.domain.CityTaxAssessment;
+import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.dto.ChargeRequest;
 import com.hotelpms.frontdesk.client.dto.ChargeResponse;
@@ -41,12 +43,14 @@ class StayBillingCoordinator {
 
     private static final String BILLING_SERVICE_UNAVAILABLE_REASON = "BILLING_SERVICE_UNAVAILABLE";
     private static final String ROOM_NIGHT_CHARGE_TYPE = "ROOM_NIGHT";
+    private static final String CITY_TAX_CHARGE_TYPE = "CITY_TAX";
 
     private final BillingClient billingClient;
     private final RoomService roomService;
     private final StayRepository stayRepository;
     private final ReservationService reservationService;
     private final RatePricingService ratePricingService;
+    private final CityTaxAssessmentService cityTaxAssessmentService;
 
     /**
      * Resolves the invoice to verify at check-out. Reservation-based stays are looked
@@ -73,8 +77,11 @@ class StayBillingCoordinator {
 
     /**
      * Opens the billing folio for a just-checked-in stay and posts the room-night
-     * charge. A stray retry (double-click, manual retry) must not re-add the room
-     * charge and double-bill it.
+     * and (if applicable) tourist-tax charges. A stray retry (double-click, manual
+     * retry) must not re-add a charge that was already posted successfully and
+     * double-bill it — {@link Stay#getRoomChargeId()} and {@code
+     * CityTaxAssessment.billingChargeId} are independent per-charge idempotency
+     * guards, so a failure on one charge never causes a retry to re-post the other.
      *
      * @param stay the just-checked-in stay
      */
@@ -109,9 +116,9 @@ class StayBillingCoordinator {
             stay.setInvoiceId(invoiceId);
         }
 
-        final ChargeRequest chargeReq;
+        final RoomChargeCalculation roomCharge;
         try {
-            chargeReq = buildRoomChargeRequest(stay);
+            roomCharge = buildRoomChargeCalculation(stay);
         } catch (final NotFoundException ex) {
             log.error("[STAY] INVOICE_CREATION_FAILED | stayId={} | reason=ROOM_NOT_FOUND | detail={}",
                     stay.getId(), ex.getMessage());
@@ -119,15 +126,22 @@ class StayBillingCoordinator {
             return;
         }
 
-        final ChargeResponse chargeResp;
-        try {
-            chargeResp = billingClient.addCharge(stay.getId(), chargeReq);
-        } catch (final FeignException ex) {
-            markInvoiceFlowFailed(stay, StayFailureReason.truncate(ex.getMessage()));
-            return;
+        if (stay.getRoomChargeId() == null) {
+            final ChargeResponse chargeResp;
+            try {
+                chargeResp = billingClient.addCharge(stay.getId(), roomCharge.chargeRequest());
+            } catch (final FeignException ex) {
+                markInvoiceFlowFailed(stay, StayFailureReason.truncate(ex.getMessage()));
+                return;
+            }
+            if (chargeResp == null || chargeResp.id() == null) {
+                markInvoiceFlowFailed(stay, BILLING_SERVICE_UNAVAILABLE_REASON);
+                return;
+            }
+            stay.setRoomChargeId(chargeResp.id());
         }
-        if (chargeResp == null || chargeResp.id() == null) {
-            markInvoiceFlowFailed(stay, BILLING_SERVICE_UNAVAILABLE_REASON);
+
+        if (!postCityTaxChargeIfNeeded(stay, roomCharge.nights())) {
             return;
         }
 
@@ -135,7 +149,60 @@ class StayBillingCoordinator {
         stay.setInvoiceCreationFailureReason(null);
         stayRepository.save(stay);
         log.info("[STAY] INVOICE_CREATED | stayId={} | invoiceId={} | roomChargeId={}",
-                stay.getId(), invoiceId, chargeResp.id());
+                stay.getId(), invoiceId, stay.getRoomChargeId());
+    }
+
+    /**
+     * Assesses and, if applicable, posts the {@code CITY_TAX} charge — a no-op
+     * (returning {@code true}) when the hotel's comune/category/rate isn't
+     * configured, when the assessment was already charged on a prior attempt,
+     * or when the assessed total is zero (all guests exempt): no zero-amount
+     * line is ever posted, but the assessment itself is still recorded by
+     * {@link CityTaxAssessmentService#assessFor} for the audit trail.
+     *
+     * @param stay   the just-checked-in stay
+     * @param nights the night count already computed for the room charge —
+     *               reused here so the two lines can never disagree
+     * @return {@code false} if posting failed and the caller must stop (the
+     *         failure has already been recorded on the stay); {@code true} otherwise
+     */
+    private boolean postCityTaxChargeIfNeeded(final Stay stay, final long nights) {
+        final Optional<CityTaxAssessment> assessment = cityTaxAssessmentService.assessFor(stay, nights);
+        if (assessment.isEmpty()) {
+            return true;
+        }
+        final CityTaxAssessment cityTax = assessment.get();
+        if (cityTax.getBillingChargeId() != null || cityTax.getTotalAmount().signum() <= 0) {
+            return true;
+        }
+
+        final ChargeResponse cityTaxResp;
+        try {
+            cityTaxResp = billingClient.addCharge(stay.getId(), buildCityTaxChargeRequest(stay, cityTax));
+        } catch (final FeignException ex) {
+            markInvoiceFlowFailed(stay, StayFailureReason.truncate(ex.getMessage()));
+            return false;
+        }
+        if (cityTaxResp == null || cityTaxResp.id() == null) {
+            markInvoiceFlowFailed(stay, BILLING_SERVICE_UNAVAILABLE_REASON);
+            return false;
+        }
+        cityTaxAssessmentService.markCharged(cityTax.getId(), cityTaxResp.id());
+        return true;
+    }
+
+    /**
+     * Builds the tourist-tax charge for an assessed stay.
+     *
+     * @param stay      the just-checked-in stay
+     * @param assessment the recorded assessment (already snapshotted, never recomputed here)
+     * @return the charge request to post to billing-service
+     */
+    private ChargeRequest buildCityTaxChargeRequest(final Stay stay, final CityTaxAssessment assessment) {
+        final String description = "Imposta di soggiorno - " + assessment.getTaxableNights()
+                + " night(s) x " + assessment.getTaxableGuests() + " guest(s)";
+        return new ChargeRequest(CITY_TAX_CHARGE_TYPE, description, assessment.getTotalAmount(), stay.getId(),
+                assessment.getAmountPerNightSnapshot(), assessment.getTaxableNights());
     }
 
     private void markInvoiceFlowFailed(final Stay stay, final String reason) {
@@ -167,9 +234,11 @@ class StayBillingCoordinator {
      * actual/expected dates, since there is no reservation to read it from.
      *
      * @param stay the just-checked-in stay
-     * @return the charge request to post to billing-service
+     * @return the charge request to post to billing-service, paired with the
+     *         resolved night count — reused as-is for the {@code CITY_TAX}
+     *         assessment so the two charges can never disagree on nights
      */
-    private ChargeRequest buildRoomChargeRequest(final Stay stay) {
+    private RoomChargeCalculation buildRoomChargeCalculation(final Stay stay) {
         final RoomResponse room = roomService.getRoomById(stay.getRoomId(), stay.getHotelId());
 
         final Optional<ReservedRoomCharge> reservedCharge = stay.getReservationId() == null
@@ -193,7 +262,9 @@ class StayBillingCoordinator {
         }
 
         final String description = "Room " + stay.getRoomNumber() + " - " + nights + " night(s)";
-        return new ChargeRequest(ROOM_NIGHT_CHARGE_TYPE, description, amount, stay.getId(), unitPrice, (int) nights);
+        final ChargeRequest chargeRequest =
+                new ChargeRequest(ROOM_NIGHT_CHARGE_TYPE, description, amount, stay.getId(), unitPrice, (int) nights);
+        return new RoomChargeCalculation(chargeRequest, nights);
     }
 
     /**
@@ -210,5 +281,15 @@ class StayBillingCoordinator {
         final boolean allEqual = nightlyRates.stream()
                 .allMatch(rate -> rate.nightlyPrice().compareTo(first) == 0);
         return allEqual ? first : null;
+    }
+
+    /**
+     * The room charge to post (or already posted), paired with the resolved
+     * night count for reuse by the {@code CITY_TAX} assessment.
+     *
+     * @param chargeRequest the {@code ROOM_NIGHT} charge request
+     * @param nights        the resolved night count
+     */
+    private record RoomChargeCalculation(ChargeRequest chargeRequest, long nights) {
     }
 }

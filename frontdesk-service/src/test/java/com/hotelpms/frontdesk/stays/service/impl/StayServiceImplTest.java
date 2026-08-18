@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
+import com.hotelpms.frontdesk.citytax.domain.CityTaxAssessment;
+import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
@@ -101,6 +103,7 @@ class StayServiceImplTest {
     private static final String CURRENCY_EUR = "EUR";
     private static final BigDecimal INVOICE_TOTAL_200 = BigDecimal.valueOf(200);
     private static final BigDecimal INVOICE_TOTAL_80 = BigDecimal.valueOf(80);
+    private static final int CITY_TAX_TOTAL_AMOUNT = 5;
 
     @Mock
     private StayRepository stayRepository;
@@ -131,6 +134,9 @@ class StayServiceImplTest {
 
     @Mock
     private RatePricingService ratePricingService;
+
+    @Mock
+    private CityTaxAssessmentService cityTaxAssessmentService;
 
     // Not mocked: StayServiceImpl now delegates to these collaborators instead of
     // doing the work inline (P10 SRP refactor). Building them for real out of the
@@ -207,7 +213,8 @@ class StayServiceImplTest {
         stayService = new StayServiceImpl(
                 stayRepository, stayMapper, guestClient, roomService,
                 new StayCheckInValidator(guestClient, reservationService, roomService),
-                new StayBillingCoordinator(billingClient, roomService, stayRepository, reservationService, ratePricingService),
+                new StayBillingCoordinator(billingClient, roomService, stayRepository, reservationService,
+                        ratePricingService, cityTaxAssessmentService),
                 new StayAlloggiatiCoordinator(alloggiatiWebSenderService, hotelSettingsService, stayRepository),
                 new StayNotificationCoordinator(
                         notificationClient, guestClient, billingClient, hotelSettingsService, stayRepository),
@@ -1139,6 +1146,160 @@ class StayServiceImplTest {
         verify(billingClient, never()).createInvoiceForStay(ArgumentMatchers.any());
         verify(billingClient, never()).addCharge(ArgumentMatchers.any(), ArgumentMatchers.any());
         verify(stayRepository, never()).save(ArgumentMatchers.any());
+    }
+
+    @Test
+    void shouldPostCityTaxChargeAlongsideRoomNightWhenAssessed() {
+        // Arrange — hotel has comune+category+rate configured, assessment yields a positive total
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+        final Stay saved = Objects.requireNonNull(savedStay);
+        saved.setHotelId(hotelId);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationService.getReservationById(reservation))
+                .thenReturn(reservationResponse(ReservationStatus.CONFIRMED, null));
+        when(roomService.getRoomById(room, hotelId)).thenReturn(room());
+
+        final Stay unmappedStay = new Stay();
+        when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(saved);
+
+        final UUID invoiceId = UUID.randomUUID();
+        when(billingClient.createInvoiceForStay(anyNonNull(StayInvoiceRequest.class)))
+                .thenReturn(new InvoiceCreatedResponse(invoiceId));
+        final UUID roomChargeId = UUID.randomUUID();
+        final UUID cityTaxChargeId = UUID.randomUUID();
+        when(billingClient.addCharge(ArgumentMatchers.eq(stayId), ArgumentMatchers.any()))
+                .thenReturn(new ChargeResponse(roomChargeId), new ChargeResponse(cityTaxChargeId));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null, null));
+        when(stayMapper.toDto(saved)).thenReturn(Objects.requireNonNull(validResponse));
+
+        final UUID assessmentId = UUID.randomUUID();
+        final CityTaxAssessment assessment = CityTaxAssessment.builder()
+                .id(assessmentId)
+                .hotelId(hotelId)
+                .stayId(stayId)
+                .totalAmount(BigDecimal.valueOf(CITY_TAX_TOTAL_AMOUNT))
+                .taxableNights(2)
+                .taxableGuests(1)
+                .build();
+        when(cityTaxAssessmentService.assessFor(ArgumentMatchers.any(), ArgumentMatchers.anyLong()))
+                .thenReturn(Optional.of(assessment));
+
+        // Act
+        stayService.checkIn(request);
+
+        // Assert — two distinct charges posted, city-tax marked charged with its own id
+        verify(billingClient, times(2)).addCharge(ArgumentMatchers.eq(stayId), ArgumentMatchers.any());
+        verify(cityTaxAssessmentService, times(1)).markCharged(assessmentId, cityTaxChargeId);
+        assertFalse(saved.isInvoiceCreationFailed());
+    }
+
+    @Test
+    void shouldNotPostCityTaxChargeWhenAssessedTotalIsZero() {
+        // Arrange — assessment exists (e.g. all guests age-exempt) but totals to zero:
+        // no zero-amount line should ever be posted to billing-service
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+        final Stay saved = Objects.requireNonNull(savedStay);
+        saved.setHotelId(hotelId);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationService.getReservationById(reservation))
+                .thenReturn(reservationResponse(ReservationStatus.CONFIRMED, null));
+        when(roomService.getRoomById(room, hotelId)).thenReturn(room());
+
+        final Stay unmappedStay = new Stay();
+        when(stayMapper.toEntity(request)).thenReturn(unmappedStay);
+        when(stayRepository.save(anyNonNull(Stay.class))).thenReturn(saved);
+
+        final UUID invoiceId = UUID.randomUUID();
+        when(billingClient.createInvoiceForStay(anyNonNull(StayInvoiceRequest.class)))
+                .thenReturn(new InvoiceCreatedResponse(invoiceId));
+        when(billingClient.addCharge(ArgumentMatchers.eq(stayId), ArgumentMatchers.any()))
+                .thenReturn(new ChargeResponse(UUID.randomUUID()));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null, null));
+        when(stayMapper.toDto(saved)).thenReturn(Objects.requireNonNull(validResponse));
+
+        final CityTaxAssessment zeroAssessment = CityTaxAssessment.builder()
+                .id(UUID.randomUUID())
+                .hotelId(hotelId)
+                .stayId(stayId)
+                .totalAmount(BigDecimal.ZERO)
+                .taxableNights(2)
+                .taxableGuests(0)
+                .build();
+        when(cityTaxAssessmentService.assessFor(ArgumentMatchers.any(), ArgumentMatchers.anyLong()))
+                .thenReturn(Optional.of(zeroAssessment));
+
+        // Act
+        stayService.checkIn(request);
+
+        // Assert — only ROOM_NIGHT posted, city-tax assessment never marked charged
+        verify(billingClient, times(1)).addCharge(ArgumentMatchers.eq(stayId), ArgumentMatchers.any());
+        verify(cityTaxAssessmentService, never()).markCharged(ArgumentMatchers.any(), ArgumentMatchers.any());
+    }
+
+    /**
+     * Regression test for the per-charge idempotency guard added alongside CITY_TAX
+     * (E18): before {@code Stay.roomChargeId} existed, the retry guard was a single
+     * boolean shared by both charges, so a CITY_TAX-only failure on a prior attempt
+     * would have caused the retry to re-post ROOM_NIGHT too — double-billing the room.
+     */
+    @Test
+    void shouldRetryOnlyCityTaxChargeWithoutRePostingRoomNightWhenOnlyCityTaxFailedPreviously() {
+        // Arrange — room charge already posted successfully on a prior attempt;
+        // only the city-tax charge failed and must be the only thing retried
+        final Stay stay = Objects.requireNonNull(savedStay);
+        stay.setHotelId(hotelId);
+        final UUID invoiceId = UUID.randomUUID();
+        stay.setInvoiceId(invoiceId);
+        final UUID roomChargeId = UUID.randomUUID();
+        stay.setRoomChargeId(roomChargeId);
+        stay.setInvoiceCreationFailed(true);
+        stay.setInvoiceCreationFailureReason("CITY_TAX_POST_FAILED");
+
+        when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
+        when(roomService.getRoomById(roomId, hotelId)).thenReturn(room());
+        when(stayRepository.save(stay)).thenReturn(stay);
+        when(stayMapper.toDto(stay)).thenReturn(Objects.requireNonNull(validResponse));
+
+        final UUID assessmentId = UUID.randomUUID();
+        final UUID cityTaxChargeId = UUID.randomUUID();
+        final CityTaxAssessment assessment = CityTaxAssessment.builder()
+                .id(assessmentId)
+                .hotelId(hotelId)
+                .stayId(stayId)
+                .totalAmount(BigDecimal.TEN)
+                .taxableNights(2)
+                .taxableGuests(2)
+                .build();
+        when(cityTaxAssessmentService.assessFor(ArgumentMatchers.any(), ArgumentMatchers.anyLong()))
+                .thenReturn(Optional.of(assessment));
+        when(billingClient.addCharge(ArgumentMatchers.eq(stayId), ArgumentMatchers.any()))
+                .thenReturn(new ChargeResponse(cityTaxChargeId));
+
+        // Act
+        stayService.retryInvoiceCreation(stayId, hotelId);
+
+        // Assert — invoice not re-created, room charge not re-posted (still the
+        // original id), only the missing city-tax charge is posted
+        verify(billingClient, never()).createInvoiceForStay(ArgumentMatchers.any());
+        verify(billingClient, times(1)).addCharge(ArgumentMatchers.eq(stayId), ArgumentMatchers.any());
+        verify(cityTaxAssessmentService, times(1)).markCharged(assessmentId, cityTaxChargeId);
+        assertEquals(roomChargeId, stay.getRoomChargeId());
+        assertFalse(stay.isInvoiceCreationFailed());
     }
 
     @Test
