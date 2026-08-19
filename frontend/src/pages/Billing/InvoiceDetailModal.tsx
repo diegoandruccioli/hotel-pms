@@ -32,6 +32,7 @@ const chargeTypeIcon: Record<ChargeType, string> = {
   FB_ORDER: 'restaurant',
   ROOM_NIGHT: 'bed',
   EXTRA: 'add_circle',
+  CITY_TAX: 'account_balance',
 };
 
 const sdiStatusTone = (s: SdiStatus) => {

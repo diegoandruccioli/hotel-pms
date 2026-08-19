@@ -21,6 +21,7 @@
   "charge_type_fb_order": "F&B Order",
   "charge_type_room_night": "Room Night",
   "charge_type_extra": "Extra Charge",
+  "charge_type_city_tax": "Tourist Tax",
   "download_pdf": "Download PDF",
   "document_type_fattura": "Invoice",
   "document_type_ricevuta": "Receipt",
