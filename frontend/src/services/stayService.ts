@@ -5,6 +5,10 @@ import type {
   AlloggiatiStato,
   AlloggiatiTipdoc,
   AvailableRoom,
+  CityTaxRateRequest,
+  CityTaxRateResponse,
+  HotelCategoryHistoryRequest,
+  HotelCategoryHistoryResponse,
   HotelSettingsRequest,
   HotelSettingsResponse,
   StayRequest,
@@ -125,5 +129,28 @@ export const stayService = {
       params: { size: 200 },
     });
     return (response.data.content ?? []).filter((r) => r.status === 'CLEAN');
+  },
+
+  // E18: tourist-tax rate rules and hotel category history — both append-only
+  // (list + create, no update/delete), ADMIN/OWNER-only writes enforced server-side.
+
+  getHotelCategoryHistory: async (): Promise<HotelCategoryHistoryResponse[]> => {
+    const response = await api.get<HotelCategoryHistoryResponse[]>(`${BASE_PATH}/hotel-category`);
+    return response.data;
+  },
+
+  recordHotelCategory: async (data: HotelCategoryHistoryRequest): Promise<HotelCategoryHistoryResponse> => {
+    const response = await api.post<HotelCategoryHistoryResponse>(`${BASE_PATH}/hotel-category`, data);
+    return response.data;
+  },
+
+  getCityTaxRates: async (): Promise<CityTaxRateResponse[]> => {
+    const response = await api.get<CityTaxRateResponse[]>(`${BASE_PATH}/city-tax-rates`);
+    return response.data;
+  },
+
+  createCityTaxRate: async (data: CityTaxRateRequest): Promise<CityTaxRateResponse> => {
+    const response = await api.post<CityTaxRateResponse>(`${BASE_PATH}/city-tax-rates`, data);
+    return response.data;
   },
 };

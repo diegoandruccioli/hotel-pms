@@ -36,6 +36,10 @@ const ADMIN_USERS_ITEM: SettingsHubItem = {
   to: '/admin/users', icon: 'manage_accounts', titleKey: 'settings_section_admin_users', descKey: 'settings_hub_admin_users_desc',
 };
 
+const CITY_TAX_ITEM: SettingsHubItem = {
+  to: '/settings/city-tax', icon: 'account_balance', titleKey: 'settings_section_city_tax', descKey: 'settings_hub_city_tax_desc',
+};
+
 const SettingsHubRow = memo(({ item }: { item: SettingsHubItem }) => {
   const { t } = useTranslation('settings');
   return (
@@ -66,7 +70,7 @@ export const Settings = () => {
 
   const items = useMemo(
     () => (isAdminOrOwner
-      ? [...SETTINGS_ITEMS, HOTEL_PROFILE_ITEM, ADMIN_USERS_ITEM, SYSTEM_ITEM]
+      ? [...SETTINGS_ITEMS, HOTEL_PROFILE_ITEM, ADMIN_USERS_ITEM, CITY_TAX_ITEM, SYSTEM_ITEM]
       : SETTINGS_ITEMS),
     [isAdminOrOwner]
   );

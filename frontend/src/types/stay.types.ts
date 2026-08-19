@@ -176,3 +176,44 @@ export interface HotelSettingsResponse {
   comune?: string | null;
   provincia?: string | null;
 }
+
+/** E18: request to record a new hotel classification/category entry (append-only). */
+export interface HotelCategoryHistoryRequest {
+  category: string;
+  validFrom: string;
+}
+
+export interface HotelCategoryHistoryResponse {
+  id: string;
+  category: string;
+  validFrom: string;
+  /** null = this is the hotel's current category. */
+  validTo: string | null;
+}
+
+/**
+ * E18: request to create a tourist-tax rate rule. The comune is resolved
+ * server-side from the hotel's own settings — never sent from the client.
+ */
+export interface CityTaxRateRequest {
+  category: string;
+  amountPerNight: number;
+  /** Cap on taxable nights; omit/undefined = uncapped. */
+  maxTaxableNights?: number | null;
+  /** Guests strictly under this age at check-in are exempt; omit/undefined = no age exemption. */
+  exemptUnderAge?: number | null;
+  validFrom: string;
+  note?: string | null;
+}
+
+export interface CityTaxRateResponse {
+  id: string;
+  comuneCodice: string;
+  category: string;
+  amountPerNight: number;
+  maxTaxableNights: number | null;
+  exemptUnderAge: number | null;
+  validFrom: string;
+  validTo: string | null;
+  note: string | null;
+}
