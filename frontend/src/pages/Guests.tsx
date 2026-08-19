@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { guestService } from '../services/guestService';
+import { useQueryClient } from '@tanstack/react-query';
 import type { GuestResponseDTO } from '../types/guest.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
@@ -10,6 +10,9 @@ import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
+import { useGuestsSearch, useDeleteGuest } from '../hooks/queries/useGuests';
+import { queryKeys } from '../lib/queryKeys';
+import { getErrorMessage } from '../utils/errorMessage';
 import { GuestFormModal } from './GuestFormModal';
 
 const PAGE_SIZE = 20;
@@ -55,16 +58,12 @@ export const Guests = memo(() => {
   const addToast = useToastStore((s) => s.addToast);
   const role = useAuthStore((s) => s.user?.role);
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
+  const queryClient = useQueryClient();
 
-  const [guests, setGuests] = useState<GuestResponseDTO[]>([]);
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<GuestResponseDTO | undefined>();
   const [guestToDelete, setGuestToDelete] = useState<GuestResponseDTO | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') ?? '';
   const [searchQuery, setSearchQuery] = useState(initialSearch);
@@ -87,24 +86,19 @@ export const Guests = memo(() => {
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
   const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
 
-  const loadGuests = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await guestService.searchGuestsPaged(debouncedSearch, page, PAGE_SIZE);
-      setGuests(data.content);
-      setTotalPages(data.totalPages);
-    } catch (err: unknown) {
-      const e = err as {response?: {data?: {detail?: string}}, message?: string};
-      setError(e.response?.data?.detail || e.message || 'Failed to load guests');
-    } finally {
-      setLoading(false);
-    }
-  }, [debouncedSearch, page]);
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+    refetch,
+  } = useGuestsSearch(debouncedSearch, page, PAGE_SIZE);
+  const guests = data?.content ?? [];
+  const totalPages = data?.totalPages ?? 1;
+  const error = queryError ? getErrorMessage(queryError, t('error_unexpected_fallback')) : null;
 
-  useEffect(() => {
-    loadGuests();
-  }, [loadGuests]);
+  const deleteGuestMutation = useDeleteGuest();
+  const deleting = deleteGuestMutation.isPending;
+  const handleRetry = useCallback(() => { refetch(); }, [refetch]);
 
   const handleOpenAddModal = useCallback(() => {
     setSelectedGuest(undefined);
@@ -122,8 +116,8 @@ export const Guests = memo(() => {
 
   const handleSaved = useCallback(() => {
     setIsModalOpen(false);
-    loadGuests();
-  }, [loadGuests]);
+    queryClient.invalidateQueries({ queryKey: queryKeys.guests.all });
+  }, [queryClient]);
 
   const handleDeleteRequest = useCallback((guest: GuestResponseDTO) => {
     setGuestToDelete(guest);
@@ -135,10 +129,8 @@ export const Guests = memo(() => {
 
   const handleDeleteConfirm = useCallback(async () => {
     if (!guestToDelete) return;
-    setDeleting(true);
     try {
-      await guestService.deleteGuest(guestToDelete.id);
-      await loadGuests();
+      await deleteGuestMutation.mutateAsync(guestToDelete.id);
       addToast(t('guest_deleted_success'), 'success');
     } catch (err: unknown) {
       const e = err as { response?: { status?: number } };
@@ -148,10 +140,9 @@ export const Guests = memo(() => {
         addToast(t('delete_guest_failed'), 'error');
       }
     } finally {
-      setDeleting(false);
       setGuestToDelete(null);
     }
-  }, [guestToDelete, addToast, t, loadGuests]);
+  }, [guestToDelete, addToast, t, deleteGuestMutation]);
 
   const headers = useMemo(() => [
     t('name'),
@@ -199,7 +190,7 @@ export const Guests = memo(() => {
           <div>
             <h3 className="text-sm font-medium font-body">{t('error_loading_guests')}</h3>
             <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button type="button" onClick={loadGuests} className="mt-2 text-sm font-medium underline hover:no-underline">
+            <button type="button" onClick={handleRetry} className="mt-2 text-sm font-medium underline hover:no-underline">
               {t('try_again')}
             </button>
           </div>
