@@ -46,14 +46,27 @@ ToastItem.displayName = 'ToastItem';
 
 export const ToastContainer = () => {
   const toasts = useToastStore((s) => s.toasts);
+  const assertiveToasts = toasts.filter((toast) => toast.type === 'error');
+  const politeToasts = toasts.filter((toast) => toast.type !== 'error');
 
-  if (toasts.length === 0) return null;
-
+  // Both live regions stay mounted even when empty. An `aria-live` region
+  // that doesn't exist yet at the moment a toast is added is not observed
+  // by the screen reader, so unmounting the whole container between toasts
+  // (the previous `if (toasts.length === 0) return null`) meant the very
+  // first toast after a quiet period could go unannounced. Errors get
+  // `assertive` (interrupts immediately); success/info get `polite`.
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2">
-      {toasts.map((toast) => (
-        <ToastItem key={toast.id} toast={toast} />
-      ))}
+      <div aria-live="assertive" aria-atomic="false" className="flex flex-col gap-2">
+        {assertiveToasts.map((toast) => (
+          <ToastItem key={toast.id} toast={toast} />
+        ))}
+      </div>
+      <div aria-live="polite" aria-atomic="false" className="flex flex-col gap-2">
+        {politeToasts.map((toast) => (
+          <ToastItem key={toast.id} toast={toast} />
+        ))}
+      </div>
     </div>
   );
 };

@@ -327,3 +327,20 @@ html {
       "opsz" 24;
   }
 }
+
+/* ── Reduced Motion (WCAG 2.3.3) ───────────────────── */
+/* The global transition rule above and the 4 keyframe animations in
+   tailwind.config.js (fade-in, slide-in-right, slide-out-left, scale-in)
+   otherwise run unconditionally. `[data-no-transition]` is an explicit
+   per-element opt-out; this is the system-level one, honoring the OS/browser
+   "reduce motion" preference for every element and animation at once. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

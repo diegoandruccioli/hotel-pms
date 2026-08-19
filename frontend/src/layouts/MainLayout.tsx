@@ -5,6 +5,7 @@ import { ToastContainer } from '../components/Toast';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { UserMenu } from '../components/UserMenu';
+import { RouteAnnouncer } from '../components/RouteAnnouncer';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import * as FocusTrapModule from 'focus-trap-react';
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
@@ -145,6 +146,7 @@ export const MainLayout = () => {
       >
         {t('skip_to_main')}
       </a>
+      <RouteAnnouncer />
       {/* ── Mobile Modal Drawer ─────────────────────── */}
       {drawerOpen && (
         <FocusTrap>

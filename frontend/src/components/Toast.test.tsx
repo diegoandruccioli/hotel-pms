@@ -24,9 +24,29 @@ describe('Toast Component', () => {
     expect(results).toHaveNoViolations();
   });
 
-  it('renders nothing when there are no toasts', () => {
-    const { container } = render(<ToastContainer />);
-    expect(container).toBeEmptyDOMElement();
+  it('renders no toast items when there are no toasts, but keeps the live regions mounted', () => {
+    render(<ToastContainer />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    // The live regions themselves must stay in the DOM even when empty —
+    // that's the whole point of the fix: a screen reader needs to have
+    // already registered them before a toast can be reliably announced.
+    expect(document.querySelector('[aria-live="polite"]')).toBeInTheDocument();
+    expect(document.querySelector('[aria-live="assertive"]')).toBeInTheDocument();
+  });
+
+  it('routes an error toast into the assertive live region and others into the polite one', () => {
+    useToastStore.setState({
+      toasts: [
+        { id: '1', type: 'error', message: 'Error message' },
+        { id: '2', type: 'success', message: 'Success message' },
+      ],
+    });
+    render(<ToastContainer />);
+
+    const assertiveRegion = document.querySelector('[aria-live="assertive"]');
+    const politeRegion = document.querySelector('[aria-live="polite"]');
+    expect(assertiveRegion).toContainElement(screen.getByText('Error message'));
+    expect(politeRegion).toContainElement(screen.getByText('Success message'));
   });
 
   it('renders error and info toast variants', () => {
