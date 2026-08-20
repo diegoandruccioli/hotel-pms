@@ -39,6 +39,7 @@ public class RoomServiceImpl implements RoomService {
     private static final String ROOM_NOT_FOUND_MSG = "ROOM_NOT_FOUND";
     private static final String TYPE_NOT_FOUND_MSG = "ROOM_TYPE_NOT_FOUND";
     private static final String ROOM_ID_NULL_MSG = "Room ID cannot be null";
+    private static final String ROOM_IDS_NULL_MSG = "Room IDs cannot be null";
     private static final String ROOM_TYPE_ID_NULL_MSG = "RoomType ID cannot be null";
     private static final String HOTEL_ID_NULL_MSG = "Hotel ID cannot be null";
 
@@ -111,6 +112,36 @@ public class RoomServiceImpl implements RoomService {
         Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
         return roomRepository.findAllByActiveTrueAndHotelId(hotelId, pageable)
                 .map(roomMapper::toResponse);
+    }
+
+    /**
+     * Returns a paginated, filtered view of active rooms belonging to the
+     * authenticated hotel: an optional housekeeping status and an optional
+     * room type.
+     *
+     * @param pageable   pagination and sorting parameters; must not be {@code null}
+     * @param hotelId    the hotel UUID from the authenticated user's JWT
+     * @param status     optional housekeeping status filter
+     * @param roomTypeId optional room type filter
+     * @return a page of matching room response DTOs
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<RoomResponse> getAllRooms(final Pageable pageable, final UUID hotelId,
+            final RoomStatus status, final UUID roomTypeId) {
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
+        final Page<Room> rooms;
+        if (status != null && roomTypeId != null) {
+            rooms = roomRepository.findAllByActiveTrueAndHotelIdAndStatusAndRoomTypeId(
+                    hotelId, status, roomTypeId, pageable);
+        } else if (status != null) {
+            rooms = roomRepository.findAllByActiveTrueAndHotelIdAndStatus(hotelId, status, pageable);
+        } else if (roomTypeId != null) {
+            rooms = roomRepository.findAllByActiveTrueAndHotelIdAndRoomTypeId(hotelId, roomTypeId, pageable);
+        } else {
+            rooms = roomRepository.findAllByActiveTrueAndHotelId(hotelId, pageable);
+        }
+        return rooms.map(roomMapper::toResponse);
     }
 
     /**
@@ -229,6 +260,25 @@ public class RoomServiceImpl implements RoomService {
 
         final Room updated = roomRepository.saveAndFlush(Objects.requireNonNull(room));
         return roomMapper.toResponse(updated);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Delegates each room to {@link #updateHousekeepingStatus}, so the same
+     * {@code OCCUPIED} guards apply per-room. Runs in a single transaction: any
+     * failure (room not found, or an {@code OCCUPIED} guard violation) rolls
+     * back every update already applied in this batch.
+     */
+    @Override
+    @Transactional
+    public List<RoomResponse> updateHousekeepingStatusBulk(
+            final List<UUID> roomIds, final UUID hotelId, final RoomStatus status) {
+        Objects.requireNonNull(roomIds, ROOM_IDS_NULL_MSG);
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
+        return roomIds.stream()
+                .map(id -> updateHousekeepingStatus(id, hotelId, status))
+                .toList();
     }
 
     /**

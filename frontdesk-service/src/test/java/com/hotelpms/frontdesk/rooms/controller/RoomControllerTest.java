@@ -6,6 +6,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
+import com.hotelpms.frontdesk.rooms.dto.RoomBulkStatusRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import com.hotelpms.frontdesk.rooms.dto.RoomStatusRequest;
@@ -166,6 +167,46 @@ class RoomControllerTest {
 
         mockMvc.perform(get(BASE_URL))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldGetAllRoomsWithStatusFilterReturn200() throws Exception {
+        final Page<RoomResponse> page = new PageImpl<>(
+                List.of(roomResponse), PageRequest.of(0, 20), 1L);
+        when(roomService.getAllRooms(any(Pageable.class), any(UUID.class), eq(RoomStatus.CLEAN), eq(null)))
+                .thenReturn(page);
+
+        mockMvc.perform(get(BASE_URL).param("status", "CLEAN"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldUpdateRoomStatusBulkReturn200() throws Exception {
+        final UUID secondRoomId = UUID.randomUUID();
+        final RoomBulkStatusRequest request =
+                new RoomBulkStatusRequest(List.of(roomId, secondRoomId), RoomStatus.DIRTY);
+        final RoomResponse dirtyResponse = new RoomResponse(
+                roomId, HOTEL_ID, ROOM_NUMBER_101, null, RoomStatus.DIRTY, true, null, null, null);
+
+        when(roomService.updateHousekeepingStatusBulk(
+                eq(List.of(roomId, secondRoomId)), any(UUID.class), eq(RoomStatus.DIRTY)))
+                .thenReturn(List.of(dirtyResponse));
+
+        mockMvc.perform(patch(BASE_URL + "/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("DIRTY"));
+    }
+
+    @Test
+    void shouldReturnValidationErrorWhenBulkStatusRoomIdsEmpty() throws Exception {
+        final RoomBulkStatusRequest request = new RoomBulkStatusRequest(List.of(), RoomStatus.DIRTY);
+
+        mockMvc.perform(patch(BASE_URL + "/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

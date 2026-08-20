@@ -49,6 +49,19 @@ public interface RoomService {
     Page<RoomResponse> getAllRooms(Pageable pageable, UUID hotelId);
 
     /**
+     * Gets a paginated, filtered list of active rooms belonging to the
+     * authenticated hotel: an optional housekeeping status and an optional
+     * room type.
+     *
+     * @param pageable   the pagination and sorting parameters
+     * @param hotelId    the hotel UUID (from the authenticated user's JWT) (T-ROOM-01)
+     * @param status     optional housekeeping status filter
+     * @param roomTypeId optional room type filter
+     * @return a page of matching room responses
+     */
+    Page<RoomResponse> getAllRooms(Pageable pageable, UUID hotelId, RoomStatus status, UUID roomTypeId);
+
+    /**
      * Updates a room scoped to the authenticated hotel.
      *
      * @param id      the room UUID
@@ -87,6 +100,20 @@ public interface RoomService {
      * @return the updated room response
      */
     RoomResponse updateHousekeepingStatus(UUID id, UUID hotelId, RoomStatus status);
+
+    /**
+     * Bulk variant of {@link #updateHousekeepingStatus}, applying the same
+     * guarded status change to several rooms in one call — Housekeeping's
+     * multi-select status change, replacing one request per room. All-or-nothing:
+     * if any room fails (not found, or the same {@code OCCUPIED} guard
+     * violations as the single-room path), the whole batch is rolled back.
+     *
+     * @param roomIds the room UUIDs to update
+     * @param hotelId the hotel UUID (from the authenticated user's JWT)
+     * @param status  the requested housekeeping status
+     * @return the updated room responses, in the same order as {@code roomIds}
+     */
+    List<RoomResponse> updateHousekeepingStatusBulk(List<UUID> roomIds, UUID hotelId, RoomStatus status);
 
     /**
      * Deletes a room scoped to the authenticated hotel.

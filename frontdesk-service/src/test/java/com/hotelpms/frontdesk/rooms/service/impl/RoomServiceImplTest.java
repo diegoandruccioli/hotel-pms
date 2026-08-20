@@ -184,6 +184,53 @@ class RoomServiceImplTest {
     }
 
     @Test
+    void testGetAllRoomsWithStatusOnlyFilter() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        final Page<Room> roomPage = new PageImpl<>(List.of(Objects.requireNonNull(room)), pageable, 1L);
+
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatus(hotelId, RoomStatus.CLEAN, pageable))
+                .thenReturn(roomPage);
+        when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
+
+        final Page<RoomResponse> result = roomService.getAllRooms(pageable, hotelId, RoomStatus.CLEAN, null);
+
+        assertEquals(1, result.getTotalElements());
+        verify(roomRepository).findAllByActiveTrueAndHotelIdAndStatus(hotelId, RoomStatus.CLEAN, pageable);
+    }
+
+    @Test
+    void testGetAllRoomsWithRoomTypeOnlyFilter() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        final Page<Room> roomPage = new PageImpl<>(List.of(Objects.requireNonNull(room)), pageable, 1L);
+
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndRoomTypeId(hotelId, roomTypeId, pageable))
+                .thenReturn(roomPage);
+        when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
+
+        final Page<RoomResponse> result = roomService.getAllRooms(pageable, hotelId, null, roomTypeId);
+
+        assertEquals(1, result.getTotalElements());
+        verify(roomRepository).findAllByActiveTrueAndHotelIdAndRoomTypeId(hotelId, roomTypeId, pageable);
+    }
+
+    @Test
+    void testGetAllRoomsWithStatusAndRoomTypeFilter() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        final Page<Room> roomPage = new PageImpl<>(List.of(Objects.requireNonNull(room)), pageable, 1L);
+
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatusAndRoomTypeId(
+                hotelId, RoomStatus.CLEAN, roomTypeId, pageable))
+                .thenReturn(roomPage);
+        when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
+
+        final Page<RoomResponse> result = roomService.getAllRooms(pageable, hotelId, RoomStatus.CLEAN, roomTypeId);
+
+        assertEquals(1, result.getTotalElements());
+        verify(roomRepository).findAllByActiveTrueAndHotelIdAndStatusAndRoomTypeId(
+                hotelId, RoomStatus.CLEAN, roomTypeId, pageable);
+    }
+
+    @Test
     void testUpdateRoomSuccess() {
         final RoomRequest updateRequest = new RoomRequest(hotelId, ROOM_102, roomTypeId, RoomStatus.DIRTY);
         final Room updatedRoom = Room.builder()
@@ -386,6 +433,58 @@ class RoomServiceImplTest {
 
         assertThrows(NotFoundException.class,
                 () -> roomService.updateHousekeepingStatus(roomId, hotelId, RoomStatus.MAINTENANCE));
+    }
+
+    @Test
+    void testUpdateHousekeepingStatusBulkAppliesToEveryRoom() {
+        final UUID secondRoomId = UUID.randomUUID();
+        final Room secondRoom = Room.builder()
+                .id(secondRoomId)
+                .hotelId(hotelId)
+                .roomNumber(ROOM_102)
+                .roomType(roomType)
+                .status(RoomStatus.DIRTY)
+                .active(true)
+                .build();
+        final Room updatedFirst = Room.builder()
+                .id(roomId).hotelId(hotelId).roomNumber(ROOM_101).roomType(roomType)
+                .status(RoomStatus.MAINTENANCE).active(true).build();
+        final Room updatedSecond = Room.builder()
+                .id(secondRoomId).hotelId(hotelId).roomNumber(ROOM_102).roomType(roomType)
+                .status(RoomStatus.MAINTENANCE).active(true).build();
+        final RoomResponse firstResponse = new RoomResponse(
+                roomId, hotelId, ROOM_101, null, RoomStatus.MAINTENANCE, true, null, null, null);
+        final RoomResponse secondResponse = new RoomResponse(
+                secondRoomId, hotelId, ROOM_102, null, RoomStatus.MAINTENANCE, true, null, null, null);
+
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(secondRoomId, hotelId))
+                .thenReturn(Optional.of(secondRoom));
+        when(roomRepository.saveAndFlush(Objects.requireNonNull(room))).thenReturn(updatedFirst);
+        when(roomRepository.saveAndFlush(secondRoom)).thenReturn(updatedSecond);
+        when(roomMapper.toResponse(updatedFirst)).thenReturn(firstResponse);
+        when(roomMapper.toResponse(updatedSecond)).thenReturn(secondResponse);
+
+        final List<RoomResponse> results = roomService.updateHousekeepingStatusBulk(
+                List.of(roomId, secondRoomId), hotelId, RoomStatus.MAINTENANCE);
+
+        assertEquals(2, results.size());
+        assertEquals(firstResponse, results.get(0));
+        assertEquals(secondResponse, results.get(1));
+    }
+
+    @Test
+    void testUpdateHousekeepingStatusBulkPropagatesGuardViolation() {
+        final UUID occupiedRoomId = UUID.randomUUID();
+        final Room occupiedRoom = Room.builder()
+                .id(occupiedRoomId).hotelId(hotelId).roomNumber(ROOM_102).roomType(roomType)
+                .status(RoomStatus.OCCUPIED).active(true).build();
+
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(occupiedRoomId, hotelId))
+                .thenReturn(Optional.of(occupiedRoom));
+
+        assertThrows(ConflictException.class, () -> roomService.updateHousekeepingStatusBulk(
+                List.of(occupiedRoomId), hotelId, RoomStatus.MAINTENANCE));
     }
 
     @Test

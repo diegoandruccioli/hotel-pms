@@ -1,6 +1,8 @@
 package com.hotelpms.frontdesk.rooms.controller;
 
 import com.hotelpms.frontdesk.reservations.service.ReservationService;
+import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
+import com.hotelpms.frontdesk.rooms.dto.RoomBulkStatusRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import com.hotelpms.frontdesk.rooms.dto.RoomStatusRequest;
@@ -77,14 +79,21 @@ public class RoomController {
      * parameters: {@code ?page=0&size=20&sort=roomNumber,asc}
      * Defaults to page 0, 20 items per page, sorted by roomNumber ascending.
      *
-     * @param pageable the pagination and sorting parameters, resolved from request
-     *                 query params
+     * @param status     optional housekeeping status filter
+     * @param roomTypeId optional room type filter
+     * @param pageable   the pagination and sorting parameters, resolved from request
+     *                   query params
      * @return a page of room responses
      */
     @GetMapping
     public ResponseEntity<Page<RoomResponse>> getAllRooms(
+            @RequestParam(required = false) final RoomStatus status,
+            @RequestParam(required = false) final UUID roomTypeId,
             @PageableDefault(size = DEFAULT_PAGE_SIZE, sort = "roomNumber",
                     direction = Sort.Direction.ASC) final Pageable pageable) {
+        if (status != null || roomTypeId != null) {
+            return ResponseEntity.ok(roomService.getAllRooms(pageable, resolveHotelId(), status, roomTypeId));
+        }
         return ResponseEntity.ok(roomService.getAllRooms(pageable, resolveHotelId()));
     }
 
@@ -131,6 +140,24 @@ public class RoomController {
     public ResponseEntity<RoomResponse> updateRoomStatus(@NonNull @PathVariable final UUID id,
             @NonNull @Valid @RequestBody final RoomStatusRequest request) {
         return ResponseEntity.ok(roomService.updateHousekeepingStatus(id, resolveHotelId(), request.status()));
+    }
+
+    /**
+     * Bulk-updates the housekeeping status of several rooms at once — used by
+     * Housekeeping's multi-select status change, replacing one {@code PATCH
+     * /{id}/status} request per room. Same guards as the single-room path
+     * (see {@link RoomService#updateHousekeepingStatus}), applied per room in
+     * one transaction.
+     *
+     * @param request the room IDs and target status
+     * @return the updated room responses
+     */
+    @PatchMapping("/status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'RECEPTIONIST')")
+    public ResponseEntity<List<RoomResponse>> updateRoomStatusBulk(
+            @NonNull @Valid @RequestBody final RoomBulkStatusRequest request) {
+        return ResponseEntity.ok(
+                roomService.updateHousekeepingStatusBulk(request.roomIds(), resolveHotelId(), request.status()));
     }
 
     /**

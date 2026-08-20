@@ -80,6 +80,44 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
     List<Room> findAllByActiveTrueAndHotelIdAndStatus(UUID hotelId, RoomStatus status);
 
     /**
+     * Returns a page of active rooms scoped to the given hotel, filtered by
+     * housekeeping status. Backs the {@code status}-only case of {@code
+     * getAllRooms}'s room-listing filters.
+     *
+     * @param hotelId  the hotel UUID extracted from the authenticated user's JWT
+     * @param status   the housekeeping status to filter by
+     * @param pageable the pagination and sorting parameters
+     * @return a page of matching active rooms for that hotel
+     */
+    Page<Room> findAllByActiveTrueAndHotelIdAndStatus(UUID hotelId, RoomStatus status, Pageable pageable);
+
+    /**
+     * Returns a page of active rooms scoped to the given hotel, filtered by
+     * room type. Backs the {@code roomTypeId}-only case of {@code
+     * getAllRooms}'s room-listing filters.
+     *
+     * @param hotelId    the hotel UUID extracted from the authenticated user's JWT
+     * @param roomTypeId the room type UUID to filter by
+     * @param pageable   the pagination and sorting parameters
+     * @return a page of matching active rooms for that hotel
+     */
+    Page<Room> findAllByActiveTrueAndHotelIdAndRoomTypeId(UUID hotelId, UUID roomTypeId, Pageable pageable);
+
+    /**
+     * Returns a page of active rooms scoped to the given hotel, filtered by
+     * both housekeeping status and room type. Backs the combined-filter case
+     * of {@code getAllRooms}'s room-listing filters.
+     *
+     * @param hotelId    the hotel UUID extracted from the authenticated user's JWT
+     * @param status     the housekeeping status to filter by
+     * @param roomTypeId the room type UUID to filter by
+     * @param pageable   the pagination and sorting parameters
+     * @return a page of matching active rooms for that hotel
+     */
+    Page<Room> findAllByActiveTrueAndHotelIdAndStatusAndRoomTypeId(
+            UUID hotelId, RoomStatus status, UUID roomTypeId, Pageable pageable);
+
+    /**
      * Counts active rooms per housekeeping status for a hotel, one row per
      * status present. Backs the day-sheet room-status breakdown
      * (E-DASHBOARD-1) — a single grouped query instead of downloading every
