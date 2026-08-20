@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.stays.controller;
 
+import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
 import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
@@ -113,12 +114,18 @@ public class StayController {
      * {@code ?page=0&size=20&sort=actualCheckInTime,desc}
      *
      * @param reservationId optional reservation ID to filter by
+     * @param dateFrom      optional lower bound (inclusive) on actual check-in date
+     * @param dateTo        optional upper bound (inclusive) on actual check-in date
+     * @param status        optional stay status filter
      * @param pageable      the pagination and sorting parameters
      * @return a page of stay responses
      */
     @GetMapping
     public ResponseEntity<Page<StayResponse>> getAllStays(
             @RequestParam(name = "reservationId", required = false) final UUID reservationId,
+            @RequestParam(required = false) final LocalDate dateFrom,
+            @RequestParam(required = false) final LocalDate dateTo,
+            @RequestParam(required = false) final StayStatus status,
             @PageableDefault(size = DEFAULT_PAGE_SIZE,
                     sort = "actualCheckInTime",
                     direction = Sort.Direction.DESC)
@@ -126,6 +133,9 @@ public class StayController {
         final UUID hotelId = Objects.requireNonNull(extractHotelId());
         if (reservationId != null) {
             return ResponseEntity.ok(stayService.getStaysByReservationId(reservationId, hotelId, pageable));
+        }
+        if (dateFrom != null || dateTo != null || status != null) {
+            return ResponseEntity.ok(stayService.getAllStays(pageable, hotelId, dateFrom, dateTo, status));
         }
         return ResponseEntity.ok(stayService.getAllStays(pageable, hotelId));
     }

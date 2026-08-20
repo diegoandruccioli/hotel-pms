@@ -69,6 +69,8 @@ class StayControllerTest {
     private static final String TEST_DATE = "2026-05-01";
     private static final String STATO_CODE = "Z000";
     private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
+    private static final LocalDate FILTER_DATE_FROM = LocalDate.of(2026, 8, 1);
+    private static final LocalDate FILTER_DATE_TO = LocalDate.of(2026, 8, 31);
 
     @Mock
     private StayService stayService;
@@ -207,6 +209,21 @@ class StayControllerTest {
         when(stayService.getAllStays(any(Pageable.class), eq(hotelId))).thenReturn(page);
 
         mockMvc.perform(get(BASE_URL))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldGetAllStaysWithDateRangeAndStatusReturn200() throws Exception {
+        final Page<StayResponse> page = new PageImpl<>(
+                List.of(stayResponse), PageRequest.of(0, 20), 1L);
+        when(stayService.getAllStays(any(Pageable.class), eq(hotelId),
+                eq(FILTER_DATE_FROM), eq(FILTER_DATE_TO), eq(StayStatus.CHECKED_IN)))
+                .thenReturn(page);
+
+        mockMvc.perform(get(BASE_URL)
+                        .param("dateFrom", "2026-08-01")
+                        .param("dateTo", "2026-08-31")
+                        .param("status", "CHECKED_IN"))
                 .andExpect(status().isOk());
     }
 

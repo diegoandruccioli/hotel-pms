@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.stays.service;
 
+import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
@@ -56,6 +57,20 @@ public interface StayService {
      * @return a page of stay responses
      */
     Page<StayResponse> getAllStays(Pageable pageable, @NonNull UUID hotelId);
+
+    /**
+     * Retrieves a paginated, filtered list of stays belonging to the authenticated
+     * hotel: an optional actual-check-in date range and an optional status filter.
+     *
+     * @param pageable the pagination and sorting parameters
+     * @param hotelId  the authenticated hotel UUID (T-STAY-04)
+     * @param dateFrom optional lower bound (inclusive) on actual check-in date
+     * @param dateTo   optional upper bound (inclusive) on actual check-in date
+     * @param status   optional stay status filter
+     * @return a page of matching stay responses
+     */
+    Page<StayResponse> getAllStays(Pageable pageable, @NonNull UUID hotelId,
+            LocalDate dateFrom, LocalDate dateTo, StayStatus status);
 
     /**
      * Retrieves all stays for a given reservation, scoped to the authenticated hotel.

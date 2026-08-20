@@ -30,9 +30,11 @@ import org.springframework.lang.NonNull;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -61,6 +63,8 @@ public class StayServiceImpl implements StayService {
 
     private static final String PAID_STATUS = "PAID";
     private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
+    private static final LocalDate EARLIEST_FILTER_DATE = LocalDate.of(1900, 1, 1);
+    private static final LocalDate LATEST_FILTER_DATE = LocalDate.of(2100, 12, 31);
 
     private final StayRepository stayRepository;
     private final StayMapper stayMapper;
@@ -193,14 +197,40 @@ public class StayServiceImpl implements StayService {
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
+    public Page<StayResponse> getAllStays(final Pageable pageable, @NonNull final UUID hotelId,
+            final LocalDate dateFrom, final LocalDate dateTo, final StayStatus status) {
+        log.debug("Fetching filtered stays, dateFrom={}, dateTo={}, status={}", dateFrom, dateTo, status);
+        final LocalDateTime start = (dateFrom != null ? dateFrom : EARLIEST_FILTER_DATE).atStartOfDay();
+        final LocalDateTime end = (dateTo != null ? dateTo.plusDays(1) : LATEST_FILTER_DATE).atStartOfDay();
+        final Set<StayStatus> statuses = status != null ? Set.of(status) : EnumSet.allOf(StayStatus.class);
+        return stayRepository.findByHotelIdAndActualCheckInTimeBetweenAndStatusIn(hotelId, start, end, statuses, pageable)
+                .map(stayMapper::toDto);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
     public Page<StayResponse> getStaysByReservationId(
             @NonNull final UUID reservationId, @NonNull final UUID hotelId, final Pageable pageable) {
         log.debug("Fetching stays for reservationId: {}", reservationId);
+        final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
         final List<Stay> stays = stayRepository.findAllByReservationIdAndHotelId(reservationId, hotelId);
         final List<StayResponse> content = stays.stream()
                 .map(stayMapper::toDto)
                 .toList();
-        return new PageImpl<>(content, pageable == null ? Pageable.unpaged() : pageable, content.size());
+        return pageFromList(content, safePageable);
+    }
+
+    private static <T> Page<T> pageFromList(final List<T> list, final Pageable pageable) {
+        if (!pageable.isPaged()) {
+            return new PageImpl<>(list, pageable, list.size());
+        }
+        final int start = (int) pageable.getOffset();
+        if (start >= list.size()) {
+            return new PageImpl<>(List.of(), pageable, list.size());
+        }
+        final int end = Math.min(start + pageable.getPageSize(), list.size());
+        return new PageImpl<>(list.subList(start, end), pageable, list.size());
     }
 
     /** {@inheritDoc} */

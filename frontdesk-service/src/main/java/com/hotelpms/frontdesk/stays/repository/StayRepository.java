@@ -12,6 +12,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -136,6 +137,23 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      */
     List<Stay> findByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(
             @NonNull UUID guestId, @NonNull UUID hotelId);
+
+    /**
+     * Finds a paginated, filtered list of stays belonging to a specific hotel:
+     * an actual-check-in-time window and a status set, both always concretely
+     * valued by the caller (never {@code null}) so this query never needs an
+     * {@code IS NULL} branch on a date-typed parameter.
+     *
+     * @param hotelId  the hotel UUID (tenant isolation)
+     * @param start    lower bound (inclusive) on actual check-in time
+     * @param end      upper bound (exclusive) on actual check-in time
+     * @param statuses stay statuses to include
+     * @param pageable the pagination and sorting parameters
+     * @return a page of matching stays for that hotel
+     */
+    Page<Stay> findByHotelIdAndActualCheckInTimeBetweenAndStatusIn(
+            UUID hotelId, LocalDateTime start, LocalDateTime end,
+            Collection<StayStatus> statuses, Pageable pageable);
 
     /**
      * Counts stays with the given status, scoped to a hotel. Backs the

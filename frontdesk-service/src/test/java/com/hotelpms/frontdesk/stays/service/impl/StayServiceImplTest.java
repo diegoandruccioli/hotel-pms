@@ -483,6 +483,79 @@ class StayServiceImplTest {
     }
 
     @Test
+    void shouldGetStaysByReservationIdReturnCorrectSliceForSecondPage() {
+        // Arrange: 3 stays, page size 2 — second page must contain only the
+        // remaining 1 stay, not the full unpaginated list (regression guard for
+        // the fake-PageImpl bug where pageable was ignored entirely).
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final Stay stayA = Objects.requireNonNull(savedStay);
+        final Stay stayB = new Stay();
+        final Stay stayC = new Stay();
+        final StayResponse responseA = Objects.requireNonNull(validResponse);
+        final StayResponse responseB = mock(StayResponse.class);
+        final StayResponse responseC = mock(StayResponse.class);
+        final Pageable secondPage = PageRequest.of(1, 2);
+
+        when(stayRepository.findAllByReservationIdAndHotelId(reservation, hotelId))
+                .thenReturn(List.of(stayA, stayB, stayC));
+        when(stayMapper.toDto(stayA)).thenReturn(responseA);
+        when(stayMapper.toDto(stayB)).thenReturn(responseB);
+        when(stayMapper.toDto(stayC)).thenReturn(responseC);
+
+        // Act
+        final Page<StayResponse> response = stayService.getStaysByReservationId(reservation, hotelId, secondPage);
+
+        // Assert
+        assertEquals(3, response.getTotalElements());
+        assertEquals(1, response.getContent().size());
+        assertEquals(responseC, response.getContent().get(0));
+    }
+
+    @Test
+    void shouldGetAllStaysWithDateRangeAndStatusFilter() {
+        // Arrange
+        final Stay stay = Objects.requireNonNull(savedStay);
+        final StayResponse expectedResponse = Objects.requireNonNull(validResponse);
+        final Pageable pageable = PageRequest.of(0, 20);
+        final LocalDate dateFrom = LocalDate.of(2026, 8, 1);
+        final LocalDate dateTo = LocalDate.of(2026, 8, 31);
+        final Page<Stay> stayPage = new PageImpl<>(List.of(stay), pageable, 1L);
+
+        when(stayRepository.findByHotelIdAndActualCheckInTimeBetweenAndStatusIn(
+                hotelId, dateFrom.atStartOfDay(), dateTo.plusDays(1).atStartOfDay(),
+                java.util.Set.of(StayStatus.CHECKED_IN), pageable))
+                .thenReturn(stayPage);
+        when(stayMapper.toDto(stay)).thenReturn(expectedResponse);
+
+        // Act
+        final Page<StayResponse> response = stayService.getAllStays(
+                pageable, hotelId, dateFrom, dateTo, StayStatus.CHECKED_IN);
+
+        // Assert
+        assertEquals(1, response.getTotalElements());
+        assertEquals(expectedResponse, response.getContent().get(0));
+    }
+
+    @Test
+    void shouldGetAllStaysWithNoFiltersDefaultToWidestRangeAndAllStatuses() {
+        // Arrange
+        final Pageable pageable = PageRequest.of(0, 20);
+
+        when(stayRepository.findByHotelIdAndActualCheckInTimeBetweenAndStatusIn(
+                ArgumentMatchers.eq(hotelId), ArgumentMatchers.any(), ArgumentMatchers.any(),
+                ArgumentMatchers.eq(java.util.EnumSet.allOf(StayStatus.class)), ArgumentMatchers.eq(pageable)))
+                .thenReturn(Page.empty(pageable));
+
+        // Act
+        stayService.getAllStays(pageable, hotelId, null, null, null);
+
+        // Assert
+        verify(stayRepository).findByHotelIdAndActualCheckInTimeBetweenAndStatusIn(
+                ArgumentMatchers.eq(hotelId), ArgumentMatchers.any(), ArgumentMatchers.any(),
+                ArgumentMatchers.eq(java.util.EnumSet.allOf(StayStatus.class)), ArgumentMatchers.eq(pageable));
+    }
+
+    @Test
     void shouldCheckOutSuccessfully() {
         // Arrange
         final UUID id = Objects.requireNonNull(stayId);
