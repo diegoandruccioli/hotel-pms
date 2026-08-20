@@ -266,21 +266,19 @@ export const Billing = memo(() => {
           ))}
         </div>
         <div className="flex items-center gap-2 text-sm font-body">
-          <label htmlFor="billing-date-from" className="text-on-surface-variant">{t('date_from')}</label>
-          <input
-            id="billing-date-from"
+          <M3TextField
+            label={t('date_from')}
             type="date"
             value={dateFrom}
             onChange={handleDateFromChange}
-            className="px-2 py-1 rounded-shape-xs border border-outline bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+            className="w-40"
           />
-          <label htmlFor="billing-date-to" className="text-on-surface-variant">{t('date_to')}</label>
-          <input
-            id="billing-date-to"
+          <M3TextField
+            label={t('date_to')}
             type="date"
             value={dateTo}
             onChange={handleDateToChange}
-            className="px-2 py-1 rounded-shape-xs border border-outline bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+            className="w-40"
           />
         </div>
       </div>

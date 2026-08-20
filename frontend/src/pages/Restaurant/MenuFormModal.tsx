@@ -4,6 +4,9 @@ import { fbService } from '../../services/fbService';
 import { useToastStore } from '../../store/toastStore';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Dialog } from '../../components/m3/M3Dialog';
+import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Textarea } from '../../components/m3/M3Textarea';
+import { M3Checkbox } from '../../components/m3/M3Checkbox';
 import { getErrorMessage } from '../../utils/errorMessage';
 import type { MenuItemRequest, MenuItemResponse } from '../../types/fb.types';
 
@@ -18,8 +21,6 @@ const EMPTY_FORM: MenuItemRequest = { name: '', price: 0, category: '', descript
 function itemToForm(item: MenuItemResponse): MenuItemRequest {
   return { name: item.name, price: item.price, category: item.category, description: item.description ?? '', available: item.available };
 }
-
-const INPUT_CLASS = 'w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
 
 export const MenuFormModal = memo(({ item, onClose, onSaved }: Props) => {
   const { t } = useTranslation(['restaurant', 'common']);
@@ -77,27 +78,19 @@ export const MenuFormModal = memo(({ item, onClose, onSaved }: Props) => {
       }
     >
       <form id="menu-form" onSubmit={handleSubmit} noValidate className="space-y-4">
-        <div>
-          <label htmlFor="menu-name" className="block text-sm font-medium text-on-surface mb-1">{t('menu_name')} *</label>
-          <input id="menu-name" type="text" value={form.name} onChange={handleName} className={INPUT_CLASS} />
-        </div>
-        <div>
-          <label htmlFor="menu-category" className="block text-sm font-medium text-on-surface mb-1">{t('menu_category')} *</label>
-          <input id="menu-category" type="text" value={form.category} onChange={handleCategory} className={INPUT_CLASS} />
-        </div>
-        <div>
-          <label htmlFor="menu-price" className="block text-sm font-medium text-on-surface mb-1">{t('menu_price')} *</label>
-          <input id="menu-price" type="number" min="0.01" step="0.01" value={form.price} onChange={handlePrice} className={INPUT_CLASS} />
-        </div>
-        <div>
-          <label htmlFor="menu-description" className="block text-sm font-medium text-on-surface mb-1">{t('menu_description')}</label>
-          <textarea id="menu-description" value={form.description ?? ''} onChange={handleDescription} rows={3} className={INPUT_CLASS} />
-        </div>
-        <div className="flex items-center gap-3">
-          <input id="menu-available" type="checkbox" checked={form.available} onChange={handleAvailable}
-            className="h-4 w-4 rounded border-outline text-primary focus:ring-primary" />
-          <label htmlFor="menu-available" className="text-sm font-medium text-on-surface">{t('menu_available')}</label>
-        </div>
+        <M3TextField label={`${t('menu_name')} *`} required value={form.name} onChange={handleName} />
+        <M3TextField label={`${t('menu_category')} *`} required value={form.category} onChange={handleCategory} />
+        <M3TextField
+          label={`${t('menu_price')} *`}
+          required
+          type="number"
+          min="0.01"
+          step="0.01"
+          value={form.price}
+          onChange={handlePrice}
+        />
+        <M3Textarea label={t('menu_description')} value={form.description ?? ''} onChange={handleDescription} rows={3} />
+        <M3Checkbox checked={form.available} onChange={handleAvailable} label={t('menu_available')} />
 
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
       </form>

@@ -237,6 +237,7 @@ export const CalendarPlanning = () => {
               onChange={handleMonthChange}
               className="absolute inset-0 opacity-0 cursor-pointer"
               title={t('select_month')}
+              aria-label={t('select_month')}
             />
             <MaterialIcon name="calendar_month" className="text-on-surface-variant opacity-60" />
           </div>

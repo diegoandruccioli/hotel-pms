@@ -6,6 +6,7 @@ import type { RateBulkApplyRequest } from '../../types/inventory.types';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Checkbox } from '../../components/m3/M3Checkbox';
 import { useToastStore } from '../../store/toastStore';
 import { getErrorMessage } from '../../utils/errorMessage';
 
@@ -30,10 +31,12 @@ const RoomTypeCheckboxRow = memo(({ roomType, checked, onToggle }: {
 }) => {
   const handleChange = useCallback(() => onToggle(roomType.id), [onToggle, roomType.id]);
   return (
-    <label className="flex items-center gap-2 py-1.5 px-2 rounded-shape-xs hover:bg-surface-container-low cursor-pointer">
-      <input type="checkbox" checked={checked} onChange={handleChange} className="w-4 h-4" />
-      <span className="text-sm font-body text-on-surface">{roomType.name}</span>
-    </label>
+    <M3Checkbox
+      className="py-1.5 px-2 rounded-shape-xs hover:bg-surface-container-low"
+      checked={checked}
+      onChange={handleChange}
+      label={roomType.name}
+    />
   );
 });
 RoomTypeCheckboxRow.displayName = 'RoomTypeCheckboxRow';

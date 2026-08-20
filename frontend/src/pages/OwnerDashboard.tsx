@@ -9,6 +9,7 @@ import { M3Button } from '../components/m3/M3Button';
 import { M3Card } from '../components/m3/M3Card';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
+import { M3TextField } from '../components/m3/M3TextField';
 import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '../utils/errorMessage';
 
@@ -139,30 +140,20 @@ export const OwnerDashboard = memo(() => {
 
       <M3Card variant="outlined" className="p-4">
         <div className="flex flex-col sm:flex-row items-end gap-4">
-          <div className="flex-1">
-            <label htmlFor="startDate" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-              {t('start_date')}
-            </label>
-            <input
-              id="startDate"
-              type="date"
-              value={startDate}
-              onChange={handleStartDateChange}
-              className="block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
-            />
-          </div>
-          <div className="flex-1">
-            <label htmlFor="endDate" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-              {t('end_date')}
-            </label>
-            <input
-              id="endDate"
-              type="date"
-              value={endDate}
-              onChange={handleEndDateChange}
-              className="block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
-            />
-          </div>
+          <M3TextField
+            className="flex-1"
+            label={t('start_date')}
+            type="date"
+            value={startDate}
+            onChange={handleStartDateChange}
+          />
+          <M3TextField
+            className="flex-1"
+            label={t('end_date')}
+            type="date"
+            value={endDate}
+            onChange={handleEndDateChange}
+          />
           <M3Button
             id="load-report-btn"
             icon={loading ? 'progress_activity' : 'bar_chart'}
