@@ -4,7 +4,7 @@ import { userService } from '../../services/userService';
 import type { UserResponse } from '../../types/user.types';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Dialog } from '../../components/m3/M3Dialog';
-import { PasswordVisibilityToggle } from '../../components/m3/PasswordVisibilityToggle';
+import { M3TextField } from '../../components/m3/M3TextField';
 import { getErrorMessage } from '../../utils/errorMessage';
 
 interface ResetPasswordModalProps {
@@ -21,13 +21,9 @@ export const ResetPasswordModal = memo(({ user, onClose, onSuccess }: ResetPassw
   const [confirmPw, setConfirmPw] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showNewPw, setShowNewPw] = useState(false);
-  const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   const handleNewPw = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setNewPw(e.target.value), []);
   const handleConfirmPw = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setConfirmPw(e.target.value), []);
-  const toggleShowNewPw = useCallback(() => setShowNewPw((prev) => !prev), []);
-  const toggleShowConfirmPw = useCallback(() => setShowConfirmPw((prev) => !prev), []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,34 +56,18 @@ export const ResetPasswordModal = memo(({ user, onClose, onSuccess }: ResetPassw
       }
     >
       <form id="reset-pw-form" onSubmit={handleSubmit} noValidate className="space-y-4">
-        <div>
-          <label htmlFor="reset-new-pw" className="block text-sm font-medium text-on-surface mb-1">
-            {t('label_new_password')}
-          </label>
-          <div className="relative">
-            <input id="reset-new-pw" type={showNewPw ? 'text' : 'password'} value={newPw} onChange={handleNewPw}
-              className="w-full rounded-md border border-outline bg-surface px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-            <PasswordVisibilityToggle
-              visible={showNewPw}
-              onToggle={toggleShowNewPw}
-              className="absolute right-1 top-1/2 -translate-y-1/2"
-            />
-          </div>
-        </div>
-        <div>
-          <label htmlFor="reset-confirm-pw" className="block text-sm font-medium text-on-surface mb-1">
-            {t('label_confirm_password')}
-          </label>
-          <div className="relative">
-            <input id="reset-confirm-pw" type={showConfirmPw ? 'text' : 'password'} value={confirmPw} onChange={handleConfirmPw}
-              className="w-full rounded-md border border-outline bg-surface px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-            <PasswordVisibilityToggle
-              visible={showConfirmPw}
-              onToggle={toggleShowConfirmPw}
-              className="absolute right-1 top-1/2 -translate-y-1/2"
-            />
-          </div>
-        </div>
+        <M3TextField
+          label={t('label_new_password')}
+          type="password"
+          value={newPw}
+          onChange={handleNewPw}
+        />
+        <M3TextField
+          label={t('label_confirm_password')}
+          type="password"
+          value={confirmPw}
+          onChange={handleConfirmPw}
+        />
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
       </form>
     </M3Dialog>

@@ -7,6 +7,8 @@ import { guestService } from '../../services/guestService';
 import type { AvailableRoom, AlloggiatiStato, AlloggiatiTipdoc, StayGuestRequest, TravellerType } from '../../types/stay.types';
 import type { GuestResponseDTO } from '../../types/guest.types';
 import { useToastStore } from '../../store/toastStore';
+import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Select } from '../../components/m3/M3Select';
 import { GuestFieldSection } from './GuestFieldSection';
 import {
   emptyGuest,
@@ -86,6 +88,11 @@ export function WalkInCheckInForm() {
   const handleRoomChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedRoomId(e.target.value);
   }, []);
+
+  const roomOptions = useMemo(() => rooms.map((r) => ({
+    value: r.id,
+    label: `${r.roomNumber}${r.roomType?.name ? ` — ${r.roomType.name}` : ''}`,
+  })), [rooms]);
 
   const handleGuestQueryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
@@ -202,35 +209,39 @@ export function WalkInCheckInForm() {
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         {/* Room selection */}
         <div>
-          <label htmlFor="walkin-room" className="block text-sm font-medium text-on-surface mb-1">
-            {t('walkin_label_room')} <span aria-hidden="true">*</span>
-          </label>
           {roomsLoading ? (
-            <p className="text-sm text-on-surface-variant" role="status">{t('walkin_loading_rooms')}</p>
+            <>
+              <p className="block text-sm font-medium text-on-surface mb-1">{t('walkin_label_room')}</p>
+              <p className="text-sm text-on-surface-variant" role="status">{t('walkin_loading_rooms')}</p>
+            </>
           ) : rooms.length === 0 ? (
-            <p className="text-sm text-error" role="alert">{t('walkin_no_rooms')}</p>
+            <>
+              <p className="block text-sm font-medium text-on-surface mb-1">{t('walkin_label_room')}</p>
+              <p className="text-sm text-error" role="alert">{t('walkin_no_rooms')}</p>
+            </>
           ) : (
-            <select id="walkin-room" value={selectedRoomId} onChange={handleRoomChange} required
-              className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary">
-              <option value="">{t('walkin_placeholder_room')}</option>
-              {rooms.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.roomNumber}{r.roomType?.name ? ` — ${r.roomType.name}` : ''}
-                </option>
-              ))}
-            </select>
+            <M3Select
+              label={t('walkin_label_room')}
+              required
+              options={roomOptions}
+              placeholder={t('walkin_placeholder_room')}
+              value={selectedRoomId}
+              onChange={handleRoomChange}
+            />
           )}
         </div>
 
         {/* Guest search */}
         <div className="relative">
-          <label htmlFor="walkin-guest" className="block text-sm font-medium text-on-surface mb-1">
-            {t('walkin_label_guest')} <span aria-hidden="true">*</span>
-          </label>
-          <input id="walkin-guest" type="search" value={guestQuery}
+          <M3TextField
+            label={t('walkin_label_guest')}
+            required
+            type="search"
+            value={guestQuery}
             onChange={handleGuestQueryChange}
-            placeholder={t('walkin_placeholder_guest')} autoComplete="off"
-            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary" />
+            placeholder={t('walkin_placeholder_guest')}
+            autoComplete="off"
+          />
           {guestResults.length > 0 && (
             <div role="listbox" aria-label={guestListLabel}
               className="absolute z-10 mt-1 w-full rounded-md border border-outline bg-surface shadow-md max-h-48 overflow-y-auto">
@@ -244,14 +255,14 @@ export function WalkInCheckInForm() {
         </div>
 
         {/* Expected check-out date */}
-        <div>
-          <label htmlFor="walkin-checkout" className="block text-sm font-medium text-on-surface mb-1">
-            {t('walkin_label_checkout_date')} <span aria-hidden="true">*</span>
-          </label>
-          <input id="walkin-checkout" type="date" value={expectedCheckOutDate}
-            min={todayIso} onChange={handleCheckoutChange} required
-            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary" />
-        </div>
+        <M3TextField
+          label={t('walkin_label_checkout_date')}
+          required
+          type="date"
+          value={expectedCheckOutDate}
+          min={todayIso}
+          onChange={handleCheckoutChange}
+        />
 
         {/* Alloggiati guest data */}
         <div className="space-y-4">

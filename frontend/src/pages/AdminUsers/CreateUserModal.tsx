@@ -1,10 +1,11 @@
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { userService } from '../../services/userService';
 import type { UserResponse, CreateUserRequest } from '../../types/user.types';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Dialog } from '../../components/m3/M3Dialog';
-import { PasswordVisibilityToggle } from '../../components/m3/PasswordVisibilityToggle';
+import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Select } from '../../components/m3/M3Select';
 import { getErrorMessage } from '../../utils/errorMessage';
 import type { Role } from '../../types/auth.types';
 
@@ -20,9 +21,6 @@ export const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProp
   const [form, setForm] = useState<CreateUserRequest>(INITIAL_FORM);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-
-  const toggleShowPassword = useCallback(() => setShowPassword((prev) => !prev), []);
 
   const handleUsername = useCallback((e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, username: e.target.value })), []);
@@ -51,6 +49,12 @@ export const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProp
     }
   }, [form, onCreated, t]);
 
+  const roleOptions = useMemo(() => [
+    { value: 'RECEPTIONIST', label: t('role_receptionist') },
+    { value: 'OWNER', label: t('role_owner') },
+    { value: 'ADMIN', label: t('role_admin') },
+  ], [t]);
+
   return (
     <M3Dialog
       open
@@ -65,45 +69,29 @@ export const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProp
       }
     >
       <form id="create-user-form" onSubmit={handleSubmit} noValidate className="space-y-4">
-        <div>
-          <label htmlFor="new-username" className="block text-sm font-medium text-on-surface mb-1">
-            {t('label_username')}
-          </label>
-          <input id="new-username" type="text" value={form.username} onChange={handleUsername}
-            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-        </div>
-        <div>
-          <label htmlFor="new-email" className="block text-sm font-medium text-on-surface mb-1">
-            {t('label_email')}
-          </label>
-          <input id="new-email" type="email" value={form.email} onChange={handleEmail}
-            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-        </div>
-        <div>
-          <label htmlFor="new-password" className="block text-sm font-medium text-on-surface mb-1">
-            {t('label_password')}
-          </label>
-          <div className="relative">
-            <input id="new-password" type={showPassword ? 'text' : 'password'} value={form.password} onChange={handlePassword}
-              className="w-full rounded-md border border-outline bg-surface px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-            <PasswordVisibilityToggle
-              visible={showPassword}
-              onToggle={toggleShowPassword}
-              className="absolute right-1 top-1/2 -translate-y-1/2"
-            />
-          </div>
-        </div>
-        <div>
-          <label htmlFor="new-role" className="block text-sm font-medium text-on-surface mb-1">
-            {t('label_role')}
-          </label>
-          <select id="new-role" value={form.role} onChange={handleRole}
-            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-            <option value="RECEPTIONIST">{t('role_receptionist')}</option>
-            <option value="OWNER">{t('role_owner')}</option>
-            <option value="ADMIN">{t('role_admin')}</option>
-          </select>
-        </div>
+        <M3TextField
+          label={t('label_username')}
+          value={form.username}
+          onChange={handleUsername}
+        />
+        <M3TextField
+          label={t('label_email')}
+          type="email"
+          value={form.email}
+          onChange={handleEmail}
+        />
+        <M3TextField
+          label={t('label_password')}
+          type="password"
+          value={form.password}
+          onChange={handlePassword}
+        />
+        <M3Select
+          label={t('label_role')}
+          options={roleOptions}
+          value={form.role}
+          onChange={handleRole}
+        />
 
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
       </form>

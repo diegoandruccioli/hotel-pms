@@ -1,8 +1,9 @@
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Select } from '../../components/m3/M3Select';
 import { billingService } from '../../services/billingService';
 import { useToastStore } from '../../store/toastStore';
 import { getErrorMessage } from '../../utils/errorMessage';
@@ -92,6 +93,14 @@ export const PaymentModal = memo(({ invoice, onClose, onPaid }: Props) => {
     [amount, method, reference, invoice, onPaid, onClose, addToast, t],
   );
 
+  const methodOptions = useMemo(
+    () => PAYMENT_METHODS.map((m) => ({
+      value: m,
+      label: t(`payment_method_${m.toLowerCase()}`, { ns: 'billing' }),
+    })),
+    [t],
+  );
+
   return (
     <M3Dialog
       open
@@ -127,32 +136,13 @@ export const PaymentModal = memo(({ invoice, onClose, onPaid }: Props) => {
         />
 
         {/* Payment method */}
-        <div>
-          <label
-            htmlFor="payment-method-select"
-            className="block text-sm font-medium font-body text-on-surface mb-1"
-          >
-            {t('payment_method', { ns: 'billing' })} *
-          </label>
-          <select
-            id="payment-method-select"
-            value={method}
-            onChange={handleMethodChange}
-            required
-            className={[
-              'w-full rounded-shape-xs border border-outline bg-surface',
-              'text-on-surface px-4 py-3 text-sm font-body',
-              'focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary focus:ring-offset-1',
-              'hover:border-on-surface transition-colors',
-            ].join(' ')}
-          >
-            {PAYMENT_METHODS.map((m) => (
-              <option key={m} value={m}>
-                {t(`payment_method_${m.toLowerCase()}`, { ns: 'billing' })}
-              </option>
-            ))}
-          </select>
-        </div>
+        <M3Select
+          label={t('payment_method', { ns: 'billing' })}
+          required
+          options={methodOptions}
+          value={method}
+          onChange={handleMethodChange}
+        />
 
         {/* Reference (optional) */}
         <M3TextField

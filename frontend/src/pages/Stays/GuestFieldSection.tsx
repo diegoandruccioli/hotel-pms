@@ -5,6 +5,7 @@ import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Card } from '../../components/m3/M3Card';
 import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Checkbox } from '../../components/m3/M3Checkbox';
 import type { AlloggiatiStato, AlloggiatiTipdoc, TravellerType } from '../../types/stay.types';
 import {
   TYPES_WITHOUT_DOC,
@@ -232,19 +233,13 @@ export const GuestFieldSection = memo(({
 
         <M3TextField label={t('label_stay_reason')} name="travelPurpose" value={guest.travelPurpose ?? ''} onChange={handleSimpleChange} />
 
-        <div className="md:col-span-2 flex items-center gap-2 mt-2">
-          <input
-            id={`primary-${index}`}
-            type="checkbox"
-            name="isPrimaryGuest"
-            checked={guest.isPrimaryGuest}
-            onChange={handlePrimaryChange}
-            className="w-5 h-5 text-primary rounded focus:ring-primary"
-          />
-          <label htmlFor={`primary-${index}`} className="text-sm font-body text-on-surface cursor-pointer">
-            {t('label_primary_guest')}
-          </label>
-        </div>
+        <M3Checkbox
+          className="md:col-span-2 mt-2"
+          name="isPrimaryGuest"
+          label={t('label_primary_guest')}
+          checked={guest.isPrimaryGuest}
+          onChange={handlePrimaryChange}
+        />
       </div>
     </M3Card>
   );

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3Button } from '../../components/m3/M3Button';
+import { M3Select } from '../../components/m3/M3Select';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { fbService } from '../../services/fbService';
 import { stayService } from '../../services/stayService';
@@ -115,6 +116,11 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
     setStayIdError('');
   }, []);
 
+  const stayOptions = useMemo(() => activeStays.map((stay) => ({
+    value: stay.id,
+    label: `${stay.roomNumber}${stay.guestDisplayName ? ` — ${stay.guestDisplayName}` : ''}`,
+  })), [activeStays]);
+
   const handleDecrement = useCallback((itemId: string) => {
     setQuantities((prev) => {
       const current = prev[itemId] ?? 0;
@@ -180,33 +186,26 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
     >
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div>
-          <label htmlFor="order-room" className="block text-sm font-medium text-on-surface mb-1">
-            {t('room_label')} <span aria-hidden="true">*</span>
-          </label>
           {staysLoading ? (
-            <p className="text-sm text-on-surface-variant" role="status">{t('loading_rooms')}</p>
+            <>
+              <p className="block text-sm font-medium text-on-surface mb-1">{t('room_label')}</p>
+              <p className="text-sm text-on-surface-variant" role="status">{t('loading_rooms')}</p>
+            </>
           ) : activeStays.length === 0 ? (
-            <p className="text-sm text-error" role="alert">{t('no_active_stays')}</p>
+            <>
+              <p className="block text-sm font-medium text-on-surface mb-1">{t('room_label')}</p>
+              <p className="text-sm text-error" role="alert">{t('no_active_stays')}</p>
+            </>
           ) : (
-            <select
-              id="order-room"
+            <M3Select
+              label={t('room_label')}
+              required
+              options={stayOptions}
+              placeholder={t('placeholder_room')}
               value={stayId}
               onChange={handleStayIdChange}
-              required
-              className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
-              aria-invalid={!!stayIdError}
-              aria-describedby={stayIdError ? 'order-room-error' : undefined}
-            >
-              <option value="">{t('placeholder_room')}</option>
-              {activeStays.map((stay) => (
-                <option key={stay.id} value={stay.id}>
-                  {stay.roomNumber}{stay.guestDisplayName ? ` — ${stay.guestDisplayName}` : ''}
-                </option>
-              ))}
-            </select>
-          )}
-          {stayIdError && (
-            <p id="order-room-error" role="alert" className="mt-1 text-sm text-error">{stayIdError}</p>
+              errorText={stayIdError || undefined}
+            />
           )}
         </div>
 
