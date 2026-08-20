@@ -1,15 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
+import { renderWithQuery as render } from '../test-utils/renderWithQuery';
 import { Housekeeping } from './Housekeeping';
 import { inventoryService } from '../services/inventoryService';
 import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
 
-// `t` must be a module-level stable reference: Housekeeping's loadRooms useCallback
-// depends on `t`, and that callback is the sole effect dependency triggering the
-// initial fetch. An inline arrow recreated on every useTranslation() call would give
-// `t` (and loadRooms) a new identity every render, silently re-firing the fetch after
-// every interaction in this file and exhausting the mockResolvedValueOnce queue.
 const stableT = (key: string) => key;
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: stableT, i18n: { language: 'en' } }),

@@ -1,12 +1,15 @@
-import { useState, useEffect, useCallback, memo, useMemo } from 'react';
-import { inventoryService } from '../services/inventoryService';
+import { useState, useCallback, memo, useMemo } from 'react';
 import { useToastStore } from '../store/toastStore';
 import type { RoomResponse, RoomStatus } from '../types/inventory.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
+import { M3LoadingState } from '../components/m3/M3LoadingState';
+import { M3ErrorState } from '../components/m3/M3ErrorState';
+import { M3EmptyState } from '../components/m3/M3EmptyState';
 import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '../utils/errorMessage';
+import { useRoomsList, useUpdateRoomStatus } from '../hooks/queries/useRooms';
 
 const STATUS_KEYS: Record<RoomStatus, string> = {
   CLEAN: 'room_status_clean',
@@ -39,6 +42,7 @@ const STATUS_BUTTON_STYLES: Record<RoomStatus, string> = {
 };
 
 const ALL_STATUSES: RoomStatus[] = ['CLEAN', 'DIRTY', 'MAINTENANCE'];
+const EMPTY_ROOMS: RoomResponse[] = [];
 
 const RoomCard = memo(({
   room,
@@ -124,39 +128,23 @@ const StatusButton = memo(({ newStatus, updating, onClick, t }: {
 
 export const Housekeeping = memo(() => {
   const { t } = useTranslation('common');
-  const [rooms, setRooms] = useState<RoomResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<RoomStatus | 'ALL'>('ALL');
   const addToast = useToastStore((s) => s.addToast);
 
-  const loadRooms = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await inventoryService.getAllRooms();
-      setRooms(data.content);
-    } catch (err: unknown) {
-      const message = getErrorMessage(err, t('failed_load_rooms'));
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
+  const { data: roomsData, isLoading: loading, error: queryError, refetch } = useRoomsList(false);
+  const rooms = roomsData ?? EMPTY_ROOMS;
+  const error = queryError ? getErrorMessage(queryError, t('failed_load_rooms')) : null;
+  const handleRetry = useCallback(() => { refetch(); }, [refetch]);
 
-  useEffect(() => {
-    loadRooms();
-  }, [loadRooms]);
-
+  const updateRoomStatus = useUpdateRoomStatus();
   const handleStatusChange = useCallback(async (id: string, newStatus: RoomStatus) => {
     try {
-      const updated = await inventoryService.updateRoomStatus(id, newStatus);
-      setRooms((prev) => prev.map((r) => (r.id === id ? updated : r)));
+      await updateRoomStatus.mutateAsync({ id, status: newStatus });
       addToast(t('room_updated', { status: t(STATUS_KEYS[newStatus]) }), 'success');
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('failed_update_room')), 'error');
     }
-  }, [addToast, t]);
+  }, [addToast, t, updateRoomStatus]);
 
   const filteredRooms = useMemo(() => 
     filter === 'ALL' ? rooms : rooms.filter((r) => r.status === filter),
@@ -180,44 +168,39 @@ export const Housekeeping = memo(() => {
           </h1>
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('housekeeping_subtitle')}</p>
         </div>
-        <M3Button variant="outlined" icon="refresh" onClick={loadRooms}>
+        <M3Button variant="outlined" icon="refresh" onClick={handleRetry}>
           {t('refresh')}
         </M3Button>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
         {ALL_STATUSES.map((status) => (
-          <FilterBadge 
-            key={status} 
-            status={status} 
-            active={filter === status} 
-            count={countByStatus(status)} 
-            onClick={handleFilterClick} 
-            t={t} 
+          <FilterBadge
+            key={status}
+            status={status}
+            active={filter === status}
+            count={countByStatus(status)}
+            onClick={handleFilterClick}
+            t={t}
           />
         ))}
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('loading')} />
       ) : error ? (
-        <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium font-body">{t('error_loading_rooms')}</h3>
-            <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button type="button" onClick={loadRooms} className="mt-2 text-sm font-medium underline hover:no-underline">
-              {t('try_again')}
-            </button>
-          </div>
-        </div>
+        <M3ErrorState
+          title={t('error_loading_rooms')}
+          message={error}
+          retryLabel={t('try_again')}
+          onRetry={handleRetry}
+        />
       ) : filteredRooms.length === 0 ? (
-        <div className="text-center py-16 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="cleaning_services" size={40} className="text-outline-variant mx-auto mb-3" />
-          <p className="text-sm font-body text-on-surface-variant">{t('no_rooms_found')}</p>
-        </div>
+        <M3EmptyState
+          icon="cleaning_services"
+          title={t('no_rooms_found')}
+          className="bg-surface rounded-shape-md shadow-elevation-1"
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredRooms.map((room) => (

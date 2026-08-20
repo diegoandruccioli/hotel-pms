@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { inventoryService } from '../../services/inventoryService';
+import type { RoomResponse, RoomStatus } from '../../types/inventory.types';
 import { queryKeys } from '../../lib/queryKeys';
 
 const getTodayString = (): string => {
@@ -29,5 +30,26 @@ export function useRoomTypes() {
   return useQuery({
     queryKey: queryKeys.roomTypes.all,
     queryFn: () => inventoryService.getAllRoomTypes(),
+  });
+}
+
+/**
+ * Patches the cached unfiltered room list in place on success instead of
+ * invalidating — Housekeeping.tsx did the equivalent with a local
+ * `setRooms((prev) => prev.map(...))` before this migration, and a full
+ * refetch after every single status click would be a worse experience for
+ * what's meant to be a fast, frequent action.
+ */
+export function useUpdateRoomStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: RoomStatus }) =>
+      inventoryService.updateRoomStatus(id, status),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<RoomResponse[]>(queryKeys.rooms.list(false), (prev) =>
+        prev?.map((r) => (r.id === updated.id ? updated : r)),
+      );
+      queryClient.invalidateQueries({ queryKey: queryKeys.rooms.list(true) });
+    },
   });
 }
