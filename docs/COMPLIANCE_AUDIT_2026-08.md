@@ -255,6 +255,18 @@ lo standard WCAG 2.2 AA è stato adottato come scelta tecnica propria, non ancor
 esplicitamente alla normativa italiana sull'accessibilità digitale (che per un prodotto
 SaaS B2B non pubblico non è comunque un obbligo diretto, a differenza della PA).
 
+**Tre gap reali chiusi (2026-08-20, branch `feature/ui-ux-optimization-phase0`)**, trovati
+durante un audit UI/UX indipendente da questo stesso lavoro di conformità:
+- `prefers-reduced-motion` non era mai onorato — `m3-base.css` applicava una transizione
+  globale a `*` e `tailwind.config.js` definisce 4 keyframe, entrambi incondizionati.
+  Violazione WCAG 2.3.3. Aggiunto un blocco `@media (prefers-reduced-motion: reduce)`.
+- I toast si smontavano interamente tra un messaggio e l'altro (`if (toasts.length === 0)
+  return null`), quindi la live region non esisteva ancora nel momento in cui un nuovo
+  toast veniva aggiunto e poteva non essere annunciata. Ora resta sempre montata, con due
+  regioni distinte (`assertive` per gli errori, `polite` per successo/info).
+- I cambi di rotta lato client non erano mai annunciati — l'unico `aria-live` di tutta
+  l'app era in `Restaurant/OrderFormModal.tsx`. Aggiunto `RouteAnnouncer` in `MainLayout`.
+
 ---
 
 ## 9. Antiriciclaggio (D.Lgs. 231/2007) — 🔴 Mai citato, rischio basso ma non documentato
