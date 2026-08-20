@@ -9,7 +9,7 @@ export type PaymentMethod =
   | 'BANK_TRANSFER'
   | 'CHECK';
 
-export type ChargeType = 'FB_ORDER' | 'ROOM_NIGHT' | 'EXTRA';
+export type ChargeType = 'FB_ORDER' | 'ROOM_NIGHT' | 'EXTRA' | 'CITY_TAX';
 
 export interface ChargeResponse {
   id: string;

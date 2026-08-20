@@ -16,14 +16,22 @@
 
 <div class="totals">
     <th:block th:each="vat : ${vatBreakdown}">
-        <div class="row">
-            <div class="label" th:text="'Imponibile ' + ${vat.rateLabel} + ':'">Imponibile 10%:</div>
+        <!-- A natura line (imposta di soggiorno etc.) is out of VAT scope, not "0% VAT" —
+             shown as a single amount, no separate always-zero "IVA:" row. -->
+        <div class="row" th:if="${vat.natura == 'true'}">
+            <div class="label" th:text="${vat.rateLabel} + ':'">Escluso IVA:</div>
             <div class="value" th:text="${vat.taxableFormatted}">EUR 0,00</div>
         </div>
-        <div class="row">
-            <div class="label" th:text="'IVA ' + ${vat.rateLabel} + ':'">IVA 10%:</div>
-            <div class="value" th:text="${vat.vatFormatted}">EUR 0,00</div>
-        </div>
+        <th:block th:unless="${vat.natura == 'true'}">
+            <div class="row">
+                <div class="label" th:text="'Imponibile ' + ${vat.rateLabel} + ':'">Imponibile 10%:</div>
+                <div class="value" th:text="${vat.taxableFormatted}">EUR 0,00</div>
+            </div>
+            <div class="row">
+                <div class="label" th:text="'IVA ' + ${vat.rateLabel} + ':'">IVA 10%:</div>
+                <div class="value" th:text="${vat.vatFormatted}">EUR 0,00</div>
+            </div>
+        </th:block>
     </th:block>
     <div class="row grand-total">
         <div class="label">TOTALE:</div>

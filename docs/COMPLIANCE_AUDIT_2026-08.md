@@ -128,7 +128,7 @@ con un ruolo non autorizzato).
 
 ---
 
-## 4. Imposta di soggiorno (tassa di soggiorno comunale) — 🔴 Assente, non tracciata
+## 4. Imposta di soggiorno (tassa di soggiorno comunale) — ✅ Implementato (2026-08-19)
 
 **Normativa** (verificata via ricerca web, 2026-08-03): il gestore della struttura è
 responsabile diretto della riscossione e del versamento (Cassazione n. 1527/2026, che ha
@@ -159,6 +159,25 @@ completamente fuori dal sistema, con rischio di errore/dimenticanza che ricade
 sull'hotel, non sul fornitore software — ma un prodotto che si presenta come
 "gestionale alberghiero completo" ne risulta strutturalmente incompleto su un punto che
 ogni hotel italiano deve gestire.
+
+**Risoluzione** (2026-08-19, `docs/ROADMAP.md` E18): implementato su
+`feature/imposta-di-soggiorno` (5 commit). `ChargeType.CITY_TAX` fuori campo IVA via
+`Natura` FatturaPA N1 (art. 15 c.1 n.3 DPR 633/1972 — riscossione in nome e per conto del
+comune), da confermare col commercialista prima del go-live. Nuovo package `citytax`
+(frontdesk-service): `HotelCategoryHistory` (storico categoria per hotel, versionato —
+una prenotazione passata si liquida con la categoria che l'hotel aveva allora, non quella
+attuale), `CityTaxRate` (per hotel+comune+categoria, `EXCLUDE USING gist` contro
+overlap, deliberatamente non condivisa fra hotel dello stesso comune per non introdurre
+un modello di autorizzazione cross-tenant assente altrove nel repo), `CityTaxAssessment`
+(record immutabile per-stay, FK + snapshot denormalizzato per ricostruibilità fiscale
+anche se la regola referenziata cambiasse). Calcolo e posting automatico al check-in
+insieme a `ROOM_NIGHT`, guardia di idempotenza per-charge indipendente
+(`Stay.roomChargeId` / `CityTaxAssessment.billingChargeId` — un fallimento sulla sola
+CITY_TAX non ripubblica la camera al retry). UI amministrazione tariffe/categoria su
+`/settings/city-tax` (ADMIN/OWNER). ISTAT/ROSS1000 (§9ter/E17) resta esplicitamente
+rinviato — nessun cliente pagante lo richiede oggi. **Prima di inserire tariffe reali**:
+confermare con un commercialista il codice Natura corretto (N1 vs N2.2) e l'importo
+esatto dalla delibera comunale ufficiale (non dedotto da fonti giornalistiche).
 
 ---
 

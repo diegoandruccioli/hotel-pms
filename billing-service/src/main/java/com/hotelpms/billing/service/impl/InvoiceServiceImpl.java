@@ -56,6 +56,14 @@ public class InvoiceServiceImpl implements InvoiceService {
 
     private static final String INVOICE_NOT_FOUND = "INVOICE_NOT_FOUND";
     private static final int GUEST_SEARCH_MATCH_CAP = 200;
+    /**
+     * The FatturaPA {@code Natura} code for the tourist tax — collected by the
+     * operator in the comune's name, not as consideration for a service of its own
+     * (art. 15 c.1 n.3 D.P.R. 633/1972, "anticipazioni fatte in nome e per conto").
+     * Kept as a single named constant, not inlined, so a future correction (e.g. to
+     * {@code N2.2}) after commercialista review is a one-line change.
+     */
+    private static final String NATURA_CITY_TAX = "N1";
 
     private final InvoiceRepository invoiceRepository;
     private final InvoiceChargeRepository invoiceChargeRepository;
@@ -110,11 +118,13 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
         assertNotFiscallyLocked(invoice);
 
+        final VatTreatment vatTreatment = vatTreatmentFor(request.type());
         final InvoiceCharge charge = InvoiceCharge.builder()
                 .type(request.type())
                 .description(request.description())
                 .amount(request.amount())
-                .vatRate(vatRateFor(request.type()))
+                .vatRate(vatTreatment.rate())
+                .naturaCode(vatTreatment.naturaCode())
                 .referenceId(request.referenceId())
                 .unitPrice(request.unitPrice())
                 .nights(request.nights())
@@ -322,10 +332,11 @@ public class InvoiceServiceImpl implements InvoiceService {
         return invoiceMapper.toResponse(Objects.requireNonNull(saved));
     }
 
-    private static BigDecimal vatRateFor(final ChargeType type) {
+    private static VatTreatment vatTreatmentFor(final ChargeType type) {
         return switch (type) {
-            case ROOM_NIGHT, FB_ORDER -> new BigDecimal("0.10");
-            case EXTRA -> new BigDecimal("0.22");
+            case ROOM_NIGHT, FB_ORDER -> new VatTreatment(new BigDecimal("0.10"), null);
+            case EXTRA -> new VatTreatment(new BigDecimal("0.22"), null);
+            case CITY_TAX -> new VatTreatment(BigDecimal.ZERO, NATURA_CITY_TAX);
         };
     }
 
@@ -377,5 +388,18 @@ public class InvoiceServiceImpl implements InvoiceService {
                         inv.getTotalAmount(),
                         inv.getStatus()))
                 .toList();
+    }
+
+    /**
+     * The VAT rate and, when the charge is out of VAT scope, the FatturaPA
+     * {@code Natura} code to record alongside it. Derived only from the server-known
+     * {@link ChargeType} — never accepted from the client, same non-forgeable
+     * property {@code vatRate} alone already had.
+     *
+     * @param rate       the VAT rate
+     * @param naturaCode the FatturaPA {@code Natura} code, or {@code null} for an
+     *                   ordinary taxable charge
+     */
+    private record VatTreatment(BigDecimal rate, String naturaCode) {
     }
 }

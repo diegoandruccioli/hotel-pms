@@ -30,6 +30,19 @@ class FatturaPaXsdValidatorTest {
     }
 
     @Test
+    void shouldReturnNoErrorsForADocumentWithAnOutOfVatScopeNaturaLine() {
+        // E18 prep: a second DettaglioLinee/DatiRiepilogo pair at 0% VAT with a Natura
+        // code (imposta di soggiorno's eventual shape) plus RiferimentoNormativo, in
+        // the XSD-mandated element order — proves the schema itself accepts this
+        // structure before FatturaPAServiceImpl ever emits it for a real charge.
+        final byte[] xml = withNaturaLine(minimalValidFattura());
+
+        final List<String> errors = validator.validate(xml);
+
+        assertThat(errors).isEmpty();
+    }
+
+    @Test
     void shouldReturnErrorsWhenARequiredElementIsRenamed() {
         final byte[] xml = new String(minimalValidFattura(), StandardCharsets.UTF_8)
                 .replace("<Numero>1/2026</Numero>", "<NumeroSbagliato>1/2026</NumeroSbagliato>")
@@ -118,5 +131,31 @@ class FatturaPaXsdValidatorTest {
                 + "  </FatturaElettronicaBody>"
                 + "</p:FatturaElettronica>";
         return xml.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Inserts a second {@code DettaglioLinee}/{@code DatiRiepilogo} pair (0% VAT,
+     * {@code Natura} {@code N1}, {@code RiferimentoNormativo}) into
+     * {@link #minimalValidFattura()}, in the element order the XSD requires
+     * ({@code DettaglioLineeType}: ...AliquotaIVA, Ritenuta, Natura...;
+     * {@code DatiRiepilogoType}: AliquotaIVA, Natura, ..., ImponibileImporto, Imposta,
+     * EsigibilitaIVA, RiferimentoNormativo). Renumbers {@code NumeroLinea} to 2.
+     *
+     * @param base the minimal valid fixture to extend
+     * @return the extended fixture, still schema-valid
+     */
+    private static byte[] withNaturaLine(final byte[] base) {
+        final String extraDettaglioLinee = "<DettaglioLinee><NumeroLinea>2</NumeroLinea>"
+                + "<Descrizione>Imposta di soggiorno</Descrizione><Quantita>1.00</Quantita>"
+                + "<PrezzoUnitario>6.00</PrezzoUnitario><PrezzoTotale>6.00</PrezzoTotale>"
+                + "<AliquotaIVA>0.00</AliquotaIVA><Natura>N1</Natura></DettaglioLinee>";
+        final String extraDatiRiepilogo = "<DatiRiepilogo><AliquotaIVA>0.00</AliquotaIVA><Natura>N1</Natura>"
+                + "<ImponibileImporto>6.00</ImponibileImporto><Imposta>0.00</Imposta>"
+                + "<EsigibilitaIVA>I</EsigibilitaIVA>"
+                + "<RiferimentoNormativo>Escluso ex art. 15 DPR 633/1972</RiferimentoNormativo></DatiRiepilogo>";
+        return new String(base, StandardCharsets.UTF_8)
+                .replace("</DettaglioLinee>", "</DettaglioLinee>" + extraDettaglioLinee)
+                .replace("</DatiRiepilogo>", "</DatiRiepilogo>" + extraDatiRiepilogo)
+                .getBytes(StandardCharsets.UTF_8);
     }
 }

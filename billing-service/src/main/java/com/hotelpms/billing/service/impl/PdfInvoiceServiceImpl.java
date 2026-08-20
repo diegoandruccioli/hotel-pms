@@ -152,7 +152,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
             final Map<String, String> row = new HashMap<>();
             row.put("typeLabel", formatChargeType(charge.type().name()));
             row.put("description", charge.description() != null ? charge.description() : EMPTY_VALUE);
-            row.put("vatLabel", charge.vatRate() != null ? vatRateToLabel(charge.vatRate()) : EMPTY_VALUE);
+            row.put("vatLabel", charge.vatRate() != null ? vatRateToLabel(charge.vatRate(), charge.naturaCode()) : EMPTY_VALUE);
             row.put("amountFormatted", formatAmount(charge.amount()));
             rows.add(row);
         }
@@ -174,11 +174,15 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
     }
 
     private List<Map<String, String>> toVatRows(final List<ChargeResponse> charges) {
-        final Map<BigDecimal, VatBreakdownCalculator.VatLine> breakdown = vatBreakdownCalculator.groupByRate(charges);
+        final Map<VatBreakdownCalculator.VatGroupKey, VatBreakdownCalculator.VatLine> breakdown =
+                vatBreakdownCalculator.groupByTreatment(charges);
         final List<Map<String, String>> rows = new ArrayList<>();
-        for (final Map.Entry<BigDecimal, VatBreakdownCalculator.VatLine> entry : breakdown.entrySet()) {
+        for (final Map.Entry<VatBreakdownCalculator.VatGroupKey, VatBreakdownCalculator.VatLine> entry
+                : breakdown.entrySet()) {
             final Map<String, String> row = new HashMap<>();
-            row.put("rateLabel", vatRateToLabel(entry.getKey()));
+            final String naturaCode = entry.getKey().naturaCode();
+            row.put("rateLabel", vatRateToLabel(entry.getKey().rate(), naturaCode));
+            row.put("natura", String.valueOf(naturaCode != null));
             row.put("taxableFormatted", formatAmount(entry.getValue().taxable()));
             row.put("vatFormatted", formatAmount(entry.getValue().vat()));
             rows.add(row);
@@ -186,7 +190,20 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
         return rows;
     }
 
-    private static String vatRateToLabel(final BigDecimal rate) {
+    /**
+     * Renders a VAT-rate label for display. A charge carrying a {@code naturaCode}
+     * is out of VAT scope, not "0% VAT" — labelling it as such would misrepresent a
+     * fiscally exempt line as an ordinary zero-rate one on the courtesy PDF.
+     *
+     * @param rate       the VAT rate
+     * @param naturaCode the FatturaPA Natura code, or {@code null} for an ordinary
+     *                   taxable rate
+     * @return "Escluso IVA" for a natura line, otherwise the percentage (e.g. "10%")
+     */
+    private static String vatRateToLabel(final BigDecimal rate, final String naturaCode) {
+        if (naturaCode != null) {
+            return "Escluso IVA";
+        }
         return rate.movePointRight(2).stripTrailingZeros().toPlainString() + "%";
     }
 
@@ -202,6 +219,7 @@ public class PdfInvoiceServiceImpl implements PdfInvoiceService {
             case "ROOM_NIGHT" -> "Camera";
             case "FB_ORDER" -> "F&B";
             case "EXTRA" -> "Extra";
+            case "CITY_TAX" -> "Imposta di soggiorno";
             default -> type;
         };
     }

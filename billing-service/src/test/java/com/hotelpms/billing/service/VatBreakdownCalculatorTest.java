@@ -21,6 +21,10 @@ class VatBreakdownCalculatorTest {
     private static final UUID INVOICE_ID = UUID.randomUUID();
     private static final BigDecimal GROSS_110 = new BigDecimal("110.00");
     private static final BigDecimal UNRELATED_TOTAL = new BigDecimal("999.00");
+    private static final BigDecimal AMOUNT_12_20 = new BigDecimal("12.20");
+    private static final BigDecimal AMOUNT_6 = new BigDecimal("6.00");
+    private static final String NATURA_N1 = "N1";
+    private static final String NATURA_N4 = "N4";
 
     private final VatBreakdownCalculator calculator = new VatBreakdownCalculator();
 
@@ -34,34 +38,88 @@ class VatBreakdownCalculatorTest {
     }
 
     @Test
-    void groupByRateSumsChargesWithTheSameRate() {
-        final List<ChargeResponse> charges = List.of(
-                charge(GROSS_110, VAT_RATE_10),
-                charge(new BigDecimal("55.00"), VAT_RATE_10),
-                charge(new BigDecimal("12.20"), VAT_RATE_22));
+    void splitLineAtZeroRateReturnsFullGrossAsTaxableAndZeroVat() {
+        final VatBreakdownCalculator.VatLine line = calculator.splitLine(GROSS_110, BigDecimal.ZERO);
 
-        final Map<BigDecimal, VatBreakdownCalculator.VatLine> breakdown = calculator.groupByRate(charges);
-
-        assertThat(breakdown).hasSize(2);
-        assertThat(breakdown.get(VAT_RATE_10).taxable()).isEqualByComparingTo("150.00");
-        assertThat(breakdown.get(VAT_RATE_10).vat()).isEqualByComparingTo("15.00");
-        assertThat(breakdown.get(VAT_RATE_22).taxable()).isEqualByComparingTo("10.00");
-        assertThat(breakdown.get(VAT_RATE_22).vat()).isEqualByComparingTo("2.20");
+        assertThat(line.taxable()).isEqualByComparingTo(GROSS_110);
+        assertThat(line.vat()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test
-    void groupByRateReturnsEmptyMapForNullOrEmptyCharges() {
-        assertThat(calculator.groupByRate(null)).isEmpty();
-        assertThat(calculator.groupByRate(List.of())).isEmpty();
+    void groupByTreatmentSumsChargesWithTheSameRate() {
+        final List<ChargeResponse> charges = List.of(
+                charge(GROSS_110, VAT_RATE_10),
+                charge(new BigDecimal("55.00"), VAT_RATE_10),
+                charge(AMOUNT_12_20, VAT_RATE_22));
+
+        final Map<VatBreakdownCalculator.VatGroupKey, VatBreakdownCalculator.VatLine> breakdown =
+                calculator.groupByTreatment(charges);
+
+        assertThat(breakdown).hasSize(2);
+        final VatBreakdownCalculator.VatGroupKey rate10 = new VatBreakdownCalculator.VatGroupKey(VAT_RATE_10, null);
+        final VatBreakdownCalculator.VatGroupKey rate22 = new VatBreakdownCalculator.VatGroupKey(VAT_RATE_22, null);
+        assertThat(breakdown.get(rate10).taxable()).isEqualByComparingTo("150.00");
+        assertThat(breakdown.get(rate10).vat()).isEqualByComparingTo("15.00");
+        assertThat(breakdown.get(rate22).taxable()).isEqualByComparingTo("10.00");
+        assertThat(breakdown.get(rate22).vat()).isEqualByComparingTo("2.20");
+    }
+
+    @Test
+    void groupByTreatmentReturnsEmptyMapForNullOrEmptyCharges() {
+        assertThat(calculator.groupByTreatment(null)).isEmpty();
+        assertThat(calculator.groupByTreatment(List.of())).isEmpty();
+    }
+
+    @Test
+    void groupByTreatmentDoesNotMergeSameRateWithDifferentNaturaCodes() {
+        final Map<VatBreakdownCalculator.VatGroupKey, VatBreakdownCalculator.VatLine> breakdown =
+                calculator.groupByTreatment(List.of(
+                        chargeWithNatura(AMOUNT_6, NATURA_N1),
+                        chargeWithNatura(new BigDecimal("4.00"), NATURA_N4)));
+
+        assertThat(breakdown).hasSize(2);
+        final VatBreakdownCalculator.VatGroupKey n1 = new VatBreakdownCalculator.VatGroupKey(BigDecimal.ZERO, NATURA_N1);
+        final VatBreakdownCalculator.VatGroupKey n4 = new VatBreakdownCalculator.VatGroupKey(BigDecimal.ZERO, NATURA_N4);
+        assertThat(breakdown.get(n1).taxable()).isEqualByComparingTo(AMOUNT_6);
+        assertThat(breakdown.get(n4).taxable()).isEqualByComparingTo("4.00");
+    }
+
+    @Test
+    void groupByTreatmentOrdersByRateThenNaturaWithNullsFirst() {
+        final List<ChargeResponse> charges = List.of(
+                chargeWithNatura(AMOUNT_6, NATURA_N4),
+                charge(AMOUNT_12_20, VAT_RATE_22),
+                chargeWithNatura(AMOUNT_6, NATURA_N1),
+                charge(GROSS_110, VAT_RATE_10));
+
+        final List<VatBreakdownCalculator.VatGroupKey> orderedKeys =
+                List.copyOf(calculator.groupByTreatment(charges).keySet());
+
+        // 0% (natura-bearing) sorts before any positive rate; among equal 0% rates,
+        // natura codes sort by natural String order ("N1" before "N4").
+        assertThat(orderedKeys).containsExactly(
+                new VatBreakdownCalculator.VatGroupKey(BigDecimal.ZERO, NATURA_N1),
+                new VatBreakdownCalculator.VatGroupKey(BigDecimal.ZERO, NATURA_N4),
+                new VatBreakdownCalculator.VatGroupKey(VAT_RATE_10, null),
+                new VatBreakdownCalculator.VatGroupKey(VAT_RATE_22, null));
     }
 
     @Test
     void assertReconcilesPassesWhenSumMatchesTotal() {
         final List<ChargeResponse> charges = List.of(
                 charge(GROSS_110, VAT_RATE_10),
-                charge(new BigDecimal("12.20"), VAT_RATE_22));
+                charge(AMOUNT_12_20, VAT_RATE_22));
 
         calculator.assertReconciles(new BigDecimal("122.20"), charges);
+    }
+
+    @Test
+    void assertReconcilesPassesWithANaturaLinePresent() {
+        final List<ChargeResponse> charges = List.of(
+                charge(GROSS_110, VAT_RATE_10),
+                chargeWithNatura(AMOUNT_6, NATURA_N1));
+
+        calculator.assertReconciles(new BigDecimal("116.00"), charges);
     }
 
     @Test
@@ -81,6 +139,11 @@ class VatBreakdownCalculatorTest {
 
     private static ChargeResponse charge(final BigDecimal amount, final BigDecimal vatRate) {
         return new ChargeResponse(UUID.randomUUID(), INVOICE_ID, ChargeType.ROOM_NIGHT,
-                "Test charge", amount, vatRate, null, null, null, LocalDateTime.now());
+                "Test charge", amount, vatRate, null, null, null, null, LocalDateTime.now());
+    }
+
+    private static ChargeResponse chargeWithNatura(final BigDecimal amount, final String naturaCode) {
+        return new ChargeResponse(UUID.randomUUID(), INVOICE_ID, ChargeType.ROOM_NIGHT,
+                "Natura test charge", amount, BigDecimal.ZERO, naturaCode, null, null, null, LocalDateTime.now());
     }
 }

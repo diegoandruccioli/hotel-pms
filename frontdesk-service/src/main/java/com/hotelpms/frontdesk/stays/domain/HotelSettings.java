@@ -38,6 +38,7 @@ public class HotelSettings {
     private static final int LEN_CAP = 5;
     private static final int LEN_PROVINCIA = 2;
     private static final int LEN_COMUNE = 100;
+    private static final int LEN_COMUNE_CODICE = 9;
 
     /** The hotel this settings row belongs to (primary key). */
     @Id
@@ -85,6 +86,16 @@ public class HotelSettings {
     /** Provincia — 2-letter province code (e.g. {@code "RM"}). */
     @Column(name = "provincia", length = LEN_PROVINCIA)
     private String provincia;
+
+    /**
+     * Stable comune identifier — FK to {@code alloggiati_comuni.codice} (the
+     * Polizia di Stato 9-digit code, not ISTAT/Belfiore), resolved and stored
+     * whenever {@link #comune}/{@link #provincia} are set. Used to key
+     * {@code city_tax_rates} reliably, unlike the human-readable name pair
+     * above, which is validated but not itself a stable key.
+     */
+    @Column(name = "comune_codice", length = LEN_COMUNE_CODICE)
+    private String comuneCodice;
 
     /**
      * Per-hotel Alloggiati Web portal username. Not a secret on its own (a portal

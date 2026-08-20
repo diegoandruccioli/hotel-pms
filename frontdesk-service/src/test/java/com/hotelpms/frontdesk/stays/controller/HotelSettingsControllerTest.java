@@ -77,7 +77,7 @@ class HotelSettingsControllerTest {
 
         settingsResponse = new HotelSettingsResponse(
                 hotelId, false, HOTEL_NAME, HOTEL_ADDRESS, null, null, null, null, false,
-                true, true, null, null, null, null, null, null);
+                true, true, null, null, null, null, null, null, null);
     }
 
     @AfterEach
@@ -101,7 +101,7 @@ class HotelSettingsControllerTest {
                 null, null, null, null, null, null, null, null);
         final HotelSettingsResponse updated = new HotelSettingsResponse(
                 hotelId, true, HOTEL_NAME, HOTEL_ADDRESS, null, null, null, null, false,
-                true, true, null, null, null, null, null, null);
+                true, true, null, null, null, null, null, null, null);
         when(hotelSettingsService.update(eq(hotelId), any(HotelSettingsRequest.class)))
                 .thenReturn(updated);
 

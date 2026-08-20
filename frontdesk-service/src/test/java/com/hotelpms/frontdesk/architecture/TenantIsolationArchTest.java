@@ -55,7 +55,10 @@ final class TenantIsolationArchTest {
             "com.hotelpms.frontdesk.rooms.repository.RoomRepository",
             "com.hotelpms.frontdesk.stays.repository.StayRepository",
             "com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository",
-            "com.hotelpms.frontdesk.quotations.repository.QuotationRepository");
+            "com.hotelpms.frontdesk.quotations.repository.QuotationRepository",
+            "com.hotelpms.frontdesk.citytax.repository.CityTaxRateRepository",
+            "com.hotelpms.frontdesk.citytax.repository.CityTaxAssessmentRepository",
+            "com.hotelpms.frontdesk.citytax.repository.HotelCategoryHistoryRepository");
 
     @ArchTest
     static final ArchRule CUSTOM_QUERY_METHODS_ON_TENANT_ROOT_REPOSITORIES_MUST_SCOPE_BY_HOTEL_ID =

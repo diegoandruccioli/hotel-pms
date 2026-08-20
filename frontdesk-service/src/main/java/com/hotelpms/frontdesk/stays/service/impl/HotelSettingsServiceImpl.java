@@ -1,6 +1,7 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
 import com.hotelpms.frontdesk.exception.BadRequestException;
+import com.hotelpms.frontdesk.stays.domain.AlloggiatiComune;
 import com.hotelpms.frontdesk.stays.domain.HotelSettings;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsRequest;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
@@ -94,9 +95,9 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
         final String provincia = request.provincia() != null
                 ? request.provincia().toUpperCase(java.util.Locale.ROOT) : settings.getProvincia();
         if (request.comune() != null || request.provincia() != null) {
-            validateComune(comune, provincia);
             settings.setComune(comune);
             settings.setProvincia(provincia);
+            settings.setComuneCodice(resolveComuneCodice(comune, provincia));
         }
         return toResponse(hotelSettingsRepository.save(Objects.requireNonNull(settings)));
     }
@@ -105,19 +106,22 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
      * Validates that comune and provincia are both present and form a real, active
      * municipality per the Alloggiati Web reference data — the same data source already
      * used for police check-in reporting (F2), reused here so the FatturaPA {@code Sede}
-     * is never built from a comune/provincia pair that doesn't actually exist.
+     * is never built from a comune/provincia pair that doesn't actually exist. Also
+     * resolves and returns the comune's stable {@code codice} (E18: the key
+     * {@code city_tax_rates} needs), replacing the previous existence-only check.
      *
      * @param comune    the comune name
      * @param provincia the 2-letter province code
+     * @return the resolved comune codice
      * @throws BadRequestException if either is missing or the pair doesn't match a real comune
      */
-    private void validateComune(final String comune, final String provincia) {
+    private String resolveComuneCodice(final String comune, final String provincia) {
         if (comune == null || comune.isBlank() || provincia == null || provincia.isBlank()) {
             throw new BadRequestException("COMUNE_AND_PROVINCIA_MUST_BE_PROVIDED_TOGETHER");
         }
-        if (!alloggiatiComuneRepository.existsActiveByComuneAndProvincia(comune, provincia, LocalDate.now())) {
-            throw new BadRequestException("COMUNE_NOT_FOUND_FOR_PROVINCIA");
-        }
+        return alloggiatiComuneRepository.findActiveByComuneAndProvincia(comune, provincia, LocalDate.now())
+                .map(AlloggiatiComune::getCodice)
+                .orElseThrow(() -> new BadRequestException("COMUNE_NOT_FOUND_FOR_PROVINCIA"));
     }
 
     private HotelSettings createDefault(final UUID hotelId) {
@@ -148,6 +152,7 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
                 entity.getEmailGreetingText(),
                 entity.getCap(),
                 entity.getComune(),
-                entity.getProvincia());
+                entity.getProvincia(),
+                entity.getComuneCodice());
     }
 }
