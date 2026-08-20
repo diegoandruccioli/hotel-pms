@@ -10,6 +10,7 @@ import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { M3LoadingState } from '../components/m3/M3LoadingState';
 import { M3ErrorState } from '../components/m3/M3ErrorState';
 import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
+import { M3Pagination } from '../components/m3/M3Pagination';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
@@ -88,6 +89,10 @@ export const Guests = memo(() => {
 
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
   const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
+  const pageOfLabel = useCallback(
+    (current: number, total: number) => t('page_x_of_y', { current, total }),
+    [t],
+  );
 
   const {
     data,
@@ -210,30 +215,17 @@ export const Guests = memo(() => {
         </M3Table>
       )}
 
-      {!loading && !error && totalPages > 1 && (
-        <nav aria-label={t('pagination')} className="flex items-center justify-center gap-3">
-          <M3Button
-            variant="outlined"
-            icon="chevron_left"
-            disabled={page === 0}
-            onClick={handlePrevPage}
-            aria-label={t('prev_page')}
-          >
-            {t('prev_page')}
-          </M3Button>
-          <span className="text-sm font-body text-on-surface-variant">
-            {t('page_x_of_y', { current: page + 1, total: totalPages })}
-          </span>
-          <M3Button
-            variant="outlined"
-            icon="chevron_right"
-            disabled={page >= totalPages - 1}
-            onClick={handleNextPage}
-            aria-label={t('next_page')}
-          >
-            {t('next_page')}
-          </M3Button>
-        </nav>
+      {!loading && !error && (
+        <M3Pagination
+          page={page}
+          totalPages={totalPages}
+          onPrev={handlePrevPage}
+          onNext={handleNextPage}
+          pageLabel={t('pagination')}
+          prevLabel={t('prev_page')}
+          nextLabel={t('next_page')}
+          pageOfLabel={pageOfLabel}
+        />
       )}
 
       {isModalOpen && (
