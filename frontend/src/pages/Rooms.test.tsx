@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
+import { renderWithQuery as render } from '../test-utils/renderWithQuery';
 import { Rooms } from './Rooms';
 
 vi.mock('react-i18next', () => ({

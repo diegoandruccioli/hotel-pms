@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 /* eslint-disable react-perf/jsx-no-new-array-as-prop -- test-only render helper, not the real perf-sensitive render path */
 import { axe } from 'vitest-axe';
+import { renderWithQuery } from '../../test-utils/renderWithQuery';
 import { RoomList } from './RoomList';
 import { inventoryService } from '../../services/inventoryService';
 
@@ -48,7 +49,7 @@ const roomPage = { content: [ROOM], totalElements: 1, totalPages: 1, number: 0, 
 
 const renderPage = (state?: Record<string, unknown>) => {
   const initialEntries = [{ pathname: '/rooms', state }];
-  return render(
+  return renderWithQuery(
     <MemoryRouter initialEntries={initialEntries}>
       <RoomList />
     </MemoryRouter>,

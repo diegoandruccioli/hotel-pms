@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
+import { renderWithQuery as render } from '../../test-utils/renderWithQuery';
 import { RoomTypeList } from './RoomTypeList';
 import { inventoryService } from '../../services/inventoryService';
 

@@ -1,26 +1,19 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useCallback, useMemo, memo } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { inventoryService } from '../../services/inventoryService';
-import type { RoomResponse, RoomTypeResponse } from '../../types/inventory.types';
-import { MaterialIcon } from '../../components/MaterialIcon';
+import type { RoomResponse } from '../../types/inventory.types';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
 import { M3StatusChip } from '../../components/m3/M3StatusChip';
 import { M3TableActionLink } from '../../components/m3/M3TableActionLink';
-import { useToastStore } from '../../store/toastStore';
+import { M3LoadingState } from '../../components/m3/M3LoadingState';
+import { M3ErrorState } from '../../components/m3/M3ErrorState';
+import { M3TableEmptyRow } from '../../components/m3/M3EmptyState';
+import { useRoomsList, useRoomTypes } from '../../hooks/queries/useRooms';
+import { queryKeys } from '../../lib/queryKeys';
+import { getErrorMessage } from '../../utils/errorMessage';
 import { RoomFormModal } from './RoomFormModal';
-
-const getTodayString = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
-
-const getTomorrowString = (): string => {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-};
 
 interface RoomListNavState {
   availableToday?: boolean;
@@ -63,11 +56,7 @@ const RoomRow = memo(({ room, onEdit, t }: {
 export const RoomList = memo(() => {
   const { t } = useTranslation('common');
   const location = useLocation();
-  const addToast = useToastStore((s) => s.addToast);
-  const [rooms, setRooms] = useState<RoomResponse[]>([]);
-  const [roomTypes, setRoomTypes] = useState<RoomTypeResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [availableOnly, setAvailableOnly] = useState(
     () => ((location.state as RoomListNavState | null)?.availableToday ?? false),
   );
@@ -75,31 +64,28 @@ export const RoomList = memo(() => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<RoomResponse | undefined>();
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [roomsData, typesData] = await Promise.all([
-        availableOnly
-          ? inventoryService.getAvailableRooms(getTodayString(), getTomorrowString())
-          : inventoryService.getAllRooms().then((page) => page.content),
-        inventoryService.getAllRoomTypes(),
-      ]);
-      setRooms(roomsData);
-      setRoomTypes(typesData);
-    } catch (err: unknown) {
-      const e = err as {response?: {data?: {detail?: string}}, message?: string};
-      const errorMsg = e.response?.data?.detail || e.message || t('failed_load_rooms');
-      setError(errorMsg);
-      addToast(errorMsg, 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [addToast, t, availableOnly]);
+  const {
+    data: roomsData,
+    isLoading: roomsLoading,
+    error: roomsError,
+    refetch: refetchRooms,
+  } = useRoomsList(availableOnly);
+  const {
+    data: roomTypesData,
+    isLoading: roomTypesLoading,
+    error: roomTypesError,
+    refetch: refetchRoomTypes,
+  } = useRoomTypes();
+  const rooms = roomsData ?? [];
+  const roomTypes = roomTypesData ?? [];
+  const loading = roomsLoading || roomTypesLoading;
+  const queryError = roomsError ?? roomTypesError;
+  const error = queryError ? getErrorMessage(queryError, t('error_unexpected_fallback')) : null;
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const handleRetry = useCallback(() => {
+    refetchRooms();
+    refetchRoomTypes();
+  }, [refetchRooms, refetchRoomTypes]);
 
   const toggleAvailableOnly = useCallback(() => {
     setAvailableOnly((prev) => !prev);
@@ -121,13 +107,13 @@ export const RoomList = memo(() => {
 
   const handleSaved = useCallback(() => {
     setIsModalOpen(false);
-    loadData();
-  }, [loadData]);
+    queryClient.invalidateQueries({ queryKey: queryKeys.rooms.all });
+  }, [queryClient]);
 
   const headers = useMemo(() => [
     t('room_number_col'),
     t('room_type'),
-    t('status'), 
+    t('status'),
     t('actions')
   ], [t]);
 
@@ -161,28 +147,21 @@ export const RoomList = memo(() => {
       )}
 
       {loading ? (
-        <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1 border border-outline-variant/30">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('loading')} />
       ) : error ? (
-        <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium font-body">{t('failed_load_rooms')}</h3>
-            <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button type="button" onClick={loadData} className="mt-2 text-sm font-medium underline hover:no-underline">
-              {t('try_again')}
-            </button>
-          </div>
-        </div>
+        <M3ErrorState
+          title={t('failed_load_rooms')}
+          message={error}
+          retryLabel={t('try_again')}
+          onRetry={handleRetry}
+        />
       ) : (
         <M3Table headers={headers}>
           {rooms.length === 0 ? (
-            <tr>
-              <td colSpan={4} className="py-8 text-center text-sm font-body text-on-surface-variant">
-                {availableOnly ? t('no_rooms_available_today') : t('no_rooms_found')}
-              </td>
-            </tr>
+            <M3TableEmptyRow
+              colSpan={headers.length}
+              message={availableOnly ? t('no_rooms_available_today') : t('no_rooms_found')}
+            />
           ) : (
             rooms.map((room) => (
               <RoomRow key={room.id} room={room} onEdit={openEditModal} t={t} />

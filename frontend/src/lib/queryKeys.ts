@@ -12,4 +12,11 @@ export const queryKeys = {
       ['guests', 'search', query, page, size] as const,
     detail: (id: string) => ['guests', 'detail', id] as const,
   },
+  rooms: {
+    all: ['rooms'] as const,
+    list: (availableOnly: boolean) => ['rooms', 'list', availableOnly] as const,
+  },
+  roomTypes: {
+    all: ['room-types'] as const,
+  },
 } as const;
