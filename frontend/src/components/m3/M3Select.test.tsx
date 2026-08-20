@@ -53,6 +53,13 @@ describe('M3Select', () => {
     expect(screen.getByText('Pick the room category')).toBeInTheDocument();
   });
 
+  it('visually hides the label but keeps it programmatically associated when hideLabel is set', () => {
+    render(<M3Select label="Sort by" hideLabel options={OPTIONS} value="CLEAN" onChange={() => {}} />);
+    const label = screen.getByText('Sort by');
+    expect(label.className).toContain('sr-only');
+    expect(screen.getByLabelText('Sort by')).toBeInTheDocument();
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <M3Select label="Room status" options={OPTIONS} value="CLEAN" onChange={() => {}} />,

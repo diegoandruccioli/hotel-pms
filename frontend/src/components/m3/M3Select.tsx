@@ -15,6 +15,12 @@ interface M3SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElemen
   placeholder?: string;
   errorText?: string;
   supportingText?: string;
+  /** Renders `label` as visually-hidden (`sr-only`) instead of a static
+   * label above the field — for compact toolbar selects (e.g. a "sort by"
+   * control next to a direction toggle) that need the accessible name
+   * without the visible label pushing the layout around. The label stays
+   * in the DOM and `htmlFor`-associated either way. */
+  hideLabel?: boolean;
 }
 
 /**
@@ -30,6 +36,7 @@ export const M3Select = ({
   placeholder,
   errorText,
   supportingText,
+  hideLabel = false,
   className = '',
   required,
   ...rest
@@ -39,7 +46,10 @@ export const M3Select = ({
 
   return (
     <div className={className}>
-      <label htmlFor={id} className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+      <label
+        htmlFor={id}
+        className={hideLabel ? 'sr-only' : 'block text-sm font-medium font-body text-on-surface-variant mb-1'}
+      >
         {label}
         {required && ' *'}
       </label>

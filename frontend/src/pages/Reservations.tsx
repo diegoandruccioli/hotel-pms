@@ -11,6 +11,7 @@ import { M3LoadingState } from '../components/m3/M3LoadingState';
 import { M3ErrorState } from '../components/m3/M3ErrorState';
 import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
 import { M3Pagination } from '../components/m3/M3Pagination';
+import { M3Select } from '../components/m3/M3Select';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { RoomResponse } from '../types/inventory.types';
@@ -218,6 +219,11 @@ export const Reservations = () => {
     (current: number, total: number) => t('page_x_of_y', { current, total }),
     [t],
   );
+  const sortOptions = useMemo(() => [
+    { value: 'checkInDate', label: t('check_in') },
+    { value: 'checkOutDate', label: t('check_out') },
+    { value: 'status', label: t('status') },
+  ], [t]);
 
   const searchParams = useMemo(() => ({
     query: debouncedSearch,
@@ -347,17 +353,13 @@ export const Reservations = () => {
             {t('reservations_upcoming_filter')}
           </button>
           <div className="flex items-center gap-2">
-            <label htmlFor="reservations-sort-field" className="sr-only">{t('sort_by')}</label>
-            <select
-              id="reservations-sort-field"
+            <M3Select
+              label={t('sort_by')}
+              hideLabel
+              options={sortOptions}
               value={sortField}
               onChange={handleSortFieldChange}
-              className="pl-3 pr-8 py-2 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
-            >
-              <option value="checkInDate">{t('check_in')}</option>
-              <option value="checkOutDate">{t('check_out')}</option>
-              <option value="status">{t('status')}</option>
-            </select>
+            />
             <button
               type="button"
               onClick={toggleSortDir}

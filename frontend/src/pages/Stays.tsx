@@ -10,6 +10,7 @@ import { M3LoadingState } from '../components/m3/M3LoadingState';
 import { M3ErrorState } from '../components/m3/M3ErrorState';
 import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
 import { M3Pagination } from '../components/m3/M3Pagination';
+import { M3Select } from '../components/m3/M3Select';
 import { useTranslation } from 'react-i18next';
 
 import { StayRow } from './Stays/StayRow';
@@ -142,6 +143,12 @@ export const Stays = memo(() => {
     [t],
   );
   
+  const sortOptions = useMemo(() => [
+    { value: 'actualCheckInTime', label: t('check_in') },
+    { value: 'expectedCheckOutDate', label: t('expected_checkout_col') },
+    { value: 'status', label: t('status') },
+  ], [t]);
+
   const formatDate = useCallback((dateStr?: string) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleString(i18n.language);
@@ -203,17 +210,13 @@ export const Stays = memo(() => {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <label htmlFor="stays-sort-field" className="sr-only">{t('sort_by')}</label>
-          <select
-            id="stays-sort-field"
+          <M3Select
+            label={t('sort_by')}
+            hideLabel
+            options={sortOptions}
             value={sortField}
             onChange={handleSortFieldChange}
-            className="pl-3 pr-8 py-2 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
-          >
-            <option value="actualCheckInTime">{t('check_in')}</option>
-            <option value="expectedCheckOutDate">{t('expected_checkout_col')}</option>
-            <option value="status">{t('status')}</option>
-          </select>
+          />
           <button
             type="button"
             onClick={toggleSortDir}

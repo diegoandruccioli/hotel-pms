@@ -9,6 +9,7 @@ import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { M3LoadingState } from '../components/m3/M3LoadingState';
 import { M3ErrorState } from '../components/m3/M3ErrorState';
 import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
+import { M3Select } from '../components/m3/M3Select';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store/authStore';
@@ -240,6 +241,12 @@ export const Restaurant = memo(() => {
     <span key="sr" className="sr-only">{t('actions')}</span>
   ], [t]);
 
+  const sortOptions = useMemo(() => [
+    { value: 'orderDate', label: t('date') },
+    { value: 'roomNumber', label: t('room_label') },
+    { value: 'guestDisplayName', label: t('guest_name') },
+  ], [t]);
+
   const menuHeaders = useMemo(() => [
     tMenu('menu_name'),
     tMenu('menu_category'),
@@ -260,17 +267,13 @@ export const Restaurant = memo(() => {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <label htmlFor="orders-sort-field" className="sr-only">{t('sort_by')}</label>
-            <select
-              id="orders-sort-field"
+            <M3Select
+              label={t('sort_by')}
+              hideLabel
+              options={sortOptions}
               value={sortField}
               onChange={handleSortFieldChange}
-              className="pl-3 pr-8 py-2 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
-            >
-              <option value="orderDate">{t('date')}</option>
-              <option value="roomNumber">{t('room_label')}</option>
-              <option value="guestDisplayName">{t('guest_name')}</option>
-            </select>
+            />
             <button
               type="button"
               onClick={toggleSortDir}
