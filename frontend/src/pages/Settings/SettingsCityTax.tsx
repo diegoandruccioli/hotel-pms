@@ -12,6 +12,7 @@ import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Card } from '../../components/m3/M3Card';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
+import { M3TextField } from '../../components/m3/M3TextField';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
 import { useToastStore } from '../../store/toastStore';
 import { getErrorMessage } from '../../utils/errorMessage';
@@ -20,9 +21,6 @@ const CATEGORY_MAX_LENGTH = 20;
 const NOTE_MAX_LENGTH = 200;
 const AGE_MIN = 0;
 const AGE_MAX = 120;
-
-const inputClass = 'block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body '
-  + 'bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none';
 
 // -----------------------------------------------------------------------
 // Hotel category history section
@@ -127,43 +125,24 @@ const HotelCategorySection = () => {
       )}
 
       <form onSubmit={handleSubmit} noValidate className="grid grid-cols-2 gap-4 items-end">
-        <div>
-          <label htmlFor="hc-category" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-            {t('city_tax_category')} *
-          </label>
-          <input
-            type="text"
-            id="hc-category"
-            name="category"
-            value={formData.category}
-            onChange={handleChange}
-            placeholder={t('city_tax_category_placeholder')}
-            className={inputClass}
-            aria-invalid={!!fieldErrors.category}
-            aria-describedby={fieldErrors.category ? 'hc-category-error' : undefined}
-          />
-          {fieldErrors.category && (
-            <p id="hc-category-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.category}</p>
-          )}
-        </div>
-        <div>
-          <label htmlFor="hc-valid-from" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-            {t('city_tax_valid_from')} *
-          </label>
-          <input
-            type="date"
-            id="hc-valid-from"
-            name="validFrom"
-            value={formData.validFrom}
-            onChange={handleChange}
-            className={inputClass}
-            aria-invalid={!!fieldErrors.validFrom}
-            aria-describedby={fieldErrors.validFrom ? 'hc-valid-from-error' : undefined}
-          />
-          {fieldErrors.validFrom && (
-            <p id="hc-valid-from-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.validFrom}</p>
-          )}
-        </div>
+        <M3TextField
+          label={`${t('city_tax_category')} *`}
+          required
+          name="category"
+          value={formData.category}
+          onChange={handleChange}
+          placeholder={t('city_tax_category_placeholder')}
+          errorText={fieldErrors.category}
+        />
+        <M3TextField
+          label={`${t('city_tax_valid_from')} *`}
+          required
+          type="date"
+          name="validFrom"
+          value={formData.validFrom}
+          onChange={handleChange}
+          errorText={fieldErrors.validFrom}
+        />
         <div className="col-span-2 flex justify-end">
           <M3Button type="submit" icon="add" loading={saving} disabled={saving}>
             {t('city_tax_add_category')}
@@ -309,130 +288,71 @@ const CityTaxRatesSection = () => {
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="ctr-category" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-            {t('city_tax_category')} *
-          </label>
-          <input
-            type="text"
-            id="ctr-category"
-            name="category"
-            value={formData.category}
-            onChange={handleChange}
-            placeholder={t('city_tax_category_placeholder')}
-            className={inputClass}
-            aria-invalid={!!fieldErrors.category}
-            aria-describedby={fieldErrors.category ? 'ctr-category-error' : undefined}
-          />
-          {fieldErrors.category && (
-            <p id="ctr-category-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.category}</p>
-          )}
-        </div>
+        <M3TextField
+          label={`${t('city_tax_category')} *`}
+          required
+          name="category"
+          value={formData.category}
+          onChange={handleChange}
+          placeholder={t('city_tax_category_placeholder')}
+          errorText={fieldErrors.category}
+        />
 
-        <div>
-          <label htmlFor="ctr-amount" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-            {t('city_tax_amount_per_night')} *
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            id="ctr-amount"
-            name="amountPerNight"
-            value={formData.amountPerNight}
-            onChange={handleChange}
-            className={inputClass}
-            aria-invalid={!!fieldErrors.amountPerNight}
-            aria-describedby={fieldErrors.amountPerNight ? 'ctr-amount-error' : undefined}
-          />
-          {fieldErrors.amountPerNight && (
-            <p id="ctr-amount-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.amountPerNight}</p>
-          )}
-        </div>
+        <M3TextField
+          label={`${t('city_tax_amount_per_night')} *`}
+          required
+          type="number"
+          min="0"
+          step="0.01"
+          name="amountPerNight"
+          value={formData.amountPerNight}
+          onChange={handleChange}
+          errorText={fieldErrors.amountPerNight}
+        />
 
-        <div>
-          <label htmlFor="ctr-max-nights" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-            {t('city_tax_max_taxable_nights')}
-          </label>
-          <input
-            type="number"
-            min="1"
-            step="1"
-            id="ctr-max-nights"
-            name="maxTaxableNights"
-            value={formData.maxTaxableNights}
-            onChange={handleChange}
-            placeholder={t('city_tax_uncapped_placeholder')}
-            className={inputClass}
-            aria-invalid={!!fieldErrors.maxTaxableNights}
-            aria-describedby={fieldErrors.maxTaxableNights ? 'ctr-max-nights-error' : undefined}
-          />
-          {fieldErrors.maxTaxableNights && (
-            <p id="ctr-max-nights-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.maxTaxableNights}</p>
-          )}
-        </div>
+        <M3TextField
+          label={t('city_tax_max_taxable_nights')}
+          type="number"
+          min="1"
+          step="1"
+          name="maxTaxableNights"
+          value={formData.maxTaxableNights}
+          onChange={handleChange}
+          placeholder={t('city_tax_uncapped_placeholder')}
+          errorText={fieldErrors.maxTaxableNights}
+        />
 
-        <div>
-          <label htmlFor="ctr-exempt-age" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-            {t('city_tax_exempt_under_age')}
-          </label>
-          <input
-            type="number"
-            min={AGE_MIN}
-            max={AGE_MAX}
-            step="1"
-            id="ctr-exempt-age"
-            name="exemptUnderAge"
-            value={formData.exemptUnderAge}
-            onChange={handleChange}
-            placeholder={t('city_tax_no_age_exemption_placeholder')}
-            className={inputClass}
-            aria-invalid={!!fieldErrors.exemptUnderAge}
-            aria-describedby={fieldErrors.exemptUnderAge ? 'ctr-exempt-age-error' : undefined}
-          />
-          {fieldErrors.exemptUnderAge && (
-            <p id="ctr-exempt-age-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.exemptUnderAge}</p>
-          )}
-        </div>
+        <M3TextField
+          label={t('city_tax_exempt_under_age')}
+          type="number"
+          min={AGE_MIN}
+          max={AGE_MAX}
+          step="1"
+          name="exemptUnderAge"
+          value={formData.exemptUnderAge}
+          onChange={handleChange}
+          placeholder={t('city_tax_no_age_exemption_placeholder')}
+          errorText={fieldErrors.exemptUnderAge}
+        />
 
-        <div>
-          <label htmlFor="ctr-valid-from" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-            {t('city_tax_valid_from')} *
-          </label>
-          <input
-            type="date"
-            id="ctr-valid-from"
-            name="validFrom"
-            value={formData.validFrom}
-            onChange={handleChange}
-            className={inputClass}
-            aria-invalid={!!fieldErrors.validFrom}
-            aria-describedby={fieldErrors.validFrom ? 'ctr-valid-from-error' : undefined}
-          />
-          {fieldErrors.validFrom && (
-            <p id="ctr-valid-from-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.validFrom}</p>
-          )}
-        </div>
+        <M3TextField
+          label={`${t('city_tax_valid_from')} *`}
+          required
+          type="date"
+          name="validFrom"
+          value={formData.validFrom}
+          onChange={handleChange}
+          errorText={fieldErrors.validFrom}
+        />
 
-        <div>
-          <label htmlFor="ctr-note" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-            {t('city_tax_note')}
-          </label>
-          <input
-            type="text"
-            id="ctr-note"
-            name="note"
-            value={formData.note}
-            onChange={handleChange}
-            placeholder={t('city_tax_note_placeholder')}
-            className={inputClass}
-            aria-invalid={!!fieldErrors.note}
-            aria-describedby={fieldErrors.note ? 'ctr-note-error' : undefined}
-          />
-          {fieldErrors.note && (
-            <p id="ctr-note-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.note}</p>
-          )}
-        </div>
+        <M3TextField
+          label={t('city_tax_note')}
+          name="note"
+          value={formData.note}
+          onChange={handleChange}
+          placeholder={t('city_tax_note_placeholder')}
+          errorText={fieldErrors.note}
+        />
 
         <div className="col-span-2 flex justify-end">
           <M3Button type="submit" icon="add" loading={saving} disabled={saving}>

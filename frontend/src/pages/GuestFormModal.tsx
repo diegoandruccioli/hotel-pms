@@ -6,6 +6,8 @@ import type { GuestResponseDTO, GuestRequestDTO } from '../types/guest.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3Dialog } from '../components/m3/M3Dialog';
+import { M3TextField } from '../components/m3/M3TextField';
+import { M3Select } from '../components/m3/M3Select';
 import { StructuredAddressFields } from '../components/StructuredAddressFields';
 import { useToastStore } from '../store/toastStore';
 
@@ -188,8 +190,10 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
   const closeDeleteConfirm = useCallback(() => setShowDeleteConfirm(false), []);
   const toggleFiscalSection = useCallback(() => setShowFiscalSection(prev => !prev), []);
 
-  const inputClass = "block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
-  const selectClass = "shrink-0 w-24 rounded-shape-xs border border-outline px-2 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
+  const countryCodeOptions = useMemo(
+    () => COUNTRY_CODES.map((c) => ({ value: c.code, label: c.label })),
+    [],
+  );
 
   const footer = showDeleteConfirm ? (
     <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
@@ -227,89 +231,61 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
     >
             <form id="guest-form" onSubmit={handleSubmit} noValidate className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                    {t('label_first_name')} *
-                  </label>
-                  <input
-                    type="text" id="firstName" name="firstName" value={formData.firstName} onChange={handleChange}
-                    className={inputClass}
-                    aria-invalid={!!fieldErrors.firstName}
-                    aria-describedby={fieldErrors.firstName ? 'firstName-error' : undefined}
-                  />
-                  {fieldErrors.firstName && (
-                    <p id="firstName-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.firstName}</p>
-                  )}
-                </div>
-                <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                    {t('label_last_name')} *
-                  </label>
-                  <input
-                    type="text" id="lastName" name="lastName" value={formData.lastName} onChange={handleChange}
-                    className={inputClass}
-                    aria-invalid={!!fieldErrors.lastName}
-                    aria-describedby={fieldErrors.lastName ? 'lastName-error' : undefined}
-                  />
-                  {fieldErrors.lastName && (
-                    <p id="lastName-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.lastName}</p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                  {t('label_email_hint')} *
-                </label>
-                <input
-                  type="email" id="email" name="email" value={formData.email} onChange={handleChange}
-                  className={inputClass}
-                  aria-invalid={!!fieldErrors.email}
-                  aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+                <M3TextField
+                  label={t('label_first_name')}
+                  required
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  errorText={fieldErrors.firstName}
                 />
-                {fieldErrors.email && (
-                  <p id="email-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.email}</p>
-                )}
+                <M3TextField
+                  label={t('label_last_name')}
+                  required
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  errorText={fieldErrors.lastName}
+                />
               </div>
 
+              <M3TextField
+                label={t('label_email_hint')}
+                required
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                errorText={fieldErrors.email}
+              />
+
               <div>
-                <label htmlFor="phonePrefix" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
+                <p className="block text-sm font-medium font-body text-on-surface-variant mb-1">
                   {t('label_phone_hint')} *
-                </label>
+                </p>
                 <div className="flex gap-2">
-                  <select
-                    id="phonePrefix"
+                  <M3Select
+                    label={t('label_phone_hint')}
+                    hideLabel
+                    className="shrink-0 w-24"
+                    options={countryCodeOptions}
                     value={phonePrefix}
                     onChange={handlePhonePrefixChange}
-                    className={selectClass}
-                  >
-                    {COUNTRY_CODES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
-                  </select>
-                  <input
-                    type="text"
-                    id="phoneNumber"
-                    aria-label={t('label_phone_number')}
+                  />
+                  <M3TextField
+                    label={t('label_phone_number')}
+                    hideLabel
+                    className="flex-1"
                     value={phoneNumber}
                     onChange={handlePhoneNumberChange}
-                    className={`${inputClass} flex-1`}
                     placeholder="Es. 333 1234567"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="city" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                    {t('city')}
-                  </label>
-                  <input type="text" id="city" name="city" value={formData.city} onChange={handleChange} className={inputClass} />
-                </div>
-                <div>
-                  <label htmlFor="country" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                    {t('label_country')}
-                  </label>
-                  <input type="text" id="country" name="country" value={formData.country} onChange={handleChange} className={inputClass} />
-                </div>
+                <M3TextField label={t('city')} name="city" value={formData.city} onChange={handleChange} />
+                <M3TextField label={t('label_country')} name="country" value={formData.country} onChange={handleChange} />
               </div>
 
               <div className="border border-outline-variant/40 rounded-shape-xs">
@@ -326,38 +302,13 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
                 {showFiscalSection && (
                   <div id="fiscal-section" className="px-3 pb-3 pt-1 space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label htmlFor="fiscalCode" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                          {t('label_fiscal_code')}
-                        </label>
-                        <input type="text" id="fiscalCode" name="fiscalCode" value={formData.fiscalCode ?? ''} onChange={handleChange} className={inputClass} />
-                      </div>
-                      <div>
-                        <label htmlFor="vatNumber" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                          {t('label_vat_number')}
-                        </label>
-                        <input type="text" id="vatNumber" name="vatNumber" value={formData.vatNumber ?? ''} onChange={handleChange} className={inputClass} />
-                      </div>
+                      <M3TextField label={t('label_fiscal_code')} name="fiscalCode" value={formData.fiscalCode ?? ''} onChange={handleChange} />
+                      <M3TextField label={t('label_vat_number')} name="vatNumber" value={formData.vatNumber ?? ''} onChange={handleChange} />
                     </div>
-                    <div>
-                      <label htmlFor="companyName" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                        {t('label_company_name')}
-                      </label>
-                      <input type="text" id="companyName" name="companyName" value={formData.companyName ?? ''} onChange={handleChange} className={inputClass} />
-                    </div>
+                    <M3TextField label={t('label_company_name')} name="companyName" value={formData.companyName ?? ''} onChange={handleChange} />
                     <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label htmlFor="sdiCode" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                          {t('label_sdi_code')}
-                        </label>
-                        <input type="text" id="sdiCode" name="sdiCode" value={formData.sdiCode ?? ''} onChange={handleChange} className={inputClass} />
-                      </div>
-                      <div>
-                        <label htmlFor="pecEmail" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                          {t('label_pec_email')}
-                        </label>
-                        <input type="email" id="pecEmail" name="pecEmail" value={formData.pecEmail ?? ''} onChange={handleChange} className={inputClass} />
-                      </div>
+                      <M3TextField label={t('label_sdi_code')} name="sdiCode" value={formData.sdiCode ?? ''} onChange={handleChange} />
+                      <M3TextField label={t('label_pec_email')} type="email" name="pecEmail" value={formData.pecEmail ?? ''} onChange={handleChange} />
                     </div>
                     <StructuredAddressFields
                       idPrefix="guest"

@@ -27,6 +27,11 @@ describe('M3TextField', () => {
     expect(screen.getByLabelText('Search guests')).toHaveAttribute('placeholder', 'Search guests');
   });
 
+  it('sets the native required attribute without altering the visible label text', () => {
+    render(<M3TextField label="Email" required name="email" />);
+    expect(screen.getByLabelText('Email')).toBeRequired();
+  });
+
   it('should show error text when provided', () => {
     render(<M3TextField label="Email" errorText="Required field" name="email" />);
     expect(screen.getByText('Required field')).toBeInTheDocument();
