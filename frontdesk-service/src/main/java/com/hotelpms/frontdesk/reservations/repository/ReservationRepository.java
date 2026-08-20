@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -211,4 +212,28 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
             @Param("query") String query,
             @Param("guestIds") List<UUID> guestIds,
             Pageable pageable);
+
+    /**
+     * Counts reservations checking in on a given date with one of the given
+     * statuses, scoped to a hotel. Backs the day-sheet "arrivals today" count
+     * (E-DASHBOARD-1) — previously computed client-side by downloading up to
+     * 500 reservations and filtering in the browser.
+     *
+     * @param hotelId the hotel UUID
+     * @param date    the check-in date
+     * @param statuses the reservation statuses to count (e.g. CONFIRMED, PENDING)
+     * @return the number of matching reservations
+     */
+    int countByHotelIdAndCheckInDateAndStatusIn(UUID hotelId, LocalDate date, Collection<ReservationStatus> statuses);
+
+    /**
+     * Counts reservations checking out on a given date with one of the given
+     * statuses, scoped to a hotel. Backs the day-sheet "departures today" count.
+     *
+     * @param hotelId the hotel UUID
+     * @param date    the check-out date
+     * @param statuses the reservation statuses to count (e.g. CONFIRMED, CHECKED_IN, PENDING)
+     * @return the number of matching reservations
+     */
+    int countByHotelIdAndCheckOutDateAndStatusIn(UUID hotelId, LocalDate date, Collection<ReservationStatus> statuses);
 }

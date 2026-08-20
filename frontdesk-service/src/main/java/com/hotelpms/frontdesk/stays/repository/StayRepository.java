@@ -6,6 +6,8 @@ import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
@@ -134,4 +136,28 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      */
     List<Stay> findByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(
             @NonNull UUID guestId, @NonNull UUID hotelId);
+
+    /**
+     * Counts stays with the given status, scoped to a hotel. Backs the
+     * day-sheet "current stays" count (E-DASHBOARD-1) — previously computed
+     * client-side by downloading up to 500 stays and filtering in the browser.
+     *
+     * @param hotelId the hotel UUID
+     * @param status  the stay status to count (e.g. CHECKED_IN)
+     * @return the number of matching stays
+     */
+    long countByHotelIdAndStatus(UUID hotelId, StayStatus status);
+
+    /**
+     * Counts guests attached to stays with the given status, scoped to a
+     * hotel. Backs the day-sheet "guests in house" count — the sum of
+     * {@code guests.size()} across every checked-in stay, computed in the
+     * database instead of loading each stay's full guest list.
+     *
+     * @param hotelId the hotel UUID
+     * @param status  the stay status to filter by (e.g. CHECKED_IN)
+     * @return the total number of guests across matching stays
+     */
+    @Query("SELECT COUNT(g) FROM Stay s JOIN s.guests g WHERE s.hotelId = :hotelId AND s.status = :status")
+    long countGuestsInHouseByHotelId(@Param("hotelId") UUID hotelId, @Param("status") StayStatus status);
 }

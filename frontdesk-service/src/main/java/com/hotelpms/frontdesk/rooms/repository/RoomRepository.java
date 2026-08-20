@@ -78,4 +78,18 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
      * @return active rooms for that hotel and status
      */
     List<Room> findAllByActiveTrueAndHotelIdAndStatus(UUID hotelId, RoomStatus status);
+
+    /**
+     * Counts active rooms per housekeeping status for a hotel, one row per
+     * status present. Backs the day-sheet room-status breakdown
+     * (E-DASHBOARD-1) — a single grouped query instead of downloading every
+     * room and counting client-side.
+     *
+     * @param hotelId the hotel UUID
+     * @return one {@link RoomStatusCount} per distinct status among that
+     *         hotel's active rooms
+     */
+    @Query("SELECT r.status AS status, COUNT(r) AS count FROM Room r "
+            + "WHERE r.hotelId = :hotelId AND r.active = true GROUP BY r.status")
+    List<RoomStatusCount> countRoomsByStatusForHotelId(@Param("hotelId") UUID hotelId);
 }
