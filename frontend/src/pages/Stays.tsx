@@ -11,6 +11,7 @@ import { M3ErrorState } from '../components/m3/M3ErrorState';
 import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
 import { M3Pagination } from '../components/m3/M3Pagination';
 import { M3Select } from '../components/m3/M3Select';
+import { M3TextField } from '../components/m3/M3TextField';
 import { useTranslation } from 'react-i18next';
 
 import { StayRow } from './Stays/StayRow';
@@ -187,17 +188,15 @@ export const Stays = memo(() => {
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="relative">
-          <MaterialIcon name="search" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={handleSearchChange}
-            placeholder={t('search_placeholder')}
-            aria-label={t('search_placeholder')}
-            className="pl-9 pr-3 py-2 w-full sm:w-56 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
-          />
-        </div>
+        <M3TextField
+          label={t('search_placeholder')}
+          hideLabel
+          leadingIcon="search"
+          type="search"
+          value={searchQuery}
+          onChange={handleSearchChange}
+          className="w-full sm:w-56"
+        />
         <div className="flex flex-wrap gap-2" role="group" aria-label={t('filter_status')}>
           {(['ALL', 'EXPECTED', 'CHECKED_IN', 'CHECKED_OUT'] as const).map((s) => (
             <StayStatusChip

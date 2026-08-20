@@ -19,6 +19,14 @@ describe('M3TextField', () => {
     expect(screen.getByText('person')).toBeInTheDocument();
   });
 
+  it('visually hides the label but keeps it programmatically associated when hideLabel is set', () => {
+    render(<M3TextField label="Search guests" hideLabel name="search" />);
+    const label = screen.getByText('Search guests');
+    expect(label.className).toBe('sr-only');
+    expect(screen.getByLabelText('Search guests')).toBeInTheDocument();
+    expect(screen.getByLabelText('Search guests')).toHaveAttribute('placeholder', 'Search guests');
+  });
+
   it('should show error text when provided', () => {
     render(<M3TextField label="Email" errorText="Required field" name="email" />);
     expect(screen.getByText('Required field')).toBeInTheDocument();

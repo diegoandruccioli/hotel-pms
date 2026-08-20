@@ -7,6 +7,7 @@ import { M3LoadingState } from '../components/m3/M3LoadingState';
 import { M3ErrorState } from '../components/m3/M3ErrorState';
 import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
 import { M3Pagination } from '../components/m3/M3Pagination';
+import { M3TextField } from '../components/m3/M3TextField';
 import { PaymentModal } from './Billing/PaymentModal';
 import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useTranslation } from 'react-i18next';
@@ -241,17 +242,15 @@ export const Billing = memo(() => {
           </h1>
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('billing_subtitle')}</p>
         </div>
-        <div className="relative">
-          <MaterialIcon name="search" size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={handleSearchChange}
-            placeholder={t('invoice_search_placeholder')}
-            aria-label={t('invoice_search_placeholder')}
-            className="pl-9 pr-3 py-2 w-full sm:w-72 rounded-shape-xs border border-outline bg-transparent text-sm font-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
-          />
-        </div>
+        <M3TextField
+          label={t('invoice_search_placeholder')}
+          hideLabel
+          leadingIcon="search"
+          type="search"
+          value={searchQuery}
+          onChange={handleSearchChange}
+          className="w-full sm:w-72"
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-4">

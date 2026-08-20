@@ -6,6 +6,12 @@ interface M3TextFieldProps extends Omit<React.InputHTMLAttributes<HTMLInputEleme
   supportingText?: string;
   errorText?: string;
   leadingIcon?: string;
+  /** Renders `label` as visually-hidden (`sr-only`) instead of the floating
+   * label — for compact toolbar search fields where the leading icon +
+   * placeholder already communicate purpose and a floating label bubble
+   * would be redundant chrome. The label stays in the DOM and htmlFor-
+   * associated either way; `placeholder` still shows the label text. */
+  hideLabel?: boolean;
 }
 
 const ICON_STYLE = { fontSize: 20 };
@@ -15,6 +21,7 @@ export const M3TextField = ({
   supportingText,
   errorText,
   leadingIcon,
+  hideLabel = false,
   className = '',
   onFocus,
   onBlur,
@@ -80,7 +87,7 @@ export const M3TextField = ({
         {/* Floating Label */}
         <label
           htmlFor={id}
-          className={`absolute transition-all duration-150 pointer-events-none font-body
+          className={hideLabel ? 'sr-only' : `absolute transition-all duration-150 pointer-events-none font-body
             ${leadingIcon ? 'left-10' : 'left-4'}
             ${isFloating
               ? 'top-1 text-xs'
