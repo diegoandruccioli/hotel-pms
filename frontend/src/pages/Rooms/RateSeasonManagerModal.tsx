@@ -8,6 +8,7 @@ import { M3Button } from '../../components/m3/M3Button';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
 import { M3TableActionLink } from '../../components/m3/M3TableActionLink';
+import { M3TextField } from '../../components/m3/M3TextField';
 import { useToastStore } from '../../store/toastStore';
 
 interface Props {
@@ -174,8 +175,6 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
     }
   }, [deletingSeason, roomType.id, addToast, t, loadSeasons]);
 
-  const inputClass = 'block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none';
-
   const listFooter = (
     <div className="flex justify-end">
       <M3Button variant="text" onClick={onClose}>{t('close')}</M3Button>
@@ -232,85 +231,47 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
         </div>
       ) : (
         <form id="rate-season-form" onSubmit={handleSubmit} noValidate className="space-y-4">
-          <div>
-            <label htmlFor="rsName" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-              {t('rate_season_name')}
-            </label>
-            <input
-              type="text"
-              id="rsName"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              placeholder={t('rate_season_name_placeholder')}
-              className={inputClass}
-              aria-invalid={!!fieldErrors.name}
-              aria-describedby={fieldErrors.name ? 'rsName-error' : undefined}
-            />
-            {fieldErrors.name && (
-              <p id="rsName-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.name}</p>
-            )}
-          </div>
+          <M3TextField
+            label={t('rate_season_name')}
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            placeholder={t('rate_season_name_placeholder')}
+            errorText={fieldErrors.name}
+          />
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="rsStartDate" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                {t('rate_season_start_date')} *
-              </label>
-              <input
-                type="date"
-                id="rsStartDate"
-                name="startDate"
-                value={formData.startDate}
-                onChange={handleChange}
-                className={inputClass}
-                aria-invalid={!!fieldErrors.startDate}
-                aria-describedby={fieldErrors.startDate ? 'rsStartDate-error' : undefined}
-              />
-              {fieldErrors.startDate && (
-                <p id="rsStartDate-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.startDate}</p>
-              )}
-            </div>
-            <div>
-              <label htmlFor="rsEndDate" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-                {t('rate_season_end_date')} *
-              </label>
-              <input
-                type="date"
-                id="rsEndDate"
-                name="endDate"
-                value={formData.endDate}
-                onChange={handleChange}
-                className={inputClass}
-                aria-invalid={!!fieldErrors.endDate}
-                aria-describedby={fieldErrors.endDate ? 'rsEndDate-error' : undefined}
-              />
-              {fieldErrors.endDate && (
-                <p id="rsEndDate-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.endDate}</p>
-              )}
-            </div>
+            <M3TextField
+              label={`${t('rate_season_start_date')} *`}
+              required
+              type="date"
+              name="startDate"
+              value={formData.startDate}
+              onChange={handleChange}
+              errorText={fieldErrors.startDate}
+            />
+            <M3TextField
+              label={`${t('rate_season_end_date')} *`}
+              required
+              type="date"
+              name="endDate"
+              value={formData.endDate}
+              onChange={handleChange}
+              errorText={fieldErrors.endDate}
+            />
           </div>
 
-          <div>
-            <label htmlFor="rsNightlyPrice" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-              {t('rate_season_nightly_price')} *
-            </label>
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              id="rsNightlyPrice"
-              name="nightlyPrice"
-              value={formData.nightlyPrice}
-              onChange={handleChange}
-              className={inputClass}
-              aria-invalid={!!fieldErrors.nightlyPrice}
-              aria-describedby={fieldErrors.nightlyPrice ? 'rsNightlyPrice-error' : undefined}
-            />
-            {fieldErrors.nightlyPrice && (
-              <p id="rsNightlyPrice-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.nightlyPrice}</p>
-            )}
-          </div>
+          <M3TextField
+            label={`${t('rate_season_nightly_price')} *`}
+            required
+            type="number"
+            min="0.01"
+            step="0.01"
+            name="nightlyPrice"
+            value={formData.nightlyPrice}
+            onChange={handleChange}
+            errorText={fieldErrors.nightlyPrice}
+          />
         </form>
       )}
     </M3Dialog>

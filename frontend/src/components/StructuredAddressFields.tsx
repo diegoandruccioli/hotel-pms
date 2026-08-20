@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { stayService } from '../services/stayService';
 import type { AlloggiatiComune } from '../types/stay.types';
+import { M3TextField } from './m3/M3TextField';
 
 const AUTOCOMPLETE_DEBOUNCE_MS = 300;
 const AUTOCOMPLETE_MIN_CHARS = 2;
@@ -110,8 +111,6 @@ export const StructuredAddressFields = memo(({
   );
 
   const comuneId = `${idPrefix}-comune`;
-  const capId = `${idPrefix}-cap`;
-  const provinciaId = `${idPrefix}-provincia`;
 
   return (
     <div className="space-y-4">
@@ -160,37 +159,21 @@ export const StructuredAddressFields = memo(({
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor={capId} className="block text-sm font-medium text-on-surface mb-1">
-            {t('label_cap')}
-          </label>
-          <input
-            id={capId}
-            type="text"
-            inputMode="numeric"
-            maxLength={5}
-            value={cap}
-            onChange={handleCapChange}
-            placeholder={t('placeholder_cap')}
-            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface
-              focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
-        <div>
-          <label htmlFor={provinciaId} className="block text-sm font-medium text-on-surface mb-1">
-            {t('label_provincia')}
-          </label>
-          <input
-            id={provinciaId}
-            type="text"
-            maxLength={2}
-            value={provincia}
-            onChange={handleProvinciaChange}
-            placeholder={t('placeholder_provincia')}
-            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface
-              focus:outline-none focus:ring-2 focus:ring-primary uppercase"
-          />
-        </div>
+        <M3TextField
+          label={t('label_cap')}
+          inputMode="numeric"
+          maxLength={5}
+          value={cap}
+          onChange={handleCapChange}
+          placeholder={t('placeholder_cap')}
+        />
+        <M3TextField
+          label={t('label_provincia')}
+          maxLength={2}
+          value={provincia}
+          onChange={handleProvinciaChange}
+          placeholder={t('placeholder_provincia')}
+        />
       </div>
     </div>
   );

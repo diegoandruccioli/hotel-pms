@@ -5,6 +5,7 @@ import { stayService } from '../../services/stayService';
 import type { HotelSettingsResponse, HotelSettingsRequest } from '../../types/stay.types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Card } from '../../components/m3/M3Card';
+import { M3TextField } from '../../components/m3/M3TextField';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
 
 const EMAIL_GREETING_MAX_LENGTH = 300;
@@ -71,14 +72,13 @@ ToggleRow.displayName = 'ToggleRow';
 // -----------------------------------------------------------------------
 
 interface SubjectFieldProps {
-  id: string;
   label: string;
   placeholder: string;
   value: string;
   onBlurSave: (value: string) => void;
 }
 
-const SubjectField = memo(({ id, label, placeholder, value, onBlurSave }: SubjectFieldProps) => {
+const SubjectField = memo(({ label, placeholder, value, onBlurSave }: SubjectFieldProps) => {
   const [draft, setDraft] = useState(value);
   // Reset the local draft when the saved value changes (e.g. after a successful save
   // elsewhere), without a useEffect — adjusting state during render per React docs.
@@ -94,21 +94,14 @@ const SubjectField = memo(({ id, label, placeholder, value, onBlurSave }: Subjec
   }, [draft, value, onBlurSave]);
 
   return (
-    <div className="pl-4 pr-1">
-      <label htmlFor={id} className="block text-xs font-medium text-on-surface-variant mb-1">
-        {label}
-      </label>
-      <input
-        id={id}
-        type="text"
-        value={draft}
-        placeholder={placeholder}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface
-          focus:outline-none focus:ring-2 focus:ring-primary"
-      />
-    </div>
+    <M3TextField
+      className="pl-4 pr-1"
+      label={label}
+      value={draft}
+      placeholder={placeholder}
+      onChange={handleChange}
+      onBlur={handleBlur}
+    />
   );
 });
 SubjectField.displayName = 'SubjectField';
@@ -208,7 +201,6 @@ export const SettingsSystem = () => {
           />
           {hotelSettings?.sendReservationConfirmedEmail && (
             <SubjectField
-              id="email-subject-reservation-confirmed"
               label={t('email_subject_label')}
               placeholder={t('email_subject_placeholder')}
               value={hotelSettings.emailSubjectReservationConfirmed ?? ''}
@@ -228,7 +220,6 @@ export const SettingsSystem = () => {
           />
           {hotelSettings?.sendCheckoutEmail && (
             <SubjectField
-              id="email-subject-checkout"
               label={t('email_subject_label')}
               placeholder={t('email_subject_placeholder')}
               value={hotelSettings.emailSubjectCheckout ?? ''}

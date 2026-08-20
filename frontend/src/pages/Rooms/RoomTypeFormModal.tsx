@@ -5,6 +5,8 @@ import { inventoryService } from '../../services/inventoryService';
 import type { RoomTypeRequest, RoomTypeResponse } from '../../types/inventory.types';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Dialog } from '../../components/m3/M3Dialog';
+import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Textarea } from '../../components/m3/M3Textarea';
 import { useToastStore } from '../../store/toastStore';
 
 interface Props {
@@ -101,8 +103,6 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
   const openDeleteConfirm = useCallback(() => setShowDeleteConfirm(true), []);
   const closeDeleteConfirm = useCallback(() => setShowDeleteConfirm(false), []);
 
-  const inputClass = "block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
-
   const footer = showDeleteConfirm ? (
     <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
       <span className="text-sm font-medium font-body text-error">
@@ -138,79 +138,45 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
       footer={footer}
     >
       <form id="room-type-form" onSubmit={handleSubmit} noValidate className="space-y-4">
-        <div>
-          <label htmlFor="rtName" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-            {t('name')} *
-          </label>
-          <input
-            type="text"
-            id="rtName"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            className={inputClass}
-            aria-invalid={!!fieldErrors.name}
-            aria-describedby={fieldErrors.name ? 'rtName-error' : undefined}
-          />
-          {fieldErrors.name && (
-            <p id="rtName-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.name}</p>
-          )}
-        </div>
+        <M3TextField
+          label={`${t('name')} *`}
+          required
+          name="name"
+          value={formData.name}
+          onChange={handleChange}
+          errorText={fieldErrors.name}
+        />
 
-        <div>
-          <label htmlFor="rtDescription" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-            {t('description')}
-          </label>
-          <textarea
-            id="rtDescription"
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            rows={3}
-            className={inputClass}
-          />
-        </div>
+        <M3Textarea
+          label={t('description')}
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          rows={3}
+        />
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="rtMaxOccupancy" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-              {t('max_occupancy')} *
-            </label>
-            <input
-              type="number"
-              min="1"
-              id="rtMaxOccupancy"
-              name="maxOccupancy"
-              value={formData.maxOccupancy}
-              onChange={handleChange}
-              className={inputClass}
-              aria-invalid={!!fieldErrors.maxOccupancy}
-              aria-describedby={fieldErrors.maxOccupancy ? 'rtMaxOccupancy-error' : undefined}
-            />
-            {fieldErrors.maxOccupancy && (
-              <p id="rtMaxOccupancy-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.maxOccupancy}</p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="rtBasePrice" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-              {t('base_price')} *
-            </label>
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              id="rtBasePrice"
-              name="basePrice"
-              value={formData.basePrice}
-              onChange={handleChange}
-              className={inputClass}
-              aria-invalid={!!fieldErrors.basePrice}
-              aria-describedby={fieldErrors.basePrice ? 'rtBasePrice-error' : undefined}
-            />
-            {fieldErrors.basePrice && (
-              <p id="rtBasePrice-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.basePrice}</p>
-            )}
-          </div>
+          <M3TextField
+            label={`${t('max_occupancy')} *`}
+            required
+            type="number"
+            min="1"
+            name="maxOccupancy"
+            value={formData.maxOccupancy}
+            onChange={handleChange}
+            errorText={fieldErrors.maxOccupancy}
+          />
+          <M3TextField
+            label={`${t('base_price')} *`}
+            required
+            type="number"
+            min="0.01"
+            step="0.01"
+            name="basePrice"
+            value={formData.basePrice}
+            onChange={handleChange}
+            errorText={fieldErrors.basePrice}
+          />
         </div>
       </form>
     </M3Dialog>

@@ -4,6 +4,7 @@ import { stayService } from '../../services/stayService';
 import { useToastStore } from '../../store/toastStore';
 import { M3Card } from '../../components/m3/M3Card';
 import { M3Button } from '../../components/m3/M3Button';
+import { M3TextField } from '../../components/m3/M3TextField';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { getErrorMessage } from '../../utils/errorMessage';
 
@@ -77,18 +78,13 @@ export const AlloggiatiReportSection = memo(({ isAdminOrOwner }: AlloggiatiRepor
       </div>
       <p className="text-xs font-body text-on-surface-variant mb-4">{t('police_report_desc')}</p>
       <div className="flex flex-col sm:flex-row items-end gap-3">
-        <div className="flex-1">
-          <label htmlFor="alloggiati-date" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-            {t('check_in_date')}
-          </label>
-          <input
-            id="alloggiati-date"
-            type="date"
-            value={alloggiatiDate}
-            onChange={handleAlloggiatiDateChange}
-            className="block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
-          />
-        </div>
+        <M3TextField
+          className="flex-1"
+          label={t('check_in_date')}
+          type="date"
+          value={alloggiatiDate}
+          onChange={handleAlloggiatiDateChange}
+        />
         <M3Button
           id="generate-alloggiati-btn"
           icon={downloadingReport ? 'progress_activity' : 'download'}
