@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, memo, useMemo } from 'react';
-import { fbService } from '../services/fbService';
+import { useState, useCallback, memo, useMemo } from 'react';
 import type { MenuItemResponse, RestaurantOrderResponse, OrderStatus } from '../types/fb.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
@@ -7,16 +6,24 @@ import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { M3Card } from '../components/m3/M3Card';
 import { M3TableActionLink } from '../components/m3/M3TableActionLink';
+import { M3LoadingState } from '../components/m3/M3LoadingState';
+import { M3ErrorState } from '../components/m3/M3ErrorState';
+import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import { getErrorMessage } from '../utils/errorMessage';
+import { useQueryClient } from '@tanstack/react-query';
+import { useOrders, useMenuItems, useConfirmOrder, useDeleteMenuItem } from '../hooks/queries/useFb';
+import { queryKeys } from '../lib/queryKeys';
 import { OrderFormModal } from './Restaurant/OrderFormModal';
 import { OrderDetailModal } from './Restaurant/OrderDetailModal';
 import { MenuFormModal } from './Restaurant/MenuFormModal';
 
 const CONFIRMABLE_STATUSES = new Set<string>(['PENDING', 'PREPARED']);
+const EMPTY_ORDERS: RestaurantOrderResponse[] = [];
+const EMPTY_MENU_ITEMS: MenuItemResponse[] = [];
 
 type OrderSortField = 'orderDate' | 'roomNumber' | 'guestDisplayName';
 type SortDir = 'asc' | 'desc';
@@ -135,86 +142,64 @@ export const Restaurant = memo(() => {
   const { addToast } = useToastStore();
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
 
-  const [orders, setOrders] = useState<RestaurantOrderResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<RestaurantOrderResponse | null>(null);
 
-  const [menuItems, setMenuItems] = useState<MenuItemResponse[]>([]);
   const [menuFormTarget, setMenuFormTarget] = useState<MenuItemResponse | 'new' | null>(null);
   const [deletingMenuId, setDeletingMenuId] = useState<string | null>(null);
 
   const [sortField, setSortField] = useState<OrderSortField>('orderDate');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  const loadOrders = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await fbService.getAllOrders();
-      setOrders(data);
-    } catch (err: unknown) {
-      const e = err as {response?: {data?: {detail?: string}}, message?: string};
-      setError(e.response?.data?.detail || e.message || t('failed_load_orders'));
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
+  const { data: ordersData, isLoading: loading, error: queryError, refetch } = useOrders();
+  const orders = ordersData ?? EMPTY_ORDERS;
+  const error = queryError ? getErrorMessage(queryError, t('failed_load_orders')) : null;
+  const handleRetry = useCallback(() => { refetch(); }, [refetch]);
 
-  useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
+  const { data: menuItemsData } = useMenuItems(isAdminOrOwner);
+  const menuItems = menuItemsData ?? EMPTY_MENU_ITEMS;
+
+  const confirmOrderMutation = useConfirmOrder();
+  const confirmingId = confirmOrderMutation.isPending
+    ? (confirmOrderMutation.variables ?? null)
+    : null;
 
   const handleConfirm = useCallback(async (orderId: string) => {
-    setConfirmingId(orderId);
     try {
-      await fbService.confirmOrder(orderId);
-      await loadOrders();
+      await confirmOrderMutation.mutateAsync(orderId);
     } catch (err: unknown) {
-      const e = err as {response?: {data?: {detail?: string}}, message?: string};
-      addToast(e.response?.data?.detail || e.message || t('confirm_order_failed'), 'error');
-    } finally {
-      setConfirmingId(null);
+      addToast(getErrorMessage(err, t('confirm_order_failed')), 'error');
     }
-  }, [loadOrders, t, addToast]);
+  }, [confirmOrderMutation, t, addToast]);
 
-  const loadMenu = useCallback(async () => {
-    if (!isAdminOrOwner) return;
-    try {
-      const items = await fbService.getMenuItems();
-      setMenuItems(items);
-    } catch { /* non-blocking */ }
-  }, [isAdminOrOwner]);
-
-  useEffect(() => { loadMenu(); }, [loadMenu]);
-
-  const handleMenuSaved = useCallback(async () => {
+  const handleMenuSaved = useCallback(() => {
     setMenuFormTarget(null);
-    await loadMenu();
-  }, [loadMenu]);
+    queryClient.invalidateQueries({ queryKey: queryKeys.menuItems.all });
+  }, [queryClient]);
 
   const handleMenuEdit = useCallback((mi: MenuItemResponse) => setMenuFormTarget(mi), []);
   const handleOpenMenuForm = useCallback(() => setMenuFormTarget('new'), []);
   const handleCloseMenuForm = useCallback(() => setMenuFormTarget(null), []);
 
+  const deleteMenuItemMutation = useDeleteMenuItem();
   const handleDeleteMenuItem = useCallback(async (item: MenuItemResponse) => {
     const confirmed = window.confirm(tMenu('menu_delete_confirm', { name: item.name }));
     if (!confirmed) return;
     setDeletingMenuId(item.id);
     try {
-      await fbService.deleteMenuItem(item.id);
+      await deleteMenuItemMutation.mutateAsync(item.id);
       addToast(tMenu('menu_delete_success'), 'success');
-      await loadMenu();
     } catch (err: unknown) {
       addToast(getErrorMessage(err, tMenu('menu_delete_error')), 'error');
     } finally {
       setDeletingMenuId(null);
     }
-  }, [addToast, loadMenu, tMenu]);
+  }, [addToast, deleteMenuItemMutation, tMenu]);
 
-  const handleOrderCreated = useCallback(async () => { await loadOrders(); }, [loadOrders]);
+  const handleOrderCreated = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.fbOrders.all });
+  }, [queryClient]);
 
   const handleSortFieldChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setSortField(e.target.value as OrderSortField);
@@ -292,24 +277,18 @@ export const Restaurant = memo(() => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('loading')} />
       ) : error ? (
-        <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium font-body">{t('error_loading_orders')}</h3>
-            <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button type="button" onClick={loadOrders} className="mt-2 text-sm font-medium underline hover:no-underline">
-              {t('try_again')}
-            </button>
-          </div>
-        </div>
+        <M3ErrorState
+          title={t('error_loading_orders')}
+          message={error}
+          retryLabel={t('try_again')}
+          onRetry={handleRetry}
+        />
       ) : (
         <M3Table headers={tableHeaders}>
           {sortedOrders.length === 0 ? (
-            <tr><td colSpan={6} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_orders')}</td></tr>
+            <M3TableEmptyRow colSpan={tableHeaders.length} message={t('no_orders')} />
           ) : (
             sortedOrders.map((order) => (
               <OrderRow

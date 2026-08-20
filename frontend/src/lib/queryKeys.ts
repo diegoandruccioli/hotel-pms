@@ -34,4 +34,10 @@ export const queryKeys = {
     search: (params: { status?: string; query: string; dateFrom?: string; dateTo?: string; page: number }) =>
       ['invoices', 'search', params] as const,
   },
+  fbOrders: {
+    all: ['fb-orders'] as const,
+  },
+  menuItems: {
+    all: ['menu-items'] as const,
+  },
 } as const;

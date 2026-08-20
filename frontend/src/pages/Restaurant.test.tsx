@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
+import { renderWithQuery as render } from '../test-utils/renderWithQuery';
 import { Restaurant } from './Restaurant';
 import { fbService } from '../services/fbService';
 import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
@@ -169,9 +170,9 @@ describe('Restaurant', () => {
 
   it('should show an error toast and keep the order list visible when confirmOrder fails', async () => {
     vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([PENDING_ORDER]);
-    vi.mocked(fbService.confirmOrder).mockRejectedValueOnce({
-      response: { data: { detail: 'STAY_NOT_CHECKED_IN' } },
-    });
+    vi.mocked(fbService.confirmOrder).mockRejectedValueOnce(
+      mockAxiosErrorWithDetail('STAY_NOT_CHECKED_IN', 409),
+    );
     render(<Restaurant />);
 
     await waitFor(() => {
