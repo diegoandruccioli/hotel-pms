@@ -7,6 +7,9 @@ import { M3Button } from '../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3Dialog } from '../components/m3/M3Dialog';
 import { M3TableActionLink } from '../components/m3/M3TableActionLink';
+import { M3LoadingState } from '../components/m3/M3LoadingState';
+import { M3ErrorState } from '../components/m3/M3ErrorState';
+import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
@@ -181,24 +184,18 @@ export const Guests = memo(() => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('loading')} />
       ) : error ? (
-        <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium font-body">{t('error_loading_guests')}</h3>
-            <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button type="button" onClick={handleRetry} className="mt-2 text-sm font-medium underline hover:no-underline">
-              {t('try_again')}
-            </button>
-          </div>
-        </div>
+        <M3ErrorState
+          title={t('error_loading_guests')}
+          message={error}
+          retryLabel={t('try_again')}
+          onRetry={handleRetry}
+        />
       ) : (
         <M3Table headers={headers}>
           {guests.length === 0 ? (
-            <tr><td colSpan={5} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_guests_found')}</td></tr>
+            <M3TableEmptyRow colSpan={headers.length} message={t('no_guests_found')} />
           ) : (
             guests.map((guest) => (
               <GuestRow
