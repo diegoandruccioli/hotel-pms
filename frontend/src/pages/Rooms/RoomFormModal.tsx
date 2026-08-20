@@ -5,6 +5,7 @@ import { inventoryService } from '../../services/inventoryService';
 import type { RoomRequest, RoomResponse, RoomTypeResponse } from '../../types/inventory.types';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Dialog } from '../../components/m3/M3Dialog';
+import { M3Select } from '../../components/m3/M3Select';
 import { useToastStore } from '../../store/toastStore';
 
 interface Props {
@@ -96,6 +97,17 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
 
   const inputClass = "block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
 
+  const statusOptions = useMemo(() => [
+    { value: 'CLEAN', label: t('room_status_clean') },
+    { value: 'DIRTY', label: t('room_status_dirty') },
+    { value: 'MAINTENANCE', label: t('room_status_maintenance') },
+  ], [t]);
+
+  const roomTypeOptions = useMemo(() => roomTypes.map((rt) => ({
+    value: rt.id,
+    label: `${rt.name} (Max ${rt.maxOccupancy} pax)`,
+  })), [roomTypes]);
+
   const footer = showDeleteConfirm ? (
     <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
       <span className="text-sm font-medium font-body text-error">
@@ -152,48 +164,26 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
               <p id="roomNumber-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.roomNumber}</p>
             )}
           </div>
-          <div>
-            <label htmlFor="roomStatus" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-              {t('status')} *
-            </label>
-            <select
-              id="roomStatus"
-              name="status"
-              value={formData.status}
-              onChange={handleChange}
-              className={inputClass}
-            >
-              <option value="CLEAN">{t('room_status_clean')}</option>
-              <option value="DIRTY">{t('room_status_dirty')}</option>
-              <option value="MAINTENANCE">{t('room_status_maintenance')}</option>
-            </select>
-          </div>
+          <M3Select
+            label={t('status')}
+            required
+            name="status"
+            value={formData.status}
+            onChange={handleChange}
+            options={statusOptions}
+          />
         </div>
 
-        <div>
-          <label htmlFor="roomTypeId" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-            {t('room_type')} *
-          </label>
-          <select
-            id="roomTypeId"
-            name="roomTypeId"
-            value={formData.roomTypeId}
-            onChange={handleChange}
-            className={inputClass}
-            aria-invalid={!!fieldErrors.roomTypeId}
-            aria-describedby={fieldErrors.roomTypeId ? 'roomTypeId-error' : undefined}
-          >
-            <option value="" disabled>{t('select_placeholder')}</option>
-            {roomTypes.map(rt => (
-              <option key={rt.id} value={rt.id}>
-                {rt.name} (Max {rt.maxOccupancy} pax)
-              </option>
-            ))}
-          </select>
-          {fieldErrors.roomTypeId && (
-            <p id="roomTypeId-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.roomTypeId}</p>
-          )}
-        </div>
+        <M3Select
+          label={t('room_type')}
+          required
+          name="roomTypeId"
+          value={formData.roomTypeId}
+          onChange={handleChange}
+          options={roomTypeOptions}
+          placeholder={t('select_placeholder')}
+          errorText={fieldErrors.roomTypeId}
+        />
 
       </form>
     </M3Dialog>
