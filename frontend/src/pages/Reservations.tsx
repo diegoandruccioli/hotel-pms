@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { reservationService } from '../services/reservationService';
 import type { ReservationResponse } from '../types/reservation.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
@@ -8,17 +7,28 @@ import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { M3Dialog } from '../components/m3/M3Dialog';
+import { M3LoadingState } from '../components/m3/M3LoadingState';
+import { M3ErrorState } from '../components/m3/M3ErrorState';
+import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
+import { M3Pagination } from '../components/m3/M3Pagination';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { inventoryService } from '../services/inventoryService';
 import type { RoomResponse } from '../types/inventory.types';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import { getErrorMessage } from '../utils/errorMessage';
+import {
+  useReservationsSearch,
+  useRoomsLookup,
+  useDeleteReservation,
+  useRetryConfirmationEmail,
+} from '../hooks/queries/useReservations';
 
 const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
+const EMPTY_RESERVATIONS: ReservationResponse[] = [];
+const EMPTY_ROOMS: RoomResponse[] = [];
 
 type SortField = 'checkInDate' | 'checkOutDate' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -168,20 +178,13 @@ export const Reservations = () => {
   const role = useAuthStore((s) => s.user?.role);
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
 
-  const [reservations, setReservations] = useState<ReservationResponse[]>([]);
-  const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>(() => navState?.sortField ?? 'checkInDate');
   const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? 'desc');
   const [upcomingOnly, setUpcomingOnly] = useState(() => navState?.upcomingOnly ?? false);
-  const [retryingEmail, setRetryingEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);
@@ -211,49 +214,52 @@ export const Reservations = () => {
 
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
   const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
+  const pageOfLabel = useCallback(
+    (current: number, total: number) => t('page_x_of_y', { current, total }),
+    [t],
+  );
 
-  const loadReservations = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [resData, roomsData] = await Promise.all([
-        reservationService.searchReservations({
-          query: debouncedSearch,
-          upcomingOnly,
-          page,
-          size: PAGE_SIZE,
-          sort: `${sortField},${sortDir}`,
-        }),
-        inventoryService.getAllRooms(0, 500)
-      ]);
-      setReservations(resData.content);
-      setTotalPages(resData.totalPages);
-      setRooms(roomsData.content);
-    } catch (err: unknown) {
-      const e = err as {response?: {data?: {detail?: string}}, message?: string};
-      setError(e.response?.data?.detail || e.message || t('failed_load_reservations'));
-    } finally {
-      setLoading(false);
-    }
-  }, [t, debouncedSearch, upcomingOnly, page, sortField, sortDir]);
+  const searchParams = useMemo(() => ({
+    query: debouncedSearch,
+    upcomingOnly,
+    page,
+    size: PAGE_SIZE,
+    sort: `${sortField},${sortDir}`,
+  }), [debouncedSearch, upcomingOnly, page, sortField, sortDir]);
+
+  const {
+    data: reservationsPage,
+    isLoading: reservationsLoading,
+    error: reservationsError,
+    refetch: refetchReservations,
+  } = useReservationsSearch(searchParams);
+  const { data: roomsData, isLoading: roomsLoading, error: roomsErrorRaw, refetch: refetchRooms } = useRoomsLookup();
+  const reservations = reservationsPage?.content ?? EMPTY_RESERVATIONS;
+  const totalPages = reservationsPage?.totalPages ?? 1;
+  const rooms = roomsData ?? EMPTY_ROOMS;
+  const loading = reservationsLoading || roomsLoading;
+  const queryError = reservationsError ?? roomsErrorRaw;
+  const error = queryError ? getErrorMessage(queryError, t('failed_load_reservations')) : null;
+
+  const handleRetry = useCallback(() => {
+    refetchReservations();
+    refetchRooms();
+  }, [refetchReservations, refetchRooms]);
+
+  const retryConfirmationEmailMutation = useRetryConfirmationEmail();
+  const retryingEmail = retryConfirmationEmailMutation.isPending
+    ? (retryConfirmationEmailMutation.variables ?? null)
+    : null;
 
   const handleRetryConfirmationEmail = useCallback(async (id: string) => {
-    setRetryingEmail(id);
     try {
-      const updated = await reservationService.retryConfirmationEmail(id);
-      setReservations((prev) => prev.map((r) => (r.id === id ? updated : r)));
+      await retryConfirmationEmailMutation.mutateAsync(id);
       addToast(t('confirmation_email_retry_success'), 'success');
     } catch (err: unknown) {
       const message = getErrorMessage(err, t('confirmation_email_retry_failed'));
       addToast(message, 'error');
-    } finally {
-      setRetryingEmail(null);
     }
-  }, [addToast, t]);
-
-  useEffect(() => {
-    loadReservations();
-  }, [loadReservations]);
+  }, [addToast, t, retryConfirmationEmailMutation]);
 
   const handleNewReservation = useCallback(() => {
     navigate('/reservations/new');
@@ -281,20 +287,20 @@ export const Reservations = () => {
     setReservationToDelete(null);
   }, []);
 
+  const deleteReservationMutation = useDeleteReservation();
+  const deleting = deleteReservationMutation.isPending;
+
   const handleDeleteConfirm = useCallback(async () => {
     if (!reservationToDelete) return;
-    setDeleting(true);
     try {
-      await reservationService.deleteReservation(reservationToDelete);
-      await loadReservations();
+      await deleteReservationMutation.mutateAsync(reservationToDelete);
       addToast(t('reservation_deleted_success'), 'success');
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('delete_reservation_failed')), 'error');
     } finally {
-      setDeleting(false);
       setReservationToDelete(null);
     }
-  }, [reservationToDelete, addToast, t, loadReservations]);
+  }, [reservationToDelete, addToast, t, deleteReservationMutation]);
 
   const tableHeaders = useMemo(() => [
     t('guest_name'), 
@@ -368,28 +374,21 @@ export const Reservations = () => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('loading')} />
       ) : error ? (
-        <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium font-body">{t('error_loading_reservations')}</h3>
-            <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button type="button" onClick={loadReservations} className="mt-2 text-sm font-medium underline hover:no-underline">
-              {t('try_again')}
-            </button>
-          </div>
-        </div>
+        <M3ErrorState
+          title={t('error_loading_reservations')}
+          message={error}
+          retryLabel={t('try_again')}
+          onRetry={handleRetry}
+        />
       ) : (
         <M3Table headers={tableHeaders}>
           {reservations.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="py-8 text-center text-sm font-body text-on-surface-variant">
-                {upcomingOnly ? t('no_upcoming_reservations_found') : t('no_reservations_found')}
-              </td>
-            </tr>
+            <M3TableEmptyRow
+              colSpan={tableHeaders.length}
+              message={upcomingOnly ? t('no_upcoming_reservations_found') : t('no_reservations_found')}
+            />
           ) : (
             reservations.map((reservation) => (
               <ReservationRow
@@ -409,30 +408,17 @@ export const Reservations = () => {
         </M3Table>
       )}
 
-      {!loading && !error && totalPages > 1 && (
-        <nav aria-label={t('pagination')} className="flex items-center justify-center gap-3">
-          <M3Button
-            variant="outlined"
-            icon="chevron_left"
-            disabled={page === 0}
-            onClick={handlePrevPage}
-            aria-label={t('prev_page')}
-          >
-            {t('prev_page')}
-          </M3Button>
-          <span className="text-sm font-body text-on-surface-variant">
-            {t('page_x_of_y', { current: page + 1, total: totalPages })}
-          </span>
-          <M3Button
-            variant="outlined"
-            icon="chevron_right"
-            disabled={page >= totalPages - 1}
-            onClick={handleNextPage}
-            aria-label={t('next_page')}
-          >
-            {t('next_page')}
-          </M3Button>
-        </nav>
+      {!loading && !error && (
+        <M3Pagination
+          page={page}
+          totalPages={totalPages}
+          onPrev={handlePrevPage}
+          onNext={handleNextPage}
+          pageLabel={t('pagination')}
+          prevLabel={t('prev_page')}
+          nextLabel={t('next_page')}
+          pageOfLabel={pageOfLabel}
+        />
       )}
       {reservationToDelete && (
         <M3Dialog
