@@ -2,6 +2,7 @@ import { useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { UserResponse } from '../../types/user.types';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { M3TableRow, M3TableCell } from '../../components/m3/M3Table';
 
 interface UserRowProps {
   user: UserResponse;
@@ -16,30 +17,30 @@ export const UserRow = memo(({ user, onToggle, onResetPassword, currentUsername 
   const handleReset = useCallback(() => onResetPassword(user), [onResetPassword, user]);
 
   return (
-    <tr className="hover:bg-surface-variant/40 transition-colors">
-      <td className="px-4 py-3 font-medium">{user.username}</td>
-      <td className="px-4 py-3 text-on-surface-variant">{user.email}</td>
-      <td className="px-4 py-3">
+    <M3TableRow>
+      <M3TableCell className="font-medium">{user.username}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant">{user.email}</M3TableCell>
+      <M3TableCell>
         <span className="rounded-full bg-secondary-container text-on-secondary-container px-2 py-0.5 text-xs font-medium">
           {user.role}
         </span>
-      </td>
-      <td className="px-4 py-3">
+      </M3TableCell>
+      <M3TableCell>
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
           user.active ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-error-container text-on-error-container'
         }`}>
           {user.active ? t('status_active') : t('status_inactive')}
         </span>
-      </td>
-      <td className="px-4 py-3">
+      </M3TableCell>
+      <M3TableCell>
         {user.mustChangePassword && (
           <span className="text-xs flex items-center gap-1 text-on-surface-variant">
             <MaterialIcon name="warning" size={14} />
             {t('must_change_pw')}
           </span>
         )}
-      </td>
-      <td className="px-4 py-3">
+      </M3TableCell>
+      <M3TableCell>
         <div className="flex items-center gap-2">
           <button type="button" onClick={handleToggle}
             className="inline-flex items-center justify-center min-h-[40px] text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary"
@@ -54,8 +55,8 @@ export const UserRow = memo(({ user, onToggle, onResetPassword, currentUsername 
             </button>
           )}
         </div>
-      </td>
-    </tr>
+      </M3TableCell>
+    </M3TableRow>
   );
 });
 UserRow.displayName = 'UserRow';

@@ -31,6 +31,12 @@ const OptionCard = ({ option, isAccepted, isConvertChoice, selectable, onChoose 
   const { t } = useTranslation(['quotations', 'common']);
   const handleChoose = useCallback(() => onChoose?.(option.id), [onChoose, option.id]);
 
+  const lineItemHeaders = useMemo(() => [
+    <span key="room" className="sr-only">{t('common:room_number_col')}</span>,
+    <span key="type" className="sr-only">{t('common:room_type')}</span>,
+    <span key="price" className="sr-only">{t('common:amount')}</span>,
+  ], [t]);
+
   return (
     <M3Card
       variant="outlined"
@@ -40,17 +46,15 @@ const OptionCard = ({ option, isAccepted, isConvertChoice, selectable, onChoose 
         <h3 className="font-medium text-on-surface">{option.label}</h3>
         {isAccepted && <M3StatusChip label={t('label_accepted_option')} tone="success" icon="check_circle" />}
       </div>
-      <table className="w-full text-sm">
-        <tbody>
-          {option.lineItems.map((li) => (
-            <tr key={li.id} className="border-b border-outline-variant last:border-0">
-              <td className="py-1.5 pr-2 text-on-surface">{li.roomNumber}</td>
-              <td className="py-1.5 pr-2 text-on-surface-variant">{li.roomTypeName}</td>
-              <td className="py-1.5 text-right text-on-surface-variant">€ {li.price.toFixed(2)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <M3Table headers={lineItemHeaders}>
+        {option.lineItems.map((li) => (
+          <M3TableRow key={li.id}>
+            <M3TableCell className="py-1.5 first:pl-0 last:pr-0 text-on-surface">{li.roomNumber}</M3TableCell>
+            <M3TableCell className="py-1.5 first:pl-0 last:pr-0 text-on-surface-variant">{li.roomTypeName}</M3TableCell>
+            <M3TableCell className="py-1.5 first:pl-0 last:pr-0 text-right text-on-surface-variant">€ {li.price.toFixed(2)}</M3TableCell>
+          </M3TableRow>
+        ))}
+      </M3Table>
       <p className="text-right font-medium text-on-surface">€ {option.totalPrice.toFixed(2)}</p>
       {selectable && (
         <M3Button type="button" variant={isConvertChoice ? 'filled' : 'outlined'} onClick={handleChoose} className="w-full">

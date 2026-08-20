@@ -1,8 +1,9 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3StatusChip } from '../../components/m3/M3StatusChip';
+import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
 import type { RestaurantOrderResponse, OrderStatus } from '../../types/fb.types';
 
 interface Props {
@@ -36,6 +37,13 @@ export const OrderDetailModal = memo(({ order, onClose }: Props) => {
     },
     [i18n.language],
   );
+
+  const itemHeaders = useMemo(() => [
+    t('item_name'),
+    t('quantity'),
+    t('unit_price'),
+    t('subtotal'),
+  ], [t]);
 
   return (
     <M3Dialog
@@ -72,42 +80,28 @@ export const OrderDetailModal = memo(({ order, onClose }: Props) => {
         </div>
 
         {order.items && order.items.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm font-body">
-              <thead>
-                <tr className="border-b border-outline-variant text-on-surface-variant text-left">
-                  <th scope="col" className="pb-2 pr-4 font-medium">{t('item_name')}</th>
-                  <th scope="col" className="pb-2 pr-4 text-right font-medium">{t('quantity')}</th>
-                  <th scope="col" className="pb-2 pr-4 text-right font-medium">{t('unit_price')}</th>
-                  <th scope="col" className="pb-2 text-right font-medium">{t('subtotal')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.items.map((item) => (
-                  <tr key={item.id} className="border-b border-outline-variant/50">
-                    <td className="py-2 pr-4 text-on-surface">{item.itemName}</td>
-                    <td className="py-2 pr-4 text-right text-on-surface-variant">{item.quantity}</td>
-                    <td className="py-2 pr-4 text-right text-on-surface-variant">
-                      {formatCurrency(item.unitPrice)}
-                    </td>
-                    <td className="py-2 text-right font-medium text-on-surface">
-                      {formatCurrency(item.unitPrice * item.quantity)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td colSpan={3} className="pt-3 pr-4 text-right font-medium text-on-surface">
-                    {t('total_amount')}
-                  </td>
-                  <td className="pt-3 text-right font-bold text-on-surface">
-                    {formatCurrency(order.totalAmount)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <M3Table headers={itemHeaders}>
+            {order.items.map((item) => (
+              <M3TableRow key={item.id}>
+                <M3TableCell>{item.itemName}</M3TableCell>
+                <M3TableCell className="text-right text-on-surface-variant">{item.quantity}</M3TableCell>
+                <M3TableCell className="text-right text-on-surface-variant">
+                  {formatCurrency(item.unitPrice)}
+                </M3TableCell>
+                <M3TableCell className="text-right font-medium">
+                  {formatCurrency(item.unitPrice * item.quantity)}
+                </M3TableCell>
+              </M3TableRow>
+            ))}
+            <M3TableRow className="hover:bg-transparent">
+              <M3TableCell colSpan={3} className="text-right font-medium">
+                {t('total_amount')}
+              </M3TableCell>
+              <M3TableCell className="text-right font-bold">
+                {formatCurrency(order.totalAmount)}
+              </M3TableCell>
+            </M3TableRow>
+          </M3Table>
         )}
 
         <div className="flex justify-end pt-2">

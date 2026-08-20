@@ -44,17 +44,17 @@ const MenuItemRow = memo(({
   const handleEdit = useCallback(() => onEdit(mi), [onEdit, mi]);
   const handleDelete = useCallback(() => onDelete(mi), [onDelete, mi]);
   return (
-    <tr key={mi.id} className="hover:bg-surface-variant/30">
-      <td className="px-3 py-2 font-medium">{mi.name}</td>
-      <td className="px-3 py-2 text-on-surface-variant">{mi.category}</td>
-      <td className="px-3 py-2 text-right">{formatCurrencyFn(mi.price)}</td>
-      <td className="px-3 py-2 text-center">
+    <M3TableRow>
+      <M3TableCell className="font-medium">{mi.name}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant">{mi.category}</M3TableCell>
+      <M3TableCell className="text-right">{formatCurrencyFn(mi.price)}</M3TableCell>
+      <M3TableCell className="text-center">
         <M3StatusChip
           label={mi.available ? tLabel('menu_available_yes') : tLabel('menu_available_no')}
           tone={mi.available ? 'success' : 'neutral'}
         />
-      </td>
-      <td className="px-3 py-2 text-right">
+      </M3TableCell>
+      <M3TableCell className="text-right">
         <div className="flex justify-end gap-2">
           <button type="button" onClick={handleEdit}
             className="text-primary hover:text-primary/80 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary rounded"
@@ -68,8 +68,8 @@ const MenuItemRow = memo(({
             {tCommon('delete')}
           </button>
         </div>
-      </td>
-    </tr>
+      </M3TableCell>
+    </M3TableRow>
   );
 });
 MenuItemRow.displayName = 'MenuItemRow';
@@ -240,6 +240,14 @@ export const Restaurant = memo(() => {
     <span key="sr" className="sr-only">{t('actions')}</span>
   ], [t]);
 
+  const menuHeaders = useMemo(() => [
+    tMenu('menu_name'),
+    tMenu('menu_category'),
+    tMenu('menu_price'),
+    tMenu('menu_available'),
+    t('actions'),
+  ], [t, tMenu]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -320,33 +328,20 @@ export const Restaurant = memo(() => {
           {menuItems.length === 0 ? (
             <p className="text-sm text-on-surface-variant text-center py-4">{tMenu('menu_no_items')}</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-on-surface">
-                <thead className="bg-surface-variant text-on-surface-variant uppercase text-xs tracking-wide">
-                  <tr>
-                    <th className="px-3 py-2 text-left">{tMenu('menu_name')}</th>
-                    <th className="px-3 py-2 text-left">{tMenu('menu_category')}</th>
-                    <th className="px-3 py-2 text-right">{tMenu('menu_price')}</th>
-                    <th className="px-3 py-2 text-center">{tMenu('menu_available')}</th>
-                    <th className="px-3 py-2 text-right">{t('actions')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant">
-                  {menuItems.map((mi) => (
-                    <MenuItemRow
-                      key={mi.id}
-                      mi={mi}
-                      deletingMenuId={deletingMenuId}
-                      onEdit={handleMenuEdit}
-                      onDelete={handleDeleteMenuItem}
-                      formatCurrencyFn={formatCurrency}
-                      tLabel={tMenu}
-                      tCommon={t}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <M3Table headers={menuHeaders}>
+              {menuItems.map((mi) => (
+                <MenuItemRow
+                  key={mi.id}
+                  mi={mi}
+                  deletingMenuId={deletingMenuId}
+                  onEdit={handleMenuEdit}
+                  onDelete={handleDeleteMenuItem}
+                  formatCurrencyFn={formatCurrency}
+                  tLabel={tMenu}
+                  tCommon={t}
+                />
+              ))}
+            </M3Table>
           )}
         </M3Card>
       )}

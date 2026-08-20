@@ -1,9 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { userService } from '../services/userService';
 import type { UserResponse } from '../types/user.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
+import { M3Table } from '../components/m3/M3Table';
+import { M3LoadingState } from '../components/m3/M3LoadingState';
+import { M3EmptyState } from '../components/m3/M3EmptyState';
 import { useToastStore } from '../store/toastStore';
 import { useAuthStore } from '../store/authStore';
 import { getErrorMessage } from '../utils/errorMessage';
@@ -51,6 +54,10 @@ export function AdminUsers() {
     addToast(t('toast_reset_success'), 'success');
   }, [closeReset, addToast, t]);
 
+  const tableHeaders = useMemo(() => (
+    ['col_username', 'col_email', 'col_role', 'col_status', 'col_must_change_password', 'col_actions'] as const
+  ).map((col) => t(col)), [t]);
+
   const handleToggle = useCallback(
     async (u: UserResponse) => {
       try {
@@ -87,37 +94,21 @@ export function AdminUsers() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('loading', { ns: 'common' })} />
+      ) : users.length === 0 ? (
+        <M3EmptyState icon="manage_accounts" title={t('no_users')} className="bg-surface rounded-shape-md shadow-elevation-1" />
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-outline-variant">
-          <table className="w-full text-sm text-on-surface">
-            <thead className="bg-surface-variant text-on-surface-variant uppercase text-xs tracking-wide">
-              <tr>
-                {(['col_username', 'col_email', 'col_role', 'col_status', 'col_must_change_password', 'col_actions'] as const).map((col) => (
-                  <th key={col} scope="col" className="px-4 py-3 text-left font-medium">
-                    {t(col)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant">
-              {users.map((u) => (
-                <UserRow
-                  key={u.id}
-                  user={u}
-                  onToggle={handleToggle}
-                  onResetPassword={openReset}
-                  currentUsername={currentUser?.username}
-                />
-              ))}
-            </tbody>
-          </table>
-          {users.length === 0 && (
-            <p className="text-center py-8 text-on-surface-variant text-sm">{t('no_users')}</p>
-          )}
-        </div>
+        <M3Table headers={tableHeaders}>
+          {users.map((u) => (
+            <UserRow
+              key={u.id}
+              user={u}
+              onToggle={handleToggle}
+              onResetPassword={openReset}
+              currentUsername={currentUser?.username}
+            />
+          ))}
+        </M3Table>
       )}
 
       {showCreate && (
