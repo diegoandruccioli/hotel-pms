@@ -6,6 +6,7 @@ import type { RoomRequest, RoomResponse, RoomTypeResponse } from '../../types/in
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3Select } from '../../components/m3/M3Select';
+import { M3TextField } from '../../components/m3/M3TextField';
 import { useToastStore } from '../../store/toastStore';
 
 interface Props {
@@ -95,8 +96,6 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
   const openDeleteConfirm = useCallback(() => setShowDeleteConfirm(true), []);
   const closeDeleteConfirm = useCallback(() => setShowDeleteConfirm(false), []);
 
-  const inputClass = "block w-full rounded-shape-xs border border-outline px-3 py-2 text-sm font-body bg-transparent text-on-surface focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none";
-
   const statusOptions = useMemo(() => [
     { value: 'CLEAN', label: t('room_status_clean') },
     { value: 'DIRTY', label: t('room_status_dirty') },
@@ -145,25 +144,15 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
       <form id="room-form" onSubmit={handleSubmit} noValidate className="space-y-4">
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="roomNumber" className="block text-sm font-medium font-body text-on-surface-variant mb-1">
-              {t('room_number_col')} *
-            </label>
-            <input
-              type="text"
-              id="roomNumber"
-              name="roomNumber"
-              value={formData.roomNumber}
-              onChange={handleChange}
-              className={inputClass}
-              placeholder="101"
-              aria-invalid={!!fieldErrors.roomNumber}
-              aria-describedby={fieldErrors.roomNumber ? 'roomNumber-error' : undefined}
-            />
-            {fieldErrors.roomNumber && (
-              <p id="roomNumber-error" role="alert" className="mt-1 text-sm font-body text-error">{fieldErrors.roomNumber}</p>
-            )}
-          </div>
+          <M3TextField
+            label={`${t('room_number_col')} *`}
+            required
+            name="roomNumber"
+            value={formData.roomNumber}
+            onChange={handleChange}
+            placeholder="101"
+            errorText={fieldErrors.roomNumber}
+          />
           <M3Select
             label={t('status')}
             required
