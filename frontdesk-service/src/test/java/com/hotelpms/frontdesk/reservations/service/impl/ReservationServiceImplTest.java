@@ -49,6 +49,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -456,7 +457,7 @@ class ReservationServiceImplTest {
         when(guestClient.getGuestsBatch(List.of(GUEST_ID))).thenReturn(List.of(mockGuestResponse));
         when(reservationMapper.toResponse(entity)).thenReturn(response);
 
-        final Page<ReservationResponse> result = reservationService.searchReservations(null, false, pageable);
+        final Page<ReservationResponse> result = reservationService.searchReservations(null, false, null, null, null, pageable);
 
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
@@ -469,7 +470,7 @@ class ReservationServiceImplTest {
         when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
                 .thenReturn(Page.empty(pageable));
 
-        reservationService.searchReservations("   ", false, pageable);
+        reservationService.searchReservations("   ", false, null, null, null, pageable);
 
         verify(guestClient, never()).searchGuests(any(), anyInt());
     }
@@ -487,7 +488,7 @@ class ReservationServiceImplTest {
                 HOTEL_ID, QUERY_MARIO, List.of(otherGuestId), pageable))
                 .thenReturn(Page.empty(pageable));
 
-        reservationService.searchReservations("  " + QUERY_MARIO + "  ", false, pageable);
+        reservationService.searchReservations("  " + QUERY_MARIO + "  ", false, null, null, null, pageable);
 
         verify(reservationRepository).searchReservationsByHotelId(
                 HOTEL_ID, QUERY_MARIO, List.of(otherGuestId), pageable);
@@ -500,10 +501,54 @@ class ReservationServiceImplTest {
                 eq(HOTEL_ID), eq(LocalDate.now()), eq(null), eq(List.of()), eq(pageable)))
                 .thenReturn(Page.empty(pageable));
 
-        reservationService.searchReservations(null, true, pageable);
+        reservationService.searchReservations(null, true, null, null, null, pageable);
 
         verify(reservationRepository).searchUpcomingReservationsByHotelId(
                 eq(HOTEL_ID), eq(LocalDate.now()), eq(null), eq(List.of()), eq(pageable));
+    }
+
+    @Test
+    void testSearchReservationsWithDateRangeUsesFilterQuery() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        final LocalDate dateFrom = LocalDate.of(2026, 8, 1);
+        final LocalDate dateTo = LocalDate.of(2026, 8, 31);
+        when(reservationRepository.filterReservationsByHotelId(
+                eq(HOTEL_ID), eq(dateFrom), eq(dateTo), any(), eq(null), eq(List.of()), eq(pageable)))
+                .thenReturn(Page.empty(pageable));
+
+        reservationService.searchReservations(null, false, dateFrom, dateTo, null, pageable);
+
+        verify(reservationRepository).filterReservationsByHotelId(
+                eq(HOTEL_ID), eq(dateFrom), eq(dateTo), any(), eq(null), eq(List.of()), eq(pageable));
+    }
+
+    @Test
+    void testSearchReservationsWithStatusFilterUsesFilterQueryWithSingleStatus() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        when(reservationRepository.filterReservationsByHotelId(
+                eq(HOTEL_ID), any(), any(), eq(Set.of(ReservationStatus.CHECKED_IN)),
+                eq(null), eq(List.of()), eq(pageable)))
+                .thenReturn(Page.empty(pageable));
+
+        reservationService.searchReservations(null, false, null, null, ReservationStatus.CHECKED_IN, pageable);
+
+        verify(reservationRepository).filterReservationsByHotelId(
+                eq(HOTEL_ID), any(), any(), eq(Set.of(ReservationStatus.CHECKED_IN)),
+                eq(null), eq(List.of()), eq(pageable));
+    }
+
+    @Test
+    void testSearchReservationsDateRangeTakesPrecedenceOverUpcomingOnly() {
+        final Pageable pageable = PageRequest.of(0, 20);
+        final LocalDate dateFrom = LocalDate.of(2026, 8, 1);
+        when(reservationRepository.filterReservationsByHotelId(
+                eq(HOTEL_ID), eq(dateFrom), any(), any(), eq(null), eq(List.of()), eq(pageable)))
+                .thenReturn(Page.empty(pageable));
+
+        reservationService.searchReservations(null, true, dateFrom, null, null, pageable);
+
+        verify(reservationRepository, never()).searchUpcomingReservationsByHotelId(
+                any(), any(), any(), any(), any());
     }
 
     @Test
@@ -512,7 +557,7 @@ class ReservationServiceImplTest {
         when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
                 .thenReturn(Page.empty(pageable));
 
-        final Page<ReservationResponse> result = reservationService.searchReservations(null, false, pageable);
+        final Page<ReservationResponse> result = reservationService.searchReservations(null, false, null, null, null, pageable);
 
         assertNotNull(result);
         assertEquals(0, result.getTotalElements());

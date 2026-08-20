@@ -52,6 +52,9 @@ class ReservationControllerTest {
     private static final String BASE_URL = "/api/v1/reservations";
     private static final String PATH_BY_ID = "/{id}";
     private static final String PATH_STATUS = "/{id}/status-and-guests";
+    private static final String SEARCH_PATH = "/search";
+    private static final LocalDate DATE_FROM = LocalDate.of(2026, 8, 1);
+    private static final LocalDate DATE_TO = LocalDate.of(2026, 8, 31);
     private static final String JSON_ID = "$.id";
     private static final UUID GUEST_ID = UUID.randomUUID();
     private static final String FULL_NAME = "Test Guest";
@@ -140,12 +143,30 @@ class ReservationControllerTest {
     void shouldSearchReservationsReturn200() throws Exception {
         final Page<ReservationResponse> page = new PageImpl<>(
                 List.of(response), PageRequest.of(0, 20), 1L);
-        when(reservationService.searchReservations(eq("mario"), eq(true), any(Pageable.class)))
+        when(reservationService.searchReservations(
+                eq("mario"), eq(true), eq(null), eq(null), eq(null), any(Pageable.class)))
                 .thenReturn(page);
 
-        mockMvc.perform(get(BASE_URL + "/search")
+        mockMvc.perform(get(BASE_URL + SEARCH_PATH)
                         .param("query", "mario")
                         .param("upcomingOnly", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(reservationId.toString()));
+    }
+
+    @Test
+    void shouldSearchReservationsWithDateRangeAndStatusReturn200() throws Exception {
+        final Page<ReservationResponse> page = new PageImpl<>(
+                List.of(response), PageRequest.of(0, 20), 1L);
+        when(reservationService.searchReservations(
+                eq(null), eq(false), eq(DATE_FROM), eq(DATE_TO),
+                eq(ReservationStatus.CHECKED_IN), any(Pageable.class)))
+                .thenReturn(page);
+
+        mockMvc.perform(get(BASE_URL + SEARCH_PATH)
+                        .param("dateFrom", "2026-08-01")
+                        .param("dateTo", "2026-08-31")
+                        .param("status", "CHECKED_IN"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(reservationId.toString()));
     }
@@ -154,10 +175,11 @@ class ReservationControllerTest {
     void shouldSearchReservationsWithNoFiltersReturn200() throws Exception {
         final Page<ReservationResponse> page = new PageImpl<>(
                 List.of(response), PageRequest.of(0, 20), 1L);
-        when(reservationService.searchReservations(eq(null), eq(false), any(Pageable.class)))
+        when(reservationService.searchReservations(
+                eq(null), eq(false), eq(null), eq(null), eq(null), any(Pageable.class)))
                 .thenReturn(page);
 
-        mockMvc.perform(get(BASE_URL + "/search"))
+        mockMvc.perform(get(BASE_URL + SEARCH_PATH))
                 .andExpect(status().isOk());
     }
 

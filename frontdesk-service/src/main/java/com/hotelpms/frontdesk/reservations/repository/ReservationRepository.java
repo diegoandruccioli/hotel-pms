@@ -214,6 +214,39 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
             Pageable pageable);
 
     /**
+     * Combinable search over a hotel's reservations, with an explicit check-in
+     * date range and a status set — used by the C1.2 filtered listing (E-DASHBOARD-1
+     * follow-up). Both date bounds and the status set are always non-null and
+     * concretely valued (callers resolve "no filter" to the widest possible
+     * range/full status set in {@code ReservationServiceImpl}) so this query never
+     * needs an {@code IS NULL} branch on a date-typed parameter — see {@link
+     * #searchUpcomingReservationsByHotelId} for why that pattern is avoided here.
+     *
+     * @param hotelId  the hotel UUID from the authenticated request (always applied)
+     * @param dateFrom lower bound (inclusive) on check-in date
+     * @param dateTo   upper bound (inclusive) on check-in date
+     * @param statuses reservation statuses to include
+     * @param query    non-null marker that a guest query was requested (drives the
+     *                 {@code guestIds} filter); {@code null} to skip it entirely
+     * @param guestIds guest IDs matching the query in guest-service; must be non-null
+     *                 (empty when {@code query} is null, or when no guest matched)
+     * @param pageable pagination and sorting parameters
+     * @return a page of matching reservations scoped to the hotel
+     */
+    @Query("SELECT r FROM Reservation r WHERE r.hotelId = :hotelId "
+            + "AND r.checkInDate BETWEEN :dateFrom AND :dateTo "
+            + "AND r.status IN :statuses "
+            + "AND (:query IS NULL OR r.guestId IN :guestIds)")
+    Page<Reservation> filterReservationsByHotelId(
+            @Param("hotelId") UUID hotelId,
+            @Param("dateFrom") LocalDate dateFrom,
+            @Param("dateTo") LocalDate dateTo,
+            @Param("statuses") Collection<ReservationStatus> statuses,
+            @Param("query") String query,
+            @Param("guestIds") List<UUID> guestIds,
+            Pageable pageable);
+
+    /**
      * Counts reservations checking in on a given date with one of the given
      * statuses, scoped to a hotel. Backs the day-sheet "arrivals today" count
      * (E-DASHBOARD-1) — previously computed client-side by downloading up to

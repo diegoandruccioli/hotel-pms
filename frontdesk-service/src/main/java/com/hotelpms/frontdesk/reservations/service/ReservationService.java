@@ -46,19 +46,26 @@ public interface ReservationService {
 
     /**
      * Combinable search over the caller's hotel reservations (C12): an optional
-     * {@code upcomingOnly} filter (check-in date today or later) and an optional
-     * free-text query matched against the associated guest's name/email (resolved
-     * via a cross-service call to guest-service, since Reservation only stores a
+     * {@code upcomingOnly} filter (check-in date today or later), an optional
+     * check-in date range, an optional status filter, and an optional free-text
+     * query matched against the associated guest's name/email (resolved via a
+     * cross-service call to guest-service, since Reservation only stores a
      * guestId). Results include {@code guestFullName}, batch-resolved for the
      * returned page only — same pattern as {@link #getAllReservations(Pageable)}.
      *
      * @param query        optional free-text query (guest name/email), or {@code null}/blank
      *                     to skip it
-     * @param upcomingOnly if {@code true}, only reservations with check-in today or later
+     * @param upcomingOnly if {@code true}, only reservations with check-in today or later;
+     *                     ignored when {@code dateFrom} is set
+     * @param dateFrom     optional lower bound (inclusive) on check-in date; overrides
+     *                     {@code upcomingOnly} when set
+     * @param dateTo       optional upper bound (inclusive) on check-in date
+     * @param status       optional reservation status filter
      * @param pageable     pagination and sorting parameters
      * @return a page of matching reservation responses, scoped to the authenticated hotel
      */
-    Page<ReservationResponse> searchReservations(String query, boolean upcomingOnly, Pageable pageable);
+    Page<ReservationResponse> searchReservations(String query, boolean upcomingOnly,
+            LocalDate dateFrom, LocalDate dateTo, ReservationStatus status, Pageable pageable);
 
     /**
      * Updates an existing reservation.

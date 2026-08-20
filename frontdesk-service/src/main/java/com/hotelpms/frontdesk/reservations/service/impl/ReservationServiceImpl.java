@@ -40,6 +40,7 @@ import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -64,6 +65,8 @@ public class ReservationServiceImpl implements ReservationService {
     private static final int MAX_FAILURE_REASON_LENGTH = 500;
     private static final int GUEST_SEARCH_MATCH_CAP = 200;
     private static final String UNKNOWN_GUEST = "Unknown Guest";
+    private static final LocalDate EARLIEST_FILTER_DATE = LocalDate.of(1900, 1, 1);
+    private static final LocalDate LATEST_FILTER_DATE = LocalDate.of(2100, 12, 31);
 
     private final ReservationRepository reservationRepository;
     private final ReservationMapper reservationMapper;
@@ -145,16 +148,29 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional(readOnly = true)
     public Page<ReservationResponse> searchReservations(
-            final String query, final boolean upcomingOnly, final Pageable pageable) {
+            final String query, final boolean upcomingOnly,
+            final LocalDate dateFrom, final LocalDate dateTo, final ReservationStatus status,
+            final Pageable pageable) {
         final UUID hotelId = resolveHotelId();
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
         final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
         final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
-        final Page<Reservation> results = upcomingOnly
-                ? reservationRepository.searchUpcomingReservationsByHotelId(
-                        hotelId, LocalDate.now(), trimmedQuery, guestIds, safePageable)
-                : reservationRepository.searchReservationsByHotelId(
-                        hotelId, trimmedQuery, guestIds, safePageable);
+
+        final Page<Reservation> results;
+        if (dateFrom != null || dateTo != null || status != null) {
+            final LocalDate effectiveFrom = dateFrom != null ? dateFrom : EARLIEST_FILTER_DATE;
+            final LocalDate effectiveTo = dateTo != null ? dateTo : LATEST_FILTER_DATE;
+            final Set<ReservationStatus> effectiveStatuses = status != null
+                    ? Set.of(status) : EnumSet.allOf(ReservationStatus.class);
+            results = reservationRepository.filterReservationsByHotelId(
+                    hotelId, effectiveFrom, effectiveTo, effectiveStatuses, trimmedQuery, guestIds, safePageable);
+        } else if (upcomingOnly) {
+            results = reservationRepository.searchUpcomingReservationsByHotelId(
+                    hotelId, LocalDate.now(), trimmedQuery, guestIds, safePageable);
+        } else {
+            results = reservationRepository.searchReservationsByHotelId(
+                    hotelId, trimmedQuery, guestIds, safePageable);
+        }
 
         final List<UUID> pageGuestIds = results.getContent().stream()
                 .map((@NonNull Reservation r) -> r.getGuestId())

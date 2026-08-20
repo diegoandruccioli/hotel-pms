@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.reservations.controller;
 
+import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
 import com.hotelpms.frontdesk.reservations.dto.ReservationRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
 import com.hotelpms.frontdesk.reservations.dto.ReservationStatusUpdateRequest;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -83,11 +85,15 @@ public class ReservationController {
 
     /**
      * Combinable search over the caller's hotel reservations (C12): an optional
-     * {@code upcomingOnly} filter and an optional free-text query matched against
-     * the associated guest's name/email.
+     * {@code upcomingOnly} filter, an optional check-in date range, an optional
+     * status filter, and an optional free-text query matched against the
+     * associated guest's name/email.
      *
      * @param query        optional free-text query (guest name/email)
      * @param upcomingOnly if {@code true}, only reservations with check-in today or later
+     * @param dateFrom     optional lower bound (inclusive) on check-in date
+     * @param dateTo       optional upper bound (inclusive) on check-in date
+     * @param status       optional reservation status filter
      * @param pageable     pagination and sorting parameters
      * @return a page of matching reservation responses
      */
@@ -95,12 +101,16 @@ public class ReservationController {
     public ResponseEntity<Page<ReservationResponse>> searchReservations(
             @RequestParam(required = false) final String query,
             @RequestParam(defaultValue = "false") final boolean upcomingOnly,
+            @RequestParam(required = false) final LocalDate dateFrom,
+            @RequestParam(required = false) final LocalDate dateTo,
+            @RequestParam(required = false) final ReservationStatus status,
             @PageableDefault(
                     size = DEFAULT_PAGE_SIZE,
                     sort = "checkInDate",
                     direction = Sort.Direction.DESC
             ) final Pageable pageable) {
-        return ResponseEntity.ok(reservationService.searchReservations(query, upcomingOnly, pageable));
+        return ResponseEntity.ok(
+                reservationService.searchReservations(query, upcomingOnly, dateFrom, dateTo, status, pageable));
     }
 
     /**
