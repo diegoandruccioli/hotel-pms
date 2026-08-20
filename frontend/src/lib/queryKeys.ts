@@ -40,4 +40,8 @@ export const queryKeys = {
   menuItems: {
     all: ['menu-items'] as const,
   },
+  stays: {
+    all: ['stays'] as const,
+    list: (page: number) => ['stays', 'list', page] as const,
+  },
 } as const;

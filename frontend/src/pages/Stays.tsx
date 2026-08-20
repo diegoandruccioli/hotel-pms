@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { stayService } from '../services/stayService';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import type { StayResponse, StayStatus } from '../types/stay.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3Table } from '../components/m3/M3Table';
+import { M3LoadingState } from '../components/m3/M3LoadingState';
+import { M3ErrorState } from '../components/m3/M3ErrorState';
+import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
+import { M3Pagination } from '../components/m3/M3Pagination';
 import { useTranslation } from 'react-i18next';
 
 import { StayRow } from './Stays/StayRow';
@@ -14,6 +17,12 @@ import { StayStatusChip } from './Stays/StayStatusChip';
 import { getStatusTone } from './Stays/stayStatusTone';
 import { AlloggiatiReportSection } from './Stays/AlloggiatiReportSection';
 import { getErrorMessage } from '../utils/errorMessage';
+import {
+  useStaysList,
+  useCheckOutStay,
+  useRetryInvoiceCreation,
+  useRetryCheckoutEmail,
+} from '../hooks/queries/useStays';
 
 type StaySortField = 'actualCheckInTime' | 'expectedCheckOutDate' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -24,19 +33,14 @@ interface StaysNavState {
   sortDir?: SortDir;
 }
 
+const EMPTY_STAYS: StayResponse[] = [];
+
 export const Stays = memo(() => {
   const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
   const location = useLocation();
   const navState = location.state as StaysNavState | null;
-  const [stays, setStays] = useState<StayResponse[]>([]);
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [checkingOut, setCheckingOut] = useState<string | null>(null);
-  const [retryingInvoice, setRetryingInvoice] = useState<string | null>(null);
-  const [retryingEmail, setRetryingEmail] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StayStatus | 'ALL'>(() => navState?.statusFilter ?? 'ALL');
@@ -67,6 +71,12 @@ export const Stays = memo(() => {
     setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
   }, []);
 
+  const { data: staysPage, isLoading: loading, error: queryError, refetch } = useStaysList(page);
+  const stays = staysPage?.content ?? EMPTY_STAYS;
+  const totalPages = staysPage?.totalPages ?? 1;
+  const error = queryError ? getErrorMessage(queryError, t('failed_load_stays')) : null;
+  const handleRetry = useCallback(() => { refetch(); }, [refetch]);
+
   const filteredStays = useMemo(() => {
     let result = stays;
     if (statusFilter !== 'ALL') {
@@ -87,66 +97,38 @@ export const Stays = memo(() => {
     return sorted;
   }, [stays, statusFilter, debouncedSearch, sortField, sortDir]);
 
-  const loadStays = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await stayService.getAllStays(page);
-      setStays(data.content);
-      setTotalPages(data.totalPages);
-    } catch (err: unknown) {
-      const message = getErrorMessage(err, t('failed_load_stays'));
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, t]);
-
-  useEffect(() => {
-    loadStays();
-  }, [loadStays]);
-
+  const checkOutMutation = useCheckOutStay();
+  const checkingOut = checkOutMutation.isPending ? (checkOutMutation.variables ?? null) : null;
   const handleCheckOut = useCallback(async (stay: StayResponse) => {
-    setCheckingOut(stay.id);
     try {
-      const updated = await stayService.checkOut(stay.id);
-      setStays((prev) => prev.map((s) => (s.id === stay.id ? updated : s)));
+      await checkOutMutation.mutateAsync(stay.id);
       addToast(t('guest_checked_out_success'), 'success');
     } catch (err: unknown) {
-      const message = getErrorMessage(err, t('checkout_failed'));
-      addToast(message, 'error');
-    } finally {
-      setCheckingOut(null);
+      addToast(getErrorMessage(err, t('checkout_failed')), 'error');
     }
-  }, [addToast, t]);
+  }, [addToast, t, checkOutMutation]);
 
+  const retryInvoiceMutation = useRetryInvoiceCreation();
+  const retryingInvoice = retryInvoiceMutation.isPending ? (retryInvoiceMutation.variables ?? null) : null;
   const handleRetryInvoice = useCallback(async (stay: StayResponse) => {
-    setRetryingInvoice(stay.id);
     try {
-      const updated = await stayService.retryInvoiceCreation(stay.id);
-      setStays((prev) => prev.map((s) => (s.id === stay.id ? updated : s)));
+      await retryInvoiceMutation.mutateAsync(stay.id);
       addToast(t('invoice_retry_success'), 'success');
     } catch (err: unknown) {
-      const message = getErrorMessage(err, t('invoice_retry_failed'));
-      addToast(message, 'error');
-    } finally {
-      setRetryingInvoice(null);
+      addToast(getErrorMessage(err, t('invoice_retry_failed')), 'error');
     }
-  }, [addToast, t]);
+  }, [addToast, t, retryInvoiceMutation]);
 
+  const retryCheckoutEmailMutation = useRetryCheckoutEmail();
+  const retryingEmail = retryCheckoutEmailMutation.isPending ? (retryCheckoutEmailMutation.variables ?? null) : null;
   const handleRetryCheckoutEmail = useCallback(async (stay: StayResponse) => {
-    setRetryingEmail(stay.id);
     try {
-      const updated = await stayService.retryCheckoutEmail(stay.id);
-      setStays((prev) => prev.map((s) => (s.id === stay.id ? updated : s)));
+      await retryCheckoutEmailMutation.mutateAsync(stay.id);
       addToast(t('checkout_email_retry_success'), 'success');
     } catch (err: unknown) {
-      const message = getErrorMessage(err, t('checkout_email_retry_failed'));
-      addToast(message, 'error');
-    } finally {
-      setRetryingEmail(null);
+      addToast(getErrorMessage(err, t('checkout_email_retry_failed')), 'error');
     }
-  }, [addToast, t]);
+  }, [addToast, t, retryCheckoutEmailMutation]);
 
   const handleNewCheckIn = useCallback(() => navigate('/reservations'), [navigate]);
   const handleWalkIn = useCallback(() => navigate('/stays/walk-in'), [navigate]);
@@ -155,6 +137,10 @@ export const Stays = memo(() => {
   }, [navigate]);
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
   const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
+  const pageOfLabel = useCallback(
+    (current: number, total: number) => t('page_x_of_y', { current, total }),
+    [t],
+  );
   
   const formatDate = useCallback((dateStr?: string) => {
     if (!dateStr) return '-';
@@ -240,24 +226,18 @@ export const Stays = memo(() => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('loading')} />
       ) : error ? (
-        <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium font-body">{t('error_loading_stays')}</h3>
-            <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button type="button" onClick={loadStays} className="mt-2 text-sm font-medium underline hover:no-underline">
-              {t('try_again')}
-            </button>
-          </div>
-        </div>
+        <M3ErrorState
+          title={t('error_loading_stays')}
+          message={error}
+          retryLabel={t('try_again')}
+          onRetry={handleRetry}
+        />
       ) : (
         <M3Table headers={headers}>
           {filteredStays.length === 0 ? (
-            <tr><td colSpan={9} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_active_stays')}</td></tr>
+            <M3TableEmptyRow colSpan={headers.length} message={t('no_active_stays')} />
           ) : (
             filteredStays.map((stay) => (
               <StayRow
@@ -280,30 +260,17 @@ export const Stays = memo(() => {
       )}
 
       {/* Pagination */}
-      {!loading && !error && totalPages > 1 && (
-        <nav aria-label={t('pagination')} className="flex items-center justify-center gap-3">
-          <M3Button
-            variant="outlined"
-            icon="chevron_left"
-            disabled={page === 0}
-            onClick={handlePrevPage}
-            aria-label={t('prev_page')}
-          >
-            {t('prev_page')}
-          </M3Button>
-          <span className="text-sm font-body text-on-surface-variant">
-            {t('page_x_of_y', { current: page + 1, total: totalPages })}
-          </span>
-          <M3Button
-            variant="outlined"
-            icon="chevron_right"
-            disabled={page >= totalPages - 1}
-            onClick={handleNextPage}
-            aria-label={t('next_page')}
-          >
-            {t('next_page')}
-          </M3Button>
-        </nav>
+      {!loading && !error && (
+        <M3Pagination
+          page={page}
+          totalPages={totalPages}
+          onPrev={handlePrevPage}
+          onNext={handleNextPage}
+          pageLabel={t('pagination')}
+          prevLabel={t('prev_page')}
+          nextLabel={t('next_page')}
+          pageOfLabel={pageOfLabel}
+        />
       )}
 
       <AlloggiatiReportSection isAdminOrOwner={isAdminOrOwner} />
