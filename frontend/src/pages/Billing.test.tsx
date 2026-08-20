@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
+import { renderWithQuery as render } from '../test-utils/renderWithQuery';
 import { Billing } from './Billing';
 import { billingService } from '../services/billingService';
 import type { InvoiceResponse, InvoiceSearchResult } from '../types/billing.types';

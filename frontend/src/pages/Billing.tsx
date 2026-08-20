@@ -3,11 +3,15 @@ import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../typ
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
-import { M3Button } from '../components/m3/M3Button';
-import { billingService } from '../services/billingService';
+import { M3LoadingState } from '../components/m3/M3LoadingState';
+import { M3ErrorState } from '../components/m3/M3ErrorState';
+import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
+import { M3Pagination } from '../components/m3/M3Pagination';
 import { PaymentModal } from './Billing/PaymentModal';
 import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useTranslation } from 'react-i18next';
+import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries/useInvoices';
+import { getErrorMessage } from '../utils/errorMessage';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -109,13 +113,11 @@ const StatusFilterChip = memo(({ value, active, label, onClick }: {
 });
 StatusFilterChip.displayName = 'StatusFilterChip';
 
+const EMPTY_RESULTS: InvoiceSearchResult[] = [];
+
 export const Billing = memo(() => {
   const { t, i18n } = useTranslation('common');
-  const [results, setResults] = useState<InvoiceSearchResult[]>([]);
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceResponse | null>(null);
   const [detailTarget, setDetailTarget]   = useState<InvoiceResponse | null>(null);
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL');
@@ -130,9 +132,21 @@ export const Billing = memo(() => {
   }, [searchQuery]);
 
   // Any filter change invalidates the current page — always restart from page 0.
-  useEffect(() => {
+  // Adjusted during render (React's documented pattern for this — see
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes)
+  // rather than in a useEffect, which would run an extra commit after the
+  // filter change instead of resetting in the same render pass.
+  const activeFilters = { debouncedSearch, statusFilter, dateFrom, dateTo };
+  const [prevFilters, setPrevFilters] = useState(activeFilters);
+  if (
+    prevFilters.debouncedSearch !== activeFilters.debouncedSearch ||
+    prevFilters.statusFilter !== activeFilters.statusFilter ||
+    prevFilters.dateFrom !== activeFilters.dateFrom ||
+    prevFilters.dateTo !== activeFilters.dateTo
+  ) {
+    setPrevFilters(activeFilters);
     setPage(0);
-  }, [debouncedSearch, statusFilter, dateFrom, dateTo]);
+  }
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -148,49 +162,44 @@ export const Billing = memo(() => {
 
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
   const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
+  const pageOfLabel = useCallback(
+    (current: number, total: number) => t('page_x_of_y', { current, total }),
+    [t],
+  );
 
-  const loadInvoices = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await billingService.searchInvoices({
-        status: statusFilter === 'ALL' ? undefined : statusFilter,
-        query: debouncedSearch,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
-        page,
-        size: PAGE_SIZE,
-      });
-      setResults(data.content);
-      setTotalPages(data.totalPages);
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      setError(e.response?.data?.detail ?? e.message ?? t('failed_load_invoices'));
-    } finally {
-      setLoading(false);
-    }
-  }, [t, statusFilter, debouncedSearch, dateFrom, dateTo, page]);
+  const searchParams = useMemo(() => ({
+    status: statusFilter === 'ALL' ? undefined : statusFilter,
+    query: debouncedSearch,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    page,
+    size: PAGE_SIZE,
+  }), [statusFilter, debouncedSearch, dateFrom, dateTo, page]);
 
-  useEffect(() => {
-    loadInvoices();
-  }, [loadInvoices]);
+  const { data, isLoading: loading, error: queryError, refetch } = useInvoicesSearch(searchParams);
+  const results = data?.content ?? EMPTY_RESULTS;
+  const totalPages = data?.totalPages ?? 1;
+  const error = queryError ? getErrorMessage(queryError, t('failed_load_invoices')) : null;
+  const handleRetry = useCallback(() => { refetch(); }, [refetch]);
+
+  const patchInvoiceInCache = usePatchInvoiceInCache();
 
   const handleStatusFilterClick = useCallback((s: InvoiceStatus | 'ALL') => {
     setStatusFilter(s);
   }, []);
 
   const handlePaid = useCallback((updated: InvoiceResponse) => {
-    setResults((prev) => prev.map((r) => (r.invoice.id === updated.id ? { ...r, invoice: updated } : r)));
-  }, []);
+    patchInvoiceInCache(updated);
+  }, [patchInvoiceInCache]);
 
   const handleOpenDetail  = useCallback((inv: InvoiceResponse) => setDetailTarget(inv), []);
   const handleOpenPayment = useCallback((inv: InvoiceResponse) => setPaymentTarget(inv), []);
   const handleCloseDetail  = useCallback(() => setDetailTarget(null), []);
   const handleClosePayment = useCallback(() => setPaymentTarget(null), []);
   const handleInvoiceUpdated = useCallback((updated: InvoiceResponse) => {
-    setResults((prev) => prev.map((r) => (r.invoice.id === updated.id ? { ...r, invoice: updated } : r)));
+    patchInvoiceInCache(updated);
     setDetailTarget(updated);
-  }, []);
+  }, [patchInvoiceInCache]);
 
   const formatCurrency = useCallback(
     (amount: number) =>
@@ -278,32 +287,18 @@ export const Billing = memo(() => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('loading')} />
       ) : error ? (
-        <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium font-body">{t('error_loading_invoices')}</h3>
-            <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button
-              type="button"
-              onClick={loadInvoices}
-              className="mt-2 text-sm font-medium underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-error-container rounded"
-            >
-              {t('try_again')}
-            </button>
-          </div>
-        </div>
+        <M3ErrorState
+          title={t('error_loading_invoices')}
+          message={error}
+          retryLabel={t('try_again')}
+          onRetry={handleRetry}
+        />
       ) : (
         <M3Table headers={tableHeaders}>
           {results.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="py-8 text-center text-sm font-body text-on-surface-variant">
-                {t('no_invoices')}
-              </td>
-            </tr>
+            <M3TableEmptyRow colSpan={tableHeaders.length} message={t('no_invoices')} />
           ) : (
             results.map((result) => (
               <InvoiceRow
@@ -322,30 +317,17 @@ export const Billing = memo(() => {
         </M3Table>
       )}
 
-      {!loading && !error && totalPages > 1 && (
-        <nav aria-label={t('pagination')} className="flex items-center justify-center gap-3">
-          <M3Button
-            variant="outlined"
-            icon="chevron_left"
-            disabled={page === 0}
-            onClick={handlePrevPage}
-            aria-label={t('prev_page')}
-          >
-            {t('prev_page')}
-          </M3Button>
-          <span className="text-sm font-body text-on-surface-variant">
-            {t('page_x_of_y', { current: page + 1, total: totalPages })}
-          </span>
-          <M3Button
-            variant="outlined"
-            icon="chevron_right"
-            disabled={page >= totalPages - 1}
-            onClick={handleNextPage}
-            aria-label={t('next_page')}
-          >
-            {t('next_page')}
-          </M3Button>
-        </nav>
+      {!loading && !error && (
+        <M3Pagination
+          page={page}
+          totalPages={totalPages}
+          onPrev={handlePrevPage}
+          onNext={handleNextPage}
+          pageLabel={t('pagination')}
+          prevLabel={t('prev_page')}
+          nextLabel={t('next_page')}
+          pageOfLabel={pageOfLabel}
+        />
       )}
 
       {paymentTarget && (

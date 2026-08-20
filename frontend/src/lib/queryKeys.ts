@@ -29,4 +29,9 @@ export const queryKeys = {
     search: (params: { query: string; upcomingOnly: boolean; page: number; sort: string }) =>
       ['reservations', 'search', params] as const,
   },
+  invoices: {
+    all: ['invoices'] as const,
+    search: (params: { status?: string; query: string; dateFrom?: string; dateTo?: string; page: number }) =>
+      ['invoices', 'search', params] as const,
+  },
 } as const;
