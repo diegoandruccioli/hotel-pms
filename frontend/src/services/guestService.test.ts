@@ -88,4 +88,13 @@ describe('guestService', () => {
     expect(api.get).toHaveBeenCalledWith('/api/v1/guests/search?page=0&size=20');
     expect(result).toEqual(mockPage);
   });
+
+  it('should append a sort param when provided', async () => {
+    const mockPage = { content: [], totalPages: 1, totalElements: 0 };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockPage });
+
+    await guestService.searchGuestsPaged('', 0, 20, 'lastName,desc');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/guests/search?page=0&size=20&sort=lastName%2Cdesc');
+  });
 });

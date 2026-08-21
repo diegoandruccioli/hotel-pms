@@ -1,18 +1,19 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { GuestResponseDTO } from '../types/guest.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
-import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
+import { M3DataTable } from '../components/m3/M3DataTable';
 import { M3Dialog } from '../components/m3/M3Dialog';
 import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { M3LoadingState } from '../components/m3/M3LoadingState';
 import { M3ErrorState } from '../components/m3/M3ErrorState';
-import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
 import { M3Pagination } from '../components/m3/M3Pagination';
 import { M3TextField } from '../components/m3/M3TextField';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import { useGuestsSearch, useDeleteGuest } from '../hooks/queries/useGuests';
@@ -21,42 +22,38 @@ import { getErrorMessage } from '../utils/errorMessage';
 import { GuestFormModal } from './GuestFormModal';
 
 const PAGE_SIZE = 20;
+const DEFAULT_SORT_FIELD = 'lastName';
+const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'asc';
 
-interface GuestRowProps {
+interface ActionsCellProps {
   guest: GuestResponseDTO;
   onEdit: (g: GuestResponseDTO) => void;
   onDelete?: (g: GuestResponseDTO) => void;
-  t: (k: string) => string;
+  t: TFunction;
 }
 
-const GuestRow = memo(({ guest, onEdit, onDelete, t }: GuestRowProps) => {
+const ActionsCell = ({ guest, onEdit, onDelete, t }: ActionsCellProps) => {
   const handleEdit = useCallback(() => onEdit(guest), [onEdit, guest]);
   const handleDeleteClick = useCallback(() => onDelete?.(guest), [onDelete, guest]);
 
   return (
-    <M3TableRow key={guest.id}>
-      <M3TableCell className="font-medium">{guest.firstName} {guest.lastName}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{guest.email}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{guest.phone || '-'}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{guest.city || '-'} ({guest.country || '-'})</M3TableCell>
-      <M3TableCell className="text-right">
-        <M3TableActionLink onClick={handleEdit}>
-          {t('edit')}
+    <div className="text-right">
+      <M3TableActionLink onClick={handleEdit}>
+        {t('edit')}
+      </M3TableActionLink>
+      {onDelete && (
+        <M3TableActionLink
+          tone="error"
+          className="ml-3"
+          aria-label={`${t('delete')} ${guest.firstName} ${guest.lastName}`}
+          onClick={handleDeleteClick}
+        >
+          {t('delete')}
         </M3TableActionLink>
-        {onDelete && (
-          <M3TableActionLink
-            tone="error"
-            className="ml-3"
-            aria-label={`${t('delete')} ${guest.firstName} ${guest.lastName}`}
-            onClick={handleDeleteClick}
-          >
-            {t('delete')}
-          </M3TableActionLink>
-        )}
-      </M3TableCell>
-    </M3TableRow>
+      )}
+    </div>
   );
-});
+};
 
 export const Guests = memo(() => {
   const { t } = useTranslation('common');
@@ -74,6 +71,9 @@ export const Guests = memo(() => {
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
 
+  const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
+
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => clearTimeout(id);
@@ -82,7 +82,7 @@ export const Guests = memo(() => {
   // A new search query invalidates the current page — always restart from page 0.
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, sortField, sortDir]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -95,12 +95,22 @@ export const Guests = memo(() => {
     [t],
   );
 
+  const sorting = useMemo<SortingState>(
+    () => [{ id: sortField, desc: sortDir === 'desc' }],
+    [sortField, sortDir],
+  );
+
+  const handleSortingChange = useCallback((next: SortingState) => {
+    setSortField(next[0].id);
+    setSortDir(next[0].desc ? 'desc' : 'asc');
+  }, []);
+
   const {
     data,
     isLoading: loading,
     error: queryError,
     refetch,
-  } = useGuestsSearch(debouncedSearch, page, PAGE_SIZE);
+  } = useGuestsSearch(debouncedSearch, page, PAGE_SIZE, `${sortField},${sortDir}`);
   const guests = data?.content ?? [];
   const totalPages = data?.totalPages ?? 1;
   const error = queryError ? getErrorMessage(queryError, t('error_unexpected_fallback')) : null;
@@ -153,13 +163,51 @@ export const Guests = memo(() => {
     }
   }, [guestToDelete, addToast, t, deleteGuestMutation]);
 
-  const headers = useMemo(() => [
-    t('name'),
-    t('email'),
-    t('phone'),
-    t('city'),
-    <span key="sr" className="sr-only">{t('actions')}</span>
-  ], [t]);
+  const getGuestRowId = useCallback((g: GuestResponseDTO) => g.id, []);
+
+  const columns = useMemo<ColumnDef<GuestResponseDTO>[]>(() => [
+    {
+      id: 'lastName',
+      accessorKey: 'lastName',
+      header: t('name'),
+      cell: ({ row }) => (
+        <span className="font-medium">{row.original.firstName} {row.original.lastName}</span>
+      ),
+    },
+    {
+      id: 'email',
+      accessorKey: 'email',
+      header: t('email'),
+      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.email}</span>,
+    },
+    {
+      id: 'phone',
+      header: t('phone'),
+      enableSorting: false,
+      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.phone || '-'}</span>,
+    },
+    {
+      id: 'city',
+      header: t('city'),
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="text-on-surface-variant">{row.original.city || '-'} ({row.original.country || '-'})</span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => <span className="sr-only">{t('actions')}</span>,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <ActionsCell
+          guest={row.original}
+          onEdit={handleOpenEditModal}
+          onDelete={isAdminOrOwner ? handleDeleteRequest : undefined}
+          t={t}
+        />
+      ),
+    },
+  ], [t, handleOpenEditModal, isAdminOrOwner, handleDeleteRequest]);
 
   return (
     <div className="space-y-6">
@@ -197,21 +245,14 @@ export const Guests = memo(() => {
           onRetry={handleRetry}
         />
       ) : (
-        <M3Table headers={headers}>
-          {guests.length === 0 ? (
-            <M3TableEmptyRow colSpan={headers.length} message={t('no_guests_found')} />
-          ) : (
-            guests.map((guest) => (
-              <GuestRow
-                key={guest.id}
-                guest={guest}
-                onEdit={handleOpenEditModal}
-                onDelete={isAdminOrOwner ? handleDeleteRequest : undefined}
-                t={t}
-              />
-            ))
-          )}
-        </M3Table>
+        <M3DataTable
+          data={guests}
+          columns={columns}
+          getRowId={getGuestRowId}
+          sorting={sorting}
+          onSortingChange={handleSortingChange}
+          emptyMessage={t('no_guests_found')}
+        />
       )}
 
       {!loading && !error && (

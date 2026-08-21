@@ -12,11 +12,19 @@ export const guestService = {
     return response.data.content;
   },
 
-  searchGuestsPaged: async (query: string, page = 0, size = 20): Promise<SpringPage<GuestResponseDTO>> => {
+  searchGuestsPaged: async (
+    query: string,
+    page = 0,
+    size = 20,
+    sort?: string,
+  ): Promise<SpringPage<GuestResponseDTO>> => {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
     const trimmed = query.trim();
     if (trimmed) {
       params.set('query', trimmed);
+    }
+    if (sort) {
+      params.set('sort', sort);
     }
     const response = await api.get<SpringPage<GuestResponseDTO>>(`${BASE_PATH}/search?${params.toString()}`);
     return response.data;

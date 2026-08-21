@@ -7,10 +7,10 @@ import { queryKeys } from '../../lib/queryKeys';
  * loading/error/useEffect trio that used to live in `pages/Guests.tsx` —
  * React Query owns the fetch, cache and in-flight/error state instead.
  */
-export function useGuestsSearch(query: string, page: number, size = 20) {
+export function useGuestsSearch(query: string, page: number, size = 20, sort?: string) {
   return useQuery({
-    queryKey: queryKeys.guests.search(query, page, size),
-    queryFn: () => guestService.searchGuestsPaged(query, page, size),
+    queryKey: queryKeys.guests.search(query, page, size, sort),
+    queryFn: () => guestService.searchGuestsPaged(query, page, size, sort),
     placeholderData: (previousData) => previousData,
   });
 }

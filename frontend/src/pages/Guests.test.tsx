@@ -93,7 +93,7 @@ describe('Guests', () => {
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
-    expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('', 0, 20);
+    expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('', 0, 20, 'lastName,asc');
   });
 
   it('should show empty state message when no guests', async () => {
@@ -264,7 +264,7 @@ describe('Guests', () => {
     fireEvent.change(input, { target: { value: 'Jane' } });
 
     await waitFor(() => {
-      expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('Jane', 0, 20);
+      expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('Jane', 0, 20, 'lastName,asc');
       expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
       expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     }, { timeout: 500 });
@@ -276,7 +276,7 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => {
-      expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('Jane', 0, 20);
+      expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('Jane', 0, 20, 'lastName,asc');
       expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     });
   });
@@ -291,7 +291,7 @@ describe('Guests', () => {
     fireEvent.click(screen.getByRole('button', { name: 'next_page' }));
 
     await waitFor(() => {
-      expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('', 1, 20);
+      expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('', 1, 20, 'lastName,asc');
       expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     });
   });

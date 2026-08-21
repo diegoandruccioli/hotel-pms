@@ -8,8 +8,8 @@
 export const queryKeys = {
   guests: {
     all: ['guests'] as const,
-    search: (query: string, page: number, size: number) =>
-      ['guests', 'search', query, page, size] as const,
+    search: (query: string, page: number, size: number, sort?: string) =>
+      ['guests', 'search', query, page, size, sort] as const,
     detail: (id: string) => ['guests', 'detail', id] as const,
   },
   rooms: {
