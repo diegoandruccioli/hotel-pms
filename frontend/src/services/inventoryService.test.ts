@@ -16,8 +16,32 @@ describe('inventoryService', () => {
 
     const result = await inventoryService.getAllRooms();
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/rooms?page=0&size=100&sort=roomNumber,asc');
+    expect(api.get).toHaveBeenCalledWith('/api/v1/rooms', {
+      params: { page: 0, size: 100, sort: 'roomNumber,asc', status: undefined },
+    });
     expect(result).toEqual(mockRooms);
+  });
+
+  it('should fetch rooms filtered by status', async () => {
+    const mockRooms = { content: [{ id: '2', roomNumber: '102', status: 'DIRTY' }], totalElements: 1 };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockRooms });
+
+    const result = await inventoryService.getAllRooms(0, 100, 'DIRTY');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/rooms', {
+      params: { page: 0, size: 100, sort: 'roomNumber,asc', status: 'DIRTY' },
+    });
+    expect(result).toEqual(mockRooms);
+  });
+
+  it('should bulk-update room status', async () => {
+    const mockUpdated = [{ id: '1', roomNumber: '101', status: 'DIRTY' }];
+    vi.mocked(api.patch).mockResolvedValueOnce({ data: mockUpdated });
+
+    const result = await inventoryService.updateRoomStatusBulk(['1'], 'DIRTY');
+
+    expect(api.patch).toHaveBeenCalledWith('/api/v1/rooms/status', { roomIds: ['1'], status: 'DIRTY' });
+    expect(result).toEqual(mockUpdated);
   });
 
   it('should fetch available rooms for a date range', async () => {

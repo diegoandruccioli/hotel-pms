@@ -1,7 +1,8 @@
 import api from './api';
-import type { OwnerFinancialReportDto } from '../types/ownerReport.types';
+import type { OwnerFinancialReportDto, OwnerFinancialSummaryDto } from '../types/ownerReport.types';
 
 const REPORT_PATH = '/api/v1/reports/owner';
+const SUMMARY_PATH = '/api/v1/reports/owner/summary';
 
 export const billingReportService = {
   getOwnerFinancialReport: async (
@@ -9,6 +10,18 @@ export const billingReportService = {
     endDate: string
   ): Promise<OwnerFinancialReportDto> => {
     const response = await api.get<OwnerFinancialReportDto>(REPORT_PATH, {
+      params: { startDate, endDate },
+    });
+    return response.data;
+  },
+
+  /** Aggregates-only counterpart of {@link getOwnerFinancialReport} — no
+   * per-invoice list, backs the Dashboard's revenue widget. */
+  getOwnerFinancialSummary: async (
+    startDate: string,
+    endDate: string
+  ): Promise<OwnerFinancialSummaryDto> => {
+    const response = await api.get<OwnerFinancialSummaryDto>(SUMMARY_PATH, {
       params: { startDate, endDate },
     });
     return response.data;

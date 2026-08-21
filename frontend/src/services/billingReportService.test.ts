@@ -39,6 +39,25 @@ describe('billingReportService', () => {
     expect(result).toEqual(mockReport);
   });
 
+  it('should fetch owner financial summary', async () => {
+    const mockSummary = {
+      startDate: '2000-01-01',
+      endDate: '2099-12-31',
+      totalRevenue: 50000,
+      totalInvoices: 300,
+      paidInvoices: 280,
+      pendingRevenue: 10000,
+    };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockSummary });
+
+    const result = await billingReportService.getOwnerFinancialSummary('2000-01-01', '2099-12-31');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/reports/owner/summary', {
+      params: { startDate: '2000-01-01', endDate: '2099-12-31' },
+    });
+    expect(result).toEqual(mockSummary);
+  });
+
   it('should export report to CSV with translated headers, translated status, a UTF-8 BOM and a semicolon delimiter', () => {
     const mockReport = {
       startDate: '2026-01-01',

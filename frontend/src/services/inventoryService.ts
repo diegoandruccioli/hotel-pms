@@ -32,8 +32,14 @@ export const inventoryService = {
   },
 
   // Rooms
-  getAllRooms: async (page = 0, size = 100): Promise<SpringPage<RoomResponse>> => {
-    const response = await api.get<SpringPage<RoomResponse>>(`${ROOMS_PATH}?page=${page}&size=${size}&sort=roomNumber,asc`);
+  getAllRooms: async (
+    page = 0,
+    size = 100,
+    status?: RoomStatus,
+  ): Promise<SpringPage<RoomResponse>> => {
+    const response = await api.get<SpringPage<RoomResponse>>(ROOMS_PATH, {
+      params: { page, size, sort: 'roomNumber,asc', status },
+    });
     return response.data;
   },
 
@@ -69,6 +75,13 @@ export const inventoryService = {
 
   updateRoomStatus: async (id: string, status: RoomStatus): Promise<RoomResponse> => {
     const response = await api.patch<RoomResponse>(`${ROOMS_PATH}/${id}/status`, { status });
+    return response.data;
+  },
+
+  /** Updates several rooms' housekeeping status in one request, replacing one
+   * PATCH per room for Housekeeping's multi-select action. */
+  updateRoomStatusBulk: async (roomIds: string[], status: RoomStatus): Promise<RoomResponse[]> => {
+    const response = await api.patch<RoomResponse[]>(`${ROOMS_PATH}/status`, { roomIds, status });
     return response.data;
   },
 

@@ -4,16 +4,28 @@ import { axe } from 'vitest-axe';
 import { renderWithQuery as render } from '../test-utils/renderWithQuery';
 import { Housekeeping } from './Housekeeping';
 import { inventoryService } from '../services/inventoryService';
+import { dashboardService } from '../services/dashboardService';
 import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
 
-const stableT = (key: string) => key;
+const stableT = (key: string, options?: { count?: number; status?: string }) => {
+  if (options?.count !== undefined) return `${key} ${options.count}`;
+  return key;
+};
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: stableT, i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
 vi.mock('../services/inventoryService', () => ({
-  inventoryService: { getAllRooms: vi.fn(), updateRoomStatus: vi.fn() },
+  inventoryService: {
+    getAllRooms: vi.fn(),
+    updateRoomStatus: vi.fn(),
+    updateRoomStatusBulk: vi.fn(),
+  },
+}));
+
+vi.mock('../services/dashboardService', () => ({
+  dashboardService: { getDaySheet: vi.fn() },
 }));
 
 const mockAddToast = vi.fn();
@@ -22,8 +34,21 @@ vi.mock('../store/toastStore', () => ({
     (selector as (s: { addToast: typeof mockAddToast }) => unknown)({ addToast: mockAddToast }),
 }));
 
+const MOCK_DAY_SHEET = {
+  date: '2026-08-20',
+  todayArrivals: 0,
+  todayDepartures: 0,
+  guestsInHouse: 0,
+  currentStays: 0,
+  availableRooms: 0,
+  roomStatusCounts: { CLEAN: 3, DIRTY: 1, MAINTENANCE: 0, OCCUPIED: 2 },
+};
+
 describe('Housekeeping', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(dashboardService.getDaySheet).mockResolvedValue(MOCK_DAY_SHEET);
+  });
 
   it('should show loading spinner initially', () => {
     vi.mocked(inventoryService.getAllRooms).mockReturnValue(new Promise(() => {}));
@@ -73,7 +98,7 @@ describe('Housekeeping', () => {
     });
   });
 
-  it('should render OCCUPIED room without action buttons', async () => {
+  it('should render OCCUPIED room without action buttons or a select checkbox', async () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
       content: [
         { id: '2', roomNumber: '102', type: 'Standard', status: 'OCCUPIED', pricePerNight: 100 },
@@ -87,6 +112,7 @@ describe('Housekeeping', () => {
       expect(screen.getByText('room_status_occupied')).toBeInTheDocument();
     });
     expect(screen.queryByText(/→/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('select_room')).not.toBeInTheDocument();
   });
 
   it('changes a room status to DIRTY and shows a success toast', async () => {
@@ -156,27 +182,33 @@ describe('Housekeeping', () => {
     expect(inventoryService.updateRoomStatus).not.toHaveBeenCalled();
   });
 
-  it('toggles a status filter badge on and off', async () => {
-    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
-      content: [
-        { id: '1', roomNumber: '101', type: 'Standard', status: 'CLEAN', pricePerNight: 100 },
-        { id: '2', roomNumber: '102', type: 'Standard', status: 'DIRTY', pricePerNight: 100 },
-      ],
-      totalElements: 2,
+  it('applies a status-filtered server request when a filter badge is toggled', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue({
+      content: [{ id: '2', roomNumber: '102', type: 'Standard', status: 'DIRTY', pricePerNight: 100 }],
+      totalElements: 1,
     } as never);
     render(<Housekeeping />);
-    await waitFor(() => expect(screen.getAllByText('room_number')).toHaveLength(2));
+    await waitFor(() => expect(inventoryService.getAllRooms).toHaveBeenCalledWith(0, 100, undefined));
 
-    // The filter badge's accessible name is "<count> room_status_dirty" (no arrow prefix),
-    // unlike the room card's "→ room_status_dirty" action button.
     const dirtyButtons = screen.getAllByRole('button', { name: /room_status_dirty/i });
     const filterBadge = dirtyButtons.find((b) => !b.textContent?.startsWith('→'))!;
 
     fireEvent.click(filterBadge);
-    await waitFor(() => expect(screen.getAllByText('room_number')).toHaveLength(1));
+    await waitFor(() => expect(inventoryService.getAllRooms).toHaveBeenCalledWith(0, 100, 'DIRTY'));
 
     fireEvent.click(filterBadge);
-    await waitFor(() => expect(screen.getAllByText('room_number')).toHaveLength(2));
+    await waitFor(() => expect(inventoryService.getAllRooms).toHaveBeenCalledWith(0, 100, undefined));
+  });
+
+  it('shows status-count badges sourced from the day-sheet aggregate', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
+      content: [{ id: '1', roomNumber: '101', type: 'Standard', status: 'CLEAN', pricePerNight: 100 }],
+      totalElements: 1,
+    } as never);
+    render(<Housekeeping />);
+    await waitFor(() => expect(screen.getByText('3')).toBeInTheDocument()); // CLEAN count
+    expect(screen.getByText('1')).toBeInTheDocument(); // DIRTY count
+    expect(screen.getByText('0')).toBeInTheDocument(); // MAINTENANCE count
   });
 
   it('retries loading rooms when the try_again button is clicked after a failure', async () => {
@@ -194,6 +226,45 @@ describe('Housekeeping', () => {
     vi.mocked(inventoryService.getAllRooms).mockRejectedValueOnce('not an Error instance');
     render(<Housekeeping />);
     await waitFor(() => expect(screen.getByText('failed_load_rooms')).toBeInTheDocument());
+  });
+
+  it('selects rooms and applies a bulk status change', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
+      content: [
+        { id: '1', roomNumber: '101', type: 'Standard', status: 'CLEAN', pricePerNight: 100 },
+        { id: '2', roomNumber: '102', type: 'Standard', status: 'CLEAN', pricePerNight: 100 },
+      ],
+      totalElements: 2,
+    } as never);
+    vi.mocked(inventoryService.updateRoomStatusBulk).mockResolvedValueOnce([
+      { id: '1', roomNumber: '101', type: 'Standard', status: 'DIRTY', pricePerNight: 100 },
+      { id: '2', roomNumber: '102', type: 'Standard', status: 'DIRTY', pricePerNight: 100 },
+    ] as never);
+    render(<Housekeeping />);
+    await waitFor(() => expect(screen.getAllByText('room_number')).toHaveLength(2));
+
+    fireEvent.click(screen.getByLabelText('select_all_visible'));
+    await waitFor(() => expect(screen.getByText(/n_rooms_selected 2/)).toBeInTheDocument());
+
+    const bulkDirtyButton = screen
+      .getAllByRole('button', { name: 'room_status_dirty' })
+      .find((b) => !b.textContent?.startsWith('→'))!;
+    fireEvent.click(bulkDirtyButton);
+
+    await waitFor(() =>
+      expect(inventoryService.updateRoomStatusBulk).toHaveBeenCalledWith(['1', '2'], 'DIRTY'),
+    );
+    expect(mockAddToast).toHaveBeenCalledWith('rooms_updated 2', 'success');
+  });
+
+  it('does not render a select-all control when every visible room is OCCUPIED', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
+      content: [{ id: '2', roomNumber: '102', type: 'Standard', status: 'OCCUPIED', pricePerNight: 100 }],
+      totalElements: 1,
+    } as never);
+    render(<Housekeeping />);
+    await waitFor(() => expect(screen.getByText('room_status_occupied')).toBeInTheDocument());
+    expect(screen.queryByLabelText('select_all_visible')).not.toBeInTheDocument();
   });
 
   it('should have no accessibility violations', async () => {

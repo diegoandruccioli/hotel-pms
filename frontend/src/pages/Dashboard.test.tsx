@@ -1,14 +1,26 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { Dashboard } from './Dashboard';
 import { axe } from 'vitest-axe';
-import { useDashboardStore } from '../store/dashboardStore';
+import { renderWithQuery } from '../test-utils/renderWithQuery';
+import { Dashboard } from './Dashboard';
 import { useAuthStore } from '../store/authStore';
 import { stayService } from '../services/stayService';
+import { dashboardService } from '../services/dashboardService';
+import { billingReportService } from '../services/billingReportService';
+import type { DaySheetResponse } from '../types/daySheet.types';
+import type { OwnerFinancialSummaryDto } from '../types/ownerReport.types';
 
 vi.mock('../services/stayService', () => ({
   stayService: { getAlloggiatiFailureSummary: vi.fn() },
+}));
+
+vi.mock('../services/dashboardService', () => ({
+  dashboardService: { getDaySheet: vi.fn() },
+}));
+
+vi.mock('../services/billingReportService', () => ({
+  billingReportService: { getOwnerFinancialSummary: vi.fn() },
 }));
 
 vi.mock('react-i18next', () => ({
@@ -22,26 +34,27 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
-import type { RoomResponse } from '../types/inventory.types';
-
-const MOCK_ROOMS: RoomResponse[] = [
-  { id: 'r1', roomNumber: '101', status: 'CLEAN',       hotelId: 'h1', active: true, roomType: { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 80, active: true, createdAt: '', updatedAt: '' }, createdAt: '', updatedAt: '' },
-  { id: 'r2', roomNumber: '102', status: 'OCCUPIED',    hotelId: 'h1', active: true, roomType: { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 80, active: true, createdAt: '', updatedAt: '' }, createdAt: '', updatedAt: '' },
-  { id: 'r3', roomNumber: '103', status: 'DIRTY',       hotelId: 'h1', active: true, roomType: { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 80, active: true, createdAt: '', updatedAt: '' }, createdAt: '', updatedAt: '' },
-  { id: 'r4', roomNumber: '104', status: 'MAINTENANCE', hotelId: 'h1', active: true, roomType: { id: 'rt1', name: 'Standard', maxOccupancy: 2, basePrice: 80, active: true, createdAt: '', updatedAt: '' }, createdAt: '', updatedAt: '' },
-];
-
-const MOCK_STATS_ADMIN = {
-  guestsInHouse: 200,
+const MOCK_DAY_SHEET: DaySheetResponse = {
+  date: '2026-08-20',
   todayArrivals: 5,
   todayDepartures: 3,
+  guestsInHouse: 200,
   currentStays: 12,
   availableRooms: 8,
-  pendingRevenue: 10000,
-  rooms: MOCK_ROOMS,
+  roomStatusCounts: { CLEAN: 10, DIRTY: 2, MAINTENANCE: 1, OCCUPIED: 12 },
 };
 
-const renderDashboard = () => render(<MemoryRouter><Dashboard /></MemoryRouter>);
+const MOCK_SUMMARY: OwnerFinancialSummaryDto = {
+  startDate: '2000-01-01',
+  endDate: '2099-12-31',
+  totalRevenue: 50000,
+  totalInvoices: 300,
+  paidInvoices: 280,
+  pendingRevenue: 10000,
+};
+
+const renderDashboard = () =>
+  renderWithQuery(<MemoryRouter><Dashboard /></MemoryRouter>);
 
 describe('Dashboard Component', () => {
   beforeEach(() => {
@@ -49,12 +62,10 @@ describe('Dashboard Component', () => {
     vi.mocked(stayService.getAlloggiatiFailureSummary).mockResolvedValue({
       failedCount: 0, mostRecentFailureAt: null, mostRecentFailureReason: null,
     });
-    useDashboardStore.setState({
-      stats: MOCK_STATS_ADMIN,
-      isLoading: false,
-      error: null,
-      fetchStats: vi.fn(),
-    });
+    vi.mocked(dashboardService.getDaySheet).mockReset();
+    vi.mocked(dashboardService.getDaySheet).mockResolvedValue(MOCK_DAY_SHEET);
+    vi.mocked(billingReportService.getOwnerFinancialSummary).mockReset();
+    vi.mocked(billingReportService.getOwnerFinancialSummary).mockResolvedValue(MOCK_SUMMARY);
     useAuthStore.setState({
       user: { sub: 'user1', username: 'admin', role: 'ADMIN' },
       isAuthenticated: true,
@@ -62,66 +73,49 @@ describe('Dashboard Component', () => {
     });
   });
 
-  it('renders dashboard heading and stats grid', () => {
+  it('renders dashboard heading and stats grid', async () => {
     renderDashboard();
     expect(screen.getByTestId('dashboard-page')).toBeInTheDocument();
     expect(screen.getByTestId('dashboard-heading')).toHaveTextContent('welcome_back admin');
-    expect(screen.getByTestId('stats-grid')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('stats-grid')).toBeInTheDocument());
   });
 
-  it('shows today arrivals and departures counts', () => {
+  it('shows today arrivals and departures counts', async () => {
     renderDashboard();
-    expect(screen.getByText('5')).toBeInTheDocument();  // todayArrivals
-    expect(screen.getByText('3')).toBeInTheDocument();  // todayDepartures
-    expect(screen.getByText('8')).toBeInTheDocument();  // availableRooms
-    expect(screen.getByText('200')).toBeInTheDocument(); // totalGuests
+    await waitFor(() => expect(screen.getByText('5')).toBeInTheDocument());
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('8')).toBeInTheDocument();
+    expect(screen.getByText('200')).toBeInTheDocument();
   });
 
-  it('shows pending revenue card for ADMIN', () => {
+  it('shows pending revenue card for ADMIN', async () => {
     renderDashboard();
-    expect(screen.getByText('stat_pending_revenue')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('stat_pending_revenue')).toBeInTheDocument());
   });
 
-  it('hides pending revenue card for RECEPTIONIST', () => {
+  it('hides pending revenue card for RECEPTIONIST and skips the summary call', async () => {
     useAuthStore.setState({
       user: { sub: 'user2', username: 'reception', role: 'RECEPTIONIST' },
       isAuthenticated: true,
       isLoading: false,
     });
-    useDashboardStore.setState({
-      stats: { ...MOCK_STATS_ADMIN, pendingRevenue: null },
-      isLoading: false,
-      error: null,
-      fetchStats: vi.fn(),
-    });
     renderDashboard();
+    await waitFor(() => expect(screen.getByTestId('stats-grid')).toBeInTheDocument());
     expect(screen.queryByText('stat_pending_revenue')).not.toBeInTheDocument();
+    expect(billingReportService.getOwnerFinancialSummary).not.toHaveBeenCalled();
   });
 
-  it('renders loading skeleton', () => {
-    useDashboardStore.setState({ isLoading: true, stats: null, error: null, fetchStats: vi.fn() });
-    const { container } = renderDashboard();
-    expect(container.getElementsByClassName('animate-pulse').length).toBeGreaterThan(0);
-  });
-
-  it('renders room overview grid when rooms are present', () => {
+  it('renders loading state', () => {
+    vi.mocked(dashboardService.getDaySheet).mockReturnValue(new Promise(() => {}));
     renderDashboard();
-    expect(screen.getByTestId('room-overview-grid')).toBeInTheDocument();
-    expect(screen.getByText('101')).toBeInTheDocument();
-    expect(screen.getByText('102')).toBeInTheDocument();
-    expect(screen.getByText('103')).toBeInTheDocument();
-    expect(screen.getByText('104')).toBeInTheDocument();
+    expect(screen.getByText('progress_activity')).toBeInTheDocument();
   });
 
-  it('hides room overview grid when rooms array is empty', () => {
-    useDashboardStore.setState({
-      stats: { ...MOCK_STATS_ADMIN, rooms: [] },
-      isLoading: false,
-      error: null,
-      fetchStats: vi.fn(),
-    });
+  it('renders room status summary with counts per status', async () => {
     renderDashboard();
-    expect(screen.queryByTestId('room-overview-grid')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('room-status-summary')).toBeInTheDocument());
+    expect(screen.getByText('10')).toBeInTheDocument(); // CLEAN
+    expect(screen.getByText('2')).toBeInTheDocument();  // DIRTY
   });
 
   it('shows Alloggiati failure banner for ADMIN when failures exist', async () => {
@@ -141,19 +135,21 @@ describe('Dashboard Component', () => {
       isLoading: false,
     });
     renderDashboard();
+    await waitFor(() => expect(screen.getByTestId('stats-grid')).toBeInTheDocument());
     expect(stayService.getAlloggiatiFailureSummary).not.toHaveBeenCalled();
     expect(screen.queryByText('alloggiati_failure_banner_title')).not.toBeInTheDocument();
   });
 
-  it('renders error state with retry button', () => {
-    useDashboardStore.setState({ error: 'FETCH_ERROR', stats: null, isLoading: false, fetchStats: vi.fn() });
+  it('renders error state with retry button', async () => {
+    vi.mocked(dashboardService.getDaySheet).mockRejectedValueOnce(new Error('boom'));
     renderDashboard();
-    expect(screen.getByText('FETCH_ERROR')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('error_loading_dashboard')).toBeInTheDocument());
     expect(screen.getByText('try_again')).toBeInTheDocument();
   });
 
   it('has no accessibility violations', async () => {
     const { container } = renderDashboard();
+    await waitFor(() => expect(screen.getByTestId('stats-grid')).toBeInTheDocument());
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });

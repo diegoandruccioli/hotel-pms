@@ -1,15 +1,16 @@
-import { useEffect, useCallback, useMemo, useState, memo } from 'react';
+import { useEffect, useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { useDashboardStore } from '../store/dashboardStore';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Card } from '../components/m3/M3Card';
+import { M3LoadingState } from '../components/m3/M3LoadingState';
+import { M3ErrorState } from '../components/m3/M3ErrorState';
 import { stayService } from '../services/stayService';
-import type { RoomResponse, RoomStatus } from '../types/inventory.types';
+import { getErrorMessage } from '../utils/errorMessage';
+import { useDaySheet, useOwnerFinancialSummary } from '../hooks/queries/useDashboard';
+import type { RoomStatus } from '../types/inventory.types';
 import type { AlloggiatiFailureSummaryResponse } from '../types/stay.types';
-
-const ROOM_GRID_STYLE = { gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))' } as const;
 
 const ROOM_STATUS_COLORS: Record<RoomStatus, string> = {
   CLEAN:       'bg-tertiary-container/60 text-on-tertiary-container border-tertiary/50',
@@ -18,17 +19,13 @@ const ROOM_STATUS_COLORS: Record<RoomStatus, string> = {
   OCCUPIED:    'bg-primary-container/60 text-on-primary-container border-primary/50',
 };
 
-const RoomCell = memo(({ room, statusLabel }: { room: RoomResponse; statusLabel: string }) => (
-  <div
-    className={`border rounded-shape-sm p-2 text-center min-w-0 ${ROOM_STATUS_COLORS[room.status]}`}
-    title={`${room.roomNumber} — ${statusLabel}`}
-    aria-label={`${room.roomNumber} ${statusLabel}`}
-  >
-    <div className="text-sm font-display font-semibold leading-tight truncate">{room.roomNumber}</div>
-    <div className="text-[10px] font-body mt-0.5 truncate">{statusLabel}</div>
-  </div>
-));
-RoomCell.displayName = 'RoomCell';
+const ALL_ROOM_STATUSES: RoomStatus[] = ['CLEAN', 'DIRTY', 'MAINTENANCE', 'OCCUPIED'];
+
+/** Owner financial summary covers the hotel's full operating history — same
+ * range the pre-day-sheet Dashboard used for pending revenue — but now backed
+ * by an aggregate-only query instead of downloading every invoice. */
+const SUMMARY_START_DATE = '2000-01-01';
+const SUMMARY_END_DATE = '2099-12-31';
 
 interface StatCardConfig {
   nameKey: string;
@@ -42,18 +39,14 @@ interface StatCardConfig {
 export const Dashboard = () => {
   const { t, i18n } = useTranslation('common');
   const user = useAuthStore((state) => state.user);
-  const stats = useDashboardStore((state) => state.stats);
-  const isLoading = useDashboardStore((state) => state.isLoading);
-  const error = useDashboardStore((state) => state.error);
-  const fetchStats = useDashboardStore((state) => state.fetchStats);
-
   const isOwnerOrAdmin = user?.role === 'OWNER' || user?.role === 'ADMIN';
 
   const [alloggiatiFailures, setAlloggiatiFailures] = useState<AlloggiatiFailureSummaryResponse | null>(null);
 
-  useEffect(() => {
-    fetchStats(isOwnerOrAdmin);
-  }, [fetchStats, isOwnerOrAdmin]);
+  const { data: daySheet, isLoading, error: queryError, refetch } = useDaySheet();
+  const { data: ownerSummary } = useOwnerFinancialSummary(SUMMARY_START_DATE, SUMMARY_END_DATE, isOwnerOrAdmin);
+  const error = queryError ? getErrorMessage(queryError, t('failed_load_dashboard')) : null;
+  const handleRetry = useCallback(() => { refetch(); }, [refetch]);
 
   useEffect(() => {
     if (!isOwnerOrAdmin) return;
@@ -62,14 +55,10 @@ export const Dashboard = () => {
       .catch(() => setAlloggiatiFailures(null));
   }, [isOwnerOrAdmin]);
 
-  const handleRefresh = useCallback(() => {
-    fetchStats(isOwnerOrAdmin);
-  }, [fetchStats, isOwnerOrAdmin]);
-
   const universalStats = useMemo<StatCardConfig[]>(() => [
     {
       nameKey: 'stat_guests_in_house',
-      stat: stats ? stats.guestsInHouse.toLocaleString() : '0',
+      stat: daySheet ? daySheet.guestsInHouse.toLocaleString() : '0',
       icon: 'group',
       containerClass: 'bg-primary-container text-on-primary-container',
       href: '/stays',
@@ -77,7 +66,7 @@ export const Dashboard = () => {
     },
     {
       nameKey: 'stat_today_checkins',
-      stat: stats ? stats.todayArrivals.toString() : '0',
+      stat: daySheet ? daySheet.todayArrivals.toString() : '0',
       icon: 'login',
       containerClass: 'bg-tertiary-container text-on-tertiary-container',
       href: '/reservations',
@@ -85,7 +74,7 @@ export const Dashboard = () => {
     },
     {
       nameKey: 'stat_today_checkouts',
-      stat: stats ? stats.todayDepartures.toString() : '0',
+      stat: daySheet ? daySheet.todayDepartures.toString() : '0',
       icon: 'logout',
       containerClass: 'bg-secondary-container text-on-secondary-container',
       href: '/stays',
@@ -93,25 +82,25 @@ export const Dashboard = () => {
     },
     {
       nameKey: 'stat_available_rooms',
-      stat: stats ? stats.availableRooms.toString() : '0',
+      stat: daySheet ? daySheet.availableRooms.toString() : '0',
       icon: 'meeting_room',
       containerClass: 'bg-surface-container-highest text-on-surface',
       href: '/rooms',
       state: { availableToday: true },
     },
-  ], [stats]);
+  ], [daySheet]);
 
   const ownerStat = useMemo<StatCardConfig | null>(() => {
-    if (!isOwnerOrAdmin || stats?.pendingRevenue === null || stats?.pendingRevenue === undefined) return null;
+    if (!isOwnerOrAdmin || !ownerSummary) return null;
     return {
       nameKey: 'stat_pending_revenue',
       stat: new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' })
-        .format(stats.pendingRevenue),
+        .format(ownerSummary.pendingRevenue),
       icon: 'receipt_long',
       containerClass: 'bg-error-container text-on-error-container',
       href: '/billing',
     };
-  }, [isOwnerOrAdmin, stats, i18n.language]);
+  }, [isOwnerOrAdmin, ownerSummary, i18n.language]);
 
   const allStats = useMemo<StatCardConfig[]>(
     () => (ownerStat ? [...universalStats, ownerStat] : universalStats),
@@ -152,16 +141,16 @@ export const Dashboard = () => {
         </div>
       )}
 
-      {error ? (
-        <div className="mt-8 flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
-          <div>
-            <p className="text-sm font-body">{t(error)}</p>
-            <button onClick={handleRefresh} className="mt-1 text-sm font-medium underline hover:no-underline">
-              {t('try_again')}
-            </button>
-          </div>
-        </div>
+      {isLoading ? (
+        <M3LoadingState label={t('loading')} className="mt-8" />
+      ) : error ? (
+        <M3ErrorState
+          title={t('error_loading_dashboard')}
+          message={error}
+          retryLabel={t('try_again')}
+          onRetry={handleRetry}
+          className="mt-8"
+        />
       ) : (
         <div className="mt-8 space-y-6">
           <div data-testid="stats-grid" className={gridClass}>
@@ -176,11 +165,7 @@ export const Dashboard = () => {
                       <dl>
                         <dt className="text-sm font-body font-medium text-on-surface-variant truncate">{t(item.nameKey)}</dt>
                         <dd>
-                          {isLoading ? (
-                            <div className="h-7 bg-surface-container-highest rounded-shape-xs animate-pulse w-24 mt-1" />
-                          ) : (
-                            <div className="text-xl font-display font-bold text-on-surface">{item.stat}</div>
-                          )}
+                          <div className="text-xl font-display font-bold text-on-surface">{item.stat}</div>
                         </dd>
                       </dl>
                     </div>
@@ -199,8 +184,9 @@ export const Dashboard = () => {
             ))}
           </div>
 
-          {/* Room status overview grid */}
-          {stats && stats.rooms.length > 0 && (
+          {/* Room status overview — counts only; the day-sheet endpoint doesn't
+              carry the full per-room list, see Housekeeping for that. */}
+          {daySheet && (
             <M3Card variant="outlined" className="p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
@@ -216,17 +202,19 @@ export const Dashboard = () => {
                   {t('view_all')}
                 </Link>
               </div>
-              <div
-                data-testid="room-overview-grid"
-                className="grid gap-2"
-                style={ROOM_GRID_STYLE}
-              >
-                {stats.rooms.map((room) => (
-                  <RoomCell
-                    key={room.id}
-                    room={room}
-                    statusLabel={t(`room_status_${room.status.toLowerCase()}`)}
-                  />
+              <div data-testid="room-status-summary" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {ALL_ROOM_STATUSES.map((status) => (
+                  <div
+                    key={status}
+                    className={`rounded-shape-sm border p-3 text-center ${ROOM_STATUS_COLORS[status]}`}
+                  >
+                    <div className="text-xl font-display font-bold">
+                      {daySheet.roomStatusCounts[status] ?? 0}
+                    </div>
+                    <div className="text-xs font-body font-medium uppercase tracking-wide">
+                      {t(`room_status_${status.toLowerCase()}`)}
+                    </div>
+                  </div>
                 ))}
               </div>
             </M3Card>

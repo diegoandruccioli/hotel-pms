@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
+import { renderWithQuery as render } from './test-utils/renderWithQuery';
 import App from './App';
 import { useAuthStore } from './store/authStore';
 import { authService } from './services/authService';

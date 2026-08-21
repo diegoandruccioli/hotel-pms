@@ -14,7 +14,7 @@ export const queryKeys = {
   },
   rooms: {
     all: ['rooms'] as const,
-    list: (availableOnly: boolean) => ['rooms', 'list', availableOnly] as const,
+    list: (availableOnly: boolean, status?: string) => ['rooms', 'list', availableOnly, status] as const,
     /** Full unpaginated room list used as a lookup map (e.g. resolving room
      * numbers on the Reservations table) — distinct key from `list()` since
      * it fetches a different page size and callers shouldn't share a cache
@@ -43,5 +43,12 @@ export const queryKeys = {
   stays: {
     all: ['stays'] as const,
     list: (page: number) => ['stays', 'list', page] as const,
+  },
+  dashboard: {
+    daySheet: (date: string) => ['dashboard', 'day-sheet', date] as const,
+  },
+  ownerReport: {
+    summary: (startDate: string, endDate: string) =>
+      ['owner-report', 'summary', startDate, endDate] as const,
   },
 } as const;
