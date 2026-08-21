@@ -89,6 +89,7 @@ describe('Billing', () => {
       dateTo: undefined,
       page: 0,
       size: 20,
+      sort: 'issueDate,desc',
     });
   });
 

@@ -31,7 +31,7 @@ export const queryKeys = {
   },
   invoices: {
     all: ['invoices'] as const,
-    search: (params: { status?: string; query: string; dateFrom?: string; dateTo?: string; page: number }) =>
+    search: (params: { status?: string; query: string; dateFrom?: string; dateTo?: string; page: number; sort?: string }) =>
       ['invoices', 'search', params] as const,
   },
   fbOrders: {

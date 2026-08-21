@@ -11,6 +11,7 @@ interface SearchParams {
   dateTo?: string;
   page: number;
   size: number;
+  sort?: string;
 }
 
 export function useInvoicesSearch(params: SearchParams) {

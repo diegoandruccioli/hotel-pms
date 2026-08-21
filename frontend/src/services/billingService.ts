@@ -31,6 +31,7 @@ export const billingService = {
     dateTo?: string;
     page?: number;
     size?: number;
+    sort?: string;
   }): Promise<SpringPage<InvoiceSearchResult>> => {
     const searchParams = new URLSearchParams({
       page: String(params.page ?? 0),
@@ -40,6 +41,7 @@ export const billingService = {
     if (params.query?.trim()) searchParams.set('query', params.query.trim());
     if (params.dateFrom) searchParams.set('dateFrom', params.dateFrom);
     if (params.dateTo) searchParams.set('dateTo', params.dateTo);
+    if (params.sort) searchParams.set('sort', params.sort);
     const response = await api.get<SpringPage<InvoiceSearchResult>>(
       `${BASE_PATH}/search?${searchParams.toString()}`,
     );

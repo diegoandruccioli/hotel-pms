@@ -66,6 +66,14 @@ describe('billingService', () => {
     expect(api.get).toHaveBeenCalledWith('/api/v1/invoices/search?page=0&size=20');
   });
 
+  it('should append a sort param when provided', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { content: [] } });
+
+    await billingService.searchInvoices({ sort: 'totalAmount,asc' });
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/invoices/search?page=0&size=20&sort=totalAmount%2Casc');
+  });
+
   it('should call the FatturaPA validate endpoint', async () => {
     vi.mocked(api.get).mockResolvedValueOnce({ data: undefined });
 

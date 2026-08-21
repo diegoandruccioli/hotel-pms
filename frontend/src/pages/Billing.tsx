@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
+import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types/billing.types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
+import { M3DataTable } from '../components/m3/M3DataTable';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { M3LoadingState } from '../components/m3/M3LoadingState';
 import { M3ErrorState } from '../components/m3/M3ErrorState';
-import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
 import { M3Pagination } from '../components/m3/M3Pagination';
 import { M3TextField } from '../components/m3/M3TextField';
 import { PaymentModal } from './Billing/PaymentModal';
@@ -16,6 +16,8 @@ import { getErrorMessage } from '../utils/errorMessage';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
+const DEFAULT_SORT_FIELD = 'issueDate';
+const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'desc';
 
 const getStatusTone = (status: InvoiceStatus) => {
   switch (status) {
@@ -36,59 +38,31 @@ const PAY_BTN_CLASS = [
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tertiary rounded',
 ].join(' ');
 
-interface InvoiceRowProps {
-  result: InvoiceSearchResult;
+interface ActionsCellProps {
+  invoice: InvoiceResponse;
   onView: (inv: InvoiceResponse) => void;
   onPay: (inv: InvoiceResponse) => void;
-  formatDate: (d?: string) => string;
-  formatCurrency: (n: number) => string;
   tView: string;
   tRegisterPayment: string;
-  tPending: string;
 }
 
-const InvoiceRow = memo(({
-  result,
-  onView,
-  onPay,
-  formatDate,
-  formatCurrency,
-  tView,
-  tRegisterPayment,
-  tPending,
-}: InvoiceRowProps) => {
-  const { t } = useTranslation('common');
-  const { invoice, guestName } = result;
+const ActionsCell = ({ invoice, onView, onPay, tView, tRegisterPayment }: ActionsCellProps) => {
   const handleView = useCallback(() => onView(invoice), [onView, invoice]);
   const handlePay  = useCallback(() => onPay(invoice),  [onPay,  invoice]);
 
   return (
-    <M3TableRow>
-      <M3TableCell className="font-medium">
-        {invoice.invoiceNumber || (
-          <span className="text-on-surface-variant italic">{tPending}</span>
-        )}
-      </M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{guestName ?? '—'}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{formatDate(invoice.issueDate)}</M3TableCell>
-      <M3TableCell className="font-medium">{formatCurrency(invoice.totalAmount)}</M3TableCell>
-      <M3TableCell>
-        <M3StatusChip label={t(`invoice_status_${invoice.status}`, invoice.status)} tone={getStatusTone(invoice.status)} />
-      </M3TableCell>
-      <M3TableCell className="text-right">
-        <button type="button" onClick={handleView} className={VIEW_BTN_CLASS}>
-          {tView}
+    <div className="text-right">
+      <button type="button" onClick={handleView} className={VIEW_BTN_CLASS}>
+        {tView}
+      </button>
+      {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
+        <button type="button" onClick={handlePay} className={PAY_BTN_CLASS}>
+          {tRegisterPayment}
         </button>
-        {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
-          <button type="button" onClick={handlePay} className={PAY_BTN_CLASS}>
-            {tRegisterPayment}
-          </button>
-        )}
-      </M3TableCell>
-    </M3TableRow>
+      )}
+    </div>
   );
-});
-InvoiceRow.displayName = 'InvoiceRow';
+};
 
 const StatusFilterChip = memo(({ value, active, label, onClick }: {
   value: InvoiceStatus | 'ALL';
@@ -126,6 +100,8 @@ export const Billing = memo(() => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);
@@ -137,13 +113,15 @@ export const Billing = memo(() => {
   // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes)
   // rather than in a useEffect, which would run an extra commit after the
   // filter change instead of resetting in the same render pass.
-  const activeFilters = { debouncedSearch, statusFilter, dateFrom, dateTo };
+  const activeFilters = { debouncedSearch, statusFilter, dateFrom, dateTo, sortField, sortDir };
   const [prevFilters, setPrevFilters] = useState(activeFilters);
   if (
     prevFilters.debouncedSearch !== activeFilters.debouncedSearch ||
     prevFilters.statusFilter !== activeFilters.statusFilter ||
     prevFilters.dateFrom !== activeFilters.dateFrom ||
-    prevFilters.dateTo !== activeFilters.dateTo
+    prevFilters.dateTo !== activeFilters.dateTo ||
+    prevFilters.sortField !== activeFilters.sortField ||
+    prevFilters.sortDir !== activeFilters.sortDir
   ) {
     setPrevFilters(activeFilters);
     setPage(0);
@@ -168,6 +146,16 @@ export const Billing = memo(() => {
     [t],
   );
 
+  const sorting = useMemo<SortingState>(
+    () => [{ id: sortField, desc: sortDir === 'desc' }],
+    [sortField, sortDir],
+  );
+
+  const handleSortingChange = useCallback((next: SortingState) => {
+    setSortField(next[0].id);
+    setSortDir(next[0].desc ? 'desc' : 'asc');
+  }, []);
+
   const searchParams = useMemo(() => ({
     status: statusFilter === 'ALL' ? undefined : statusFilter,
     query: debouncedSearch,
@@ -175,7 +163,8 @@ export const Billing = memo(() => {
     dateTo: dateTo || undefined,
     page,
     size: PAGE_SIZE,
-  }), [statusFilter, debouncedSearch, dateFrom, dateTo, page]);
+    sort: `${sortField},${sortDir}`,
+  }), [statusFilter, debouncedSearch, dateFrom, dateTo, page, sortField, sortDir]);
 
   const { data, isLoading: loading, error: queryError, refetch } = useInvoicesSearch(searchParams);
   const results = data?.content ?? EMPTY_RESULTS;
@@ -216,21 +205,71 @@ export const Billing = memo(() => {
     [i18n.language],
   );
 
-  const tableHeaders = useMemo(
-    () => [
-      t('invoice_number'),
-      t('guest_name'),
-      t('issue_date'),
-      t('total_amount'),
-      t('status'),
-      <span key="sr" className="sr-only">{t('actions')}</span>,
-    ],
-    [t],
-  );
-
   const tView            = t('view');
   const tRegisterPayment = t('register_payment');
   const tPending         = t('pending');
+
+  const getInvoiceRowId = useCallback((r: InvoiceSearchResult) => r.invoice.id, []);
+
+  const columns = useMemo<ColumnDef<InvoiceSearchResult>[]>(() => [
+    {
+      id: 'invoiceNumber',
+      enableSorting: false,
+      header: t('invoice_number'),
+      cell: ({ row }) => (
+        <span className="font-medium">
+          {row.original.invoice.invoiceNumber || (
+            <span className="text-on-surface-variant italic">{tPending}</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      id: 'guestName',
+      enableSorting: false,
+      header: t('guest_name'),
+      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.guestName ?? '—'}</span>,
+    },
+    {
+      id: 'issueDate',
+      accessorFn: (r) => r.invoice.issueDate,
+      header: t('issue_date'),
+      cell: ({ row }) => (
+        <span className="text-on-surface-variant">{formatDate(row.original.invoice.issueDate)}</span>
+      ),
+    },
+    {
+      id: 'totalAmount',
+      accessorFn: (r) => r.invoice.totalAmount,
+      header: t('total_amount'),
+      cell: ({ row }) => <span className="font-medium">{formatCurrency(row.original.invoice.totalAmount)}</span>,
+    },
+    {
+      id: 'status',
+      accessorFn: (r) => r.invoice.status,
+      header: t('status'),
+      cell: ({ row }) => (
+        <M3StatusChip
+          label={t(`invoice_status_${row.original.invoice.status}`, row.original.invoice.status)}
+          tone={getStatusTone(row.original.invoice.status)}
+        />
+      ),
+    },
+    {
+      id: 'actions',
+      enableSorting: false,
+      header: () => <span className="sr-only">{t('actions')}</span>,
+      cell: ({ row }) => (
+        <ActionsCell
+          invoice={row.original.invoice}
+          onView={handleOpenDetail}
+          onPay={handleOpenPayment}
+          tView={tView}
+          tRegisterPayment={tRegisterPayment}
+        />
+      ),
+    },
+  ], [t, tPending, formatDate, formatCurrency, handleOpenDetail, handleOpenPayment, tView, tRegisterPayment]);
 
   return (
     <div className="space-y-6">
@@ -293,25 +332,14 @@ export const Billing = memo(() => {
           onRetry={handleRetry}
         />
       ) : (
-        <M3Table headers={tableHeaders}>
-          {results.length === 0 ? (
-            <M3TableEmptyRow colSpan={tableHeaders.length} message={t('no_invoices')} />
-          ) : (
-            results.map((result) => (
-              <InvoiceRow
-                key={result.invoice.id}
-                result={result}
-                onView={handleOpenDetail}
-                onPay={handleOpenPayment}
-                formatDate={formatDate}
-                formatCurrency={formatCurrency}
-                tView={tView}
-                tRegisterPayment={tRegisterPayment}
-                tPending={tPending}
-              />
-            ))
-          )}
-        </M3Table>
+        <M3DataTable
+          data={results}
+          columns={columns}
+          getRowId={getInvoiceRowId}
+          sorting={sorting}
+          onSortingChange={handleSortingChange}
+          emptyMessage={t('no_invoices')}
+        />
       )}
 
       {!loading && !error && (
