@@ -35,10 +35,17 @@ export interface M3DataTableProps<T> {
   className?: string;
 }
 
-function nextSortDirection(current: false | 'asc' | 'desc'): false | 'asc' | 'desc' {
-  if (current === false) return 'asc';
+/**
+ * Clicking an inactive column sorts it ascending; clicking the already-active
+ * column toggles asc/desc. Deliberately a 2-state toggle once a column is
+ * active rather than a 3-state asc/desc/none cycle: every page migrated to
+ * `M3DataTable` so far always has exactly one active sort (their backend
+ * `Pageable` always applies a default), so a reachable "no sort" state would
+ * just be a dead end the caller has to special-case back to some default.
+ */
+function nextSortDirection(current: false | 'asc' | 'desc'): 'asc' | 'desc' {
   if (current === 'asc') return 'desc';
-  return false;
+  return 'asc';
 }
 
 /**
@@ -94,7 +101,7 @@ export function M3DataTable<T>({
 
   const handleToggleSort = useCallback((columnId: string, currentDirection: false | 'asc' | 'desc') => {
     const next = nextSortDirection(currentDirection);
-    onSortingChange(next === false ? [] : [{ id: columnId, desc: next === 'desc' }]);
+    onSortingChange([{ id: columnId, desc: next === 'desc' }]);
   }, [onSortingChange]);
 
   return (

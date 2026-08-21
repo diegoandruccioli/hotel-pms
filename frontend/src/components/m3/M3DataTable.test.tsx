@@ -68,7 +68,7 @@ describe('M3DataTable', () => {
     expect(screen.getByRole('columnheader', { name: 'Value' })).not.toHaveAttribute('aria-sort');
   });
 
-  it('cycles sort asc -> desc -> none on repeated clicks and reports each state', () => {
+  it('selects a column ascending on first click, then toggles asc/desc on repeated clicks', () => {
     const onSortingChange = vi.fn();
     const { rerender } = render(
       <M3DataTable
@@ -110,7 +110,7 @@ describe('M3DataTable', () => {
     expect(screen.getByRole('columnheader', { name: /Name/ })).toHaveAttribute('aria-sort', 'descending');
 
     fireEvent.click(screen.getByRole('button', { name: /Name/ }));
-    expect(onSortingChange).toHaveBeenLastCalledWith([]);
+    expect(onSortingChange).toHaveBeenLastCalledWith([{ id: 'name', desc: false }] satisfies SortingState);
   });
 
   it('virtualizes past the row threshold, exposing aria-rowcount and rendering fewer DOM rows than data', () => {

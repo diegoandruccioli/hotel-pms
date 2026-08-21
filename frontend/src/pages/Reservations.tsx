@@ -1,17 +1,16 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { ReservationResponse } from '../types/reservation.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
-import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
+import { M3DataTable } from '../components/m3/M3DataTable';
 import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { M3Dialog } from '../components/m3/M3Dialog';
 import { M3LoadingState } from '../components/m3/M3LoadingState';
 import { M3ErrorState } from '../components/m3/M3ErrorState';
-import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
 import { M3Pagination } from '../components/m3/M3Pagination';
-import { M3Select } from '../components/m3/M3Select';
 import { M3TextField } from '../components/m3/M3TextField';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -34,6 +33,8 @@ const EMPTY_ROOMS: RoomResponse[] = [];
 
 type SortField = 'checkInDate' | 'checkOutDate' | 'status';
 type SortDir = 'asc' | 'desc';
+const DEFAULT_SORT_FIELD: SortField = 'checkInDate';
+const DEFAULT_SORT_DIR: SortDir = 'desc';
 
 interface ReservationsNavState {
   upcomingOnly?: boolean;
@@ -55,34 +56,80 @@ const getStatusTone = (status: string) => {
 const getStatusLabel = (status: string, t: TFunction) =>
   t(`status_${status.toLowerCase()}`, status);
 
-interface ReservationRowProps {
+const RoomsCell = ({ reservation, rooms }: { reservation: ReservationResponse; rooms: RoomResponse[] }) => {
+  const roomNumbers = useMemo(() => (
+    reservation.lineItems?.filter(li => li.active !== false).map(li => {
+      const room = rooms.find(r => r.id === li.roomId);
+      return room?.roomNumber;
+    }).filter(Boolean).sort().join(', ') || '-'
+  ), [reservation.lineItems, rooms]);
+
+  return <span className="text-on-surface-variant font-medium">{roomNumbers}</span>;
+};
+
+const GuestsCountCell = ({ reservation }: { reservation: ReservationResponse }) => (
+  <div className={`font-medium flex items-center gap-1.5 ${
+    (reservation.actualGuests || 0) < reservation.expectedGuests ? 'text-warning' :
+    (reservation.actualGuests || 0) > reservation.expectedGuests ? 'text-error' :
+    'text-on-surface'
+  }`}>
+    <MaterialIcon name="group" size={18} />
+    <span>{reservation.actualGuests || 0} / {reservation.expectedGuests}</span>
+  </div>
+);
+
+interface StatusCellProps {
   reservation: ReservationResponse;
-  rooms: RoomResponse[];
-  onCheckIn: (reservationId: string, roomId: string, expectedGuests: number, guestId: string) => void;
-  onView: (reservationId: string) => void;
-  onEdit: (reservationId: string) => void;
-  onDelete?: (id: string) => void;
   onRetryConfirmationEmail: (id: string) => void;
   retryingEmail: string | null;
   t: TFunction;
 }
 
-const ReservationRow = memo(({
-  reservation, rooms, onCheckIn, onView, onEdit, onDelete, onRetryConfirmationEmail, retryingEmail, t,
-}: ReservationRowProps) => {
-  const roomNumbers = useMemo(() => {
-    return reservation.lineItems?.filter(li => li.active !== false).map(li => {
-      const room = rooms.find(r => r.id === li.roomId);
-      return room?.roomNumber;
-    }).filter(Boolean).sort().join(', ') || '-';
-  }, [reservation.lineItems, rooms]);
+const StatusCell = ({ reservation, onRetryConfirmationEmail, retryingEmail, t }: StatusCellProps) => {
+  const handleRetry = useCallback(() => {
+    onRetryConfirmationEmail(reservation.id);
+  }, [onRetryConfirmationEmail, reservation.id]);
 
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <M3StatusChip label={getStatusLabel(reservation.status, t)} tone={getStatusTone(reservation.status)} />
+      {reservation.confirmationEmailFailed && (
+        <span
+          className="inline-flex items-center gap-1"
+          title={reservation.confirmationEmailFailureReason ?? undefined}
+        >
+          <M3StatusChip label={t('confirmation_email_failed')} tone="error" />
+          <button
+            type="button"
+            onClick={handleRetry}
+            disabled={retryingEmail === reservation.id}
+            aria-label={t('retry_confirmation_email')}
+            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+          >
+            <MaterialIcon name={retryingEmail === reservation.id ? 'progress_activity' : 'refresh'} size={16} />
+          </button>
+        </span>
+      )}
+    </div>
+  );
+};
+
+interface ActionsCellProps {
+  reservation: ReservationResponse;
+  onCheckIn: (reservationId: string, roomId: string, expectedGuests: number, guestId: string) => void;
+  onView: (reservationId: string) => void;
+  onEdit: (reservationId: string) => void;
+  onDelete?: (id: string) => void;
+  t: TFunction;
+}
+
+const ActionsCell = ({ reservation, onCheckIn, onView, onEdit, onDelete, t }: ActionsCellProps) => {
   const handleCheckInClick = useCallback(() => {
     onCheckIn(
-      reservation.id, 
+      reservation.id,
       reservation.lineItems?.[0]?.roomId || '',
       reservation.expectedGuests,
-      reservation.guestId
+      reservation.guestId,
     );
   }, [onCheckIn, reservation]);
 
@@ -98,78 +145,32 @@ const ReservationRow = memo(({
     onDelete?.(reservation.id);
   }, [onDelete, reservation.id]);
 
-  const handleRetryConfirmationEmail = useCallback(() => {
-    onRetryConfirmationEmail(reservation.id);
-  }, [onRetryConfirmationEmail, reservation.id]);
-
   return (
-    <M3TableRow>
-      <M3TableCell className="font-medium">{reservation.guestFullName}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{reservation.checkInDate}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{reservation.checkOutDate}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant font-medium">
-        {roomNumbers}
-      </M3TableCell>
-      <M3TableCell>
-        <div className={`font-medium flex items-center gap-1.5 ${
-          (reservation.actualGuests || 0) < reservation.expectedGuests ? 'text-warning' :
-          (reservation.actualGuests || 0) > reservation.expectedGuests ? 'text-error' :
-          'text-on-surface'
-        }`}>
-          <MaterialIcon name="group" size={18} />
-          <span>{reservation.actualGuests || 0} / {reservation.expectedGuests}</span>
-        </div>
-      </M3TableCell>
-      <M3TableCell>
-        <div className="flex flex-col items-start gap-1">
-          <M3StatusChip label={getStatusLabel(reservation.status, t)} tone={getStatusTone(reservation.status)} />
-          {reservation.confirmationEmailFailed && (
-            <span
-              className="inline-flex items-center gap-1"
-              title={reservation.confirmationEmailFailureReason ?? undefined}
-            >
-              <M3StatusChip label={t('confirmation_email_failed')} tone="error" />
-              <button
-                type="button"
-                onClick={handleRetryConfirmationEmail}
-                disabled={retryingEmail === reservation.id}
-                aria-label={t('retry_confirmation_email')}
-                className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
-              >
-                <MaterialIcon name={retryingEmail === reservation.id ? 'progress_activity' : 'refresh'} size={16} />
-              </button>
-            </span>
-          )}
-        </div>
-      </M3TableCell>
-      <M3TableCell className="text-right">
-        {reservation.status === 'CONFIRMED' && (
-          <M3TableActionLink className="mr-4" onClick={handleCheckInClick}>
-            {t('check_in')}
-          </M3TableActionLink>
-        )}
-        <M3TableActionLink className="mr-4" onClick={handleViewClick}>
-          {t('view')}
+    <div className="text-right">
+      {reservation.status === 'CONFIRMED' && (
+        <M3TableActionLink className="mr-4" onClick={handleCheckInClick}>
+          {t('check_in')}
         </M3TableActionLink>
-        <M3TableActionLink onClick={handleEditClick}>
-          {t('edit')}
+      )}
+      <M3TableActionLink className="mr-4" onClick={handleViewClick}>
+        {t('view')}
+      </M3TableActionLink>
+      <M3TableActionLink onClick={handleEditClick}>
+        {t('edit')}
+      </M3TableActionLink>
+      {onDelete && DELETABLE_STATUSES.has(reservation.status) && (
+        <M3TableActionLink
+          tone="error"
+          className="ml-4"
+          aria-label={`${t('delete_reservation')} ${reservation.id}`}
+          onClick={handleDeleteClick}
+        >
+          {t('delete_reservation')}
         </M3TableActionLink>
-        {onDelete && DELETABLE_STATUSES.has(reservation.status) && (
-          <M3TableActionLink
-            tone="error"
-            className="ml-4"
-            aria-label={`${t('delete_reservation')} ${reservation.id}`}
-            onClick={handleDeleteClick}
-          >
-            {t('delete_reservation')}
-          </M3TableActionLink>
-        )}
-      </M3TableCell>
-    </M3TableRow>
+      )}
+    </div>
   );
-});
-
-ReservationRow.displayName = 'ReservationRow';
+};
 
 export const Reservations = () => {
   const { t } = useTranslation('common');
@@ -184,8 +185,8 @@ export const Reservations = () => {
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sortField, setSortField] = useState<SortField>(() => navState?.sortField ?? 'checkInDate');
-  const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? 'desc');
+  const [sortField, setSortField] = useState<SortField>(() => navState?.sortField ?? DEFAULT_SORT_FIELD);
+  const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? DEFAULT_SORT_DIR);
   const [upcomingOnly, setUpcomingOnly] = useState(() => navState?.upcomingOnly ?? false);
 
   useEffect(() => {
@@ -202,14 +203,6 @@ export const Reservations = () => {
     setSearchQuery(e.target.value);
   }, []);
 
-  const handleSortFieldChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSortField(e.target.value as SortField);
-  }, []);
-
-  const toggleSortDir = useCallback(() => {
-    setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-  }, []);
-
   const toggleUpcomingOnly = useCallback(() => {
     setUpcomingOnly((prev) => !prev);
   }, []);
@@ -220,11 +213,22 @@ export const Reservations = () => {
     (current: number, total: number) => t('page_x_of_y', { current, total }),
     [t],
   );
-  const sortOptions = useMemo(() => [
-    { value: 'checkInDate', label: t('check_in') },
-    { value: 'checkOutDate', label: t('check_out') },
-    { value: 'status', label: t('status') },
-  ], [t]);
+
+  const sorting = useMemo<SortingState>(
+    () => [{ id: sortField, desc: sortDir === 'desc' }],
+    [sortField, sortDir],
+  );
+
+  const getReservationRowId = useCallback((r: ReservationResponse) => r.id, []);
+
+  const handleSortingChange = useCallback((next: SortingState) => {
+    // M3DataTable only ever reports a single active sort (clicking an
+    // inactive column selects it ascending; clicking the active one toggles
+    // asc/desc) — never an empty array, so there's no "unsorted" case to
+    // fall back to a default for.
+    setSortField(next[0].id as SortField);
+    setSortDir(next[0].desc ? 'desc' : 'asc');
+  }, []);
 
   const searchParams = useMemo(() => ({
     query: debouncedSearch,
@@ -309,15 +313,67 @@ export const Reservations = () => {
     }
   }, [reservationToDelete, addToast, t, deleteReservationMutation]);
 
-  const tableHeaders = useMemo(() => [
-    t('guest_name'), 
-    t('check_in'), 
-    t('check_out'), 
-    t('nav_rooms'), 
-    t('guests'), 
-    t('status'), 
-    <span key="sr" className="sr-only">{t('actions')}</span>
-  ], [t]);
+  const columns = useMemo<ColumnDef<ReservationResponse>[]>(() => [
+    {
+      id: 'guestFullName',
+      header: t('guest_name'),
+      enableSorting: false,
+      cell: ({ row }) => <span className="font-medium">{row.original.guestFullName}</span>,
+    },
+    {
+      id: 'checkInDate',
+      accessorKey: 'checkInDate',
+      header: t('check_in'),
+      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.checkInDate}</span>,
+    },
+    {
+      id: 'checkOutDate',
+      accessorKey: 'checkOutDate',
+      header: t('check_out'),
+      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.checkOutDate}</span>,
+    },
+    {
+      id: 'rooms',
+      header: t('nav_rooms'),
+      enableSorting: false,
+      cell: ({ row }) => <RoomsCell reservation={row.original} rooms={rooms} />,
+    },
+    {
+      id: 'guests',
+      header: t('guests'),
+      enableSorting: false,
+      cell: ({ row }) => <GuestsCountCell reservation={row.original} />,
+    },
+    {
+      id: 'status',
+      accessorKey: 'status',
+      header: t('status'),
+      cell: ({ row }) => (
+        <StatusCell
+          reservation={row.original}
+          onRetryConfirmationEmail={handleRetryConfirmationEmail}
+          retryingEmail={retryingEmail}
+          t={t}
+        />
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => <span className="sr-only">{t('actions')}</span>,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <ActionsCell
+          reservation={row.original}
+          onCheckIn={handleCheckIn}
+          onView={handleView}
+          onEdit={handleEdit}
+          onDelete={isAdminOrOwner ? handleDeleteRequest : undefined}
+          t={t}
+        />
+      ),
+    },
+  ], [t, rooms, handleRetryConfirmationEmail, retryingEmail, handleCheckIn, handleView, handleEdit,
+      isAdminOrOwner, handleDeleteRequest]);
 
   return (
     <div className="space-y-6">
@@ -351,23 +407,6 @@ export const Reservations = () => {
           >
             {t('reservations_upcoming_filter')}
           </button>
-          <div className="flex items-center gap-2">
-            <M3Select
-              label={t('sort_by')}
-              hideLabel
-              options={sortOptions}
-              value={sortField}
-              onChange={handleSortFieldChange}
-            />
-            <button
-              type="button"
-              onClick={toggleSortDir}
-              aria-label={sortDir === 'asc' ? t('sort_dir_asc') : t('sort_dir_desc')}
-              className="flex items-center justify-center w-10 h-10 rounded-shape-full border border-outline text-on-surface-variant hover:bg-primary/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
-            >
-              <MaterialIcon name={sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'} size={20} />
-            </button>
-          </div>
           <M3Button data-testid="new-reservation-btn" icon="add" onClick={handleNewReservation}>
             {t('new_reservation')}
           </M3Button>
@@ -384,29 +423,14 @@ export const Reservations = () => {
           onRetry={handleRetry}
         />
       ) : (
-        <M3Table headers={tableHeaders}>
-          {reservations.length === 0 ? (
-            <M3TableEmptyRow
-              colSpan={tableHeaders.length}
-              message={upcomingOnly ? t('no_upcoming_reservations_found') : t('no_reservations_found')}
-            />
-          ) : (
-            reservations.map((reservation) => (
-              <ReservationRow
-                key={reservation.id}
-                reservation={reservation}
-                rooms={rooms}
-                onCheckIn={handleCheckIn}
-                onView={handleView}
-                onEdit={handleEdit}
-                onDelete={isAdminOrOwner ? handleDeleteRequest : undefined}
-                onRetryConfirmationEmail={handleRetryConfirmationEmail}
-                retryingEmail={retryingEmail}
-                t={t}
-              />
-            ))
-          )}
-        </M3Table>
+        <M3DataTable
+          data={reservations}
+          columns={columns}
+          getRowId={getReservationRowId}
+          sorting={sorting}
+          onSortingChange={handleSortingChange}
+          emptyMessage={upcomingOnly ? t('no_upcoming_reservations_found') : t('no_reservations_found')}
+        />
       )}
 
       {!loading && !error && (

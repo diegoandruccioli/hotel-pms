@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 /* eslint-disable react-perf/jsx-no-new-array-as-prop -- test-only render helper, not the real perf-sensitive render path */
 import { MemoryRouter } from 'react-router-dom';
@@ -267,30 +267,34 @@ describe('Reservations', () => {
     }, { timeout: 500 });
   });
 
-  it('requests checkOutDate sort when the sort field is changed', async () => {
+  it('requests checkOutDate sort ascending when the check_out column header is clicked', async () => {
     vi.mocked(reservationService.searchReservations)
       .mockResolvedValueOnce(page([CONFIRMED_RESERVATION]) as never)
       .mockResolvedValueOnce(page([CONFIRMED_RESERVATION]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText('sort_by'), { target: { value: 'checkOutDate' } });
+    const checkOutHeader = screen.getByRole('columnheader', { name: /check_out/i });
+    fireEvent.click(within(checkOutHeader).getByRole('button'));
 
     await waitFor(() => {
       expect(reservationService.searchReservations).toHaveBeenLastCalledWith(
-        expect.objectContaining({ sort: 'checkOutDate,desc' }),
+        expect.objectContaining({ sort: 'checkOutDate,asc' }),
       );
     });
   });
 
-  it('requests the reversed sort direction when the direction toggle is clicked', async () => {
+  it('toggles the active column to descending when its header is clicked again', async () => {
     vi.mocked(reservationService.searchReservations)
       .mockResolvedValueOnce(page([CONFIRMED_RESERVATION]) as never)
       .mockResolvedValueOnce(page([CONFIRMED_RESERVATION]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
+    // Default sort is checkInDate,desc — clicking its already-active header
+    // toggles the direction rather than selecting a new column.
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: 'sort_dir_desc' }));
+    const checkInHeader = screen.getByRole('columnheader', { name: /check_in/i });
+    fireEvent.click(within(checkInHeader).getByRole('button'));
 
     await waitFor(() => {
       expect(reservationService.searchReservations).toHaveBeenLastCalledWith(
@@ -303,8 +307,11 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'check_in' })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: 'check_in' }));
+    // "check_in" also names the sortable check-in-date column header — scope
+    // to the table body to get the row action button, not the header's.
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    const tableBody = screen.getAllByRole('rowgroup')[1];
+    fireEvent.click(within(tableBody).getByRole('button', { name: 'check_in' }));
 
     expect(mockNavigate).toHaveBeenCalledWith(
       '/stays/check-in/res-1',
