@@ -10,16 +10,18 @@ import java.time.LocalDate;
  * these three numbers but previously triggered a full {@code /reports/owner}
  * call (every invoice ever issued, unpaginated) just to sum them client-side.
  *
- * @param startDate     the start of the reporting period
- * @param endDate       the end of the reporting period
- * @param totalRevenue  sum of all invoice amounts in the period
- * @param totalInvoices total number of invoices in the period
- * @param paidInvoices  number of invoices with status PAID
+ * @param startDate      the start of the reporting period
+ * @param endDate        the end of the reporting period
+ * @param totalRevenue   sum of all invoice amounts in the period, regardless of status
+ * @param totalInvoices  total number of invoices in the period
+ * @param paidInvoices   number of invoices with status PAID
+ * @param pendingRevenue sum of invoice amounts with status ISSUED — owed but not yet collected
  */
 public record OwnerFinancialSummaryDto(
         LocalDate startDate,
         LocalDate endDate,
         BigDecimal totalRevenue,
         long totalInvoices,
-        long paidInvoices) {
+        long paidInvoices,
+        BigDecimal pendingRevenue) {
 }

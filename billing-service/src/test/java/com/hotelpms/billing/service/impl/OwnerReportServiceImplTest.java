@@ -45,6 +45,7 @@ class OwnerReportServiceImplTest {
         private static final int HOUR_10 = 10;
         private static final int HOUR_9 = 9;
         private static final String TOTAL_REVENUE = "870.50";
+        private static final String PENDING_REVENUE = "120.00";
 
         @Mock
         private InvoiceRepository invoiceRepository;
@@ -158,6 +159,7 @@ class OwnerReportServiceImplTest {
                 when(aggregates.getTotalRevenue()).thenReturn(new BigDecimal(TOTAL_REVENUE));
                 when(aggregates.getTotalInvoices()).thenReturn(3L);
                 when(aggregates.getPaidInvoices()).thenReturn(2L);
+                when(aggregates.getPendingRevenue()).thenReturn(new BigDecimal(PENDING_REVENUE));
                 when(invoiceRepository.getFinancialSummaryAggregatesByHotelId(
                                 eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class)))
                                 .thenReturn(aggregates);
@@ -171,6 +173,7 @@ class OwnerReportServiceImplTest {
                 assertEquals(new BigDecimal(TOTAL_REVENUE), summary.totalRevenue());
                 assertEquals(3, summary.totalInvoices());
                 assertEquals(2, summary.paidInvoices());
+                assertEquals(new BigDecimal(PENDING_REVENUE), summary.pendingRevenue());
         }
 
         @Test

@@ -115,7 +115,8 @@ class OwnerReportControllerTest {
                 LocalDate.of(2026, 5, 31),
                 new BigDecimal(SUMMARY_REVENUE),
                 10L,
-                8L);
+                8L,
+                BigDecimal.ZERO);
         when(ownerReportService.getFinancialSummary(eq(hotelId), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(summary);
 

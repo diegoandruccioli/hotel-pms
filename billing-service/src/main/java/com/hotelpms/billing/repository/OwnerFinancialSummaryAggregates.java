@@ -29,4 +29,13 @@ public interface OwnerFinancialSummaryAggregates {
      * @return the paid invoice count for the window
      */
     long getPaidInvoices();
+
+    /**
+     * Returns the sum of invoice amounts with status {@code ISSUED} — money
+     * owed but not yet collected, as opposed to {@link #getTotalRevenue}
+     * which sums every matching invoice regardless of status.
+     *
+     * @return the pending (issued, unpaid) revenue for the window
+     */
+    BigDecimal getPendingRevenue();
 }

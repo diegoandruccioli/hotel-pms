@@ -74,11 +74,12 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     List<Invoice> findByHotelIdAndIssueDateBetween(UUID hotelId, LocalDateTime start, LocalDateTime end);
 
     /**
-     * Computes the same three totals as {@link #findByHotelIdAndIssueDateBetween}
+     * Computes the same three totals {@link #findByHotelIdAndIssueDateBetween}
      * feeds into {@code OwnerFinancialReportDto} (revenue, invoice count, paid
-     * count), entirely in SQL — no {@code Invoice} entity is loaded. Backs the
-     * Dashboard's revenue summary, which only ever needed these numbers, not the
-     * full unpaginated invoice list the {@code /reports/owner} endpoint returns.
+     * count), plus pending (issued, unpaid) revenue, entirely in SQL — no
+     * {@code Invoice} entity is loaded. Backs the Dashboard's revenue summary,
+     * which only ever needed these numbers, not the full unpaginated invoice
+     * list the {@code /reports/owner} endpoint returns.
      *
      * @param hotelId the hotel UUID from the authenticated request (T-BILL-04)
      * @param start   beginning of the time window (inclusive)
@@ -88,7 +89,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     @Query("SELECT COALESCE(SUM(i.totalAmount), 0) AS totalRevenue, "
             + "COUNT(i) AS totalInvoices, "
             + "COALESCE(SUM(CASE WHEN i.status = com.hotelpms.billing.domain.InvoiceStatus.PAID THEN 1L ELSE 0L END), 0) "
-            + "AS paidInvoices "
+            + "AS paidInvoices, "
+            + "COALESCE(SUM(CASE WHEN i.status = com.hotelpms.billing.domain.InvoiceStatus.ISSUED "
+            + "THEN i.totalAmount ELSE 0 END), 0) AS pendingRevenue "
             + "FROM Invoice i WHERE i.hotelId = :hotelId AND i.issueDate BETWEEN :start AND :end")
     OwnerFinancialSummaryAggregates getFinancialSummaryAggregatesByHotelId(
             @Param("hotelId") UUID hotelId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);

@@ -77,6 +77,7 @@ public class OwnerReportServiceImpl implements OwnerReportService {
                                 invoiceRepository.getFinancialSummaryAggregatesByHotelId(hotelId, start, end);
 
                 return new OwnerFinancialSummaryDto(startDate, endDate, aggregates.getTotalRevenue(),
-                                aggregates.getTotalInvoices(), aggregates.getPaidInvoices());
+                                aggregates.getTotalInvoices(), aggregates.getPaidInvoices(),
+                                aggregates.getPendingRevenue());
         }
 }
