@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { renderWithQuery as render } from '../test-utils/renderWithQuery';
 import { Stays } from './Stays';
@@ -293,8 +293,10 @@ describe('Stays', () => {
     render(<Stays />);
     await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText('sort_by'), { target: { value: 'expectedCheckOutDate' } });
-    fireEvent.click(screen.getByRole('button', { name: 'sort_dir_desc' })); // default dir is desc; this click flips to asc
+    // Column starts inactive — first click selects it ascending, which is
+    // exactly the asc order this test wants (2026-07-01 before 2026-07-05).
+    const expectedCheckoutHeader = screen.getByRole('columnheader', { name: /expected_checkout_col/i });
+    fireEvent.click(within(expectedCheckoutHeader).getByRole('button'));
 
     await waitFor(() => {
       const rows = screen.getAllByRole('row').slice(1);

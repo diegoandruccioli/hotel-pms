@@ -1,21 +1,22 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import type { ColumnDef, SortingState } from '@tanstack/react-table';
+import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import type { StayResponse, StayStatus } from '../types/stay.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
-import { M3Table } from '../components/m3/M3Table';
+import { M3DataTable } from '../components/m3/M3DataTable';
 import { M3LoadingState } from '../components/m3/M3LoadingState';
 import { M3ErrorState } from '../components/m3/M3ErrorState';
-import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
 import { M3Pagination } from '../components/m3/M3Pagination';
-import { M3Select } from '../components/m3/M3Select';
 import { M3TextField } from '../components/m3/M3TextField';
 import { useTranslation } from 'react-i18next';
 
-import { StayRow } from './Stays/StayRow';
 import { StayStatusChip } from './Stays/StayStatusChip';
+import { M3StatusChip } from '../components/m3/M3StatusChip';
+import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { getStatusTone } from './Stays/stayStatusTone';
 import { AlloggiatiReportSection } from './Stays/AlloggiatiReportSection';
 import { getErrorMessage } from '../utils/errorMessage';
@@ -28,6 +29,104 @@ import {
 
 type StaySortField = 'actualCheckInTime' | 'expectedCheckOutDate' | 'status';
 type SortDir = 'asc' | 'desc';
+
+const GuestCell = ({ stay, onGuestClick }: { stay: StayResponse; onGuestClick: (name: string) => void }) => {
+  const handleClick = useCallback(() => {
+    onGuestClick(stay.guestDisplayName ?? stay.guestId);
+  }, [onGuestClick, stay.guestDisplayName, stay.guestId]);
+
+  return (
+    <M3TableActionLink onClick={handleClick} className="truncate block max-w-[120px] text-left" title={stay.guestId}>
+      {stay.guestDisplayName ?? `${stay.guestId.substring(0, 8)}…`}
+    </M3TableActionLink>
+  );
+};
+
+interface AlloggiatiCellProps {
+  stay: StayResponse;
+  onRetryInvoice: (s: StayResponse) => void;
+  retryingInvoice: string | null;
+  onRetryCheckoutEmail: (s: StayResponse) => void;
+  retryingEmail: string | null;
+  t: TFunction;
+}
+
+const AlloggiatiCell = ({ stay, onRetryInvoice, retryingInvoice, onRetryCheckoutEmail, retryingEmail, t }: AlloggiatiCellProps) => {
+  const handleRetryInvoice = useCallback(() => onRetryInvoice(stay), [onRetryInvoice, stay]);
+  const handleRetryCheckoutEmail = useCallback(() => onRetryCheckoutEmail(stay), [onRetryCheckoutEmail, stay]);
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <span title={stay.alloggiatiSendFailed ? stay.alloggiatiFailureReason ?? undefined : undefined}>
+        <M3StatusChip
+          label={
+            stay.alloggiatiSent
+              ? t('alloggiati_sent')
+              : stay.alloggiatiSendFailed
+                ? t('alloggiati_failed')
+                : t('alloggiati_not_sent')
+          }
+          tone={stay.alloggiatiSent ? 'success' : stay.alloggiatiSendFailed ? 'error' : 'neutral'}
+        />
+      </span>
+      {stay.invoiceCreationFailed && (
+        <span className="inline-flex items-center gap-1" title={stay.invoiceCreationFailureReason ?? undefined}>
+          <M3StatusChip label={t('invoice_creation_failed')} tone="error" />
+          <button
+            type="button"
+            onClick={handleRetryInvoice}
+            disabled={retryingInvoice === stay.id}
+            aria-label={t('retry_invoice_creation')}
+            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+          >
+            <MaterialIcon name={retryingInvoice === stay.id ? 'progress_activity' : 'refresh'} size={16} />
+          </button>
+        </span>
+      )}
+      {stay.checkoutEmailFailed && (
+        <span className="inline-flex items-center gap-1" title={stay.checkoutEmailFailureReason ?? undefined}>
+          <M3StatusChip label={t('checkout_email_failed')} tone="error" />
+          <button
+            type="button"
+            onClick={handleRetryCheckoutEmail}
+            disabled={retryingEmail === stay.id}
+            aria-label={t('retry_checkout_email')}
+            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+          >
+            <MaterialIcon name={retryingEmail === stay.id ? 'progress_activity' : 'refresh'} size={16} />
+          </button>
+        </span>
+      )}
+    </div>
+  );
+};
+
+const ActionsCell = ({ stay, onCheckOut, checkingOut, t }: {
+  stay: StayResponse;
+  onCheckOut: (s: StayResponse) => void;
+  checkingOut: string | null;
+  t: TFunction;
+}) => {
+  const handleCheckOut = useCallback(() => onCheckOut(stay), [onCheckOut, stay]);
+
+  if (stay.status !== 'CHECKED_IN') return null;
+
+  return (
+    <div className="text-right">
+      <M3Button
+        variant="tonal"
+        icon={checkingOut === stay.id ? 'progress_activity' : 'logout'}
+        loading={checkingOut === stay.id}
+        disabled={checkingOut === stay.id}
+        onClick={handleCheckOut}
+        id={`checkout-btn-${stay.id}`}
+        className="text-xs h-10 px-3"
+      >
+        {t('action_checkout')}
+      </M3Button>
+    </div>
+  );
+};
 
 interface StaysNavState {
   statusFilter?: StayStatus | 'ALL';
@@ -65,12 +164,14 @@ export const Stays = memo(() => {
     setStatusFilter(s);
   }, []);
 
-  const handleSortFieldChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSortField(e.target.value as StaySortField);
-  }, []);
+  const sorting = useMemo<SortingState>(
+    () => [{ id: sortField, desc: sortDir === 'desc' }],
+    [sortField, sortDir],
+  );
 
-  const toggleSortDir = useCallback(() => {
-    setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+  const handleSortingChange = useCallback((next: SortingState) => {
+    setSortField(next[0].id as StaySortField);
+    setSortDir(next[0].desc ? 'desc' : 'asc');
   }, []);
 
   const { data: staysPage, isLoading: loading, error: queryError, refetch } = useStaysList(page);
@@ -144,28 +245,101 @@ export const Stays = memo(() => {
     [t],
   );
   
-  const sortOptions = useMemo(() => [
-    { value: 'actualCheckInTime', label: t('check_in') },
-    { value: 'expectedCheckOutDate', label: t('expected_checkout_col') },
-    { value: 'status', label: t('status') },
-  ], [t]);
-
   const formatDate = useCallback((dateStr?: string) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleString(i18n.language);
   }, [i18n.language]);
 
-  const headers = useMemo(() => [
-    t('room_id'),
-    t('guest_id'),
-    t('check_in'),
-    t('check_out'),
-    t('expected_checkout_col'),
-    t('guests'),
-    t('status'),
-    t('alloggiati_column'),
-    <span key="sr" className="sr-only">{t('actions')}</span>
-  ], [t]);
+  const getStayRowId = useCallback((s: StayResponse) => s.id, []);
+
+  const columns = useMemo<ColumnDef<StayResponse>[]>(() => [
+    {
+      id: 'roomId',
+      header: t('room_id'),
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="truncate block max-w-[120px] font-medium" title={row.original.roomId}>
+          {row.original.roomNumber ?? `${row.original.roomId.substring(0, 8)}…`}
+        </span>
+      ),
+    },
+    {
+      id: 'guestId',
+      header: t('guest_id'),
+      enableSorting: false,
+      cell: ({ row }) => <GuestCell stay={row.original} onGuestClick={handleGuestNavigate} />,
+    },
+    {
+      id: 'actualCheckInTime',
+      accessorKey: 'actualCheckInTime',
+      header: t('check_in'),
+      cell: ({ row }) => (
+        <span className="text-on-surface-variant">{formatDate(row.original.actualCheckInTime)}</span>
+      ),
+    },
+    {
+      id: 'actualCheckOutTime',
+      header: t('check_out'),
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="text-on-surface-variant">{formatDate(row.original.actualCheckOutTime)}</span>
+      ),
+    },
+    {
+      id: 'expectedCheckOutDate',
+      accessorKey: 'expectedCheckOutDate',
+      header: t('expected_checkout_col'),
+      cell: ({ row }) => (
+        <span className="text-on-surface-variant">{row.original.expectedCheckOutDate ?? '-'}</span>
+      ),
+    },
+    {
+      id: 'guests',
+      header: t('guests'),
+      enableSorting: false,
+      cell: ({ row }) => (
+        <div className="font-medium flex items-center gap-1.5 text-on-surface">
+          <MaterialIcon name="group" size={18} />
+          <span>{row.original.guests?.length || 0}</span>
+        </div>
+      ),
+    },
+    {
+      id: 'status',
+      accessorKey: 'status',
+      header: t('status'),
+      cell: ({ row }) => (
+        <M3StatusChip
+          label={t(`status_${row.original.status.toLowerCase()}`, row.original.status.replace('_', ' '))}
+          tone={getStatusTone(row.original.status)}
+        />
+      ),
+    },
+    {
+      id: 'alloggiati',
+      header: t('alloggiati_column'),
+      enableSorting: false,
+      cell: ({ row }) => (
+        <AlloggiatiCell
+          stay={row.original}
+          onRetryInvoice={handleRetryInvoice}
+          retryingInvoice={retryingInvoice}
+          onRetryCheckoutEmail={handleRetryCheckoutEmail}
+          retryingEmail={retryingEmail}
+          t={t}
+        />
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => <span className="sr-only">{t('actions')}</span>,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <ActionsCell stay={row.original} onCheckOut={handleCheckOut} checkingOut={checkingOut} t={t} />
+      ),
+    },
+  ], [t, formatDate, handleGuestNavigate, handleRetryInvoice, retryingInvoice, handleRetryCheckoutEmail,
+      retryingEmail, handleCheckOut, checkingOut]);
 
   return (
     <div className="space-y-6">
@@ -208,23 +382,6 @@ export const Stays = memo(() => {
             />
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <M3Select
-            label={t('sort_by')}
-            hideLabel
-            options={sortOptions}
-            value={sortField}
-            onChange={handleSortFieldChange}
-          />
-          <button
-            type="button"
-            onClick={toggleSortDir}
-            aria-label={sortDir === 'asc' ? t('sort_dir_asc') : t('sort_dir_desc')}
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full border border-outline text-on-surface-variant hover:bg-primary/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
-          >
-            <MaterialIcon name={sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'} size={20} />
-          </button>
-        </div>
       </div>
 
       {loading ? (
@@ -237,28 +394,14 @@ export const Stays = memo(() => {
           onRetry={handleRetry}
         />
       ) : (
-        <M3Table headers={headers}>
-          {filteredStays.length === 0 ? (
-            <M3TableEmptyRow colSpan={headers.length} message={t('no_active_stays')} />
-          ) : (
-            filteredStays.map((stay) => (
-              <StayRow
-                key={stay.id}
-                stay={stay}
-                onCheckOut={handleCheckOut}
-                checkingOut={checkingOut}
-                onRetryInvoice={handleRetryInvoice}
-                retryingInvoice={retryingInvoice}
-                onRetryCheckoutEmail={handleRetryCheckoutEmail}
-                retryingEmail={retryingEmail}
-                formatDate={formatDate}
-                getStatusTone={getStatusTone}
-                t={t}
-                onGuestClick={handleGuestNavigate}
-              />
-            ))
-          )}
-        </M3Table>
+        <M3DataTable
+          data={filteredStays}
+          columns={columns}
+          getRowId={getStayRowId}
+          sorting={sorting}
+          onSortingChange={handleSortingChange}
+          emptyMessage={t('no_active_stays')}
+        />
       )}
 
       {/* Pagination */}
