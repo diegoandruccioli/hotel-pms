@@ -1,6 +1,7 @@
 package com.hotelpms.billing.controller;
 
 import com.hotelpms.billing.dto.OwnerFinancialReportDto;
+import com.hotelpms.billing.dto.OwnerFinancialSummaryDto;
 import com.hotelpms.billing.exception.GlobalExceptionHandler;
 import com.hotelpms.billing.service.OwnerReportService;
 import org.junit.jupiter.api.AfterEach;
@@ -35,6 +36,9 @@ class OwnerReportControllerTest {
     private static final String BASE_URL = "/api/v1/reports/owner";
     private static final String PARAM_START = "startDate";
     private static final String PARAM_END = "endDate";
+    private static final String JSON_TOTAL_INVOICES = "$.totalInvoices";
+    private static final String SUMMARY_REVENUE = "1500.00";
+    private static final double SUMMARY_REVENUE_VALUE = 1500.00;
 
     @Mock
     private OwnerReportService ownerReportService;
@@ -68,7 +72,7 @@ class OwnerReportControllerTest {
         final OwnerFinancialReportDto report = new OwnerFinancialReportDto(
                 LocalDate.of(2026, 5, 1),
                 LocalDate.of(2026, 5, 31),
-                new BigDecimal("1500.00"),
+                new BigDecimal(SUMMARY_REVENUE),
                 10L,
                 8L,
                 List.of());
@@ -79,7 +83,7 @@ class OwnerReportControllerTest {
                         .param(PARAM_START, "2026-05-01")
                         .param(PARAM_END, "2026-05-31"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalInvoices").value(10))
+                .andExpect(jsonPath(JSON_TOTAL_INVOICES).value(10))
                 .andExpect(jsonPath("$.paidInvoices").value(8));
 
         verify(ownerReportService).getFinancialReport(eq(hotelId), any(LocalDate.class), any(LocalDate.class));
@@ -101,6 +105,28 @@ class OwnerReportControllerTest {
                         .param(PARAM_START, "2026-04-01")
                         .param(PARAM_END, "2026-04-30"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalInvoices").value(0));
+                .andExpect(jsonPath(JSON_TOTAL_INVOICES).value(0));
+    }
+
+    @Test
+    void shouldGetOwnerSummaryReturn200() throws Exception {
+        final OwnerFinancialSummaryDto summary = new OwnerFinancialSummaryDto(
+                LocalDate.of(2026, 5, 1),
+                LocalDate.of(2026, 5, 31),
+                new BigDecimal(SUMMARY_REVENUE),
+                10L,
+                8L);
+        when(ownerReportService.getFinancialSummary(eq(hotelId), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(summary);
+
+        mockMvc.perform(get(BASE_URL + "/summary")
+                        .param(PARAM_START, "2026-05-01")
+                        .param(PARAM_END, "2026-05-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_TOTAL_INVOICES).value(10))
+                .andExpect(jsonPath("$.paidInvoices").value(8))
+                .andExpect(jsonPath("$.totalRevenue").value(SUMMARY_REVENUE_VALUE));
+
+        verify(ownerReportService).getFinancialSummary(eq(hotelId), any(LocalDate.class), any(LocalDate.class));
     }
 }

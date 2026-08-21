@@ -4,8 +4,10 @@ import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.OwnerFinancialReportDto;
+import com.hotelpms.billing.dto.OwnerFinancialSummaryDto;
 import com.hotelpms.billing.mapper.InvoiceMapper;
 import com.hotelpms.billing.repository.InvoiceRepository;
+import com.hotelpms.billing.repository.OwnerFinancialSummaryAggregates;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +44,7 @@ class OwnerReportServiceImplTest {
         private static final int HOUR_12 = 12;
         private static final int HOUR_10 = 10;
         private static final int HOUR_9 = 9;
+        private static final String TOTAL_REVENUE = "870.50";
 
         @Mock
         private InvoiceRepository invoiceRepository;
@@ -111,7 +114,7 @@ class OwnerReportServiceImplTest {
                 assertNotNull(report);
                 assertEquals(3, report.totalInvoices(), "Total invoice count should be 3");
                 assertEquals(2, report.paidInvoices(), "Paid invoice count should be 2");
-                assertEquals(new BigDecimal("870.50"), report.totalRevenue(),
+                assertEquals(new BigDecimal(TOTAL_REVENUE), report.totalRevenue(),
                                 "Total revenue should be sum of all invoice amounts");
                 assertEquals(3, report.invoices().size(), "Invoice list should contain 3 entries");
                 assertEquals(startDate, report.startDate());
@@ -146,6 +149,41 @@ class OwnerReportServiceImplTest {
                 ownerReportService.getFinancialReport(hotelId, startDate, endDate);
 
                 verify(invoiceRepository).findByHotelIdAndIssueDateBetween(
+                                eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class));
+        }
+
+        @Test
+        void shouldReturnSummaryFromAggregatesWithoutLoadingInvoices() {
+                final OwnerFinancialSummaryAggregates aggregates = mock(OwnerFinancialSummaryAggregates.class);
+                when(aggregates.getTotalRevenue()).thenReturn(new BigDecimal(TOTAL_REVENUE));
+                when(aggregates.getTotalInvoices()).thenReturn(3L);
+                when(aggregates.getPaidInvoices()).thenReturn(2L);
+                when(invoiceRepository.getFinancialSummaryAggregatesByHotelId(
+                                eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class)))
+                                .thenReturn(aggregates);
+
+                final OwnerFinancialSummaryDto summary =
+                                ownerReportService.getFinancialSummary(hotelId, startDate, endDate);
+
+                assertNotNull(summary);
+                assertEquals(startDate, summary.startDate());
+                assertEquals(endDate, summary.endDate());
+                assertEquals(new BigDecimal(TOTAL_REVENUE), summary.totalRevenue());
+                assertEquals(3, summary.totalInvoices());
+                assertEquals(2, summary.paidInvoices());
+        }
+
+        @Test
+        void shouldScopeSummaryQueryToTheAuthenticatedHotelOnly() {
+                final OwnerFinancialSummaryAggregates aggregates = mock(OwnerFinancialSummaryAggregates.class);
+                when(aggregates.getTotalRevenue()).thenReturn(BigDecimal.ZERO);
+                when(invoiceRepository.getFinancialSummaryAggregatesByHotelId(
+                                eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class)))
+                                .thenReturn(aggregates);
+
+                ownerReportService.getFinancialSummary(hotelId, startDate, endDate);
+
+                verify(invoiceRepository).getFinancialSummaryAggregatesByHotelId(
                                 eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class));
         }
 }

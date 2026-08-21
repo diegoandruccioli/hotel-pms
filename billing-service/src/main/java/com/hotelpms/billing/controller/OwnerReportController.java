@@ -1,6 +1,7 @@
 package com.hotelpms.billing.controller;
 
 import com.hotelpms.billing.dto.OwnerFinancialReportDto;
+import com.hotelpms.billing.dto.OwnerFinancialSummaryDto;
 import com.hotelpms.billing.service.OwnerReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +51,28 @@ public class OwnerReportController {
         log.info("REST request for owner financial report | hotelId={} | from {} to {}", hotelId, startDate, endDate);
         final OwnerFinancialReportDto report = ownerReportService.getFinancialReport(hotelId, startDate, endDate);
         return ResponseEntity.ok(report);
+    }
+
+    /**
+     * Returns the same aggregated totals as {@link #getOwnerFinancialReport},
+     * without the per-invoice list, scoped to the caller's hotel (T-BILL-04).
+     * Backs the Dashboard's revenue widget, which only needs these numbers —
+     * not a full unpaginated invoice list. Access is restricted to users with
+     * the OWNER or ADMIN role.
+     *
+     * @param startDate the start of the period (inclusive), format YYYY-MM-DD
+     * @param endDate   the end of the period (inclusive), format YYYY-MM-DD
+     * @return the aggregated financial summary for the caller's hotel
+     */
+    @GetMapping("/owner/summary")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    public ResponseEntity<OwnerFinancialSummaryDto> getOwnerFinancialSummary(
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate startDate,
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate endDate) {
+        final UUID hotelId = Objects.requireNonNull(extractHotelId());
+        log.info("REST request for owner financial summary | hotelId={} | from {} to {}", hotelId, startDate, endDate);
+        final OwnerFinancialSummaryDto summary = ownerReportService.getFinancialSummary(hotelId, startDate, endDate);
+        return ResponseEntity.ok(summary);
     }
 
     private UUID extractHotelId() {

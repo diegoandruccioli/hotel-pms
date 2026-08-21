@@ -4,8 +4,10 @@ import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.OwnerFinancialReportDto;
+import com.hotelpms.billing.dto.OwnerFinancialSummaryDto;
 import com.hotelpms.billing.mapper.InvoiceMapper;
 import com.hotelpms.billing.repository.InvoiceRepository;
+import com.hotelpms.billing.repository.OwnerFinancialSummaryAggregates;
 import com.hotelpms.billing.service.OwnerReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,5 +61,22 @@ public class OwnerReportServiceImpl implements OwnerReportService {
 
                 return new OwnerFinancialReportDto(startDate, endDate, totalRevenue, totalInvoices, paidInvoices,
                                 invoiceResponses);
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        @Transactional(readOnly = true)
+        public OwnerFinancialSummaryDto getFinancialSummary(
+                        final UUID hotelId, final LocalDate startDate, final LocalDate endDate) {
+                log.info("Generating owner financial summary for hotelId={} from {} to {}", hotelId, startDate, endDate);
+
+                final LocalDateTime start = startDate.atStartOfDay();
+                final LocalDateTime end = endDate.plusDays(1).atStartOfDay();
+
+                final OwnerFinancialSummaryAggregates aggregates =
+                                invoiceRepository.getFinancialSummaryAggregatesByHotelId(hotelId, start, end);
+
+                return new OwnerFinancialSummaryDto(startDate, endDate, aggregates.getTotalRevenue(),
+                                aggregates.getTotalInvoices(), aggregates.getPaidInvoices());
         }
 }

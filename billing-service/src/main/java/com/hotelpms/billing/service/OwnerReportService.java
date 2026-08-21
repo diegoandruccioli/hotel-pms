@@ -1,6 +1,7 @@
 package com.hotelpms.billing.service;
 
 import com.hotelpms.billing.dto.OwnerFinancialReportDto;
+import com.hotelpms.billing.dto.OwnerFinancialSummaryDto;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -8,7 +9,6 @@ import java.util.UUID;
 /**
  * Service for generating financial reports for the Owner/Admin Dashboard.
  */
-@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface OwnerReportService {
 
     /**
@@ -21,4 +21,15 @@ public interface OwnerReportService {
      * @return aggregated report DTO
      */
     OwnerFinancialReportDto getFinancialReport(UUID hotelId, LocalDate startDate, LocalDate endDate);
+
+    /**
+     * Returns the same totals as {@link #getFinancialReport}, without the
+     * per-invoice list, computed entirely in SQL.
+     *
+     * @param hotelId   the authenticated hotel UUID; only this hotel's invoices are included
+     * @param startDate the first day of the reporting period (inclusive)
+     * @param endDate   the last day of the reporting period (inclusive)
+     * @return the aggregated totals
+     */
+    OwnerFinancialSummaryDto getFinancialSummary(UUID hotelId, LocalDate startDate, LocalDate endDate);
 }

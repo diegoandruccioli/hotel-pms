@@ -74,6 +74,26 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     List<Invoice> findByHotelIdAndIssueDateBetween(UUID hotelId, LocalDateTime start, LocalDateTime end);
 
     /**
+     * Computes the same three totals as {@link #findByHotelIdAndIssueDateBetween}
+     * feeds into {@code OwnerFinancialReportDto} (revenue, invoice count, paid
+     * count), entirely in SQL — no {@code Invoice} entity is loaded. Backs the
+     * Dashboard's revenue summary, which only ever needed these numbers, not the
+     * full unpaginated invoice list the {@code /reports/owner} endpoint returns.
+     *
+     * @param hotelId the hotel UUID from the authenticated request (T-BILL-04)
+     * @param start   beginning of the time window (inclusive)
+     * @param end     end of the time window (exclusive)
+     * @return the aggregated totals for that hotel and window
+     */
+    @Query("SELECT COALESCE(SUM(i.totalAmount), 0) AS totalRevenue, "
+            + "COUNT(i) AS totalInvoices, "
+            + "COALESCE(SUM(CASE WHEN i.status = com.hotelpms.billing.domain.InvoiceStatus.PAID THEN 1L ELSE 0L END), 0) "
+            + "AS paidInvoices "
+            + "FROM Invoice i WHERE i.hotelId = :hotelId AND i.issueDate BETWEEN :start AND :end")
+    OwnerFinancialSummaryAggregates getFinancialSummaryAggregatesByHotelId(
+            @Param("hotelId") UUID hotelId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    /**
      * Finds the active invoice for a stay, scoped to a hotel (IDOR-safe lookup).
      * Returns empty if no invoice exists for the given stay and hotel combination.
      * Used to detect duplicates before creating and to look up the invoice for charge additions.
