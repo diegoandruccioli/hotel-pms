@@ -1,15 +1,14 @@
 import { useState, useCallback, memo, useMemo } from 'react';
+import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { MenuItemResponse, RestaurantOrderResponse, OrderStatus } from '../types/fb.types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
-import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
+import { M3DataTable } from '../components/m3/M3DataTable';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { M3Card } from '../components/m3/M3Card';
 import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { M3LoadingState } from '../components/m3/M3LoadingState';
 import { M3ErrorState } from '../components/m3/M3ErrorState';
-import { M3TableEmptyRow } from '../components/m3/M3EmptyState';
-import { M3Select } from '../components/m3/M3Select';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store/authStore';
@@ -28,52 +27,48 @@ const EMPTY_MENU_ITEMS: MenuItemResponse[] = [];
 
 type OrderSortField = 'orderDate' | 'roomNumber' | 'guestDisplayName';
 type SortDir = 'asc' | 'desc';
+const DEFAULT_ORDER_SORT_FIELD: OrderSortField = 'orderDate';
+const DEFAULT_ORDER_SORT_DIR: SortDir = 'desc';
+const DEFAULT_MENU_SORT_FIELD = 'name';
+const DEFAULT_MENU_SORT_DIR: SortDir = 'asc';
 
-interface MenuItemRowProps {
+interface MenuActionsCellProps {
   mi: MenuItemResponse;
   deletingMenuId: string | null;
   onEdit: (mi: MenuItemResponse) => void;
   onDelete: (mi: MenuItemResponse) => void;
-  formatCurrencyFn: (price: number) => string;
   tLabel: (key: string) => string;
   tCommon: (key: string) => string;
 }
 
-const MenuItemRow = memo(({
-  mi, deletingMenuId, onEdit, onDelete, formatCurrencyFn, tLabel, tCommon,
-}: MenuItemRowProps) => {
+const MenuActionsCell = ({ mi, deletingMenuId, onEdit, onDelete, tLabel, tCommon }: MenuActionsCellProps) => {
   const handleEdit = useCallback(() => onEdit(mi), [onEdit, mi]);
   const handleDelete = useCallback(() => onDelete(mi), [onDelete, mi]);
   return (
-    <M3TableRow>
-      <M3TableCell className="font-medium">{mi.name}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{mi.category}</M3TableCell>
-      <M3TableCell className="text-right">{formatCurrencyFn(mi.price)}</M3TableCell>
-      <M3TableCell className="text-center">
-        <M3StatusChip
-          label={mi.available ? tLabel('menu_available_yes') : tLabel('menu_available_no')}
-          tone={mi.available ? 'success' : 'neutral'}
-        />
-      </M3TableCell>
-      <M3TableCell className="text-right">
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={handleEdit}
-            className="text-primary hover:text-primary/80 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary rounded"
-            aria-label={`${tLabel('menu_edit_item')} ${mi.name}`}>
-            {tCommon('edit')}
-          </button>
-          <button type="button" onClick={handleDelete}
-            disabled={deletingMenuId === mi.id}
-            className="text-error hover:text-error/80 text-xs font-medium disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-error rounded"
-            aria-label={`${tLabel('menu_delete_item')} ${mi.name}`}>
-            {tCommon('delete')}
-          </button>
-        </div>
-      </M3TableCell>
-    </M3TableRow>
+    <div className="flex justify-end gap-2">
+      <button type="button" onClick={handleEdit}
+        className="text-primary hover:text-primary/80 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary rounded"
+        aria-label={`${tLabel('menu_edit_item')} ${mi.name}`}>
+        {tCommon('edit')}
+      </button>
+      <button type="button" onClick={handleDelete}
+        disabled={deletingMenuId === mi.id}
+        className="text-error hover:text-error/80 text-xs font-medium disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-error rounded"
+        aria-label={`${tLabel('menu_delete_item')} ${mi.name}`}>
+        {tCommon('delete')}
+      </button>
+    </div>
   );
-});
-MenuItemRow.displayName = 'MenuItemRow';
+};
+
+function compareMenuItems(a: MenuItemResponse, b: MenuItemResponse, field: string): number {
+  switch (field) {
+    case 'category': return a.category.localeCompare(b.category);
+    case 'price': return a.price - b.price;
+    case 'available': return Number(a.available) - Number(b.available);
+    default: return a.name.localeCompare(b.name);
+  }
+}
 
 const getStatusTone = (status: OrderStatus | string) => {
   switch (status) {
@@ -88,53 +83,40 @@ const getStatusTone = (status: OrderStatus | string) => {
   }
 };
 
-interface OrderRowProps {
+interface OrderActionsCellProps {
   order: RestaurantOrderResponse;
   confirmingId: string | null;
   onConfirm: (id: string) => void;
   onView: (order: RestaurantOrderResponse) => void;
-  formatCurrency: (amount: number) => string;
-  formatDate: (dateStr?: string) => string;
   t: TFunction<'common'>;
 }
 
-const OrderRow = memo(({ order, confirmingId, onConfirm, onView, formatCurrency, formatDate, t }: OrderRowProps) => {
+const OrderActionsCell = ({ order, confirmingId, onConfirm, onView, t }: OrderActionsCellProps) => {
   const isConfirmable = CONFIRMABLE_STATUSES.has(order.status);
   const isConfirming = confirmingId === order.id;
   const handleConfirmClick = useCallback(() => onConfirm(order.id), [onConfirm, order.id]);
   const handleViewClick = useCallback(() => onView(order), [onView, order]);
 
   return (
-    <M3TableRow key={order.id}>
-      <M3TableCell className="font-medium">{order.roomNumber ?? '—'}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{order.guestDisplayName ?? '—'}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{formatDate(order.orderDate)}</M3TableCell>
-      <M3TableCell className="font-medium">{formatCurrency(order.totalAmount)}</M3TableCell>
-      <M3TableCell>
-        <M3StatusChip label={t(`order_status_${order.status}`, order.status.replace(/_/g, ' '))} tone={getStatusTone(order.status)} />
-      </M3TableCell>
-      <M3TableCell className="text-right">
-        <div className="flex justify-end gap-2">
-          {isConfirmable && (
-            <M3TableActionLink
-              onClick={handleConfirmClick}
-              disabled={isConfirming}
-              aria-label={`${t('confirm_order')} ${order.id}`}
-              className="flex items-center gap-1"
-            >
-              {isConfirming
-                ? <MaterialIcon name="progress_activity" size={14} className="animate-spin" aria-hidden="true" />
-                : t('confirm')}
-            </M3TableActionLink>
-          )}
-          <M3TableActionLink onClick={handleViewClick} aria-label={`${t('view')} ${order.id}`}>
-            {t('view')}
-          </M3TableActionLink>
-        </div>
-      </M3TableCell>
-    </M3TableRow>
+    <div className="flex justify-end gap-2">
+      {isConfirmable && (
+        <M3TableActionLink
+          onClick={handleConfirmClick}
+          disabled={isConfirming}
+          aria-label={`${t('confirm_order')} ${order.id}`}
+          className="flex items-center gap-1"
+        >
+          {isConfirming
+            ? <MaterialIcon name="progress_activity" size={14} className="animate-spin" aria-hidden="true" />
+            : t('confirm')}
+        </M3TableActionLink>
+      )}
+      <M3TableActionLink onClick={handleViewClick} aria-label={`${t('view')} ${order.id}`}>
+        {t('view')}
+      </M3TableActionLink>
+    </div>
   );
-});
+};
 
 export const Restaurant = memo(() => {
   const { t, i18n } = useTranslation('common');
@@ -150,8 +132,10 @@ export const Restaurant = memo(() => {
   const [menuFormTarget, setMenuFormTarget] = useState<MenuItemResponse | 'new' | null>(null);
   const [deletingMenuId, setDeletingMenuId] = useState<string | null>(null);
 
-  const [sortField, setSortField] = useState<OrderSortField>('orderDate');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [sortField, setSortField] = useState<OrderSortField>(DEFAULT_ORDER_SORT_FIELD);
+  const [sortDir, setSortDir] = useState<SortDir>(DEFAULT_ORDER_SORT_DIR);
+  const [menuSortField, setMenuSortField] = useState(DEFAULT_MENU_SORT_FIELD);
+  const [menuSortDir, setMenuSortDir] = useState<SortDir>(DEFAULT_MENU_SORT_DIR);
 
   const { data: ordersData, isLoading: loading, error: queryError, refetch } = useOrders();
   const orders = ordersData ?? EMPTY_ORDERS;
@@ -202,12 +186,14 @@ export const Restaurant = memo(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.fbOrders.all });
   }, [queryClient]);
 
-  const handleSortFieldChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSortField(e.target.value as OrderSortField);
-  }, []);
+  const orderSorting = useMemo<SortingState>(
+    () => [{ id: sortField, desc: sortDir === 'desc' }],
+    [sortField, sortDir],
+  );
 
-  const toggleSortDir = useCallback(() => {
-    setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+  const handleOrderSortingChange = useCallback((next: SortingState) => {
+    setSortField(next[0].id as OrderSortField);
+    setSortDir(next[0].desc ? 'desc' : 'asc');
   }, []);
 
   const sortedOrders = useMemo(() => {
@@ -217,6 +203,21 @@ export const Restaurant = memo(() => {
     });
     return sorted;
   }, [orders, sortField, sortDir]);
+
+  const menuSorting = useMemo<SortingState>(
+    () => [{ id: menuSortField, desc: menuSortDir === 'desc' }],
+    [menuSortField, menuSortDir],
+  );
+
+  const handleMenuSortingChange = useCallback((next: SortingState) => {
+    setMenuSortField(next[0].id);
+    setMenuSortDir(next[0].desc ? 'desc' : 'asc');
+  }, []);
+
+  const sortedMenuItems = useMemo(() => {
+    const sign = menuSortDir === 'desc' ? -1 : 1;
+    return [...menuItems].sort((a, b) => sign * compareMenuItems(a, b, menuSortField));
+  }, [menuItems, menuSortField, menuSortDir]);
 
   const handleOpenOrderModal = useCallback(() => setIsOrderModalOpen(true), []);
   const handleCloseOrderModal = useCallback(() => setIsOrderModalOpen(false), []);
@@ -232,28 +233,104 @@ export const Restaurant = memo(() => {
     return new Date(dateStr).toLocaleString(i18n.language);
   }, [i18n.language]);
 
-  const tableHeaders = useMemo(() => [
-    t('room_label'),
-    t('guest_name'),
-    t('date'),
-    t('total_amount'),
-    t('status'),
-    <span key="sr" className="sr-only">{t('actions')}</span>
-  ], [t]);
+  const getOrderRowId = useCallback((o: RestaurantOrderResponse) => o.id, []);
 
-  const sortOptions = useMemo(() => [
-    { value: 'orderDate', label: t('date') },
-    { value: 'roomNumber', label: t('room_label') },
-    { value: 'guestDisplayName', label: t('guest_name') },
-  ], [t]);
+  const orderColumns = useMemo<ColumnDef<RestaurantOrderResponse>[]>(() => [
+    {
+      id: 'roomNumber',
+      accessorKey: 'roomNumber',
+      header: t('room_label'),
+      cell: ({ row }) => <span className="font-medium">{row.original.roomNumber ?? '—'}</span>,
+    },
+    {
+      id: 'guestDisplayName',
+      accessorKey: 'guestDisplayName',
+      header: t('guest_name'),
+      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.guestDisplayName ?? '—'}</span>,
+    },
+    {
+      id: 'orderDate',
+      accessorKey: 'orderDate',
+      header: t('date'),
+      cell: ({ row }) => <span className="text-on-surface-variant">{formatDate(row.original.orderDate)}</span>,
+    },
+    {
+      id: 'totalAmount',
+      header: t('total_amount'),
+      enableSorting: false,
+      cell: ({ row }) => <span className="font-medium">{formatCurrency(row.original.totalAmount)}</span>,
+    },
+    {
+      id: 'status',
+      header: t('status'),
+      enableSorting: false,
+      cell: ({ row }) => (
+        <M3StatusChip
+          label={t(`order_status_${row.original.status}`, row.original.status.replace(/_/g, ' '))}
+          tone={getStatusTone(row.original.status)}
+        />
+      ),
+    },
+    {
+      id: 'actions',
+      header: () => <span className="sr-only">{t('actions')}</span>,
+      enableSorting: false,
+      cell: ({ row }) => (
+        <OrderActionsCell order={row.original} confirmingId={confirmingId} onConfirm={handleConfirm} onView={handleViewOrder} t={t} />
+      ),
+    },
+  ], [t, formatDate, formatCurrency, confirmingId, handleConfirm, handleViewOrder]);
 
-  const menuHeaders = useMemo(() => [
-    tMenu('menu_name'),
-    tMenu('menu_category'),
-    tMenu('menu_price'),
-    tMenu('menu_available'),
-    t('actions'),
-  ], [t, tMenu]);
+  const getMenuItemRowId = useCallback((mi: MenuItemResponse) => mi.id, []);
+
+  const menuColumns = useMemo<ColumnDef<MenuItemResponse>[]>(() => [
+    {
+      id: 'name',
+      accessorKey: 'name',
+      header: tMenu('menu_name'),
+      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    },
+    {
+      id: 'category',
+      accessorKey: 'category',
+      header: tMenu('menu_category'),
+      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.category}</span>,
+    },
+    {
+      id: 'price',
+      accessorKey: 'price',
+      header: tMenu('menu_price'),
+      cell: ({ row }) => <span className="text-right block">{formatCurrency(row.original.price)}</span>,
+    },
+    {
+      id: 'available',
+      accessorKey: 'available',
+      header: tMenu('menu_available'),
+      cell: ({ row }) => (
+        <div className="text-center">
+          <M3StatusChip
+            label={row.original.available ? tMenu('menu_available_yes') : tMenu('menu_available_no')}
+            tone={row.original.available ? 'success' : 'neutral'}
+          />
+        </div>
+      ),
+    },
+    {
+      id: 'actions',
+      header: t('actions'),
+      enableSorting: false,
+      cell: ({ row }) => (
+        <MenuActionsCell
+          mi={row.original}
+          deletingMenuId={deletingMenuId}
+          onEdit={handleMenuEdit}
+          onDelete={handleDeleteMenuItem}
+          tLabel={tMenu}
+          tCommon={t}
+        />
+      ),
+    },
+  ], [t, tMenu, formatCurrency, deletingMenuId, handleMenuEdit, handleDeleteMenuItem]);
 
   return (
     <div className="space-y-6">
@@ -266,23 +343,6 @@ export const Restaurant = memo(() => {
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('restaurant_subtitle')}</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <M3Select
-              label={t('sort_by')}
-              hideLabel
-              options={sortOptions}
-              value={sortField}
-              onChange={handleSortFieldChange}
-            />
-            <button
-              type="button"
-              onClick={toggleSortDir}
-              aria-label={sortDir === 'asc' ? t('sort_dir_asc') : t('sort_dir_desc')}
-              className="flex items-center justify-center w-10 h-10 rounded-shape-full border border-outline text-on-surface-variant hover:bg-primary/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
-            >
-              <MaterialIcon name={sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'} size={20} />
-            </button>
-          </div>
           <M3Button icon="add" onClick={handleOpenOrderModal}>{t('new_order')}</M3Button>
         </div>
       </div>
@@ -297,24 +357,14 @@ export const Restaurant = memo(() => {
           onRetry={handleRetry}
         />
       ) : (
-        <M3Table headers={tableHeaders}>
-          {sortedOrders.length === 0 ? (
-            <M3TableEmptyRow colSpan={tableHeaders.length} message={t('no_orders')} />
-          ) : (
-            sortedOrders.map((order) => (
-              <OrderRow
-                key={order.id}
-                order={order}
-                confirmingId={confirmingId}
-                onConfirm={handleConfirm}
-                onView={handleViewOrder}
-                formatCurrency={formatCurrency}
-                formatDate={formatDate}
-                t={t}
-              />
-            ))
-          )}
-        </M3Table>
+        <M3DataTable
+          data={sortedOrders}
+          columns={orderColumns}
+          getRowId={getOrderRowId}
+          sorting={orderSorting}
+          onSortingChange={handleOrderSortingChange}
+          emptyMessage={t('no_orders')}
+        />
       )}
 
       {isAdminOrOwner && (
@@ -331,20 +381,14 @@ export const Restaurant = memo(() => {
           {menuItems.length === 0 ? (
             <p className="text-sm text-on-surface-variant text-center py-4">{tMenu('menu_no_items')}</p>
           ) : (
-            <M3Table headers={menuHeaders}>
-              {menuItems.map((mi) => (
-                <MenuItemRow
-                  key={mi.id}
-                  mi={mi}
-                  deletingMenuId={deletingMenuId}
-                  onEdit={handleMenuEdit}
-                  onDelete={handleDeleteMenuItem}
-                  formatCurrencyFn={formatCurrency}
-                  tLabel={tMenu}
-                  tCommon={t}
-                />
-              ))}
-            </M3Table>
+            <M3DataTable
+              data={sortedMenuItems}
+              columns={menuColumns}
+              getRowId={getMenuItemRowId}
+              sorting={menuSorting}
+              onSortingChange={handleMenuSortingChange}
+              emptyMessage={tMenu('menu_no_items')}
+            />
           )}
         </M3Card>
       )}

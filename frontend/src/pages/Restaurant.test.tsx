@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { renderWithQuery as render } from '../test-utils/renderWithQuery';
 import { Restaurant } from './Restaurant';
@@ -269,7 +269,7 @@ describe('Restaurant', () => {
     expect(rows[1]).toHaveTextContent('Old Guest');
   });
 
-  it('re-sorts by room number when the sort field is changed', async () => {
+  it('sorts by room number ascending when the room column header is clicked', async () => {
     vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([
       { ...PENDING_ORDER, id: 'order-101', roomNumber: '101', guestDisplayName: 'Room Low' },
       { ...PENDING_ORDER, id: 'order-205', roomNumber: '205', guestDisplayName: 'Room High' },
@@ -277,22 +277,27 @@ describe('Restaurant', () => {
     render(<Restaurant />);
 
     await waitFor(() => expect(screen.getByText('Room Low')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText('sort_by'), { target: { value: 'roomNumber' } });
+    // Column starts inactive — first click selects it ascending.
+    const roomHeader = screen.getByRole('columnheader', { name: /room_label/i });
+    fireEvent.click(within(roomHeader).getByRole('button'));
 
     const rows = screen.getAllByText(/^Room /);
-    expect(rows[0]).toHaveTextContent('Room High');
-    expect(rows[1]).toHaveTextContent('Room Low');
+    expect(rows[0]).toHaveTextContent('Room Low');
+    expect(rows[1]).toHaveTextContent('Room High');
   });
 
-  it('reverses sort order when the direction toggle is clicked', async () => {
+  it('reverses sort order when the already-active date column header is clicked again', async () => {
     vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([
       { ...PENDING_ORDER, id: 'order-old', roomNumber: '101', guestDisplayName: 'Old Guest', orderDate: '2026-01-01T10:00:00' },
       { ...PENDING_ORDER, id: 'order-new', roomNumber: '205', guestDisplayName: 'New Guest', orderDate: '2026-06-01T10:00:00' },
     ]);
     render(<Restaurant />);
 
+    // Default sort is orderDate desc (newest first) — clicking its already-active
+    // header toggles direction rather than selecting a new column.
     await waitFor(() => expect(screen.getByText('New Guest')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: 'sort_dir_desc' }));
+    const dateHeader = screen.getByRole('columnheader', { name: /^date$/i });
+    fireEvent.click(within(dateHeader).getByRole('button'));
 
     const rows = screen.getAllByText(/Guest$/);
     expect(rows[0]).toHaveTextContent('Old Guest');
