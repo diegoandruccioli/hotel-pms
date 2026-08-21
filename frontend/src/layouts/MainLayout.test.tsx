@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { MainLayout } from './MainLayout';
 import { useAuthStore } from '../store/authStore';
+import { renderWithQuery } from '../test-utils/renderWithQuery';
 import type { UserPayload } from '../types/auth.types';
 
 vi.mock('react-i18next', () => ({
@@ -37,7 +38,7 @@ const mockAuthStore = (user: UserPayload | null, logout = vi.fn()) => {
 };
 
 const renderLayout = () =>
-  render(
+  renderWithQuery(
     <MemoryRouter initialEntries={ROOT_ENTRY}>
       <Routes>
         <Route element={<MainLayout />}>
@@ -122,7 +123,7 @@ describe('MainLayout', () => {
   it('logs out and navigates to /login via the user menu', async () => {
     const logout = vi.fn();
     mockAuthStore(RECEPTIONIST, logout);
-    render(
+    renderWithQuery(
       <MemoryRouter initialEntries={ROOT_ENTRY}>
         <Routes>
           <Route element={<MainLayout />}>

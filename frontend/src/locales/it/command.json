@@ -1,0 +1,16 @@
+{
+  "palette_label": "Palette comandi",
+  "palette_placeholder": "Digita un comando o cerca…",
+  "palette_empty": "Nessun risultato trovato.",
+  "palette_group_navigate": "Vai a",
+  "palette_group_actions": "Azioni rapide",
+  "palette_group_guests": "Ospiti",
+  "palette_group_reservations": "Prenotazioni",
+  "palette_action_new_reservation": "Nuova prenotazione",
+  "palette_action_new_walkin": "Check-in walk-in",
+  "palette_hint_navigate": "per navigare",
+  "palette_hint_select": "per selezionare",
+  "palette_hint_close": "per chiudere",
+  "palette_open_button": "Apri palette comandi",
+  "palette_reservation_result": "{{guest}} — {{checkIn}}"
+}

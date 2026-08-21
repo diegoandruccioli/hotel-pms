@@ -5,6 +5,17 @@ import { expect } from 'vitest';
 
 expect.extend(matchers);
 
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+window.ResizeObserver = window.ResizeObserver ?? ResizeObserverStub;
+
+// jsdom doesn't implement scrollIntoView; cmdk calls it to keep the
+// highlighted item in view as arrow keys move selection.
+Element.prototype.scrollIntoView = Element.prototype.scrollIntoView ?? (() => {});
+
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: (query: string) => ({

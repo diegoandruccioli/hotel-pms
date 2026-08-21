@@ -47,6 +47,10 @@ export const queryKeys = {
   dashboard: {
     daySheet: (date: string) => ['dashboard', 'day-sheet', date] as const,
   },
+  commandPalette: {
+    guests: (query: string) => ['command-palette', 'guests', query] as const,
+    reservations: (query: string) => ['command-palette', 'reservations', query] as const,
+  },
   ownerReport: {
     summary: (startDate: string, endDate: string) =>
       ['owner-report', 'summary', startDate, endDate] as const,

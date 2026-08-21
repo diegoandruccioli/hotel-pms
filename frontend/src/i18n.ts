@@ -17,6 +17,7 @@ import restaurantEn from './locales/en/restaurant.json';
 import housekeepingEn from './locales/en/housekeeping.json';
 import dashboardEn from './locales/en/dashboard.json';
 import adminEn from './locales/en/admin.json';
+import commandEn from './locales/en/command.json';
 
 import commonIt from './locales/it/common.json';
 import authIt from './locales/it/auth.json';
@@ -33,6 +34,7 @@ import restaurantIt from './locales/it/restaurant.json';
 import housekeepingIt from './locales/it/housekeeping.json';
 import dashboardIt from './locales/it/dashboard.json';
 import adminIt from './locales/it/admin.json';
+import commandIt from './locales/it/command.json';
 
 const resources = {
   en: {
@@ -51,6 +53,7 @@ const resources = {
     housekeeping: housekeepingEn,
     dashboard: dashboardEn,
     admin: adminEn,
+    command: commandEn,
   },
   it: {
     common: commonIt,
@@ -68,6 +71,7 @@ const resources = {
     housekeeping: housekeepingIt,
     dashboard: dashboardIt,
     admin: adminIt,
+    command: commandIt,
   },
 };
 

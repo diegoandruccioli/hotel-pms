@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, useEffect, memo } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { ToastContainer } from '../components/Toast';
@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { UserMenu } from '../components/UserMenu';
 import { RouteAnnouncer } from '../components/RouteAnnouncer';
+import { CommandPalette } from '../components/CommandPalette';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import * as FocusTrapModule from 'focus-trap-react';
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
@@ -119,11 +120,13 @@ DrawerNavItem.displayName = 'DrawerNavItem';
 
 export const MainLayout = () => {
   const { t } = useTranslation('common');
+  const { t: tCommand } = useTranslation('command');
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
   const [drawerOpen, setDrawerOpen]     = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen]   = useState(false);
 
   const handleLogout   = useCallback(() => { logout(); navigate('/login'); }, [logout, navigate]);
   const openDrawer     = useCallback(() => setDrawerOpen(true), []);
@@ -131,8 +134,21 @@ export const MainLayout = () => {
   const toggleUserMenu = useCallback(() => setUserMenuOpen((v) => !v), []);
   const closeUserMenu  = useCallback(() => setUserMenuOpen(false), []);
   const openSettings   = useCallback(() => navigate('/settings'), [navigate]);
+  const openPalette    = useCallback(() => setPaletteOpen(true), []);
+  const closePalette   = useCallback(() => setPaletteOpen(false), []);
 
   useEscapeKey(drawerOpen, closeDrawer);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const isOwnerOrAdmin = user?.role === 'OWNER' || user?.role === 'ADMIN';
   const username       = user?.username ?? t('guest');
@@ -244,6 +260,19 @@ export const MainLayout = () => {
 
           <div className="flex-1" />
 
+          {/* Command palette trigger */}
+          <button
+            type="button"
+            onClick={openPalette}
+            aria-label={tCommand('palette_open_button')}
+            className="flex items-center gap-2 h-10 px-3 mr-2 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            <MaterialIcon name="search" size={20} />
+            <kbd className="hidden sm:inline text-xs rounded border border-outline-variant px-1.5 py-0.5">
+              {navigator.platform.toUpperCase().includes('MAC') ? '⌘K' : 'Ctrl K'}
+            </kbd>
+          </button>
+
           {/* Username + role (desktop only) */}
           <div className="hidden sm:flex flex-col items-end mr-2">
             <span className="text-sm font-medium font-body text-on-surface">{username}</span>
@@ -274,6 +303,8 @@ export const MainLayout = () => {
 
       {/* Global Toast Notifications */}
       <ToastContainer />
+
+      <CommandPalette open={paletteOpen} onClose={closePalette} />
     </div>
   );
 };
