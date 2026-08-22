@@ -3,10 +3,13 @@ package com.hotelpms.frontdesk.stays.service.impl;
 import com.hotelpms.frontdesk.citytax.domain.CityTaxAssessment;
 import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
 import com.hotelpms.frontdesk.client.BillingClient;
+import com.hotelpms.frontdesk.client.GatewayEventsClient;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.ChargeRequest;
 import com.hotelpms.frontdesk.client.dto.ChargeResponse;
+import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest;
+import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest.GatewayEventType;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
@@ -138,6 +141,9 @@ class StayServiceImplTest {
     @Mock
     private CityTaxAssessmentService cityTaxAssessmentService;
 
+    @Mock
+    private GatewayEventsClient gatewayEventsClient;
+
     // Not mocked: StayServiceImpl now delegates to these collaborators instead of
     // doing the work inline (P10 SRP refactor). Building them for real out of the
     // same 9 leaf mocks above — rather than mocking the collaborators themselves —
@@ -218,7 +224,8 @@ class StayServiceImplTest {
                 new StayAlloggiatiCoordinator(alloggiatiWebSenderService, hotelSettingsService, stayRepository),
                 new StayNotificationCoordinator(
                         notificationClient, guestClient, billingClient, hotelSettingsService, stayRepository),
-                new StayReservationSync(reservationService, stayRepository));
+                new StayReservationSync(reservationService, stayRepository),
+                gatewayEventsClient);
     }
 
     private ReservationResponse reservationResponse(
@@ -267,6 +274,8 @@ class StayServiceImplTest {
         verify(stayRepository, times(1)).save(Objects.requireNonNull(unmappedStay));
         assertEquals(StayStatus.CHECKED_IN, unmappedStay.getStatus());
         assertNotNull(unmappedStay.getActualCheckInTime());
+        verify(gatewayEventsClient, times(1))
+                .notify(new GatewayEventNotifyRequest(GatewayEventType.CHECK_IN));
     }
 
     @Test
@@ -600,6 +609,8 @@ class StayServiceImplTest {
         verify(reservationService, times(1))
                 .updateStatusAndGuests(reservationId, ReservationStatus.CHECKED_OUT, null);
         verify(notificationClient, times(1)).sendCheckout(ArgumentMatchers.any());
+        verify(gatewayEventsClient, times(1))
+                .notify(new GatewayEventNotifyRequest(GatewayEventType.CHECK_OUT));
     }
 
     @Test

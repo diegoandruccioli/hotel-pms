@@ -2,7 +2,7 @@
 
 **Metodologia**: STRIDE (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege)  
 **Branch di riferimento**: `feature/secure-coding-hardening`  
-**Data ultima revisione**: 2026-08-16  
+**Data ultima revisione**: 2026-08-22  
 **Autore**: Diego Andruccioli
 
 ---
@@ -97,6 +97,8 @@
 | T-GW-08 | Spoofing | HMAC interno (X-Internal-Signature) firma solo username:role:hotelId, senza timestamp/nonce: un set di header catturato (es. accesso alla rete Docker interna) resta una credenziale valida indefinitamente — nessuna protezione anti-replay | ALTO | BASSA | ✅ RISOLTO |
 | T-GW-09 | Elevation of Privilege | Il endpoint di scrittura amministrativa POST /api/v1/rate-calendar/bulk-apply (introdotto nella stessa feature) mancava della seconda barriera di difesa a livello gateway (WRITE_RESTRICTED_PREFIXES) che la sua risorsa gemella /api/v1/room-types già ha — non exploitable da solo (RateCalendarController già applica @PreAuthorize hasAnyRole ADMIN/OWNER a livello servizio), ma rompeva il pattern a due livelli usato per ogni altra risorsa admin-only | BASSO | BASSA | ✅ RISOLTO |
 | T-GW-10 | Denial of Service | `RateLimiterConfig` si fidava del valore leftmost dell'header client-supplied `X-Forwarded-For` per il bucketing del rate limit — un attaccante poteva ruotare valori XFF falsificati per ottenere bucket illimitati e bypassare completamente il rate limiting sul login e su ogni altra rotta. Rilevato dall'audit a 10 agenti | ALTO | ALTA | ✅ RISOLTO — la fonte spoofabile resta rimossa (mai X-Forwarded-For); GAP-17 chiude anche il trust boundary nginx→gateway che l'aveva vanificata |
+| T-GW-11 | Elevation of Privilege | **Trovato in security review prima del merge, non solo modellato**: il nuovo endpoint SSE `GET /api/v1/events/stream` (sincronizzazione realtime stato camere) era raggiunto tramite una route self-referenziale (`uri: forward:/api/v1/events/stream`) che mappava `EventStreamController` sulla **stessa** path pubblica su cui la route matcha. `DispatcherHandler` interroga i bean `HandlerMapping` in ordine crescente: `RequestMappingHandlerMapping` di WebFlux (order 0, risolve `@GetMapping`) viene consultato *prima* di `RoutePredicateHandlerMapping` di Gateway (order 1) — un client che chiamava direttamente `GET /api/v1/events/stream` veniva risolto dal primo, mai dal secondo, saltando per intero la catena di filtri della route: `AuthenticationFilter` non veniva mai eseguito. Un chiamante non autenticato (nessun cookie JWT) poteva inviare un header `X-Auth-Hotel` arbitrario e ricevere lo stream realtime di un hotel qualunque — bypass completo di autenticazione più IDOR cross-tenant sul canale, non solo un rischio residuo | CRITICO | ALTA | ✅ RISOLTO — separazione strutturale dei due path: `EventStreamController` ora mappato su `/local/events/stream` (path interno, mai esposto), la route pubblica `/api/v1/events/stream` continua a puntare lì solo tramite `uri: forward:/local/events/stream`; poiché nessun `@GetMapping` risolve più la path pubblica, `RequestMappingHandlerMapping` non può più intercettarla e solo `RoutePredicateHandlerMapping` (quindi `AuthenticationFilter`) la risolve. Nuovo `EventStreamControllerMappingTest` asserisce che le due path non coincidano mai (guardia di regressione). L'hotelId resta comunque letto esclusivamente dall'header `X-Auth-Hotel` iniettato da `AuthenticationFilter` dal claim JWT verificato, mai da input diretto del client |
+| T-GW-12 | Spoofing | Nuovo endpoint interno `POST /internal/events/notify` (frontdesk-service → gateway): primo caso in cui il gateway *riceve*, e non solo produce, una chiamata interna firmata HMAC. `InternalAuthFilter` (`internal-auth-lib`), il verificatore condiviso da tutti gli altri 6 servizi, è servlet-only (`OncePerRequestFilter`) e non riusabile su questo gateway reattivo/WebFlux — un verificatore reimplementato in modo indipendente rischia di divergere dall'algoritmo condiviso (finestra di replay, confronto a tempo costante, claim del nonce) | ALTO | BASSA | ✅ RISOLTO — `InternalEventsAuthFilter` (nuovo `WebFilter` reattivo) replica byte-per-byte lo stesso algoritmo di `InternalAuthFilter`/`AuthenticationFilter.computeHmac` (payload `user:role:hotelId:timestamp:nonce`, finestra ±60s, confronto `MessageDigest.isEqual`, nonce store con TTL 120s — reattivo via `ReactiveStringRedisTemplate.setIfAbsent`, dato che il gateway ha solo lo stack Redis reattivo), verificato da una matrice di test a specchio di `InternalAuthFilterTest` |
 
 ### 4.3 guest-service
 
@@ -203,7 +205,7 @@
 ```
 IMPATTO
   │
-  │  CRITICO  │ T-AUTH-02 │ T-AUTH-07 │ T-GW-01  │ T-GST-01  │ T-RES-01  │ T-CFG-01  │ T-BILL-04 │ T-GST-06  │ T-AUTH-11 │ T-RES-01-residuo │ T-STAY-07 │
+  │  CRITICO  │ T-AUTH-02 │ T-AUTH-07 │ T-GW-01  │ T-GST-01  │ T-RES-01  │ T-CFG-01  │ T-BILL-04 │ T-GST-06  │ T-AUTH-11 │ T-RES-01-residuo │ T-STAY-07 │ T-GW-11 │
   │  ALTO     │ T-AUTH-01 │ T-AUTH-08 │ T-GW-03  │ T-GST-02  │ T-STAY-01 │ T-BILL-01 │ T-GST-07  │ T-BILL-07 │ T-AUTH-12 │ T-GW-10 │ T-QUOT-01 │
   │  MEDIO    │ T-AUTH-05 │ T-AUTH-06 │ T-AUTH-09 │ T-GW-05  │ T-GST-04  │ T-AUTH-13 │ T-PRICE-01 │ T-FE-05 │           │
   │  ALTO     │           │          │ T-GST-05  │           │           │
@@ -316,6 +318,8 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 | GAP-21 | Nessun limite superiore su diverse liste di request DTO (`OrderItemRequest.quantity`, `RestaurantOrderRequest.items`, `ReservationRequest.lineItems`, `QuotationOptionRequest.roomIds`, `RateBulkApplyRequest.roomTypeIds`) — leva di esaurimento risorse (payload enormi accettati e processati). Trovato dall'audit a 10 agenti. Fix: `@Max(100)` su quantity, `@Size(max=50)` sulle 4 liste, soglie proposte e motivate prima dell'applicazione | fb-service/dto/{OrderItemRequest.java, RestaurantOrderRequest.java}, frontdesk-service/{reservations/dto/ReservationRequest.java, quotations/dto/QuotationOptionRequest.java, pricing/dto/RateBulkApplyRequest.java} | f1ab269 | A04 | ✅ |
 | GAP-22 | 4 file `application-{auth,billing,fb,guest}-service.yml` avevano una password Postgres locale-dev hardcoded in chiaro. Trovato dall'audit a 10 agenti. Fix: resa overridabile via `${POSTGRES_PASSWORD:<valore-locale-esistente>}` in tutti e 4 (non rimossa — `docker-compose.yml` la sovrascrive comunque via `SPRING_DATASOURCE_PASSWORD`, che come env var OS ha precedenza su `application-{profile}.yml`; rimuoverla avrebbe rotto il `bootRun` locale non-Docker) | auth/billing/fb/guest-service/src/main/resources/application-*-service.yml | a2c33eb | A02 | ✅ |
 | T-FE-05 | Vedi §4.9 per il dettaglio del threat | frontend/nginx.conf | d8cafcf | A05 | ✅ |
+| T-GW-11 | Vedi §4.2 per il dettaglio del threat | api-gateway/events/{EventStreamController.java, RoomEventBroadcaster.java}, config-service/config/api-gateway.yml | [pending] | A01 | ✅ |
+| T-GW-12 | Vedi §4.2 per il dettaglio del threat | api-gateway/events/InternalEventsAuthFilter.java, frontdesk-service/{client/GatewayEventsClient.java, config/frontdesk-service.yml} | [pending] | A01 | ✅ |
 
 **Legenda stato**: ⏳ In attesa | 🔄 In corso | ✅ Completato
 
@@ -325,7 +329,7 @@ Questa tabella viene aggiornata ad ogni commit di hardening sul branch `feature/
 
 | OWASP | Nome | Threats mappati |
 |-------|------|----------------|
-| A01 | Broken Access Control | T-GST-01, T-GST-03, T-GST-07, T-RES-02, T-BILL-01, T-BILL-04, T-BILL-07, T-FB-01, T-FE-03, T-GW-05, T-GW-06, T-GW-07, T-GW-08, T-GW-09, T-STAY-04, T-STAY-05, T-STAY-06, T-ROOM-01, T-ROOM-02, T-AUTH-06, T-AUTH-10, T-AUTH-11, T-NOTIF-01, GAP-3, GAP-7, GAP-9 |
+| A01 | Broken Access Control | T-GST-01, T-GST-03, T-GST-07, T-RES-02, T-BILL-01, T-BILL-04, T-BILL-07, T-FB-01, T-FE-03, T-GW-05, T-GW-06, T-GW-07, T-GW-08, T-GW-09, T-GW-11, T-GW-12, T-STAY-04, T-STAY-05, T-STAY-06, T-ROOM-01, T-ROOM-02, T-AUTH-06, T-AUTH-10, T-AUTH-11, T-NOTIF-01, GAP-3, GAP-7, GAP-9 |
 | A02 | Cryptographic Failures | T-AUTH-03, T-CFG-02, T-STAY-03, GAP-22 |
 | A03 | Injection | T-GST-02, T-RES-03, T-FE-01 |
 | A04 | Insecure Design | T-RES-01, T-RES-01-residuo, T-STAY-01, T-STAY-07, T-FB-02, T-BILL-02, T-BILL-05, T-GST-04, T-GST-05, T-GST-06, T-AUTH-07, T-PRICE-01, T-QUOT-01, GAP-7, GAP-18, GAP-21 |

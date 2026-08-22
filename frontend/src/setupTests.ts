@@ -16,6 +16,17 @@ window.ResizeObserver = window.ResizeObserver ?? ResizeObserverStub;
 // highlighted item in view as arrow keys move selection.
 Element.prototype.scrollIntoView = Element.prototype.scrollIntoView ?? (() => {});
 
+// jsdom doesn't implement EventSource. This inert stub (never connects,
+// never fires) is enough for every test that just renders MainLayout and
+// doesn't care about the realtime stream; useServerEvents.test.ts installs
+// its own richer mock to actually exercise message handling.
+class EventSourceStub {
+  onmessage: ((event: MessageEvent<string>) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  close() {}
+}
+window.EventSource = window.EventSource ?? (EventSourceStub as unknown as typeof EventSource);
+
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: (query: string) => ({

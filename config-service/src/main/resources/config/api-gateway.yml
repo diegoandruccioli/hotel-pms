@@ -79,6 +79,31 @@ spring:
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
 
+        # Self-referencing route (T-GW-11): forward: dispatches in-process to
+        # EventStreamController via DispatcherHandler rather than proxying
+        # through the reactive HTTP client, so SSE streaming is unaffected —
+        # but the request still passes through AuthenticationFilter and every
+        # global filter exactly like a proxied route. The forward: target
+        # (/local/events/stream) is deliberately a DIFFERENT path from this
+        # route's own predicate (/api/v1/events/stream) — mapping the
+        # controller at the same public path it's routed from would let
+        # WebFlux's RequestMappingHandlerMapping (checked before Gateway's own
+        # route matching) resolve the request directly, bypassing
+        # AuthenticationFilter entirely (caught in security review; see
+        # EventStreamControllerMappingTest).
+        - id: events-stream
+          uri: forward:/local/events/stream
+          predicates:
+            - Path=/api/v1/events/stream
+          filters:
+            - AuthenticationFilter
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 50
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
+
         - id: billing-service
           uri: "${GW_BILLING_SERVICE_URI:http://billing-service:8085}"
           predicates:

@@ -38,6 +38,11 @@ spring:
                 host: notification-service
                 port: 8088
                 secure: false
+            api-gateway:
+              - serviceId: api-gateway
+                host: api-gateway
+                port: 8080
+                secure: false
 
 # T-STAY-03: Alloggiati Web portal credentials and URL.
 # All values MUST be provided as environment variables — no defaults for credentials.
@@ -92,6 +97,16 @@ resilience4j:
   circuitbreaker:
     instances:
       notificationService:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+      apiGatewayEvents:
+        # A missed realtime notification is not a business failure (the user
+        # can always reload) — same posture as notificationService: open fast,
+        # recover fast, never let this block the room/stay mutation it follows.
         registerHealthIndicator: true
         slidingWindowType: COUNT_BASED
         slidingWindowSize: 5

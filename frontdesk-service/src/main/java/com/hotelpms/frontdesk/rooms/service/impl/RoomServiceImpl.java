@@ -1,5 +1,8 @@
 package com.hotelpms.frontdesk.rooms.service.impl;
 
+import com.hotelpms.frontdesk.client.GatewayEventsClient;
+import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest;
+import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest.GatewayEventType;
 import com.hotelpms.frontdesk.rooms.domain.Room;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.domain.RoomType;
@@ -46,6 +49,7 @@ public class RoomServiceImpl implements RoomService {
     private final RoomRepository roomRepository;
     private final RoomTypeRepository roomTypeRepository;
     private final RoomMapper roomMapper;
+    private final GatewayEventsClient gatewayEventsClient;
 
     /**
      * Creates a new room linked to an existing, active {@link RoomType},
@@ -199,6 +203,9 @@ public class RoomServiceImpl implements RoomService {
         room.setHotelId(hotelId);
 
         final Room saved = roomRepository.saveAndFlush(Objects.requireNonNull(room));
+        if (requestedStatus != currentStatus) {
+            notifyRoomStatusChanged();
+        }
         return roomMapper.toResponse(saved);
     }
 
@@ -223,6 +230,10 @@ public class RoomServiceImpl implements RoomService {
         room.setStatus(status);
 
         final Room updated = roomRepository.saveAndFlush(Objects.requireNonNull(room));
+        // No realtime notify here (T-GW-09b): this is the check-in/check-out
+        // Saga path, called from StayServiceImpl.checkIn/checkOut, which
+        // already sends its own CHECK_IN/CHECK_OUT event for the same
+        // underlying change — notifying here too would double-fire.
         return roomMapper.toResponse(updated);
     }
 
@@ -259,6 +270,7 @@ public class RoomServiceImpl implements RoomService {
         room.setStatus(status);
 
         final Room updated = roomRepository.saveAndFlush(Objects.requireNonNull(room));
+        notifyRoomStatusChanged();
         return roomMapper.toResponse(updated);
     }
 
@@ -316,5 +328,15 @@ public class RoomServiceImpl implements RoomService {
         return roomRepository.findAllByActiveTrueAndHotelIdAndStatus(hotelId, RoomStatus.CLEAN).stream()
                 .map(roomMapper::toResponse)
                 .toList();
+    }
+
+    /**
+     * Notifies api-gateway of a room status change (T-GW-09b), immediately
+     * after {@code saveAndFlush}. Fire-and-forget: {@link GatewayEventsClient}'s
+     * circuit breaker fallback swallows any failure, so a downstream hiccup
+     * here never affects the room mutation that just succeeded.
+     */
+    private void notifyRoomStatusChanged() {
+        gatewayEventsClient.notify(new GatewayEventNotifyRequest(GatewayEventType.ROOM_STATUS_CHANGED));
     }
 }

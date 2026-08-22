@@ -4461,6 +4461,194 @@ possono usare lo stesso nome di room-type, e nessuno dei tre metodi
 \paragraph{Riferimento} Commit: \commitref{121e4d0}{fix(security): T-ROOM-02 --- cross-tenant IDOR and tampering on room types}
 
 % ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Bypass di Autenticazione sul Canale SSE Realtime via Collisione HandlerMapping \threat{T-GW-11}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato in security review prima del merge (non da un audit post-hoc): il
+nuovo endpoint SSE \texttt{GET /api/v1/events/stream} (sincronizzazione
+realtime dello stato camere/check-in/check-out, \texttt{api-gateway}, primo
+uso di SSE nel backend) era raggiunto tramite una route
+self-referenziale --- \texttt{uri: forward:/api/v1/events/stream} in
+\texttt{api-gateway.yml} --- che mappava \texttt{EventStreamController} sulla
+\textbf{stessa} path pubblica su cui la route stessa predica. L'intento era
+che \texttt{forward:} facesse comunque passare la richiesta per
+\texttt{AuthenticationFilter} e i quattro \texttt{GlobalFilter} del gateway,
+esattamente come ogni endpoint proxato.
+
+Non è così in questa applicazione: \texttt{DispatcherHandler} di Spring
+interroga i bean \texttt{HandlerMapping} in ordine crescente di
+\texttt{@Order} e delega al primo che produce un match.
+\texttt{RequestMappingHandlerMapping} di WebFlux (che risolve i controller
+\texttt{@GetMapping}, incluso questo) si registra all'ordine 0;
+\texttt{RoutePredicateHandlerMapping} di Spring Cloud Gateway si registra
+all'ordine 1. Poiché il controller era mappato sulla stessa path su cui la
+route predicava, ogni richiesta diretta a quella path veniva risolta dal
+primo mapping --- il controller stesso --- e la catena di filtri della route
+non veniva mai raggiunta: \texttt{AuthenticationFilter} non veniva mai
+eseguito. Un chiamante privo di qualunque autenticazione (nessun cookie JWT)
+poteva inviare \texttt{GET /api/v1/events/stream} con un header
+\texttt{X-Auth-Hotel} arbitrario e ricevere lo stream realtime di un hotel
+qualsiasi. Non un rischio residuo o teorico: bypass completo di
+autenticazione più IDOR cross-tenant sul canale, verificato riproducendo il
+percorso di dispatch con \texttt{RequestMappingHandlerMapping} in isolamento.
+Classificato OWASP A01 --- Broken Access Control.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- EventStreamController.java + api-gateway.yml (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: il controller e la route puntano alla STESSA path pubblica --
+// RequestMappingHandlerMapping (order 0) intercetta la richiesta prima che
+// RoutePredicateHandlerMapping (order 1) possa applicare AuthenticationFilter.
+@GetMapping(path = "/api/v1/events/stream", ...)
+public Flux<ServerSentEvent<RoomEvent>> stream(...) { ... }
+\end{lstlisting}
+\begin{lstlisting}[language=yaml]
+- id: events-stream
+  uri: forward:/api/v1/events/stream   # stessa path del predicate sotto!
+  predicates:
+    - Path=/api/v1/events/stream
+  filters:
+    - AuthenticationFilter               # mai eseguito da una richiesta diretta
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={Codice Sicuro --- EventStreamController.java + api-gateway.yml (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: il controller vive su una path interna, mai esposta. Nessun
+// @GetMapping risolve piu' /api/v1/events/stream, quindi solo
+// RoutePredicateHandlerMapping (e quindi AuthenticationFilter) puo' risolverla.
+public static final String INTERNAL_STREAM_PATH = "/local/events/stream";
+
+@GetMapping(path = INTERNAL_STREAM_PATH,
+        produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+public Flux<ServerSentEvent<RoomEvent>> stream(
+        @RequestHeader(value = "X-Auth-Hotel", required = false)
+        String hotelHeader) {
+    UUID hotelId = parseHotelId(hotelHeader); // 401 se assente/malformato
+    return broadcaster.streamFor(hotelId)     // un solo Sinks.Many per hotelId
+            .map(event -> ServerSentEvent.builder(event).build());
+}
+\end{lstlisting}
+\begin{lstlisting}[language=yaml]
+- id: events-stream
+  uri: forward:/local/events/stream    # path DIVERSA dal predicate pubblico
+  predicates:
+    - Path=/api/v1/events/stream
+  filters:
+    - AuthenticationFilter               # ora l'unico modo di raggiungere il controller
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Mitigazione applicata}
+\begin{enumerate}
+  \item Separazione strutturale dei due path: la path pubblica
+    (\texttt{/api/v1/events/stream}, su cui la route predica) e la path
+    interna a cui il controller è realmente mappato
+    (\texttt{/local/events/stream}) non coincidono mai. Poiché nessun
+    \texttt{@GetMapping} risolve più la path pubblica,
+    \texttt{RequestMappingHandlerMapping} non può intercettarla --- resta
+    l'unica strada \texttt{RoutePredicateHandlerMapping}, che applica sempre
+    \texttt{AuthenticationFilter} prima di inoltrare.
+  \item Nuovo \texttt{EventStreamControllerMappingTest}: asserisce via
+    reflection che la path del \texttt{@GetMapping} non sia mai uguale alla
+    path pubblica hardcoded nel test stesso (deliberatamente non derivata
+    dalla stessa costante che una regressione modificherebbe) --- guardia di
+    regressione per esattamente questa classe di bug.
+  \item L'hotelId resta comunque letto esclusivamente dall'header
+    \texttt{X-Auth-Hotel}, iniettato da \texttt{AuthenticationFilter} dal
+    claim JWT già verificato, mai da un parametro di query o da un header non
+    firmato che il client potrebbe manipolare direttamente.
+  \item \texttt{RoomEventBroadcaster} mantiene un
+    \texttt{ConcurrentHashMap<UUID, Sinks.Many<RoomEvent>>}, un sink per
+    hotelId: anche assumendo un chiamante autenticato, un tenant può ottenere
+    soltanto il \texttt{Flux} del proprio hotel.
+  \item Il payload dell'evento (\texttt{RoomEvent}) è deliberatamente
+    minimale --- solo tipo e timestamp --- il frontend invalida la cache
+    React Query e rifà il fetch autenticato, invece di fidarsi di dati
+    applicativi ricevuti sul canale push.
+\end{enumerate}
+
+\paragraph{Test}
+\texttt{EventStreamControllerMappingTest} (nuovo, la regressione specifica di
+questo finding): la path del controller non coincide mai con quella pubblica.
+\texttt{EventStreamControllerTest}: 401 con header hotel assente o non-UUID;
+un evento pubblicato per un hotelId arriva solo agli iscritti di quello stesso
+hotelId, non a quelli di un hotelId diverso (test dedicato con due sink
+paralleli). \texttt{RoomEventBroadcasterTest} verifica lo stesso isolamento a
+livello di sink, indipendentemente dal layer HTTP.
+
+\paragraph{Riferimento} Commit: \commitref{[pending]}{feat(secure-coding-hardening): SSE realtime room-status sync (T-GW-11, T-GW-12)}
+
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Verifica HMAC in Ingresso sul Gateway \threat{T-GW-12}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Anche T-GW-12 è una minaccia modellata proattivamente, non una vulnerabilità
+trovata in codice esistente. Il nuovo endpoint \texttt{POST /internal/events/notify}
+(\texttt{frontdesk-service} $\to$ \texttt{api-gateway}, chiamata interna che
+innesca la pubblicazione di un evento sul canale SSE di T-GW-11) è il primo
+caso in cui il gateway \emph{riceve}, e non solo produce, una chiamata interna
+firmata HMAC. Il verificatore condiviso da tutti gli altri sei servizi,
+\texttt{InternalAuthFilter} (\texttt{internal-auth-lib}, vedi T-GW-08), estende
+\texttt{OncePerRequestFilter} ed è quindi legato allo stack servlet --- non
+riusabile as-is su \texttt{api-gateway}, che è reattivo (WebFlux/Netty). Il
+rischio: un verificatore reimplementato in modo indipendente potrebbe
+divergere dall'algoritmo condiviso (finestra di tolleranza sul timestamp,
+confronto non a tempo costante, nessun controllo anti-replay sul nonce),
+indebolendo silenziosamente la garanzia che solo il gateway stesso possa
+autenticare chiamate interne (T-GW-01/T-GW-08).
+
+\begin{securebox}[title={Codice Sicuro --- InternalEventsAuthFilter.java}]
+\begin{lstlisting}[style=java]
+// SICURO: stesso algoritmo byte-per-byte di InternalAuthFilter, reimplementato
+// per lo stack reattivo -- stesso payload, stessa finestra di tolleranza,
+// stesso confronto a tempo costante, stesso meccanismo anti-replay.
+private boolean isSignatureValid(String username, String role, String hotelId,
+        String timestamp, String nonce, String signature) {
+    String expected = computeHmac(username, role, hotelId, timestamp, nonce);
+    return MessageDigest.isEqual(
+            expected.getBytes(StandardCharsets.UTF_8),
+            signature.getBytes(StandardCharsets.UTF_8));
+}
+
+// Nonce store reattivo: il gateway ha solo lo stack Redis reattivo,
+// non quello bloccante da cui dipende RedisNonceStore.
+private Mono<Boolean> claimNonce(String nonce) {
+    return redisTemplate.opsForValue().setIfAbsent(
+            "internal-auth:nonce:" + nonce, "1",
+            Duration.ofSeconds(NONCE_TTL_SECONDS));
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Mitigazione applicata}
+\begin{enumerate}
+  \item Payload HMAC identico a \texttt{InternalAuthFilter}/\texttt{AuthenticationFilter.computeHmac}:
+    \texttt{HMAC-SHA256(secret, "user:role:hotelId:timestamp:nonce")}, esadecimale minuscolo.
+  \item Finestra di tolleranza identica: $\pm$60 secondi (T-GW-08).
+  \item Nonce store reattivo (\texttt{ReactiveStringRedisTemplate.setIfAbsent},
+    semantica SETNX) con TTL 120s, stessa politica di \texttt{RedisNonceStore}
+    ma senza condividerne il codice --- prima parte reattiva del backend,
+    forzare un'astrazione comune servlet/reactive sarebbe stata
+    over-engineering prematuro.
+  \item Lato \texttt{frontdesk-service} (chiamante), zero codice nuovo di
+    firma: \texttt{InternalFeignAuthInterceptor} è già registrato come bean
+    globale in \texttt{FeignHeaderConfig} e firma automaticamente ogni nuovo
+    client Feign, incluso \texttt{GatewayEventsClient}.
+\end{enumerate}
+
+\paragraph{Test}
+\texttt{InternalEventsAuthFilterTest} replica l'intera matrice di
+\texttt{InternalAuthFilterTest}: header mancanti, firma non valida, firma
+calcolata per un hotelId diverso (isolamento tenant), timestamp scaduto,
+replay dello stesso nonce rifiutato.
+
+\paragraph{Riferimento} Commit: \commitref{[pending]}{feat(secure-coding-hardening): SSE realtime room-status sync (T-GW-11, T-GW-12)}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}
 % ─────────────────────────────────────────────────────────────────────────────
 

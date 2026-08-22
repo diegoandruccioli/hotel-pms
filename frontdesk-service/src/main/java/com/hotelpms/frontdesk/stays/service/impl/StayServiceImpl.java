@@ -1,6 +1,9 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
+import com.hotelpms.frontdesk.client.GatewayEventsClient;
 import com.hotelpms.frontdesk.client.GuestClient;
+import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest;
+import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest.GatewayEventType;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
@@ -75,6 +78,7 @@ public class StayServiceImpl implements StayService {
     private final StayAlloggiatiCoordinator stayAlloggiatiCoordinator;
     private final StayNotificationCoordinator stayNotificationCoordinator;
     private final StayReservationSync stayReservationSync;
+    private final GatewayEventsClient gatewayEventsClient;
 
     /** {@inheritDoc} */
     @Override
@@ -116,6 +120,7 @@ public class StayServiceImpl implements StayService {
 
         // SAGA STEP 3: mark room OCCUPIED — failure triggers @Transactional rollback of the save
         markRoomOccupied(savedStay);
+        gatewayEventsClient.notify(new GatewayEventNotifyRequest(GatewayEventType.CHECK_IN));
 
         // Non-blocking steps: execute only after OCCUPIED is confirmed
         stayBillingCoordinator.openInvoiceForStay(savedStay);
@@ -172,6 +177,7 @@ public class StayServiceImpl implements StayService {
 
         stayReservationSync.updateReservationStatusAfterCheckOut(updatedStay.getReservationId());
         stayNotificationCoordinator.sendCheckoutEmailIfPossible(updatedStay, invoice);
+        gatewayEventsClient.notify(new GatewayEventNotifyRequest(GatewayEventType.CHECK_OUT));
 
         return stayMapper.toDto(updatedStay);
     }

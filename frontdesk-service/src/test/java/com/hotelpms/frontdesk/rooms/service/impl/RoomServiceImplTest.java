@@ -1,5 +1,8 @@
 package com.hotelpms.frontdesk.rooms.service.impl;
 
+import com.hotelpms.frontdesk.client.GatewayEventsClient;
+import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest;
+import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest.GatewayEventType;
 import com.hotelpms.frontdesk.rooms.domain.Room;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.domain.RoomType;
@@ -32,6 +35,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +54,9 @@ class RoomServiceImplTest {
 
     @Mock
     private RoomMapper roomMapper;
+
+    @Mock
+    private GatewayEventsClient gatewayEventsClient;
 
     @InjectMocks
     private RoomServiceImpl roomService;
@@ -255,6 +263,8 @@ class RoomServiceImplTest {
         assertEquals(ROOM_102, result.roomNumber());
         assertEquals(RoomStatus.DIRTY, result.status());
         verify(roomRepository).saveAndFlush(Objects.requireNonNull(room));
+        verify(gatewayEventsClient, times(1))
+                .notify(new GatewayEventNotifyRequest(GatewayEventType.ROOM_STATUS_CHANGED));
     }
 
     @Test
@@ -325,6 +335,7 @@ class RoomServiceImplTest {
 
         assertEquals(ROOM_102, result.roomNumber());
         assertEquals(RoomStatus.OCCUPIED, result.status());
+        verify(gatewayEventsClient, never()).notify(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -348,6 +359,9 @@ class RoomServiceImplTest {
 
         assertEquals(RoomStatus.DIRTY, result.status());
         verify(roomRepository).saveAndFlush(Objects.requireNonNull(room));
+        // No T-GW-09b notify here — this is the check-in/check-out Saga path,
+        // which fires its own CHECK_IN/CHECK_OUT event from StayServiceImpl instead.
+        verify(gatewayEventsClient, never()).notify(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -402,6 +416,8 @@ class RoomServiceImplTest {
 
         assertEquals(RoomStatus.MAINTENANCE, result.status());
         verify(roomRepository).saveAndFlush(Objects.requireNonNull(room));
+        verify(gatewayEventsClient, times(1))
+                .notify(new GatewayEventNotifyRequest(GatewayEventType.ROOM_STATUS_CHANGED));
     }
 
     @Test
