@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { OwnerDashboard } from './OwnerDashboard';
 import { billingReportService } from '../services/billingReportService';
+import { kpiReportService } from '../services/kpiReportService';
+import { renderWithQuery } from '../test-utils/renderWithQuery';
 import type { OwnerFinancialReportDto } from '../types/ownerReport.types';
 import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
 
@@ -13,6 +15,10 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../services/billingReportService', () => ({
   billingReportService: { getOwnerFinancialReport: vi.fn(), exportToCsv: vi.fn() },
+}));
+
+vi.mock('../services/kpiReportService', () => ({
+  kpiReportService: { getKpiReport: vi.fn() },
 }));
 
 vi.mock('../store/toastStore', () => ({
@@ -26,48 +32,54 @@ vi.mock('../store/authStore', () => ({
 }));
 
 describe('OwnerDashboard', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(kpiReportService.getKpiReport).mockResolvedValue({
+      periods: [], totals: { periodStart: '', totalRoomRevenue: 0, occupiedRoomNights: 0,
+        availableRoomNights: 0, adr: 0, revpar: 0, occupancyRate: 0 },
+    });
+  });
 
   it('should show access restricted for non-owner', () => {
     mockUseAuthStore.mockReturnValue({ user: { role: 'RECEPTIONIST' } });
-    render(<OwnerDashboard />);
+    renderWithQuery(<OwnerDashboard />);
     expect(screen.getByText('access_restricted')).toBeInTheDocument();
   });
 
   it('should show access restricted for unauthenticated user', () => {
     mockUseAuthStore.mockReturnValue({ user: null });
-    render(<OwnerDashboard />);
+    renderWithQuery(<OwnerDashboard />);
     expect(screen.getByText('access_restricted')).toBeInTheDocument();
   });
 
   it('should render dashboard for OWNER role', () => {
     mockUseAuthStore.mockReturnValue({ user: { role: 'OWNER' } });
-    render(<OwnerDashboard />);
+    renderWithQuery(<OwnerDashboard />);
     expect(screen.getByText('owner_dashboard')).toBeInTheDocument();
   });
 
   it('should render dashboard for ADMIN role', () => {
     mockUseAuthStore.mockReturnValue({ user: { role: 'ADMIN' } });
-    render(<OwnerDashboard />);
+    renderWithQuery(<OwnerDashboard />);
     expect(screen.getByText('owner_dashboard')).toBeInTheDocument();
   });
 
   it('should show date filter fields for authorized users', () => {
     mockUseAuthStore.mockReturnValue({ user: { role: 'OWNER' } });
-    render(<OwnerDashboard />);
+    renderWithQuery(<OwnerDashboard />);
     expect(screen.getByLabelText('start_date')).toBeInTheDocument();
     expect(screen.getByLabelText('end_date')).toBeInTheDocument();
   });
 
   it('should show generate report button', () => {
     mockUseAuthStore.mockReturnValue({ user: { role: 'OWNER' } });
-    render(<OwnerDashboard />);
+    renderWithQuery(<OwnerDashboard />);
     expect(screen.getByText('generate_report')).toBeInTheDocument();
   });
 
   it('should have no accessibility violations', async () => {
     mockUseAuthStore.mockReturnValue({ user: { role: 'OWNER' } });
-    const { container } = render(<OwnerDashboard />);
+    const { container } = renderWithQuery(<OwnerDashboard />);
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
@@ -89,7 +101,7 @@ describe('OwnerDashboard', () => {
   it('loads and renders a report with revenue, invoices, collection rate, and CSV export', async () => {
     mockUseAuthStore.mockReturnValue({ user: { role: 'OWNER' } });
     vi.mocked(billingReportService.getOwnerFinancialReport).mockResolvedValueOnce(REPORT);
-    render(<OwnerDashboard />);
+    renderWithQuery(<OwnerDashboard />);
 
     fireEvent.click(screen.getByText('generate_report'));
 
@@ -113,7 +125,7 @@ describe('OwnerDashboard', () => {
     vi.mocked(billingReportService.getOwnerFinancialReport).mockResolvedValueOnce({
       ...REPORT, totalInvoices: 0, paidInvoices: 0, invoices: [],
     });
-    render(<OwnerDashboard />);
+    renderWithQuery(<OwnerDashboard />);
 
     fireEvent.click(screen.getByText('generate_report'));
 
@@ -125,7 +137,7 @@ describe('OwnerDashboard', () => {
     mockUseAuthStore.mockReturnValue({ user: { role: 'OWNER' } });
     vi.mocked(billingReportService.getOwnerFinancialReport)
       .mockRejectedValueOnce(mockAxiosErrorWithDetail('Report non disponibile per il periodo selezionato'));
-    render(<OwnerDashboard />);
+    renderWithQuery(<OwnerDashboard />);
 
     fireEvent.click(screen.getByText('generate_report'));
 
@@ -135,7 +147,7 @@ describe('OwnerDashboard', () => {
 
   it('updates start and end date inputs', () => {
     mockUseAuthStore.mockReturnValue({ user: { role: 'OWNER' } });
-    render(<OwnerDashboard />);
+    renderWithQuery(<OwnerDashboard />);
 
     fireEvent.change(screen.getByLabelText('start_date'), { target: { value: '2026-01-01' } });
     fireEvent.change(screen.getByLabelText('end_date'), { target: { value: '2026-01-31' } });

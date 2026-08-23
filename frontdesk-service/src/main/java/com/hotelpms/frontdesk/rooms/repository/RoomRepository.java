@@ -130,4 +130,13 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
     @Query("SELECT r.status AS status, COUNT(r) AS count FROM Room r "
             + "WHERE r.hotelId = :hotelId AND r.active = true GROUP BY r.status")
     List<RoomStatusCount> countRoomsByStatusForHotelId(@Param("hotelId") UUID hotelId);
+
+    /**
+     * Counts active rooms for a hotel — the denominator for available
+     * room-nights in the KPI occupancy report (epic C4).
+     *
+     * @param hotelId the hotel UUID
+     * @return the number of active rooms for that hotel
+     */
+    long countByActiveTrueAndHotelId(UUID hotelId);
 }

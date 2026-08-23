@@ -55,4 +55,8 @@ export const queryKeys = {
     summary: (startDate: string, endDate: string) =>
       ['owner-report', 'summary', startDate, endDate] as const,
   },
+  kpiReport: {
+    trend: (startDate: string, endDate: string, granularity: string) =>
+      ['kpi-report', 'trend', startDate, endDate, granularity] as const,
+  },
 } as const;

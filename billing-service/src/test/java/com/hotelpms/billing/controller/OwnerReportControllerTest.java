@@ -1,8 +1,15 @@
 package com.hotelpms.billing.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.hotelpms.billing.dto.KpiPeriodDto;
+import com.hotelpms.billing.dto.KpiReportDto;
 import com.hotelpms.billing.dto.OwnerFinancialReportDto;
 import com.hotelpms.billing.dto.OwnerFinancialSummaryDto;
+import com.hotelpms.billing.dto.ReportGranularity;
 import com.hotelpms.billing.exception.GlobalExceptionHandler;
+import com.hotelpms.billing.service.KpiReportService;
 import com.hotelpms.billing.service.OwnerReportService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -39,9 +47,19 @@ class OwnerReportControllerTest {
     private static final String JSON_TOTAL_INVOICES = "$.totalInvoices";
     private static final String SUMMARY_REVENUE = "1500.00";
     private static final double SUMMARY_REVENUE_VALUE = 1500.00;
+    private static final String KPI_URL = "/api/v1/reports/kpi";
+    private static final String KPI_DATE = "2026-08-01";
+    private static final String GRANULARITY_DAY = "DAY";
+    private static final double ADR_VALUE = 125.00;
+    private static final double REVPAR_VALUE = 50.00;
+    private static final double OCCUPANCY_RATE_VALUE = 0.4;
+    private static final long KPI_OCCUPIED_NIGHTS = 4L;
 
     @Mock
     private OwnerReportService ownerReportService;
+
+    @Mock
+    private KpiReportService kpiReportService;
 
     @InjectMocks
     private OwnerReportController ownerReportController;
@@ -51,8 +69,13 @@ class OwnerReportControllerTest {
 
     @BeforeEach
     void setUp() {
+        final ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
         mockMvc = MockMvcBuilders.standaloneSetup(ownerReportController)
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
 
         hotelId = UUID.randomUUID();
@@ -129,5 +152,38 @@ class OwnerReportControllerTest {
                 .andExpect(jsonPath("$.totalRevenue").value(SUMMARY_REVENUE_VALUE));
 
         verify(ownerReportService).getFinancialSummary(eq(hotelId), any(LocalDate.class), any(LocalDate.class));
+    }
+
+    @Test
+    void shouldGetKpiReportReturn200() throws Exception {
+        final KpiPeriodDto period = new KpiPeriodDto(
+                LocalDate.parse(KPI_DATE), new BigDecimal("500.00"), KPI_OCCUPIED_NIGHTS, 10L,
+                BigDecimal.valueOf(ADR_VALUE), BigDecimal.valueOf(REVPAR_VALUE),
+                BigDecimal.valueOf(OCCUPANCY_RATE_VALUE));
+        final KpiReportDto report = new KpiReportDto(List.of(period), period);
+        when(kpiReportService.getKpiReport(eq(hotelId), any(LocalDate.class), any(LocalDate.class),
+                eq(ReportGranularity.DAY))).thenReturn(report);
+
+        mockMvc.perform(get(KPI_URL)
+                        .param(PARAM_START, KPI_DATE)
+                        .param(PARAM_END, KPI_DATE)
+                        .param("granularity", GRANULARITY_DAY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.periods[0].adr").value(ADR_VALUE))
+                .andExpect(jsonPath("$.periods[0].revpar").value(REVPAR_VALUE))
+                .andExpect(jsonPath("$.periods[0].occupancyRate").value(OCCUPANCY_RATE_VALUE))
+                .andExpect(jsonPath("$.totals.occupiedRoomNights").value(KPI_OCCUPIED_NIGHTS));
+
+        verify(kpiReportService).getKpiReport(eq(hotelId), any(LocalDate.class), any(LocalDate.class),
+                eq(ReportGranularity.DAY));
+    }
+
+    @Test
+    void shouldReturn400WhenKpiGranularityIsNotAValidEnumValue() throws Exception {
+        mockMvc.perform(get(KPI_URL)
+                        .param(PARAM_START, KPI_DATE)
+                        .param(PARAM_END, KPI_DATE)
+                        .param("granularity", "fortnight"))
+                .andExpect(status().isBadRequest());
     }
 }

@@ -1,7 +1,10 @@
 package com.hotelpms.billing.controller;
 
+import com.hotelpms.billing.dto.KpiReportDto;
 import com.hotelpms.billing.dto.OwnerFinancialReportDto;
 import com.hotelpms.billing.dto.OwnerFinancialSummaryDto;
+import com.hotelpms.billing.dto.ReportGranularity;
+import com.hotelpms.billing.service.KpiReportService;
 import com.hotelpms.billing.service.OwnerReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +35,7 @@ import java.util.UUID;
 public class OwnerReportController {
 
     private final OwnerReportService ownerReportService;
+    private final KpiReportService kpiReportService;
 
     /**
      * Returns an aggregated financial report for the given date range, scoped to
@@ -73,6 +77,30 @@ public class OwnerReportController {
         log.info("REST request for owner financial summary | hotelId={} | from {} to {}", hotelId, startDate, endDate);
         final OwnerFinancialSummaryDto summary = ownerReportService.getFinancialSummary(hotelId, startDate, endDate);
         return ResponseEntity.ok(summary);
+    }
+
+    /**
+     * Returns the RevPAR/ADR/Occupancy trend for a date range, scoped to the
+     * caller's hotel (epic C4). {@code startDate}/{@code endDate} are
+     * inclusive, same convention as {@link #getOwnerFinancialReport}. Access
+     * is restricted to users with the OWNER or ADMIN role.
+     *
+     * @param startDate   the start of the period (inclusive), format YYYY-MM-DD
+     * @param endDate     the end of the period (inclusive), format YYYY-MM-DD
+     * @param granularity the time-bucket size
+     * @return the KPI trend report for the caller's hotel
+     */
+    @GetMapping("/kpi")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    public ResponseEntity<KpiReportDto> getKpiReport(
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate startDate,
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate endDate,
+            @NonNull @RequestParam final ReportGranularity granularity) {
+        final UUID hotelId = Objects.requireNonNull(extractHotelId());
+        log.info("REST request for KPI report | hotelId={} | from {} to {} | granularity={}",
+                hotelId, startDate, endDate, granularity);
+        final KpiReportDto report = kpiReportService.getKpiReport(hotelId, startDate, endDate, granularity);
+        return ResponseEntity.ok(report);
     }
 
     private UUID extractHotelId() {

@@ -178,4 +178,35 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      */
     @Query("SELECT COUNT(g) FROM Stay s JOIN s.guests g WHERE s.hotelId = :hotelId AND s.status = :status")
     long countGuestsInHouseByHotelId(@Param("hotelId") UUID hotelId, @Param("status") StayStatus status);
+
+    /**
+     * Sums occupied room-nights per time bucket for a hotel, for the KPI
+     * occupancy trend report (epic C4). Only {@code CHECKED_OUT} stays count,
+     * attributed to the bucket their {@code actual_check_in_time} falls in —
+     * same arrival-date convention {@link #countByHotelIdAndStatus} and the
+     * day-sheet already use. Native query: {@code date_trunc} and the
+     * {@code date - date} day-count idiom used here are PostgreSQL-specific,
+     * and this project targets only PostgreSQL (see Flyway migrations) — no
+     * portability concern traded away. {@code granularity} is always a
+     * validated {@code ReportGranularity} enum value by the time it reaches
+     * this bind parameter (see {@code OccupancySummaryController}), never a
+     * raw client-supplied string.
+     *
+     * @param hotelId     the hotel UUID (tenant isolation)
+     * @param start       beginning of the window (inclusive), by check-in time
+     * @param end         end of the window (exclusive), by check-in time
+     * @param granularity {@code date_trunc}'s bucket size — {@code "day"}, {@code "week"}, or {@code "month"}
+     * @return one row per non-empty bucket, ordered by {@code periodStart}
+     */
+    @Query(value = "SELECT date_trunc(:granularity, s.actual_check_in_time)::date AS periodStart, "
+            + "COALESCE(SUM(s.actual_check_out_time::date - s.actual_check_in_time::date), 0) AS occupiedRoomNights "
+            + "FROM stays s "
+            + "WHERE s.hotel_id = :hotelId AND s.status = 'CHECKED_OUT' "
+            + "AND s.actual_check_in_time >= :start AND s.actual_check_in_time < :end "
+            + "GROUP BY date_trunc(:granularity, s.actual_check_in_time) "
+            + "ORDER BY periodStart",
+            nativeQuery = true)
+    List<StayOccupancyPeriod> sumOccupiedRoomNightsByHotelIdGroupedByPeriod(
+            @Param("hotelId") UUID hotelId, @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end, @Param("granularity") String granularity);
 }

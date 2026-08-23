@@ -12,6 +12,7 @@ import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { M3TextField } from '../components/m3/M3TextField';
 import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '../utils/errorMessage';
+import { KpiTrendSection } from './OwnerDashboard/KpiTrendSection';
 
 const getStatusTone = (status: InvoiceResponse['status']) => {
   switch (status) {
@@ -172,6 +173,13 @@ export const OwnerDashboard = memo(() => {
           <p className="text-sm font-body">{error}</p>
         </div>
       )}
+
+      <KpiTrendSection
+        startDate={startDate}
+        endDate={endDate}
+        formatCurrency={formatCurrency}
+        formatDate={formatDate}
+      />
 
       {report && (
         <>
