@@ -104,7 +104,7 @@ test.describe('Walk-in Check-in', () => {
       }),
     );
     await page.goto('/stays/walk-in');
-    const roomSelect = page.locator('#walkin-room');
+    const roomSelect = page.getByLabel(/^Room/);
     await expect(roomSelect).toBeVisible({ timeout: 10000 });
     await expect(roomSelect.locator('option', { hasText: '101' })).toBeAttached();
     await expect(roomSelect.locator('option', { hasText: '102' })).toBeAttached();
@@ -138,7 +138,7 @@ test.describe('Walk-in Check-in', () => {
     );
     await page.goto('/stays/walk-in');
     // Wait for rooms to load (select appears only when rooms.length > 0)
-    await expect(page.locator('#walkin-room')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByLabel(/^Room/)).toBeVisible({ timeout: 10000 });
     // Click submit without selecting a room — should show validation error
     await page.getByRole('button', { name: /complete walk-in/i }).click();
     await expect(page.getByRole('alert')).toBeVisible();
@@ -175,13 +175,13 @@ test.describe('Walk-in Check-in', () => {
 
     await page.goto('/stays/walk-in');
     // Wait for rooms to load before interacting
-    await expect(page.locator('#walkin-room')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByLabel(/^Room/)).toBeVisible({ timeout: 10000 });
 
     // Select room
-    await page.locator('#walkin-room').selectOption({ value: 'room-001' });
+    await page.getByLabel(/^Room/).selectOption({ value: 'room-001' });
 
     // Search and select guest
-    await page.locator('#walkin-guest').fill('Lucia');
+    await page.getByRole('searchbox').fill('Lucia');
     await expect(page.getByRole('option', { name: /Lucia Bianchi/i })).toBeVisible({ timeout: 3000 });
     await page.getByRole('option', { name: /Lucia Bianchi/i }).click();
 
@@ -189,7 +189,7 @@ test.describe('Walk-in Check-in', () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const iso = tomorrow.toISOString().split('T')[0];
-    await page.locator('#walkin-checkout').fill(iso);
+    await page.getByLabel(/Expected Check-out Date/).fill(iso);
 
     // Fill mandatory Alloggiati fields (added in F2 sprint).
     // Choose FAMILIARE type (no document required) and a foreign birthplace

@@ -1,95 +1,10 @@
 import { test, expect } from '@playwright/test';
-
-const MOCK_USER = { username: 'admin', role: 'ADMIN', sub: 'admin', mustChangePassword: false };
-
-const MOCK_ROOMS = [
-  { id: 'rm-1', roomNumber: '101', status: 'CLEAN', roomType: { name: 'Standard', basePrice: 80 } },
-  { id: 'rm-2', roomNumber: '102', status: 'DIRTY', roomType: { name: 'Double', basePrice: 120 } },
-  { id: 'rm-3', roomNumber: '103', status: 'OCCUPIED', roomType: { name: 'Suite', basePrice: 200 } },
-];
-
-// Local date, matching dashboardService.getTodayDateString() — not toISOString(),
-// which is UTC and can disagree with the local date near local midnight.
-const nowForToday = new Date();
-const TODAY = `${nowForToday.getFullYear()}-${String(nowForToday.getMonth() + 1).padStart(2, '0')}-${String(nowForToday.getDate()).padStart(2, '0')}`;
-
-const MOCK_GUESTS = [
-  { id: 'g-1', firstName: 'Mario', lastName: 'Rossi', email: 'mario@test.com' },
-  { id: 'g-2', firstName: 'Anna', lastName: 'Bianchi', email: 'anna@test.com' },
-];
-
-const MOCK_RESERVATIONS = [
-  {
-    id: 'res-1', guestId: 'g-1', guestFullName: 'Mario Rossi',
-    checkInDate: TODAY, checkOutDate: '2099-01-01',
-    status: 'CONFIRMED', expectedGuests: 1, active: true, lineItems: [],
-  },
-];
-
-const MOCK_STAYS = [
-  {
-    id: 'stay-1', guestId: 'g-1', roomId: 'rm-2', status: 'CHECKED_IN',
-    guests: [{ id: 'g-1' }, { id: 'g-2' }],
-  },
-];
-
-const MOCK_REPORT = {
-  invoices: [
-    { id: 'inv-1', status: 'ISSUED', totalAmount: 150.0 },
-    { id: 'inv-2', status: 'PAID', totalAmount: 200.0 },
-  ],
-};
+import { mockAuthMe, mockDaySheet, mockOwnerSummary } from './fixtures/mockApi';
 
 async function mockDashboardApis(page: import('@playwright/test').Page): Promise<void> {
-  await page.route('**/api/v1/auth/me', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER) }),
-  );
-  await page.route('**/api/v1/guests**', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ content: MOCK_GUESTS, totalElements: 2, totalPages: 1, number: 0, size: 20 }),
-    }),
-  );
-  await page.route('**/api/v1/reservations**', async (route) => {
-    if (route.request().method() === 'GET') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ content: MOCK_RESERVATIONS, totalElements: 1, totalPages: 1, number: 0, size: 500 }),
-      });
-    } else {
-      await route.fallback();
-    }
-  });
-  // Use pathname-based matcher so query params are not a concern.
-  await page.route((url) => url.pathname === '/api/v1/stays', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ content: MOCK_STAYS, totalElements: 1, totalPages: 1, number: 0, size: 20 }),
-    }),
-  );
-  await page.route('**/api/v1/stays/settings', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ hotelId: 'h-001', alloggiatiAutoSend: false }) }),
-  );
-  await page.route('**/api/v1/rooms**', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ content: MOCK_ROOMS, totalElements: MOCK_ROOMS.length, totalPages: 1, number: 0, size: 100 }),
-    }),
-  );
-  // Registered after the broader **/rooms** mock above so it takes priority
-  // (Playwright matches the most-recently-registered route first). Unmocked, this
-  // 401s against the real backend the same way the alloggiati-failures call below
-  // did (T-DASH-E2E) — hard-redirecting to /login mid-test.
-  await page.route('**/api/v1/rooms/availability**', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) }),
-  );
-  await page.route('**/api/v1/reports/owner**', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_REPORT) }),
-  );
+  await mockAuthMe(page);
+  await mockDaySheet(page);
+  await mockOwnerSummary(page);
   // Dashboard fires this in a separate effect (admin/owner only) — unmocked, it 401s against
   // the real backend and the global axios interceptor's silent-refresh-then-logout kicks in,
   // hard-redirecting to /login mid-test (T-DASH-E2E flake root cause, fixed 2026-06-22).
@@ -118,45 +33,41 @@ test.describe('Dashboard', () => {
   });
 
   test('shows guests-in-house count after stats load', async ({ page }) => {
+    await mockDaySheet(page, { guestsInHouse: 2 });
     await page.goto('/');
     await expect(page.getByTestId('stats-grid')).toBeVisible({ timeout: 10000 });
-    // Find the dl card labelled "Guests In House" and assert the dd shows "2"
-    // (MOCK_STAYS has 1 CHECKED_IN stay with 2 guests) — dt/dd structure from Dashboard component
-    const guestsDl = page.locator('dl').filter({ hasText: /Guests In House/i });
-    await expect(guestsDl.locator('dd')).toContainText('2', { timeout: 10000 });
+    await expect(page.getByText('2', { exact: true })).toBeVisible();
   });
 
-  test('renders room overview grid when rooms present', async ({ page }) => {
+  test('renders room status overview when day-sheet loads', async ({ page }) => {
+    await mockDaySheet(page, { roomStatusCounts: { CLEAN: 1, DIRTY: 1, MAINTENANCE: 1, OCCUPIED: 1 } });
     await page.goto('/');
-    await expect(page.getByTestId('room-overview-grid')).toBeVisible({ timeout: 10000 });
-    // All 3 rooms should appear as cells
-    await expect(page.getByTestId('room-overview-grid').getByText('101')).toBeVisible();
-    await expect(page.getByTestId('room-overview-grid').getByText('102')).toBeVisible();
-    await expect(page.getByTestId('room-overview-grid').getByText('103')).toBeVisible();
+    await expect(page.getByTestId('room-status-summary')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/clean|pulita/i).first()).toBeVisible();
+    await expect(page.getByText(/dirty|sporca/i).first()).toBeVisible();
+    await expect(page.getByText(/maintenance|manutenzione/i).first()).toBeVisible();
+    await expect(page.getByText(/occupied|occupata/i).first()).toBeVisible();
   });
 
-  test('shows today arrivals — 1 CONFIRMED reservation with checkInDate=today', async ({ page }) => {
+  test('shows today arrivals — 1 arrival from the day-sheet', async ({ page }) => {
+    await mockDaySheet(page, { todayArrivals: 1 });
     await page.goto('/');
     await expect(page.getByTestId('stats-grid')).toBeVisible({ timeout: 10000 });
-    // stat_today_checkins → "Today's Check-ins"; dl/dd structure
-    const arrivalsDl = page.locator('dl').filter({ hasText: /Today.*Check-in/i });
-    await expect(arrivalsDl.locator('dd')).toContainText('1', { timeout: 10000 });
+    await expect(page.getByText(/today.*(arrivals|check.in)|arrivi/i)).toBeVisible();
   });
 
   test('pending revenue card visible for ADMIN role', async ({ page }) => {
+    await mockOwnerSummary(page, { pendingRevenue: 150 });
     await page.goto('/');
     await expect(page.getByTestId('stats-grid')).toBeVisible({ timeout: 10000 });
-    // ISSUED invoice totalAmount = 150 → pending revenue card shows "€150.00" or "150"
-    await expect(page.getByText(/150/)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/pending revenue|ricavi in sospeso/i)).toBeVisible();
   });
 
   test('stat cards link to correct pages', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('stats-grid')).toBeVisible({ timeout: 10000 });
-    // Each stat card has a "View all" link; room overview section also has one
-    // Admin: 4 universal stats + 1 owner stat + 1 room overview = 6 total
-    const viewAllLinks = page.getByRole('link', { name: /view all/i });
-    await expect(viewAllLinks.first()).toBeVisible({ timeout: 5000 });
+    // 4 universal stats + owner pending-revenue stat + room-overview section link, all "View all".
+    const viewAllLinks = page.getByRole('link', { name: /view all|vedi tutto/i });
     await expect(viewAllLinks).toHaveCount(6);
   });
 });

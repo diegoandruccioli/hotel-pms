@@ -80,10 +80,10 @@ test.describe('Admin Users management', () => {
     await page.getByRole('button', { name: /new user/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3000 });
 
-    await page.locator('#new-username').fill('newstaff');
-    await page.locator('#new-email').fill('newstaff@hotel.com');
-    await page.locator('#new-password').fill('SecurePass123');
-    await page.locator('#new-role').selectOption('RECEPTIONIST');
+    await page.getByLabel('Username').fill('newstaff');
+    await page.getByLabel('Email').fill('newstaff@hotel.com');
+    await page.getByLabel('Temporary Password').fill('SecurePass123');
+    await page.getByLabel('Role').selectOption('RECEPTIONIST');
 
     await page.getByRole('button', { name: /^create$/i }).click();
 

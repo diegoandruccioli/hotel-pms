@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { mockDaySheet, mockOwnerSummary } from './fixtures/mockApi';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -56,36 +57,11 @@ test.describe('Authentication – Happy Path', () => {
       });
     });
 
-    // Dashboard aggregates 5 API calls. Mock them all so the stats-grid renders
-    // instead of the error state (the mock SESSION cookie is not a valid JWT).
-    const emptyPage = { content: [], totalElements: 0, totalPages: 0, number: 0, size: 20 };
-    await page.route('**/api/v1/guests/search**', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(emptyPage) })
-    );
-    await page.route('**/api/v1/reservations**', async (route) => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(emptyPage) });
-      } else {
-        await route.fallback();
-      }
-    });
-    await page.route((url) => url.pathname === '/api/v1/stays', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(emptyPage) })
-    );
-    await page.route('**/api/v1/rooms**', (route) =>
-      // totalElements ≥ 1 avoids division-by-zero in dashboard percentage calculation
-      route.fulfill({ status: 200, contentType: 'application/json',
-        body: JSON.stringify({ content: [], totalElements: 1, totalPages: 1, number: 0, size: 100 }) })
-    );
-    // Registered after the broader **/rooms** mock above so it takes priority
-    // (Playwright matches the most-recently-registered route first).
-    await page.route('**/api/v1/rooms/availability**', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
-    );
-    await page.route('**/api/v1/reports/owner**', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json',
-        body: JSON.stringify({ invoices: [], startDate: '2000-01-01', endDate: '2099-12-31' }) })
-    );
+    // Dashboard now fetches the day-sheet aggregate (plus owner-summary for
+    // admin/owner) instead of five separate client calls — mock both so the
+    // stats-grid renders instead of the error state.
+    await mockDaySheet(page);
+    await mockOwnerSummary(page);
 
     // -----------------------------------------------------------------------
     // PHASE 2 – Navigate to the root URL.

@@ -35,6 +35,30 @@ async function mockDashboardApis(page: import('@playwright/test').Page): Promise
   );
 }
 
+const EMPTY_KPI_PERIOD = {
+  periodStart: '2026-01-01',
+  totalRoomRevenue: 0,
+  occupiedRoomNights: 0,
+  availableRoomNights: 0,
+  adr: 0,
+  revpar: 0,
+  occupancyRate: 0,
+};
+
+// OwnerDashboard unconditionally mounts KpiTrendSection, which fetches this
+// endpoint regardless of role (any ADMIN/OWNER who reaches the page triggers
+// it) — unmocked, it 401s and the axios interceptor's logout redirect fires
+// before the "Owner Dashboard" heading assertion below can observe it.
+function mockKpiReport(page: import('@playwright/test').Page): Promise<void> {
+  return page.route('**/api/v1/reports/kpi**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ periods: [], totals: EMPTY_KPI_PERIOD }),
+    })
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Test Suite: RBAC Enforcement
 // ---------------------------------------------------------------------------
@@ -80,6 +104,7 @@ test.describe('Security – RBAC Enforcement', () => {
       })
     );
     await mockDashboardApis(page);
+    await mockKpiReport(page);
 
     await page.goto('/owner-dashboard');
 
@@ -104,6 +129,7 @@ test.describe('Security – RBAC Enforcement', () => {
       })
     );
     await mockDashboardApis(page);
+    await mockKpiReport(page);
 
     await page.goto('/owner-dashboard');
 

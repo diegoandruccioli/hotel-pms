@@ -65,6 +65,9 @@ test.describe('Guests', () => {
         await route.fallback();
       }
     });
+    // Guests.tsx always uses the paginated search endpoint now, even with an
+    // empty query — the bare GET /api/v1/guests list above is no longer
+    // called by this page but is left mocked in case other flows need it.
     await page.route('**/api/v1/guests/search**', (route) => {
       const url = new URL(route.request().url());
       const query = (url.searchParams.get('query') ?? '').toLowerCase();
@@ -114,9 +117,9 @@ test.describe('Guests', () => {
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3000 });
 
     // Fill in required fields
-    await page.locator('#firstName').fill('Luca');
-    await page.locator('#lastName').fill('Verdi');
-    await page.locator('#email').fill('luca.verdi@test.com');
+    await page.getByLabel('First Name').fill('Luca');
+    await page.getByLabel('Last Name').fill('Verdi');
+    await page.getByLabel('Email (if no phone)').fill('luca.verdi@test.com');
 
     // Submit the form
     await page.getByRole('button', { name: /save|salva/i }).click();
@@ -132,7 +135,7 @@ test.describe('Guests', () => {
     await page.getByRole('button', { name: /edit/i }).first().click();
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3000 });
     // Modal pre-fills first name
-    await expect(page.locator('#firstName')).toHaveValue('Mario');
+    await expect(page.getByLabel('First Name')).toHaveValue('Mario');
   });
 
   test('shows delete confirmation for admin', async ({ page }) => {

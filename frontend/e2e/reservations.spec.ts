@@ -115,8 +115,10 @@ test.describe('Reservations', () => {
   test('shows check-in button for CONFIRMED reservation', async ({ page }) => {
     await page.goto('/reservations');
     await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
-    // Check-in button should appear next to the CONFIRMED reservation
-    await expect(page.getByRole('button', { name: /check.in/i }).first()).toBeVisible();
+    // res-001 (Mario Rossi) is CONFIRMED. Row check-in action is a distinct
+    // data-testid because the "Check In" text also labels the sortable
+    // checkInDate column header, which M3DataTable also renders as a button.
+    await expect(page.getByTestId('check-in-btn-res-001')).toBeVisible();
   });
 
   test('navigates to check-in form when check-in clicked', async ({ page }) => {
@@ -139,7 +141,7 @@ test.describe('Reservations', () => {
 
     await page.goto('/reservations');
     await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
-    await page.getByRole('button', { name: /check.in/i }).first().click();
+    await page.getByTestId('check-in-btn-res-001').click();
     await expect(page).toHaveURL(/\/stays\/check-in\//);
   });
 
