@@ -81,7 +81,12 @@ const RoomCard = memo(({
 
   return (
     <div className={`rounded-shape-md border-2 p-4 flex flex-col gap-3 shadow-elevation-1 transition-all ${STATUS_CARD_STYLES[room.status]}`}>
-      <div className="flex items-start justify-between gap-2">
+      {/* flex-wrap: the checkbox + room-number block + status chip can outgrow a
+          4-up grid column for the longer status labels (e.g. "Maintenance").
+          Without wrapping, the flex-1 min-w-0 heading block was the only shrinkable
+          item and got squeezed to zero width — the room number disappeared
+          entirely instead of just re-flowing the chip onto its own line. */}
+      <div className="flex items-start justify-between gap-2 flex-wrap">
         {room.status !== 'OCCUPIED' && (
           <M3Checkbox
             label={t('select_room', { number: room.roomNumber })}
@@ -90,9 +95,9 @@ const RoomCard = memo(({
             onChange={handleToggle}
           />
         )}
-        <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-display font-bold text-on-surface">{t('room_number', { number: room.roomNumber })}</h3>
-          <p className="text-xs font-body font-medium uppercase tracking-wide text-on-surface-variant">{room.roomType?.name}</p>
+        <div className="flex-1 min-w-[4rem]">
+          <h3 className="text-lg font-display font-bold text-on-surface truncate">{t('room_number', { number: room.roomNumber })}</h3>
+          <p className="text-xs font-body font-medium uppercase tracking-wide text-on-surface-variant truncate">{room.roomType?.name}</p>
         </div>
         <M3StatusChip label={t(STATUS_KEYS[room.status])} tone={STATUS_TONES[room.status]} />
       </div>
@@ -311,6 +316,7 @@ const BulkStatusButton = memo(({ status, disabled, onClick, t }: {
     <button
       onClick={handleClick}
       disabled={disabled}
+      data-testid={`bulk-status-${status}`}
       className={`flex items-center justify-center min-h-[40px] text-xs font-medium font-body border rounded-shape-sm px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${STATUS_BUTTON_STYLES[status]}`}
     >
       {t(STATUS_KEYS[status])}

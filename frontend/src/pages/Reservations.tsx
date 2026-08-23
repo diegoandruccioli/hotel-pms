@@ -148,7 +148,11 @@ const ActionsCell = ({ reservation, onCheckIn, onView, onEdit, onDelete, t }: Ac
   return (
     <div className="text-right">
       {reservation.status === 'CONFIRMED' && (
-        <M3TableActionLink className="mr-4" onClick={handleCheckInClick}>
+        <M3TableActionLink
+          className="mr-4"
+          data-testid={`check-in-btn-${reservation.id}`}
+          onClick={handleCheckInClick}
+        >
           {t('check_in')}
         </M3TableActionLink>
       )}
