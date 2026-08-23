@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
  * that triggered the call.
  */
 @FeignClient(name = "api-gateway")
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface GatewayEventsClient {
 
     Logger LOG = LoggerFactory.getLogger(GatewayEventsClient.class);
