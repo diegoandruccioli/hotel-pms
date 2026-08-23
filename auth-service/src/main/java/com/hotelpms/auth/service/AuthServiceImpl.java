@@ -86,25 +86,30 @@ public class AuthServiceImpl implements AuthService {
                 request.password(), user != null ? user.getPasswordHash() : dummyHash());
 
         if (user == null) {
-            log.warn("[AUTH] LOGIN_FAILED | user={} | reason=USER_NOT_FOUND", request.username());
+            log.warn("[AUTH] LOGIN_FAILED | user={} | reason=USER_NOT_FOUND", sanitizeForLog(request.username()));
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
 
         final Optional<Instant> lockedUntil = loginAttemptService.getLockedUntil(user.getUsername(), clientIp);
         if (lockedUntil.isPresent() && Instant.now().isBefore(lockedUntil.get())) {
+            // codeql[java/log-injection]: sanitizeForLog strips CR/LF below (CWE-117) — CodeQL's
+            // standard query doesn't model this project's custom sanitizer as a taint sanitizer.
             log.warn("[AUTH] LOGIN_BLOCKED | user={} | ip={} | reason=ACCOUNT_LOCKED | until={}",
-                    user.getUsername(), clientIp, lockedUntil.get());
+                    sanitizeForLog(user.getUsername()), sanitizeForLog(clientIp), lockedUntil.get());
             throw new AccountLockedException("ACCOUNT_TEMPORARILY_LOCKED");
         }
 
         if (!passwordMatches) {
             final LoginAttemptResult result = loginAttemptService.recordFailure(user.getUsername(), clientIp);
             if (result.locked()) {
+                // codeql[java/log-injection]: see sanitizeForLog note above.
                 log.warn("[AUTH] ACCOUNT_LOCKED | user={} | ip={} | attempts={} | until={}",
-                        user.getUsername(), clientIp, result.attempts(), result.lockedUntil());
+                        sanitizeForLog(user.getUsername()), sanitizeForLog(clientIp), result.attempts(),
+                        result.lockedUntil());
             } else {
+                // codeql[java/log-injection]: see sanitizeForLog note above.
                 log.warn("[AUTH] LOGIN_FAILED | user={} | ip={} | reason=BAD_PASSWORD | attempts={}",
-                        user.getUsername(), clientIp, result.attempts());
+                        sanitizeForLog(user.getUsername()), sanitizeForLog(clientIp), result.attempts());
             }
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
@@ -275,5 +280,16 @@ public class AuthServiceImpl implements AuthService {
             dummyPasswordHash = hash;
         }
         return hash;
+    }
+
+    /**
+     * Strips CR/LF from a value before it is written to the log, to prevent an
+     * attacker-controlled username or client IP from forging log entries (CWE-117).
+     *
+     * @param value the raw value to sanitize
+     * @return the value with carriage returns and line feeds replaced
+     */
+    private static String sanitizeForLog(final String value) {
+        return value.replaceAll("[\r\n]", "_");
     }
 }
