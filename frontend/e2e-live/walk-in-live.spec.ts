@@ -24,8 +24,14 @@ test.describe('Walk-in check-in against the real backend (Fase 7 / item 20)', ()
     test('completes a walk-in, opens an invoice, and charges a real ROOM_NIGHT line item', async ({ page }) => {
         await page.goto('/stays/walk-in');
 
-        await expect(page.locator('#walkin-room')).toBeVisible({ timeout: 15000 });
-        await page.locator('#walkin-room').selectOption({ value: roomId });
+        // 2026-08-24: #walkin-room/#walkin-guest/#walkin-checkout no longer exist —
+        // an earlier M3Select/M3TextField migration (this branch, before this session)
+        // dropped the raw id props in favor of accessible label-based lookup. Switched
+        // to role+label locators to match; this test was stale (not run in CI, per its
+        // own header comment) and nobody had re-run it against the live stack since.
+        const roomSelect = page.getByRole('combobox', { name: /^Room/i });
+        await expect(roomSelect).toBeVisible({ timeout: 15000 });
+        await roomSelect.selectOption({ value: roomId });
 
         // Search by the (unique) email, not the fixed "Live Suite Guest" name:
         // guest search sorts by lastName with every fixture from every run of
@@ -34,14 +40,14 @@ test.describe('Walk-in check-in against the real backend (Fase 7 / item 20)', ()
         // one we just created might not be on the results page's default
         // size. The backend search also matches email (searchByKeywordAndHotelId),
         // which is unique per run.
-        await page.locator('#walkin-guest').fill(guestEmail);
+        await page.getByRole('searchbox', { name: 'Primary Guest' }).fill(guestEmail);
         const guestOption = page.getByRole('option', { name: guestEmail });
         await expect(guestOption).toBeVisible({ timeout: 5000 });
         await guestOption.click();
 
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
-        await page.locator('#walkin-checkout').fill(tomorrow.toISOString().split('T')[0]);
+        await page.getByLabel('Expected Check-out Date').fill(tomorrow.toISOString().split('T')[0]);
 
         // Minimum-path Alloggiati fields (no document/comune required):
         // FAMILIARE traveller type + foreign birthplace. Unlike the mocked

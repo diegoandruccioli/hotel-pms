@@ -40,27 +40,25 @@ describe('AlloggiatiReportSection', () => {
     expect(screen.queryByText('alloggiati_submit')).not.toBeInTheDocument();
   });
 
+  // 2026-08-24 follow-up (REPORT.md §6 #3b): downloadAlloggiatiReport/downloadAlloggiatiJson
+  // switched from an async blob-fetch to a synchronous hidden-iframe trigger (same pattern
+  // billingService.ts's downloadPdf already uses — see stayService.ts's comment). They can no
+  // longer reject, so there is no download-rejection path to test here anymore, same as
+  // billingService.test.ts has no such test for downloadPdf: any non-download error response
+  // is now contained inside the iframe instead of surfacing to this component.
+
   it('downloads the TXT report and shows a success toast', async () => {
-    vi.mocked(stayService.downloadAlloggiatiReport).mockResolvedValueOnce(undefined);
     render(<AlloggiatiReportSection isAdminOrOwner={false} />);
     fireEvent.click(screen.getByText('generate_and_download'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('alloggiati_report_downloaded', 'success'));
-  });
-
-  it('shows an error toast when the TXT download fails', async () => {
-    vi.mocked(stayService.downloadAlloggiatiReport)
-      .mockRejectedValueOnce(mockAxiosErrorWithDetail('Nessuna presenza da riportare per la data selezionata'));
-    render(<AlloggiatiReportSection isAdminOrOwner={false} />);
-    fireEvent.click(screen.getByText('generate_and_download'));
-    await waitFor(() =>
-      expect(mockAddToast).toHaveBeenCalledWith('Nessuna presenza da riportare per la data selezionata', 'error'));
+    expect(stayService.downloadAlloggiatiReport).toHaveBeenCalled();
   });
 
   it('downloads the JSON export for admin/owner and shows a success toast', async () => {
-    vi.mocked(stayService.downloadAlloggiatiJson).mockResolvedValueOnce(undefined);
     render(<AlloggiatiReportSection isAdminOrOwner />);
     fireEvent.click(screen.getByText('download_json_export'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('alloggiati_json_downloaded', 'success'));
+    expect(stayService.downloadAlloggiatiJson).toHaveBeenCalled();
   });
 
   describe('submit to PS portal', () => {

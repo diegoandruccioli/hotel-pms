@@ -228,8 +228,12 @@ test.describe('QA 2026-08-24 — F&B order to room charge', () => {
   });
 });
 
-test.describe('QA 2026-08-24 — grey path: check-in form has no deep-link/refresh support', () => {
-  test('a direct navigation (or refresh) on /stays/check-in/:id loses roomId/guestId context, since CheckInForm reads them from router state, not the API', async ({ page, request }) => {
+test.describe('QA 2026-08-24 — grey path: check-in form deep-link/refresh support', () => {
+  test('a direct navigation on /stays/check-in/:id (no router state) fetches the reservation and completes check-in', async ({ page, request }) => {
+    // Fixed 2026-08-24 (REPORT.md §6 #5): CheckInForm.tsx used to read
+    // roomId/guestId/expectedGuests ONLY from React Router location.state (set by
+    // Reservations.tsx's handleCheckIn) — a direct navigation, bookmark, or page
+    // refresh lost them entirely. Now falls back to GET /api/v1/reservations/{id}.
     const headers = await csrfHeader(request);
     const room = await createCleanRoom(request, headers);
     const guest = await createGuest(request, headers);
@@ -248,20 +252,29 @@ test.describe('QA 2026-08-24 — grey path: check-in form has no deep-link/refre
     });
     const reservation = await reservationResponse.json();
 
-    setContext(`/stays/check-in/${reservation.id}`, 'deep-link-missing-state');
+    setContext(`/stays/check-in/${reservation.id}`, 'deep-link-fallback-fetch');
+    // Direct navigation — no click-through from /reservations, so no location.state.
     await page.goto(`/stays/check-in/${reservation.id}`);
-    await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined);
-    const errorVisible = await page.getByRole('alert').isVisible().catch(() => false);
-    const submitDisabledOrMissing = await page.getByRole('button', { name: /complete check-?in/i }).count() === 0;
-    logCustom('finding', {
-      area: 'CheckInForm deep-link',
-      summary: 'Direct navigation or a page refresh on /stays/check-in/:reservationId loses roomId/guestId (carried only via React Router location.state, set by Reservations.tsx handleCheckIn), leaving the user on a form that cannot complete check-in with no route back except manual navigation.',
-      errorVisible, submitDisabledOrMissing,
-      severity: 'minor-to-moderate',
-      repro: `GET /stays/check-in/${reservation.id} directly (bookmark, refresh, or shared link) instead of clicking the Reservations row's check-in button`,
-    });
-    // Documents the behavior — not asserted as pass/fail either way, since
-    // whether this is "acceptable" (app is not meant to be deep-linked) or a
-    // real gap is a product call, not something this test should decide.
+    await expect(page.getByRole('button', { name: /complete check-?in/i })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('err_missing_context')).toHaveCount(0);
+
+    const travellerType = page.locator('#traveller-type-0');
+    if (await travellerType.count() > 0) {
+      await travellerType.selectOption({ value: 'FAMILIARE' });
+      await page.locator('#stato-nascita-0').fill('FRANC');
+      await expect(page.getByRole('option', { name: /FRANCIA/i })).toBeVisible({ timeout: 5_000 });
+      await page.getByRole('option', { name: /FRANCIA/i }).click();
+      await page.locator('input[name="dateOfBirth"]').first().fill('1990-01-01');
+    }
+
+    const [checkinResponse] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/v1/stays') && r.request().method() === 'POST'),
+      page.getByRole('button', { name: /complete check-?in/i }).click(),
+    ]);
+    const body = await checkinResponse.text();
+    expect(checkinResponse.status(), body).toBe(201);
+    const stay = JSON.parse(body) as { roomId: string; invoiceId: string | null };
+    expect(stay.roomId, 'deep-linked check-in must still resolve to the correct room from the reservation').toBe(room.id);
+    expect(stay.invoiceId).toBeTruthy();
   });
 });

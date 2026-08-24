@@ -114,6 +114,35 @@ class HotelSettingsControllerTest {
     }
 
     @Test
+    void shouldRejectMalformedVatNumberWith400() throws Exception {
+        // 2026-08-24 follow-up (REPORT.md §6 #6): vatNumber previously had no backend
+        // format validation — only the frontend's regex guarded it, trivially bypassed
+        // via direct API. Mirrors cap's own @Pattern guard on this same DTO.
+        final HotelSettingsRequest request = new HotelSettingsRequest(
+                null, null, null, "NOT-A-VAT-NUMBER!!", null, null, null, null, null,
+                null, null, null, null, null, null, null, null);
+
+        mockMvc.perform(put(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldAccept11DigitVatNumber() throws Exception {
+        final HotelSettingsRequest request = new HotelSettingsRequest(
+                null, null, null, "01234567890", null, null, null, null, null,
+                null, null, null, null, null, null, null, null);
+        when(hotelSettingsService.update(eq(hotelId), any(HotelSettingsRequest.class)))
+                .thenReturn(settingsResponse);
+
+        mockMvc.perform(put(BASE_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void shouldUpdateSettingsReturn200WithAutoSendFalse() throws Exception {
         final HotelSettingsRequest request = new HotelSettingsRequest(
                 false, HOTEL_NAME, null, null, null, null, null, null, null,

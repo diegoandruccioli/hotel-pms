@@ -6,6 +6,7 @@ import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { stayService } from '../../services/stayService';
 import { guestService } from '../../services/guestService';
+import { reservationService } from '../../services/reservationService';
 import type {
   AlloggiatiStato,
   AlloggiatiTipdoc,
@@ -53,17 +54,52 @@ export const CheckInForm = memo(() => {
   const [stati, setStati] = useState<AlloggiatiStato[]>([]);
   const [tipdoc, setTipdoc] = useState<AlloggiatiTipdoc[]>([]);
 
+  // location.state (set by Reservations.tsx's handleCheckIn) is the normal path — but a
+  // direct navigation, bookmark, or page refresh loses it entirely. Fall back to fetching
+  // the reservation itself so this route is actually deep-linkable/refreshable, not just
+  // reachable from one specific button.
+  const [fallbackState, setFallbackState] = useState<CheckInState | null>(null);
+  const [contextLoading, setContextLoading] = useState(!state && !!reservationId);
+  const effectiveState = state ?? fallbackState;
+
+  useEffect(() => {
+    if (state || !reservationId) return; // location.state present, or no id to look up
+    let cancelled = false;
+    setContextLoading(true);
+    reservationService.getReservationById(reservationId)
+      .then((r) => {
+        if (cancelled) return;
+        const roomId = r.lineItems[0]?.roomId;
+        if (roomId) {
+          setFallbackState({ guestId: r.guestId, roomId, expectedGuests: r.expectedGuests });
+        }
+      })
+      .catch(() => { /* leave fallbackState null — existing err_missing_context path still applies */ })
+      .finally(() => { if (!cancelled) setContextLoading(false); });
+    return () => { cancelled = true; };
+  }, [state, reservationId]);
+
   const initialCount = state?.expectedGuests && state.expectedGuests > 0 ? state.expectedGuests : 1;
   const [guests, setGuests] = useState<IdentifiableGuest[]>(
     Array.from({ length: initialCount }, (_, i) => emptyGuest(i === 0))
   );
+
+  // Resizes the guest list once the fallback fetch resolves — the useState initializer
+  // above only runs on mount, before an async fallback could possibly have data yet.
+  useEffect(() => {
+    if (state || !fallbackState) return; // location.state already sized `guests` correctly
+    const count = fallbackState.expectedGuests > 0 ? fallbackState.expectedGuests : 1;
+    setGuests(prev => prev.length === count
+      ? prev
+      : Array.from({ length: count }, (_, i) => prev[i] ?? emptyGuest(i === 0)));
+  }, [state, fallbackState]);
 
   useEffect(() => {
     stayService.getLookupStati().then(setStati).catch(() => { /* non-blocking */ });
     stayService.getLookupTipdoc().then(setTipdoc).catch(() => { /* non-blocking */ });
   }, []);
 
-  const guestId = state?.guestId;
+  const guestId = effectiveState?.guestId;
   useEffect(() => {
     if (!guestId) return;
 
@@ -121,7 +157,7 @@ export const CheckInForm = memo(() => {
     e.preventDefault();
     setError(null);
 
-    if (!reservationId || !state?.roomId || !state?.guestId) {
+    if (!reservationId || !effectiveState?.roomId || !effectiveState?.guestId) {
       setError(t('err_missing_context'));
       return;
     }
@@ -155,8 +191,8 @@ export const CheckInForm = memo(() => {
 
       const request: StayRequest = {
         reservationId,
-        guestId: state.guestId,
-        roomId: state.roomId,
+        guestId: effectiveState.guestId,
+        roomId: effectiveState.roomId,
         status: 'CHECKED_IN',
         guests: apiGuests,
       };
@@ -169,7 +205,7 @@ export const CheckInForm = memo(() => {
     } finally {
       setLoading(false);
     }
-  }, [reservationId, state, guests, navigate, t]);
+  }, [reservationId, effectiveState, guests, navigate, t]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -196,6 +232,11 @@ export const CheckInForm = memo(() => {
         </div>
       )}
 
+      {contextLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} noValidate className="space-y-6">
         {guests.map((guest, index) => (
           <GuestFieldSection
@@ -219,6 +260,7 @@ export const CheckInForm = memo(() => {
           </M3Button>
         </div>
       </form>
+      )}
     </div>
   );
 });

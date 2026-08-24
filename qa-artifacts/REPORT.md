@@ -6,11 +6,11 @@ route in the SPA, console/network cleanliness, download validity, and the config
 fiscal flows (Alloggiati Web, FatturaPA, imposta di soggiorno) under complete / missing /
 malformed settings.
 
-**Update (2026-08-24, follow-up pass):** defects #1 (KPI report 500) and #2 (RICEVUTA→FATTURA
-blocked after payment) — the two critical/high findings — have been fixed and verified live; see
-§6 for the resolution notes. Defects #3–#6 (Alloggiati all-or-nothing validation + risky download
-pattern, `/me` rate-limit bucket, CheckInForm deep-link gap, VAT format validation) remain open
-and fully specified for a future pass.
+**Update (2026-08-24, follow-up passes):** all 6 defects — KPI report 500, RICEVUTA→FATTURA
+blocked after payment, Alloggiati all-or-nothing validation + risky download pattern, `/me`
+rate-limit bucket, CheckInForm deep-link gap, and VAT format validation — have been fixed and
+verified live. See §6 for per-defect resolution notes and §8 for a housekeeping note from the
+final regression pass.
 
 Test code lives at `frontend/e2e-live/qa2408/` (five new spec files extending the repo's
 existing `npm run test:e2e:live` live-stack harness — see §Methodology). Raw event log:
@@ -298,7 +298,7 @@ user decision during triage.
 
 ---
 
-### 🟡 3. MODERATE — Alloggiati daily report is all-or-nothing: one bad guest record blocks the entire day for everyone
+### 🟡 3. MODERATE — Alloggiati daily report is all-or-nothing: one bad guest record blocks the entire day for everyone — ✅ RISOLTO
 
 **Where:** `frontdesk-service/src/main/java/com/hotelpms/frontdesk/stays/service/impl/AlloggiatiReportServiceImpl.java:184-198`,
 method `validateGroupCoherence` (a real, correct TULPS/Alloggiati business rule: a `FAMILIARE`
@@ -339,9 +339,28 @@ so the "silent failure" symptom itself was **not** empirically reproduced here �
 real reliability risk worth fixing for consistency with the rest of the codebase, not as a
 confirmed live failure.
 
+**Fix applied (2026-08-24 follow-up):**
+- **3a:** `buildRows` now catches `AlloggiatiValidationException` per-stay inside the loop
+  (logs a WARN with hotelId/stayId/reason, then `continue`s) instead of letting it propagate and
+  abort the whole day. Both `generateReport` and `generateJsonReport` share this method, so both
+  call paths are fixed in one place. Four existing unit tests that asserted the old
+  abort-the-whole-report behavior (`shouldThrowWhenFamiliareHasNoCapofamiglia` and 3 siblings) were
+  rewritten to assert the corrected skip-and-continue behavior, plus a new
+  `shouldSkipOnlyTheInvalidStayAndKeepValidOnes` test proving one bad stay no longer takes down a
+  valid one in the same batch.
+- **3b:** `stayService.ts`'s `downloadAlloggiatiReport`/`downloadAlloggiatiJson` switched to the
+  same hidden-`<iframe>` pattern `billingService.ts` already uses for invoice PDF/FatturaPA XML,
+  dropping the blob+synthetic-click+immediate-revoke pattern entirely.
+
+**Verified live:** the QA regression test for this exact defect
+(`qa-downloads.spec.ts`'s "Alloggiati .txt and .json exports download..." — previously
+deliberately red, see that spec's own comment) is green again: `GET
+/api/v1/stays/reports/alloggiati?date=...` returns `200` (was `422` blocking the whole day), and
+both files land on disk via the iframe trigger with correct filename/Content-Disposition.
+
 ---
 
-### 🟡 4. MODERATE — `/api/v1/auth/me` shares the strict login-tier rate limit; a 429 there is treated as "logged out"
+### 🟡 4. MODERATE — `/api/v1/auth/me` shares the strict login-tier rate limit; a 429 there is treated as "logged out" — ✅ RISOLTO
 
 **Where:** API Gateway rate-limit config (bucket: `Replenish-Rate: 5`, `Burst-Capacity: 10` —
 matches README's documented `POST /login` limit, apparently applied to the whole `/api/v1/auth/**`
@@ -366,9 +385,19 @@ but a real robustness gap for a read-only bootstrap check tied to the brute-forc
 **Suggested fix (not applied):** Move `/api/v1/auth/me` (and `/refresh`) to the general rate-limit
 bucket, or add a distinct, more generous bucket for authenticated read-only session checks.
 
+**Fix applied (2026-08-24 follow-up):** added a dedicated `auth-service-me` route in
+`config-service/src/main/resources/config/api-gateway.yml`, matching only `/api/v1/auth/me`,
+listed before the `auth-service` catch-all (first-match routing) with the general rate limit
+(20 req/s, burst 50) instead of the strict one. `/login`, `/refresh`, `/change-password`,
+`/logout` stay on the strict bucket unchanged.
+
+**Verified live:** 15, then 55 (70 total), consecutive `GET /api/v1/auth/me` calls all returned
+`200` — the exact request pattern that produced two `429`s during this session's testing before
+the fix.
+
 ---
 
-### 🟢 5. MINOR — CheckInForm has no deep-link or refresh support
+### 🟢 5. MINOR — CheckInForm has no deep-link or refresh support — ✅ RISOLTO
 
 **Where:** `frontend/src/pages/Stays/CheckInForm.tsx:45,120-125` — reads `roomId`/`guestId` from
 React Router `location.state` (set only by `Reservations.tsx`'s `handleCheckIn`), not from an API
@@ -386,9 +415,21 @@ Reservations with no explanation of why the form "reset."
 **Suggested fix (not applied):** Fetch `roomId`/`guestId` from `GET /api/v1/reservations/{id}`
 when `location.state` is absent, falling back to the current behavior only if that also fails.
 
+**Fix applied (2026-08-24 follow-up):** exactly the suggested fix. When `location.state` is
+absent but `:reservationId` is present, `CheckInForm.tsx` now fetches the reservation via the
+existing `reservationService.getReservationById`, derives `guestId`/`roomId`/`expectedGuests`
+(from `lineItems[0].roomId`), and resizes the guest-count form accordingly, with a brief loading
+spinner while the fetch is in flight. Two new component tests cover the fallback-fetch success and
+failure paths (`CheckInForm.test.tsx`).
+
+**Verified live:** a reservation → direct `page.goto('/stays/check-in/:id')` with **no**
+`location.state` → the form now renders fully pre-configured and completes check-in for real,
+producing a stay on the correct room (previously would have shown `err_missing_context` on
+submit).
+
 ---
 
-### 🟢 6. MINOR — VAT number format is validated client-side only
+### 🟢 6. MINOR — VAT number format is validated client-side only — ✅ RISOLTO
 
 **Where:** `frontdesk-service/src/main/java/com/hotelpms/frontdesk/stays/dto/HotelSettingsRequest.java`
 (no `@Pattern` on `vatNumber`) vs. `frontend/src/pages/HotelProfile.tsx:15`
@@ -404,6 +445,13 @@ nothing stops a hotel's own fiscal identity from being silently garbage via dire
 
 **Suggested fix (not applied):** Add `@Pattern(regexp = "^$|\\d{11}")` to `HotelSettingsRequest.vatNumber`,
 mirroring the CAP/provincia pattern already present on the same DTO.
+
+**Fix applied (2026-08-24 follow-up):** exactly the suggested `@Pattern`. Two new controller tests
+(`HotelSettingsControllerTest`) confirm a malformed VAT is now rejected `400` and a real 11-digit
+one still succeeds `200`.
+
+**Verified live:** `PUT /api/v1/stays/settings {"vatNumber":"NOT-A-VAT-NUMBER!!"}` → `400` (was
+`200`); `{"vatNumber":"01234567890"}` → `200`, unchanged.
 
 ---
 
@@ -426,3 +474,18 @@ mirroring the CAP/provincia pattern already present on the same DTO.
   covers this class thoroughly (concurrent payments, concurrent invoice numbering) and was not
   re-run here; those findings are marked resolved in `docs/EXPLORATORY_TEST_2026-08.md` and were
   not independently re-verified this session.
+
+---
+
+## §8 Follow-up pass (2026-08-24) — housekeeping note
+
+While re-running the full `e2e-live` suite to verify Fixes 3–6 with no regressions, one unrelated,
+pre-existing issue surfaced and was fixed as routine test maintenance (not a new numbered defect,
+no application code touched): `walk-in-live.spec.ts` used stale `#walkin-room`/`#walkin-guest`/
+`#walkin-checkout` CSS-id locators that an earlier M3Select/M3TextField migration on this branch
+(predating this session) had already removed in favor of accessible label-based markup — that
+spec isn't wired into CI (per its own header comment) so nobody had re-run it since. Not a
+user-facing bug: the fields render and work correctly, just under a different (more accessible)
+lookup than the test still used. Updated to `getByRole`/`getByLabel` locators; the suite is fully
+green (77/77 across `checkout-live`, `walk-in-live`, `planning-board-live`,
+`idor-cross-tenant-live`, and every `qa2408` spec).

@@ -7,7 +7,6 @@ import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.domain.TravellerType;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
 import com.hotelpms.frontdesk.exception.AlloggiatiRowLimitExceededException;
-import com.hotelpms.frontdesk.exception.AlloggiatiValidationException;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiLookupService;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +42,7 @@ class AlloggiatiReportServiceImplTest {
     // Alloggiati portal codes used in test data
     // -----------------------------------------------------------------------
     private static final String CODICE_ITALIA = "100000100";
+    private static final String SKIPPED_NOT_THROWN_MSG = "the only stay is invalid and must be skipped, not thrown";
     private static final String CODICE_ROMA = "058091000";
     private static final String CODICE_GERMANIA = "100000083";
     private static final String CODICE_FRANCIA = "100000070";
@@ -499,42 +499,47 @@ class AlloggiatiReportServiceImplTest {
         assertTrue(report.isEmpty(), "Stay with no guests must be skipped");
     }
 
+    // NOTE: these four validation-failure cases used to assert that a single invalid stay
+    // aborted the WHOLE report (assertThrows). Fixed (2026-08-24 follow-up, REPORT.md §6 #3a):
+    // one bad stay must not block every other guest checked in that day — the offending stay
+    // is now skipped (logged at WARN) and the report/JSON export continues for the rest.
+    // See shouldSkipOnlyTheInvalidStayAndKeepValidOnes below for the mixed-stay case that
+    // actually proves the fix (a lone invalid stay skipped down to an empty report doesn't,
+    // by itself, distinguish "skipped" from "still throwing but swallowed somewhere else").
+
     @Test
-    void shouldThrowWhenFamiliareHasNoCapofamiglia() {
+    void shouldSkipStayWhenFamiliareHasNoCapofamiglia() {
         final StayGuest familiare = guestFamiliare(); // no CAPOFAMIGLIA in stay
         when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(familiare)));
 
-        final AlloggiatiValidationException ex = assertThrows(AlloggiatiValidationException.class,
-                () -> service.generateReport(reportDate, hotelId));
-        assertTrue(ex.getMessage().contains("ALLOGGIATI_FAMILIARE_WITHOUT_CAPO"));
+        final String report = assertDoesNotThrow(() -> service.generateReport(reportDate, hotelId));
+        assertTrue(report.isEmpty(), SKIPPED_NOT_THROWN_MSG);
     }
 
     @Test
-    void shouldThrowWhenMembroGruppoHasNoCapogruppo() {
+    void shouldSkipStayWhenMembroGruppoHasNoCapogruppo() {
         final StayGuest membro = guestMembroGruppo();
         when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(membro)));
 
-        final AlloggiatiValidationException ex = assertThrows(AlloggiatiValidationException.class,
-                () -> service.generateReport(reportDate, hotelId));
-        assertTrue(ex.getMessage().contains("ALLOGGIATI_MEMBRO_WITHOUT_CAPO"));
+        final String report = assertDoesNotThrow(() -> service.generateReport(reportDate, hotelId));
+        assertTrue(report.isEmpty(), SKIPPED_NOT_THROWN_MSG);
     }
 
     @Test
-    void shouldThrowWhenMultipleCapofamigliaInSameStay() {
+    void shouldSkipStayWhenMultipleCapofamigliaInSameStay() {
         final StayGuest capo1 = guestItalian(TravellerType.CAPOFAMIGLIA, true);
         final StayGuest capo2 = guestItalian(TravellerType.CAPOFAMIGLIA, false);
         when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
                 .thenReturn(List.of(stayWith(capo1, capo2)));
 
-        final AlloggiatiValidationException ex = assertThrows(AlloggiatiValidationException.class,
-                () -> service.generateReport(reportDate, hotelId));
-        assertTrue(ex.getMessage().contains("ALLOGGIATI_MULTIPLE_CAPOFAMIGLIA"));
+        final String report = assertDoesNotThrow(() -> service.generateReport(reportDate, hotelId));
+        assertTrue(report.isEmpty(), SKIPPED_NOT_THROWN_MSG);
     }
 
     @Test
-    void shouldThrowWhenCheckOutBeforeArrival() {
+    void shouldSkipStayWhenCheckOutBeforeArrival() {
         final StayGuest guest = guestItalian(TravellerType.OSPITE_SINGOLO, true);
         final Stay stay = Stay.builder()
                 .id(UUID.randomUUID())
@@ -547,9 +552,26 @@ class AlloggiatiReportServiceImplTest {
         stay.getGuests().add(guest);
         when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any())).thenReturn(List.of(stay));
 
-        final AlloggiatiValidationException ex = assertThrows(AlloggiatiValidationException.class,
-                () -> service.generateReport(reportDate, hotelId));
-        assertTrue(ex.getMessage().contains("ALLOGGIATI_INVALID_DATES"));
+        final String report = assertDoesNotThrow(() -> service.generateReport(reportDate, hotelId));
+        assertTrue(report.isEmpty(), SKIPPED_NOT_THROWN_MSG);
+    }
+
+    @Test
+    void shouldSkipOnlyTheInvalidStayAndKeepValidOnes() {
+        final StayGuest validGuest = guestItalian(TravellerType.OSPITE_SINGOLO, true);
+        final StayGuest invalidFamiliare = guestFamiliare(); // no CAPOFAMIGLIA in its own stay
+        when(stayRepository.findByActualCheckInTimeBetweenAndHotelId(any(), any(), any()))
+                .thenReturn(List.of(stayWith(validGuest), stayWith(invalidFamiliare)));
+        when(lookupService.findComuneByCodice(CODICE_ROMA)).thenReturn(Optional.of(comuneRoma()));
+        when(lookupService.findStatoByCodice(anyString())).thenReturn(Optional.empty());
+        when(lookupService.findTipdocByCodice(anyString())).thenReturn(Optional.empty());
+
+        final String report = assertDoesNotThrow(() -> service.generateReport(reportDate, hotelId),
+                "one invalid stay must not abort the report for the other, valid stay");
+
+        final String[] lines = report.split(CRLF, -1);
+        assertEquals(1, lines.length, "only the valid stay's guest should produce a row");
+        assertTrue(lines[0].startsWith(TIPALLOG_16), "the surviving record must be the valid OSPITE_SINGOLO");
     }
 
     // -----------------------------------------------------------------------

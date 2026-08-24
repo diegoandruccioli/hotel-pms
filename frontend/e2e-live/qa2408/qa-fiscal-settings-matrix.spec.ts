@@ -130,20 +130,29 @@ test.describe('QA 2026-08-24 — FatturaPA export vs hotel fiscal identity confi
     expect(body, 'error body should be readable, not empty').not.toBe('');
   });
 
-  test('(c) malformed config: a non-numeric VAT number is accepted by the backend (frontend-only validation)', async () => {
-    // HotelSettingsRequest.vatNumber has no @Pattern — HotelProfile.tsx's
-    // VAT_NUMBER_REGEX (/^\d{11}$/) is a frontend-only guard. Direct API bypass check.
+  test('(c) malformed config: a non-numeric VAT number is rejected by the backend', async () => {
+    // Fixed 2026-08-24 (REPORT.md §6 #6): HotelSettingsRequest.vatNumber now has
+    // @Pattern(regexp = "^$|\\d{11}") — previously only HotelProfile.tsx's
+    // VAT_NUMBER_REGEX (/^\d{11}$/) guarded this, trivially bypassed via direct API.
     const updateResponse = await otherHotelContext.put('/api/v1/stays/settings', {
       headers: otherHotelHeaders,
       data: { hotelName: 'QA Malformed Hotel', vatNumber: 'NOT-A-VAT-NUMBER!!' },
     });
     logCustom('fiscal_matrix_result', {
-      flow: 'fatturaPA', state: 'malformed_vat_accepted_check', status: updateResponse.status(),
+      flow: 'fatturaPA', state: 'malformed_vat_rejected_check', status: updateResponse.status(),
     });
-    expect(updateResponse.status(), 'backend accepted a non-numeric VAT number with no format validation')
-      .toBe(200);
+    expect(updateResponse.status(), 'backend should reject a non-numeric VAT number as 400')
+      .toBe(400);
+  });
+
+  test('(c) malformed config: an 11-digit VAT number is still accepted', async () => {
+    const updateResponse = await otherHotelContext.put('/api/v1/stays/settings', {
+      headers: otherHotelHeaders,
+      data: { vatNumber: '01234567890' },
+    });
+    expect(updateResponse.status(), await updateResponse.text()).toBe(200);
     const stored = await updateResponse.json();
-    expect(stored.vatNumber).toBe('NOT-A-VAT-NUMBER!!');
+    expect(stored.vatNumber).toBe('01234567890');
   });
 });
 

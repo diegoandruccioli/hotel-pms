@@ -18,7 +18,7 @@ import jakarta.validation.constraints.Size;
  *                                        report at check-in ({@code null} = unchanged)
  * @param hotelName                      display name of the hotel property (optional)
  * @param address                        full street address including civic number (optional)
- * @param vatNumber                      Partita IVA — Italian VAT number (optional)
+ * @param vatNumber                      Partita IVA — Italian VAT number, 11 digits (optional)
  * @param fiscalCode                     Codice Fiscale — Italian fiscal code (optional)
  * @param logoUrl                        URL of the hotel logo image (optional)
  * @param alloggiatiUsername             Alloggiati Web portal username for this hotel (optional —
@@ -49,7 +49,7 @@ public record HotelSettingsRequest(
         Boolean alloggiatiAutoSend,
         String hotelName,
         String address,
-        String vatNumber,
+        @Pattern(regexp = "^$|\\d{11}", message = "vatNumber must be 11 digits") String vatNumber,
         String fiscalCode,
         @Size(max = MAX_LOGO_URL_LENGTH) @Pattern(regexp = "^$|https?://.+", message = "logoUrl must be a valid http(s) URL")
                 String logoUrl,

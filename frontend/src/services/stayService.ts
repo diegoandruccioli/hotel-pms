@@ -17,6 +17,7 @@ import type {
 import type { SpringPage } from '../types/page.types';
 
 const BASE_PATH = '/api/v1/stays';
+const IFRAME_CLEANUP_DELAY_MS = 10000;
 
 export const stayService = {
   getAllStays: async (page = 0, size = 20): Promise<SpringPage<StayResponse>> => {
@@ -61,18 +62,25 @@ export const stayService = {
     return response.data;
   },
 
-  downloadAlloggiatiReport: async (date: string): Promise<void> => {
-    const response = await api.get(`${BASE_PATH}/reports/alloggiati`, {
-      params: { date },
-      responseType: 'blob',
-    });
-    const blob = new Blob([response.data as BlobPart], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `alloggiati-${date}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+  /**
+   * Triggers the browser's native download for the Alloggiati Web fixed-width report
+   * via a hidden iframe.
+   *
+   * Deliberately NOT fetch+Blob+synthetic-<a>-click+immediate-revokeObjectURL: that
+   * exact pattern is documented in billingService.ts's downloadPdf as verified-broken
+   * in real Chrome (produced no visible file save — a known failure mode for synthetic
+   * clicks on blob: URLs, silently dropped, no JS-visible error) and was replaced there
+   * with a hidden iframe pointed straight at the endpoint, relying on the server's
+   * `Content-Disposition: attachment` header to trigger the native download. Mirrored
+   * here for the same reason — this download was verified to silently fail with the
+   * old pattern during the 2026-08-24 QA pass (REPORT.md §6 #3b).
+   */
+  downloadAlloggiatiReport: (date: string): void => {
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = `${BASE_PATH}/reports/alloggiati?date=${encodeURIComponent(date)}`;
+    document.body.appendChild(iframe);
+    setTimeout(() => document.body.removeChild(iframe), IFRAME_CLEANUP_DELAY_MS);
   },
 
   getLastCompletedStayForGuest: async (guestId: string): Promise<StayResponse | null> => {
@@ -82,18 +90,13 @@ export const stayService = {
     return response.status === 204 ? null : response.data;
   },
 
-  downloadAlloggiatiJson: async (date: string): Promise<void> => {
-    const response = await api.get(`${BASE_PATH}/reports/alloggiati/json`, {
-      params: { date },
-      responseType: 'blob',
-    });
-    const blob = new Blob([response.data as BlobPart], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `alloggiati-${date}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+  /** Same hidden-iframe download pattern as downloadAlloggiatiReport above — see its comment. */
+  downloadAlloggiatiJson: (date: string): void => {
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = `${BASE_PATH}/reports/alloggiati/json?date=${encodeURIComponent(date)}`;
+    document.body.appendChild(iframe);
+    setTimeout(() => document.body.removeChild(iframe), IFRAME_CLEANUP_DELAY_MS);
   },
 
   getLookupStati: async (): Promise<AlloggiatiStato[]> => {
