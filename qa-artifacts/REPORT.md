@@ -4,7 +4,13 @@ Full-stack functional QA of the PMS driven through a real browser (Playwright, r
 stack, no mocks) against branch `fix/ci-codescanning-cleanup` at commit `1aa950b`. Scope: every
 route in the SPA, console/network cleanliness, download validity, and the config-dependent
 fiscal flows (Alloggiati Web, FatturaPA, imposta di soggiorno) under complete / missing /
-malformed settings. Defects are listed, **not fixed** — awaiting triage.
+malformed settings.
+
+**Update (2026-08-24, follow-up pass):** defects #1 (KPI report 500) and #2 (RICEVUTA→FATTURA
+blocked after payment) — the two critical/high findings — have been fixed and verified live; see
+§6 for the resolution notes. Defects #3–#6 (Alloggiati all-or-nothing validation + risky download
+pattern, `/me` rate-limit bucket, CheckInForm deep-link gap, VAT format validation) remain open
+and fully specified for a future pass.
 
 Test code lives at `frontend/e2e-live/qa2408/` (five new spec files extending the repo's
 existing `npm run test:e2e:live` live-stack harness — see §Methodology). Raw event log:
@@ -96,7 +102,7 @@ unhandled `pageerror`s, zero unexpected `requestfailed`s** across both passes.
 | `/rooms` | ✅ clean | — |
 | `/rates` | ✅ clean | — |
 | `/settings` + 4 sub-pages | ✅ clean | ✅ clean |
-| `/owner-dashboard` | ⚠️ see §6 #1 (KPI widget 500s; page itself renders, console shows the error) | — |
+| `/owner-dashboard` | ✅ clean (was ⚠️ §6 #1, KPI widget 500s — fixed and re-verified) | — |
 | `/admin/users` | ✅ clean | — |
 | `/profile/hotel` | ✅ clean | ✅ clean |
 | `/settings/city-tax` | ✅ clean | ✅ clean |
@@ -147,7 +153,7 @@ above or expected 401/403 from RBAC/negative tests.
 | Reservation → check-in (real UI, via Reservations page's check-in button) → invoice opens with `ROOM_NIGHT` | ✅ Pass |
 | Walk-in check-in → invoice with `ROOM_NIGHT` | ✅ Pass (pre-existing `walk-in-live.spec.ts`, re-run this session, still green) |
 | Checkout blocked while unpaid (409) → pay in full → checkout succeeds → PDF renders | ✅ Pass (pre-existing `checkout-live.spec.ts`) |
-| Checkout → **switch RICEVUTA→FATTURA after payment** → FatturaPA XML | 🔴 **Fails — real regression, §6 #2.** Same pre-existing spec, previously green, now red against current HEAD. |
+| Checkout → **switch RICEVUTA→FATTURA after payment** → FatturaPA XML | ✅ **Fixed, §6 #2.** Was a real regression (previously green, went red); re-verified green after the fix. |
 | F&B order confirmed on a `CHECKED_IN` stay → `FB_ORDER` charge lands on the room invoice | ✅ Pass |
 | Imposta di soggiorno at check-in (comune + category + rate all configured) → `CITY_TAX` charge posted alongside `ROOM_NIGHT` | ✅ **Confirmed via direct API evidence** (real invoice charge captured live: `type=CITY_TAX, amount=3.50, vatRate=0, naturaCode=N1` — correctly VAT-exempt). The UI-driven version of this same test was flaky in this session (timeout on the check-in POST, cause not fully isolated — likely noise from the very heavy repeated test-suite execution this session, not a data/logic problem) and is left enabled, not skipped, for future runs. |
 | RBAC: RECEPTIONIST blocked from `/owner-dashboard`, `/admin/users`, `/profile/hotel`, `/settings/system`, `/settings/city-tax` (UI redirect) | ✅ 5/5 pass |
@@ -205,7 +211,7 @@ XML/CSV content spot-checked by hand) — see `MANIFEST.md`.
 
 ## §6 Defects — prioritized
 
-### 🔴 1. CRITICAL — Owner Analytics KPI trend report is completely broken (500, every request)
+### 🔴 1. CRITICAL — Owner Analytics KPI trend report is completely broken (500, every request) — ✅ RISOLTO
 
 **Where:** `billing-service/src/main/java/com/hotelpms/billing/repository/InvoiceChargeRepository.java:46-56`,
 method `sumRoomRevenueByHotelIdGroupedByPeriod`.
@@ -237,9 +243,18 @@ GROUP BY periodStart ORDER BY periodStart
 ```
 (PostgreSQL allows `GROUP BY` on a `SELECT`-list output alias.)
 
+**Fix applied (2026-08-24 follow-up):** exactly the suggested fix — `GROUP BY periodStart`
+replacing the repeated `date_trunc(:granularity, ...)`. Added a Testcontainers-backed regression
+test (`billing-service/src/test/java/com/hotelpms/billing/integration/KpiReportGranularityIntegrationTest.java`)
+against a real Postgres, since the existing `KpiReportServiceImplTest` mocks the repository and
+can't see native-SQL errors — parameterized over `day`/`week`/`month`, plus a correctness check
+that the bucket containing a seeded charge reports the real amount. Verified live: `GET
+/api/v1/reports/kpi?...&granularity={DAY,WEEK,MONTH}` → `200` for all three (was `500`); confirmed
+against the running stack, not just the test suite.
+
 ---
 
-### 🔴 2. HIGH — Cannot switch RICEVUTA→FATTURA after full payment (regression, breaks the normal checkout flow)
+### 🔴 2. HIGH — Cannot switch RICEVUTA→FATTURA after full payment (regression, breaks the normal checkout flow) — ✅ RISOLTO
 
 **Where:** `billing-service/src/main/java/com/hotelpms/billing/service/impl/InvoiceServiceImpl.java:301-303`,
 method `updateDocumentType`.
@@ -267,6 +282,19 @@ actually been **fiscally exported** (`assertNotFiscallyLocked`, already used els
 same class for the genuinely dangerous case), not merely `PAID`. `PAID` alone should not block a
 RICEVUTA→FATTURA switch; the original R1 #5 bug was about a document type flip on an invoice that
 had *already been fiscally exported*, which `assertNotFiscallyLocked` already covers separately.
+
+**Fix applied (2026-08-24 follow-up):** removed the blanket `PAID` guard, kept
+`assertNotFiscallyLocked` as the sole (and correct) guard — a PAID-but-not-yet-exported invoice
+now switches document type freely; a fiscally-exported one still gets `409
+INVOICE_LOCKED_AFTER_EXPORT` regardless of status. Updated
+`InvoiceServiceImplTest.shouldThrowWhenUpdatingPaidInvoiceDocumentType` (which asserted the old,
+now-wrong behavior) into `shouldUpdateDocumentTypeOnPaidInvoiceWhenNotFiscallyLocked`, asserting
+the corrected behavior; the sibling `shouldThrowLockedWhenUpdatingDocumentTypeOnExportedInvoice`
+test already covers the still-must-block case. Verified live: re-ran the repo's own
+`frontend/e2e-live/checkout-live.spec.ts` (the regression test that caught this) — green again.
+**Deliberate scope note:** this narrows the guard back to exactly what R1 #5 needed
+(fiscally-exported invoices stay locked); it does not add any *new* protection beyond that, per
+user decision during triage.
 
 ---
 

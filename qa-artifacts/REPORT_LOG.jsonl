@@ -298,3 +298,4 @@
 {"ts":"2026-08-23T23:59:01.812Z","kind":"requestfailed","url":"http://localhost/assets/material-symbols-outlined-DTCSuhiZ.woff2","method":"GET","failure":"net::ERR_ABORTED","route":"/profile/hotel","action":"it-locale-check","role":"ADMIN","locale":"it"}
 {"ts":"2026-08-23T23:59:17.158Z","kind":"requestfailed","url":"http://localhost/api/v1/auth/me","method":"GET","failure":"net::ERR_ABORTED","route":"/settings/city-tax","action":"it-locale-check","role":"ADMIN","locale":"it"}
 {"ts":"2026-08-23T23:59:17.159Z","kind":"requestfailed","url":"http://localhost/assets/material-symbols-outlined-DTCSuhiZ.woff2","method":"GET","failure":"net::ERR_ABORTED","route":"/settings/city-tax","action":"it-locale-check","role":"ADMIN","locale":"it"}
+{"ts":"2026-08-24T18:18:25.784Z","kind":"slow_or_incomplete_network","route":"/owner-dashboard","action":"navigate","path":"/owner-dashboard","error":"TimeoutError: page.waitForLoadState: Timeout 15000ms exceeded."}
