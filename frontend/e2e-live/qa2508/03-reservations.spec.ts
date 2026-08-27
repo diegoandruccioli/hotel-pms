@@ -46,7 +46,12 @@ test.describe('Blocco 3 — Reservations', () => {
     await dateInputs.nth(0).fill(fmt(inDate));
     await dateInputs.nth(1).fill(fmt(outDate));
 
-    const roomTile = page.getByRole('button', { name: /101/i }).first();
+    // Any AVAILABLE room, not a hardcoded "101" — RoomButton disables the
+    // tile via the `disabled` attribute exactly when occupied
+    // (RoomSelection.tsx), so this never picks an unclickable one, unlike a
+    // fixed room number that other specs sharing the seed data may have left
+    // dirty/occupied (see REPORT.md "Nota operativa").
+    const roomTile = page.locator('.md\\:grid-cols-4 > button:not([disabled])').first();
     await expect(roomTile).toBeVisible({ timeout: 8000 });
     await roomTile.click();
     guard.checkpoint('room selected');
