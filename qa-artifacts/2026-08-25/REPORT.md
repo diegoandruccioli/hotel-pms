@@ -123,6 +123,33 @@ sia già committed quando il nuovo INSERT viene eseguito (`ReservationServiceImp
 **Regressione**: stesso test di cui sopra — verde dopo entrambi i fix, incluso il caso realistico di
 modifica-senza-cambio-camera.
 
+### 🟡 MODERATO — api-gateway ritorna un 500 grezzo (non tradotto) quando un servizio a valle è completamente irraggiungibile
+**File**: `api-gateway/src/main/java/com/hotelpms/gateway/exception/GlobalErrorWebExceptionHandler.java` (nuovo)
+**Trovato**: Blocco 6, `frontend/e2e-live/qa2508/06-guest-fb-service-down.spec.ts` — `docker stop fb-service`
+poi `GET /api/v1/fb/menu-items`: risposta `500` con corpo
+`{"timestamp":...,"path":...,"status":500,"error":"Internal Server Error","requestId":...}` — il formato
+di errore grezzo di default di Spring Boot, non il ProblemDetail coerente (`type`/`title`/`status`/`detail`)
+usato ovunque nel resto dell'app. Log di api-gateway: `java.net.UnknownHostException: Failed to resolve
+'fb-service'`.
+**Causa**: `AbstractProblemDetailAdvice` (common-web-lib), che traduce ogni fallimento a valle in un
+502 `EXTERNAL_SERVICE_ERROR` pulito, è basato su Spring MVC (`@RestControllerAdvice`) e **non si applica
+alle route dell'API Gateway**, che girano interamente sulla filter chain reattiva WebFlux di Spring
+Cloud Gateway — mai attraverso un `@RestController`. Nessuna delle route del gateway (verificato in
+`config-service/.../api-gateway.yml`: nessun filtro Resilience4j su nessuna route) aveva quindi alcuna
+traduzione dell'errore quando il servizio a valle è del tutto irraggiungibile — a differenza delle
+chiamate Feign interne (frontdesk→guest-service, frontdesk→billing-service), che *sono* già tradotte
+correttamente (vedi test `guest-service` nello stesso file, verde). Il corpo grezzo rompe il contratto
+di errore su cui si basa l'interceptor Axios del frontend (`api.ts` traduce solo un `detail` che
+combacia con `^[A-Z_]+$` — qui `detail` non esiste nemmeno).
+**Fix**: nuovo `GlobalErrorWebExceptionHandler` (`@Order(-2)`, precede il default handler di Spring
+Boot) che intercetta i fallimenti di routing del gateway e risponde con lo stesso formato ProblemDetail
+del resto dell'app — 502 `EXTERNAL_SERVICE_ERROR` per host irraggiungibile/connessione rifiutata, 504
+`GATEWAY_TIMEOUT` per timeout — senza mai esporre l'host Docker interno nel corpo (stesso principio del
+Finding #17, security-report.md).
+**Regressione**: `frontend/e2e-live/qa2508/06-guest-fb-service-down.spec.ts` — "F&B order while
+fb-service is down" — rosso prima del fix (500 grezzo), verde dopo (502 con `error.toLowerCase()` privo
+di "exception", nessuna cascata sulle chiamate non correlate).
+
 ---
 
 ## Falsi allarmi verificati e scartati (per trasparenza sul processo)
@@ -202,7 +229,7 @@ axllent/mailpit`) sulla stessa rete Docker, oppure puntare `SMTP_HOST` a un serv
 | 3 — Sweep elementi per area | ✅ completo | Ospiti, Prenotazioni, Camere/Tipologie, Pulizie (+1 difetto 🟡), Fatturazione, Ristorante (menu CRUD + dialog nativi), Rates (selezione da tastiera), Calendario (vista/navigazione) — tutte con CRUD reali |
 | 4 — Dati negativi | ✅ completo | HotelProfile (VAT/CAP/logoUrl) 8/8 verdi |
 | 5 — Matrice portali | ✅ completo | D1 Alloggiati (1 difetto 🟡 risolto) · D2 FatturaPA · D3 City tax (1 difetto 🟢 documentato) · D4 Email — nessun nuovo difetto oltre ai già trovati |
-| 6 — Interruzioni | 🔄 quasi completo | `notification-service` e `billing-service` reali spenti/riavviati via `docker stop` — entrambi i circuit breaker Resilience4j confermati funzionanti (checkout/check-in mai bloccati, retry post-ripristino recupera lo stato); scoperto gap ambientale `mailpit` mancante (vedi sopra). Fault injection UI (`06-interruptions.spec.ts`, 7/7 verdi): abort+retry ospite, 500 su prenotazione, doppio-click, CSRF rimosso, sessione scaduta a metà form (redirect pulito a `/login`), back-navigation durante POST in volo. Fault injection API (`07-service-resilience.spec.ts`, 5/5 verdi): pagamento midflight, ordine F&B doppio, submit Alloggiati midflight, concorrenza su modifica prenotazione — **2 difetti 🔴 trovati e risolti** (vedi sopra: prezzo mai salvato su modifica prenotazione, falso conflitto camera). Mancano ancora: `docker stop` di guest-service, fb-service e auth-service uno alla volta (frontdesk-service stesso non testato — è il servizio centrale, spegnerlo degrada l'intera app per definizione) |
+| 6 — Interruzioni | ✅ sostanzialmente completo | `docker stop` reale di notification-service, billing-service, guest-service e fb-service, uno alla volta — tutti i circuit breaker Resilience4j confermati funzionanti (checkout/check-in mai bloccati, retry post-ripristino recupera lo stato); scoperto gap ambientale `mailpit` mancante (vedi sopra). Fault injection UI (`06-interruptions.spec.ts`, 7/7 verdi): abort+retry ospite, 500 su prenotazione, doppio-click, CSRF rimosso, sessione scaduta a metà form, back-navigation durante POST in volo. Fault injection API (`07-service-resilience.spec.ts` + `06-guest-fb-service-down.spec.ts`, 7/7 verdi): pagamento midflight, ordine F&B doppio, submit Alloggiati midflight, concorrenza su modifica prenotazione, guest-service/fb-service giù — **3 difetti 🔴/🟡 trovati e risolti** (prezzo mai salvato su modifica prenotazione, falso conflitto camera, 500 grezzo dal gateway quando un servizio a valle è irraggiungibile). Non testato: `docker stop` di auth-service (romperebbe la sessione della suite stessa) e di frontdesk-service (è il servizio centrale, spegnerlo degrada l'intera app per definizione) |
 | 7 — Flussi end-to-end | ⏳ non iniziato | |
 | 8 — Chaos | ⏳ non iniziato | infrastruttura (`chaosWalker.ts`) pronta |
 | 9 — RBAC/IDOR | ⏳ non iniziato | |
