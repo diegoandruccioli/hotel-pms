@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { ConsoleGuard } from './support/consoleGuard';
-import { abortRequest, fakeStatus, midflightAbort } from './support/faultInjector';
+import { abortRequest, fakeStatus, midflightAbort, slowResponse } from './support/faultInjector';
 
 // Blocco 6 — interruptions, using page.route() fault injection against the
 // live backend (the rest of the app keeps talking to the real services —
@@ -136,5 +136,75 @@ test.describe('Blocco 6 — interruptions', () => {
     await page.waitForTimeout(1000);
     await expect(dialog).toBeVisible(); // rejected, not silently accepted
     guard.checkpoint('missing CSRF token correctly rejected, no crash');
+  });
+
+  test('session expired mid-form: both jwt and refresh_token removed, submit ends in a clean redirect to /login, no crash', async ({ page, context }) => {
+    const guard = new ConsoleGuard(page, {
+      role: 'admin',
+      locale: 'it',
+      extraAllow: [
+        { pattern: /401.*\/api\/v1\/guests/, reason: 'expected: session expired deliberately for this test', scope: 'http_error' },
+        { pattern: /401.*\/api\/v1\/auth\/refresh/, reason: 'expected: refresh also fails once refresh_token is gone', scope: 'http_error' },
+        { pattern: /401 \(Unauthorized\)/, reason: 'expected: session expired', scope: 'console' },
+      ],
+    });
+    await page.goto('/guests');
+    await page.getByRole('heading', { name: /^ospiti$|^guests$/i }).waitFor();
+
+    await page.getByRole('button', { name: /aggiungi ospite|add guest/i }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel(/nome|first name/i).fill('Qa Round Expired');
+    await dialog.getByLabel(/cognome|last name/i).fill('Test');
+    await dialog.getByRole('textbox', { name: /email/i }).fill(`qa25.expired.${Date.now()}@example.com`);
+
+    // Remove BOTH the jwt and refresh_token cookies (httpOnly — only reachable
+    // via the CDP-level context.cookies() API, not page.evaluate) so the
+    // silent-refresh-then-retry path (api.ts) also fails, forcing the real
+    // "session truly expired" branch (performLogout() -> redirect to /login)
+    // rather than a transparent recovery.
+    const cookies = await context.cookies();
+    const remaining = cookies.filter((c) => c.name !== 'jwt' && c.name !== 'refresh_token');
+    await context.clearCookies();
+    await context.addCookies(remaining);
+
+    await dialog.getByRole('button', { name: /^salva$|^save$/i }).click();
+    await page.waitForURL(/\/login/, { timeout: 10_000 });
+    guard.checkpoint('expired session redirected cleanly to /login, no crash, form data not silently accepted');
+  });
+
+  test('back-navigation while a save POST is still in flight: no crash when the response lands after unmount', async ({ page, request }) => {
+    const guard = new ConsoleGuard(page, { role: 'admin', locale: 'it' });
+    // Navigate through the dashboard first so there's an actual in-app route
+    // for goBack() to land on — going straight to /guests as the first
+    // navigation leaves no SPA history entry to go back to.
+    await page.goto('/');
+    await page.getByTestId('dashboard-page').waitFor();
+    await page.goto('/guests');
+    await page.getByRole('heading', { name: /^ospiti$|^guests$/i }).waitFor();
+
+    const uniqueEmail = `qa25.backnav.${Date.now()}@example.com`;
+    await page.getByRole('button', { name: /aggiungi ospite|add guest/i }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel(/nome|first name/i).fill('Qa Round BackNav');
+    await dialog.getByLabel(/cognome|last name/i).fill('Test');
+    await dialog.getByRole('textbox', { name: /email/i }).fill(uniqueEmail);
+
+    const unroute = await slowResponse(page, '**/api/v1/guests', 3000);
+    await dialog.getByRole('button', { name: /^salva$|^save$/i }).click();
+    await page.waitForTimeout(300); // let the request actually start
+    await page.goBack();
+    await page.getByTestId('dashboard-page').waitFor({ timeout: 8000 });
+    await page.waitForTimeout(3500); // let the slow response land after navigation away
+    guard.checkpoint('navigated away mid-request, response landed after unmount, no crash');
+    await unroute();
+
+    // Whichever way the app chose to handle it (request still completed
+    // server-side, or the navigation effectively abandoned it client-side),
+    // the guest list must not be left in a broken/duplicated state.
+    const search = await request.get(`/api/v1/guests/search?query=${encodeURIComponent(uniqueEmail)}`);
+    expect(search.status()).toBe(200);
+    const body = await search.json();
+    const matches = (body.content ?? body).filter((g: { email: string }) => g.email === uniqueEmail);
+    expect(matches.length, 'back-navigation during an in-flight save must not create duplicate records').toBeLessThanOrEqual(1);
   });
 });
