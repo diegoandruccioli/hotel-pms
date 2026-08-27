@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, memo } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { authService } from '../services/authService';
 import { ToastContainer } from '../components/Toast';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
@@ -129,7 +130,19 @@ export const MainLayout = () => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen]   = useState(false);
 
-  const handleLogout   = useCallback(() => { logout(); navigate('/login'); }, [logout, navigate]);
+  // Must call the backend before clearing local state: this is what actually
+  // blacklists the refresh token server-side (AuthController.logout ->
+  // RefreshTokenService.blacklist). Without it, clicking "Logout" only wiped
+  // the Zustand store — the httpOnly jwt/refresh_token cookies stayed fully
+  // valid (access token up to 15 min, refresh token up to 7 days), so a
+  // direct navigation or API call after "logout" kept working as the same
+  // user. The local state clear + redirect still happen even if the network
+  // call fails, so the user can always leave the UI locally.
+  const handleLogout = useCallback(() => {
+    void authService.logout().catch(() => {});
+    logout();
+    navigate('/login');
+  }, [logout, navigate]);
   const openDrawer     = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer    = useCallback(() => setDrawerOpen(false), []);
   const toggleUserMenu = useCallback(() => setUserMenuOpen((v) => !v), []);

@@ -75,7 +75,21 @@ export const stayService = {
    * here for the same reason — this download was verified to silently fail with the
    * old pattern during the 2026-08-24 QA pass (REPORT.md §6 #3b).
    */
-  downloadAlloggiatiReport: (date: string): void => {
+  /**
+   * The hidden iframe below can't report its own HTTP status back to the
+   * caller — unlike billingService.downloadFatturaPAXml (which validates
+   * first, THEN downloads), this used to fire the iframe and let the caller
+   * show a success toast unconditionally, regardless of whether the request
+   * behind it actually succeeded. A failed Alloggiati report (wrong
+   * credentials, malformed guest data, a backend 5xx) would still show
+   * "Report downloaded" — silently hiding a TULPS art. 109 compliance
+   * failure from hotel staff. Awaiting a real GET first (same endpoint,
+   * thrown away) surfaces any error through the caller's existing catch
+   * block before the iframe — and the caller's `await` already expected a
+   * promise, so this needed no caller-side change.
+   */
+  downloadAlloggiatiReport: async (date: string): Promise<void> => {
+    await api.get(`${BASE_PATH}/reports/alloggiati`, { params: { date } });
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.src = `${BASE_PATH}/reports/alloggiati?date=${encodeURIComponent(date)}`;
@@ -90,8 +104,9 @@ export const stayService = {
     return response.status === 204 ? null : response.data;
   },
 
-  /** Same hidden-iframe download pattern as downloadAlloggiatiReport above — see its comment. */
-  downloadAlloggiatiJson: (date: string): void => {
+  /** Same validate-then-download pattern as downloadAlloggiatiReport above — see its comment. */
+  downloadAlloggiatiJson: async (date: string): Promise<void> => {
+    await api.get(`${BASE_PATH}/reports/alloggiati/json`, { params: { date } });
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.src = `${BASE_PATH}/reports/alloggiati/json?date=${encodeURIComponent(date)}`;

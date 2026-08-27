@@ -268,7 +268,9 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
                     ${isSameDay(day, new Date()) ? 'bg-primary-container text-on-primary-container' : ''}
                   `}
                 >
-                  <span className="text-[10px] uppercase font-bold tracking-wider opacity-60">
+                  {/* text-on-surface-variant, not opacity-60 on inherited color — same
+                      WCAG AA contrast defect as RateCalendar.tsx's identical weekday label. */}
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">
                     {format(day, 'EEE', { locale })}
                   </span>
                   <span className="text-lg font-display font-medium leading-none">

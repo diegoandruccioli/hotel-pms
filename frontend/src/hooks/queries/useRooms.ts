@@ -55,6 +55,7 @@ export function useUpdateRoomStatus() {
       );
       queryClient.invalidateQueries({ queryKey: queryKeys.rooms.list(true) });
       invalidateFilteredRoomLists(queryClient);
+      invalidateDaySheet(queryClient);
     },
   });
 }
@@ -72,7 +73,25 @@ export function useBulkUpdateRoomStatus() {
       // (unfiltered included) may now be stale, so a full invalidate is
       // simpler and correct here, unlike the single-room path above.
       queryClient.invalidateQueries({ queryKey: queryKeys.rooms.all });
+      invalidateDaySheet(queryClient);
     },
+  });
+}
+
+/**
+ * Housekeeping's status-count badges read `useDaySheet()`'s
+ * `roomStatusCounts` (Housekeeping.tsx:164-168) instead of counting the room
+ * list client-side. Neither the single nor bulk status mutation invalidated
+ * that query, so the badges stayed stuck at their value from page load —
+ * even after the explicit "Aggiorna" button, which only refetches the room
+ * list, not the day-sheet. `queryKeys.dashboard.daySheet` is keyed by
+ * today's date string (not known here), so invalidate by predicate on the
+ * stable `['dashboard', 'day-sheet', ...]` prefix instead of importing
+ * useDashboard's date-formatting helper into this file.
+ */
+function invalidateDaySheet(queryClient: ReturnType<typeof useQueryClient>): void {
+  queryClient.invalidateQueries({
+    predicate: (query) => query.queryKey[0] === 'dashboard' && query.queryKey[1] === 'day-sheet',
   });
 }
 
