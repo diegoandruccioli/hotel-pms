@@ -20,18 +20,19 @@ const SNAPSHOT_FILE = (hotelId: string) => path.join(SNAPSHOT_DIR, `hotel-settin
  */
 export async function snapshotHotelSettings(request: APIRequestContext, hotelId: string): Promise<void> {
   const file = SNAPSHOT_FILE(hotelId);
-  if (existsSync(file)) return;
+  // No existsSync-then-write: that shape is a real TOCTOU race between two
+  // concurrent Playwright workers (CodeQL js/file-system-race), and "the
+  // first snapshot of the day wins" (see this function's javadoc) demands
+  // an actually-atomic write, not a check-then-act one. Always fetches
+  // settings — a cheap idempotent GET — then relies solely on the
+  // exclusive-create flag below to decide, atomically, whether this call
+  // was first.
   const response = await request.get('/api/v1/stays/settings');
   if (response.status() !== 200) {
     throw new Error(`Failed to snapshot hotel settings for ${hotelId}: ${response.status()} ${await response.text()}`);
   }
-  // { flag: 'wx' } makes the write atomically fail (EEXIST) rather than
-  // silently overwrite if another worker won the race between the existsSync
-  // check above and this write — the whole point of "first snapshot of the
-  // day wins" (see the function's own javadoc) would otherwise be undermined
-  // by exactly the race this closes (CodeQL js/file-system-race).
   try {
-    writeFileSync(file, await response.text(), { encoding: 'utf-8', flag: 'wx' }); // codeql[js/file-system-race]: 'wx' is atomic, EEXIST caught below — see this function's comment above
+    writeFileSync(file, await response.text(), { encoding: 'utf-8', flag: 'wx' });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
   }
@@ -110,8 +111,12 @@ export interface FixtureIds {
  * exists from an earlier run today.
  */
 export async function ensureFixtureIds(request: APIRequestContext): Promise<FixtureIds> {
-  if (existsSync(FIXTURE_IDS_FILE)) {
+  // try/catch on the read itself, not existsSync-then-readFileSync: same
+  // TOCTOU concern as snapshotHotelSettings above (CodeQL js/file-system-race).
+  try {
     return JSON.parse(readFileSync(FIXTURE_IDS_FILE, 'utf-8'));
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
   }
 
   const headers = await csrfHeader(request);
@@ -179,15 +184,14 @@ export async function ensureFixtureIds(request: APIRequestContext): Promise<Fixt
   const quotationId = (await quotationResponse.json()).id as string;
 
   const ids: FixtureIds = { reservationId, quotationId };
-  // Atomic exclusive write (CodeQL js/file-system-race): if another worker
-  // won the race between this function's existsSync check at the top and
-  // this write, don't blindly overwrite its file with a second, different
-  // set of fixture ids — fall back to whatever it already persisted, so
-  // every spec in the round genuinely references the SAME fixtures (the
-  // whole point of this function, per its own javadoc), not whichever
-  // worker's write landed last.
+  // Atomic exclusive write: if another worker won the race against the
+  // readFileSync attempt at the top of this function, don't blindly
+  // overwrite its file with a second, different set of fixture ids — fall
+  // back to whatever it already persisted, so every spec in the round
+  // genuinely references the SAME fixtures (the whole point of this
+  // function, per its own javadoc), not whichever worker's write landed last.
   try {
-    writeFileSync(FIXTURE_IDS_FILE, JSON.stringify(ids, null, 2), { encoding: 'utf-8', flag: 'wx' }); // codeql[js/file-system-race]: 'wx' is atomic, EEXIST caught below — see this function's comment above
+    writeFileSync(FIXTURE_IDS_FILE, JSON.stringify(ids, null, 2), { encoding: 'utf-8', flag: 'wx' });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
       return JSON.parse(readFileSync(FIXTURE_IDS_FILE, 'utf-8'));
