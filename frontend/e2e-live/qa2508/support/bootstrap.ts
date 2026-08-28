@@ -25,7 +25,16 @@ export async function snapshotHotelSettings(request: APIRequestContext, hotelId:
   if (response.status() !== 200) {
     throw new Error(`Failed to snapshot hotel settings for ${hotelId}: ${response.status()} ${await response.text()}`);
   }
-  writeFileSync(file, await response.text(), 'utf-8');
+  // { flag: 'wx' } makes the write atomically fail (EEXIST) rather than
+  // silently overwrite if another worker won the race between the existsSync
+  // check above and this write — the whole point of "first snapshot of the
+  // day wins" (see the function's own javadoc) would otherwise be undermined
+  // by exactly the race this closes (CodeQL js/file-system-race).
+  try {
+    writeFileSync(file, await response.text(), { encoding: 'utf-8', flag: 'wx' });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+  }
 }
 
 /**
@@ -170,6 +179,20 @@ export async function ensureFixtureIds(request: APIRequestContext): Promise<Fixt
   const quotationId = (await quotationResponse.json()).id as string;
 
   const ids: FixtureIds = { reservationId, quotationId };
-  writeFileSync(FIXTURE_IDS_FILE, JSON.stringify(ids, null, 2), 'utf-8');
+  // Atomic exclusive write (CodeQL js/file-system-race): if another worker
+  // won the race between this function's existsSync check at the top and
+  // this write, don't blindly overwrite its file with a second, different
+  // set of fixture ids — fall back to whatever it already persisted, so
+  // every spec in the round genuinely references the SAME fixtures (the
+  // whole point of this function, per its own javadoc), not whichever
+  // worker's write landed last.
+  try {
+    writeFileSync(FIXTURE_IDS_FILE, JSON.stringify(ids, null, 2), { encoding: 'utf-8', flag: 'wx' });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+      return JSON.parse(readFileSync(FIXTURE_IDS_FILE, 'utf-8'));
+    }
+    throw err;
+  }
   return ids;
 }

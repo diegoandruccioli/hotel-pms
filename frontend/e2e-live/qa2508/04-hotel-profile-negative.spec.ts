@@ -44,7 +44,13 @@ test.describe('Blocco 4 — HotelProfile negative data', () => {
       await page.goto('/profile/hotel');
       await page.getByRole('heading', { name: /profilo hotel|hotel profile/i }).waitFor();
 
-      const field = page.getByLabel(/^cap\b|postal code/i);
+      // Grouped so the ^ anchor applies to BOTH alternatives, not just the
+      // first (CodeQL js/regex/missing-regexp-anchor — `^cap\b|postal code`
+      // would let "postal code" match anywhere in an unrelated label, not
+      // just at its start). The anchor itself is intentional: "cap" is only
+      // 3 letters and could otherwise match as a substring of an unrelated
+      // Italian word (e.g. "Capofamiglia").
+      const field = page.getByLabel(/^(cap\b|postal code)/i);
       await field.fill(c.value);
       await page.getByRole('button', { name: /salva|save/i }).click();
       await page.waitForTimeout(500);
