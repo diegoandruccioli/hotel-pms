@@ -31,6 +31,11 @@ export async function snapshotHotelSettings(request: APIRequestContext, hotelId:
   // day wins" (see the function's own javadoc) would otherwise be undermined
   // by exactly the race this closes (CodeQL js/file-system-race).
   try {
+    // codeql[js/file-system-race]: the exclusive 'wx' flag makes this write
+    // atomically fail with EEXIST instead of racing the existsSync check
+    // above — CodeQL's standard query flags the existsSync+writeFileSync
+    // shape regardless of the flag, the same class of false positive as
+    // AuthServiceImpl.java's log-injection suppressions elsewhere in this repo.
     writeFileSync(file, await response.text(), { encoding: 'utf-8', flag: 'wx' });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
@@ -187,6 +192,9 @@ export async function ensureFixtureIds(request: APIRequestContext): Promise<Fixt
   // whole point of this function, per its own javadoc), not whichever
   // worker's write landed last.
   try {
+    // codeql[js/file-system-race]: see snapshotHotelSettings's identical
+    // suppression note above — 'wx' makes this write atomically fail on
+    // EEXIST rather than race the existsSync check at the top of this function.
     writeFileSync(FIXTURE_IDS_FILE, JSON.stringify(ids, null, 2), { encoding: 'utf-8', flag: 'wx' });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
