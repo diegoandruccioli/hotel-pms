@@ -78,11 +78,11 @@ test.describe('Blocco 6/7 — real email delivery via mailpit', () => {
       headers, data: { firstName: 'Live', lastName: 'Suite Guest', email: guestEmail },
     });
     const guest = await guestResponse.json();
-    const roomTypesResponse = await request.get('/api/v1/room-types');
-    const roomTypeId = ((await roomTypesResponse.json()) as { id: string }[])[0].id;
-    const roomsResponse = await request.get(`/api/v1/rooms?roomTypeId=${roomTypeId}`);
-    const roomsBody = await roomsResponse.json();
-    const roomId = ((roomsBody.content ?? roomsBody) as { id: string }[])[0].id;
+    // A freshly created room, not a shared seed room — avoids colliding with
+    // another fixture reservation from an earlier run of this same spec at
+    // the same date offset (ROOM_UNAVAILABLE_DATES).
+    const room = await createCleanRoom(request, headers);
+    const roomId = room.id;
 
     const inSixMonths = new Date();
     inSixMonths.setMonth(inSixMonths.getMonth() + 6);
