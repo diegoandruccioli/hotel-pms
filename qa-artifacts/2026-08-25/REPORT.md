@@ -214,7 +214,7 @@ non prenotabile), ma una lacuna di isolamento tra le spec di questo round — da
 creare a `03-reservations.spec.ts` una propria camera pulita (come già fa `07-service-resilience.spec.ts`
 via `createCleanRoom`) invece di dipendere dalla "101" condivisa.
 
-## Gap ambientale — invio email reale strutturalmente impossibile in locale
+## Gap ambientale — invio email reale (CHIUSO)
 
 Durante il Blocco 6 (`notification-service` fermato via `docker stop` per testare il circuit breaker
 Resilience4j): il checkout **non si blocca mai** quando il servizio email è irraggiungibile (verificato
@@ -222,11 +222,27 @@ con successo — comportamento corretto, `checkoutEmailFailureReason` registrato
 riavviato, il retry non riusciva mai a inviare l'email realmente. Causa: `notification-service.yml`
 punta SMTP a `${SMTP_HOST:-mailpit}`, e `.env` imposta `SMTP_HOST=mailpit` — ma **nessun container
 `mailpit` esiste in `docker-compose.yml`** di questo repository (confermato nei log:
-`UnknownHostException: mailpit`). L'invio email reale è quindi strutturalmente impossibile in questo
-stack Docker così com'è, indipendentemente da qualunque test — non un difetto di codice introdotto in
-questo round, ma una dipendenza di sviluppo mai cablata nel compose file. Chi vuole verificare l'invio
-email reale deve avviare un server SMTP di test (es. `docker run -d -p 1025:1025 --name mailpit
-axllent/mailpit`) sulla stessa rete Docker, oppure puntare `SMTP_HOST` a un servizio SMTP reale.
+`UnknownHostException: mailpit`). Non un difetto di codice, ma una dipendenza di sviluppo mai cablata
+nel compose file.
+
+**Chiuso su richiesta esplicita**: aggiunto il servizio `mailpit` a `docker-compose.yml` (rete
+`backend-network`, la stessa di `notification-service`; porta `8025` esposta sull'host per l'API/UI di
+ispezione) — dev-only, mai da abilitare in produzione (va sostituito con un relay SMTP reale). Nuova
+spec `06-real-email-delivery.spec.ts` esegue un checkout reale e verifica **contro la vera API REST di
+mailpit** (non solo che la chiamata a notification-service torni 200):
+
+- **Email di checkout**: arrivata nella casella del destinatario corretto, con **un allegato PDF
+  reale** (`Content-Type: application/pdf`, i primi byte sono `%PDF`, >1000 byte — non un file vuoto o
+  un placeholder), esattamente come previsto da `StayNotificationCoordinator` (scarica la fattura/
+  ricevuta vera da billing-service e la allega).
+- **Email di conferma prenotazione**: arrivata nella casella del destinatario corretto, oggetto
+  tradotto correttamente in italiano ("Conferma prenotazione — Hotel PMS Test"), **senza allegato** —
+  corretto per design: alla creazione della prenotazione non esiste ancora nessuna fattura/scontrino
+  da allegare (nasce solo al check-in/checkout).
+
+2/2 verdi. **L'invio automatico delle due email richieste, incluso l'allegato dello scontrino/fattura
+al checkout, è ora verificato end-to-end contro una vera casella di posta, non solo a livello di
+codice/chiamata API.**
 
 ---
 
@@ -240,7 +256,7 @@ axllent/mailpit`) sulla stessa rete Docker, oppure puntare `SMTP_HOST` a un serv
 | 3 — Sweep elementi per area | ✅ completo | Ospiti, Prenotazioni, Camere/Tipologie, Pulizie (+1 difetto 🟡), Fatturazione, Ristorante (menu CRUD + dialog nativi), Rates (selezione da tastiera), Calendario (vista/navigazione) — tutte con CRUD reali |
 | 4 — Dati negativi | ✅ completo | HotelProfile (VAT/CAP/logoUrl) 8/8 verdi |
 | 5 — Matrice portali | ✅ completo | D1 Alloggiati (1 difetto 🟡 risolto) · D2 FatturaPA · D3 City tax (1 difetto 🟢 documentato) · D4 Email — nessun nuovo difetto oltre ai già trovati |
-| 6 — Interruzioni | ✅ sostanzialmente completo | `docker stop` reale di notification-service, billing-service, guest-service e fb-service, uno alla volta — tutti i circuit breaker Resilience4j confermati funzionanti (checkout/check-in mai bloccati, retry post-ripristino recupera lo stato); scoperto gap ambientale `mailpit` mancante (vedi sopra). Fault injection UI (`06-interruptions.spec.ts`, 7/7 verdi): abort+retry ospite, 500 su prenotazione, doppio-click, CSRF rimosso, sessione scaduta a metà form, back-navigation durante POST in volo. Fault injection API (`07-service-resilience.spec.ts` + `06-guest-fb-service-down.spec.ts`, 7/7 verdi): pagamento midflight, ordine F&B doppio, submit Alloggiati midflight, concorrenza su modifica prenotazione, guest-service/fb-service giù — **3 difetti 🔴/🟡 trovati e risolti** (prezzo mai salvato su modifica prenotazione, falso conflitto camera, 500 grezzo dal gateway quando un servizio a valle è irraggiungibile). Non testato: `docker stop` di auth-service (romperebbe la sessione della suite stessa) e di frontdesk-service (è il servizio centrale, spegnerlo degrada l'intera app per definizione) |
+| 6 — Interruzioni | ✅ sostanzialmente completo | `docker stop` reale di notification-service, billing-service, guest-service e fb-service, uno alla volta — tutti i circuit breaker Resilience4j confermati funzionanti (checkout/check-in mai bloccati, retry post-ripristino recupera lo stato); gap ambientale `mailpit` mancante scoperto e chiuso (vedi sotto — invio email reale ora verificato). Fault injection UI (`06-interruptions.spec.ts`, 7/7 verdi): abort+retry ospite, 500 su prenotazione, doppio-click, CSRF rimosso, sessione scaduta a metà form, back-navigation durante POST in volo. Fault injection API (`07-service-resilience.spec.ts` + `06-guest-fb-service-down.spec.ts`, 7/7 verdi): pagamento midflight, ordine F&B doppio, submit Alloggiati midflight, concorrenza su modifica prenotazione, guest-service/fb-service giù — **3 difetti 🔴/🟡 trovati e risolti** (prezzo mai salvato su modifica prenotazione, falso conflitto camera, 500 grezzo dal gateway quando un servizio a valle è irraggiungibile). Non testato: `docker stop` di auth-service (romperebbe la sessione della suite stessa) e di frontdesk-service (è il servizio centrale, spegnerlo degrada l'intera app per definizione) |
 | 7 — Flussi end-to-end | ✅ completo | `08-end-to-end-flows.spec.ts`, 2/2 verdi. Catena completa: preventivo → conversione (verificato status `ACCEPTED` + camera/date ereditate) → check-in reale (non walk-in) → ordine F&B **confermato** (creare l'ordine da solo non addebita — serve `POST /orders/{id}/confirm`, scoperto in questo blocco) → verificato che l'addebito atterri sulla stessa fattura → pagamento pieno → checkout → PDF (magic bytes `%PDF`) → switch FATTURA → XML FatturaPA (verificato codice fiscale reale dell'ospite nell'XML, non un placeholder) → export Alloggiati del giorno. Seconda spec: preventivo multi-opzione → decline (verificato blocco successivo della conversione) · prenotazione → modifica con **cambio camera reale** → cancellazione (verificato 404 dopo delete) |
 | 8 — Chaos | ✅ completo (versione ridotta) | `10-chaos.spec.ts`: 3 sessioni (una per ruolo, seed loggato per replay deterministico — `chaos-<ruolo>-seed-<N>.json` in questa cartella, non versionato in git) da **60 passi** (non 200: round-trip reali contro il backend live, 200×3 avrebbe superato il budget di tempo pratico di questo giro) di click/navigazione/back/forward/refresh/resize/Ctrl+K/Esc/digitazione casuale. 4/4 verdi, **nessun difetto emerso** — console pulita su tutti i 180 passi complessivi. Sessione MCP esplorativa "a mano libera" non eseguita in questo giro |
 | 9 — RBAC/IDOR | ✅ sostanzialmente completo | `idor-cross-tenant-live.spec.ts` (esistente, non di questo round: room/guest/invoice IDOR + RECEPTIONIST bloccato su report owner) + nuovo `09-rbac-idor.spec.ts` (5/5 verdi): IDOR cross-tenant su reservation/quotation/stay (404, mai 403 né dati altrui) + Hotel B non può fare checkout su stay altrui · RECEPTIONIST correttamente respinto (403) da Alloggiati (txt/json/submit), export FatturaPA batch, `POST` city-tax-rate, `POST` hotel-category — nessun nuovo difetto, RBAC ben implementato ovunque verificato. La matrice completa 30 route × 3 ruoli × ogni azione gated non è stata rifatta esaustivamente (già campionata nel Blocco 2 route-sweep e nel Blocco 3) |
