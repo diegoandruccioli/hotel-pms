@@ -229,14 +229,18 @@ describe('stayService — settings, lookups, downloads', () => {
   // visible file save, silently dropped). Switched to the same hidden-iframe pattern
   // billingService.ts already uses; tests mirror billingService.test.ts's iframe test.
 
-  it('should trigger the Alloggiati txt report download via a hidden iframe', () => {
+  it('should trigger the Alloggiati txt report download via a hidden iframe', async () => {
     vi.useFakeTimers();
+    // validate-then-download (REPORT.md difetto #3): downloadAlloggiatiReport now
+    // awaits a real GET before creating the iframe, so a failed/empty report never
+    // shows a false-success download — mock that call succeeding.
+    vi.mocked(api.get).mockResolvedValueOnce({ data: '' });
     const iframe = { style: {} as CSSStyleDeclaration, src: '' } as HTMLIFrameElement;
     const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(iframe);
     const appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((n) => n);
     const removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((n) => n);
 
-    stayService.downloadAlloggiatiReport('2026-06-20');
+    await stayService.downloadAlloggiatiReport('2026-06-20');
 
     expect(iframe.src).toBe('/api/v1/stays/reports/alloggiati?date=2026-06-20');
     expect(iframe.style.display).toBe('none');
@@ -252,14 +256,15 @@ describe('stayService — settings, lookups, downloads', () => {
     vi.useRealTimers();
   });
 
-  it('should trigger the Alloggiati json export download via a hidden iframe', () => {
+  it('should trigger the Alloggiati json export download via a hidden iframe', async () => {
     vi.useFakeTimers();
+    vi.mocked(api.get).mockResolvedValueOnce({ data: [] });
     const iframe = { style: {} as CSSStyleDeclaration, src: '' } as HTMLIFrameElement;
     const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(iframe);
     const appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((n) => n);
     const removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((n) => n);
 
-    stayService.downloadAlloggiatiJson('2026-06-20');
+    await stayService.downloadAlloggiatiJson('2026-06-20');
 
     expect(iframe.src).toBe('/api/v1/stays/reports/alloggiati/json?date=2026-06-20');
     expect(iframe.style.display).toBe('none');

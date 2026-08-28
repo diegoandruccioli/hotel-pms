@@ -2,6 +2,9 @@ import type { Page } from '@playwright/test';
 import type { ConsoleGuard } from './consoleGuard';
 import { extractInventory } from './elementSweeper';
 
+/** The exact ARIA-role union Page.getByRole() accepts, without guessing/duplicating Playwright's own type. */
+type AriaRole = Parameters<Page['getByRole']>[0];
+
 // Deterministic random walk for Blocco 8. A seed is logged before the first
 // step so any failing run can be replayed exactly by passing the same seed
 // back in via CHAOS_SEED — "seed loggato ⇒ ogni rotta è riproducibile".
@@ -72,7 +75,7 @@ export async function runChaosWalk(page: Page, guard: ConsoleGuard, opts: ChaosO
           if (safe.length === 0) break;
           const target = pick(safe);
           step.detail = `${target.role}:${target.name}`;
-          await page.getByRole(target.role as any, { name: target.name, exact: true }).first().click({ timeout: 3000 }).catch(() => {});
+          await page.getByRole(target.role as AriaRole, { name: target.name, exact: true }).first().click({ timeout: 3000 }).catch(() => {});
           break;
         }
         case 'navigate': {
@@ -112,7 +115,7 @@ export async function runChaosWalk(page: Page, guard: ConsoleGuard, opts: ChaosO
           break;
         }
       }
-    } catch (e) {
+    } catch {
       // step-level failures are expected sometimes (element detached, etc) —
       // only a console/network anomaly surfaced via guard.drain() counts as
       // a "the app broke" finding.

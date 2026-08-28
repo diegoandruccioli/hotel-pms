@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { csrfHeader, createCleanRoom, createGuest, createWalkInStay } from '../fixtures/api';
+import { csrfHeader, createCleanRoom, createWalkInStay } from '../fixtures/api';
 
 // Blocco 6/7 — real SMTP delivery, now that docker-compose.yml has a mailpit
 // catch-all service (added specifically to close the "structurally

@@ -31,13 +31,21 @@ const INTERACTIVE_ROLES = [
  * getByRole()-based specs (frontend/e2e/*.spec.ts) already address elements,
  * and is immune to class-name churn from styling changes.
  */
+/** Minimal shape of the nodes page.accessibility.snapshot() returns — only the fields this sweep reads. */
+interface AccessibilityNode {
+  role: string;
+  name?: string;
+  pressed?: boolean | 'mixed';
+  children?: AccessibilityNode[];
+}
+
 export async function extractInventory(page: Page): Promise<InventoryEntry[]> {
   const snapshot = await page.accessibility.snapshot({ interestingOnly: true });
   const out: InventoryEntry[] = [];
 
-  function walk(node: any): void {
+  function walk(node: AccessibilityNode | null): void {
     if (!node) return;
-    if (INTERACTIVE_ROLES.includes(node.role)) {
+    if ((INTERACTIVE_ROLES as readonly string[]).includes(node.role)) {
       out.push({
         role: node.role,
         name: node.name ?? '',

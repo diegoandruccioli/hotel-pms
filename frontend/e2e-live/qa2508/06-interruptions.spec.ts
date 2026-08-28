@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { ConsoleGuard } from './support/consoleGuard';
-import { abortRequest, fakeStatus, midflightAbort, slowResponse } from './support/faultInjector';
+import { abortRequest, fakeStatus, slowResponse } from './support/faultInjector';
 
 // Blocco 6 — interruptions, using page.route() fault injection against the
 // live backend (the rest of the app keeps talking to the real services —

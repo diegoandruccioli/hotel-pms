@@ -21,7 +21,7 @@ test.beforeAll(async ({ request, baseURL }) => {
 
 test.describe('QA 2026-08-24 — RECEPTIONIST is blocked from ADMIN/OWNER routes', () => {
   for (const routePath of OWNER_ADMIN_ONLY_ROUTES) {
-    test(`UI guard redirects RECEPTIONIST away from ${routePath}`, async ({ browser, baseURL }) => {
+    test(`UI guard redirects RECEPTIONIST away from ${routePath}`, async ({ browser }) => {
       const context = await newLoggedOutContext(browser);
       attachQaListeners(context, { role: 'RECEPTIONIST', locale: 'it' });
       const page = await context.newPage();
@@ -40,7 +40,7 @@ test.describe('QA 2026-08-24 — RECEPTIONIST is blocked from ADMIN/OWNER routes
 });
 
 test.describe('QA 2026-08-24 — RECEPTIONIST is blocked from ADMIN/OWNER APIs directly', () => {
-  test('RECEPTIONIST gets 403 from /api/v1/reports/owner (already known-good, re-verified)', async ({ browser, baseURL }) => {
+  test('RECEPTIONIST gets 403 from /api/v1/reports/owner (already known-good, re-verified)', async ({ browser }) => {
     const context = await newLoggedOutContext(browser);
     const page = await context.newPage();
     await uiLoginAs(page, QA_RECEPTIONIST.username, QA_RECEPTIONIST.password);

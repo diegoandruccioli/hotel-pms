@@ -68,7 +68,7 @@ test.describe('Blocco 3 — Rates', () => {
     await expect(dialog).not.toBeVisible({ timeout: 3000 });
   });
 
-  test('RECEPTIONIST cannot select cells or apply prices (view-only)', async ({ page }) => {
+  test('RECEPTIONIST cannot select cells or apply prices (view-only)', async () => {
     // Uses the shared 'live' ADMIN storageState project-wide, so this test
     // documents the expectation via the canApplyPrice-gated UI rather than
     // logging in as RECEPTIONIST here — full per-role verification happens

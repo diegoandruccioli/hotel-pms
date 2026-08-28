@@ -64,7 +64,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -573,6 +572,17 @@ class ReservationServiceImplTest {
         when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
         when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
+        // The real MapStruct mapper builds a new ReservationLineItem per request line
+        // item (updateEntityFromRequest is deliberately excluded from touching
+        // lineItems — see ReservationMapper's javadoc); reservationMapper is a plain
+        // mock here, so stub toEntity(ReservationLineItemRequest) the same way the
+        // other update test below does.
+        when(reservationMapper.toEntity(any(ReservationLineItemRequest.class))).thenAnswer(invocation -> {
+            final ReservationLineItemRequest lineItemRequest = invocation.getArgument(0);
+            final ReservationLineItem newItem = new ReservationLineItem();
+            newItem.setRoomId(lineItemRequest.roomId());
+            return newItem;
+        });
 
         final ReservationResponse result = reservationService.updateReservation(reservationId, request);
 
@@ -580,7 +590,10 @@ class ReservationServiceImplTest {
         verify(reservationRepository, times(1)).findByIdAndHotelId(reservationId, HOTEL_ID);
         verify(roomService, times(1)).getRoomById(roomId, HOTEL_ID);
         verify(reservationMapper, times(1)).updateEntityFromRequest(request, entity);
-        verify(reservationRepository, times(1)).saveAndFlush(entity);
+        // Called twice: once to flush the old line items' removal before the
+        // replacements are added (avoids a false-positive room-overlap conflict — see
+        // ReservationServiceImpl#updateReservation's javadoc), once for the real save.
+        verify(reservationRepository, times(2)).saveAndFlush(entity);
     }
 
     @Test
@@ -596,15 +609,18 @@ class ReservationServiceImplTest {
                         new NightlyRate(request.checkInDate().plusDays(1), PRICE_120, null)));
         when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
-        // The real MapStruct mapper repopulates lineItems from the request when
-        // updateEntityFromRequest runs; simulate that here since reservationMapper is a
-        // plain mock (a no-op by default), to exercise applyResolvedPrices realistically.
-        doAnswer(invocation -> {
+        // The real MapStruct mapper builds a new ReservationLineItem per request line
+        // item — updateEntityFromRequest is deliberately excluded from touching
+        // lineItems (see ReservationMapper's javadoc: pricing must happen on the
+        // transient item BEFORE it joins the managed collection); reservationMapper is
+        // a plain mock here, so stub toEntity(ReservationLineItemRequest) directly
+        // instead of simulating the old behavior through updateEntityFromRequest.
+        when(reservationMapper.toEntity(any(ReservationLineItemRequest.class))).thenAnswer(invocation -> {
+            final ReservationLineItemRequest lineItemRequest = invocation.getArgument(0);
             final ReservationLineItem newItem = new ReservationLineItem();
-            newItem.setRoomId(roomId);
-            entity.getLineItems().add(newItem);
-            return null;
-        }).when(reservationMapper).updateEntityFromRequest(request, entity);
+            newItem.setRoomId(lineItemRequest.roomId());
+            return newItem;
+        });
 
         reservationService.updateReservation(reservationId, request);
 
