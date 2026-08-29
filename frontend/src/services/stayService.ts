@@ -5,8 +5,13 @@ import type {
   AlloggiatiStato,
   AlloggiatiTipdoc,
   AvailableRoom,
+  CityTaxApplicabilityRequest,
+  CityTaxApplicabilityResponse,
+  CityTaxBackfillResponse,
+  CityTaxConfigurationStatusResponse,
   CityTaxRateRequest,
   CityTaxRateResponse,
+  CityTaxUnassessedSummaryResponse,
   HotelCategoryHistoryRequest,
   HotelCategoryHistoryResponse,
   HotelSettingsRequest,
@@ -169,6 +174,37 @@ export const stayService = {
 
   createCityTaxRate: async (data: CityTaxRateRequest): Promise<CityTaxRateResponse> => {
     const response = await api.post<CityTaxRateResponse>(`${BASE_PATH}/city-tax-rates`, data);
+    return response.data;
+  },
+
+  getCityTaxApplicability: async (): Promise<CityTaxApplicabilityResponse> => {
+    const response = await api.get<CityTaxApplicabilityResponse>(`${BASE_PATH}/city-tax-rates/applicability`);
+    return response.data;
+  },
+
+  updateCityTaxApplicability: async (data: CityTaxApplicabilityRequest): Promise<CityTaxApplicabilityResponse> => {
+    const response = await api.put<CityTaxApplicabilityResponse>(`${BASE_PATH}/city-tax-rates/applicability`, data);
+    return response.data;
+  },
+
+  /** Pre-flight check the check-in form calls before submitting — RECEPTIONIST included. */
+  getCityTaxConfigurationStatus: async (): Promise<CityTaxConfigurationStatusResponse> => {
+    const response = await api.get<CityTaxConfigurationStatusResponse>(`${BASE_PATH}/city-tax/configuration-status`);
+    return response.data;
+  },
+
+  getCityTaxUnassessedSummary: async (): Promise<CityTaxUnassessedSummaryResponse> => {
+    const response = await api.get<CityTaxUnassessedSummaryResponse>(`${BASE_PATH}/city-tax/unassessed/summary`);
+    return response.data;
+  },
+
+  previewCityTaxBackfill: async (): Promise<CityTaxBackfillResponse> => {
+    const response = await api.get<CityTaxBackfillResponse>(`${BASE_PATH}/city-tax/backfill/preview`);
+    return response.data;
+  },
+
+  confirmCityTaxBackfill: async (): Promise<CityTaxBackfillResponse> => {
+    const response = await api.post<CityTaxBackfillResponse>(`${BASE_PATH}/city-tax/backfill/confirm`);
     return response.data;
   },
 };

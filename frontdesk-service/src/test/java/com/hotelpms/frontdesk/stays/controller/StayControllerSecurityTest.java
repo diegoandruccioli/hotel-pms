@@ -1,6 +1,10 @@
 package com.hotelpms.frontdesk.stays.controller;
 
 import com.hotelpms.internalauth.security.NonceStore;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxBackfillResponse;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxConfigurationStatusResponse;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxUnassessedSummaryResponse;
+import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
 import com.hotelpms.frontdesk.security.SecurityConfig;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiReportService;
@@ -74,6 +78,10 @@ class StayControllerSecurityTest {
     private static final String PATH_SUBMIT = "/api/v1/stays/reports/alloggiati/submit";
     private static final String PATH_JSON = "/api/v1/stays/reports/alloggiati/json";
     private static final String PATH_TXT = "/api/v1/stays/reports/alloggiati";
+    private static final String PATH_CITY_TAX_CONFIG_STATUS = "/api/v1/stays/city-tax/configuration-status";
+    private static final String PATH_CITY_TAX_UNASSESSED_SUMMARY = "/api/v1/stays/city-tax/unassessed/summary";
+    private static final String PATH_CITY_TAX_BACKFILL_PREVIEW = "/api/v1/stays/city-tax/backfill/preview";
+    private static final String PATH_CITY_TAX_BACKFILL_CONFIRM = "/api/v1/stays/city-tax/backfill/confirm";
     private static final String PARAM_DATE = "date";
     private static final String TEST_DATE = "2026-05-17";
 
@@ -106,6 +114,9 @@ class StayControllerSecurityTest {
 
     @MockitoBean
     private AlloggiatiWebSenderService alloggiatiWebSenderService;
+
+    @MockitoBean
+    private CityTaxAssessmentService cityTaxAssessmentService;
 
     @MockitoBean
     private NonceStore nonceStore;
@@ -176,6 +187,78 @@ class StayControllerSecurityTest {
 
         mockMvc.perform(withAuthHeaders(get(PATH_TXT).param(PARAM_DATE, TEST_DATE),
                         USER_ADMIN, ROLE_ADMIN, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    // ──────────────────────────────── city-tax config status (open) ────────
+
+    /**
+     * Unlike the other city-tax endpoints below, the pre-flight check-in status is
+     * called from the check-in form itself — any authenticated staff role (not just
+     * ADMIN/OWNER) needs it, so it carries no {@code @PreAuthorize}.
+     */
+    @Test
+    void cityTaxConfigurationStatusReturns200ForReceptionist() throws Exception {
+        when(cityTaxAssessmentService.checkConfigurationStatus(any()))
+                .thenReturn(new CityTaxConfigurationStatusResponse(true, null));
+
+        mockMvc.perform(withAuthHeaders(get(PATH_CITY_TAX_CONFIG_STATUS),
+                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    // ──────────────────────────────── city-tax unassessed summary ──────────
+
+    @Test
+    void cityTaxUnassessedSummaryReturns403ForReceptionist() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(PATH_CITY_TAX_UNASSESSED_SUMMARY),
+                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cityTaxUnassessedSummaryReturns200ForOwner() throws Exception {
+        when(cityTaxAssessmentService.getUnassessedSummary(any()))
+                .thenReturn(new CityTaxUnassessedSummaryResponse(0, null, null));
+
+        mockMvc.perform(withAuthHeaders(get(PATH_CITY_TAX_UNASSESSED_SUMMARY),
+                        USER_OWNER, ROLE_OWNER, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    // ──────────────────────────────── city-tax backfill ────────────────────
+
+    @Test
+    void cityTaxBackfillPreviewReturns403ForReceptionist() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(PATH_CITY_TAX_BACKFILL_PREVIEW),
+                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cityTaxBackfillPreviewReturns200ForAdmin() throws Exception {
+        when(cityTaxAssessmentService.previewBackfill(any()))
+                .thenReturn(new CityTaxBackfillResponse(List.of(), java.math.BigDecimal.ZERO, 0, 0));
+
+        mockMvc.perform(withAuthHeaders(get(PATH_CITY_TAX_BACKFILL_PREVIEW),
+                        USER_ADMIN, ROLE_ADMIN, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void cityTaxBackfillConfirmReturns403ForReceptionist() throws Exception {
+        mockMvc.perform(withAuthHeaders(post(PATH_CITY_TAX_BACKFILL_CONFIRM),
+                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cityTaxBackfillConfirmReturns200ForOwner() throws Exception {
+        when(cityTaxAssessmentService.confirmBackfill(any()))
+                .thenReturn(new CityTaxBackfillResponse(List.of(), java.math.BigDecimal.ZERO, 0, 0));
+
+        mockMvc.perform(withAuthHeaders(post(PATH_CITY_TAX_BACKFILL_CONFIRM),
+                        USER_OWNER, ROLE_OWNER, TEST_HOTEL_ID))
                 .andExpect(status().isOk());
     }
 

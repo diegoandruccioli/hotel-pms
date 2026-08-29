@@ -2,16 +2,27 @@ package com.hotelpms.frontdesk.citytax.service.impl;
 
 import com.hotelpms.frontdesk.citytax.domain.CityTaxAssessment;
 import com.hotelpms.frontdesk.citytax.domain.CityTaxRate;
+import com.hotelpms.frontdesk.citytax.domain.CityTaxUnassessedReason;
 import com.hotelpms.frontdesk.citytax.domain.HotelCategoryHistory;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxBackfillResponse;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxConfigurationStatusResponse;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxUnassessedSummaryResponse;
 import com.hotelpms.frontdesk.citytax.repository.CityTaxAssessmentRepository;
 import com.hotelpms.frontdesk.citytax.repository.CityTaxRateRepository;
 import com.hotelpms.frontdesk.citytax.repository.HotelCategoryHistoryRepository;
 import com.hotelpms.frontdesk.citytax.service.CityTaxCalculator;
 import com.hotelpms.frontdesk.citytax.service.CityTaxCalculator.CityTaxAssessmentResult;
+import com.hotelpms.frontdesk.client.BillingClient;
+import com.hotelpms.frontdesk.client.dto.ChargeRequest;
+import com.hotelpms.frontdesk.client.dto.ChargeResponse;
+import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.exception.NotFoundException;
+import com.hotelpms.frontdesk.stays.domain.CityTaxApplicability;
 import com.hotelpms.frontdesk.stays.domain.HotelSettings;
 import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository;
+import com.hotelpms.frontdesk.stays.repository.StayRepository;
+import feign.FeignException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,15 +32,20 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -45,6 +61,10 @@ class CityTaxAssessmentServiceImplTest {
     private static final int MAX_TAXABLE_NIGHTS = 7;
     private static final int EXEMPT_UNDER_AGE = 14;
     private static final long NIGHTS = 3L;
+    private static final String OPEN_STATUS = "ISSUED";
+    private static final String PAID_STATUS = "PAID";
+    private static final BigDecimal RATE_AMOUNT_PER_NIGHT = new BigDecimal("2.50");
+    private static final int LATER_DAYS_OFFSET = 5;
 
     @Mock
     private CityTaxAssessmentRepository cityTaxAssessmentRepository;
@@ -57,6 +77,12 @@ class CityTaxAssessmentServiceImplTest {
 
     @Mock
     private HotelSettingsRepository hotelSettingsRepository;
+
+    @Mock
+    private StayRepository stayRepository;
+
+    @Mock
+    private BillingClient billingClient;
 
     @Mock
     private CityTaxCalculator cityTaxCalculator;
@@ -79,6 +105,10 @@ class CityTaxAssessmentServiceImplTest {
                 .build();
     }
 
+    // -----------------------------------------------------------------
+    // assessFor
+    // -----------------------------------------------------------------
+
     @Test
     void assessForAlreadyAssessedStayReturnsExistingWithoutRecomputing() {
         final CityTaxAssessment existing = CityTaxAssessment.builder().id(UUID.randomUUID()).build();
@@ -92,31 +122,37 @@ class CityTaxAssessmentServiceImplTest {
     }
 
     @Test
-    void assessForHotelWithoutComuneConfiguredReturnsEmpty() {
+    void assessForHotelWithoutComuneConfiguredPersistsUnassessedRow() {
         when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
         when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.empty());
+        when(cityTaxAssessmentRepository.save(any(CityTaxAssessment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         final Optional<CityTaxAssessment> result = cityTaxAssessmentService.assessFor(stay, NIGHTS);
 
-        assertTrue(result.isEmpty());
-        verify(cityTaxAssessmentRepository, never()).save(any());
+        assertTrue(result.isPresent());
+        assertEquals(CityTaxUnassessedReason.COMUNE_NOT_CONFIGURED, result.get().getUnassessedReason());
+        assertEquals(BigDecimal.ZERO, result.get().getTotalAmount());
+        verify(cityTaxAssessmentRepository).save(any(CityTaxAssessment.class));
     }
 
     @Test
-    void assessForHotelWithoutCategoryRecordedReturnsEmpty() {
+    void assessForHotelWithoutCategoryRecordedPersistsUnassessedRow() {
         when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
         when(hotelSettingsRepository.findById(hotelId))
                 .thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT)).thenReturn(Optional.empty());
+        when(cityTaxAssessmentRepository.save(any(CityTaxAssessment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         final Optional<CityTaxAssessment> result = cityTaxAssessmentService.assessFor(stay, NIGHTS);
 
-        assertTrue(result.isEmpty());
-        verify(cityTaxAssessmentRepository, never()).save(any());
+        assertTrue(result.isPresent());
+        assertEquals(CityTaxUnassessedReason.CATEGORY_NOT_RECORDED, result.get().getUnassessedReason());
     }
 
     @Test
-    void assessForNoApplicableRateReturnsEmpty() {
+    void assessForNoApplicableRatePersistsUnassessedRow() {
         when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
         when(hotelSettingsRepository.findById(hotelId))
                 .thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
@@ -124,21 +160,39 @@ class CityTaxAssessmentServiceImplTest {
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
         when(cityTaxRateRepository.findApplicableByHotelId(hotelId, COMUNE_CODICE, CATEGORY, FIRST_NIGHT))
                 .thenReturn(Optional.empty());
+        when(cityTaxAssessmentRepository.save(any(CityTaxAssessment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         final Optional<CityTaxAssessment> result = cityTaxAssessmentService.assessFor(stay, NIGHTS);
 
-        assertTrue(result.isEmpty());
-        verify(cityTaxAssessmentRepository, never()).save(any());
+        assertTrue(result.isPresent());
+        assertEquals(CityTaxUnassessedReason.NO_RATE_FOR_DATE, result.get().getUnassessedReason());
     }
 
     @Test
-    void assessForApplicableRateComputesAndPersistsSnapshot() {
+    void assessForHotelDeclaredNotApplicableSkipsResolutionAndPersistsUnassessedRow() {
+        when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
+        final HotelSettings settings = settingsWithComune(COMUNE_CODICE);
+        settings.setCityTaxApplicability(CityTaxApplicability.NOT_APPLICABLE);
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settings));
+        when(cityTaxAssessmentRepository.save(any(CityTaxAssessment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        final Optional<CityTaxAssessment> result = cityTaxAssessmentService.assessFor(stay, NIGHTS);
+
+        assertTrue(result.isPresent());
+        assertEquals(CityTaxUnassessedReason.NOT_APPLICABLE, result.get().getUnassessedReason());
+        verify(hotelCategoryHistoryRepository, never()).findApplicableByHotelId(any(), any());
+    }
+
+    @Test
+    void assessForApplicableRateComputesAndPersistsSnapshotWithNullUnassessedReason() {
         final CityTaxRate rate = CityTaxRate.builder()
                 .id(UUID.randomUUID())
                 .hotelId(hotelId)
                 .comuneCodice(COMUNE_CODICE)
                 .category(CATEGORY)
-                .amountPerNight(new BigDecimal("2.50"))
+                .amountPerNight(RATE_AMOUNT_PER_NIGHT)
                 .maxTaxableNights(MAX_TAXABLE_NIGHTS)
                 .exemptUnderAge(EXEMPT_UNDER_AGE)
                 .validFrom(RATE_VALID_FROM)
@@ -163,12 +217,28 @@ class CityTaxAssessmentServiceImplTest {
         assertEquals(hotelId, saved.getHotelId());
         assertEquals(stayId, saved.getStayId());
         assertEquals(rate.getId(), saved.getCityTaxRateId());
-        assertEquals(new BigDecimal("2.50"), saved.getAmountPerNightSnapshot());
+        assertEquals(RATE_AMOUNT_PER_NIGHT, saved.getAmountPerNightSnapshot());
         assertEquals(MAX_TAXABLE_NIGHTS, saved.getMaxTaxableNightsSnapshot());
         assertEquals(EXEMPT_UNDER_AGE, saved.getExemptUnderAgeSnapshot());
         assertEquals(2, saved.getTaxableGuests());
         assertEquals(3, saved.getTaxableNights());
         assertEquals(new BigDecimal("15.00"), saved.getTotalAmount());
+        assertNull(saved.getUnassessedReason());
+    }
+
+    // -----------------------------------------------------------------
+    // findAssessment / markCharged
+    // -----------------------------------------------------------------
+
+    @Test
+    void findAssessmentReturnsWhateverTheRepositoryHasWithoutSideEffects() {
+        final CityTaxAssessment existing = CityTaxAssessment.builder().id(UUID.randomUUID()).build();
+        when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(existing));
+
+        final Optional<CityTaxAssessment> result = cityTaxAssessmentService.findAssessment(stayId, hotelId);
+
+        assertEquals(existing, result.orElseThrow());
+        verify(cityTaxAssessmentRepository, never()).save(any());
     }
 
     @Test
@@ -194,6 +264,233 @@ class CityTaxAssessmentServiceImplTest {
                 () -> cityTaxAssessmentService.markCharged(assessmentId, UUID.randomUUID()));
     }
 
+    // -----------------------------------------------------------------
+    // checkConfigurationStatus
+    // -----------------------------------------------------------------
+
+    @Test
+    void checkConfigurationStatusWithApplicableRateIsConfigured() {
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelCategoryHistoryRepository.findApplicableByHotelId(eq(hotelId), any(LocalDate.class)))
+                .thenReturn(Optional.of(categoryHistory(CATEGORY)));
+        when(cityTaxRateRepository.findApplicableByHotelId(eq(hotelId), eq(COMUNE_CODICE), eq(CATEGORY), any(LocalDate.class)))
+                .thenReturn(Optional.of(CityTaxRate.builder().id(UUID.randomUUID()).build()));
+
+        final CityTaxConfigurationStatusResponse status = cityTaxAssessmentService.checkConfigurationStatus(hotelId);
+
+        assertTrue(status.configured());
+        assertNull(status.reason());
+    }
+
+    @Test
+    void checkConfigurationStatusWithoutComuneIsNotConfigured() {
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.empty());
+
+        final CityTaxConfigurationStatusResponse status = cityTaxAssessmentService.checkConfigurationStatus(hotelId);
+
+        assertFalse(status.configured());
+        assertEquals(CityTaxUnassessedReason.COMUNE_NOT_CONFIGURED, status.reason());
+    }
+
+    @Test
+    void checkConfigurationStatusDeclaredNotApplicableIsConfiguredWithNoReason() {
+        final HotelSettings settings = settingsWithComune(COMUNE_CODICE);
+        settings.setCityTaxApplicability(CityTaxApplicability.NOT_APPLICABLE);
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settings));
+
+        final CityTaxConfigurationStatusResponse status = cityTaxAssessmentService.checkConfigurationStatus(hotelId);
+
+        assertTrue(status.configured());
+        assertNull(status.reason());
+        verify(hotelCategoryHistoryRepository, never()).findApplicableByHotelId(any(), any());
+    }
+
+    // -----------------------------------------------------------------
+    // getUnassessedSummary
+    // -----------------------------------------------------------------
+
+    @Test
+    void unassessedSummaryReturnsCountAndMostRecent() {
+        final CityTaxAssessment older = CityTaxAssessment.builder()
+                .assessedAt(FIRST_NIGHT.atStartOfDay())
+                .unassessedReason(CityTaxUnassessedReason.NO_RATE_FOR_DATE)
+                .build();
+        final CityTaxAssessment newer = CityTaxAssessment.builder()
+                .assessedAt(FIRST_NIGHT.plusDays(LATER_DAYS_OFFSET).atStartOfDay())
+                .unassessedReason(CityTaxUnassessedReason.COMUNE_NOT_CONFIGURED)
+                .build();
+        when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
+                .thenReturn(List.of(older, newer));
+
+        final CityTaxUnassessedSummaryResponse summary = cityTaxAssessmentService.getUnassessedSummary(hotelId);
+
+        assertEquals(2, summary.unassessedCount());
+        assertEquals(newer.getAssessedAt(), summary.mostRecentUnassessedAt());
+        assertEquals(CityTaxUnassessedReason.COMUNE_NOT_CONFIGURED, summary.mostRecentReason());
+    }
+
+    @Test
+    void unassessedSummaryWithNoGapsReturnsZeroAndNulls() {
+        when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
+                .thenReturn(List.of());
+
+        final CityTaxUnassessedSummaryResponse summary = cityTaxAssessmentService.getUnassessedSummary(hotelId);
+
+        assertEquals(0, summary.unassessedCount());
+        assertNull(summary.mostRecentUnassessedAt());
+        assertNull(summary.mostRecentReason());
+    }
+
+    // -----------------------------------------------------------------
+    // preview/confirm backfill
+    // -----------------------------------------------------------------
+
+    @Test
+    void previewBackfillNeverWritesOrCharges() {
+        final CityTaxRate rate = backfillableRate();
+        final CityTaxAssessment gap = gapAssessment(CityTaxUnassessedReason.NO_RATE_FOR_DATE);
+        when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
+                .thenReturn(List.of(gap));
+        when(stayRepository.findById(stayId)).thenReturn(Optional.of(stay));
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
+                .thenReturn(Optional.of(categoryHistory(CATEGORY)));
+        when(cityTaxRateRepository.findApplicableByHotelId(hotelId, COMUNE_CODICE, CATEGORY, FIRST_NIGHT))
+                .thenReturn(Optional.of(rate));
+        when(cityTaxCalculator.assess(eq(rate), eq(FIRST_NIGHT), anyLong(), any()))
+                .thenReturn(new CityTaxAssessmentResult(1, 1, RATE_AMOUNT_PER_NIGHT));
+        stay.setInvoiceId(UUID.randomUUID());
+        when(billingClient.getInvoiceById(stay.getInvoiceId()))
+                .thenReturn(new InvoiceStatusResponse(stay.getInvoiceId(), null, OPEN_STATUS, BigDecimal.ZERO));
+
+        final CityTaxBackfillResponse preview = cityTaxAssessmentService.previewBackfill(hotelId);
+
+        assertEquals(1, preview.lines().size());
+        assertFalse(preview.lines().get(0).charged());
+        assertEquals(RATE_AMOUNT_PER_NIGHT, preview.totalAmount());
+        assertEquals(0, preview.chargedCount());
+        verify(billingClient, never()).addCharge(any(), any());
+        verify(cityTaxAssessmentRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmBackfillChargesOpenInvoiceAndCorrectsAssessment() {
+        final CityTaxRate rate = backfillableRate();
+        final CityTaxAssessment gap = gapAssessment(CityTaxUnassessedReason.NO_RATE_FOR_DATE);
+        when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
+                .thenReturn(List.of(gap));
+        when(stayRepository.findById(stayId)).thenReturn(Optional.of(stay));
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
+                .thenReturn(Optional.of(categoryHistory(CATEGORY)));
+        when(cityTaxRateRepository.findApplicableByHotelId(hotelId, COMUNE_CODICE, CATEGORY, FIRST_NIGHT))
+                .thenReturn(Optional.of(rate));
+        when(cityTaxCalculator.assess(eq(rate), eq(FIRST_NIGHT), anyLong(), any()))
+                .thenReturn(new CityTaxAssessmentResult(1, 1, RATE_AMOUNT_PER_NIGHT));
+        stay.setInvoiceId(UUID.randomUUID());
+        when(billingClient.getInvoiceById(stay.getInvoiceId()))
+                .thenReturn(new InvoiceStatusResponse(stay.getInvoiceId(), null, OPEN_STATUS, BigDecimal.ZERO));
+        final UUID chargeId = UUID.randomUUID();
+        when(billingClient.addCharge(eq(stayId), any(ChargeRequest.class))).thenReturn(new ChargeResponse(chargeId));
+        when(cityTaxAssessmentRepository.save(gap)).thenReturn(gap);
+
+        final CityTaxBackfillResponse result = cityTaxAssessmentService.confirmBackfill(hotelId);
+
+        assertEquals(1, result.chargedCount());
+        assertEquals(0, result.skippedCount());
+        assertTrue(result.lines().get(0).charged());
+        assertEquals(chargeId, gap.getBillingChargeId());
+        assertNull(gap.getUnassessedReason());
+        assertEquals(RATE_AMOUNT_PER_NIGHT, gap.getTotalAmount());
+        verify(cityTaxAssessmentRepository).save(gap);
+    }
+
+    @Test
+    void confirmBackfillSkipsStayWithClosedInvoiceWithoutCharging() {
+        final CityTaxRate rate = backfillableRate();
+        final CityTaxAssessment gap = gapAssessment(CityTaxUnassessedReason.NO_RATE_FOR_DATE);
+        when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
+                .thenReturn(List.of(gap));
+        when(stayRepository.findById(stayId)).thenReturn(Optional.of(stay));
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
+                .thenReturn(Optional.of(categoryHistory(CATEGORY)));
+        when(cityTaxRateRepository.findApplicableByHotelId(hotelId, COMUNE_CODICE, CATEGORY, FIRST_NIGHT))
+                .thenReturn(Optional.of(rate));
+        when(cityTaxCalculator.assess(eq(rate), eq(FIRST_NIGHT), anyLong(), any()))
+                .thenReturn(new CityTaxAssessmentResult(1, 1, RATE_AMOUNT_PER_NIGHT));
+        stay.setInvoiceId(UUID.randomUUID());
+        when(billingClient.getInvoiceById(stay.getInvoiceId()))
+                .thenReturn(new InvoiceStatusResponse(stay.getInvoiceId(), null, PAID_STATUS, BigDecimal.ZERO));
+
+        final CityTaxBackfillResponse result = cityTaxAssessmentService.confirmBackfill(hotelId);
+
+        assertEquals(0, result.chargedCount());
+        assertEquals(1, result.skippedCount());
+        assertEquals("INVOICE_NOT_OPEN", result.lines().get(0).skipReason());
+        verify(billingClient, never()).addCharge(any(), any());
+        verify(cityTaxAssessmentRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmBackfillSkipsStayStillLackingConfigurationForItsOwnDate() {
+        final CityTaxAssessment gap = gapAssessment(CityTaxUnassessedReason.NO_RATE_FOR_DATE);
+        when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
+                .thenReturn(List.of(gap));
+        when(stayRepository.findById(stayId)).thenReturn(Optional.of(stay));
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT)).thenReturn(Optional.empty());
+
+        final CityTaxBackfillResponse result = cityTaxAssessmentService.confirmBackfill(hotelId);
+
+        assertEquals(0, result.chargedCount());
+        assertEquals(1, result.skippedCount());
+        assertEquals("STILL_UNCONFIGURED", result.lines().get(0).skipReason());
+        verify(billingClient, never()).getInvoiceById(any());
+        verify(billingClient, never()).addCharge(any(), any());
+    }
+
+    @Test
+    void confirmBackfillDoesNothingWhenHotelHasSinceDeclaredNotApplicable() {
+        final HotelSettings settings = settingsWithComune(COMUNE_CODICE);
+        settings.setCityTaxApplicability(CityTaxApplicability.NOT_APPLICABLE);
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settings));
+
+        final CityTaxBackfillResponse result = cityTaxAssessmentService.confirmBackfill(hotelId);
+
+        assertTrue(result.lines().isEmpty());
+        assertEquals(0, result.chargedCount());
+        verify(cityTaxAssessmentRepository, never()).findByHotelIdAndUnassessedReasonIn(any(), any());
+    }
+
+    @Test
+    void confirmBackfillSkipsWhenBillingServiceRejectsTheCharge() {
+        final CityTaxRate rate = backfillableRate();
+        final CityTaxAssessment gap = gapAssessment(CityTaxUnassessedReason.NO_RATE_FOR_DATE);
+        when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
+                .thenReturn(List.of(gap));
+        when(stayRepository.findById(stayId)).thenReturn(Optional.of(stay));
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
+                .thenReturn(Optional.of(categoryHistory(CATEGORY)));
+        when(cityTaxRateRepository.findApplicableByHotelId(hotelId, COMUNE_CODICE, CATEGORY, FIRST_NIGHT))
+                .thenReturn(Optional.of(rate));
+        when(cityTaxCalculator.assess(eq(rate), eq(FIRST_NIGHT), anyLong(), any()))
+                .thenReturn(new CityTaxAssessmentResult(1, 1, RATE_AMOUNT_PER_NIGHT));
+        stay.setInvoiceId(UUID.randomUUID());
+        when(billingClient.getInvoiceById(stay.getInvoiceId()))
+                .thenReturn(new InvoiceStatusResponse(stay.getInvoiceId(), null, OPEN_STATUS, BigDecimal.ZERO));
+        when(billingClient.addCharge(eq(stayId), any(ChargeRequest.class)))
+                .thenThrow(mock(FeignException.Conflict.class));
+
+        final CityTaxBackfillResponse result = cityTaxAssessmentService.confirmBackfill(hotelId);
+
+        assertEquals(0, result.chargedCount());
+        assertEquals(1, result.skippedCount());
+        assertEquals("CHARGE_FAILED", result.lines().get(0).skipReason());
+        verify(cityTaxAssessmentRepository, never()).save(any());
+    }
+
     private static HotelSettings settingsWithComune(final String comuneCodice) {
         final HotelSettings settings = new HotelSettings();
         settings.setComuneCodice(comuneCodice);
@@ -202,5 +499,29 @@ class CityTaxAssessmentServiceImplTest {
 
     private static HotelCategoryHistory categoryHistory(final String category) {
         return HotelCategoryHistory.builder().id(UUID.randomUUID()).category(category).build();
+    }
+
+    private static CityTaxRate backfillableRate() {
+        return CityTaxRate.builder()
+                .id(UUID.randomUUID())
+                .comuneCodice(COMUNE_CODICE)
+                .category(CATEGORY)
+                .amountPerNight(RATE_AMOUNT_PER_NIGHT)
+                .validFrom(RATE_VALID_FROM)
+                .build();
+    }
+
+    private CityTaxAssessment gapAssessment(final CityTaxUnassessedReason reason) {
+        return CityTaxAssessment.builder()
+                .id(UUID.randomUUID())
+                .hotelId(hotelId)
+                .stayId(stayId)
+                .amountPerNightSnapshot(BigDecimal.ZERO)
+                .taxableGuests(0)
+                .taxableNights(0)
+                .totalAmount(BigDecimal.ZERO)
+                .assessedAt(FIRST_NIGHT.atStartOfDay())
+                .unassessedReason(reason)
+                .build();
     }
 }

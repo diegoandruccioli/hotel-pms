@@ -1,5 +1,9 @@
 package com.hotelpms.frontdesk.stays.controller;
 
+import com.hotelpms.frontdesk.citytax.dto.CityTaxBackfillResponse;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxConfigurationStatusResponse;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxUnassessedSummaryResponse;
+import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
@@ -56,6 +60,7 @@ public class StayController {
     private final StayService stayService;
     private final AlloggiatiReportService alloggiatiReportService;
     private final AlloggiatiWebSenderService alloggiatiWebSenderService;
+    private final CityTaxAssessmentService cityTaxAssessmentService;
 
     /**
      * Endpoint to check in a guest and create a stay.
@@ -291,6 +296,62 @@ public class StayController {
     @PostMapping("/{id}/checkout-email/retry")
     public StayResponse retryCheckoutEmail(@NonNull @PathVariable("id") final UUID id) {
         return stayService.retryCheckoutEmail(id, Objects.requireNonNull(extractHotelId()));
+    }
+
+    /**
+     * Reports whether a check-in for the caller's hotel today would actually get its
+     * tourist tax assessed — the pre-flight check the check-in form calls before
+     * submitting, so a missing configuration surfaces before the stay is created.
+     *
+     * @return the configuration status
+     */
+    @GetMapping("/city-tax/configuration-status")
+    public ResponseEntity<CityTaxConfigurationStatusResponse> getCityTaxConfigurationStatus() {
+        return ResponseEntity.ok(
+                cityTaxAssessmentService.checkConfigurationStatus(Objects.requireNonNull(extractHotelId())));
+    }
+
+    /**
+     * Summarizes stays whose tourist tax was never assessed because of a configuration
+     * gap, for the caller's hotel — drives the Dashboard alert banner, same pattern as
+     * {@link #getAlloggiatiFailureSummary()}.
+     *
+     * @return the summary
+     */
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
+    @GetMapping("/city-tax/unassessed/summary")
+    public ResponseEntity<CityTaxUnassessedSummaryResponse> getCityTaxUnassessedSummary() {
+        return ResponseEntity.ok(
+                cityTaxAssessmentService.getUnassessedSummary(Objects.requireNonNull(extractHotelId())));
+    }
+
+    /**
+     * Dry-run preview of a tourist-tax backfill for the caller's hotel: computes what
+     * would be charged, against each affected stay's own check-in date, without posting
+     * anything or writing any assessment.
+     *
+     * @return the preview
+     */
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
+    @GetMapping("/city-tax/backfill/preview")
+    public ResponseEntity<CityTaxBackfillResponse> previewCityTaxBackfill() {
+        return ResponseEntity.ok(
+                cityTaxAssessmentService.previewBackfill(Objects.requireNonNull(extractHotelId())));
+    }
+
+    /**
+     * Posts the {@code CITY_TAX} charge for every backfillable stay of the caller's hotel
+     * that still has an open invoice, and corrects its assessment row. A stay whose
+     * invoice is no longer open is left untouched — never re-opens or amends a fiscal
+     * document already closed.
+     *
+     * @return the outcome
+     */
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
+    @PostMapping("/city-tax/backfill/confirm")
+    public ResponseEntity<CityTaxBackfillResponse> confirmCityTaxBackfill() {
+        return ResponseEntity.ok(
+                cityTaxAssessmentService.confirmBackfill(Objects.requireNonNull(extractHotelId())));
     }
 
     private UUID extractHotelId() {

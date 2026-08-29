@@ -40,8 +40,9 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../services/stayService');
 vi.mock('../../services/guestService');
+const mockAddToast = vi.hoisted(() => vi.fn());
 vi.mock('../../store/toastStore', () => ({
-  useToastStore: () => ({ addToast: vi.fn() }),
+  useToastStore: () => ({ addToast: mockAddToast }),
 }));
 
 const mockStayResponse = (overrides: Partial<StayResponse> = {}): StayResponse => ({
@@ -75,6 +76,7 @@ describe('WalkInCheckInForm', () => {
     vi.mocked(stayService.getLookupStati).mockResolvedValue([]);
     vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([]);
     vi.mocked(guestService.searchGuests).mockResolvedValue([]);
+    vi.mocked(stayService.getCityTaxConfigurationStatus).mockResolvedValue({ configured: true });
   });
 
   it('renders the walk-in form with room select, guest search and checkout date', async () => {
@@ -259,7 +261,10 @@ describe('WalkInCheckInForm', () => {
     vi.mocked(stayService.getLookupStati).mockResolvedValue([ITALIA_STATO]);
     vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([PASOR_TIPDOC]);
     vi.mocked(stayService.searchLookupComuni).mockResolvedValue([FIANO_COMUNE]);
-    vi.mocked(stayService.createStay).mockResolvedValue(mockStayResponse());
+    // cityTaxWarning on the response exercises the post-checkin warning toast
+    // (Parte 5.3) as part of this same full-flow test, rather than duplicating
+    // the whole fill sequence in a second test just to reach the same call.
+    vi.mocked(stayService.createStay).mockResolvedValue(mockStayResponse({ cityTaxWarning: 'NO_RATE_FOR_DATE' }));
 
     render(
       <MemoryRouter>
@@ -327,7 +332,36 @@ describe('WalkInCheckInForm', () => {
       }));
     });
     await waitFor(() => expect(screen.getByText('stays_page')).toBeInTheDocument());
+    expect(mockAddToast).toHaveBeenCalledWith('city_tax_post_checkin_warning_no_rate_for_date', 'info');
   }, 15000);
+
+  it('shows the pre-flight city-tax banner when the tourist tax is not configured', async () => {
+    vi.mocked(stayService.getCityTaxConfigurationStatus).mockResolvedValue({
+      configured: false, reason: 'COMUNE_NOT_CONFIGURED',
+    });
+
+    render(
+      <MemoryRouter>
+        <Routes><Route path="/" element={<WalkInCheckInForm />} /></Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('city_tax_preflight_title')).toBeInTheDocument();
+    expect(screen.getByText('city_tax_preflight_reason_comune_not_configured')).toBeInTheDocument();
+  });
+
+  it('shows no pre-flight banner when the hotel has declared the tax not applicable', async () => {
+    vi.mocked(stayService.getCityTaxConfigurationStatus).mockResolvedValue({ configured: true, reason: null });
+
+    render(
+      <MemoryRouter>
+        <Routes><Route path="/" element={<WalkInCheckInForm />} /></Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText(/walkin_label_room/i)).toBeInTheDocument());
+    expect(screen.queryByText('city_tax_preflight_title')).not.toBeInTheDocument();
+  });
 
   it('BUG-10: shows the selected state\'s name, not its raw code, even when it '
       + 'falls outside the default 20-item slice', async () => {

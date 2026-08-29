@@ -3,6 +3,11 @@ package com.hotelpms.frontdesk.stays.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.hotelpms.frontdesk.citytax.domain.CityTaxUnassessedReason;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxBackfillResponse;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxConfigurationStatusResponse;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxUnassessedSummaryResponse;
+import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
@@ -81,6 +86,9 @@ class StayControllerTest {
     @Mock
     private AlloggiatiWebSenderService alloggiatiWebSenderService;
 
+    @Mock
+    private CityTaxAssessmentService cityTaxAssessmentService;
+
     @InjectMocks
     private StayController stayController;
 
@@ -113,7 +121,7 @@ class StayControllerTest {
         stayResponse = new StayResponse(
                 stayId, hotelId, null, guestId, UUID.randomUUID(),
                 StayStatus.CHECKED_IN, null, null, null, null, null, false, false, null, List.of(), null, null, null,
-                false, null, false, null);
+                false, null, false, null, null);
 
         final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 "admin", "", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
@@ -158,7 +166,7 @@ class StayControllerTest {
         final StayResponse checkedOut = new StayResponse(
                 stayId, hotelId, null, guestId, UUID.randomUUID(),
                 StayStatus.CHECKED_OUT, null, null, null, null, null, false, false, null, List.of(), null, null, null,
-                false, null, false, null);
+                false, null, false, null, null);
         when(stayService.checkOut(stayId, hotelId)).thenReturn(checkedOut);
 
         mockMvc.perform(put(BASE_URL + PATH_CHECKOUT, stayId))
@@ -319,5 +327,58 @@ class StayControllerTest {
         mockMvc.perform(post(BASE_URL + "/{id}/checkout-email/retry", stayId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_ID).value(stayId.toString()));
+    }
+
+    @Test
+    void shouldReturnCityTaxConfigurationStatusConfigured() throws Exception {
+        when(cityTaxAssessmentService.checkConfigurationStatus(hotelId))
+                .thenReturn(new CityTaxConfigurationStatusResponse(true, null));
+
+        mockMvc.perform(get(BASE_URL + "/city-tax/configuration-status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.configured").value(true))
+                .andExpect(jsonPath("$.reason").doesNotExist());
+    }
+
+    @Test
+    void shouldReturnCityTaxConfigurationStatusNotConfigured() throws Exception {
+        when(cityTaxAssessmentService.checkConfigurationStatus(hotelId))
+                .thenReturn(new CityTaxConfigurationStatusResponse(false, CityTaxUnassessedReason.COMUNE_NOT_CONFIGURED));
+
+        mockMvc.perform(get(BASE_URL + "/city-tax/configuration-status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.configured").value(false))
+                .andExpect(jsonPath("$.reason").value("COMUNE_NOT_CONFIGURED"));
+    }
+
+    @Test
+    void shouldReturnCityTaxUnassessedSummary() throws Exception {
+        when(cityTaxAssessmentService.getUnassessedSummary(hotelId))
+                .thenReturn(new CityTaxUnassessedSummaryResponse(3, null, CityTaxUnassessedReason.NO_RATE_FOR_DATE));
+
+        mockMvc.perform(get(BASE_URL + "/city-tax/unassessed/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.unassessedCount").value(3))
+                .andExpect(jsonPath("$.mostRecentReason").value("NO_RATE_FOR_DATE"));
+    }
+
+    @Test
+    void shouldReturnCityTaxBackfillPreview() throws Exception {
+        when(cityTaxAssessmentService.previewBackfill(hotelId))
+                .thenReturn(new CityTaxBackfillResponse(List.of(), java.math.BigDecimal.ZERO, 0, 0));
+
+        mockMvc.perform(get(BASE_URL + "/city-tax/backfill/preview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.chargedCount").value(0));
+    }
+
+    @Test
+    void shouldConfirmCityTaxBackfill() throws Exception {
+        when(cityTaxAssessmentService.confirmBackfill(hotelId))
+                .thenReturn(new CityTaxBackfillResponse(List.of(), java.math.BigDecimal.TEN, 1, 0));
+
+        mockMvc.perform(post(BASE_URL + "/city-tax/backfill/confirm"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.chargedCount").value(1));
     }
 }

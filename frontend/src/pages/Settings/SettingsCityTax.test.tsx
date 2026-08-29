@@ -43,6 +43,7 @@ describe('SettingsCityTax', () => {
     vi.resetAllMocks();
     vi.mocked(stayService.getHotelCategoryHistory).mockResolvedValue([]);
     vi.mocked(stayService.getCityTaxRates).mockResolvedValue([]);
+    vi.mocked(stayService.getCityTaxApplicability).mockResolvedValue({ applicability: 'UNKNOWN' });
   });
 
   it('renders the page title', async () => {
@@ -171,6 +172,125 @@ describe('SettingsCityTax', () => {
     fireEvent.click(screen.getByText('city_tax_add_rate'));
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('CITY_TAX_RATE_INVALID', 'error'));
+  });
+
+  describe('applicability section', () => {
+    it('loads and shows the current applicability', async () => {
+      vi.mocked(stayService.getCityTaxApplicability).mockResolvedValue({ applicability: 'NOT_APPLICABLE' });
+      renderPage();
+
+      await waitFor(() => expect(screen.getByLabelText('city_tax_applicability_label'))
+        .toHaveValue('NOT_APPLICABLE'));
+    });
+
+    it('saves a new applicability on change', async () => {
+      vi.mocked(stayService.updateCityTaxApplicability).mockResolvedValue({ applicability: 'APPLICABLE' });
+      renderPage();
+      await waitFor(() => expect(screen.getByLabelText('city_tax_applicability_label')).toHaveValue('UNKNOWN'));
+
+      fireEvent.change(screen.getByLabelText('city_tax_applicability_label'), { target: { value: 'APPLICABLE' } });
+
+      await waitFor(() => expect(stayService.updateCityTaxApplicability)
+        .toHaveBeenCalledWith({ applicability: 'APPLICABLE' }));
+      expect(mockAddToast).toHaveBeenCalledWith('save', 'success');
+    });
+
+    it('reverts the selection and shows an error toast when saving fails', async () => {
+      vi.mocked(stayService.updateCityTaxApplicability)
+        .mockRejectedValue(mockAxiosErrorWithDetail('INTERNAL_SERVER_ERROR', 500));
+      renderPage();
+      await waitFor(() => expect(screen.getByLabelText('city_tax_applicability_label')).toHaveValue('UNKNOWN'));
+
+      fireEvent.change(screen.getByLabelText('city_tax_applicability_label'), { target: { value: 'APPLICABLE' } });
+
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('INTERNAL_SERVER_ERROR', 'error'));
+      expect(screen.getByLabelText('city_tax_applicability_label')).toHaveValue('UNKNOWN');
+    });
+  });
+
+  describe('backfill section', () => {
+    it('previews without charging or writing anything', async () => {
+      vi.mocked(stayService.previewCityTaxBackfill).mockResolvedValue({
+        lines: [{ stayId: 's1', checkInDate: '2026-05-01', amount: 2.5, charged: false, skipReason: null }],
+        totalAmount: 2.5,
+        chargedCount: 0,
+        skippedCount: 0,
+      });
+      renderPage();
+      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('city_tax_backfill_action_preview'));
+
+      await waitFor(() => expect(stayService.previewCityTaxBackfill).toHaveBeenCalled());
+      expect(screen.getByText('2026-05-01')).toBeInTheDocument();
+      expect(stayService.confirmCityTaxBackfill).not.toHaveBeenCalled();
+      expect(screen.getByText('city_tax_backfill_action_confirm')).toBeInTheDocument();
+    });
+
+    it('shows no confirm action when the preview has nothing chargeable', async () => {
+      vi.mocked(stayService.previewCityTaxBackfill).mockResolvedValue({
+        lines: [{ stayId: 's1', checkInDate: '2026-05-01', amount: 2.5, charged: false, skipReason: 'INVOICE_NOT_OPEN' }],
+        totalAmount: 2.5,
+        chargedCount: 0,
+        skippedCount: 1,
+      });
+      renderPage();
+      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('city_tax_backfill_action_preview'));
+
+      await waitFor(() => expect(screen.getByText('2026-05-01')).toBeInTheDocument());
+      expect(screen.queryByText('city_tax_backfill_action_confirm')).not.toBeInTheDocument();
+    });
+
+    it('confirms and charges after a preview', async () => {
+      vi.mocked(stayService.previewCityTaxBackfill).mockResolvedValue({
+        lines: [{ stayId: 's1', checkInDate: '2026-05-01', amount: 2.5, charged: false, skipReason: null }],
+        totalAmount: 2.5,
+        chargedCount: 0,
+        skippedCount: 0,
+      });
+      vi.mocked(stayService.confirmCityTaxBackfill).mockResolvedValue({
+        lines: [{ stayId: 's1', checkInDate: '2026-05-01', amount: 2.5, charged: true, skipReason: null }],
+        totalAmount: 2.5,
+        chargedCount: 1,
+        skippedCount: 0,
+      });
+      renderPage();
+      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('city_tax_backfill_action_preview'));
+      await waitFor(() => expect(screen.getByText('city_tax_backfill_action_confirm')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('city_tax_backfill_action_confirm'));
+
+      await waitFor(() => expect(stayService.confirmCityTaxBackfill).toHaveBeenCalled());
+      expect(mockAddToast).toHaveBeenCalledWith('city_tax_backfill_success', 'success');
+      // Confirmed — the action disappears rather than allowing a duplicate charge.
+      await waitFor(() => expect(screen.queryByText('city_tax_backfill_action_confirm')).not.toBeInTheDocument());
+    });
+
+    it('shows an empty state when no unassessed stays are found', async () => {
+      vi.mocked(stayService.previewCityTaxBackfill).mockResolvedValue({
+        lines: [], totalAmount: 0, chargedCount: 0, skippedCount: 0,
+      });
+      renderPage();
+      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('city_tax_backfill_action_preview'));
+
+      await waitFor(() => expect(screen.getByText('city_tax_backfill_none_found')).toBeInTheDocument());
+    });
+
+    it('shows an error toast when the preview fails', async () => {
+      vi.mocked(stayService.previewCityTaxBackfill)
+        .mockRejectedValue(mockAxiosErrorWithDetail('INTERNAL_SERVER_ERROR', 500));
+      renderPage();
+      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('city_tax_backfill_action_preview'));
+
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('INTERNAL_SERVER_ERROR', 'error'));
+    });
   });
 
   it('passes axe accessibility check', async () => {

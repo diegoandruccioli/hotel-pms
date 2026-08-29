@@ -1,5 +1,8 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
+import com.hotelpms.frontdesk.citytax.domain.CityTaxAssessment;
+import com.hotelpms.frontdesk.citytax.domain.CityTaxUnassessedReason;
+import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
 import com.hotelpms.frontdesk.client.GatewayEventsClient;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest;
@@ -79,6 +82,7 @@ public class StayServiceImpl implements StayService {
     private final StayNotificationCoordinator stayNotificationCoordinator;
     private final StayReservationSync stayReservationSync;
     private final GatewayEventsClient gatewayEventsClient;
+    private final CityTaxAssessmentService cityTaxAssessmentService;
 
     /** {@inheritDoc} */
     @Override
@@ -136,7 +140,34 @@ public class StayServiceImpl implements StayService {
             }
         }
 
-        return stayMapper.toDto(savedStay);
+        return withCityTaxWarning(stayMapper.toDto(savedStay), savedStay.getId(), savedStay.getHotelId());
+    }
+
+    /**
+     * Attaches the just-assessed stay's {@code cityTaxWarning}, if any, to the check-in
+     * response — the "esito del check-in" surface (Parte 5.3): the operator sees the gap
+     * immediately, not only later via the Dashboard summary. A read-only lookup of the
+     * assessment {@code openInvoiceForStay} just wrote (never {@code assessFor} again —
+     * that would risk persisting a second, wrongly-parameterized assessment if the first
+     * call never actually ran, e.g. because billing-service was unreachable).
+     *
+     * @param response the mapped response to enrich
+     * @param stayId   the just-created stay's ID
+     * @param hotelId  the stay's hotel ID
+     * @return the response, with {@code cityTaxWarning} set if the assessment recorded one
+     */
+    private StayResponse withCityTaxWarning(final StayResponse response, final UUID stayId, final UUID hotelId) {
+        final CityTaxUnassessedReason warning = cityTaxAssessmentService.findAssessment(stayId, hotelId)
+                .map(CityTaxAssessment::getUnassessedReason)
+                .orElse(null);
+        return new StayResponse(
+                response.id(), response.hotelId(), response.reservationId(), response.guestId(), response.roomId(),
+                response.status(), response.actualCheckInTime(), response.actualCheckOutTime(),
+                response.createdAt(), response.updatedAt(), response.invoiceId(), response.alloggiatiSent(),
+                response.alloggiatiSendFailed(), response.alloggiatiFailureReason(), response.guests(),
+                response.guestDisplayName(), response.roomNumber(), response.expectedCheckOutDate(),
+                response.invoiceCreationFailed(), response.invoiceCreationFailureReason(),
+                response.checkoutEmailFailed(), response.checkoutEmailFailureReason(), warning);
     }
 
     /** {@inheritDoc} */

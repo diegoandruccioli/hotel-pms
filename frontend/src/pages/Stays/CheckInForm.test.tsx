@@ -36,6 +36,11 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../services/stayService');
 vi.mock('../../services/guestService');
 vi.mock('../../services/reservationService');
+const mockAddToast = vi.hoisted(() => vi.fn());
+vi.mock('../../store/toastStore', () => ({
+  useToastStore: (sel: unknown) =>
+    (sel as (s: { addToast: () => void }) => unknown)({ addToast: mockAddToast }),
+}));
 
 const mockStayResponse = (overrides: Partial<StayResponse> = {}): StayResponse => ({
   id: 'stay1',
@@ -59,6 +64,7 @@ describe('CheckInForm', () => {
     vi.mocked(stayService.getLookupStati).mockResolvedValue([]);
     vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([]);
     vi.mocked(stayService.getLastCompletedStayForGuest).mockResolvedValue(null);
+    vi.mocked(stayService.getCityTaxConfigurationStatus).mockResolvedValue({ configured: true });
   });
 
   const renderComponent = (expectedGuests = 1) =>
@@ -79,6 +85,22 @@ describe('CheckInForm', () => {
     renderComponent(2);
     await waitFor(() => expect(screen.getByText('checkin_title')).toBeInTheDocument());
     expect(screen.getAllByText('guest_number')).toHaveLength(2);
+  });
+
+  it('shows the pre-flight city-tax banner when the tourist tax is not configured', async () => {
+    vi.mocked(stayService.getCityTaxConfigurationStatus).mockResolvedValue({
+      configured: false, reason: 'CATEGORY_NOT_RECORDED',
+    });
+    renderComponent(1);
+    expect(await screen.findByText('city_tax_preflight_title')).toBeInTheDocument();
+    expect(screen.getByText('city_tax_preflight_reason_category_not_recorded')).toBeInTheDocument();
+  });
+
+  it('shows no pre-flight banner when the hotel has declared the tax not applicable', async () => {
+    vi.mocked(stayService.getCityTaxConfigurationStatus).mockResolvedValue({ configured: true, reason: null });
+    renderComponent(1);
+    await waitFor(() => expect(screen.getByText('checkin_title')).toBeInTheDocument());
+    expect(screen.queryByText('city_tax_preflight_title')).not.toBeInTheDocument();
   });
 
   it('adds and removes guest cards dynamically', async () => {
@@ -258,7 +280,10 @@ describe('CheckInForm', () => {
       vi.mocked(stayService.getLookupStati).mockResolvedValue([ITALIA_STATO, FRANCIA_STATO]);
       vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([PASOR_TIPDOC]);
       vi.mocked(stayService.searchLookupComuni).mockResolvedValue([FIANO_COMUNE]);
-      vi.mocked(stayService.createStay).mockResolvedValue(mockStayResponse());
+      // cityTaxWarning on the response exercises the post-checkin warning toast
+      // (Parte 5.3) as part of this same full-flow test, rather than duplicating
+      // the whole fill sequence in a second test just to reach the same call.
+      vi.mocked(stayService.createStay).mockResolvedValue(mockStayResponse({ cityTaxWarning: 'NO_RATE_FOR_DATE' }));
 
       render(
         <MemoryRouter
@@ -307,6 +332,7 @@ describe('CheckInForm', () => {
         }));
       });
       await waitFor(() => expect(screen.getByText('stays_page')).toBeInTheDocument());
+      expect(mockAddToast).toHaveBeenCalledWith('city_tax_post_checkin_warning_no_rate_for_date', 'info');
     }, 15000); // multi-field form fill + several async lookups — tight under --coverage instrumentation overhead
 
     it('shows the API error detail when the check-in request fails', async () => {

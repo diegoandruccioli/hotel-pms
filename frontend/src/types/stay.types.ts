@@ -117,6 +117,59 @@ export interface StayResponse {
   checkoutEmailFailed: boolean;
   /** Error message from the most recent failed checkout email attempt; null once resolved. */
   checkoutEmailFailureReason?: string | null;
+  /**
+   * Non-null only on the response from the check-in call itself, when the tourist tax
+   * could not actually be assessed (configuration gap, or the hotel declared it not
+   * applicable). Always null on every other response.
+   */
+  cityTaxWarning?: CityTaxUnassessedReason | null;
+}
+
+/** Why a stay's tourist tax has no amount assessed — see StayResponse.cityTaxWarning. */
+export type CityTaxUnassessedReason =
+  | 'COMUNE_NOT_CONFIGURED'
+  | 'CATEGORY_NOT_RECORDED'
+  | 'NO_RATE_FOR_DATE'
+  | 'NOT_APPLICABLE';
+
+/** Whether a hotel's comune levies a tourist tax at all — GET/PUT city-tax-rates/applicability. */
+export type CityTaxApplicability = 'UNKNOWN' | 'NOT_APPLICABLE' | 'APPLICABLE';
+
+export interface CityTaxApplicabilityRequest {
+  applicability: CityTaxApplicability;
+}
+
+export interface CityTaxApplicabilityResponse {
+  applicability: CityTaxApplicability;
+}
+
+/** Whether a check-in today would actually get its tourist tax assessed — the check-in form's pre-flight check. */
+export interface CityTaxConfigurationStatusResponse {
+  configured: boolean;
+  reason?: CityTaxUnassessedReason | null;
+}
+
+/** Summary of stays whose tourist tax was never assessed because of a configuration gap. */
+export interface CityTaxUnassessedSummaryResponse {
+  unassessedCount: number;
+  mostRecentUnassessedAt?: string | null;
+  mostRecentReason?: CityTaxUnassessedReason | null;
+}
+
+/** One stay's tourist-tax correction in a backfill preview/confirm result. */
+export interface CityTaxBackfillLineResponse {
+  stayId: string;
+  checkInDate: string;
+  amount: number;
+  charged: boolean;
+  skipReason?: string | null;
+}
+
+export interface CityTaxBackfillResponse {
+  lines: CityTaxBackfillLineResponse[];
+  totalAmount: number;
+  chargedCount: number;
+  skippedCount: number;
 }
 
 /** Summary of unresolved Alloggiati Web submission failures for the caller's hotel. */

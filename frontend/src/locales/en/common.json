@@ -287,6 +287,10 @@
   "alloggiati_failure_banner_title": "Alloggiati submission failed",
   "alloggiati_failure_banner_desc_one": "1 stay was not reported to the Alloggiati Web portal — check and resend from Stays.",
   "alloggiati_failure_banner_desc_other": "{{count}} stays were not reported to the Alloggiati Web portal — check and resend from Stays.",
+  "city_tax_unassessed_banner_title": "Tourist tax not charged",
+  "city_tax_unassessed_banner_desc_one": "1 stay did not have its tourist tax assessed because of a missing configuration.",
+  "city_tax_unassessed_banner_desc_other": "{{count}} stays did not have their tourist tax assessed because of a missing configuration.",
+  "city_tax_unassessed_banner_action": "Check and recover",
   "download_json_export": "Download JSON Export",
   "alloggiati_json_downloaded": "JSON export for {{date}} downloaded.",
 

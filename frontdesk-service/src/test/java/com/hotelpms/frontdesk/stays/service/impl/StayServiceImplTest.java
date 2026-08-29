@@ -187,7 +187,7 @@ class StayServiceImplTest {
         validResponse = new StayResponse(stayId, null, reservationId, guestId, roomId,
                 StayStatus.CHECKED_IN, savedStay.getActualCheckInTime(), null,
                 LocalDateTime.now(), LocalDateTime.now(), null, false, false, null, new ArrayList<>(), null, null,
-                null, false, null, false, null);
+                null, false, null, false, null, null);
 
         // StayBillingCoordinator now prefers a reservation's snapshotted price over a
         // live resolve (the P10-follow-up reconciliation fix); defaulting the snapshot
@@ -225,7 +225,8 @@ class StayServiceImplTest {
                 new StayNotificationCoordinator(
                         notificationClient, guestClient, billingClient, hotelSettingsService, stayRepository),
                 new StayReservationSync(reservationService, stayRepository),
-                gatewayEventsClient);
+                gatewayEventsClient,
+                cityTaxAssessmentService);
     }
 
     private ReservationResponse reservationResponse(
