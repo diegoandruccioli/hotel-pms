@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Card } from '../../components/m3/M3Card';
+import { M3Dialog } from '../../components/m3/M3Dialog';
 import { inventoryService } from '../../services/inventoryService';
 import { reservationService } from '../../services/reservationService';
 import { guestService } from '../../services/guestService';
@@ -41,6 +42,11 @@ export const ReservationForm = () => {
   const [expectedGuests, setExpectedGuests] = useState<number | string>(1);
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
   const [status, setStatus] = useState<string>('CONFIRMED');
+  // Optimistic-lock version last read from the server; echoed back on update so a
+  // stale save (someone else changed this reservation while this tab sat open) is
+  // rejected with a conflict instead of silently overwriting their change.
+  const [version, setVersion] = useState<number | null>(null);
+  const [staleConflict, setStaleConflict] = useState(false);
 
   const reservationSchema = useMemo(() => z.object({
     checkInDate: z.string().min(1, t('msg_valid_dates')),
@@ -74,7 +80,8 @@ export const ReservationForm = () => {
         initialRoomIds = res.lineItems?.map(li => li.roomId) || [];
         setSelectedRoomIds(initialRoomIds);
         setStatus(res.status || 'CONFIRMED');
-        
+        setVersion(res.version ?? null);
+
         // Load guest details
         if (res.guestId) {
           try {
@@ -177,7 +184,8 @@ export const ReservationForm = () => {
         expectedGuests: parsed.data.expectedGuests,
         // price is resolved server-side (RatePricingService) and never
         // accepted from the client — see ReservationLineItemRequest.
-        lineItems: selectedRoomIds.map(roomId => ({ roomId }))
+        lineItems: selectedRoomIds.map(roomId => ({ roomId })),
+        version
       };
 
       if (id) {
@@ -190,13 +198,29 @@ export const ReservationForm = () => {
       const e = err as {response?: {data?: {detail?: string; errorCode?: string}}, message?: string};
       if (e.response?.data?.errorCode === 'GUEST_NOT_FOUND') {
          setError(t('err_guest_not_found'));
+      } else if (e.response?.data?.errorCode === 'RESERVATION_STALE_VERSION') {
+         // Someone else saved this reservation while this tab sat open — surface a
+         // reload/cancel choice instead of an inline error the operator might just
+         // retry through, silently clobbering the other edit a second time.
+         setStaleConflict(true);
       } else {
          setError(e.response?.data?.detail || e.message || t(id ? 'failed_update_reservation' : 'failed_create_reservation'));
       }
     } finally {
       setLoading(false);
     }
-  }, [isView, selectedGuest, selectedRoomIds, checkInDate, checkOutDate, status, expectedGuests, allReservations, id, t, navigate, reservationSchema]);
+  }, [isView, selectedGuest, selectedRoomIds, checkInDate, checkOutDate, status, expectedGuests, version,
+      allReservations, id, t, navigate, reservationSchema]);
+
+  const handleReloadAfterConflict = useCallback(() => {
+    setStaleConflict(false);
+    loadInitialData();
+  }, [loadInitialData]);
+
+  const handleCancelAfterConflict = useCallback(() => {
+    setStaleConflict(false);
+    navigate('/reservations');
+  }, [navigate]);
 
   const toggleRoomSelection = useCallback((roomId: string) => {
     if (isView) return;
@@ -303,6 +327,25 @@ export const ReservationForm = () => {
           </M3Button>
         )}
       </div>
+
+      {staleConflict && (
+        <M3Dialog
+          open
+          title={t('reservation_stale_version_title')}
+          titleId="reservation-stale-version-dialog"
+          onClose={handleCancelAfterConflict}
+        >
+          <p className="text-sm font-body text-on-surface">{t('reservation_stale_version_body')}</p>
+          <div className="flex justify-end gap-3 pt-4">
+            <M3Button type="button" variant="outlined" onClick={handleCancelAfterConflict}>
+              {t('cancel')}
+            </M3Button>
+            <M3Button type="button" onClick={handleReloadAfterConflict}>
+              {t('refresh')}
+            </M3Button>
+          </div>
+        </M3Dialog>
+      )}
     </form>
   );
 };

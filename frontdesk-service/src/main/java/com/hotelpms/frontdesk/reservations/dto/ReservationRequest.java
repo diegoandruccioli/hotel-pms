@@ -26,6 +26,10 @@ import java.util.UUID;
  * @param checkOutDate   the check out date
  * @param status         the status
  * @param lineItems      the line items
+ * @param version        the version the client last read, for optimistic-lock
+ *                       conflict detection on update; {@code null} skips the
+ *                       check (backward-compatible for callers that don't send
+ *                       it yet, and ignored entirely on create)
  */
 @ValidDateRange
 @SuppressWarnings({ "PMD.AvoidDuplicateLiterals", "EI_EXPOSE_REP", "EI_EXPOSE_REP2" })
@@ -40,7 +44,9 @@ public record ReservationRequest(
                 @NotNull(message = "Required") ReservationStatus status,
 
                 @NotEmpty(message = "Required")
-                @Size(max = MAX_LINE_ITEMS, message = "Too many rooms") @Valid List<ReservationLineItemRequest> lineItems) {
+                @Size(max = MAX_LINE_ITEMS, message = "Too many rooms") @Valid List<ReservationLineItemRequest> lineItems,
+
+                Long version) {
 
         /**
          * Upper bound on rooms in a single reservation (Finding #18,

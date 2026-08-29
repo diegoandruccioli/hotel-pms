@@ -23,6 +23,10 @@ import java.util.UUID;
  * @param updatedAt    update time
  * @param confirmationEmailFailed       whether the most recent reservation-confirmed email attempt failed
  * @param confirmationEmailFailureReason the error from the most recent failed attempt, or null
+ * @param version      the optimistic-lock version; a client editing this reservation
+ *                     must send it back unchanged on update (T-RES-XX: two tabs open on
+ *                     the same reservation for a long time otherwise silently overwrite
+ *                     each other on save, with no conflict warning)
  */
 @SuppressWarnings({ "EI_EXPOSE_REP", "EI_EXPOSE_REP2" })
 public record ReservationResponse(
@@ -39,7 +43,8 @@ public record ReservationResponse(
                 LocalDateTime createdAt,
                 LocalDateTime updatedAt,
                 boolean confirmationEmailFailed,
-                String confirmationEmailFailureReason) {
+                String confirmationEmailFailureReason,
+                Long version) {
 
         /**
          * Compact constructor.

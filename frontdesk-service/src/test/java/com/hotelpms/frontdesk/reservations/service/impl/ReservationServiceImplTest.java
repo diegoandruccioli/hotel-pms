@@ -79,6 +79,8 @@ class ReservationServiceImplTest {
     private static final UUID GUEST_ID = Objects.requireNonNull(UUID.randomUUID());
     private static final UUID HOTEL_ID = Objects.requireNonNull(UUID.randomUUID());
     private static final int EXPECTED_GUESTS = 2;
+    private static final long MATCHING_VERSION = 5L;
+    private static final long CURRENT_VERSION_AFTER_ANOTHER_EDIT = 7L;
     private static final Reservation ANY_RESERVATION = new Reservation();
     private static final UUID ANY_UUID = Objects.requireNonNull(UUID.randomUUID());
     private static final String ERR_CHECKOUT_AFTER_CHECKIN = "CHECKOUT_MUST_BE_AFTER_CHECKIN";
@@ -122,14 +124,14 @@ class ReservationServiceImplTest {
 
     @NonNull
     private ReservationRequest request = new ReservationRequest(GUEST_ID, 0, LocalDate.now(), LocalDate.now(),
-            STATUS_CONFIRMED, List.of());
+            STATUS_CONFIRMED, List.of(), null);
 
     @NonNull
     private Reservation entity = new Reservation();
 
     @NonNull
     private ReservationResponse response = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null, 0, 0,
-            LocalDate.now(), LocalDate.now(), STATUS_CONFIRMED, null, true, null, null, false, null);
+            LocalDate.now(), LocalDate.now(), STATUS_CONFIRMED, null, true, null, null, false, null, null);
 
     @NonNull
     private final UUID reservationId = Objects.requireNonNull(UUID.randomUUID());
@@ -152,7 +154,7 @@ class ReservationServiceImplTest {
                 LocalDate.now().plusDays(1),
                 LocalDate.now().plusDays(3),
                 STATUS_CONFIRMED,
-                List.of(lineItemRequest));
+                List.of(lineItemRequest), null);
 
         final ReservationLineItem lineItemEntity = new ReservationLineItem();
         lineItemEntity.setRoomId(roomId);
@@ -170,7 +172,7 @@ class ReservationServiceImplTest {
 
         response = new ReservationResponse(reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 0,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                STATUS_CONFIRMED, null, true, null, null, false, null);
+                STATUS_CONFIRMED, null, true, null, null, false, null, null);
     }
 
     private static RoomTypeResponse roomType() {
@@ -311,7 +313,7 @@ class ReservationServiceImplTest {
                 LocalDate.now().plusDays(1),
                 LocalDate.now().plusDays(3),
                 null,
-                List.of(new ReservationLineItemRequest(roomId)));
+                List.of(new ReservationLineItemRequest(roomId)), null);
 
         final Reservation entityWithNullStatus = Reservation.builder().id(UUID.randomUUID()).build();
         entityWithNullStatus.setGuestId(GUEST_ID);
@@ -597,6 +599,56 @@ class ReservationServiceImplTest {
     }
 
     @Test
+    void testUpdateReservationWithMatchingVersionSucceeds() {
+        entity.setVersion(MATCHING_VERSION);
+        final ReservationRequest requestWithMatchingVersion = new ReservationRequest(
+                GUEST_ID, EXPECTED_GUESTS, request.checkInDate(), request.checkOutDate(),
+                STATUS_CONFIRMED, request.lineItems(), MATCHING_VERSION);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
+        when(reservationMapper.toResponse(entity)).thenReturn(response);
+        when(reservationMapper.toEntity(any(ReservationLineItemRequest.class))).thenAnswer(invocation -> {
+            final ReservationLineItemRequest lineItemRequest = invocation.getArgument(0);
+            final ReservationLineItem newItem = new ReservationLineItem();
+            newItem.setRoomId(lineItemRequest.roomId());
+            return newItem;
+        });
+
+        final ReservationResponse result =
+                reservationService.updateReservation(reservationId, requestWithMatchingVersion);
+
+        assertNotNull(result);
+        verify(reservationMapper, times(1)).updateEntityFromRequest(requestWithMatchingVersion, entity);
+    }
+
+    /**
+     * The "forgotten tab" scenario (verifyNotStale's javadoc): a client that read the
+     * reservation at version 5 must be rejected if it has since moved to version 7 —
+     * mismatched, non-null client version is exactly what the staleness check exists
+     * to catch. Also verifies the check runs before any other work (guest lookup, room
+     * lookup) — a stale update should fail fast, not partly validate first.
+     */
+    @Test
+    void testUpdateReservationWithStaleVersionThrowsConflictBeforeAnyOtherWork() {
+        entity.setVersion(CURRENT_VERSION_AFTER_ANOTHER_EDIT);
+        final ReservationRequest requestWithStaleVersion = new ReservationRequest(
+                GUEST_ID, EXPECTED_GUESTS, request.checkInDate(), request.checkOutDate(),
+                STATUS_CONFIRMED, request.lineItems(), MATCHING_VERSION);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        assertThrows(ConflictException.class,
+                () -> reservationService.updateReservation(reservationId, requestWithStaleVersion));
+
+        verify(guestClient, never()).getGuestById(any());
+        verify(roomService, never()).getRoomById(any(), any());
+        verify(reservationMapper, never()).updateEntityFromRequest(any(), any());
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void testUpdateReservationRecomputesPriceViaRatePricingServiceNotFromRequest() {
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         final GuestResponse mockGuestResponse =
@@ -706,7 +758,7 @@ class ReservationServiceImplTest {
         final ReservationResponse checkedInResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 2,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.CHECKED_IN, null, true, null, null, false, null);
+                ReservationStatus.CHECKED_IN, null, true, null, null, false, null, null);
 
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
@@ -729,7 +781,7 @@ class ReservationServiceImplTest {
         final ReservationResponse cancelledResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 0,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.CANCELLED, null, true, null, null, false, null);
+                ReservationStatus.CANCELLED, null, true, null, null, false, null, null);
 
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
@@ -844,7 +896,7 @@ class ReservationServiceImplTest {
                 LocalDate.now().plusDays(1),
                 LocalDate.now().plusDays(1),
                 STATUS_CONFIRMED,
-                List.of(new ReservationLineItemRequest(roomId)));
+                List.of(new ReservationLineItemRequest(roomId)), null);
 
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.createReservation(sameDayRequest));
@@ -861,7 +913,7 @@ class ReservationServiceImplTest {
                 LocalDate.now().plusDays(5),
                 LocalDate.now().plusDays(2),
                 STATUS_CONFIRMED,
-                List.of(new ReservationLineItemRequest(roomId)));
+                List.of(new ReservationLineItemRequest(roomId)), null);
 
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.createReservation(invertedRequest));
@@ -878,7 +930,7 @@ class ReservationServiceImplTest {
                 LocalDate.now().plusDays(3),
                 LocalDate.now().plusDays(3),
                 STATUS_CONFIRMED,
-                List.of(new ReservationLineItemRequest(roomId)));
+                List.of(new ReservationLineItemRequest(roomId)), null);
 
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.updateReservation(reservationId, sameDayRequest));

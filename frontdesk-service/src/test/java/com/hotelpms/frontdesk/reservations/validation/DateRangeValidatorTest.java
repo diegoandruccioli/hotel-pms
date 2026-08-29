@@ -84,6 +84,6 @@ class DateRangeValidatorTest {
                 checkIn,
                 checkOut,
                 ReservationStatus.CONFIRMED,
-                List.of());
+                List.of(), null);
     }
 }

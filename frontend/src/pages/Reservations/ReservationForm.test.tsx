@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 /* eslint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop -- test-only mock components, not the real perf-sensitive render path */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -17,6 +17,13 @@ import type { ReservationResponse } from '../../types/reservation.types';
 vi.mock('../../services/inventoryService');
 vi.mock('../../services/reservationService');
 vi.mock('../../services/guestService');
+
+// M3Dialog (stale-version conflict dialog) uses focus-trap-react, which requires a
+// real tabbable node inside the DOM to activate — jsdom's layout stubs make that
+// unreliable in tests. Same mock as every other M3Dialog test in this codebase.
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 
 interface GuestMockProps {
   selectedGuest: { firstName: string; lastName: string } | null;
@@ -139,6 +146,7 @@ const mockReservation = (overrides: Partial<ReservationResponse> = {}): Reservat
   createdAt: '2026-01-01T00:00:00',
   updatedAt: '2026-01-01T00:00:00',
   confirmationEmailFailed: false,
+  version: 3,
   ...overrides,
 });
 
@@ -366,6 +374,106 @@ describe('ReservationForm', () => {
       fireEvent.click(screen.getByRole('button', { name: /update_reservation/i }));
 
       await waitFor(() => expect(reservationService.updateReservation).toHaveBeenCalledWith('res123', expect.anything()));
+      expect(mockNavigate).toHaveBeenCalledWith('/reservations');
+    });
+
+    it('echoes back the version read from the server on update (optimistic-lock check)', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(
+        mockReservation({ id: 'res123', guestId: 'g1', version: 7 }),
+      );
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+      vi.mocked(reservationService.updateReservation).mockResolvedValue(mockReservation());
+
+      render(
+        <MemoryRouter initialEntries={['/reservations/edit/res123']}>
+          <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
+        </MemoryRouter>
+      );
+      await waitFor(() => screen.getByText('edit_reservation'));
+      fireEvent.click(screen.getByText('Toggle Room r1'));
+      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
+      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
+      fireEvent.click(screen.getByRole('button', { name: /update_reservation/i }));
+
+      await waitFor(() => expect(reservationService.updateReservation).toHaveBeenCalledWith(
+        'res123', expect.objectContaining({ version: 7 }),
+      ));
+    });
+
+    it('shows a reload/cancel conflict dialog on a stale-version 409, without navigating away', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(
+        mockReservation({ id: 'res123', guestId: 'g1', version: 3 }),
+      );
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+      vi.mocked(reservationService.updateReservation).mockRejectedValue({
+        response: { data: { errorCode: 'RESERVATION_STALE_VERSION' } },
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/reservations/edit/res123']}>
+          <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
+        </MemoryRouter>
+      );
+      await waitFor(() => screen.getByText('edit_reservation'));
+      fireEvent.click(screen.getByText('Toggle Room r1'));
+      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
+      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
+      fireEvent.click(screen.getByRole('button', { name: /update_reservation/i }));
+
+      expect(await screen.findByText('reservation_stale_version_body')).toBeInTheDocument();
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it('reloads the reservation when Refresh is clicked on the stale-version conflict dialog', async () => {
+      vi.mocked(reservationService.getReservationById)
+        .mockResolvedValueOnce(mockReservation({ id: 'res123', guestId: 'g1', version: 3 }))
+        .mockResolvedValueOnce(mockReservation({ id: 'res123', guestId: 'g1', version: 4, checkInDate: '2026-06-01' }));
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+      vi.mocked(reservationService.updateReservation).mockRejectedValue({
+        response: { data: { errorCode: 'RESERVATION_STALE_VERSION' } },
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/reservations/edit/res123']}>
+          <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
+        </MemoryRouter>
+      );
+      await waitFor(() => screen.getByText('edit_reservation'));
+      fireEvent.click(screen.getByText('Toggle Room r1'));
+      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
+      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
+      fireEvent.click(screen.getByRole('button', { name: /update_reservation/i }));
+      await screen.findByText('reservation_stale_version_body');
+
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'refresh' }));
+
+      await waitFor(() => expect(reservationService.getReservationById).toHaveBeenCalledTimes(2));
+      expect(screen.queryByText('reservation_stale_version_body')).not.toBeInTheDocument();
+    });
+
+    it('navigates back to the list when Cancel is clicked on the stale-version conflict dialog', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(
+        mockReservation({ id: 'res123', guestId: 'g1', version: 3 }),
+      );
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+      vi.mocked(reservationService.updateReservation).mockRejectedValue({
+        response: { data: { errorCode: 'RESERVATION_STALE_VERSION' } },
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/reservations/edit/res123']}>
+          <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
+        </MemoryRouter>
+      );
+      await waitFor(() => screen.getByText('edit_reservation'));
+      fireEvent.click(screen.getByText('Toggle Room r1'));
+      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
+      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
+      fireEvent.click(screen.getByRole('button', { name: /update_reservation/i }));
+      await screen.findByText('reservation_stale_version_body');
+
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'cancel' }));
+
       expect(mockNavigate).toHaveBeenCalledWith('/reservations');
     });
 
