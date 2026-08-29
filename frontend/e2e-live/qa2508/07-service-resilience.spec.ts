@@ -165,4 +165,62 @@ test.describe('Blocco 6 — resilience (API-level)', () => {
       expect(tabB.status()).toBe(409);
     }
   });
+
+  test('reservation TRUE concurrent edits (Promise.all, not sequential): measures whether Hibernate\'s own @Version check ever fires', async ({ request }) => {
+    const headers = await csrfHeader(request);
+    const guest = await createGuest(request, headers, {});
+    const room = await createCleanRoom(request, headers);
+    const roomId = room.id;
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const checkIn = tomorrow.toISOString().split('T')[0];
+    const checkOutDate = new Date(tomorrow);
+    checkOutDate.setDate(checkOutDate.getDate() + 2);
+    const checkOut = checkOutDate.toISOString().split('T')[0];
+
+    const created = await request.post('/api/v1/reservations', {
+      headers,
+      data: { guestId: guest.id, expectedGuests: 1, checkInDate: checkIn, checkOutDate: checkOut, status: 'CONFIRMED', lineItems: [{ roomId }] },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const reservationId = (await created.json()).id as string;
+
+    const base = { guestId: guest.id, checkInDate: checkIn, checkOutDate: checkOut, lineItems: [{ roomId }], status: 'CONFIRMED' as const };
+
+    // Unlike the sequential "tab A saves, then tab B saves" test above, this
+    // fires N requests genuinely in parallel (Promise.all) against the SAME
+    // reservation, each racing to be the one whose in-flight transaction
+    // flushes last — the actual scenario ObjectOptimisticLockingFailureException
+    // (GlobalExceptionHandler -> 409 CONCURRENT_MODIFICATION) exists to catch.
+    const concurrency = 10;
+    const attempts = Array.from({ length: concurrency }, (_, i) =>
+      request.put(`/api/v1/reservations/${reservationId}`, { headers, data: { ...base, expectedGuests: i + 1 } }));
+    const responses = await Promise.all(attempts);
+    const statuses = responses.map((r) => r.status());
+    const succeeded = statuses.filter((s) => s === 200).length;
+    const conflicted = statuses.filter((s) => s === 409).length;
+    const unexpected = statuses.filter((s) => s !== 200 && s !== 409);
+
+    expect(unexpected, `every response must be either 200 (won the race) or 409 (Hibernate's own version check caught the overlap) — got ${JSON.stringify(statuses)}`).toEqual([]);
+    expect(succeeded, 'at least one request must succeed — a full pile-up of 409s would itself be a defect (unusable UI under any concurrent load)').toBeGreaterThan(0);
+
+    // Whatever ended up persisted must be EXACTLY one of the attempted
+    // values, never a corrupted/partial write from two overlapping flushes
+    // stomping on each other mid-write.
+    const final = await request.get(`/api/v1/reservations/${reservationId}`);
+    const finalBody = await final.json();
+    const attemptedValues = Array.from({ length: concurrency }, (_, i) => i + 1);
+    expect(attemptedValues, `final expectedGuests=${finalBody.expectedGuests} must be one of the values actually attempted — anything else is data corruption from the race`).toContain(finalBody.expectedGuests);
+
+    // Not a pass/fail assertion — informational, logged so the report can
+    // state a real measured number rather than "it depends": under this
+    // round's load/timing, did the @Version column's own JPA-level check
+    // ever actually catch a genuine overlap, or does every request's
+    // read-then-flush window never overlap another's in practice on this
+    // stack (meaning the lost-update gap the sequential test documents is
+    // the ONLY realistic way to lose data, not "sometimes 409, sometimes
+    // silent" depending on luck)?
+    console.log(`[D-CONCURRENCY-2] ${concurrency} truly concurrent PUTs: ${succeeded} succeeded (200), ${conflicted} conflicted (409 CONCURRENT_MODIFICATION)`);
+  });
 });

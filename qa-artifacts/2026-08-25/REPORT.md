@@ -244,6 +244,49 @@ mailpit** (non solo che la chiamata a notification-service torni 200):
 al checkout, è ora verificato end-to-end contro una vera casella di posta, non solo a livello di
 codice/chiamata API.**
 
+### `docker stop` di auth-service e frontdesk-service (completamento Blocco 6)
+Ultimi due servizi rimasti non testati con spegnimento reale — nessun nuovo difetto, comportamento
+confermato corretto in entrambi i casi.
+
+**auth-service** (`06-auth-service-down.spec.ts`) — scoperta architetturale confermata: il JWT viene
+validato **localmente dal gateway** (`AuthenticationFilter.java`, firma HMAC con chiave propria), mai
+con una chiamata ad auth-service per validare un token già emesso. Risultato: una sessione già
+autenticata continua a funzionare normalmente (verificato: `GET /api/v1/rooms` e
+`GET /api/v1/reservations` restano `200`) anche con auth-service completamente spento — solo gli
+endpoint che *devono* raggiungere auth-service (`/login`, `/me`) falliscono, e lo fanno in modo pulito
+(502 tradotto dal fix del gateway di questa sessione, mai un crash grezzo). Al riavvio, login torna a
+funzionare. 2/2 verdi.
+
+**frontdesk-service** (`06-frontdesk-service-down.spec.ts`) — è il servizio centrale (prenotazioni,
+preventivi, soggiorni, camere, tariffe, imposta di soggiorno): spegnerlo degrada quella parte
+dell'app per definizione, non è un bug. Verificato che la degradazione sia pulita (502 tradotto, mai
+un 500 grezzo — stessa correzione del gateway) e che **non ci sia effetto a cascata**: guest-service
+(`GET /api/v1/guests/search`) e auth-service (`GET /api/v1/auth/me`) restano perfettamente funzionanti
+mentre frontdesk-service è giù. Al riavvio, le route tornano `200`. 2/2 verdi.
+
+Con questi due, **tutti e 6 i servizi applicativi** (frontdesk, billing, guest, fb, notification, auth)
+sono stati spenti/riavviati realmente almeno una volta in questo round — il Blocco 6 è ora
+effettivamente completo al 100%, non solo "sostanzialmente".
+
+### Approfondimento: concorrenza ottimistica su modifica prenotazione (D-CONCURRENCY-2)
+Il test precedente (`07-service-resilience.spec.ts`, "reservation concurrent edits") documentava un
+lost-update in scenario **sequenziale** (tab A salva, POI tab B salva con dati vecchi) — nessun 409,
+last-write-wins silenzioso, perché il client non riceve/rimanda mai `version`.
+Aggiunto un secondo test che misura il caso **realmente concorrente**: 10 `PUT` sulla stessa
+prenotazione lanciate con `Promise.all` (vero overlap di transazione, non in sequenza). Risultato
+misurato (due run): **1-2 su 10 riescono (200), gli altri 8-9 ricevono correttamente `409
+CONCURRENT_MODIFICATION`** — mai uno stato inaspettato, mai un valore finale diverso da uno di quelli
+tentati (nessuna corruzione).
+**Conclusione, più precisa della nota precedente**: il controllo `@Version` di Hibernate **funziona
+correttamente** per le vere race condition (l'unico scenario per cui esiste). Il gap reale è più stretto
+di quanto descritto prima: riguarda **solo** il caso "client con stato non aggiornato da tempo" (due tab
+browser, una rimasta aperta a lungo) — quello richiede esporre `version` nel contratto REST
+(response + request, con verifica lato server) per diventare un vero conflitto rilevato anche lì, non
+un problema del meccanismo di concorrenza in sé, che è già solido. Resta una nota informativa per una
+eventuale evoluzione futura del contratto API, non un difetto da correggere in questo giro.
+**Verificato da**: `frontend/e2e-live/qa2508/07-service-resilience.spec.ts` — "reservation TRUE
+concurrent edits (Promise.all, not sequential)".
+
 ---
 
 ## Copertura per blocco
@@ -256,7 +299,7 @@ codice/chiamata API.**
 | 3 — Sweep elementi per area | ✅ completo | Ospiti, Prenotazioni, Camere/Tipologie, Pulizie (+1 difetto 🟡), Fatturazione, Ristorante (menu CRUD + dialog nativi), Rates (selezione da tastiera), Calendario (vista/navigazione) — tutte con CRUD reali |
 | 4 — Dati negativi | ✅ completo | HotelProfile (VAT/CAP/logoUrl) 8/8 verdi |
 | 5 — Matrice portali | ✅ completo | D1 Alloggiati (1 difetto 🟡 risolto) · D2 FatturaPA · D3 City tax (1 difetto 🟢 documentato) · D4 Email — nessun nuovo difetto oltre ai già trovati |
-| 6 — Interruzioni | ✅ sostanzialmente completo | `docker stop` reale di notification-service, billing-service, guest-service e fb-service, uno alla volta — tutti i circuit breaker Resilience4j confermati funzionanti (checkout/check-in mai bloccati, retry post-ripristino recupera lo stato); gap ambientale `mailpit` mancante scoperto e chiuso (vedi sotto — invio email reale ora verificato). Fault injection UI (`06-interruptions.spec.ts`, 7/7 verdi): abort+retry ospite, 500 su prenotazione, doppio-click, CSRF rimosso, sessione scaduta a metà form, back-navigation durante POST in volo. Fault injection API (`07-service-resilience.spec.ts` + `06-guest-fb-service-down.spec.ts`, 7/7 verdi): pagamento midflight, ordine F&B doppio, submit Alloggiati midflight, concorrenza su modifica prenotazione, guest-service/fb-service giù — **3 difetti 🔴/🟡 trovati e risolti** (prezzo mai salvato su modifica prenotazione, falso conflitto camera, 500 grezzo dal gateway quando un servizio a valle è irraggiungibile). Non testato: `docker stop` di auth-service (romperebbe la sessione della suite stessa) e di frontdesk-service (è il servizio centrale, spegnerlo degrada l'intera app per definizione) |
+| 6 — Interruzioni | ✅ completo | `docker stop` reale di **tutti e 6** i servizi applicativi (frontdesk, billing, guest, fb, notification, auth), uno alla volta — tutti i circuit breaker Resilience4j confermati funzionanti, nessuna cascata, degradazione sempre pulita (mai un 500 grezzo). Scoperta: auth-service down non rompe le sessioni già autenticate (JWT validato localmente dal gateway). Gap ambientale `mailpit` mancante scoperto e chiuso — invio email reale verificato end-to-end con allegato. Fault injection UI (`06-interruptions.spec.ts`, 7/7 verdi). Fault injection API (`07-service-resilience.spec.ts` + `06-*-service-down.spec.ts`, 8/8 verdi): pagamento midflight, F&B doppio, Alloggiati midflight, concorrenza sequenziale E vera-concorrenza (`@Version` di Hibernate cattura 8-9/10 race reali, mai corruzione) — **3 difetti 🔴/🟡 trovati e risolti** (prezzo mai salvato su modifica prenotazione, falso conflitto camera, 500 grezzo dal gateway) |
 | 7 — Flussi end-to-end | ✅ completo | `08-end-to-end-flows.spec.ts`, 2/2 verdi. Catena completa: preventivo → conversione (verificato status `ACCEPTED` + camera/date ereditate) → check-in reale (non walk-in) → ordine F&B **confermato** (creare l'ordine da solo non addebita — serve `POST /orders/{id}/confirm`, scoperto in questo blocco) → verificato che l'addebito atterri sulla stessa fattura → pagamento pieno → checkout → PDF (magic bytes `%PDF`) → switch FATTURA → XML FatturaPA (verificato codice fiscale reale dell'ospite nell'XML, non un placeholder) → export Alloggiati del giorno. Seconda spec: preventivo multi-opzione → decline (verificato blocco successivo della conversione) · prenotazione → modifica con **cambio camera reale** → cancellazione (verificato 404 dopo delete) |
 | 8 — Chaos | ✅ completo (versione ridotta) | `10-chaos.spec.ts`: 3 sessioni (una per ruolo, seed loggato per replay deterministico — `chaos-<ruolo>-seed-<N>.json` in questa cartella, non versionato in git) da **60 passi** (non 200: round-trip reali contro il backend live, 200×3 avrebbe superato il budget di tempo pratico di questo giro) di click/navigazione/back/forward/refresh/resize/Ctrl+K/Esc/digitazione casuale. 4/4 verdi, **nessun difetto emerso** — console pulita su tutti i 180 passi complessivi. Sessione MCP esplorativa "a mano libera" non eseguita in questo giro |
 | 9 — RBAC/IDOR | ✅ sostanzialmente completo | `idor-cross-tenant-live.spec.ts` (esistente, non di questo round: room/guest/invoice IDOR + RECEPTIONIST bloccato su report owner) + nuovo `09-rbac-idor.spec.ts` (5/5 verdi): IDOR cross-tenant su reservation/quotation/stay (404, mai 403 né dati altrui) + Hotel B non può fare checkout su stay altrui · RECEPTIONIST correttamente respinto (403) da Alloggiati (txt/json/submit), export FatturaPA batch, `POST` city-tax-rate, `POST` hotel-category — nessun nuovo difetto, RBAC ben implementato ovunque verificato. La matrice completa 30 route × 3 ruoli × ogni azione gated non è stata rifatta esaustivamente (già campionata nel Blocco 2 route-sweep e nel Blocco 3) |
