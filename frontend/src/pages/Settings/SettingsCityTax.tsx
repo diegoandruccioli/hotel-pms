@@ -259,13 +259,12 @@ const CityTaxRatesSection = () => {
       setFormData(EMPTY_RATE_FORM);
       await loadRates();
     } catch (err: unknown) {
-      const e = err as { response?: { status?: number } };
-      const errorMsg = e.response?.status === 409
-        ? t('city_tax_err_overlap')
-        : e.response?.status === 400
-          ? t('city_tax_err_comune_not_configured')
-          : getErrorMessage(err, t('city_tax_err_save'));
-      addToast(errorMsg, 'error');
+      // Backend distinguishes CITY_TAX_RATE_OVERLAP (409), CITY_TAX_COMUNE_NOT_CONFIGURED
+      // (400) and CITY_TAX_RATE_VALID_FROM_NOT_AFTER_CURRENT (400) by error code, not by
+      // status alone — two different 400s exist, so branching on status here previously
+      // mislabelled the validFrom-guard error as "comune not configured". The response
+      // interceptor already translates the code via locales/*/errors.json; just use it.
+      addToast(getErrorMessage(err, t('city_tax_err_save')), 'error');
     } finally {
       setSaving(false);
     }

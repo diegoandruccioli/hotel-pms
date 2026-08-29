@@ -43,6 +43,8 @@ class CityTaxRateAdminServiceImplTest {
     private static final LocalDate OLD_RATE_VALID_FROM = LocalDate.of(2025, 1, 1);
     /** PostgreSQL SQLState for an EXCLUDE constraint violation. */
     private static final String SQLSTATE_EXCLUSION_VIOLATION = "23P01";
+    private static final BigDecimal AMOUNT_PER_NIGHT = new BigDecimal("2.50");
+    private static final String NOTE = "Delibera G.C. n. 45";
 
     @Mock
     private CityTaxRateRepository cityTaxRateRepository;
@@ -62,8 +64,8 @@ class CityTaxRateAdminServiceImplTest {
     @BeforeEach
     void setUp() {
         hotelId = UUID.randomUUID();
-        request = new CityTaxRateRequest(CATEGORY, new BigDecimal("2.50"), MAX_TAXABLE_NIGHTS, EXEMPT_UNDER_AGE,
-                RATE_VALID_FROM, "Delibera G.C. n. 45");
+        request = new CityTaxRateRequest(CATEGORY, AMOUNT_PER_NIGHT, MAX_TAXABLE_NIGHTS, EXEMPT_UNDER_AGE,
+                RATE_VALID_FROM, NOTE);
     }
 
     @Test
@@ -128,7 +130,45 @@ class CityTaxRateAdminServiceImplTest {
         cityTaxRateAdminService.createRule(hotelId, request);
 
         assertEquals(request.validFrom(), openRule.getValidTo());
-        verify(cityTaxRateRepository).save(openRule);
+        // Must be saveAndFlush, not save: a plain save() only marks the entity dirty and
+        // relies on Hibernate's ActionQueue to flush it later — but INSERTs run before
+        // UPDATEs regardless of call order, so the new rule's INSERT would hit the DB
+        // while this row still has valid_to = NULL, tripping the no-overlap exclusion
+        // constraint with a spurious 409. This assertion is what a mock-based test can
+        // check; the ordering bug itself only reproduces against a real DB — see
+        // CityTaxRateRepositoryIntegrationTest.createRuleClosesThePreviousOpenEndedRule.
+        verify(cityTaxRateRepository).saveAndFlush(openRule);
+    }
+
+    @Test
+    void createRuleWithValidFromNotAfterCurrentRuleThrowsBadRequest() {
+        final CityTaxRate openRule = CityTaxRate.builder()
+                .id(UUID.randomUUID()).hotelId(hotelId).comuneCodice(COMUNE_CODICE).category(CATEGORY)
+                .validFrom(RATE_VALID_FROM).build();
+        final CityTaxRateRequest sameStartDateRequest = new CityTaxRateRequest(CATEGORY, AMOUNT_PER_NIGHT,
+                MAX_TAXABLE_NIGHTS, EXEMPT_UNDER_AGE, RATE_VALID_FROM, NOTE);
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(cityTaxRateRepository.findByHotelIdAndComuneCodiceAndCategoryAndValidToIsNull(
+                hotelId, COMUNE_CODICE, CATEGORY)).thenReturn(Optional.of(openRule));
+
+        assertThrows(BadRequestException.class,
+                () -> cityTaxRateAdminService.createRule(hotelId, sameStartDateRequest));
+        verify(cityTaxRateRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createRuleWithValidFromBeforeCurrentRuleThrowsBadRequest() {
+        final CityTaxRate openRule = CityTaxRate.builder()
+                .id(UUID.randomUUID()).hotelId(hotelId).comuneCodice(COMUNE_CODICE).category(CATEGORY)
+                .validFrom(RATE_VALID_FROM).build();
+        final CityTaxRateRequest earlierRequest = new CityTaxRateRequest(CATEGORY, AMOUNT_PER_NIGHT,
+                MAX_TAXABLE_NIGHTS, EXEMPT_UNDER_AGE, OLD_RATE_VALID_FROM, NOTE);
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(cityTaxRateRepository.findByHotelIdAndComuneCodiceAndCategoryAndValidToIsNull(
+                hotelId, COMUNE_CODICE, CATEGORY)).thenReturn(Optional.of(openRule));
+
+        assertThrows(BadRequestException.class, () -> cityTaxRateAdminService.createRule(hotelId, earlierRequest));
+        verify(cityTaxRateRepository, never()).saveAndFlush(any());
     }
 
     @Test

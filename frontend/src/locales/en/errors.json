@@ -71,5 +71,12 @@
   "REPLAYED_INTERNAL_SIGNATURE": "Internal service authentication error. Please try again later.",
   "STALE_INTERNAL_SIGNATURE": "Internal service authentication error. Please try again later.",
   "INVALID_DATE_RANGE": "The date range is not valid.",
-  "DATE_RANGE_TOO_LARGE": "The requested range is too wide — narrow the period."
+  "DATE_RANGE_TOO_LARGE": "The requested range is too wide — narrow the period.",
+
+  "CITY_TAX_COMUNE_NOT_CONFIGURED": "Configure the property's comune in Settings first.",
+  "CITY_TAX_RATE_OVERLAP": "A rate with an overlapping validity period already exists for this category.",
+  "CITY_TAX_RATE_VALID_FROM_NOT_AFTER_CURRENT": "The new rate's start date must be later than the currently active rate's.",
+  "HOTEL_CATEGORY_OVERLAP": "A category with an overlapping validity period already exists.",
+  "HOTEL_CATEGORY_VALID_FROM_NOT_AFTER_CURRENT": "The new category's start date must be later than the currently active category's.",
+  "RESERVATION_STALE_VERSION": "Another user has changed this reservation in the meantime."
 }

@@ -6,6 +6,7 @@ import com.hotelpms.frontdesk.citytax.dto.HotelCategoryHistoryResponse;
 import com.hotelpms.frontdesk.citytax.mapper.HotelCategoryHistoryMapper;
 import com.hotelpms.frontdesk.citytax.repository.HotelCategoryHistoryRepository;
 import com.hotelpms.frontdesk.citytax.service.HotelCategoryHistoryService;
+import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -26,6 +27,7 @@ public class HotelCategoryHistoryServiceImpl implements HotelCategoryHistoryServ
 
     /** PostgreSQL SQLState for an EXCLUDE constraint violation. */
     private static final String SQLSTATE_EXCLUSION_VIOLATION = "23P01";
+    private static final String VALID_FROM_NOT_AFTER_CURRENT_MSG = "HOTEL_CATEGORY_VALID_FROM_NOT_AFTER_CURRENT";
 
     private final HotelCategoryHistoryRepository hotelCategoryHistoryRepository;
     private final HotelCategoryHistoryMapper hotelCategoryHistoryMapper;
@@ -48,8 +50,15 @@ public class HotelCategoryHistoryServiceImpl implements HotelCategoryHistoryServ
 
         hotelCategoryHistoryRepository.findByHotelIdAndValidToIsNull(hotelId)
                 .ifPresent(open -> {
+                    if (!request.validFrom().isAfter(open.getValidFrom())) {
+                        throw new BadRequestException(VALID_FROM_NOT_AFTER_CURRENT_MSG);
+                    }
                     open.setValidTo(request.validFrom());
-                    hotelCategoryHistoryRepository.save(open);
+                    // saveAndFlush, not save: see CityTaxRateAdminServiceImpl.createRule for
+                    // why a plain save() here lets Hibernate insert the new row before this
+                    // close reaches the DB, tripping excl_hotel_category_no_overlap (V16)
+                    // with a spurious 409 on a legitimate category change.
+                    hotelCategoryHistoryRepository.saveAndFlush(open);
                 });
 
         final HotelCategoryHistory entry = HotelCategoryHistory.builder()

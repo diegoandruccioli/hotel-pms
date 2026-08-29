@@ -71,9 +71,21 @@
   "city_tax_add_rate": "Add rate",
   "city_tax_no_rates": "No rate recorded",
   "city_tax_err_save": "Save failed. Please try again.",
-  "city_tax_err_overlap": "An active rule already exists for this category in this period",
-  "city_tax_err_comune_not_configured": "Configure the property's comune in Hotel Profile first",
   "city_tax_err_loading_category": "Failed to load category history",
   "city_tax_err_loading_rates": "Failed to load rates",
-  "city_tax_err_invalid_age": "Age must be between 0 and 120"
+  "city_tax_err_invalid_age": "Age must be between 0 and 120",
+
+  "settings_section_privacy": "Privacy",
+  "settings_hub_privacy_desc": "Guest data export (GDPR) and retention settings",
+  "privacy_page_subtitle": "Manage guest data export and the data retention period (GDPR)",
+  "privacy_retention_section_title": "Guest data retention",
+  "privacy_retention_section_desc": "Minimum retention period for guest data from their last stay, before it becomes eligible for deletion.",
+  "privacy_retention_years": "Retention years",
+  "privacy_retention_years_helper": "Minimum {{count}} years (TULPS requirement)",
+  "privacy_err_min_years": "Must be at least {{count}} years (TULPS requirement)",
+  "privacy_tulps_min_label": "TULPS legal minimum",
+  "privacy_fiscal_min_label": "Fiscal legal minimum (invoices)",
+  "privacy_years_value": "{{count}} years",
+  "privacy_err_loading": "Failed to load privacy settings",
+  "privacy_err_save": "Save failed. Please try again."
 }

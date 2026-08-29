@@ -2,10 +2,17 @@ package com.hotelpms.frontdesk.integration;
 
 import com.hotelpms.frontdesk.citytax.domain.CityTaxRate;
 import com.hotelpms.frontdesk.citytax.domain.HotelCategoryHistory;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxRateRequest;
+import com.hotelpms.frontdesk.citytax.dto.HotelCategoryHistoryRequest;
 import com.hotelpms.frontdesk.citytax.repository.CityTaxRateRepository;
 import com.hotelpms.frontdesk.citytax.repository.HotelCategoryHistoryRepository;
+import com.hotelpms.frontdesk.citytax.service.impl.CityTaxRateAdminServiceImpl;
+import com.hotelpms.frontdesk.citytax.service.impl.HotelCategoryHistoryServiceImpl;
+import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.stays.domain.AlloggiatiComune;
+import com.hotelpms.frontdesk.stays.domain.HotelSettings;
 import com.hotelpms.frontdesk.stays.repository.AlloggiatiComuneRepository;
+import com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +67,8 @@ class CityTaxRateRepositoryIntegrationTest {
     private static final String CATEGORY = "4_STAR";
     private static final LocalDate VALID_FROM_JAN = LocalDate.of(2026, 1, 1);
     private static final LocalDate VALID_FROM_JUN = LocalDate.of(2026, 6, 1);
+    private static final BigDecimal AMOUNT_PER_NIGHT = new BigDecimal("2.50");
+    private static final BigDecimal HIGHER_AMOUNT_PER_NIGHT = new BigDecimal("3.00");
     private static final LocalDate CHECK_IN_DATE = LocalDate.of(2026, 8, 10);
 
     @Autowired
@@ -70,6 +79,9 @@ class CityTaxRateRepositoryIntegrationTest {
 
     @Autowired
     private AlloggiatiComuneRepository alloggiatiComuneRepository;
+
+    @Autowired
+    private HotelSettingsRepository hotelSettingsRepository;
 
     @BeforeEach
     void seedComune() {
@@ -123,7 +135,7 @@ class CityTaxRateRepositoryIntegrationTest {
                 .hotelId(hotelId)
                 .comuneCodice(COMUNE_CODICE)
                 .category("5_STAR")
-                .amountPerNight(new BigDecimal("3.00"))
+                .amountPerNight(HIGHER_AMOUNT_PER_NIGHT)
                 .validFrom(VALID_FROM_JAN)
                 .build();
 
@@ -155,12 +167,76 @@ class CityTaxRateRepositoryIntegrationTest {
                 () -> hotelCategoryHistoryRepository.saveAndFlush(overlapping));
     }
 
+    /**
+     * Regression test for the flush-ordering bug: {@code CityTaxRateAdminServiceImpl
+     * .createRule} used to close the hotel's currently open-ended rule with a plain
+     * {@code save()}, which only marks the row dirty — Hibernate's {@code ActionQueue}
+     * flushes INSERTs before UPDATEs regardless of call order, so the new rule's INSERT
+     * hit the database while the old row still had {@code valid_to IS NULL}, and
+     * {@code excl_city_tax_rates_no_overlap} rejected a perfectly legitimate tariff
+     * change with a spurious 409. A mocked-repository unit test cannot reproduce this —
+     * it needs a real flush against a real GiST exclusion constraint, hence this class.
+     */
+    @Test
+    void createRuleAutoClosesThePreviousOpenEndedRuleWithoutSpuriousConflict() {
+        final UUID hotelId = UUID.randomUUID();
+        hotelSettingsRepository.saveAndFlush(
+                HotelSettings.builder().hotelId(hotelId).comuneCodice(COMUNE_CODICE).build());
+        final CityTaxRateAdminServiceImpl service =
+                new CityTaxRateAdminServiceImpl(cityTaxRateRepository, hotelSettingsRepository, entity -> null);
+
+        service.createRule(hotelId, new CityTaxRateRequest(
+                CATEGORY, AMOUNT_PER_NIGHT, null, null, VALID_FROM_JAN, null));
+
+        service.createRule(hotelId, new CityTaxRateRequest(
+                CATEGORY, HIGHER_AMOUNT_PER_NIGHT, null, null, VALID_FROM_JUN, null));
+
+        final CityTaxRate closed = cityTaxRateRepository
+                .findApplicableByHotelId(hotelId, COMUNE_CODICE, CATEGORY, VALID_FROM_JAN)
+                .orElseThrow();
+        assertEquals(VALID_FROM_JUN, closed.getValidTo());
+        assertTrue(cityTaxRateRepository
+                .findByHotelIdAndComuneCodiceAndCategoryAndValidToIsNull(hotelId, COMUNE_CODICE, CATEGORY)
+                .isPresent());
+    }
+
+    @Test
+    void createRuleWithValidFromNotAfterCurrentRuleIsRejectedInsteadOfViolatingCheckConstraint() {
+        final UUID hotelId = UUID.randomUUID();
+        hotelSettingsRepository.saveAndFlush(
+                HotelSettings.builder().hotelId(hotelId).comuneCodice(COMUNE_CODICE).build());
+        final CityTaxRateAdminServiceImpl service =
+                new CityTaxRateAdminServiceImpl(cityTaxRateRepository, hotelSettingsRepository, entity -> null);
+        service.createRule(hotelId, new CityTaxRateRequest(
+                CATEGORY, AMOUNT_PER_NIGHT, null, null, VALID_FROM_JUN, null));
+
+        assertThrows(BadRequestException.class, () -> service.createRule(hotelId, new CityTaxRateRequest(
+                CATEGORY, HIGHER_AMOUNT_PER_NIGHT, null, null, VALID_FROM_JAN, null)));
+    }
+
+    /** Same flush-ordering regression as above, for {@code HotelCategoryHistoryServiceImpl}. */
+    @Test
+    void recordCategoryAutoClosesThePreviousOpenEndedEntryWithoutSpuriousConflict() {
+        final UUID hotelId = UUID.randomUUID();
+        final HotelCategoryHistoryServiceImpl service =
+                new HotelCategoryHistoryServiceImpl(hotelCategoryHistoryRepository, entity -> null);
+
+        service.recordCategory(hotelId, new HotelCategoryHistoryRequest("3_STAR", VALID_FROM_JAN));
+        service.recordCategory(hotelId, new HotelCategoryHistoryRequest(CATEGORY, VALID_FROM_JUN));
+
+        final HotelCategoryHistory closed = hotelCategoryHistoryRepository
+                .findApplicableByHotelId(hotelId, VALID_FROM_JAN)
+                .orElseThrow();
+        assertEquals(VALID_FROM_JUN, closed.getValidTo());
+        assertTrue(hotelCategoryHistoryRepository.findByHotelIdAndValidToIsNull(hotelId).isPresent());
+    }
+
     private static CityTaxRate rate(final UUID hotelId, final LocalDate validFrom, final LocalDate validTo) {
         return CityTaxRate.builder()
                 .hotelId(hotelId)
                 .comuneCodice(COMUNE_CODICE)
                 .category(CATEGORY)
-                .amountPerNight(new BigDecimal("2.50"))
+                .amountPerNight(AMOUNT_PER_NIGHT)
                 .validFrom(validFrom)
                 .validTo(validTo)
                 .build();

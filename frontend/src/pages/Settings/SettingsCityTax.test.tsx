@@ -113,8 +113,13 @@ describe('SettingsCityTax', () => {
     }));
   });
 
-  it('shows a friendly message on a 409 rate overlap', async () => {
-    vi.mocked(stayService.createCityTaxRate).mockRejectedValue({ response: { status: 409 } });
+  it('shows the backend detail message on a 409 rate overlap', async () => {
+    // Two distinct 400s exist server-side (CITY_TAX_COMUNE_NOT_CONFIGURED vs.
+    // CITY_TAX_RATE_VALID_FROM_NOT_AFTER_CURRENT), so the component no longer
+    // branches on HTTP status — it surfaces the backend's `detail` code, which
+    // the real Axios interceptor translates via locales/*/errors.json.
+    vi.mocked(stayService.createCityTaxRate)
+      .mockRejectedValue(mockAxiosErrorWithDetail('CITY_TAX_RATE_OVERLAP', 409));
     renderPage();
     await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
 
@@ -123,11 +128,12 @@ describe('SettingsCityTax', () => {
     fireEvent.change(screen.getAllByLabelText(/city_tax_valid_from \*/i)[1], { target: { value: '2026-06-01' } });
     fireEvent.click(screen.getByText('city_tax_add_rate'));
 
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('city_tax_err_overlap', 'error'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('CITY_TAX_RATE_OVERLAP', 'error'));
   });
 
-  it('shows a friendly message when the comune is not configured (400)', async () => {
-    vi.mocked(stayService.createCityTaxRate).mockRejectedValue({ response: { status: 400 } });
+  it('shows the backend detail message when the comune is not configured (400)', async () => {
+    vi.mocked(stayService.createCityTaxRate)
+      .mockRejectedValue(mockAxiosErrorWithDetail('CITY_TAX_COMUNE_NOT_CONFIGURED', 400));
     renderPage();
     await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
 
@@ -136,7 +142,22 @@ describe('SettingsCityTax', () => {
     fireEvent.change(screen.getAllByLabelText(/city_tax_valid_from \*/i)[1], { target: { value: '2026-06-01' } });
     fireEvent.click(screen.getByText('city_tax_add_rate'));
 
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('city_tax_err_comune_not_configured', 'error'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('CITY_TAX_COMUNE_NOT_CONFIGURED', 'error'));
+  });
+
+  it('shows the backend detail message when the new rate does not start after the current one (400)', async () => {
+    vi.mocked(stayService.createCityTaxRate)
+      .mockRejectedValue(mockAxiosErrorWithDetail('CITY_TAX_RATE_VALID_FROM_NOT_AFTER_CURRENT', 400));
+    renderPage();
+    await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
+
+    fireEvent.change(screen.getAllByLabelText(/city_tax_category \*/i)[1], { target: { value: '4_STAR' } });
+    fireEvent.change(screen.getByLabelText(/city_tax_amount_per_night/i), { target: { value: '2.50' } });
+    fireEvent.change(screen.getAllByLabelText(/city_tax_valid_from \*/i)[1], { target: { value: '2025-01-01' } });
+    fireEvent.click(screen.getByText('city_tax_add_rate'));
+
+    await waitFor(() => expect(mockAddToast)
+      .toHaveBeenCalledWith('CITY_TAX_RATE_VALID_FROM_NOT_AFTER_CURRENT', 'error'));
   });
 
   it('shows the backend detail message on a generic failure', async () => {

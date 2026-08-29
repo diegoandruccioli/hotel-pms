@@ -71,9 +71,21 @@
   "city_tax_add_rate": "Aggiungi tariffa",
   "city_tax_no_rates": "Nessuna tariffa registrata",
   "city_tax_err_save": "Salvataggio fallito. Riprova.",
-  "city_tax_err_overlap": "Esiste già una regola attiva per questa categoria in questo periodo",
-  "city_tax_err_comune_not_configured": "Configura prima il comune della struttura nel Profilo Hotel",
   "city_tax_err_loading_category": "Errore caricamento storico categoria",
   "city_tax_err_loading_rates": "Errore caricamento tariffe",
-  "city_tax_err_invalid_age": "L'età deve essere compresa tra 0 e 120"
+  "city_tax_err_invalid_age": "L'età deve essere compresa tra 0 e 120",
+
+  "settings_section_privacy": "Privacy",
+  "settings_hub_privacy_desc": "Export dati ospite (GDPR) e impostazioni di conservazione",
+  "privacy_page_subtitle": "Gestisci l'export dei dati degli ospiti e il periodo di conservazione (GDPR)",
+  "privacy_retention_section_title": "Conservazione dati ospite",
+  "privacy_retention_section_desc": "Periodo minimo di conservazione dei dati ospite dall'ultimo soggiorno, prima che siano idonei alla cancellazione.",
+  "privacy_retention_years": "Anni di conservazione",
+  "privacy_retention_years_helper": "Minimo {{count}} anni (obbligo TULPS)",
+  "privacy_err_min_years": "Deve essere almeno {{count}} anni (obbligo TULPS)",
+  "privacy_tulps_min_label": "Minimo di legge TULPS",
+  "privacy_fiscal_min_label": "Minimo di legge fiscale (fatture)",
+  "privacy_years_value": "{{count}} anni",
+  "privacy_err_loading": "Errore caricamento impostazioni privacy",
+  "privacy_err_save": "Salvataggio fallito. Riprova."
 }

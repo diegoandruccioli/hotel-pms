@@ -28,6 +28,7 @@ import java.util.UUID;
 public class CityTaxRateAdminServiceImpl implements CityTaxRateAdminService {
 
     private static final String COMUNE_NOT_CONFIGURED_MSG = "CITY_TAX_COMUNE_NOT_CONFIGURED";
+    private static final String VALID_FROM_NOT_AFTER_CURRENT_MSG = "CITY_TAX_RATE_VALID_FROM_NOT_AFTER_CURRENT";
     /** PostgreSQL SQLState for an EXCLUDE constraint violation — same convention as RateSeasonAdminServiceImpl. */
     private static final String SQLSTATE_EXCLUSION_VIOLATION = "23P01";
 
@@ -58,8 +59,17 @@ public class CityTaxRateAdminServiceImpl implements CityTaxRateAdminService {
         cityTaxRateRepository
                 .findByHotelIdAndComuneCodiceAndCategoryAndValidToIsNull(hotelId, comuneCodice, request.category())
                 .ifPresent(open -> {
+                    if (!request.validFrom().isAfter(open.getValidFrom())) {
+                        throw new BadRequestException(VALID_FROM_NOT_AFTER_CURRENT_MSG);
+                    }
                     open.setValidTo(request.validFrom());
-                    cityTaxRateRepository.save(open);
+                    // saveAndFlush, not save: the auto-close must hit the DB before the new
+                    // row is inserted below. Hibernate's ActionQueue runs INSERTs before
+                    // UPDATEs regardless of call order, so a plain save() here left the old
+                    // row's valid_to = NULL at INSERT time — the two open-ended ranges
+                    // overlapped and excl_city_tax_rates_no_overlap (V17) rejected the new
+                    // rate with a spurious 409, even though the request was legitimate.
+                    cityTaxRateRepository.saveAndFlush(open);
                 });
 
         final CityTaxRate rate = CityTaxRate.builder()
