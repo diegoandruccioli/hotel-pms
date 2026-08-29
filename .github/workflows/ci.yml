@@ -276,7 +276,11 @@ jobs:
         uses: github/codeql-action/upload-sarif@24c7eb380a2dc368f2d129e4c65e51d172983a1e # v4
         with:
           sarif_file: "trivy-thirdparty-${{ strategy.job-index }}.sarif"
-          category: "trivy-thirdparty-${{ matrix.image }}"
+          # Stable per-slot category (not the versioned image tag): a tag-based
+          # category orphans its alerts every time the pinned version bumps,
+          # since the old category is never scanned again and GitHub can't
+          # auto-close alerts under it.
+          category: "trivy-thirdparty-${{ strategy.job-index }}"
 
   # ── Job 5: E2E ──────────────────────────────────────────────────────────────
   # Runs only after backend, frontend, and trivy pass.

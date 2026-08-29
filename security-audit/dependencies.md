@@ -25,7 +25,7 @@ attivi e verdi nella pipeline esistente, quindi riusati qui invece di duplicare 
 
 ## Findings
 
-### HIGH — `httpcore5` CVE-2026-54399, presente identico in 7/8 servizi backend
+### HIGH — `httpcore5` CVE-2026-54399, presente identico in 7/8 servizi backend — **RISOLTO**
 
 | Servizio | Pacchetto | Versione installata | Versione fix |
 |---|---|---|---|
@@ -48,6 +48,11 @@ vedi `THREAT_MODEL.md` DEP-CVE-01) — la fix corretta è un bump del BOM o un
 recentissimo, 2026, verificarne il dettaglio — non ancora triagato in `THREAT_MODEL.md`
 né in `.trivyignore`). **Non ancora tracciato come DEP-CVE-XX — candidato per il prossimo
 numero libero**.
+
+**Aggiornamento**: override applicato in `build.gradle.kts` (root, `dependencyManagement`)
+a `httpcore5:5.4.3`. Lo scan Trivy successivo su `fb-service` ha trovato il sibling HTTP/2
+`httpcore5-h2` ancora pinnato a 5.3.6 dallo stesso BOM (CVE-2026-54428, HIGH, alert #545,
+non enumerato in questo audit del 2026-08-13) — override esteso a entrambi gli artifact.
 
 **notification-service non è mai scansionato**: il job matrix in `.github/workflows/ci.yml`
 (righe ~120-149) elenca `config-service, api-gateway, auth-service, guest-service,
@@ -94,7 +99,7 @@ prima: verificare se `.trivyignore` lo copre già o se manca una riga.
 
 | Finding | Componente | Severità | Fix disponibile | Sfruttabile qui? |
 |---|---|---|---|---|
-| CVE-2026-54399 | httpcore5 5.3.6 (7 servizi backend) | HIGH | 5.4.3 / 5.5-beta2 | Da valutare — transitivo, non ancora triagato |
+| CVE-2026-54399 / CVE-2026-54428 | httpcore5 + httpcore5-h2 5.3.6 (7 servizi backend) | HIGH | 5.4.3 / 5.5-beta2 | **Risolto** — override centralizzato `dependencyManagement` |
 | Gap copertura CI | notification-service assente dal matrix Trivy | — (gap processo) | aggiungere al matrix | N/A |
 | GHSA-mh99/rgw5 | brace-expansion (npm, dev-only) | HIGH | disponibile | No — già triagato, dev-only |
 | CVE-2025-68121 + altri | Go stdlib in postgres:15-alpine | CRITICAL+HIGH | richiede nuova immagine upstream | Accettato, stesso pattern DEP-CVE-07 |

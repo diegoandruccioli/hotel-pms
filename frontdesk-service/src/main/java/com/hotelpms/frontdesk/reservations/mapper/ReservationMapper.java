@@ -52,8 +52,20 @@ public interface ReservationMapper {
     /**
      * Updates Entity from Request DTO.
      *
+     * <p>{@code lineItems} is deliberately excluded: {@code
+     * ReservationServiceImpl#updateReservation} rebuilds and prices line
+     * items manually, before they're added to the managed {@code
+     * existingReservation} collection. Letting this mapper's generated
+     * clear+addAll touch {@code lineItems} too would add the new (still
+     * unpriced) entities to the managed, cascade-persisted collection before
+     * price resolution runs — Hibernate can snapshot the INSERT statement's
+     * bound values at that earlier point, so a later {@code setPrice()} call
+     * silently never reaches the database (NOT NULL violation on {@code
+     * reservation_line_items.price}).
+     *
      * @param request the request
      * @param entity  the entity
      */
+    @Mapping(target = "lineItems", ignore = true)
     void updateEntityFromRequest(ReservationRequest request, @MappingTarget Reservation entity);
 }

@@ -39,6 +39,24 @@ spring:
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
 
+        # /me is a read-only session-bootstrap check called on every page load/reload — it
+        # must NOT share the strict anti-brute-force bucket below (5 req/s, meant for
+        # /login). A 429 there was previously indistinguishable from "not authenticated" to
+        # the frontend's axios interceptor (api.ts), spuriously logging a real user out
+        # under normal rapid navigation. Listed before the auth-service catch-all, same
+        # first-match-wins reasoning as auth-service-users above.
+        - id: auth-service-me
+          uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
+          predicates:
+            - Path=/api/v1/auth/me
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 50
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@remoteAddrKeyResolver}"
+
         - id: auth-service
           uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
           predicates:

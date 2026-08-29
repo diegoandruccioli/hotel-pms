@@ -97,7 +97,7 @@ public class ReservationServiceImpl implements ReservationService {
         if (reservation.getLineItems() != null) {
             reservation.getLineItems().forEach(lineItem -> lineItem.setReservation(reservation));
         }
-        applyResolvedPrices(reservation, roomsById, hotelId, request.checkInDate(), request.checkOutDate());
+        applyResolvedPrices(reservation.getLineItems(), roomsById, hotelId, request.checkInDate(), request.checkOutDate());
 
         final Reservation savedReservation = saveTranslatingOverlap(Objects.requireNonNull(reservation));
         sendReservationConfirmedEmail(savedReservation, hotelId, guest, roomNumbersOf(roomsById));
@@ -219,16 +219,34 @@ public class ReservationServiceImpl implements ReservationService {
         final java.util.Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(request.lineItems(), hotelId);
         verifyNoOverlappingReservations(id, request);
 
-        // For simplicity, we recreate line items on update
-        existingReservation.getLineItems().clear();
-
         reservationMapper.updateEntityFromRequest(request, existingReservation);
 
-        if (existingReservation.getLineItems() != null) {
-            existingReservation.getLineItems().forEach(lineItem -> lineItem.setReservation(existingReservation));
-        }
-        applyResolvedPrices(existingReservation, roomsById, hotelId, request.checkInDate(), request.checkOutDate());
+        // Priced BEFORE the new line items join existingReservation's managed,
+        // cascade-persisted collection (see ReservationMapper#updateEntityFromRequest's
+        // @Mapping(target="lineItems", ignore=true) javadoc): Hibernate can snapshot a
+        // newly cascade-reachable entity's INSERT state as soon as it's added to the
+        // managed collection, so pricing it only after `addAll` silently never reached
+        // the database (NOT NULL violation on reservation_line_items.price).
+        final List<ReservationLineItem> newLineItems = request.lineItems().stream()
+                .map(reservationMapper::toEntity)
+                .toList();
+        newLineItems.forEach(lineItem -> lineItem.setReservation(existingReservation));
+        applyResolvedPrices(newLineItems, roomsById, hotelId, request.checkInDate(), request.checkOutDate());
 
+        // For simplicity, we recreate line items on update. The removal is
+        // flushed on its own, BEFORE the replacements are added: Hibernate's
+        // flush ordering runs INSERTs before DELETEs within a single flush, but
+        // the old line item's "delete" is actually a soft-delete UPDATE (see
+        // @SQLDelete on ReservationLineItem) that excl_reservation_line_items_no_overlap
+        // (V14) only excludes once `active` flips to false. Inserting the
+        // replacement for the SAME room+dates before that UPDATE lands would
+        // trip the constraint against the reservation's own about-to-be-removed
+        // row — a false-positive ROOM_UNAVAILABLE_DATES on an edit that doesn't
+        // even change the room.
+        existingReservation.getLineItems().clear();
+        reservationRepository.saveAndFlush(existingReservation);
+
+        existingReservation.getLineItems().addAll(newLineItems);
         final Reservation updatedReservation = saveTranslatingOverlap(Objects.requireNonNull(existingReservation));
         return enrichWithGuestName(reservationMapper.toResponse(updatedReservation), guest);
     }
@@ -511,21 +529,25 @@ public class ReservationServiceImpl implements ReservationService {
      * room's room type — the same function {@code StayBillingCoordinator} reads
      * back (never recomputes) at check-in for reservation-based stays.
      *
-     * @param reservation the reservation whose line items need a price (already
-     *                    has {@code roomId} set on each, from the mapper)
-     * @param roomsById   the rooms verified by {@link #verifyRoomsAvailability},
-     *                    keyed by roomId — carries the room type needed to resolve a price
-     * @param hotelId     the authenticated hotel, for multi-tenant pricing scope
-     * @param checkIn     the reservation's check-in date
-     * @param checkOut    the reservation's check-out date (exclusive)
+     * @param lineItems the line items needing a price (already has {@code
+     *                  roomId} set on each, from the mapper) — for a
+     *                  not-yet-managed list this must be called BEFORE the
+     *                  items are added to a persistence-context-managed,
+     *                  cascade-persisted collection (see {@link
+     *                  ReservationMapper#updateEntityFromRequest} javadoc)
+     * @param roomsById the rooms verified by {@link #verifyRoomsAvailability},
+     *                  keyed by roomId — carries the room type needed to resolve a price
+     * @param hotelId   the authenticated hotel, for multi-tenant pricing scope
+     * @param checkIn   the reservation's check-in date
+     * @param checkOut  the reservation's check-out date (exclusive)
      */
     private void applyResolvedPrices(
-            final Reservation reservation, final java.util.Map<UUID, RoomResponse> roomsById,
+            final List<ReservationLineItem> lineItems, final java.util.Map<UUID, RoomResponse> roomsById,
             final UUID hotelId, final LocalDate checkIn, final LocalDate checkOut) {
-        if (reservation.getLineItems() == null) {
+        if (lineItems == null) {
             return;
         }
-        for (final ReservationLineItem lineItem : reservation.getLineItems()) {
+        for (final ReservationLineItem lineItem : lineItems) {
             final RoomResponse room = roomsById.get(lineItem.getRoomId());
             final List<NightlyRate> nightlyRates = ratePricingService.resolveStayRates(
                     room.roomType().id(), hotelId, checkIn, checkOut);

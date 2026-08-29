@@ -23,7 +23,7 @@ riga di codice — cross-validazione reale, non duplicazione.
 | 🟠 HIGH | 4 | Lockout account keyed solo su username, nessun bind IP/device — DoS non autenticato contro l'account `admin` noto | `AuthServiceImpl.java` (lockout logic) | auth-jwt |
 | 🟠 HIGH | 5 | Doppia prenotazione: TOCTOU reale, nessun vincolo di esclusione DB su date/camera (a differenza di `rate_seasons`) | `ReservationServiceImpl.java:76-99,625-647` | business-logic |
 | 🟠 HIGH | 6 | Conversione preventivo→prenotazione: race concorrente, nessun `@Version`/lock, doppia prenotazione dallo stesso preventivo | `QuotationServiceImpl.java:280-315` | business-logic |
-| 🟠 HIGH | 7 | CVE-2026-54399 in `httpcore5` 5.3.6, presente identico su 7/8 servizi backend, transitivo, non ancora triagato | tutti i `build.gradle.kts` (transitivo) | dependencies |
+| ✅ RISOLTO | 7 | ~~CVE-2026-54399 in `httpcore5` 5.3.6, presente identico su 7/8 servizi backend, transitivo, non ancora triagato~~ — override centralizzato applicato a `httpcore5` e al sibling `httpcore5-h2` (CVE-2026-54428) | `build.gradle.kts` (root) | dependencies |
 | 🟡 MEDIUM | 8 | Status HTTP lockout (429 vs 401) reintroduce user enumeration, regressione parziale di T-AUTH-01 | `AuthServiceImpl.java` | auth-jwt |
 | 🟡 MEDIUM | 9 | Timing side-channel (DB-miss vs verifica Argon2id) abilita user enumeration al login | `AuthServiceImpl.java:99-124` | auth-jwt |
 | 🟡 MEDIUM | 10 | `QuotationRepository` assente da `TenantIsolationArchTest` — nessuna guardia di regressione (oggi scoping corretto) | `TenantIsolationArchTest.java:52` | access-control |
@@ -144,12 +144,15 @@ concorrenti sullo stesso preventivo passano entrambe il controllo di stato e cre
 entrambe una prenotazione. **Remediation**: `@Version` su `Quotation` o
 `PESSIMISTIC_WRITE` sulla lettura pre-conversione.
 
-### 7. CVE-2026-54399 — httpcore5, 7/8 servizi backend
+### 7. CVE-2026-54399 — httpcore5, 7/8 servizi backend — **RISOLTO**
 
 Vedi `security-audit/dependencies.md` per dettaglio completo. Transitivo (nessuna
 dichiarazione diretta), identico su tutti i servizi Spring Boot 3.5.16/Spring Cloud
-2025.0.0. **Remediation**: bump centralizzato del BOM o override `dependencyManagement`,
-non un fix per-servizio isolato (rischio di drift, vedi precedente DEP-CVE-01).
+2025.0.0. **Remediation applicata**: override centralizzato in `build.gradle.kts`
+(`dependencyManagement`, non un fix per-servizio isolato — evita il rischio di drift già
+visto in DEP-CVE-01). Il fix copriva solo `httpcore5`; lo scan CodeQL/Trivy successivo ha
+trovato il sibling `httpcore5-h2` ancora pinnato a 5.3.6 dallo stesso BOM
+(CVE-2026-54428, HIGH, alert #545) — override esteso a entrambi gli artifact.
 
 ---
 

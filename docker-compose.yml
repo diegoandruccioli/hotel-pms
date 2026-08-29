@@ -711,6 +711,38 @@ services:
           memory: 256M
 
   # ----------------------------------------------------------
+  # Mailpit – dev-only SMTP catch-all + web UI, so notification-service's
+  # SMTP_HOST=mailpit (.env) actually resolves to something. Without this,
+  # every outbound email (reservation-confirmed has no SMTP dependency issue
+  # since it's sent the same way, checkout summary, etc.) failed at DNS
+  # resolution — real delivery was structurally impossible, not just
+  # unconfigured. Never enable this pattern in production: point SMTP_HOST at
+  # a real relay instead.
+  # ----------------------------------------------------------
+  mailpit:
+    image: axllent/mailpit:v1.30.5
+    container_name: mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025" # web UI + REST API, for inspecting received mail
+    healthcheck:
+      test: ["CMD", "wget", "-T5", "-q", "-O", "/dev/null", "http://127.0.0.1:8025/api/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - backend-network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+
+  # ----------------------------------------------------------
   # Frontend (Nginx static build)
   # ----------------------------------------------------------
   frontend:

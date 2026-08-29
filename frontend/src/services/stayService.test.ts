@@ -223,53 +223,60 @@ describe('stayService — settings, lookups, downloads', () => {
     expect(result).toEqual([]);
   });
 
-  it('should download the Alloggiati txt report as a blob', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: 'plain text content' });
+  // 2026-08-24 follow-up (REPORT.md §6 #3b): these used to fetch a Blob and drive a
+  // synthetic <a>.click() + immediate URL.revokeObjectURL() — the exact pattern
+  // billingService.ts's downloadPdf documents as verified-broken in real Chrome (no
+  // visible file save, silently dropped). Switched to the same hidden-iframe pattern
+  // billingService.ts already uses; tests mirror billingService.test.ts's iframe test.
 
-    const createObjectURL = vi.fn(() => 'blob:http://test/txt');
-    const revokeObjectURL = vi.fn();
-    const clickFn = vi.fn();
-    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
-    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue({
-      href: '',
-      download: '',
-      click: clickFn,
-    } as unknown as HTMLAnchorElement);
+  it('should trigger the Alloggiati txt report download via a hidden iframe', async () => {
+    vi.useFakeTimers();
+    // validate-then-download (REPORT.md difetto #3): downloadAlloggiatiReport now
+    // awaits a real GET before creating the iframe, so a failed/empty report never
+    // shows a false-success download — mock that call succeeding.
+    vi.mocked(api.get).mockResolvedValueOnce({ data: '' });
+    const iframe = { style: {} as CSSStyleDeclaration, src: '' } as HTMLIFrameElement;
+    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(iframe);
+    const appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((n) => n);
+    const removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((n) => n);
 
     await stayService.downloadAlloggiatiReport('2026-06-20');
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/stays/reports/alloggiati', {
-      params: { date: '2026-06-20' },
-      responseType: 'blob',
-    });
-    expect(createObjectURL).toHaveBeenCalled();
-    expect(clickFn).toHaveBeenCalled();
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:http://test/txt');
+    expect(iframe.src).toBe('/api/v1/stays/reports/alloggiati?date=2026-06-20');
+    expect(iframe.style.display).toBe('none');
+    expect(appendChildSpy).toHaveBeenCalledWith(iframe);
+    expect(removeChildSpy).not.toHaveBeenCalled();
+
+    vi.runAllTimers();
+    expect(removeChildSpy).toHaveBeenCalledWith(iframe);
+
     createElementSpy.mockRestore();
+    appendChildSpy.mockRestore();
+    removeChildSpy.mockRestore();
+    vi.useRealTimers();
   });
 
-  it('should download the Alloggiati json export as a blob', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: '[]' });
-
-    const createObjectURL = vi.fn(() => 'blob:http://test/json');
-    const revokeObjectURL = vi.fn();
-    const clickFn = vi.fn();
-    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
-    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue({
-      href: '',
-      download: '',
-      click: clickFn,
-    } as unknown as HTMLAnchorElement);
+  it('should trigger the Alloggiati json export download via a hidden iframe', async () => {
+    vi.useFakeTimers();
+    vi.mocked(api.get).mockResolvedValueOnce({ data: [] });
+    const iframe = { style: {} as CSSStyleDeclaration, src: '' } as HTMLIFrameElement;
+    const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(iframe);
+    const appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((n) => n);
+    const removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((n) => n);
 
     await stayService.downloadAlloggiatiJson('2026-06-20');
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/stays/reports/alloggiati/json', {
-      params: { date: '2026-06-20' },
-      responseType: 'blob',
-    });
-    expect(createObjectURL).toHaveBeenCalled();
-    expect(clickFn).toHaveBeenCalled();
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:http://test/json');
+    expect(iframe.src).toBe('/api/v1/stays/reports/alloggiati/json?date=2026-06-20');
+    expect(iframe.style.display).toBe('none');
+    expect(appendChildSpy).toHaveBeenCalledWith(iframe);
+    expect(removeChildSpy).not.toHaveBeenCalled();
+
+    vi.runAllTimers();
+    expect(removeChildSpy).toHaveBeenCalledWith(iframe);
+
     createElementSpy.mockRestore();
+    appendChildSpy.mockRestore();
+    removeChildSpy.mockRestore();
+    vi.useRealTimers();
   });
 });

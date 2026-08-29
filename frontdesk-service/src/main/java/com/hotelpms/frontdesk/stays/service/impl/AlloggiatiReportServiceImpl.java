@@ -126,8 +126,17 @@ public class AlloggiatiReportServiceImpl implements AlloggiatiReportService {
                 log.warn("[REPORT] No StayGuest records for stayId={} — skipping", stay.getId());
                 continue;
             }
-            validateGroupCoherence(stay);
-            validateDates(stay, date);
+            // A single stay with invalid Alloggiati data (e.g. a FAMILIARE guest with no
+            // CAPOFAMIGLIA in the same stay) must not abort the report for every other guest
+            // checked in that day — skip only the offending stay, loudly, and keep going.
+            try {
+                validateGroupCoherence(stay);
+                validateDates(stay, date);
+            } catch (final AlloggiatiValidationException ex) {
+                log.warn("[REPORT] Skipping invalid stay stayId={} hotelId={}: {}",
+                        stay.getId(), hotelId, ex.getMessage());
+                continue;
+            }
 
             final int permanenza = computePermanenza(date, stay.getExpectedCheckOutDate());
 

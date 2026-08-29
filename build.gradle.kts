@@ -8,16 +8,19 @@ plugins {
 }
 
 subprojects {
-    // CVE-2026-54399 (security-report.md Finding #7): Apache HttpComponents Core
-    // HTTP/1.1 parser DoS (unbounded header count/length), fixed in httpcore5 5.4.3.
-    // Transitive on every service via Spring Boot 3.5.16's BOM, which still pins
-    // httpcore5.version=5.3.6 (vulnerable) — no service declares it directly. One
-    // override here instead of repeating it in each service's own build.gradle.kts,
-    // per the report's remediation (centralized bump, not a per-service fix).
+    // CVE-2026-54399 / CVE-2026-54428 (security-report.md Finding #7): Apache
+    // HttpComponents Core HTTP/1.1 and HTTP/2 parser DoS (unbounded header
+    // count/length), fixed in 5.4.3. Transitive on every service via Spring Boot
+    // 3.5.16's BOM, which still pins both httpcore5 and its HTTP/2 sibling
+    // httpcore5-h2 at 5.3.6 (vulnerable) — no service declares either directly.
+    // One override here instead of repeating it in each service's own
+    // build.gradle.kts, per the report's remediation (centralized bump, not a
+    // per-service fix).
     plugins.withId("io.spring.dependency-management") {
         configure<DependencyManagementExtension> {
             dependencies {
                 dependency("org.apache.httpcomponents.core5:httpcore5:5.4.3")
+                dependency("org.apache.httpcomponents.core5:httpcore5-h2:5.4.3")
             }
         }
     }

@@ -6,9 +6,11 @@ import { axe } from 'vitest-axe';
 import { CheckInForm } from './CheckInForm';
 import { stayService } from '../../services/stayService';
 import { guestService } from '../../services/guestService';
+import { reservationService } from '../../services/reservationService';
 import userEvent from '@testing-library/user-event';
 import type { StayResponse } from '../../types/stay.types';
 import type { GuestResponseDTO } from '../../types/guest.types';
+import type { ReservationResponse } from '../../types/reservation.types';
 
 const ITALIA_STATO = { codice: '100000100', descrizione: 'ITALIA' };
 const FRANCIA_STATO = { codice: '200000100', descrizione: 'FRANCIA' };
@@ -33,6 +35,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../services/stayService');
 vi.mock('../../services/guestService');
+vi.mock('../../services/reservationService');
 
 const mockStayResponse = (overrides: Partial<StayResponse> = {}): StayResponse => ({
   id: 'stay1',
@@ -92,6 +95,58 @@ describe('CheckInForm', () => {
     expect(removeBtns).toHaveLength(2);
     await user.click(removeBtns[1]);
     expect(screen.getAllByText('guest_number')).toHaveLength(1);
+  });
+
+  describe('deep-link / refresh without location.state', () => {
+    // 2026-08-24 follow-up (REPORT.md §6 #5): roomId/guestId/expectedGuests used to come
+    // ONLY from React Router location.state (set by Reservations.tsx's handleCheckIn) — a
+    // direct navigation, bookmark, or page refresh lost them entirely. Now falls back to
+    // fetching the reservation itself.
+    const mockReservation = (overrides: Partial<ReservationResponse> = {}): ReservationResponse => ({
+      id: 'res123',
+      guestId: 'g1',
+      checkInDate: '2026-06-01',
+      checkOutDate: '2026-06-02',
+      status: 'CONFIRMED',
+      expectedGuests: 1,
+      lineItems: [{ id: 'li1', roomId: 'r1', price: 90, active: true, createdAt: '', updatedAt: '' }],
+      active: true,
+      createdAt: '2026-01-01T00:00:00',
+      updatedAt: '2026-01-01T00:00:00',
+      confirmationEmailFailed: false,
+      ...overrides,
+    });
+
+    const renderWithoutState = () =>
+      render(
+        <MemoryRouter initialEntries={['/stays/checkin/res123']}>
+          <Routes>
+            <Route path="/stays/checkin/:reservationId" element={<CheckInForm />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+    it('fetches the reservation and renders the form once resolved', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation());
+
+      renderWithoutState();
+
+      expect(reservationService.getReservationById).toHaveBeenCalledWith('res123');
+      await waitFor(() => expect(screen.getByText('checkin_title')).toBeInTheDocument());
+      expect(screen.getAllByText('guest_number')).toHaveLength(1);
+      expect(screen.queryByText('err_missing_context')).not.toBeInTheDocument();
+    });
+
+    it('shows err_missing_context when the reservation fetch fails and the form is submitted', async () => {
+      vi.mocked(reservationService.getReservationById).mockRejectedValue(new Error('not found'));
+      const { container } = renderWithoutState();
+
+      await waitFor(() => expect(screen.getByText('checkin_title')).toBeInTheDocument());
+      fireEvent.submit(container.querySelector('form')!);
+
+      await waitFor(() => expect(screen.getByText('err_missing_context')).toBeInTheDocument());
+      expect(stayService.createStay).not.toHaveBeenCalled();
+    });
   });
 
   it('should have no accessibility violations', async () => {

@@ -298,9 +298,12 @@ public class InvoiceServiceImpl implements InvoiceService {
         if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
             throw new InvoiceConflictException("CANNOT_UPDATE_CANCELLED_INVOICE");
         }
-        if (invoice.getStatus() == InvoiceStatus.PAID) {
-            throw new InvoiceConflictException("CANNOT_UPDATE_PAID_INVOICE");
-        }
+        // NOT a blanket PAID guard (removed — was CANNOT_UPDATE_PAID_INVOICE): a paid-but-
+        // never-exported invoice legitimately switches RICEVUTA->FATTURA all the time (guest
+        // pays, then asks for a proper fattura) — that's the common case, not an edge case.
+        // assertNotFiscallyLocked below is the guard that actually matters: once a FatturaPA
+        // has been generated for this invoice, its type must not change underneath the
+        // already-transmitted snapshot.
         assertNotFiscallyLocked(invoice);
         invoice.setDocumentType(documentType);
         final Invoice saved = invoiceRepository.save(Objects.requireNonNull(invoice));

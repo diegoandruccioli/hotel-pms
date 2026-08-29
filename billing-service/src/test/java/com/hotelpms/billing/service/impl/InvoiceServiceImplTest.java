@@ -536,23 +536,37 @@ class InvoiceServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should throw ConflictException when updating document type on PAID invoice")
-        void shouldThrowWhenUpdatingPaidInvoiceDocumentType() {
-                // Arrange — round 1 bug #5: FATTURA->RICEVUTA silently succeeded on a
-                // PAID invoice, even without a fiscal export, integrity gap on a settled
-                // fiscal document
+        @DisplayName("Should switch document type on a PAID-but-not-fiscally-exported invoice (pays, then asks for FATTURA)")
+        void shouldUpdateDocumentTypeOnPaidInvoiceWhenNotFiscallyLocked() {
+                // Arrange — PAID alone must NOT block this: the ordinary real-world sequence is
+                // pay in full, then request a proper FatturaPA (RICEVUTA->FATTURA). A blanket
+                // CANNOT_UPDATE_PAID_INVOICE guard here previously blocked that legitimate flow
+                // (regression found by the 2026-08-24 live QA pass against checkout-live.spec.ts).
+                // assertNotFiscallyLocked (invoiceFiscalExportRepository) is the guard that
+                // actually matters — see shouldThrowLockedWhenUpdatingDocumentTypeOnExportedInvoice
+                // below for the case that must still be blocked.
                 final UUID invoiceId = UUID.randomUUID();
                 final Invoice invoice = new Invoice();
                 invoice.setId(invoiceId);
                 invoice.setStatus(InvoiceStatus.PAID);
+                final InvoiceResponse expected = new InvoiceResponse(invoiceId, hotelId, INV_123, null,
+                                BigDecimal.TEN, InvoiceStatus.PAID, reservationId, guestId, null,
+                                DocumentType.FATTURA, null, List.of(), List.of());
 
                 when(invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)).thenReturn(Optional.of(invoice));
+                when(invoiceFiscalExportRepository.existsByInvoiceId(invoiceId)).thenReturn(false);
+                when(invoiceRepository.save(any(Invoice.class))).thenReturn(invoice);
+                when(invoiceMapper.toResponse(invoice)).thenReturn(expected);
 
-                // Act & Assert
-                final Exception exception = assertThrows(InvoiceConflictException.class,
-                                () -> invoiceService.updateDocumentType(invoiceId, DocumentType.RICEVUTA));
-                assertEquals("CANNOT_UPDATE_PAID_INVOICE", exception.getMessage());
-                verify(invoiceRepository, never()).save(any(Invoice.class));
+                // Act
+                final InvoiceResponse result = invoiceService.updateDocumentType(invoiceId, DocumentType.FATTURA);
+
+                // Assert
+                assertNotNull(result);
+                assertEquals(DocumentType.FATTURA, result.documentType());
+                final ArgumentCaptor<Invoice> captor = ArgumentCaptor.forClass(Invoice.class);
+                verify(invoiceRepository).save(captor.capture());
+                assertEquals(DocumentType.FATTURA, captor.getValue().getDocumentType());
         }
 
         @Test

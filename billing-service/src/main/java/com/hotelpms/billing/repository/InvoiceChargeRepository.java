@@ -48,7 +48,12 @@ public interface InvoiceChargeRepository extends JpaRepository<InvoiceCharge, UU
             + "FROM invoice_charges c JOIN invoices i ON c.invoice_id = i.id "
             + "WHERE i.hotel_id = :hotelId AND c.type = 'ROOM_NIGHT' "
             + "AND i.issue_date >= :start AND i.issue_date < :end "
-            + "GROUP BY date_trunc(:granularity, i.issue_date) "
+            // GROUP BY the output alias, not a second date_trunc(:granularity, ...) —
+            // two separate bind-parameter occurrences of the same expression are NOT
+            // recognized by Postgres as equal for GROUP BY validity (42803: "column
+            // must appear in the GROUP BY clause"), even though both bind to the same
+            // runtime value. Grouping by the SELECT-list alias sidesteps the issue.
+            + "GROUP BY periodStart "
             + "ORDER BY periodStart",
             nativeQuery = true)
     List<RoomRevenuePeriod> sumRoomRevenueByHotelIdGroupedByPeriod(
