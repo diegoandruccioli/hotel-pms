@@ -53,6 +53,7 @@ describe('Settings hub', () => {
     expect(screen.queryByRole('link', { name: /settings_section_system/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /settings_section_hotel_profile/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /settings_section_admin_users/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /settings_section_privacy/ })).not.toBeInTheDocument();
   });
 
   it('also shows the System category for ADMIN', () => {
@@ -73,6 +74,13 @@ describe('Settings hub', () => {
     renderSettings();
     expect(screen.getByRole('link', { name: /settings_section_hotel_profile/ })).toHaveAttribute('href', '/profile/hotel');
     expect(screen.getByRole('link', { name: /settings_section_admin_users/ })).toHaveAttribute('href', '/admin/users');
+  });
+
+  it('also shows Privacy (GDPR export/retention) for ADMIN/OWNER, previously reachable '
+      + 'only by a direct API call', () => {
+    vi.mocked(useAuthStore).mockImplementation(mockAuth('ADMIN'));
+    renderSettings();
+    expect(screen.getByRole('link', { name: /settings_section_privacy/ })).toHaveAttribute('href', '/settings/privacy');
   });
 
   it('should have no accessibility violations', async () => {

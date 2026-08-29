@@ -256,6 +256,8 @@
   "failed_create_reservation": "Errore durante la creazione della prenotazione",
   "room_move_overlap_error": "Impossibile spostare. La camera è già occupata in queste date.",
   "reservation_overlap_error": "Le date selezionate si sovrappongono con un'altra prenotazione per queste camere.",
+  "reservation_stale_version_title": "Prenotazione modificata nel frattempo",
+  "reservation_stale_version_body": "Un altro utente ha modificato questa prenotazione mentre la stavi guardando. Ricarica per vedere la versione aggiornata prima di salvare di nuovo.",
 
   "skip_to_main": "Vai al contenuto principale",
 
@@ -326,6 +328,12 @@
   "delete_guest_gdpr_hold": "Impossibile eliminare: l'ospite ha soggiorni o fatture da conservare per obblighi di legge.",
   "delete_guest_failed": "Impossibile eliminare l'ospite. Riprova.",
   "guest_deleted_success": "Ospite eliminato con successo.",
+
+  "export_guest_data": "Esporta dati (GDPR)",
+  "export_guest_data_confirm_title": "Esportare i dati dell'ospite",
+  "export_guest_data_confirm_body": "Il file scaricato conterrà i dati personali dell'ospite (anagrafica, documenti, soggiorni e fatture). È una comunicazione di dati personali: consegnalo solo alla persona a cui appartengono i dati o a chi ne ha titolo.",
+  "export_guest_data_confirm_action": "Scarica",
+  "export_guest_data_failed": "Impossibile generare l'export. Riprova.",
 
   "delete_reservation": "Elimina",
   "delete_reservation_confirm": "Sei sicuro di voler eliminare questa prenotazione? L'azione non può essere annullata.",

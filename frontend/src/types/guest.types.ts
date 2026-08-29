@@ -57,3 +57,52 @@ export interface GuestResponseDTO {
   updatedAt: string;
   active: boolean;
 }
+
+/** Mirrors StaySummaryClientResponse (guest-service), used only by the GDPR export. */
+export interface GuestExportStaySummary {
+  stayId: string;
+  checkInTime: string;
+  checkOutTime: string | null;
+  roomId: string;
+  status: string;
+}
+
+/** Mirrors InvoiceSummaryClientResponse (guest-service), used only by the GDPR export. */
+export interface GuestExportInvoiceSummary {
+  invoiceId: string;
+  invoiceNumber: string;
+  issueDate: string;
+  totalAmount: number;
+  status: string;
+}
+
+/** GDPR Art. 20 data-portability export — GET /api/v1/guests/{id}/export. */
+export interface GuestDataExportResponse {
+  exportedAt: string;
+  guestId: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  dateOfBirth?: string;
+  gdprConsentDate?: string;
+  createdAt: string;
+  identityDocuments: IdentityDocumentResponseDTO[];
+  stays: GuestExportStaySummary[];
+  invoices: GuestExportInvoiceSummary[];
+}
+
+/** Per-hotel GDPR retention settings — GET/PUT /api/v1/guests/settings. */
+export interface GuestPrivacySettingsResponse {
+  hotelId: string;
+  guestRetentionYears: number;
+  tulpsMinYears: number;
+  fiscalMinYears: number;
+}
+
+export interface GuestPrivacySettingsRequest {
+  guestRetentionYears: number;
+}

@@ -256,6 +256,8 @@
   "failed_create_reservation": "Failed to create reservation",
   "room_move_overlap_error": "Cannot change room. The room is already occupied during these dates.",
   "reservation_overlap_error": "The selected dates overlap with another reservation for these rooms.",
+  "reservation_stale_version_title": "Reservation changed in the meantime",
+  "reservation_stale_version_body": "Another user changed this reservation while you had it open. Reload to see the latest version before saving again.",
 
   "skip_to_main": "Skip to main content",
 
@@ -326,6 +328,12 @@
   "delete_guest_gdpr_hold": "Cannot delete: guest has stays or invoices that must be retained for legal compliance.",
   "delete_guest_failed": "Failed to delete guest. Please try again.",
   "guest_deleted_success": "Guest deleted successfully.",
+
+  "export_guest_data": "Export data (GDPR)",
+  "export_guest_data_confirm_title": "Export guest data",
+  "export_guest_data_confirm_body": "The downloaded file will contain the guest's personal data (profile, documents, stays and invoices). This is a disclosure of personal data: hand it over only to the person it belongs to, or someone entitled to it.",
+  "export_guest_data_confirm_action": "Download",
+  "export_guest_data_failed": "Could not generate the export. Please try again.",
 
   "delete_reservation": "Delete",
   "delete_reservation_confirm": "Are you sure you want to delete this reservation? This action cannot be undone.",

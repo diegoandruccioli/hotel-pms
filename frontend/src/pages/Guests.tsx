@@ -19,6 +19,7 @@ import { useToastStore } from '../store/toastStore';
 import { useGuestsSearch, useDeleteGuest } from '../hooks/queries/useGuests';
 import { queryKeys } from '../lib/queryKeys';
 import { getErrorMessage } from '../utils/errorMessage';
+import { guestService } from '../services/guestService';
 import { GuestFormModal } from './GuestFormModal';
 
 const PAGE_SIZE = 20;
@@ -29,18 +30,29 @@ interface ActionsCellProps {
   guest: GuestResponseDTO;
   onEdit: (g: GuestResponseDTO) => void;
   onDelete?: (g: GuestResponseDTO) => void;
+  onExport?: (g: GuestResponseDTO) => void;
   t: TFunction;
 }
 
-const ActionsCell = ({ guest, onEdit, onDelete, t }: ActionsCellProps) => {
+const ActionsCell = ({ guest, onEdit, onDelete, onExport, t }: ActionsCellProps) => {
   const handleEdit = useCallback(() => onEdit(guest), [onEdit, guest]);
   const handleDeleteClick = useCallback(() => onDelete?.(guest), [onDelete, guest]);
+  const handleExportClick = useCallback(() => onExport?.(guest), [onExport, guest]);
 
   return (
     <div className="text-right">
       <M3TableActionLink onClick={handleEdit}>
         {t('edit')}
       </M3TableActionLink>
+      {onExport && (
+        <M3TableActionLink
+          className="ml-3"
+          aria-label={`${t('export_guest_data')} ${guest.firstName} ${guest.lastName}`}
+          onClick={handleExportClick}
+        >
+          {t('export_guest_data')}
+        </M3TableActionLink>
+      )}
       {onDelete && (
         <M3TableActionLink
           tone="error"
@@ -55,6 +67,17 @@ const ActionsCell = ({ guest, onEdit, onDelete, t }: ActionsCellProps) => {
   );
 };
 
+/** Triggers a client-side download of a JSON blob — same pattern as billingReportService's CSV export. */
+function downloadJson(data: unknown, filename: string): void {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export const Guests = memo(() => {
   const { t } = useTranslation('common');
   const addToast = useToastStore((s) => s.addToast);
@@ -66,6 +89,8 @@ export const Guests = memo(() => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<GuestResponseDTO | undefined>();
   const [guestToDelete, setGuestToDelete] = useState<GuestResponseDTO | null>(null);
+  const [guestToExport, setGuestToExport] = useState<GuestResponseDTO | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') ?? '';
   const [searchQuery, setSearchQuery] = useState(initialSearch);
@@ -163,6 +188,28 @@ export const Guests = memo(() => {
     }
   }, [guestToDelete, addToast, t, deleteGuestMutation]);
 
+  const handleExportRequest = useCallback((guest: GuestResponseDTO) => {
+    setGuestToExport(guest);
+  }, []);
+
+  const handleExportCancel = useCallback(() => {
+    setGuestToExport(null);
+  }, []);
+
+  const handleExportConfirm = useCallback(async () => {
+    if (!guestToExport) return;
+    setExporting(true);
+    try {
+      const data = await guestService.exportGuestData(guestToExport.id);
+      downloadJson(data, `guest-export-${guestToExport.id}.json`);
+      setGuestToExport(null);
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('export_guest_data_failed')), 'error');
+    } finally {
+      setExporting(false);
+    }
+  }, [guestToExport, addToast, t]);
+
   const getGuestRowId = useCallback((g: GuestResponseDTO) => g.id, []);
 
   const columns = useMemo<ColumnDef<GuestResponseDTO>[]>(() => [
@@ -203,11 +250,12 @@ export const Guests = memo(() => {
           guest={row.original}
           onEdit={handleOpenEditModal}
           onDelete={isAdminOrOwner ? handleDeleteRequest : undefined}
+          onExport={isAdminOrOwner ? handleExportRequest : undefined}
           t={t}
         />
       ),
     },
-  ], [t, handleOpenEditModal, isAdminOrOwner, handleDeleteRequest]);
+  ], [t, handleOpenEditModal, isAdminOrOwner, handleDeleteRequest, handleExportRequest]);
 
   return (
     <div className="space-y-6">
@@ -290,6 +338,25 @@ export const Guests = memo(() => {
             </M3Button>
             <M3Button type="button" onClick={handleDeleteConfirm} loading={deleting}>
               {t('delete')}
+            </M3Button>
+          </div>
+        </M3Dialog>
+      )}
+
+      {guestToExport && (
+        <M3Dialog
+          open
+          title={t('export_guest_data_confirm_title')}
+          titleId="confirm-export-guest-dialog"
+          onClose={handleExportCancel}
+        >
+          <p className="text-sm font-body text-on-surface">{t('export_guest_data_confirm_body')}</p>
+          <div className="flex justify-end gap-3 pt-4">
+            <M3Button type="button" variant="outlined" onClick={handleExportCancel} disabled={exporting}>
+              {t('cancel')}
+            </M3Button>
+            <M3Button type="button" onClick={handleExportConfirm} loading={exporting}>
+              {t('export_guest_data_confirm_action')}
             </M3Button>
           </div>
         </M3Dialog>
