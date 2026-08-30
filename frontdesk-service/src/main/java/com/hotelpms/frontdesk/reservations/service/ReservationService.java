@@ -117,6 +117,21 @@ public interface ReservationService {
     List<RoomResponse> getAvailableRooms(LocalDate checkIn, LocalDate checkOut);
 
     /**
+     * Reports whether {@code roomId} has an overlapping reservation in {@code [checkIn,
+     * checkOut)}, regardless of the room's current housekeeping status — unlike {@link
+     * #getAvailableRooms}, which also requires housekeeping-{@code CLEAN} and is therefore
+     * unusable for a room the caller already knows is occupied. Used by a stay extension
+     * (Parte 3): the room being extended is occupied by definition, so only a genuine
+     * future booking conflict — never its own current occupancy — should block it.
+     *
+     * @param roomId   the room to check
+     * @param checkIn  the range start (inclusive)
+     * @param checkOut the range end (exclusive)
+     * @return {@code true} if another reservation overlaps the range for this room
+     */
+    boolean isRoomBookedByOthers(UUID roomId, LocalDate checkIn, LocalDate checkOut);
+
+    /**
      * Retries the reservation-confirmed email for a reservation whose original attempt
      * failed (notification-service was unavailable). Clears {@code confirmationEmailFailed}
      * on success. Scoped to the authenticated hotel.

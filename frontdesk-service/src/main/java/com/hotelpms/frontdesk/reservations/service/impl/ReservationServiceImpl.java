@@ -360,6 +360,17 @@ public class ReservationServiceImpl implements ReservationService {
                 .toList();
     }
 
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isRoomBookedByOthers(final UUID roomId, final LocalDate checkIn, final LocalDate checkOut) {
+        Objects.requireNonNull(roomId, "Room ID cannot be null");
+        Objects.requireNonNull(checkIn, "Check-in date cannot be null");
+        Objects.requireNonNull(checkOut, "Check-out date cannot be null");
+        return checkOut.isAfter(checkIn)
+                && !reservationRepository.findOverlappingRoomIds(List.of(roomId), checkIn, checkOut).isEmpty();
+    }
+
     /**
      * Resolves the total price of {@code room}'s room type for the requested
      * stay, via {@link RatePricingService} — this is what lets the availability

@@ -9,8 +9,11 @@ import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest;
 import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest.GatewayEventType;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
+import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
+import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
+import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.service.RoomService;
 import com.hotelpms.frontdesk.stays.domain.Stay;
@@ -71,7 +74,9 @@ import java.util.UUID;
 public class StayServiceImpl implements StayService {
 
     private static final String PAID_STATUS = "PAID";
+    private static final String OPEN_INVOICE_STATUS = "ISSUED";
     private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
+    private static final String INVALID_STAY_STATUS_MSG = "INVALID_STAY_STATUS";
     private static final LocalDate EARLIEST_FILTER_DATE = LocalDate.of(1900, 1, 1);
     private static final LocalDate LATEST_FILTER_DATE = LocalDate.of(2100, 12, 31);
 
@@ -80,6 +85,7 @@ public class StayServiceImpl implements StayService {
     private final StayMapper stayMapper;
     private final GuestClient guestClient;
     private final RoomService roomService;
+    private final ReservationService reservationService;
     private final StayCheckInValidator stayCheckInValidator;
     private final StayBillingCoordinator stayBillingCoordinator;
     private final StayAlloggiatiCoordinator stayAlloggiatiCoordinator;
@@ -190,7 +196,7 @@ public class StayServiceImpl implements StayService {
         if (stay.getStatus() != StayStatus.CHECKED_IN) {
             log.warn("[STAY] CHECK_OUT_FAILED | stayId={} | reason=INVALID_STATUS | currentStatus={}",
                     stayId, stay.getStatus());
-            throw new IllegalStateException("INVALID_STAY_STATUS");
+            throw new IllegalStateException(INVALID_STAY_STATUS_MSG);
         }
 
         // 1. Verify billing folio is PAID. Walk-in stays have no reservationId — the
@@ -362,7 +368,7 @@ public class StayServiceImpl implements StayService {
         final Stay stay = stayRepository.findByIdAndHotelId(stayId, hotelId)
                 .orElseThrow(() -> new NotFoundException(STAY_NOT_FOUND_MSG));
         if (stay.getStatus() != StayStatus.CHECKED_OUT) {
-            throw new IllegalStateException("INVALID_STAY_STATUS");
+            throw new IllegalStateException(INVALID_STAY_STATUS_MSG);
         }
         final InvoiceStatusResponse invoice = stayBillingCoordinator.resolveInvoiceForCheckOut(stay);
         if (invoice == null) {
@@ -426,5 +432,47 @@ public class StayServiceImpl implements StayService {
                         s.getRoomId(),
                         s.getStatus()))
                 .toList();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public StayResponse extendStay(
+            @NonNull final UUID stayId, @NonNull final UUID hotelId, @NonNull final LocalDate newCheckOutDate) {
+        final Stay stay = stayRepository.findByIdAndHotelId(stayId, hotelId)
+                .orElseThrow(() -> new NotFoundException(STAY_NOT_FOUND_MSG));
+
+        if (stay.getStatus() != StayStatus.CHECKED_IN) {
+            log.warn("[STAY] EXTENSION_FAILED | stayId={} | reason=INVALID_STATUS | currentStatus={}",
+                    stayId, stay.getStatus());
+            throw new IllegalStateException(INVALID_STAY_STATUS_MSG);
+        }
+        final LocalDate oldCheckOut = stay.getExpectedCheckOutDate();
+        if (oldCheckOut == null || !newCheckOutDate.isAfter(oldCheckOut)) {
+            throw new BadRequestException("EXTENSION_MUST_BE_LATER_THAN_CURRENT_CHECKOUT");
+        }
+
+        final InvoiceStatusResponse invoice = stayBillingCoordinator.resolveInvoiceForCheckOut(stay);
+        if (invoice == null || !OPEN_INVOICE_STATUS.equalsIgnoreCase(invoice.status())) {
+            log.warn("[STAY] EXTENSION_FAILED | stayId={} | reason=INVOICE_NOT_OPEN", stayId);
+            throw new ConflictException("STAY_EXTENSION_INVOICE_NOT_OPEN");
+        }
+        if (reservationService.isRoomBookedByOthers(stay.getRoomId(), oldCheckOut, newCheckOutDate)) {
+            log.warn("[STAY] EXTENSION_FAILED | stayId={} | reason=ROOM_NOT_AVAILABLE | roomId={}",
+                    stayId, stay.getRoomId());
+            throw new ConflictException("ROOM_NOT_AVAILABLE_FOR_EXTENSION");
+        }
+
+        // Billing before persisting the new date: a failed charge must never leave the
+        // stay silently extended with nothing billed for the added nights.
+        stayBillingCoordinator.postExtensionRoomCharge(stay, oldCheckOut, newCheckOutDate);
+
+        stay.setExpectedCheckOutDate(newCheckOutDate);
+        final Stay saved = stayRepository.save(stay);
+
+        cityTaxAssessmentService.rectifyForStayExtended(saved, oldCheckOut, newCheckOutDate);
+
+        log.info("[STAY] EXTENDED | stayId={} | oldCheckOut={} | newCheckOut={}", stayId, oldCheckOut, newCheckOutDate);
+        return stayMapper.toDto(saved);
     }
 }

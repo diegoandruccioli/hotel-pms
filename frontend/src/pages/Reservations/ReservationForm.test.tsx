@@ -8,6 +8,7 @@ import { ReservationForm } from './ReservationForm';
 import { inventoryService } from '../../services/inventoryService';
 import { reservationService } from '../../services/reservationService';
 import { guestService } from '../../services/guestService';
+import { stayService } from '../../services/stayService';
 
 import type { RoomResponse } from '../../types/inventory.types';
 import type { GuestResponseDTO } from '../../types/guest.types';
@@ -17,6 +18,7 @@ import type { ReservationResponse } from '../../types/reservation.types';
 vi.mock('../../services/inventoryService');
 vi.mock('../../services/reservationService');
 vi.mock('../../services/guestService');
+vi.mock('../../services/stayService');
 
 // M3Dialog (stale-version conflict dialog) uses focus-trap-react, which requires a
 // real tabbable node inside the DOM to activate — jsdom's layout stubs make that
@@ -165,6 +167,9 @@ describe('ReservationForm', () => {
     // asserts on the actual prices — this just keeps the effect's promise from
     // resolving to undefined and throwing on `.then`).
     vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue([]);
+    vi.mocked(stayService.getStaysByReservationId).mockResolvedValue(
+      { content: [], totalElements: 0 } as never,
+    );
   });
 
   it('renders correctly and loads rooms in "New" mode', async () => {
@@ -227,6 +232,58 @@ describe('ReservationForm', () => {
     });
 
     expect(screen.getByRole('button', { name: /update_reservation/i })).toBeInTheDocument();
+  });
+
+  it('shows the already-checked-in banner and disables dates/rooms when a CHECKED_IN stay exists', async () => {
+    vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
+      id: 'res123',
+      guestId: 'g1',
+    }));
+    vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1', firstName: 'Luigi', lastName: 'Verdi' }));
+    vi.mocked(stayService.getStaysByReservationId).mockResolvedValue({
+      content: [{ id: 'stay1', status: 'CHECKED_IN' }],
+      totalElements: 1,
+    } as never);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/edit/res123']}>
+        <Routes>
+          <Route path="/reservations/edit/:id" element={<ReservationForm />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('reservation_already_checked_in_banner')).toBeInTheDocument();
+      expect(screen.getByText('Read Only')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'reservation_go_to_stay' })).toBeInTheDocument();
+  });
+
+  it('does not show the already-checked-in banner when no stay is CHECKED_IN', async () => {
+    vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
+      id: 'res123',
+      guestId: 'g1',
+    }));
+    vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1', firstName: 'Luigi', lastName: 'Verdi' }));
+    vi.mocked(stayService.getStaysByReservationId).mockResolvedValue({
+      content: [{ id: 'stay1', status: 'CHECKED_OUT' }],
+      totalElements: 1,
+    } as never);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/edit/res123']}>
+        <Routes>
+          <Route path="/reservations/edit/:id" element={<ReservationForm />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('edit_reservation')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('reservation_already_checked_in_banner')).not.toBeInTheDocument();
+    expect(screen.queryByText('Read Only')).not.toBeInTheDocument();
   });
 
   it('should have no accessibility violations', async () => {

@@ -8,6 +8,7 @@ import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
 import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
+import com.hotelpms.frontdesk.stays.dto.StayExtensionRequest;
 import com.hotelpms.frontdesk.stays.dto.StayGuestDepartureRequest;
 import com.hotelpms.frontdesk.stays.dto.StayGuestRequest;
 import com.hotelpms.frontdesk.stays.dto.StayGuestResponse;
@@ -359,6 +360,22 @@ public class StayController {
     public ResponseEntity<CityTaxBackfillResponse> confirmCityTaxBackfill() {
         return ResponseEntity.ok(
                 cityTaxAssessmentService.confirmBackfill(Objects.requireNonNull(extractHotelId())));
+    }
+
+    /**
+     * Extends an open stay's expected check-out date (Parte 3) — "I'm staying another
+     * night" at the desk. Verifies room availability for the added nights and that the
+     * stay's invoice is still open, posts a supplementary {@code ROOM_NIGHT} charge, and
+     * rectifies the tourist tax for the same range. Scoped to the caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param request the new check-out date
+     * @return the updated stay response
+     */
+    @PutMapping("/{id}")
+    public StayResponse extendStay(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @Valid @RequestBody final StayExtensionRequest request) {
+        return stayService.extendStay(id, Objects.requireNonNull(extractHotelId()), request.newCheckOutDate());
     }
 
     /**

@@ -156,4 +156,19 @@ public interface StayService {
      * @return the updated stay response
      */
     StayResponse retryCheckoutEmail(@NonNull UUID stayId, @NonNull UUID hotelId);
+
+    /**
+     * Extends an open ({@code CHECKED_IN}) stay's expected check-out date (Parte 3) — "I'm
+     * staying another night" at the desk. Verifies the room has no other reservation for
+     * the added nights, that the stay's invoice is still open, posts a supplementary {@code
+     * ROOM_NIGHT} charge for the added nights, and triggers a tourist-tax rectification for
+     * the same range. Rejects a stay that's already {@code CHECKED_OUT} or whose invoice is
+     * no longer open — never re-opens or amends a closed fiscal document.
+     *
+     * @param stayId          the stay ID
+     * @param hotelId         the authenticated hotel UUID; the stay must belong to it
+     * @param newCheckOutDate the new expected check-out date; must be strictly after the current one
+     * @return the updated stay response
+     */
+    StayResponse extendStay(@NonNull UUID stayId, @NonNull UUID hotelId, @NonNull LocalDate newCheckOutDate);
 }

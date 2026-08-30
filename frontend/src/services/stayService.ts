@@ -39,6 +39,13 @@ export const stayService = {
     return response.data;
   },
 
+  getStaysByReservationId: async (reservationId: string): Promise<SpringPage<StayResponse>> => {
+    const response = await api.get<SpringPage<StayResponse>>(
+      `${BASE_PATH}?reservationId=${reservationId}`,
+    );
+    return response.data;
+  },
+
   createStay: async (data: StayRequest): Promise<StayResponse> => {
     const response = await api.post<StayResponse>(BASE_PATH, data);
     return response.data;
@@ -234,6 +241,11 @@ export const stayService = {
 
   promoteGuestToPrimary: async (stayId: string, guestId: string): Promise<StayGuestResponse> => {
     const response = await api.put<StayGuestResponse>(`${BASE_PATH}/${stayId}/guests/${guestId}/primary`);
+    return response.data;
+  },
+
+  extendStay: async (stayId: string, newCheckOutDate: string): Promise<StayResponse> => {
+    const response = await api.put<StayResponse>(`${BASE_PATH}/${stayId}`, { newCheckOutDate });
     return response.data;
   },
 };

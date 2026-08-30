@@ -399,6 +399,34 @@ class StayControllerTest {
     }
 
     // -----------------------------------------------------------------------
+    // extendStay (Parte 3)
+    // -----------------------------------------------------------------------
+
+    @Test
+    void shouldExtendStaySuccessfully() throws Exception {
+        final LocalDate newCheckOut = LocalDate.now().plusDays(5);
+        when(stayService.extendStay(eq(stayId), eq(hotelId), eq(newCheckOut))).thenReturn(stayResponse);
+
+        mockMvc.perform(put(BASE_URL + PATH_BY_ID, stayId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newCheckOutDate\":\"" + newCheckOut + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_ID).value(stayId.toString()));
+    }
+
+    @Test
+    void shouldReturnConflictWhenExtensionRoomUnavailable() throws Exception {
+        final LocalDate newCheckOut = LocalDate.now().plusDays(5);
+        when(stayService.extendStay(eq(stayId), eq(hotelId), eq(newCheckOut)))
+                .thenThrow(new ConflictException("ROOM_NOT_AVAILABLE_FOR_EXTENSION"));
+
+        mockMvc.perform(put(BASE_URL + PATH_BY_ID, stayId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newCheckOutDate\":\"" + newCheckOut + "\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    // -----------------------------------------------------------------------
     // Guest lifecycle (Parte 1)
     // -----------------------------------------------------------------------
 

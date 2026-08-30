@@ -7,6 +7,7 @@ import com.hotelpms.frontdesk.citytax.dto.CityTaxUnassessedSummaryResponse;
 import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.domain.StayGuest;
 
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -128,4 +129,17 @@ public interface CityTaxAssessmentService {
      * @param newGuest the guest just added, with {@code arrivalDate} already set
      */
     void rectifyForGuestAdded(Stay stay, StayGuest newGuest);
+
+    /**
+     * Parte 3/Parte 6: a stay extended past its original check-out generates a
+     * supplementary line for every current guest, for {@code [fromDate, toDateExclusive)}
+     * — same rectification mechanics as {@link #rectifyForGuestAdded}, sharing its
+     * "append, never rewrite the original assessment" contract.
+     *
+     * @param stay          the stay being extended (its {@code hotelId} and current
+     *                      guests are used to resolve and tax the added nights)
+     * @param fromDate      the first added night (inclusive) — the stay's old check-out
+     * @param toDateExclusive the new check-out (exclusive)
+     */
+    void rectifyForStayExtended(Stay stay, LocalDate fromDate, LocalDate toDateExclusive);
 }

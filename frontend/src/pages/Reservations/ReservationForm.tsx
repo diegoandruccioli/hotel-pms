@@ -8,6 +8,7 @@ import { M3Dialog } from '../../components/m3/M3Dialog';
 import { inventoryService } from '../../services/inventoryService';
 import { reservationService } from '../../services/reservationService';
 import { guestService } from '../../services/guestService';
+import { stayService } from '../../services/stayService';
 import type { GuestResponseDTO } from '../../types/guest.types';
 import type { RoomResponse } from '../../types/inventory.types';
 import type { ReservationRequest, ReservationResponse } from '../../types/reservation.types';
@@ -48,6 +49,12 @@ export const ReservationForm = () => {
   const [version, setVersion] = useState<number | null>(null);
   const [staleConflict, setStaleConflict] = useState(false);
 
+  // Parte 3: this reservation's own stay is a separate record (see StayGuestManagerDialog /
+  // the extend-stay action on the Stays list) — editing dates/rooms here never touches it.
+  // A non-blocking banner steers the operator there instead of leaving them confused why a
+  // save here didn't move the guest's room or dates.
+  const [checkedInStayId, setCheckedInStayId] = useState<string | null>(null);
+
   const reservationSchema = useMemo(() => z.object({
     checkInDate: z.string().min(1, t('msg_valid_dates')),
     checkOutDate: z.string().min(1, t('msg_valid_dates')),
@@ -81,6 +88,16 @@ export const ReservationForm = () => {
         setSelectedRoomIds(initialRoomIds);
         setStatus(res.status || 'CONFIRMED');
         setVersion(res.version ?? null);
+
+        // Non-blocking: a stay lookup failure must never prevent viewing/editing the
+        // reservation itself, so any error here just leaves the banner hidden.
+        try {
+          const stays = await stayService.getStaysByReservationId(id);
+          const openStay = stays.content.find(s => s.status === 'CHECKED_IN');
+          setCheckedInStayId(openStay?.id ?? null);
+        } catch {
+          setCheckedInStayId(null);
+        }
 
         // Load guest details
         if (res.guestId) {
@@ -223,11 +240,11 @@ export const ReservationForm = () => {
   }, [navigate]);
 
   const toggleRoomSelection = useCallback((roomId: string) => {
-    if (isView) return;
-    setSelectedRoomIds(prev => 
+    if (isView || checkedInStayId) return;
+    setSelectedRoomIds(prev =>
       prev.includes(roomId) ? prev.filter(id => id !== roomId) : [...prev, roomId]
     );
-  }, [isView]);
+  }, [isView, checkedInStayId]);
 
   const handleBackToReservations = useCallback(() => {
     navigate('/reservations');
@@ -236,6 +253,10 @@ export const ReservationForm = () => {
   const handleClearGuest = useCallback(() => {
     setSelectedGuest(null);
   }, []);
+
+  const handleGoToStay = useCallback(() => {
+    navigate('/stays', { state: { statusFilter: 'CHECKED_IN' } });
+  }, [navigate]);
 
   const titles = useMemo(() => {
     if (isEdit) return { title: t('edit_reservation'), subtitle: t('edit_reservation_subtitle') };
@@ -275,6 +296,23 @@ export const ReservationForm = () => {
         </div>
       )}
 
+      {checkedInStayId && (
+        <div className="p-4 bg-tertiary-container text-on-tertiary-container rounded-shape-sm flex items-start gap-3">
+          <MaterialIcon name="info" />
+          <div className="text-sm font-body mt-0.5 flex-1">
+            <p>{t('reservation_already_checked_in_banner')}</p>
+            <M3Button
+              type="button"
+              variant="text"
+              className="mt-1 px-0"
+              onClick={handleGoToStay}
+            >
+              {t('reservation_go_to_stay')}
+            </M3Button>
+          </div>
+        </div>
+      )}
+
       {/* STEP 1: GUEST SELECTION OR CREATION */}
       <M3Card className="p-6 space-y-4">
         <div className="flex items-center gap-2 mb-4">
@@ -308,7 +346,7 @@ export const ReservationForm = () => {
           onCheckOutChange={setCheckOutDate}
           onExpectedGuestsChange={setExpectedGuests}
           onToggleRoom={toggleRoomSelection}
-          readOnly={isView}
+          readOnly={isView || !!checkedInStayId}
         />
       </M3Card>
 
