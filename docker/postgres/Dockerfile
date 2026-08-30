@@ -2,7 +2,7 @@
 # backups, replacing the old db-backup sidecar (pg_dumpall on a fixed 24h cadence).
 # archive_command runs as a subprocess of the Postgres engine itself, so pgBackRest
 # has to live in this image, not a satellite container — see backup/DECISIONS.md §3.5.
-FROM postgres:15-alpine
+FROM postgres:18-alpine
 
 # Alpine's pgbackrest package depends on the generic "postgresql" meta-package
 # (currently Alpine 3.24's postgresql18), which pulls in a second, unused
