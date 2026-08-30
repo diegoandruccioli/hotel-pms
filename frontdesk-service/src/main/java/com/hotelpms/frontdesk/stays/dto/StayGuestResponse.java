@@ -20,6 +20,10 @@ import java.util.UUID;
  * @param isPrimaryGuest       whether the guest is the primary one
  * @param travellerType        the traveller classification type
  * @param travelPurpose        the purpose of travel
+ * @param arrivalDate          the date this guest actually arrived (Parte 1)
+ * @param departureDate        this guest's own departure date, if different from the room's
+ * @param alloggiatiSent       whether this guest's own Alloggiati Web schedina was transmitted
+ * @param needsResubmit        whether a correction after sending still needs to be retransmitted
  */
 public record StayGuestResponse(
         UUID id,
@@ -34,6 +38,10 @@ public record StayGuestResponse(
         String documentPlaceOfIssue,
         boolean isPrimaryGuest,
         TravellerType travellerType,
-        String travelPurpose
+        String travelPurpose,
+        LocalDate arrivalDate,
+        LocalDate departureDate,
+        boolean alloggiatiSent,
+        boolean needsResubmit
 ) {
 }

@@ -25,6 +25,7 @@ import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.stays.domain.CityTaxApplicability;
 import com.hotelpms.frontdesk.stays.domain.HotelSettings;
 import com.hotelpms.frontdesk.stays.domain.Stay;
+import com.hotelpms.frontdesk.stays.domain.StayGuest;
 import com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import feign.FeignException;
@@ -288,6 +289,70 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
         }
 
         return new CityTaxBackfillResponse(lines, total, charged, skipped);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public void rectifyForGuestAdded(final Stay stay, final StayGuest newGuest) {
+        Objects.requireNonNull(stay, "Stay cannot be null");
+        Objects.requireNonNull(newGuest, "Guest cannot be null");
+
+        final Optional<CityTaxAssessment> existing =
+                cityTaxAssessmentRepository.findByStayIdAndHotelId(stay.getId(), stay.getHotelId());
+        if (existing.isEmpty() || existing.get().getUnassessedReason() != null) {
+            // Nothing assessed yet to add a rectification onto — a later backfill run
+            // (or the stay's own first assessFor) covers this guest as part of the whole stay.
+            return;
+        }
+        final CityTaxAssessment assessment = existing.get();
+
+        final LocalDate arrivalDate = newGuest.getArrivalDate();
+        final LocalDate stayEnd = stay.getExpectedCheckOutDate() != null
+                ? stay.getExpectedCheckOutDate() : arrivalDate.plusDays(1);
+        if (!stayEnd.isAfter(arrivalDate)) {
+            return;
+        }
+        final long nights = ChronoUnit.DAYS.between(arrivalDate, stayEnd);
+
+        final RangeResolution resolution = resolveRange(stay.getHotelId(), arrivalDate, nights);
+        if (resolution.reason() != null) {
+            log.warn("[CITY_TAX] RECTIFICATION_SKIPPED | stayId={} | reason={}", stay.getId(), resolution.reason());
+            return;
+        }
+
+        final CityTaxAssessmentResult result =
+                cityTaxCalculator.assess(resolution.rates(), arrivalDate, nights, List.of(newGuest));
+        if (result.totalAmount().signum() <= 0) {
+            return;
+        }
+
+        saveLines(assessment.getId(), result.lines());
+        // Only the aggregate total is corrected — every other snapshot field keeps
+        // reflecting the stay as first assessed, per the established convention that
+        // per-segment truth lives in the lines, never in the top-level snapshot.
+        assessment.setTotalAmount(assessment.getTotalAmount().add(result.totalAmount()));
+        cityTaxAssessmentRepository.save(assessment);
+        log.info("[CITY_TAX] RECTIFICATION_ADDED | stayId={} | guestId={} | amount={}",
+                stay.getId(), newGuest.getId(), result.totalAmount());
+
+        if (!isInvoiceOpen(stay)) {
+            log.warn("[CITY_TAX] RECTIFICATION_NOT_CHARGED | stayId={} | reason=INVOICE_NOT_OPEN", stay.getId());
+            return;
+        }
+        try {
+            billingClient.addCharge(stay.getId(), buildRectificationChargeRequest(stay, result));
+        } catch (final FeignException ex) {
+            log.error("[CITY_TAX] RECTIFICATION_CHARGE_FAILED | stayId={} | reason={}", stay.getId(), ex.getMessage());
+        }
+    }
+
+    private static ChargeRequest buildRectificationChargeRequest(final Stay stay, final CityTaxAssessmentResult result) {
+        final String description = "Imposta di soggiorno (rettifica - ospite aggiunto) - "
+                + result.taxableNights() + " night(s)";
+        final BigDecimal unitPrice = result.lines().size() == 1 ? result.lines().get(0).amountPerNight() : null;
+        return new ChargeRequest(CITY_TAX_CHARGE_TYPE, description, result.totalAmount(), stay.getId(),
+                unitPrice, result.taxableNights());
     }
 
     private boolean isInvoiceOpen(final Stay stay) {

@@ -5,6 +5,7 @@ import com.hotelpms.frontdesk.citytax.dto.CityTaxBackfillResponse;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxConfigurationStatusResponse;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxUnassessedSummaryResponse;
 import com.hotelpms.frontdesk.stays.domain.Stay;
+import com.hotelpms.frontdesk.stays.domain.StayGuest;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -109,4 +110,22 @@ public interface CityTaxAssessmentService {
      * @return the outcome, same shape as the preview but with lines actually charged
      */
     CityTaxBackfillResponse confirmBackfill(UUID hotelId);
+
+    /**
+     * Parte 1/Parte 6: a guest added mid-stay generates a supplementary line, never a
+     * recomputation of the original assessment — {@code city_tax_assessments.total_amount}
+     * is increased by the new guest's own contribution and a matching {@code
+     * CITY_TAX} charge is posted if the invoice is still open; every other snapshot field
+     * on the original assessment is left exactly as first recorded.
+     *
+     * <p>A no-op when the stay has no assessment yet, or its assessment records an {@code
+     * unassessedReason} (nothing to add a rectification onto — a later backfill run
+     * covers the whole stay, this new guest included), or the added guest's own remaining
+     * nights aren't covered by any configured rate (the same gap the stay itself would hit).
+     *
+     * @param stay     the stay the guest was added to (its {@code hotelId} and {@code
+     *                 expectedCheckOutDate} are used to resolve the guest's remaining nights)
+     * @param newGuest the guest just added, with {@code arrivalDate} already set
+     */
+    void rectifyForGuestAdded(Stay stay, StayGuest newGuest);
 }

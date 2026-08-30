@@ -51,6 +51,14 @@ export interface StayGuestResponse {
   isPrimaryGuest: boolean;
   travellerType?: TravellerType;
   travelPurpose?: string;
+  /** The date this guest actually arrived — may differ from the room's check-in date. */
+  arrivalDate: string;
+  /** This guest's own departure date, if different from the room's own check-out. */
+  departureDate?: string | null;
+  /** Whether this guest's own Alloggiati Web schedina was transmitted. */
+  alloggiatiSent: boolean;
+  /** Whether a correction after sending still needs to be retransmitted. */
+  needsResubmit: boolean;
 }
 
 export interface StayGuestRequest {

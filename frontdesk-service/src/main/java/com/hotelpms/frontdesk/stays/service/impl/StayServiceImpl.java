@@ -14,6 +14,7 @@ import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.service.RoomService;
 import com.hotelpms.frontdesk.stays.domain.Stay;
+import com.hotelpms.frontdesk.stays.domain.StayGuest;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
@@ -21,6 +22,7 @@ import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
 import com.hotelpms.frontdesk.stays.dto.StaySummaryResponse;
 import com.hotelpms.frontdesk.stays.mapper.StayMapper;
+import com.hotelpms.frontdesk.stays.repository.StayGuestRepository;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import com.hotelpms.frontdesk.stays.service.StayService;
 import feign.FeignException;
@@ -35,6 +37,7 @@ import org.springframework.lang.NonNull;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
@@ -73,6 +76,7 @@ public class StayServiceImpl implements StayService {
     private static final LocalDate LATEST_FILTER_DATE = LocalDate.of(2100, 12, 31);
 
     private final StayRepository stayRepository;
+    private final StayGuestRepository stayGuestRepository;
     private final StayMapper stayMapper;
     private final GuestClient guestClient;
     private final RoomService roomService;
@@ -102,12 +106,16 @@ public class StayServiceImpl implements StayService {
         newStay.setGuestDisplayName(ctx.guestDisplayName());
         newStay.setRoomNumber(ctx.roomNumber());
 
-        if (newStay.getGuests() != null) {
-            newStay.getGuests().forEach(guest -> guest.setStay(newStay));
-        }
-
         if (newStay.getActualCheckInTime() == null) {
             newStay.setActualCheckInTime(LocalDateTime.now());
+        }
+
+        if (newStay.getGuests() != null) {
+            final LocalDate arrivalDate = newStay.getActualCheckInTime().toLocalDate();
+            newStay.getGuests().forEach(guest -> {
+                guest.setStay(newStay);
+                guest.setArrivalDate(arrivalDate);
+            });
         }
 
         // Never trust a client-supplied status at creation — checkIn() always
@@ -316,8 +324,25 @@ public class StayServiceImpl implements StayService {
             stay.setAlloggiatiFailureReason(null);
         }
         stayRepository.saveAll(Objects.requireNonNull(stays));
-        log.info("[STAY] ALLOGGIATI_MANUAL_SUBMIT_RECORDED | date={} | hotelId={} | staysUpdated={}",
-                date, hotelId, stays.size());
+
+        // Guest-level: the manual submit sends the same report as generateReport()
+        // (Parte 1) — arrival_date=date plus every needsResubmit guest, regardless
+        // of their own arrival date.
+        final List<StayGuest> sentGuests = new ArrayList<>(
+                stayGuestRepository.findByHotelIdAndArrivalDate(hotelId, date));
+        stayGuestRepository.findByHotelIdAndNeedsResubmitTrue(hotelId).stream()
+                .filter(g -> !sentGuests.contains(g))
+                .forEach(sentGuests::add);
+        final LocalDateTime now = LocalDateTime.now();
+        sentGuests.forEach(guest -> {
+            guest.setAlloggiatiSent(true);
+            guest.setAlloggiatiSentAt(now);
+            guest.setNeedsResubmit(false);
+        });
+        stayGuestRepository.saveAll(sentGuests);
+
+        log.info("[STAY] ALLOGGIATI_MANUAL_SUBMIT_RECORDED | date={} | hotelId={} | staysUpdated={} | guestsUpdated={}",
+                date, hotelId, stays.size(), sentGuests.size());
     }
 
     /** {@inheritDoc} */

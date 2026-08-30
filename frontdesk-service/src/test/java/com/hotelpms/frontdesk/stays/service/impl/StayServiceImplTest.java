@@ -37,6 +37,7 @@ import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
 import com.hotelpms.frontdesk.stays.mapper.StayMapper;
+import com.hotelpms.frontdesk.stays.repository.StayGuestRepository;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
 import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
@@ -110,6 +111,9 @@ class StayServiceImplTest {
 
     @Mock
     private StayRepository stayRepository;
+
+    @Mock
+    private StayGuestRepository stayGuestRepository;
 
     @Mock
     private StayMapper stayMapper;
@@ -217,7 +221,7 @@ class StayServiceImplTest {
                 });
 
         stayService = new StayServiceImpl(
-                stayRepository, stayMapper, guestClient, roomService,
+                stayRepository, stayGuestRepository, stayMapper, guestClient, roomService,
                 new StayCheckInValidator(guestClient, reservationService, roomService),
                 new StayBillingCoordinator(billingClient, roomService, stayRepository, reservationService,
                         ratePricingService, cityTaxAssessmentService),

@@ -9,6 +9,7 @@ import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
 import com.hotelpms.frontdesk.security.SecurityConfig;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiReportService;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
+import com.hotelpms.frontdesk.stays.service.StayGuestService;
 import com.hotelpms.frontdesk.stays.service.StayService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -108,6 +109,9 @@ class StayControllerSecurityTest {
 
     @MockitoBean
     private StayService stayService;
+
+    @MockitoBean
+    private StayGuestService stayGuestService;
 
     @MockitoBean
     private AlloggiatiReportService alloggiatiReportService;

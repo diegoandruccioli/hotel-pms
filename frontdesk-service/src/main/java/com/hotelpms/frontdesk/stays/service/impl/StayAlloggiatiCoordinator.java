@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * Submits the check-in to Alloggiati Web (Polizia di Stato) when auto-send is
@@ -47,6 +48,7 @@ class StayAlloggiatiCoordinator {
             stay.setAlloggiatiSent(true);
             stay.setAlloggiatiSendFailed(false);
             stay.setAlloggiatiFailureReason(null);
+            markGuestsSent(stay);
             stayRepository.save(stay);
             log.info("[STAY] ALLOGGIATI_SENT | stayId={} | date={}", stay.getId(), checkInDate);
         } catch (final ExternalServiceException ex) {
@@ -56,5 +58,24 @@ class StayAlloggiatiCoordinator {
             stay.setAlloggiatiFailureReason(StayFailureReason.truncate(ex.getMessage()));
             stayRepository.save(stay);
         }
+    }
+
+    /**
+     * Marks every guest of this stay as sent, mirroring the stay-level flag this
+     * coordinator has always set — the per-guest grain Alloggiati Web actually
+     * recognizes, and what the daily report selection (Parte 1) now relies on.
+     *
+     * @param stay the just-sent stay
+     */
+    private static void markGuestsSent(final Stay stay) {
+        if (stay.getGuests() == null) {
+            return;
+        }
+        final LocalDateTime now = LocalDateTime.now();
+        stay.getGuests().forEach(guest -> {
+            guest.setAlloggiatiSent(true);
+            guest.setAlloggiatiSentAt(now);
+            guest.setNeedsResubmit(false);
+        });
     }
 }

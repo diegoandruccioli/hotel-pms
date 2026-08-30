@@ -23,6 +23,7 @@ import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.stays.domain.CityTaxApplicability;
 import com.hotelpms.frontdesk.stays.domain.HotelSettings;
 import com.hotelpms.frontdesk.stays.domain.Stay;
+import com.hotelpms.frontdesk.stays.domain.StayGuest;
 import com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import feign.FeignException;
@@ -339,6 +340,98 @@ class CityTaxAssessmentServiceImplTest {
         assertEquals(newRate.getId(), linesCaptor.getValue().get(1).getCityTaxRateId());
         assertEquals(new BigDecimal("4.00"), linesCaptor.getValue().get(0).getSubtotal());
         assertEquals(new BigDecimal("6.00"), linesCaptor.getValue().get(1).getSubtotal());
+    }
+
+    // -----------------------------------------------------------------
+    // rectifyForGuestAdded
+    // -----------------------------------------------------------------
+
+    @Test
+    void rectifyForGuestAddedIsNoOpWhenStayHasNoAssessmentYet() {
+        when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
+        final StayGuest newGuest = StayGuest.builder().id(UUID.randomUUID()).arrivalDate(FIRST_NIGHT).build();
+
+        cityTaxAssessmentService.rectifyForGuestAdded(stay, newGuest);
+
+        verify(cityTaxCalculator, never()).assess(any(), any(), anyLong(), any());
+        verify(cityTaxAssessmentRepository, never()).save(any());
+    }
+
+    @Test
+    void rectifyForGuestAddedIsNoOpWhenStayAssessmentIsUnconfigured() {
+        final CityTaxAssessment unassessed = CityTaxAssessment.builder()
+                .id(UUID.randomUUID()).unassessedReason(CityTaxUnassessedReason.NO_RATE_FOR_DATE).build();
+        when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(unassessed));
+        final StayGuest newGuest = StayGuest.builder().id(UUID.randomUUID()).arrivalDate(FIRST_NIGHT).build();
+
+        cityTaxAssessmentService.rectifyForGuestAdded(stay, newGuest);
+
+        verify(cityTaxCalculator, never()).assess(any(), any(), anyLong(), any());
+    }
+
+    @Test
+    void rectifyForGuestAddedAddsLineAndChargeWhenInvoiceOpen() {
+        final CityTaxAssessment assessment = CityTaxAssessment.builder()
+                .id(UUID.randomUUID()).stayId(stayId).hotelId(hotelId).totalAmount(ASSESSMENT_TOTAL).build();
+        when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(assessment));
+
+        final StayGuest newGuest = StayGuest.builder().id(UUID.randomUUID()).arrivalDate(FIRST_NIGHT).build();
+        final long remainingNights = 2L;
+        stay.setExpectedCheckOutDate(FIRST_NIGHT.plusDays(remainingNights));
+        final CityTaxRate rate = CityTaxRate.builder()
+                .id(UUID.randomUUID()).amountPerNight(RATE_AMOUNT_PER_NIGHT).validFrom(RATE_VALID_FROM).build();
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
+                .thenReturn(Optional.of(categoryHistory(CATEGORY)));
+        when(cityTaxRateRepository.findAllApplicableByHotelIdInRange(
+                hotelId, COMUNE_CODICE, CATEGORY, FIRST_NIGHT, FIRST_NIGHT.plusDays(remainingNights)))
+                .thenReturn(List.of(rate));
+        final BigDecimal rectificationAmount = new BigDecimal("5.00");
+        when(cityTaxCalculator.assess(List.of(rate), FIRST_NIGHT, remainingNights, List.of(newGuest)))
+                .thenReturn(singleLineResult(
+                        rate.getId(), FIRST_NIGHT, FIRST_NIGHT.plusDays(remainingNights),
+                        (int) remainingNights, 1, RATE_AMOUNT_PER_NIGHT, rectificationAmount));
+        stay.setInvoiceId(UUID.randomUUID());
+        when(billingClient.getInvoiceById(stay.getInvoiceId()))
+                .thenReturn(new InvoiceStatusResponse(stay.getInvoiceId(), null, OPEN_STATUS, BigDecimal.ZERO));
+        when(billingClient.addCharge(eq(stayId), any(ChargeRequest.class))).thenReturn(new ChargeResponse(UUID.randomUUID()));
+
+        cityTaxAssessmentService.rectifyForGuestAdded(stay, newGuest);
+
+        assertEquals(ASSESSMENT_TOTAL.add(rectificationAmount), assessment.getTotalAmount());
+        verify(cityTaxAssessmentRepository).save(assessment);
+        verify(cityTaxAssessmentLineRepository).saveAll(any());
+        verify(billingClient).addCharge(eq(stayId), any(ChargeRequest.class));
+    }
+
+    @Test
+    void rectifyForGuestAddedSkipsChargeButKeepsLineWhenInvoiceNotOpen() {
+        final CityTaxAssessment assessment = CityTaxAssessment.builder()
+                .id(UUID.randomUUID()).stayId(stayId).hotelId(hotelId).totalAmount(ASSESSMENT_TOTAL).build();
+        when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(assessment));
+
+        final StayGuest newGuest = StayGuest.builder().id(UUID.randomUUID()).arrivalDate(FIRST_NIGHT).build();
+        final long remainingNights = 1L;
+        stay.setExpectedCheckOutDate(FIRST_NIGHT.plusDays(remainingNights));
+        final CityTaxRate rate = CityTaxRate.builder()
+                .id(UUID.randomUUID()).amountPerNight(RATE_AMOUNT_PER_NIGHT).validFrom(RATE_VALID_FROM).build();
+        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
+                .thenReturn(Optional.of(categoryHistory(CATEGORY)));
+        when(cityTaxRateRepository.findAllApplicableByHotelIdInRange(
+                hotelId, COMUNE_CODICE, CATEGORY, FIRST_NIGHT, FIRST_NIGHT.plusDays(remainingNights)))
+                .thenReturn(List.of(rate));
+        when(cityTaxCalculator.assess(List.of(rate), FIRST_NIGHT, remainingNights, List.of(newGuest)))
+                .thenReturn(singleLineResult(
+                        rate.getId(), FIRST_NIGHT, FIRST_NIGHT.plusDays(remainingNights),
+                        (int) remainingNights, 1, RATE_AMOUNT_PER_NIGHT, RATE_AMOUNT_PER_NIGHT));
+        stay.setInvoiceId(null);
+
+        cityTaxAssessmentService.rectifyForGuestAdded(stay, newGuest);
+
+        assertEquals(ASSESSMENT_TOTAL.add(RATE_AMOUNT_PER_NIGHT), assessment.getTotalAmount());
+        verify(cityTaxAssessmentLineRepository).saveAll(any());
+        verify(billingClient, never()).addCharge(any(), any());
     }
 
     // -----------------------------------------------------------------

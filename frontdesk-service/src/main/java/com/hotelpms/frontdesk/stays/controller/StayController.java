@@ -8,11 +8,15 @@ import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
 import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
+import com.hotelpms.frontdesk.stays.dto.StayGuestDepartureRequest;
+import com.hotelpms.frontdesk.stays.dto.StayGuestRequest;
+import com.hotelpms.frontdesk.stays.dto.StayGuestResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
 import com.hotelpms.frontdesk.stays.dto.StaySummaryResponse;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiReportService;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
+import com.hotelpms.frontdesk.stays.service.StayGuestService;
 import com.hotelpms.frontdesk.stays.service.StayService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +30,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,8 +61,10 @@ public class StayController {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final String ROLE_ADMIN_OR_OWNER = "hasAnyRole('ADMIN', 'OWNER')";
+    private static final String PATH_VAR_GUEST_ID = "guestId";
 
     private final StayService stayService;
+    private final StayGuestService stayGuestService;
     private final AlloggiatiReportService alloggiatiReportService;
     private final AlloggiatiWebSenderService alloggiatiWebSenderService;
     private final CityTaxAssessmentService cityTaxAssessmentService;
@@ -159,7 +166,7 @@ public class StayController {
      */
     @GetMapping("/guest/{guestId}/latest")
     public ResponseEntity<StayResponse> getLastCompletedStayForGuest(
-            @NonNull @PathVariable("guestId") final UUID guestId) {
+            @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId) {
         return stayService.getLastCompletedStayForGuest(guestId, Objects.requireNonNull(extractHotelId()))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.noContent().build());
@@ -352,6 +359,80 @@ public class StayController {
     public ResponseEntity<CityTaxBackfillResponse> confirmCityTaxBackfill() {
         return ResponseEntity.ok(
                 cityTaxAssessmentService.confirmBackfill(Objects.requireNonNull(extractHotelId())));
+    }
+
+    /**
+     * Adds a guest to an open ({@code CHECKED_IN}) stay — the late-arrival and
+     * mid-stay-addition cases (Parte 1). Scoped to the caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param request the new guest's data
+     * @return the created guest
+     */
+    @PostMapping("/{id}/guests")
+    @ResponseStatus(HttpStatus.CREATED)
+    public StayGuestResponse addGuest(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @Valid @RequestBody final StayGuestRequest request) {
+        return stayGuestService.addGuest(id, Objects.requireNonNull(extractHotelId()), request);
+    }
+
+    /**
+     * Corrects an existing guest's data on an open stay. Scoped to the caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param guestId the guest ID
+     * @param request the corrected data
+     * @return the updated guest
+     */
+    @PutMapping("/{id}/guests/{guestId}")
+    public StayGuestResponse updateGuest(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId,
+            @NonNull @Valid @RequestBody final StayGuestRequest request) {
+        return stayGuestService.updateGuest(id, guestId, Objects.requireNonNull(extractHotelId()), request);
+    }
+
+    /**
+     * Removes a guest from an open stay — only allowed before their schedina was ever
+     * sent and when they aren't the stay's primary guest. Scoped to the caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param guestId the guest ID
+     */
+    @DeleteMapping("/{id}/guests/{guestId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeGuest(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId) {
+        stayGuestService.removeGuest(id, guestId, Objects.requireNonNull(extractHotelId()));
+    }
+
+    /**
+     * Records an early departure for one guest of a multi-guest stay, without
+     * checking out the room. Scoped to the caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param guestId the departing guest's ID
+     * @param request the departure date
+     * @return the updated guest
+     */
+    @PutMapping("/{id}/guests/{guestId}/departure")
+    public StayGuestResponse recordGuestDeparture(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId,
+            @NonNull @Valid @RequestBody final StayGuestDepartureRequest request) {
+        return stayGuestService.recordDeparture(
+                id, guestId, Objects.requireNonNull(extractHotelId()), request.departureDate());
+    }
+
+    /**
+     * Promotes another guest of the stay to primary. Scoped to the caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param guestId the guest ID to promote
+     * @return the promoted guest
+     */
+    @PutMapping("/{id}/guests/{guestId}/primary")
+    public StayGuestResponse promoteGuestToPrimary(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId) {
+        return stayGuestService.promotePrimary(id, guestId, Objects.requireNonNull(extractHotelId()));
     }
 
     private UUID extractHotelId() {

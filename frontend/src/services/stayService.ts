@@ -16,6 +16,8 @@ import type {
   HotelCategoryHistoryResponse,
   HotelSettingsRequest,
   HotelSettingsResponse,
+  StayGuestRequest,
+  StayGuestResponse,
   StayRequest,
   StayResponse,
 } from '../types/stay.types';
@@ -205,6 +207,33 @@ export const stayService = {
 
   confirmCityTaxBackfill: async (): Promise<CityTaxBackfillResponse> => {
     const response = await api.post<CityTaxBackfillResponse>(`${BASE_PATH}/city-tax/backfill/confirm`);
+    return response.data;
+  },
+
+  addGuest: async (stayId: string, data: StayGuestRequest): Promise<StayGuestResponse> => {
+    const response = await api.post<StayGuestResponse>(`${BASE_PATH}/${stayId}/guests`, data);
+    return response.data;
+  },
+
+  updateGuest: async (stayId: string, guestId: string, data: StayGuestRequest): Promise<StayGuestResponse> => {
+    const response = await api.put<StayGuestResponse>(`${BASE_PATH}/${stayId}/guests/${guestId}`, data);
+    return response.data;
+  },
+
+  removeGuest: async (stayId: string, guestId: string): Promise<void> => {
+    await api.delete(`${BASE_PATH}/${stayId}/guests/${guestId}`);
+  },
+
+  recordGuestDeparture: async (stayId: string, guestId: string, departureDate: string): Promise<StayGuestResponse> => {
+    const response = await api.put<StayGuestResponse>(
+      `${BASE_PATH}/${stayId}/guests/${guestId}/departure`,
+      { departureDate },
+    );
+    return response.data;
+  },
+
+  promoteGuestToPrimary: async (stayId: string, guestId: string): Promise<StayGuestResponse> => {
+    const response = await api.put<StayGuestResponse>(`${BASE_PATH}/${stayId}/guests/${guestId}/primary`);
     return response.data;
   },
 };
