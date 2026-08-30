@@ -1,7 +1,7 @@
 # Hotel PMS — Manuale Operativo
 
-**Versione:** 1.2 — 2026-08-04 (aggiunte pagine Settings multi-pagina, export FatturaPA §3.7a)  
-**Destinatari:** Receptionist, Owner, Admin  
+**Versione:** 1.3 — 2026-08-30 (aggiunte Preventivi, Calendario Tariffe, Imposta di Soggiorno, Privacy/GDPR, proroga e gestione ospiti su soggiorno aperto; corretto accesso reale di OWNER alle pagine di gestione)
+**Destinatari:** Receptionist, Owner, Admin
 **Lingua sistema:** Italiano / Inglese (selezionabile)
 
 ---
@@ -10,9 +10,11 @@
 
 | Ruolo | Accesso | Chi è |
 |-------|---------|-------|
-| **RECEPTIONIST** | Dashboard, Ospiti, Prenotazioni, Soggiorni, Billing, Ristorante, Calendario, Housekeeping, Camere | Personale di front desk |
-| **OWNER** | Tutto di RECEPTIONIST + Dashboard Proprietario con report finanziari | Proprietario dell'hotel |
-| **ADMIN** | Tutto di OWNER + Gestione Utenti + Configurazione Hotel | Amministratore di sistema |
+| **RECEPTIONIST** | Dashboard, Ospiti (anagrafica, senza export/eliminazione), Prenotazioni, Preventivi, Soggiorni, Billing, Ristorante (ordini, non gestione menu), Calendario, Tariffe (sola visualizzazione), Housekeeping, Camere | Personale di front desk |
+| **OWNER** | Tutto di RECEPTIONIST + export/eliminazione Ospiti (GDPR), modifica Tariffe, gestione Menu F&B, Dashboard Proprietario, Gestione Utenti, Profilo Hotel, Impostazioni Sistema/Privacy/Imposta di Soggiorno | Proprietario dell'hotel |
+| **ADMIN** | Stesso accesso di OWNER — nel routing attuale non esiste una pagina riservata al solo ADMIN | Amministratore di sistema |
+
+> **Nota:** a differenza di quanto si potrebbe pensare dal nome, OWNER e ADMIN hanno oggi lo **stesso** accesso alle pagine (inclusa Gestione Utenti e Profilo Hotel). La distinzione tra i due ruoli è organizzativa, non tecnica.
 
 > Al primo accesso, il sistema obbliga il cambio della password temporanea. Non è possibile operare finché non viene impostata una password personale.
 
@@ -23,25 +25,32 @@
 | Percorso | Nome | Accesso | Descrizione |
 |----------|------|---------|-------------|
 | `/` | Dashboard | Tutti | Statistiche del giorno: ospiti attivi, prenotazioni, check-in/check-out attesi, camere disponibili |
-| `/guests` | Ospiti | Tutti | Anagrafica ospiti: ricerca, creazione, modifica, cancellazione |
+| `/guests` | Ospiti | Tutti | Anagrafica ospiti: ricerca, creazione, modifica; eliminazione ed export GDPR visibili solo a OWNER/ADMIN |
 | `/reservations` | Prenotazioni | Tutti | Lista prenotazioni con filtri; nuova prenotazione; modifica/cancellazione |
-| `/stays` | Soggiorni | Tutti | Lista check-in attivi; azioni check-out; report Alloggiati PS |
+| `/quotations` | Preventivi | Tutti | Lista preventivi con stato (bozza/inviato/accettato/rifiutato/scaduto); nuovo preventivo |
+| `/quotations/new` | Nuovo preventivo | Tutti | Form creazione preventivo: destinatario, una o più opzioni camere/prezzo, validità |
+| `/quotations/:id` | Dettaglio preventivo | Tutti | Vista preventivo; invio email, conversione in prenotazione, anteprima/scarico PDF, duplicazione |
+| `/quotations/:id/edit` | Modifica preventivo | Tutti | Modifica di un preventivo ancora in stato bozza |
+| `/stays` | Soggiorni | Tutti | Lista check-in attivi; proroga check-out, gestione ospiti, check-out, report Alloggiati PS |
 | `/stays/check-in/:id` | Check-in da prenotazione | Tutti | Form check-in per prenotazione esistente con campi PS |
 | `/stays/walk-in` | Check-in walk-in | Tutti | Check-in diretto senza prenotazione |
 | `/billing` | Fatturazione | Tutti | Fatture e pagamenti; registrazione pagamenti |
-| `/restaurant` | Ristorante | Tutti | Ordini F&B; conferma ordine con addebito su conto camera |
+| `/restaurant` | Ristorante | Tutti | Ordini F&B; gestione voci menu visibile solo a OWNER/ADMIN |
 | `/calendar` | Calendario | Tutti | Planning board e vista mensile prenotazioni |
 | `/housekeeping` | Housekeeping | Tutti | Status pulizia camere; aggiornamento rapido |
 | `/rooms` | Camere | Tutti | Inventario camere fisiche e tipologie; gestione status |
+| `/rates` | Tariffe | Tutti (modifica: OWNER, ADMIN) | Calendario prezzi per tipo camera/giorno; applicazione di tariffe stagionali su un periodo |
 | `/settings` | Impostazioni (hub) | Tutti | Punto d'accesso alle sotto-pagine impostazioni sotto |
 | `/settings/profile` | Profilo utente | Tutti | Informazioni account personale |
 | `/settings/password` | Cambio password | Tutti | Cambio password personale |
 | `/settings/accessibility` | Accessibilità | Tutti | Opzioni di accessibilità dell'interfaccia |
 | `/settings/appearance` | Aspetto | Tutti | Tema chiaro/scuro, lingua IT/EN |
-| `/settings/system` | Sistema | OWNER, ADMIN | Impostazioni privacy/retention ospiti |
+| `/settings/system` | Sistema | OWNER, ADMIN | Impostazioni email e invio automatico Alloggiati |
+| `/settings/city-tax` | Imposta di Soggiorno | OWNER, ADMIN | Applicabilità, categoria struttura, tariffe per notte, recupero soggiorni non tassati (backfill) |
+| `/settings/privacy` | Privacy | OWNER, ADMIN | Anni di conservazione dati ospite (retention GDPR/TULPS) |
 | `/owner-dashboard` | Report Proprietario | OWNER, ADMIN | Revenue, occupancy, ADR, RevPAR; export CSV |
-| `/admin/users` | Gestione Utenti | ADMIN | Crea, modifica, disattiva account receptionist/owner |
-| `/profile/hotel` | Profilo Hotel | ADMIN | Nome, indirizzo, PIVA/CF, logo, toggle Alloggiati automatico, credenziali PS |
+| `/admin/users` | Gestione Utenti | OWNER, ADMIN | Crea, modifica, disattiva account receptionist/owner/admin |
+| `/profile/hotel` | Profilo Hotel | OWNER, ADMIN | Nome, indirizzo, PIVA/CF, logo, toggle Alloggiati automatico, credenziali PS |
 
 ---
 
@@ -59,10 +68,12 @@ Al primo avvio del sistema, seguire questa sequenza prima di iniziare le operazi
 4. **Tipi camera** → Menu → **Camere** → sezione **Tipologie** → pulsante **Aggiungi tipo**
    Definire le tipologie disponibili (Singola, Doppia, Suite, ecc.) con tariffa e capacità.
 5. **Camere** → Aggiungi le camere fisiche con numero di stanza e tipo associato.
-6. **Menu F&B** → Menu → **Ristorante** → sezione **Gestione menu** (solo ADMIN/OWNER)
+6. **Menu F&B** → Menu → **Ristorante** → sezione **Gestione menu** (solo OWNER/ADMIN)
    Inserire le voci del bar/ristorante con nome, categoria, prezzo e disponibilità.
-7. **Utenti** → Menu → **Gestione Utenti** → **Aggiungi Utente** (solo ADMIN)
-   Creare gli account per il personale (receptionist, altri ADMIN). Comunicare username e password temporanea via canale sicuro. Al primo accesso l'utente dovrà impostare una nuova password.
+7. **Imposta di Soggiorno** → Menu → **Impostazioni** → **Sistema** → **Imposta di Soggiorno** (solo OWNER/ADMIN)
+   Impostare applicabilità, categoria struttura e tariffe per notte (vedi §3.14). Senza questa configurazione il check-in non applica l'imposta.
+8. **Utenti** → Menu → **Gestione Utenti** → **Aggiungi Utente** (solo OWNER/ADMIN)
+   Creare gli account per il personale (receptionist, altri owner/admin). Comunicare username e password temporanea via canale sicuro. Al primo accesso l'utente dovrà impostare una nuova password.
 
 Solo dopo questi passi il sistema è operativo per ricevere prenotazioni e gestire i soggiorni.
 
@@ -93,6 +104,31 @@ Solo dopo questi passi il sistema è operativo per ricevere prenotazioni e gesti
 
 **Edge case:** Se le date selezionate si sovrappongono con una prenotazione esistente per la stessa camera, il sistema mostra un errore 409 e impedisce la creazione.
 
+**Nota — prenotazione già in check-in:** Se si riapre una prenotazione il cui soggiorno è già attivo (stato **CHECKED_IN**), il form mostra un banner: *"Questa prenotazione è già in check-in. Le modifiche qui non aggiornano il soggiorno in corso: usa il pannello soggiorni per proroghe, cambio ospiti o partenza anticipata."* con collegamento diretto alla pagina Soggiorni. Modificare date/camere qui non tocca il soggiorno già aperto — usare §3.5a/§3.5b.
+
+---
+
+### 3.2a Creare e Gestire un Preventivo
+
+Un preventivo permette di proporre a un potenziale ospite una o più opzioni di soggiorno con prezzo, senza impegnare subito camere come una prenotazione.
+
+**Creare un preventivo:**
+1. Menu → **Preventivi** → pulsante **Nuovo preventivo**
+2. **Destinatario**: cerca un ospite esistente per nome/email oppure inserisci un **Nuovo contatto** (nome, cognome, email)
+3. **Dettagli soggiorno**: crea una o più **Opzioni** (fino a 5) tramite il pulsante **Aggiungi opzione**; per ciascuna opzione seleziona date di check-in/check-out, ospiti previsti e camere — il totale dell'opzione si aggiorna in tempo reale
+4. Imposta **Valido fino al** (default: oggi + 7 giorni)
+5. Clicca **Salva** — il preventivo appare in stato **DRAFT**
+
+**Inviare, convertire, gestire un preventivo** (dalla pagina di dettaglio `/quotations/:id`):
+- **Invia** (o **Reinvia**): invia il preventivo via email all'ospite; se l'invio fallisce, un banner rosso resta visibile finché non si reinvia
+- **Converti**: se il preventivo ha una sola opzione, la converte direttamente in prenotazione; se ne ha più di una, apre una scelta dell'opzione da confermare — al termine si viene portati alla nuova prenotazione
+- **Anteprima PDF / Scarica PDF**: apre/scarica il documento preventivo
+- **Duplica**: crea una copia modificabile
+- **Rifiuta**: richiede conferma, porta lo stato a **DECLINED**
+- **Elimina**: richiede conferma, sempre disponibile
+
+**Edge case:** Se non arriva risposta entro la data **Valido fino al**, il preventivo passa automaticamente allo stato **EXPIRED** e non è più convertibile — occorre crearne uno nuovo.
+
 ---
 
 ### 3.3 Check-in da Prenotazione
@@ -111,7 +147,7 @@ Solo dopo questi passi il sistema è operativo per ricevere prenotazioni e gesti
 5. Clicca **Conferma Check-in**
 6. Il sistema:
    - Crea il soggiorno e marca la camera come **OCCUPIED**
-   - Apre una fattura con totale iniziale 0
+   - Apre una fattura con totale iniziale 0, con addebito **camera + notte** e, se configurata (§3.14), **imposta di soggiorno** per ogni notte
    - Se `alloggiatiAutoSend` è abilitato, invia i dati al portale PS via SOAP
 
 **Edge case:** Se il portale PS non risponde, il check-in viene comunque completato. Il badge **Inviato PS** non appare nella riga soggiorno e il report può essere inviato manualmente in seguito.
@@ -139,6 +175,32 @@ Solo dopo questi passi il sistema è operativo per ricevere prenotazioni e gesti
 5. La camera passa in stato **DIRTY** (da pulire)
 
 **Colonne Camera e Ospite nella lista Soggiorni:** La colonna "Camera" mostra il numero camera (es. "102") e la colonna "Ospite" mostra "Cognome Nome" dell'ospite principale al posto degli UUID troncati. Questo vale per i soggiorni creati dopo l'aggiornamento (G5); i soggiorni precedenti mostrano ancora l'ID troncato.
+
+---
+
+### 3.5a Prorogare un Soggiorno Aperto
+
+1. Menu → **Soggiorni** → sul soggiorno in stato **CHECKED_IN**, pulsante **Proroga**
+2. La finestra mostra il **Check-out attuale** e un campo **Nuova data di check-out** (precompilato a +1 giorno)
+3. Clicca **Conferma**
+4. Il sistema verifica che la camera sia disponibile per le notti aggiunte e registra gli addebiti supplementari (pernottamento + imposta di soggiorno, se applicabile) sulla fattura del soggiorno
+
+**Edge case:** Se la camera è già occupata da un'altra prenotazione nelle notti richieste, la proroga viene rifiutata e l'errore compare direttamente nella finestra — scegliere un'altra data o cambiare camera.
+
+---
+
+### 3.5b Gestire gli Ospiti di un Soggiorno Aperto
+
+1. Menu → **Soggiorni** → sul soggiorno **CHECKED_IN**, clicca il numero nella colonna **Ospiti**
+2. Si apre l'elenco degli ospiti del soggiorno, ciascuno con badge di stato (Principale / Inviato / Da ritrasmettere / Partito il [data])
+
+Azioni disponibili per ogni ospite:
+- **Modifica** — corregge i dati anagrafici/documento già inseriti
+- **Registra partenza** — segna una partenza anticipata di quel singolo ospite (data a scelta), senza rimuoverlo dallo storico del soggiorno
+- **Rendi principale** — promuove un ospite non principale a intestatario del soggiorno
+- **Rimuovi** — elimina l'ospite dal soggiorno; **non disponibile** se l'ospite è già stato trasmesso ad Alloggiati Web (usare "Registra partenza") o se è l'ospite principale (promuovere prima un altro ospite)
+
+Per aggiungere un nuovo ospite al soggiorno già aperto: pulsante **Aggiungi Ospite** in fondo alla finestra, compilare gli stessi campi Alloggiati PS del check-in e salvare.
 
 ---
 
@@ -240,8 +302,8 @@ solo manualmente — non controlla TEST vs PRODUZIONE.
 1. Menu → **Soggiorni** → sezione **Report Portale PS** in fondo alla pagina
 2. Selezionare la data del rapporto
 3. Clicca **Genera e Scarica** — scarica il file `.txt` in formato 168 caratteri per upload manuale sul portale
-4. Per il formato JSON (debug): clicca **Scarica export JSON** (visibile solo a ADMIN/OWNER)
-5. *(Solo ADMIN/OWNER)* Clicca **Invia a Questura** — appare una finestra di conferma; confermando, il sistema invia il report al portale PS via SOAP in tempo reale
+4. Per il formato JSON (debug): clicca **Scarica export JSON** (visibile solo a OWNER/ADMIN)
+5. *(Solo OWNER/ADMIN)* Clicca **Invia a Questura** — appare una finestra di conferma; confermando, il sistema invia il report al portale PS via SOAP in tempo reale
    - Risposta di successo: toast verde "Lista inviata al portale PS con successo"
    - Risposta di errore portale (422): toast rosso con il messaggio ricevuto dal portale
    - Errore di rete: toast rosso generico — riprovare più tardi
@@ -265,7 +327,24 @@ solo manualmente — non controlla TEST vs PRODUZIONE.
 
 ---
 
-### 3.10 Creare un nuovo utente (solo ADMIN)
+### 3.9a Calendario Tariffe
+
+1. Menu → **Tariffe** — griglia con i tipi camera in riga e i giorni del mese in colonna (frecce per cambiare mese)
+2. Ogni cella mostra il prezzo risolto per quella camera/giorno; le celle coperte da una tariffa stagionale hanno un bordo/pallino colorato coerente con la legenda; senza stagione si vede il prezzo base
+
+**Applicare un prezzo a un periodo** (solo OWNER/ADMIN):
+1. Seleziona un intervallo di celle trascinando il mouse (o da tastiera: Invio/Spazio per iniziare, Maiusc+Invio/Spazio per estendere)
+2. Clicca **Applica prezzo** sulla pillola di selezione (o dal pulsante in alto, per aprire la selezione manualmente)
+3. Nella finestra: conferma/estendi i tipi camera, le date **Dal**/**Al**, imposta **Prezzo a notte** e un **Nome** opzionale (es. "Alta stagione")
+4. Salva — crea o aggiorna la tariffa stagionale per quei tipi camera e periodo
+
+**Edge case:** Se il periodo scelto si sovrappone a una tariffa già esistente per la stessa tipologia, il sistema rifiuta il salvataggio (409) con un messaggio dedicato.
+
+Un utente RECEPTIONIST vede il calendario ma non ha il pulsante **Applica prezzo**: la pagina è in sola visualizzazione.
+
+---
+
+### 3.10 Creare un nuovo utente (solo OWNER/ADMIN)
 
 1. Menu → **Gestione Utenti** → pulsante **Aggiungi Utente**
 2. Compilare: username, email, password temporanea, ruolo (RECEPTIONIST / OWNER / ADMIN), hotel ID
@@ -276,7 +355,7 @@ Per disattivare un utente: pulsante **Disattiva** accanto all'utente. L'account 
 
 ---
 
-### 3.11 Configurare il Profilo Hotel (solo ADMIN)
+### 3.11 Configurare il Profilo Hotel (solo OWNER/ADMIN)
 
 1. Menu → icona utente → **Profilo Hotel** (o naviga a `/profile/hotel`)
 2. Compilare: nome hotel, indirizzo, PIVA, Codice Fiscale
@@ -286,7 +365,7 @@ Per disattivare un utente: pulsante **Disattiva** accanto all'utente. L'account 
 
 ---
 
-### 3.12 Reset password utente (solo ADMIN/OWNER)
+### 3.12 Reset password utente (solo OWNER/ADMIN)
 
 Usare quando un utente ha dimenticato la password o per motivi di sicurezza (es. sospetta compromissione).
 
@@ -305,10 +384,10 @@ Usare quando un utente ha dimenticato la password o per motivi di sicurezza (es.
 
 ---
 
-### 3.13 Gestione Menu F&B (solo ADMIN e OWNER)
+### 3.13 Gestione Menu F&B (solo OWNER e ADMIN)
 
 La pagina Ristorante include una sezione di gestione del menu
-visibile solo agli utenti con ruolo ADMIN o OWNER.
+visibile solo agli utenti con ruolo OWNER o ADMIN.
 
 **Aggiungere una voce menu:**
 1. Vai su Ristorante → sezione "Gestione menu"
@@ -332,6 +411,56 @@ il proprio listino indipendentemente.
 
 ---
 
+### 3.14 Configurare l'Imposta di Soggiorno (solo OWNER/ADMIN)
+
+Menu → **Impostazioni** → **Sistema** → **Imposta di Soggiorno** (`/settings/city-tax`).
+
+**a) Applicabilità dell'imposta**
+Select con tre opzioni: **Da dichiarare** (default), **Applicabile**, **Non applicabile** (il comune non la prevede). Il salvataggio è automatico al cambio valore; se fallisce, il valore torna a quello precedente con un toast di errore.
+
+**b) Categoria struttura**
+1. Compila **Categoria** (es. "4 stelle", max 20 caratteri) e **Valida dal**
+2. Clicca **Aggiungi categoria** — registrare una nuova categoria chiude automaticamente quella corrente
+3. La tabella sotto mostra lo storico: Categoria / Valida dal / Valida fino al
+
+**c) Tariffe imposta di soggiorno**
+1. Compila **Categoria**, **Importo a notte** (obbligatorio, €), **Notti massime tassabili** (opzionale), **Esenzione sotto età** (opzionale, 0-120), **Valida dal**, **Nota** (opzionale, max 200 caratteri)
+2. Clicca **Aggiungi tariffa** — una nuova tariffa per la stessa categoria chiude automaticamente quella corrente
+3. La tabella mostra: Categoria / Importo a notte / Notti massime / Esenzione età / Valida dal / Valida fino al
+
+**Edge case:** il sistema rifiuta (409) una tariffa che si sovrappone a una già esistente per la stessa categoria, o se il comune risulta non configurato, o se la data non è successiva a quella corrente — il messaggio d'errore indica la causa specifica.
+
+**d) Recupero soggiorni non tassati (backfill)**
+Serve a caricare retroattivamente l'imposta su soggiorni passati non ancora addebitati (es. dopo aver configurato le tariffe per la prima volta).
+1. Clicca **Verifica soggiorni scoperti** — mostra una tabella con Check-in / Importo / Stato per ogni soggiorno interessato (nessun addebito viene ancora effettuato, è solo un'anteprima)
+2. Le righe non addebitabili indicano il motivo: fattura già chiusa, periodo non ancora configurato, o addebito non riuscito
+3. Se ci sono righe addebitabili, clicca **Conferma addebito** — addebita solo le fatture ancora aperte, lasciando intoccate quelle chiuse
+4. Al termine appare un toast "Addebitati N soggiorni." e il pulsante di conferma scompare (l'operazione non è ripetibile sullo stesso risultato — rilanciare la verifica per un nuovo giro)
+
+---
+
+### 3.15 Configurare la Conservazione Dati Ospite / Privacy (solo OWNER/ADMIN)
+
+Menu → **Impostazioni** → **Sistema** → **Privacy** (`/settings/privacy`).
+
+1. Campo **Anni di conservazione**: quanti anni tenere i dati ospite prima che siano eleggibili per cancellazione
+2. Sotto il campo, un riquadro informativo mostra il **minimo di legge TULPS** e, a titolo puramente informativo, il **minimo di legge fiscale** (fatture) — quest'ultimo non vincola il campo, che è gestito separatamente dal servizio di fatturazione
+3. Clicca **Salva**
+
+**Edge case:** se il valore inserito è inferiore al minimo TULPS, il salvataggio viene rifiutato lato client con il messaggio "Deve essere almeno N anni (obbligo TULPS)".
+
+---
+
+### 3.16 Esportare i Dati di un Ospite (GDPR) (solo OWNER/ADMIN)
+
+1. Menu → **Ospiti** → sulla riga dell'ospite, azione **Esporta dati (GDPR)**
+2. Si apre una finestra di conferma che ricorda: *"Il file scaricato conterrà i dati personali dell'ospite (anagrafica, documenti, soggiorni e fatture). È una comunicazione di dati personali: consegnalo solo alla persona a cui appartengono i dati o a chi ne ha titolo."*
+3. Clicca **Scarica** — scarica un file JSON (`guest-export-{id}.json`) con tutti i dati dell'ospite
+
+**Eliminare un ospite:** azione **Elimina** sulla stessa riga (solo OWNER/ADMIN) → conferma nel dialog. Se l'ospite ha soggiorni o fatture da conservare per obblighi di legge, il sistema risponde 451 (Legal Hold) e non elimina nulla — vedi §4.
+
+---
+
 ## 4. Edge Case Frequenti
 
 | Situazione | Comportamento | Azione consigliata |
@@ -343,6 +472,12 @@ il proprio listino indipendentemente.
 | Password temporanea al primo login | Redirect obbligatorio al cambio password | Inserire e confermare la nuova password |
 | Token JWT scaduto durante l'uso | L'app rinnova il token silenziosamente in background | Nessuna azione — l'utente non vede interruzioni |
 | Lookup stati/comuni vuoto al check-in | Campi dropdown vuoti | Verificare connettività con il portale PS; le lookup vengono caricate al primo avvio |
+| Preventivo non convertito entro "Valido fino al" | Passa automaticamente a EXPIRED, non più convertibile | Creare un nuovo preventivo |
+| Tariffa stagionale sovrapposta a un periodo esistente | Errore 409 con messaggio dedicato | Modificare il periodo esistente invece di crearne uno nuovo, o scegliere date diverse |
+| Proroga check-out su camera non disponibile nelle notti aggiunte | Proroga rifiutata, errore mostrato nella finestra | Scegliere un'altra data o cambiare camera |
+| Rimozione di un ospite già trasmesso ad Alloggiati Web | Azione bloccata (tooltip esplicativo) | Usare **Registra partenza** per una partenza anticipata |
+| Backfill imposta di soggiorno su fattura già chiusa | Soggiorno escluso dall'addebito, elencato con il motivo | Nessuna azione possibile da UI: la fattura chiusa non viene riaperta |
+| Valore "Anni di conservazione" sotto il minimo TULPS | Salvataggio rifiutato lato client | Inserire un valore ≥ al minimo di legge mostrato in pagina |
 
 ---
 
@@ -352,9 +487,15 @@ il proprio listino indipendentemente.
 |---------|-------------|
 | **Stay / Soggiorno** | Il periodo di permanenza di un ospite in una camera specifica |
 | **Walk-in** | Check-in senza prenotazione precedente |
+| **Preventivo / Quotation** | Proposta di soggiorno con una o più opzioni di camere/prezzo, inviabile all'ospite e convertibile in prenotazione |
 | **Alloggiati PS** | Report obbligatorio per legge (art. 109 TULPS) da inviare alla Polizia di Stato |
+| **TULPS** | Testo Unico delle Leggi di Pubblica Sicurezza — fonte normativa che impone l'obbligo di comunicazione Alloggiati e un periodo minimo di conservazione dei relativi dati |
+| **Imposta di Soggiorno** | Tassa locale a carico dell'ospite, calcolata per notte in base alla categoria della struttura e alle tariffe configurate |
+| **Categoria struttura** | Classificazione dell'hotel (es. stelle) usata per determinare la tariffa di imposta di soggiorno applicabile |
+| **Backfill** | Recupero retroattivo: applicazione di un addebito (es. imposta di soggiorno) a soggiorni passati non ancora regolarizzati |
 | **HMAC** | Firma digitale interna tra i microservizi per garantire l'autenticità delle richieste |
 | **DRY_RUN** | Modalità test del portale PS: invia i dati a un endpoint di test anziché quello reale |
-| **Invoice / Fattura** | Documento che raccoglie tutti gli addebiti di un soggiorno (camere + F&B + extra) |
+| **Invoice / Fattura** | Documento che raccoglie tutti gli addebiti di un soggiorno (camere + F&B + extra + imposta di soggiorno) |
 | **Soft delete** | Eliminazione logica: il dato viene marcato come inattivo ma non cancellato fisicamente |
+| **Retention / Conservazione dati** | Periodo minimo per cui i dati di un ospite devono essere mantenuti prima di poter essere eleggibili per cancellazione (vincolato dal minimo TULPS) |
 | **mustChangePassword** | Flag che obbliga il cambio password al prossimo login |
