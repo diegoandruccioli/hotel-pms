@@ -1,6 +1,7 @@
 package com.hotelpms.frontdesk.citytax.service.impl;
 
 import com.hotelpms.frontdesk.citytax.domain.CityTaxAssessment;
+import com.hotelpms.frontdesk.citytax.domain.CityTaxAssessmentLine;
 import com.hotelpms.frontdesk.citytax.domain.CityTaxRate;
 import com.hotelpms.frontdesk.citytax.domain.CityTaxUnassessedReason;
 import com.hotelpms.frontdesk.citytax.domain.HotelCategoryHistory;
@@ -8,11 +9,13 @@ import com.hotelpms.frontdesk.citytax.dto.CityTaxBackfillLineResponse;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxBackfillResponse;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxConfigurationStatusResponse;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxUnassessedSummaryResponse;
+import com.hotelpms.frontdesk.citytax.repository.CityTaxAssessmentLineRepository;
 import com.hotelpms.frontdesk.citytax.repository.CityTaxAssessmentRepository;
 import com.hotelpms.frontdesk.citytax.repository.CityTaxRateRepository;
 import com.hotelpms.frontdesk.citytax.repository.HotelCategoryHistoryRepository;
 import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
 import com.hotelpms.frontdesk.citytax.service.CityTaxCalculator;
+import com.hotelpms.frontdesk.citytax.service.CityTaxCalculator.CityTaxAssessmentLineResult;
 import com.hotelpms.frontdesk.citytax.service.CityTaxCalculator.CityTaxAssessmentResult;
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.dto.ChargeRequest;
@@ -69,6 +72,7 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
     private static final Set<CityTaxUnassessedReason> SUMMARY_REASONS = BACKFILLABLE_REASONS;
 
     private final CityTaxAssessmentRepository cityTaxAssessmentRepository;
+    private final CityTaxAssessmentLineRepository cityTaxAssessmentLineRepository;
     private final CityTaxRateRepository cityTaxRateRepository;
     private final HotelCategoryHistoryRepository hotelCategoryHistoryRepository;
     private final HotelSettingsRepository hotelSettingsRepository;
@@ -94,28 +98,31 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
             return Optional.of(persistUnassessed(stay, CityTaxUnassessedReason.NOT_APPLICABLE));
         }
 
-        final Resolution resolution = resolve(stay.getHotelId(), firstNight);
+        final RangeResolution resolution = resolveRange(stay.getHotelId(), firstNight, nights);
         if (resolution.reason() != null) {
             return Optional.of(persistUnassessed(stay, resolution.reason()));
         }
 
         final CityTaxAssessmentResult result =
-                cityTaxCalculator.assess(resolution.rate(), firstNight, nights, stay.getGuests());
+                cityTaxCalculator.assess(resolution.rates(), firstNight, nights, stay.getGuests());
+        final CityTaxAssessmentLineResult firstLine = result.lines().get(0);
 
         final CityTaxAssessment assessment = CityTaxAssessment.builder()
                 .hotelId(stay.getHotelId())
                 .stayId(stay.getId())
-                .cityTaxRateId(resolution.rate().getId())
-                .amountPerNightSnapshot(resolution.rate().getAmountPerNight())
-                .maxTaxableNightsSnapshot(resolution.rate().getMaxTaxableNights())
-                .exemptUnderAgeSnapshot(resolution.rate().getExemptUnderAge())
+                .cityTaxRateId(firstLine.cityTaxRateId())
+                .amountPerNightSnapshot(firstLine.amountPerNight())
+                .maxTaxableNightsSnapshot(rateById(resolution.rates(), firstLine.cityTaxRateId()).getMaxTaxableNights())
+                .exemptUnderAgeSnapshot(rateById(resolution.rates(), firstLine.cityTaxRateId()).getExemptUnderAge())
                 .taxableGuests(result.taxableGuests())
                 .taxableNights(result.taxableNights())
                 .totalAmount(result.totalAmount())
                 .assessedAt(LocalDateTime.now())
                 .build();
 
-        return Optional.of(cityTaxAssessmentRepository.save(assessment));
+        final CityTaxAssessment saved = cityTaxAssessmentRepository.save(assessment);
+        saveLines(saved.getId(), result.lines());
+        return Optional.of(saved);
     }
 
     /** {@inheritDoc} */
@@ -181,9 +188,10 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
 
     /**
      * Shared preview/confirm walk over every backfillable gap for a hotel. Each stay is
-     * re-resolved against <em>its own</em> check-in date using today's admin data — never
+     * re-resolved against <em>its own</em> nights using today's admin data — never
      * today's rate applied to a past stay — so a delibera that only recently caught up
-     * with a comune's actual requirement still produces the historically-correct amount.
+     * with a comune's actual requirement still produces the historically-correct amount,
+     * including a per-night breakdown if the stay itself crossed a rate boundary.
      *
      * @param hotelId the hotel UUID
      * @param apply   {@code false} for a dry-run preview (nothing written, nothing
@@ -215,7 +223,8 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
                 continue; // Defensive: the stay this assessment referenced is gone or malformed.
             }
             final LocalDate checkInDate = stay.getActualCheckInTime().toLocalDate();
-            final Resolution resolution = resolve(hotelId, checkInDate);
+            final long nights = resolveNightsForBackfill(stay);
+            final RangeResolution resolution = resolveRange(hotelId, checkInDate, nights);
             if (resolution.reason() != null) {
                 lines.add(new CityTaxBackfillLineResponse(
                         stay.getId(), checkInDate, BigDecimal.ZERO, false, SKIP_STILL_UNCONFIGURED));
@@ -223,9 +232,8 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
                 continue;
             }
 
-            final long nights = resolveNightsForBackfill(stay);
             final CityTaxAssessmentResult result =
-                    cityTaxCalculator.assess(resolution.rate(), checkInDate, nights, stay.getGuests());
+                    cityTaxCalculator.assess(resolution.rates(), checkInDate, nights, stay.getGuests());
             total = total.add(result.totalAmount());
 
             if (result.totalAmount().signum() <= 0) {
@@ -245,7 +253,7 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
 
             final ChargeResponse chargeResp;
             try {
-                chargeResp = billingClient.addCharge(stay.getId(), buildBackfillChargeRequest(stay, resolution, result));
+                chargeResp = billingClient.addCharge(stay.getId(), buildBackfillChargeRequest(stay, result));
             } catch (final FeignException ex) {
                 log.error("[CITY_TAX] BACKFILL_CHARGE_FAILED | stayId={} | reason={}", stay.getId(), ex.getMessage());
                 lines.add(new CityTaxBackfillLineResponse(
@@ -260,16 +268,18 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
                 continue;
             }
 
-            gap.setCityTaxRateId(resolution.rate().getId());
-            gap.setAmountPerNightSnapshot(resolution.rate().getAmountPerNight());
-            gap.setMaxTaxableNightsSnapshot(resolution.rate().getMaxTaxableNights());
-            gap.setExemptUnderAgeSnapshot(resolution.rate().getExemptUnderAge());
+            final CityTaxAssessmentLineResult firstLine = result.lines().get(0);
+            gap.setCityTaxRateId(firstLine.cityTaxRateId());
+            gap.setAmountPerNightSnapshot(firstLine.amountPerNight());
+            gap.setMaxTaxableNightsSnapshot(rateById(resolution.rates(), firstLine.cityTaxRateId()).getMaxTaxableNights());
+            gap.setExemptUnderAgeSnapshot(rateById(resolution.rates(), firstLine.cityTaxRateId()).getExemptUnderAge());
             gap.setTaxableGuests(result.taxableGuests());
             gap.setTaxableNights(result.taxableNights());
             gap.setTotalAmount(result.totalAmount());
             gap.setBillingChargeId(chargeResp.id());
             gap.setUnassessedReason(null);
             cityTaxAssessmentRepository.save(gap);
+            saveLines(gap.getId(), result.lines());
             log.info("[CITY_TAX] BACKFILL_CHARGED | stayId={} | hotelId={} | amount={}",
                     stay.getId(), hotelId, result.totalAmount());
 
@@ -298,12 +308,22 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
         return ChronoUnit.DAYS.between(checkIn, checkOut);
     }
 
-    private static ChargeRequest buildBackfillChargeRequest(
-            final Stay stay, final Resolution resolution, final CityTaxAssessmentResult result) {
+    /**
+     * Builds the backfill charge request. {@code unitPrice} is display/audit metadata
+     * only (never used to derive {@code amount}) — left {@code null} when the stay's
+     * backfilled nights span more than one rate, since no single per-night figure would
+     * be accurate.
+     *
+     * @param stay   the stay being backfilled
+     * @param result the computed assessment, possibly spanning multiple rates
+     * @return the charge request to post to billing-service
+     */
+    private static ChargeRequest buildBackfillChargeRequest(final Stay stay, final CityTaxAssessmentResult result) {
         final String description = "Imposta di soggiorno (rettifica) - " + result.taxableNights()
                 + " night(s) x " + result.taxableGuests() + " guest(s)";
+        final BigDecimal unitPrice = result.lines().size() == 1 ? result.lines().get(0).amountPerNight() : null;
         return new ChargeRequest(CITY_TAX_CHARGE_TYPE, description, result.totalAmount(), stay.getId(),
-                resolution.rate().getAmountPerNight(), result.taxableNights());
+                unitPrice, result.taxableNights());
     }
 
     private CityTaxAssessment persistUnassessed(final Stay stay, final CityTaxUnassessedReason reason) {
@@ -320,14 +340,37 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
         return cityTaxAssessmentRepository.save(assessment);
     }
 
+    private void saveLines(final UUID assessmentId, final List<CityTaxAssessmentLineResult> lineResults) {
+        final List<CityTaxAssessmentLine> entities = lineResults.stream()
+                .map(l -> CityTaxAssessmentLine.builder()
+                        .assessmentId(assessmentId)
+                        .fromDate(l.fromDate())
+                        .toDate(l.toDateExclusive())
+                        .cityTaxRateId(l.cityTaxRateId())
+                        .amountPerNight(l.amountPerNight())
+                        .taxableGuests(l.taxableGuests())
+                        .taxableNights(l.taxableNights())
+                        .subtotal(l.subtotal())
+                        .build())
+                .toList();
+        cityTaxAssessmentLineRepository.saveAll(entities);
+    }
+
+    private static CityTaxRate rateById(final List<CityTaxRate> rates, final UUID rateId) {
+        return rates.stream()
+                .filter(r -> r.getId().equals(rateId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Rate " + rateId + " missing from its own resolved range"));
+    }
+
     /**
-     * Resolves the comune/category/rate chain for a hotel on a given date — the one
-     * lookup shared by {@link #assessFor}, {@link #checkConfigurationStatus}, and the
-     * backfill flow, so all three can never disagree on what "configured" means.
+     * Resolves the comune/category/rate chain for a hotel on a single date — used by
+     * {@link #checkConfigurationStatus}, which only ever asks about today. Stay
+     * assessment and backfill use {@link #resolveRange} instead, since a stay's nights
+     * can span more than one rate.
      *
      * @param hotelId the hotel UUID
-     * @param date    the date to resolve against (a stay's check-in date, or today for
-     *                the pre-flight check)
+     * @param date    the date to resolve against
      * @return the resolution — {@code reason() == null} iff {@code rate()} is present
      */
     private Resolution resolve(final UUID hotelId, final LocalDate date) {
@@ -350,6 +393,64 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
         return new Resolution(rate.get(), null);
     }
 
+    /**
+     * Resolves every rate covering a stay's nights — {@code category} is still resolved
+     * once, at {@code firstNight} (a hotel's classification doesn't change mid-stay in
+     * this model), but the rate itself may not be uniform across the range, so this
+     * fetches every rate overlapping it and verifies there's no gap.
+     *
+     * @param hotelId    the hotel UUID
+     * @param firstNight the stay's first night
+     * @param nights     the number of nights to cover
+     * @return the resolution — {@code reason() == null} iff {@code rates()} fully
+     *         covers {@code [firstNight, firstNight + nights)} with no gaps
+     */
+    private RangeResolution resolveRange(final UUID hotelId, final LocalDate firstNight, final long nights) {
+        final String comuneCodice = resolveComuneCodice(hotelId);
+        if (comuneCodice == null) {
+            return new RangeResolution(null, CityTaxUnassessedReason.COMUNE_NOT_CONFIGURED);
+        }
+        final String category = hotelCategoryHistoryRepository
+                .findApplicableByHotelId(hotelId, firstNight)
+                .map(HotelCategoryHistory::getCategory)
+                .orElse(null);
+        if (category == null) {
+            return new RangeResolution(null, CityTaxUnassessedReason.CATEGORY_NOT_RECORDED);
+        }
+        final LocalDate stayEnd = firstNight.plusDays(nights);
+        final List<CityTaxRate> rates = cityTaxRateRepository
+                .findAllApplicableByHotelIdInRange(hotelId, comuneCodice, category, firstNight, stayEnd);
+        if (rates.isEmpty() || !fullyCovers(rates, firstNight, stayEnd)) {
+            return new RangeResolution(null, CityTaxUnassessedReason.NO_RATE_FOR_DATE);
+        }
+        return new RangeResolution(rates, null);
+    }
+
+    /**
+     * Verifies {@code rates} leaves no gap across {@code [from, toExclusive)} — a stay
+     * whose delibera only covers part of its nights is treated as fully unconfigured
+     * (the existing "not configured yet" contract) rather than partially assessed,
+     * which would be far harder to reason about and audit.
+     *
+     * @param rates        candidate rates, any order
+     * @param from         range start (inclusive)
+     * @param toExclusive  range end (exclusive)
+     * @return {@code true} if every day in the range is covered by exactly one rate
+     */
+    private static boolean fullyCovers(final List<CityTaxRate> rates, final LocalDate from, final LocalDate toExclusive) {
+        LocalDate cursor = from;
+        while (cursor.isBefore(toExclusive)) {
+            final LocalDate current = cursor;
+            final boolean covered = rates.stream().anyMatch(r -> !r.getValidFrom().isAfter(current)
+                    && (r.getValidTo() == null || r.getValidTo().isAfter(current)));
+            if (!covered) {
+                return false;
+            }
+            cursor = cursor.plusDays(1);
+        }
+        return true;
+    }
+
     private String resolveComuneCodice(final UUID hotelId) {
         return hotelSettingsRepository.findById(hotelId)
                 .map(HotelSettings::getComuneCodice)
@@ -366,5 +467,16 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
      * @param reason why {@code rate} is {@code null}, or {@code null} if it isn't
      */
     private record Resolution(CityTaxRate rate, CityTaxUnassessedReason reason) {
+    }
+
+    /**
+     * The outcome of {@link #resolveRange}: either the rates covering the whole range
+     * ({@code reason} is {@code null}), or a {@code reason} explaining why coverage is
+     * incomplete ({@code rates} is {@code null}).
+     *
+     * @param rates  every rate covering the range, or {@code null} if coverage is incomplete
+     * @param reason why {@code rates} is {@code null}, or {@code null} if it isn't
+     */
+    private record RangeResolution(List<CityTaxRate> rates, CityTaxUnassessedReason reason) {
     }
 }
