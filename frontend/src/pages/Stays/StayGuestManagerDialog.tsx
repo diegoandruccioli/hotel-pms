@@ -19,7 +19,7 @@ import type {
   StayResponse,
 } from '../../types/stay.types';
 import { GuestFieldSection } from './GuestFieldSection';
-import { emptyGuest, CODICE_ITALIA, TYPES_WITHOUT_DOC } from './stayGuestFieldHelpers';
+import { emptyGuest, CODICE_ITALIA, TYPES_WITHOUT_DOC, alloggiatiPlaceIssues } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
 
 interface StayGuestManagerDialogProps {
@@ -180,20 +180,20 @@ GuestRow.displayName = 'GuestRow';
 
 const validateSingleGuest = (g: IdentifiableGuest, t: ErrorTranslator): string | null => {
   const hasDoc = !TYPES_WITHOUT_DOC.includes(g.travellerType as never);
-  const isItalianBorn = g._statoDiNascita === CODICE_ITALIA;
-  const isItalianDocIssue = g._statoRilascioDoc === CODICE_ITALIA;
 
   if (!g.firstName || !g.lastName || !g.gender || !g.dateOfBirth || !g.travellerType) {
     return t('err_required_fields');
   }
-  if (!g._statoDiNascita) return t('err_stato_nascita_required', { number: 1 });
-  if (isItalianBorn && !g.placeOfBirth) return t('err_comune_nascita_required', { number: 1 });
-  if (hasDoc) {
-    if (!g._statoRilascioDoc) return t('err_stato_rilascio_required', { number: 1 });
-    if (isItalianDocIssue && !g.documentPlaceOfIssue) return t('err_comune_rilascio_required', { number: 1 });
-    if (!g.documentType || !g.documentNumber) return t('err_required_fields');
+  if (hasDoc && (!g.documentType || !g.documentNumber)) {
+    return t('err_required_fields');
   }
-  return null;
+  // Stato/comune-di-nascita and stato/comune-di-rilascio-documento rules are the
+  // same ones CheckInForm/WalkInCheckInForm enforce for every guest at check-in —
+  // shared here rather than re-derived, so a future Alloggiati rule change only
+  // needs to be made once (see alloggiatiPlaceIssues' own doc for why the
+  // required-field and primary-guest checks above/below aren't also shared: they
+  // don't apply the same way to a lone correction on an already-open stay).
+  return alloggiatiPlaceIssues(g, t, 1)[0] ?? null;
 };
 
 export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManagerDialogProps) => {

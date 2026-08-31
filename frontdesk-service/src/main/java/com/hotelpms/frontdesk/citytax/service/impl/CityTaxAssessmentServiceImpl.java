@@ -20,7 +20,6 @@ import com.hotelpms.frontdesk.citytax.service.CityTaxCalculator.CityTaxAssessmen
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.dto.ChargeRequest;
 import com.hotelpms.frontdesk.client.dto.ChargeResponse;
-import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.stays.domain.CityTaxApplicability;
 import com.hotelpms.frontdesk.stays.domain.HotelSettings;
@@ -28,6 +27,7 @@ import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.domain.StayGuest;
 import com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
+import com.hotelpms.frontdesk.stays.service.impl.StayInvoiceResolver;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,10 +42,13 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of {@link CityTaxAssessmentService}.
@@ -57,7 +60,6 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
 
     private static final String ASSESSMENT_NOT_FOUND_MSG = "CITY_TAX_ASSESSMENT_NOT_FOUND";
     private static final String CITY_TAX_CHARGE_TYPE = "CITY_TAX";
-    private static final String OPEN_INVOICE_STATUS = "ISSUED";
     private static final String SKIP_INVOICE_NOT_OPEN = "INVOICE_NOT_OPEN";
     private static final String SKIP_STILL_UNCONFIGURED = "STILL_UNCONFIGURED";
     private static final String SKIP_CHARGE_FAILED = "CHARGE_FAILED";
@@ -81,6 +83,7 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
     private final StayRepository stayRepository;
     private final BillingClient billingClient;
     private final CityTaxCalculator cityTaxCalculator;
+    private final StayInvoiceResolver stayInvoiceResolver;
 
     /** {@inheritDoc} */
     @Override
@@ -214,13 +217,25 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
         final List<CityTaxAssessment> gaps =
                 cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(hotelId, BACKFILLABLE_REASONS);
 
+        // One batched SELECT for every affected stay instead of one per gap — the
+        // preview endpoint is invoked freely (e.g. every time the admin opens the
+        // backfill screen), so a hotel with hundreds of gaps used to mean hundreds of
+        // sequential round-trips just to look the stays up. The isInvoiceOpen() Feign
+        // call per stay below is a separate, still-unbatched cost — billing-service has
+        // no batch invoice-status lookup today; left as-is rather than adding a new
+        // cross-service endpoint for this pass.
+        final Map<UUID, Stay> staysById = stayRepository
+                .findAllById(gaps.stream().map(CityTaxAssessment::getStayId).toList())
+                .stream()
+                .collect(Collectors.toMap(Stay::getId, Function.identity()));
+
         final List<CityTaxBackfillLineResponse> lines = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
         int charged = 0;
         int skipped = 0;
 
         for (final CityTaxAssessment gap : gaps) {
-            final Stay stay = stayRepository.findById(gap.getStayId()).orElse(null);
+            final Stay stay = staysById.get(gap.getStayId());
             if (stay == null || stay.getActualCheckInTime() == null) {
                 continue; // Defensive: the stay this assessment referenced is gone or malformed.
             }
@@ -242,7 +257,7 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
                 lines.add(new CityTaxBackfillLineResponse(stay.getId(), checkInDate, result.totalAmount(), false, null));
                 continue;
             }
-            if (!isInvoiceOpen(stay)) {
+            if (!stayInvoiceResolver.isOpen(stay)) {
                 lines.add(new CityTaxBackfillLineResponse(
                         stay.getId(), checkInDate, result.totalAmount(), false, SKIP_INVOICE_NOT_OPEN));
                 skipped++;
@@ -355,7 +370,7 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
             cityTaxAssessmentRepository.save(assessment);
         }
 
-        if (!isInvoiceOpen(stay)) {
+        if (!stayInvoiceResolver.isOpen(stay)) {
             log.warn("[CITY_TAX] GUEST_REMOVED_CHARGE_NOT_REVERSED | stayId={} | guestId={} | reason=INVOICE_NOT_OPEN",
                     stay.getId(), removedGuest.getId());
             return;
@@ -421,7 +436,7 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
         log.info("[CITY_TAX] RECTIFICATION_ADDED | stayId={} | reason={} | amount={}",
                 stay.getId(), descriptionTag, result.totalAmount());
 
-        if (!isInvoiceOpen(stay)) {
+        if (!stayInvoiceResolver.isOpen(stay)) {
             log.warn("[CITY_TAX] RECTIFICATION_NOT_CHARGED | stayId={} | reason=INVOICE_NOT_OPEN", stay.getId());
             return Optional.empty();
         }
@@ -453,16 +468,7 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
             final Stay stay, final CityTaxAssessmentResult result, final String descriptionTag) {
         final String description = "Imposta di soggiorno (rettifica - " + descriptionTag + ") - "
                 + result.taxableNights() + " night(s)";
-        final BigDecimal unitPrice = result.lines().size() == 1 ? result.lines().get(0).amountPerNight() : null;
-        return new ChargeRequest(CITY_TAX_CHARGE_TYPE, description, result.totalAmount(), stay.getId(),
-                unitPrice, result.taxableNights());
-    }
-
-    private boolean isInvoiceOpen(final Stay stay) {
-        final InvoiceStatusResponse invoice = stay.getReservationId() != null
-                ? billingClient.getLatestInvoiceByReservation(stay.getReservationId())
-                : stay.getInvoiceId() != null ? billingClient.getInvoiceById(stay.getInvoiceId()) : null;
-        return invoice != null && OPEN_INVOICE_STATUS.equalsIgnoreCase(invoice.status());
+        return buildCityTaxChargeRequest(stay, result, description);
     }
 
     private static long resolveNightsForBackfill(final Stay stay) {
@@ -489,6 +495,21 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
     private static ChargeRequest buildBackfillChargeRequest(final Stay stay, final CityTaxAssessmentResult result) {
         final String description = "Imposta di soggiorno (rettifica) - " + result.taxableNights()
                 + " night(s) x " + result.taxableGuests() + " guest(s)";
+        return buildCityTaxChargeRequest(stay, result, description);
+    }
+
+    /**
+     * Shared shape for every {@code CITY_TAX} charge this service posts — rectification
+     * and backfill differ only in the description string, never in how {@code amount}
+     * or {@code unitPrice} are derived from the computed result.
+     *
+     * @param stay        the stay being charged
+     * @param result      the computed assessment, possibly spanning multiple rates
+     * @param description the charge's description, distinguishing its cause on the invoice
+     * @return the charge request to post to billing-service
+     */
+    private static ChargeRequest buildCityTaxChargeRequest(
+            final Stay stay, final CityTaxAssessmentResult result, final String description) {
         final BigDecimal unitPrice = result.lines().size() == 1 ? result.lines().get(0).amountPerNight() : null;
         return new ChargeRequest(CITY_TAX_CHARGE_TYPE, description, result.totalAmount(), stay.getId(),
                 unitPrice, result.taxableNights());

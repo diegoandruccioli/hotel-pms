@@ -18,7 +18,6 @@ import com.hotelpms.frontdesk.citytax.service.CityTaxCalculator.CityTaxAssessmen
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.dto.ChargeRequest;
 import com.hotelpms.frontdesk.client.dto.ChargeResponse;
-import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.stays.domain.CityTaxApplicability;
 import com.hotelpms.frontdesk.stays.domain.HotelSettings;
@@ -26,6 +25,7 @@ import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.domain.StayGuest;
 import com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
+import com.hotelpms.frontdesk.stays.service.impl.StayInvoiceResolver;
 import feign.FeignException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,8 +67,6 @@ class CityTaxAssessmentServiceImplTest {
     private static final int EXEMPT_UNDER_AGE = 14;
     private static final long NIGHTS = 3L;
     private static final long BACKFILL_NIGHTS = 1L;
-    private static final String OPEN_STATUS = "ISSUED";
-    private static final String PAID_STATUS = "PAID";
     private static final BigDecimal RATE_AMOUNT_PER_NIGHT = new BigDecimal("2.50");
     private static final int LATER_DAYS_OFFSET = 5;
     private static final BigDecimal ASSESSMENT_TOTAL = new BigDecimal("15.00");
@@ -98,6 +96,9 @@ class CityTaxAssessmentServiceImplTest {
 
     @Mock
     private CityTaxCalculator cityTaxCalculator;
+
+    @Mock
+    private StayInvoiceResolver stayInvoiceResolver;
 
     @InjectMocks
     private CityTaxAssessmentServiceImpl cityTaxAssessmentService;
@@ -392,8 +393,7 @@ class CityTaxAssessmentServiceImplTest {
                         rate.getId(), FIRST_NIGHT, FIRST_NIGHT.plusDays(remainingNights),
                         (int) remainingNights, 1, RATE_AMOUNT_PER_NIGHT, rectificationAmount));
         stay.setInvoiceId(UUID.randomUUID());
-        when(billingClient.getInvoiceById(stay.getInvoiceId()))
-                .thenReturn(new InvoiceStatusResponse(stay.getInvoiceId(), null, OPEN_STATUS, BigDecimal.ZERO));
+        when(stayInvoiceResolver.isOpen(stay)).thenReturn(true);
         when(billingClient.addCharge(eq(stayId), any(ChargeRequest.class))).thenReturn(new ChargeResponse(UUID.randomUUID()));
 
         cityTaxAssessmentService.rectifyForGuestAdded(stay, newGuest);
@@ -560,7 +560,7 @@ class CityTaxAssessmentServiceImplTest {
         final LocalDate backfillStayEnd = FIRST_NIGHT.plusDays(BACKFILL_NIGHTS);
         when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
                 .thenReturn(List.of(gap));
-        when(stayRepository.findById(stayId)).thenReturn(Optional.of(stay));
+        when(stayRepository.findAllById(any())).thenReturn(List.of(stay));
         when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
@@ -571,8 +571,7 @@ class CityTaxAssessmentServiceImplTest {
                 .thenReturn(singleLineResult(
                         rate.getId(), FIRST_NIGHT, backfillStayEnd, 1, 1, RATE_AMOUNT_PER_NIGHT, RATE_AMOUNT_PER_NIGHT));
         stay.setInvoiceId(UUID.randomUUID());
-        when(billingClient.getInvoiceById(stay.getInvoiceId()))
-                .thenReturn(new InvoiceStatusResponse(stay.getInvoiceId(), null, OPEN_STATUS, BigDecimal.ZERO));
+        when(stayInvoiceResolver.isOpen(stay)).thenReturn(true);
 
         final CityTaxBackfillResponse preview = cityTaxAssessmentService.previewBackfill(hotelId);
 
@@ -592,7 +591,7 @@ class CityTaxAssessmentServiceImplTest {
         final LocalDate backfillStayEnd = FIRST_NIGHT.plusDays(BACKFILL_NIGHTS);
         when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
                 .thenReturn(List.of(gap));
-        when(stayRepository.findById(stayId)).thenReturn(Optional.of(stay));
+        when(stayRepository.findAllById(any())).thenReturn(List.of(stay));
         when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
@@ -603,8 +602,7 @@ class CityTaxAssessmentServiceImplTest {
                 .thenReturn(singleLineResult(
                         rate.getId(), FIRST_NIGHT, backfillStayEnd, 1, 1, RATE_AMOUNT_PER_NIGHT, RATE_AMOUNT_PER_NIGHT));
         stay.setInvoiceId(UUID.randomUUID());
-        when(billingClient.getInvoiceById(stay.getInvoiceId()))
-                .thenReturn(new InvoiceStatusResponse(stay.getInvoiceId(), null, OPEN_STATUS, BigDecimal.ZERO));
+        when(stayInvoiceResolver.isOpen(stay)).thenReturn(true);
         final UUID chargeId = UUID.randomUUID();
         when(billingClient.addCharge(eq(stayId), any(ChargeRequest.class))).thenReturn(new ChargeResponse(chargeId));
         when(cityTaxAssessmentRepository.save(gap)).thenReturn(gap);
@@ -628,7 +626,7 @@ class CityTaxAssessmentServiceImplTest {
         final LocalDate backfillStayEnd = FIRST_NIGHT.plusDays(BACKFILL_NIGHTS);
         when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
                 .thenReturn(List.of(gap));
-        when(stayRepository.findById(stayId)).thenReturn(Optional.of(stay));
+        when(stayRepository.findAllById(any())).thenReturn(List.of(stay));
         when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
@@ -639,8 +637,7 @@ class CityTaxAssessmentServiceImplTest {
                 .thenReturn(singleLineResult(
                         rate.getId(), FIRST_NIGHT, backfillStayEnd, 1, 1, RATE_AMOUNT_PER_NIGHT, RATE_AMOUNT_PER_NIGHT));
         stay.setInvoiceId(UUID.randomUUID());
-        when(billingClient.getInvoiceById(stay.getInvoiceId()))
-                .thenReturn(new InvoiceStatusResponse(stay.getInvoiceId(), null, PAID_STATUS, BigDecimal.ZERO));
+        when(stayInvoiceResolver.isOpen(stay)).thenReturn(false);
 
         final CityTaxBackfillResponse result = cityTaxAssessmentService.confirmBackfill(hotelId);
 
@@ -656,7 +653,7 @@ class CityTaxAssessmentServiceImplTest {
         final CityTaxAssessment gap = gapAssessment(CityTaxUnassessedReason.NO_RATE_FOR_DATE);
         when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
                 .thenReturn(List.of(gap));
-        when(stayRepository.findById(stayId)).thenReturn(Optional.of(stay));
+        when(stayRepository.findAllById(any())).thenReturn(List.of(stay));
         when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT)).thenReturn(Optional.empty());
 
@@ -665,7 +662,7 @@ class CityTaxAssessmentServiceImplTest {
         assertEquals(0, result.chargedCount());
         assertEquals(1, result.skippedCount());
         assertEquals("STILL_UNCONFIGURED", result.lines().get(0).skipReason());
-        verify(billingClient, never()).getInvoiceById(any());
+        verify(stayInvoiceResolver, never()).isOpen(any());
         verify(billingClient, never()).addCharge(any(), any());
     }
 
@@ -689,7 +686,7 @@ class CityTaxAssessmentServiceImplTest {
         final LocalDate backfillStayEnd = FIRST_NIGHT.plusDays(BACKFILL_NIGHTS);
         when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
                 .thenReturn(List.of(gap));
-        when(stayRepository.findById(stayId)).thenReturn(Optional.of(stay));
+        when(stayRepository.findAllById(any())).thenReturn(List.of(stay));
         when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
@@ -700,8 +697,7 @@ class CityTaxAssessmentServiceImplTest {
                 .thenReturn(singleLineResult(
                         rate.getId(), FIRST_NIGHT, backfillStayEnd, 1, 1, RATE_AMOUNT_PER_NIGHT, RATE_AMOUNT_PER_NIGHT));
         stay.setInvoiceId(UUID.randomUUID());
-        when(billingClient.getInvoiceById(stay.getInvoiceId()))
-                .thenReturn(new InvoiceStatusResponse(stay.getInvoiceId(), null, OPEN_STATUS, BigDecimal.ZERO));
+        when(stayInvoiceResolver.isOpen(stay)).thenReturn(true);
         when(billingClient.addCharge(eq(stayId), any(ChargeRequest.class)))
                 .thenThrow(mock(FeignException.Conflict.class));
 

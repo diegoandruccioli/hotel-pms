@@ -223,17 +223,20 @@ class StayServiceImplTest {
                     return rates;
                 });
 
+        final StayInvoiceResolver stayInvoiceResolver = new StayInvoiceResolver(billingClient);
+
         stayService = new StayServiceImpl(
                 stayRepository, stayGuestRepository, stayMapper, guestClient, roomService, reservationService,
                 new StayCheckInValidator(guestClient, reservationService, roomService),
                 new StayBillingCoordinator(billingClient, roomService, stayRepository, reservationService,
-                        ratePricingService, cityTaxAssessmentService),
+                        ratePricingService, cityTaxAssessmentService, stayInvoiceResolver),
                 new StayAlloggiatiCoordinator(alloggiatiWebSenderService, hotelSettingsService, stayRepository),
                 new StayNotificationCoordinator(
                         notificationClient, guestClient, billingClient, hotelSettingsService, stayRepository),
                 new StayReservationSync(reservationService, stayRepository),
                 gatewayEventsClient,
-                cityTaxAssessmentService);
+                cityTaxAssessmentService,
+                stayInvoiceResolver);
 
         // checkIn() always goes through the two-arg toDto(Stay, CityTaxUnassessedReason)
         // overload now (withCityTaxWarning), not the single-arg one every test below

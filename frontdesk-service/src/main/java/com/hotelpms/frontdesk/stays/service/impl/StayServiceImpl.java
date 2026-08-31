@@ -74,7 +74,6 @@ import java.util.UUID;
 public class StayServiceImpl implements StayService {
 
     private static final String PAID_STATUS = "PAID";
-    private static final String OPEN_INVOICE_STATUS = "ISSUED";
     private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
     private static final String INVALID_STAY_STATUS_MSG = "INVALID_STAY_STATUS";
     private static final LocalDate EARLIEST_FILTER_DATE = LocalDate.of(1900, 1, 1);
@@ -93,6 +92,7 @@ public class StayServiceImpl implements StayService {
     private final StayReservationSync stayReservationSync;
     private final GatewayEventsClient gatewayEventsClient;
     private final CityTaxAssessmentService cityTaxAssessmentService;
+    private final StayInvoiceResolver stayInvoiceResolver;
 
     /** {@inheritDoc} */
     @Override
@@ -445,8 +445,7 @@ public class StayServiceImpl implements StayService {
             throw new BadRequestException("EXTENSION_MUST_BE_LATER_THAN_CURRENT_CHECKOUT");
         }
 
-        final InvoiceStatusResponse invoice = stayBillingCoordinator.resolveInvoiceForCheckOut(stay);
-        if (invoice == null || !OPEN_INVOICE_STATUS.equalsIgnoreCase(invoice.status())) {
+        if (!stayInvoiceResolver.isOpen(stay)) {
             log.warn("[STAY] EXTENSION_FAILED | stayId={} | reason=INVOICE_NOT_OPEN", stayId);
             throw new ConflictException("STAY_EXTENSION_INVOICE_NOT_OPEN");
         }

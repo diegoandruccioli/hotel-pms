@@ -52,6 +52,7 @@ class StayBillingCoordinator {
     private final ReservationService reservationService;
     private final RatePricingService ratePricingService;
     private final CityTaxAssessmentService cityTaxAssessmentService;
+    private final StayInvoiceResolver stayInvoiceResolver;
 
     /**
      * Resolves the invoice to verify at check-out. Reservation-based stays are looked
@@ -67,13 +68,7 @@ class StayBillingCoordinator {
     InvoiceStatusResponse resolveInvoiceForCheckOut(final Stay stay) {
         log.debug("Verifying billing folio for stay: {} | reservationId={} | invoiceId={}",
                 stay.getId(), stay.getReservationId(), stay.getInvoiceId());
-        if (stay.getReservationId() != null) {
-            return billingClient.getLatestInvoiceByReservation(stay.getReservationId());
-        }
-        if (stay.getInvoiceId() != null) {
-            return billingClient.getInvoiceById(stay.getInvoiceId());
-        }
-        return null;
+        return stayInvoiceResolver.resolve(stay);
     }
 
     /**
