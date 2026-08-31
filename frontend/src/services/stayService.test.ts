@@ -280,3 +280,184 @@ describe('stayService — settings, lookups, downloads', () => {
     vi.useRealTimers();
   });
 });
+
+describe('stayService — guest lifecycle, extension, city tax', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should fetch stays by reservation id', async () => {
+    const mockPage = { content: [{ id: 's1' }], totalPages: 1 };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockPage });
+
+    const result = await stayService.getStaysByReservationId('res1');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/stays?reservationId=res1');
+    expect(result).toEqual(mockPage);
+  });
+
+  it('should add a guest to an open stay', async () => {
+    const request = { firstName: 'Mario', lastName: 'Rossi' };
+    const mockResponse = { id: 'g1', ...request };
+    vi.mocked(api.post).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.addGuest('stay1', request as never);
+
+    expect(api.post).toHaveBeenCalledWith('/api/v1/stays/stay1/guests', request);
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should update a guest on an open stay', async () => {
+    const request = { firstName: 'Mario', lastName: 'Bianchi' };
+    const mockResponse = { id: 'g1', ...request };
+    vi.mocked(api.put).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.updateGuest('stay1', 'g1', request as never);
+
+    expect(api.put).toHaveBeenCalledWith('/api/v1/stays/stay1/guests/g1', request);
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should remove a guest from an open stay', async () => {
+    vi.mocked(api.delete).mockResolvedValueOnce({ data: undefined });
+
+    await stayService.removeGuest('stay1', 'g1');
+
+    expect(api.delete).toHaveBeenCalledWith('/api/v1/stays/stay1/guests/g1');
+  });
+
+  it('should record an early departure for a guest', async () => {
+    const mockResponse = { id: 'g1', departureDate: '2026-09-05' };
+    vi.mocked(api.put).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.recordGuestDeparture('stay1', 'g1', '2026-09-05');
+
+    expect(api.put).toHaveBeenCalledWith('/api/v1/stays/stay1/guests/g1/departure', {
+      departureDate: '2026-09-05',
+    });
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should promote a guest to primary', async () => {
+    const mockResponse = { id: 'g1', isPrimaryGuest: true };
+    vi.mocked(api.put).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.promoteGuestToPrimary('stay1', 'g1');
+
+    expect(api.put).toHaveBeenCalledWith('/api/v1/stays/stay1/guests/g1/primary');
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should extend a stay to a new check-out date', async () => {
+    const mockResponse = { id: 'stay1', checkOutDate: '2026-09-10' };
+    vi.mocked(api.put).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.extendStay('stay1', '2026-09-10');
+
+    expect(api.put).toHaveBeenCalledWith('/api/v1/stays/stay1', { newCheckOutDate: '2026-09-10' });
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should fetch hotel category history', async () => {
+    const mockHistory = [{ category: '4 stelle', validFrom: '2026-01-01' }];
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockHistory });
+
+    const result = await stayService.getHotelCategoryHistory();
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/stays/hotel-category');
+    expect(result).toEqual(mockHistory);
+  });
+
+  it('should record a new hotel category', async () => {
+    const request = { category: '4 stelle', validFrom: '2026-01-01' };
+    const mockResponse = { id: 'c1', ...request };
+    vi.mocked(api.post).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.recordHotelCategory(request as never);
+
+    expect(api.post).toHaveBeenCalledWith('/api/v1/stays/hotel-category', request);
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should fetch city tax rates', async () => {
+    const mockRates = [{ id: 'r1', amountPerNight: 2 }];
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockRates });
+
+    const result = await stayService.getCityTaxRates();
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/stays/city-tax-rates');
+    expect(result).toEqual(mockRates);
+  });
+
+  it('should create a city tax rate', async () => {
+    const request = { category: '4 stelle', amountPerNight: 2 };
+    const mockResponse = { id: 'r1', ...request };
+    vi.mocked(api.post).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.createCityTaxRate(request as never);
+
+    expect(api.post).toHaveBeenCalledWith('/api/v1/stays/city-tax-rates', request);
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should fetch city tax applicability', async () => {
+    const mockResponse = { applicability: 'APPLICABLE' };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.getCityTaxApplicability();
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/stays/city-tax-rates/applicability');
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should update city tax applicability', async () => {
+    const request = { applicability: 'NOT_APPLICABLE' };
+    const mockResponse = { ...request };
+    vi.mocked(api.put).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.updateCityTaxApplicability(request as never);
+
+    expect(api.put).toHaveBeenCalledWith('/api/v1/stays/city-tax-rates/applicability', request);
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should fetch the city tax configuration status pre-flight check', async () => {
+    const mockResponse = { configured: false, reason: 'COMUNE_NOT_CONFIGURED' };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.getCityTaxConfigurationStatus();
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/stays/city-tax/configuration-status');
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should fetch the city tax unassessed summary', async () => {
+    const mockResponse = { count: 3, totalAmount: 12 };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.getCityTaxUnassessedSummary();
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/stays/city-tax/unassessed/summary');
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should preview a city tax backfill', async () => {
+    const mockResponse = { rows: [], totalAmount: 0 };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.previewCityTaxBackfill();
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/stays/city-tax/backfill/preview');
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should confirm a city tax backfill', async () => {
+    const mockResponse = { rows: [], totalAmount: 0 };
+    vi.mocked(api.post).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await stayService.confirmCityTaxBackfill();
+
+    expect(api.post).toHaveBeenCalledWith('/api/v1/stays/city-tax/backfill/confirm');
+    expect(result).toEqual(mockResponse);
+  });
+});
