@@ -453,17 +453,6 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
         }
     }
 
-    /**
-     * A charge successfully posted by {@link #rectify}, carried back only when the
-     * caller needs to attribute it to a single guest for later reversal — see
-     * {@link #rectifyForGuestAdded}.
-     *
-     * @param chargeId the billing-service charge id
-     * @param amount   the amount charged
-     */
-    private record PostedCharge(UUID chargeId, BigDecimal amount) {
-    }
-
     private static ChargeRequest buildRectificationChargeRequest(
             final Stay stay, final CityTaxAssessmentResult result, final String descriptionTag) {
         final String description = "Imposta di soggiorno (rettifica - " + descriptionTag + ") - "
@@ -667,5 +656,16 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
      * @param reason why {@code rates} is {@code null}, or {@code null} if it isn't
      */
     private record RangeResolution(List<CityTaxRate> rates, CityTaxUnassessedReason reason) {
+    }
+
+    /**
+     * A charge successfully posted by {@link #rectify}, carried back only when the
+     * caller needs to attribute it to a single guest for later reversal — see
+     * {@link #rectifyForGuestAdded}.
+     *
+     * @param chargeId the billing-service charge id
+     * @param amount   the amount charged
+     */
+    private record PostedCharge(UUID chargeId, BigDecimal amount) {
     }
 }
