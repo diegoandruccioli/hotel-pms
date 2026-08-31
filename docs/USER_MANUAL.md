@@ -1,6 +1,6 @@
 # Hotel PMS — Manuale Operativo
 
-**Versione:** 1.3 — 2026-08-30 (aggiunte Preventivi, Calendario Tariffe, Imposta di Soggiorno, Privacy/GDPR, proroga e gestione ospiti su soggiorno aperto; corretto accesso reale di OWNER alle pagine di gestione)
+**Versione:** 1.4 — 2026-09-01 (avviso imposta di soggiorno non configurata al check-in; storno dell'imposta alla rimozione di un ospite; proroga non tassa più ospiti già partiti; protezione da salvataggio concorrente estesa a soggiorni/ospiti; chiarito comportamento imposta di soggiorno su fatture già emesse)
 **Destinatari:** Receptionist, Owner, Admin
 **Lingua sistema:** Italiano / Inglese (selezionabile)
 
@@ -104,7 +104,7 @@ Solo dopo questi passi il sistema è operativo per ricevere prenotazioni e gesti
 
 **Edge case:** Se le date selezionate si sovrappongono con una prenotazione esistente per la stessa camera, il sistema mostra un errore 409 e impedisce la creazione.
 
-**Nota — prenotazione già in check-in:** Se si riapre una prenotazione il cui soggiorno è già attivo (stato **CHECKED_IN**), il form mostra un banner: *"Questa prenotazione è già in check-in. Le modifiche qui non aggiornano il soggiorno in corso: usa il pannello soggiorni per proroghe, cambio ospiti o partenza anticipata."* con collegamento diretto alla pagina Soggiorni. Modificare date/camere qui non tocca il soggiorno già aperto — usare §3.5a/§3.5b.
+**Nota — prenotazione già in check-in:** Se si riapre una prenotazione il cui soggiorno è già attivo (stato **CHECKED_IN**), il form mostra un banner: *"Questa prenotazione è già in check-in. Le modifiche qui non aggiornano il soggiorno in corso: usa il pannello soggiorni per proroghe, cambio ospiti o partenza anticipata."* con collegamento diretto alla pagina Soggiorni. I campi data/camere diventano **non modificabili** (sola lettura) in questo caso, non solo avvisati: il soggiorno già aperto non ha alcun collegamento "vivo" con la prenotazione di origine, quindi il sistema impedisce la modifica invece di lasciarla fare senza effetto — usare §3.5a/§3.5b per agire sul soggiorno.
 
 ---
 
@@ -150,6 +150,8 @@ Un preventivo permette di proporre a un potenziale ospite una o più opzioni di 
    - Apre una fattura con totale iniziale 0, con addebito **camera + notte** e, se configurata (§3.14), **imposta di soggiorno** per ogni notte
    - Se `alloggiatiAutoSend` è abilitato, invia i dati al portale PS via SOAP
 
+**Avviso imposta di soggiorno non configurata:** se il comune/categoria/tariffa non risultano configurati per oggi, un banner *"Imposta di soggiorno non configurata"* appare **prima** della conferma (il check-in può comunque procedere) e un toast informativo appare **dopo**, se il check-in si conclude senza che l'imposta sia stata addebitata — vedi §3.14 per configurarla. Il banner controlla solo la data odierna: un buco di configurazione futuro (es. una tariffa non ancora inserita per il mese prossimo) non viene segnalato qui, solo dal riepilogo soggiorni non tassati (Dashboard) e dal backfill (§3.14d).
+
 **Edge case:** Se il portale PS non risponde, il check-in viene comunque completato. Il badge **Inviato PS** non appare nella riga soggiorno e il report può essere inviato manualmente in seguito.
 
 ---
@@ -163,6 +165,8 @@ Un preventivo permette di proporre a un potenziale ospite una o più opzioni di 
 3. Seleziona la camera disponibile e la data di check-out prevista
 4. Compila i campi Alloggiati PS (stessi del check-in normale)
 5. Clicca **Conferma Check-in Walk-in**
+
+Vale lo stesso avviso di imposta di soggiorno non configurata descritto in §3.3.
 
 ---
 
@@ -183,9 +187,11 @@ Un preventivo permette di proporre a un potenziale ospite una o più opzioni di 
 1. Menu → **Soggiorni** → sul soggiorno in stato **CHECKED_IN**, pulsante **Proroga**
 2. La finestra mostra il **Check-out attuale** e un campo **Nuova data di check-out** (precompilato a +1 giorno)
 3. Clicca **Conferma**
-4. Il sistema verifica che la camera sia disponibile per le notti aggiunte e registra gli addebiti supplementari (pernottamento + imposta di soggiorno, se applicabile) sulla fattura del soggiorno
+4. Il sistema verifica che la camera sia disponibile per le notti aggiunte e registra gli addebiti supplementari (pernottamento + imposta di soggiorno, se applicabile) sulla fattura del soggiorno — l'imposta di soggiorno viene calcolata solo sugli ospiti ancora presenti: chi ha già registrato una partenza anticipata prima dell'inizio della proroga non viene tassato per le notti aggiunte
 
 **Edge case:** Se la camera è già occupata da un'altra prenotazione nelle notti richieste, la proroga viene rifiutata e l'errore compare direttamente nella finestra — scegliere un'altra data o cambiare camera.
+
+**Salvataggio concorrente:** se un altro utente ha già modificato lo stesso soggiorno (es. proroga effettuata da un'altra scheda rimasta aperta) tra l'apertura della finestra e la conferma, il sistema rifiuta il salvataggio invece di sovrascrivere in silenzio — ricaricare la pagina e riprovare.
 
 ---
 
@@ -195,12 +201,12 @@ Un preventivo permette di proporre a un potenziale ospite una o più opzioni di 
 2. Si apre l'elenco degli ospiti del soggiorno, ciascuno con badge di stato (Principale / Inviato / Da ritrasmettere / Partito il [data])
 
 Azioni disponibili per ogni ospite:
-- **Modifica** — corregge i dati anagrafici/documento già inseriti
+- **Modifica** — corregge i dati anagrafici/documento già inseriti; se un altro utente ha già salvato una modifica sullo stesso ospite nel frattempo, il salvataggio viene rifiutato invece di sovrascrivere in silenzio — ricaricare e riprovare
 - **Registra partenza** — segna una partenza anticipata di quel singolo ospite (data a scelta), senza rimuoverlo dallo storico del soggiorno
 - **Rendi principale** — promuove un ospite non principale a intestatario del soggiorno
-- **Rimuovi** — elimina l'ospite dal soggiorno; **non disponibile** se l'ospite è già stato trasmesso ad Alloggiati Web (usare "Registra partenza") o se è l'ospite principale (promuovere prima un altro ospite)
+- **Rimuovi** — elimina l'ospite dal soggiorno; **non disponibile** se l'ospite è già stato trasmesso ad Alloggiati Web (usare "Registra partenza") o se è l'ospite principale (promuovere prima un altro ospite). Se per quell'ospite era già stato addebitato un supplemento di imposta di soggiorno (perché aggiunto a soggiorno già in corso), il sistema lo storna automaticamente dalla fattura, se questa è ancora aperta
 
-Per aggiungere un nuovo ospite al soggiorno già aperto: pulsante **Aggiungi Ospite** in fondo alla finestra, compilare gli stessi campi Alloggiati PS del check-in e salvare.
+Per aggiungere un nuovo ospite al soggiorno già aperto: pulsante **Aggiungi Ospite** in fondo alla finestra, compilare gli stessi campi Alloggiati PS del check-in e salvare. Se il soggiorno ha già una fattura aperta, il sistema addebita subito l'imposta di soggiorno per le notti restanti di quel nuovo ospite.
 
 ---
 
@@ -437,6 +443,8 @@ Serve a caricare retroattivamente l'imposta su soggiorni passati non ancora adde
 3. Se ci sono righe addebitabili, clicca **Conferma addebito** — addebita solo le fatture ancora aperte, lasciando intoccate quelle chiuse
 4. Al termine appare un toast "Addebitati N soggiorni." e il pulsante di conferma scompare (l'operazione non è ripetibile sullo stesso risultato — rilanciare la verifica per un nuovo giro)
 
+**Comportamento voluto — le fatture già emesse non cambiano:** una volta che l'imposta di soggiorno è stata calcolata per un soggiorno, resta quella anche se in seguito si modifica la tariffa. Non è un bug: è un requisito di controllo fiscale, lo stesso motivo per cui una fattura esportata non è più modificabile (§3.7a) — un importo già addebitato non deve cambiare sotto i piedi dell'operatore. Per applicare una nuova tariffa a soggiorni già in corso serve una nuova azione esplicita, non un ricalcolo automatico.
+
 ---
 
 ### 3.15 Configurare la Conservazione Dati Ospite / Privacy (solo OWNER/ADMIN)
@@ -478,6 +486,10 @@ Menu → **Impostazioni** → **Sistema** → **Privacy** (`/settings/privacy`).
 | Rimozione di un ospite già trasmesso ad Alloggiati Web | Azione bloccata (tooltip esplicativo) | Usare **Registra partenza** per una partenza anticipata |
 | Backfill imposta di soggiorno su fattura già chiusa | Soggiorno escluso dall'addebito, elencato con il motivo | Nessuna azione possibile da UI: la fattura chiusa non viene riaperta |
 | Valore "Anni di conservazione" sotto il minimo TULPS | Salvataggio rifiutato lato client | Inserire un valore ≥ al minimo di legge mostrato in pagina |
+| Due schede aperte sullo stesso soggiorno/ospite, una modifica dopo l'altra | La seconda modifica viene rifiutata (non sovrascrive in silenzio) | Ricaricare la pagina e ripetere la modifica |
+| Rimozione di un ospite aggiunto a soggiorno già fatturato | L'eventuale supplemento di imposta di soggiorno già addebitato viene stornato dalla fattura, se ancora aperta | Nessuna azione — automatico |
+| Proroga di un soggiorno con un ospite già partito in anticipo | L'ospite partito non viene tassato per le notti aggiunte | Nessuna azione — automatico |
+| Cambio di una tariffa di imposta di soggiorno dopo che un ospite ha già fatto check-in | La sua fattura resta calcolata con la tariffa in vigore al check-in | Comportamento voluto (requisito fiscale) — non richiede intervento |
 
 ---
 
