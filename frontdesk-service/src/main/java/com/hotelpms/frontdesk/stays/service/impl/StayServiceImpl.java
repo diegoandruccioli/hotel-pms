@@ -154,34 +154,25 @@ public class StayServiceImpl implements StayService {
             }
         }
 
-        return withCityTaxWarning(stayMapper.toDto(savedStay), savedStay.getId(), savedStay.getHotelId());
+        return withCityTaxWarning(savedStay);
     }
 
     /**
-     * Attaches the just-assessed stay's {@code cityTaxWarning}, if any, to the check-in
-     * response — the "esito del check-in" surface (Parte 5.3): the operator sees the gap
-     * immediately, not only later via the Dashboard summary. A read-only lookup of the
-     * assessment {@code openInvoiceForStay} just wrote (never {@code assessFor} again —
-     * that would risk persisting a second, wrongly-parameterized assessment if the first
-     * call never actually ran, e.g. because billing-service was unreachable).
+     * Maps the just-checked-in stay, attaching its {@code cityTaxWarning} if any — the
+     * "esito del check-in" surface (Parte 5.3): the operator sees the gap immediately,
+     * not only later via the Dashboard summary. A read-only lookup of the assessment
+     * {@code openInvoiceForStay} just wrote (never {@code assessFor} again — that would
+     * risk persisting a second, wrongly-parameterized assessment if the first call
+     * never actually ran, e.g. because billing-service was unreachable).
      *
-     * @param response the mapped response to enrich
-     * @param stayId   the just-created stay's ID
-     * @param hotelId  the stay's hotel ID
-     * @return the response, with {@code cityTaxWarning} set if the assessment recorded one
+     * @param stay the just-created stay entity
+     * @return the mapped response, with {@code cityTaxWarning} set if the assessment recorded one
      */
-    private StayResponse withCityTaxWarning(final StayResponse response, final UUID stayId, final UUID hotelId) {
-        final CityTaxUnassessedReason warning = cityTaxAssessmentService.findAssessment(stayId, hotelId)
+    private StayResponse withCityTaxWarning(final Stay stay) {
+        final CityTaxUnassessedReason warning = cityTaxAssessmentService.findAssessment(stay.getId(), stay.getHotelId())
                 .map(CityTaxAssessment::getUnassessedReason)
                 .orElse(null);
-        return new StayResponse(
-                response.id(), response.hotelId(), response.reservationId(), response.guestId(), response.roomId(),
-                response.status(), response.actualCheckInTime(), response.actualCheckOutTime(),
-                response.createdAt(), response.updatedAt(), response.invoiceId(), response.alloggiatiSent(),
-                response.alloggiatiSendFailed(), response.alloggiatiFailureReason(), response.guests(),
-                response.guestDisplayName(), response.roomNumber(), response.expectedCheckOutDate(),
-                response.invoiceCreationFailed(), response.invoiceCreationFailureReason(),
-                response.checkoutEmailFailed(), response.checkoutEmailFailureReason(), warning);
+        return stayMapper.toDto(stay, warning);
     }
 
     /** {@inheritDoc} */
@@ -438,9 +429,11 @@ public class StayServiceImpl implements StayService {
     @Override
     @Transactional
     public StayResponse extendStay(
-            @NonNull final UUID stayId, @NonNull final UUID hotelId, @NonNull final LocalDate newCheckOutDate) {
+            @NonNull final UUID stayId, @NonNull final UUID hotelId, @NonNull final LocalDate newCheckOutDate,
+            final Long clientVersion) {
         final Stay stay = stayRepository.findByIdAndHotelId(stayId, hotelId)
                 .orElseThrow(() -> new NotFoundException(STAY_NOT_FOUND_MSG));
+        verifyNotStale(stay, clientVersion);
 
         if (stay.getStatus() != StayStatus.CHECKED_IN) {
             log.warn("[STAY] EXTENSION_FAILED | stayId={} | reason=INVALID_STATUS | currentStatus={}",
@@ -474,5 +467,21 @@ public class StayServiceImpl implements StayService {
 
         log.info("[STAY] EXTENDED | stayId={} | oldCheckOut={} | newCheckOut={}", stayId, oldCheckOut, newCheckOutDate);
         return stayMapper.toDto(saved);
+    }
+
+    /**
+     * Rejects a stale extension attempt — mirrors {@code
+     * ReservationServiceImpl#verifyNotStale}: a client that read the stay at an
+     * earlier version must fail fast, before any billing or availability work runs,
+     * if someone else has already saved a change since. {@code null} skips the check
+     * (a client that doesn't send a version yet).
+     *
+     * @param stay          the stay as currently persisted
+     * @param clientVersion the version the client last read, or {@code null} to skip
+     */
+    private static void verifyNotStale(final Stay stay, final Long clientVersion) {
+        if (clientVersion != null && !clientVersion.equals(stay.getVersion())) {
+            throw new ConflictException("STAY_STALE_VERSION");
+        }
     }
 }

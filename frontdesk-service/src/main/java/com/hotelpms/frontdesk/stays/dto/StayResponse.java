@@ -41,6 +41,9 @@ import java.util.UUID;
  *                                      StayServiceImpl#checkIn}) — the dashboard summary and
  *                                      backfill endpoints are the surfaces for the aggregate/
  *                                      historical view
+ * @param version                       the version the client last read, echoed back on {@code
+ *                                      extendStay} for optimistic-lock conflict detection —
+ *                                      same contract as {@code ReservationResponse.version}
  */
 public record StayResponse(
                 UUID id,
@@ -65,7 +68,8 @@ public record StayResponse(
                 String invoiceCreationFailureReason,
                 boolean checkoutEmailFailed,
                 String checkoutEmailFailureReason,
-                CityTaxUnassessedReason cityTaxWarning) {
+                CityTaxUnassessedReason cityTaxWarning,
+                Long version) {
     /**
      * Compact constructor to ensure defensive copying of the guests list.
      */

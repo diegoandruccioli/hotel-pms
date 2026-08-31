@@ -144,6 +144,38 @@ public class InvoiceServiceImpl implements InvoiceService {
 
     /** {@inheritDoc} */
     @Override
+    @Transactional
+    public void removeCharge(@NonNull final UUID stayId, @NonNull final UUID chargeId) {
+        log.info("Removing charge {} from stay {}", chargeId, stayId);
+        final UUID hotelId = resolveHotelId();
+
+        final Invoice invoice = invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)
+                .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND_FOR_STAY"));
+
+        if (invoice.getStatus() != InvoiceStatus.ISSUED) {
+            throw new InvoiceConflictException("INVOICE_NOT_OPEN");
+        }
+        assertNotFiscallyLocked(invoice);
+
+        // Scoped to this invoice, not a bare findById — a charge id that belongs to a
+        // different invoice (wrong stay, wrong hotel) must 404 exactly like it never
+        // existed, never leak whether it exists elsewhere.
+        final InvoiceCharge charge = invoiceChargeRepository.findById(chargeId)
+                .filter(c -> c.getInvoice().getId().equals(invoice.getId()))
+                .orElseThrow(() -> new NotFoundException("CHARGE_NOT_FOUND"));
+
+        invoice.removeCharge(charge);
+        invoiceChargeRepository.delete(charge);
+
+        invoice.setTotalAmount(invoice.getTotalAmount().subtract(charge.getAmount()));
+        invoiceRepository.save(Objects.requireNonNull(invoice));
+
+        log.info("Removed {} charge of {} from invoice {} (new total: {})",
+                charge.getType(), charge.getAmount(), invoice.getInvoiceNumber(), invoice.getTotalAmount());
+    }
+
+    /** {@inheritDoc} */
+    @Override
     @Transactional(readOnly = true)
     public InvoiceResponse getInvoice(@NonNull final UUID id) {
         log.info("Fetching invoice with id {}", id);

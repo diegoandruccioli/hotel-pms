@@ -142,4 +142,23 @@ public interface CityTaxAssessmentService {
      * @param toDateExclusive the new check-out (exclusive)
      */
     void rectifyForStayExtended(Stay stay, LocalDate fromDate, LocalDate toDateExclusive);
+
+    /**
+     * Reverses the rectification {@link #rectifyForGuestAdded} made for a guest who has
+     * since been removed from the stay: subtracts exactly that guest's own contribution
+     * from the assessment's running total, and voids the specific billing-service charge
+     * it posted (via {@code StayGuest.cityTaxChargeId}) if the invoice is still open.
+     *
+     * <p>A no-op when the removed guest never had a charge of their own posted —
+     * {@code cityTaxChargeId} is {@code null} for a guest present at check-in (their
+     * tax is part of the stay's original, immutable assessment, never attributable to
+     * one guest) or when the original rectification charge never actually posted. If
+     * the invoice has since closed, the assessment total is still corrected but the
+     * already-issued charge is left standing — never re-opens or amends a closed
+     * fiscal document, same rule as everywhere else in this service.
+     *
+     * @param stay         the stay the guest was removed from
+     * @param removedGuest the guest just removed, with its lifecycle fields still set
+     */
+    void rectifyForGuestRemoved(Stay stay, StayGuest removedGuest);
 }

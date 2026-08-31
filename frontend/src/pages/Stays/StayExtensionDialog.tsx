@@ -56,7 +56,7 @@ export const StayExtensionDialog = memo(({ stay, onClose, onExtended }: StayExte
     setSaving(true);
     setError(null);
     try {
-      const updated = await stayService.extendStay(stay.id, newCheckOutDate);
+      const updated = await stayService.extendStay(stay.id, newCheckOutDate, stay.version);
       addToast(t('stay_extension_success'), 'success');
       onExtended(updated);
       onClose();

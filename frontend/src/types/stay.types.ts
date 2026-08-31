@@ -59,6 +59,8 @@ export interface StayGuestResponse {
   alloggiatiSent: boolean;
   /** Whether a correction after sending still needs to be retransmitted. */
   needsResubmit: boolean;
+  /** Echo back on updateGuest for optimistic-lock conflict detection. */
+  version?: number | null;
 }
 
 export interface StayGuestRequest {
@@ -79,6 +81,11 @@ export interface StayGuestRequest {
   isPrimaryGuest: boolean;
   travellerType?: TravellerType;
   travelPurpose?: string;
+  /**
+   * The version last read from the server, for optimistic-lock conflict detection on
+   * updateGuest; omit or null to skip the check (e.g. on addGuest, where it's ignored).
+   */
+  version?: number | null;
 }
 
 export interface StayRequest {
@@ -131,6 +138,8 @@ export interface StayResponse {
    * applicable). Always null on every other response.
    */
   cityTaxWarning?: CityTaxUnassessedReason | null;
+  /** Echo back on extendStay for optimistic-lock conflict detection. */
+  version?: number | null;
 }
 
 /** Why a stay's tourist tax has no amount assessed — see StayResponse.cityTaxWarning. */

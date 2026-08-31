@@ -302,7 +302,15 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
         final LocalDate arrivalDate = newGuest.getArrivalDate();
         final LocalDate stayEnd = stay.getExpectedCheckOutDate() != null
                 ? stay.getExpectedCheckOutDate() : arrivalDate.plusDays(1);
-        rectify(stay, arrivalDate, stayEnd, List.of(newGuest), "ospite aggiunto");
+        // Single-guest rectification: whatever charge rectify() posts is entirely this
+        // guest's own contribution, so it's safe to stamp back onto them for later
+        // reversal — unlike a stay extension, which taxes every current guest at once
+        // and has no single guest to attribute the resulting charge to.
+        rectify(stay, arrivalDate, stayEnd, List.of(newGuest), "ospite aggiunto")
+                .ifPresent(posted -> {
+                    newGuest.setCityTaxChargeId(posted.chargeId());
+                    newGuest.setCityTaxChargeAmount(posted.amount());
+                });
     }
 
     /** {@inheritDoc} */
@@ -312,7 +320,54 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
         Objects.requireNonNull(stay, STAY_NOT_NULL_MSG);
         Objects.requireNonNull(fromDate, "From date cannot be null");
         Objects.requireNonNull(toDateExclusive, "To date cannot be null");
-        rectify(stay, fromDate, toDateExclusive, stay.getGuests(), "proroga soggiorno");
+        // A guest who already recorded an early departure before the extension starts
+        // wasn't present for any of the added nights — CityTaxCalculator has no notion
+        // of presence, only age exemption, so this is the only place that can exclude
+        // them before the extra nights are taxed.
+        final List<StayGuest> presentGuests = stay.getGuests().stream()
+                .filter(guest -> guest.getDepartureDate() == null || !guest.getDepartureDate().isBefore(fromDate))
+                .toList();
+        rectify(stay, fromDate, toDateExclusive, presentGuests, "proroga soggiorno");
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public void rectifyForGuestRemoved(final Stay stay, final StayGuest removedGuest) {
+        Objects.requireNonNull(stay, STAY_NOT_NULL_MSG);
+        Objects.requireNonNull(removedGuest, "Guest cannot be null");
+
+        final UUID chargeId = removedGuest.getCityTaxChargeId();
+        if (chargeId == null) {
+            // Present at check-in (part of the original, immutable assessment — not
+            // attributable to this one guest), or the original rectification charge
+            // never actually posted. Either way, nothing to reverse.
+            return;
+        }
+
+        final Optional<CityTaxAssessment> existing =
+                cityTaxAssessmentRepository.findByStayIdAndHotelId(stay.getId(), stay.getHotelId());
+        final BigDecimal chargedAmount = Objects.requireNonNullElse(
+                removedGuest.getCityTaxChargeAmount(), BigDecimal.ZERO);
+        if (existing.isPresent()) {
+            final CityTaxAssessment assessment = existing.get();
+            assessment.setTotalAmount(assessment.getTotalAmount().subtract(chargedAmount).max(BigDecimal.ZERO));
+            cityTaxAssessmentRepository.save(assessment);
+        }
+
+        if (!isInvoiceOpen(stay)) {
+            log.warn("[CITY_TAX] GUEST_REMOVED_CHARGE_NOT_REVERSED | stayId={} | guestId={} | reason=INVOICE_NOT_OPEN",
+                    stay.getId(), removedGuest.getId());
+            return;
+        }
+        try {
+            billingClient.removeCharge(stay.getId(), chargeId);
+            log.info("[CITY_TAX] GUEST_REMOVED_CHARGE_REVERSED | stayId={} | guestId={} | amount={}",
+                    stay.getId(), removedGuest.getId(), chargedAmount);
+        } catch (final FeignException ex) {
+            log.error("[CITY_TAX] GUEST_REMOVED_CHARGE_REVERSAL_FAILED | stayId={} | guestId={} | reason={}",
+                    stay.getId(), removedGuest.getId(), ex.getMessage());
+        }
     }
 
     /**
@@ -327,18 +382,21 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
      * @param guests        the guests to assess for this range (the new guest alone, or
      *                      every guest of the stay for an extension)
      * @param descriptionTag Italian label distinguishing the charge's cause on the invoice
+     * @return the posted charge's id and amount, or empty if nothing was actually
+     *         posted (no existing assessment to rectify, no coverage, non-positive
+     *         amount, invoice not open, or the billing-service call itself failed)
      */
-    private void rectify(final Stay stay, final LocalDate from, final LocalDate toExclusive,
+    private Optional<PostedCharge> rectify(final Stay stay, final LocalDate from, final LocalDate toExclusive,
             final List<StayGuest> guests, final String descriptionTag) {
         final Optional<CityTaxAssessment> existing =
                 cityTaxAssessmentRepository.findByStayIdAndHotelId(stay.getId(), stay.getHotelId());
         if (existing.isEmpty() || existing.get().getUnassessedReason() != null) {
             // Nothing assessed yet to add a rectification onto — a later backfill run
             // (or the stay's own first assessFor) covers this as part of the whole stay.
-            return;
+            return Optional.empty();
         }
         if (!toExclusive.isAfter(from)) {
-            return;
+            return Optional.empty();
         }
         final CityTaxAssessment assessment = existing.get();
         final long nights = ChronoUnit.DAYS.between(from, toExclusive);
@@ -346,12 +404,12 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
         final RangeResolution resolution = resolveRange(stay.getHotelId(), from, nights);
         if (resolution.reason() != null) {
             log.warn("[CITY_TAX] RECTIFICATION_SKIPPED | stayId={} | reason={}", stay.getId(), resolution.reason());
-            return;
+            return Optional.empty();
         }
 
         final CityTaxAssessmentResult result = cityTaxCalculator.assess(resolution.rates(), from, nights, guests);
         if (result.totalAmount().signum() <= 0) {
-            return;
+            return Optional.empty();
         }
 
         saveLines(assessment.getId(), result.lines());
@@ -365,13 +423,30 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
 
         if (!isInvoiceOpen(stay)) {
             log.warn("[CITY_TAX] RECTIFICATION_NOT_CHARGED | stayId={} | reason=INVOICE_NOT_OPEN", stay.getId());
-            return;
+            return Optional.empty();
         }
         try {
-            billingClient.addCharge(stay.getId(), buildRectificationChargeRequest(stay, result, descriptionTag));
+            final ChargeResponse chargeResp =
+                    billingClient.addCharge(stay.getId(), buildRectificationChargeRequest(stay, result, descriptionTag));
+            if (chargeResp == null || chargeResp.id() == null) {
+                return Optional.empty();
+            }
+            return Optional.of(new PostedCharge(chargeResp.id(), result.totalAmount()));
         } catch (final FeignException ex) {
             log.error("[CITY_TAX] RECTIFICATION_CHARGE_FAILED | stayId={} | reason={}", stay.getId(), ex.getMessage());
+            return Optional.empty();
         }
+    }
+
+    /**
+     * A charge successfully posted by {@link #rectify}, carried back only when the
+     * caller needs to attribute it to a single guest for later reversal — see
+     * {@link #rectifyForGuestAdded}.
+     *
+     * @param chargeId the billing-service charge id
+     * @param amount   the amount charged
+     */
+    private record PostedCharge(UUID chargeId, BigDecimal amount) {
     }
 
     private static ChargeRequest buildRectificationChargeRequest(

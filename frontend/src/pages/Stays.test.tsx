@@ -310,7 +310,7 @@ describe('Stays', () => {
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => {
-      expect(stayService.extendStay).toHaveBeenCalledWith('s1', '2026-07-02');
+      expect(stayService.extendStay).toHaveBeenCalledWith('s1', '2026-07-02', undefined);
     });
   });
 

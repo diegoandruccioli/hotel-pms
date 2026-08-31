@@ -137,7 +137,7 @@ class StayControllerTest {
         stayResponse = new StayResponse(
                 stayId, hotelId, null, guestId, UUID.randomUUID(),
                 StayStatus.CHECKED_IN, null, null, null, null, null, false, false, null, List.of(), null, null, null,
-                false, null, false, null, null);
+                false, null, false, null, null, null);
 
         final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 "admin", "", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
@@ -182,7 +182,7 @@ class StayControllerTest {
         final StayResponse checkedOut = new StayResponse(
                 stayId, hotelId, null, guestId, UUID.randomUUID(),
                 StayStatus.CHECKED_OUT, null, null, null, null, null, false, false, null, List.of(), null, null, null,
-                false, null, false, null, null);
+                false, null, false, null, null, null);
         when(stayService.checkOut(stayId, hotelId)).thenReturn(checkedOut);
 
         mockMvc.perform(put(BASE_URL + PATH_CHECKOUT, stayId))
@@ -405,7 +405,7 @@ class StayControllerTest {
     @Test
     void shouldExtendStaySuccessfully() throws Exception {
         final LocalDate newCheckOut = LocalDate.now().plusDays(5);
-        when(stayService.extendStay(eq(stayId), eq(hotelId), eq(newCheckOut))).thenReturn(stayResponse);
+        when(stayService.extendStay(eq(stayId), eq(hotelId), eq(newCheckOut), any())).thenReturn(stayResponse);
 
         mockMvc.perform(put(BASE_URL + PATH_BY_ID, stayId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -417,7 +417,7 @@ class StayControllerTest {
     @Test
     void shouldReturnConflictWhenExtensionRoomUnavailable() throws Exception {
         final LocalDate newCheckOut = LocalDate.now().plusDays(5);
-        when(stayService.extendStay(eq(stayId), eq(hotelId), eq(newCheckOut)))
+        when(stayService.extendStay(eq(stayId), eq(hotelId), eq(newCheckOut), any()))
                 .thenThrow(new ConflictException("ROOM_NOT_AVAILABLE_FOR_EXTENSION"));
 
         mockMvc.perform(put(BASE_URL + PATH_BY_ID, stayId)
@@ -433,13 +433,13 @@ class StayControllerTest {
     private StayGuestRequest newGuestRequest() {
         return new StayGuestRequest(GUEST_FIRST_NAME, GUEST_LAST_NAME, "M", GUEST_DOB,
                 COMUNE_CODICE_ROMA, "100000100", "PASOR", "AA1234567", COMUNE_CODICE_ROMA,
-                false, TravellerType.OSPITE_SINGOLO, null);
+                false, TravellerType.OSPITE_SINGOLO, null, null);
     }
 
     private StayGuestResponse guestResponse(final UUID id) {
         return new StayGuestResponse(id, GUEST_FIRST_NAME, GUEST_LAST_NAME, "M", GUEST_DOB,
                 COMUNE_CODICE_ROMA, "100000100", "PASOR", "AA1234567", COMUNE_CODICE_ROMA,
-                false, TravellerType.OSPITE_SINGOLO, null, GUEST_DOB, null, false, false);
+                false, TravellerType.OSPITE_SINGOLO, null, GUEST_DOB, null, false, false, null);
     }
 
     @Test

@@ -165,10 +165,17 @@ public interface StayService {
      * the same range. Rejects a stay that's already {@code CHECKED_OUT} or whose invoice is
      * no longer open — never re-opens or amends a closed fiscal document.
      *
+     * <p>Rejects a stale save: a {@code clientVersion} that doesn't match the stay's
+     * current version means someone else — another tab, another user — already saved a
+     * change since this client last read it (the "forgotten tab" scenario), same
+     * protection {@code ReservationService#updateReservation} already has.
+     *
      * @param stayId          the stay ID
      * @param hotelId         the authenticated hotel UUID; the stay must belong to it
      * @param newCheckOutDate the new expected check-out date; must be strictly after the current one
+     * @param clientVersion   the version the client last read, or {@code null} to skip the check
      * @return the updated stay response
      */
-    StayResponse extendStay(@NonNull UUID stayId, @NonNull UUID hotelId, @NonNull LocalDate newCheckOutDate);
+    StayResponse extendStay(
+            @NonNull UUID stayId, @NonNull UUID hotelId, @NonNull LocalDate newCheckOutDate, Long clientVersion);
 }

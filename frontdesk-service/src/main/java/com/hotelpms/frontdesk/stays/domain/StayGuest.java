@@ -22,6 +22,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -142,4 +143,24 @@ public class StayGuest {
     @Version
     @Column(name = "version")
     private Long version;
+
+    /**
+     * The billing-service charge id posted for this guest's own tourist-tax
+     * contribution when they were added mid-stay ({@code
+     * CityTaxAssessmentService#rectifyForGuestAdded}) — {@code null} for a guest
+     * present at check-in (their tax is part of the stay's original assessment, not
+     * attributable to one guest) or when no charge was actually posted (invoice
+     * closed, amount zero, or the charge call failed). Lets {@code removeGuest} void
+     * exactly this charge, and only this one, if the guest is later removed.
+     */
+    @Column(name = "city_tax_charge_id")
+    private UUID cityTaxChargeId;
+
+    /**
+     * The amount charged under {@link #cityTaxChargeId}, kept alongside it so the
+     * assessment's running total can be corrected even if the billing-service
+     * reversal itself fails or the invoice has since closed.
+     */
+    @Column(name = "city_tax_charge_amount")
+    private BigDecimal cityTaxChargeAmount;
 }

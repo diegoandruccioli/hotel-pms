@@ -46,6 +46,25 @@ public interface InvoiceService {
     ChargeResponse addCharge(@NonNull UUID stayId, @NonNull ChargeRequest request);
 
     /**
+     * Removes a charge from the open invoice for a stay — the reversal counterpart of
+     * {@link #addCharge}, for a charge that turns out to no longer apply (e.g. a guest
+     * removed from a stay after their tourist-tax charge was already posted). Updates
+     * {@code Invoice.totalAmount} atomically. Unlike a discount or credit note, this
+     * deletes the line entirely: it corrects a charge that should never have stood,
+     * not one being waived after the fact.
+     *
+     * <p>Returns 404 if no ISSUED invoice exists for the stay in the caller's hotel, or
+     * if {@code chargeId} does not belong to that invoice (IDOR-safe). Returns 409 if
+     * the invoice is not in ISSUED status, or is fiscally locked after export — same
+     * guards as {@link #addCharge}, since an invoice that can no longer receive new
+     * charges must equally not have existing ones removed.
+     *
+     * @param stayId   the stay UUID used to look up the invoice
+     * @param chargeId the charge UUID to remove
+     */
+    void removeCharge(@NonNull UUID stayId, @NonNull UUID chargeId);
+
+    /**
      * Retrieves an invoice by its ID.
      *
      * @param id the invoice UUID

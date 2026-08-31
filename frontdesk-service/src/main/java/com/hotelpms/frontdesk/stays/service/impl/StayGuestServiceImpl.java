@@ -29,6 +29,7 @@ public class StayGuestServiceImpl implements StayGuestService {
     private static final String ALREADY_SENT_MSG = "STAY_GUEST_ALREADY_SENT";
     private static final String IS_PRIMARY_MSG = "STAY_GUEST_IS_PRIMARY";
     private static final String DEPARTURE_BEFORE_ARRIVAL_MSG = "STAY_GUEST_DEPARTURE_BEFORE_ARRIVAL";
+    private static final String STAY_GUEST_STALE_VERSION_MSG = "STAY_GUEST_STALE_VERSION";
 
     private final StayRepository stayRepository;
     private final StayGuestValidator stayGuestValidator;
@@ -47,7 +48,11 @@ public class StayGuestServiceImpl implements StayGuestService {
         stayRepository.save(stay);
         log.info("[STAY] GUEST_ADDED | stayId={} | hotelId={}", stayId, hotelId);
 
+        // Stamps guest.cityTaxChargeId/cityTaxChargeAmount in place when a charge was
+        // actually posted — persisted by the save below so a later removeGuest can
+        // void exactly this charge.
         cityTaxAssessmentService.rectifyForGuestAdded(stay, guest);
+        stayRepository.save(stay);
 
         return stayGuestMapper.toResponse(guest);
     }
@@ -59,6 +64,7 @@ public class StayGuestServiceImpl implements StayGuestService {
             final UUID stayId, final UUID guestId, final UUID hotelId, final StayGuestRequest request) {
         final Stay stay = stayGuestValidator.validateStayForGuestMutation(stayId, hotelId);
         final StayGuest guest = stayGuestValidator.findGuestOnStay(stay, guestId);
+        verifyNotStale(guest, request.version());
         final boolean wasSent = guest.isAlloggiatiSent();
         stayGuestMapper.updateEntityFromRequest(request, guest);
         if (wasSent) {
@@ -87,6 +93,8 @@ public class StayGuestServiceImpl implements StayGuestService {
         stay.getGuests().remove(guest);
         stayRepository.save(stay);
         log.info("[STAY] GUEST_REMOVED | stayId={} | guestId={}", stayId, guestId);
+
+        cityTaxAssessmentService.rectifyForGuestRemoved(stay, guest);
     }
 
     /** {@inheritDoc} */
@@ -115,5 +123,20 @@ public class StayGuestServiceImpl implements StayGuestService {
         stayRepository.save(stay);
         log.info("[STAY] GUEST_PROMOTED_PRIMARY | stayId={} | guestId={}", stayId, guestId);
         return stayGuestMapper.toResponse(newPrimary);
+    }
+
+    /**
+     * Rejects a stale guest edit — mirrors {@code ReservationServiceImpl#verifyNotStale}:
+     * a client that read this guest at an earlier version must fail fast if someone
+     * else has already saved a correction since. {@code null} skips the check (a
+     * client that doesn't send a version yet).
+     *
+     * @param guest         the guest as currently persisted
+     * @param clientVersion the version the client last read, or {@code null} to skip
+     */
+    private static void verifyNotStale(final StayGuest guest, final Long clientVersion) {
+        if (clientVersion != null && !clientVersion.equals(guest.getVersion())) {
+            throw new ConflictException(STAY_GUEST_STALE_VERSION_MSG);
+        }
     }
 }

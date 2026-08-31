@@ -8,8 +8,12 @@ import java.time.LocalDate;
  *
  * @param newCheckOutDate the new expected check-out date; must be strictly after the
  *                        stay's current one
+ * @param version         the version the client last read, for optimistic-lock
+ *                        conflict detection; {@code null} skips the check
+ *                        (backward-compatible for callers that don't send it yet)
  */
 public record StayExtensionRequest(
-        @NotNull(message = "New check-out date is required") LocalDate newCheckOutDate
+        @NotNull(message = "New check-out date is required") LocalDate newCheckOutDate,
+        Long version
 ) {
 }

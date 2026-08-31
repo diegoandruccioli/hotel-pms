@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -113,6 +114,18 @@ public interface BillingClient {
     @PostMapping("/api/v1/invoices/stay/{stayId}/charges")
     @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "addChargeFallback")
     ChargeResponse addCharge(@PathVariable("stayId") UUID stayId, @RequestBody ChargeRequest request);
+
+    /**
+     * Removes a charge from the open invoice for a stay — the reversal counterpart of
+     * {@link #addCharge}. Used to void a tourist-tax charge posted for a guest who was
+     * later removed from the stay.
+     *
+     * @param stayId   the stay UUID
+     * @param chargeId the charge UUID to remove
+     */
+    @DeleteMapping("/api/v1/invoices/stay/{stayId}/charges/{chargeId}")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "removeChargeFallback")
+    void removeCharge(@PathVariable("stayId") UUID stayId, @PathVariable("chargeId") UUID chargeId);
 
     /**
      * Fallback for getLatestInvoiceByReservation.
@@ -218,5 +231,25 @@ public interface BillingClient {
             throw fe;
         }
         return null;
+    }
+
+    /**
+     * Fallback for removeCharge — same distinction as {@link #addChargeFallback}: a
+     * legitimate 4xx (e.g. 409 INVOICE_NOT_OPEN, 404 CHARGE_NOT_FOUND) is rethrown so
+     * the caller can log the specific reason; genuine unavailability is swallowed here
+     * (logged, not rethrown) so a removeGuest call never fails just because billing-
+     * service happens to be down at that moment — same best-effort trade-off already
+     * accepted for the reversal's counterpart, {@code addCharge}.
+     *
+     * @param stayId    the stay UUID
+     * @param chargeId  the charge UUID
+     * @param throwable the cause
+     */
+    default void removeChargeFallback(final UUID stayId, final UUID chargeId, final Throwable throwable) {
+        LOG.error("[BillingClient] removeCharge fallback | stayId={} | chargeId={} | cause={}: {}",
+                stayId, chargeId, throwable.getClass().getSimpleName(), throwable.getMessage());
+        if (throwable instanceof FeignException fe && fe.status() >= CLIENT_ERROR_MIN && fe.status() < CLIENT_ERROR_MAX) {
+            throw fe;
+        }
     }
 }

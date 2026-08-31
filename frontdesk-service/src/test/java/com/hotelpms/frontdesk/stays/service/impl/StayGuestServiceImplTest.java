@@ -76,7 +76,7 @@ class StayGuestServiceImplTest {
     private StayGuestRequest request(final boolean primary) {
         return new StayGuestRequest(GUEST_FIRST_NAME, "Rossi", "M", GUEST_DOB,
                 COMUNE_CODICE, CITIZENSHIP_ITALIA, "PASOR", "AA1234567", COMUNE_CODICE,
-                primary, TravellerType.OSPITE_SINGOLO, null);
+                primary, TravellerType.OSPITE_SINGOLO, null, null);
     }
 
     private StayGuest existingGuest(final boolean primary, final boolean sent) {

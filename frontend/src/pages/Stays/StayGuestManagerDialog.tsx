@@ -44,6 +44,7 @@ const toIdentifiableGuest = (g: StayGuestResponse, stati: AlloggiatiStato[]): Id
     isPrimaryGuest: g.isPrimaryGuest,
     travellerType: g.travellerType,
     travelPurpose: g.travelPurpose ?? '',
+    version: g.version,
     _statoDiNascita: isStatoCode(g.placeOfBirth) ? g.placeOfBirth : CODICE_ITALIA,
     _statoRilascioDoc: g.documentPlaceOfIssue && isStatoCode(g.documentPlaceOfIssue) ? g.documentPlaceOfIssue : CODICE_ITALIA,
   };
@@ -62,6 +63,7 @@ const toRequest = (g: IdentifiableGuest): StayGuestRequest => ({
   isPrimaryGuest: g.isPrimaryGuest,
   travellerType: g.travellerType,
   travelPurpose: g.travelPurpose || undefined,
+  version: g.version,
 });
 
 type ErrorTranslator = (key: string, options?: Record<string, unknown>) => string;

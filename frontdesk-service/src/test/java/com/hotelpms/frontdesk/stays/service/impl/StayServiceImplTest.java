@@ -194,7 +194,7 @@ class StayServiceImplTest {
         validResponse = new StayResponse(stayId, null, reservationId, guestId, roomId,
                 StayStatus.CHECKED_IN, savedStay.getActualCheckInTime(), null,
                 LocalDateTime.now(), LocalDateTime.now(), null, false, false, null, new ArrayList<>(), null, null,
-                null, false, null, false, null, null);
+                null, false, null, false, null, null, null);
 
         // StayBillingCoordinator now prefers a reservation's snapshotted price over a
         // live resolve (the P10-follow-up reconciliation fix); defaulting the snapshot
@@ -234,6 +234,15 @@ class StayServiceImplTest {
                 new StayReservationSync(reservationService, stayRepository),
                 gatewayEventsClient,
                 cityTaxAssessmentService);
+
+        // checkIn() always goes through the two-arg toDto(Stay, CityTaxUnassessedReason)
+        // overload now (withCityTaxWarning), not the single-arg one every test below
+        // stubs directly. Delegating here means every existing single-arg stub keeps
+        // working unchanged — the mock resolves stayMapper.toDto(stay) as usual, this
+        // just forwards to it instead of needing a second, parallel stub per test.
+        lenient()
+                .when(stayMapper.toDto(ArgumentMatchers.any(Stay.class), ArgumentMatchers.any()))
+                .thenAnswer(invocation -> stayMapper.toDto(invocation.getArgument(0)));
     }
 
     private ReservationResponse reservationResponse(
@@ -1775,7 +1784,7 @@ class StayServiceImplTest {
         when(stayRepository.save(stay)).thenReturn(stay);
         when(stayMapper.toDto(stay)).thenReturn(validResponse);
 
-        final StayResponse response = stayService.extendStay(id, hotelId, newCheckOut);
+        final StayResponse response = stayService.extendStay(id, hotelId, newCheckOut, null);
 
         assertNotNull(response);
         assertEquals(newCheckOut, stay.getExpectedCheckOutDate());
@@ -1796,7 +1805,7 @@ class StayServiceImplTest {
                 .thenReturn(new InvoiceStatusResponse(UUID.randomUUID(), reservationId, OPEN_STATUS, BigDecimal.ZERO));
         when(reservationService.isRoomBookedByOthers(roomId, oldCheckOut, newCheckOut)).thenReturn(true);
 
-        assertThrows(ConflictException.class, () -> stayService.extendStay(id, hotelId, newCheckOut));
+        assertThrows(ConflictException.class, () -> stayService.extendStay(id, hotelId, newCheckOut, null));
         verify(billingClient, never()).addCharge(ArgumentMatchers.any(), ArgumentMatchers.any());
         verify(cityTaxAssessmentService, never())
                 .rectifyForStayExtended(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
@@ -1813,7 +1822,7 @@ class StayServiceImplTest {
         when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
                 .thenReturn(new InvoiceStatusResponse(UUID.randomUUID(), reservationId, PAID_STATUS, BigDecimal.ZERO));
 
-        assertThrows(ConflictException.class, () -> stayService.extendStay(id, hotelId, newCheckOut));
+        assertThrows(ConflictException.class, () -> stayService.extendStay(id, hotelId, newCheckOut, null));
         verify(reservationService, never())
                 .isRoomBookedByOthers(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
     }
@@ -1827,7 +1836,7 @@ class StayServiceImplTest {
         when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(stay));
 
         assertThrows(BadRequestException.class,
-                () -> stayService.extendStay(id, hotelId, stay.getExpectedCheckOutDate()));
+                () -> stayService.extendStay(id, hotelId, stay.getExpectedCheckOutDate(), null));
     }
 
     @Test
@@ -1840,7 +1849,7 @@ class StayServiceImplTest {
         when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(stay));
 
         assertThrows(IllegalStateException.class,
-                () -> stayService.extendStay(id, hotelId, stay.getExpectedCheckOutDate().plusDays(1)));
+                () -> stayService.extendStay(id, hotelId, stay.getExpectedCheckOutDate().plusDays(1), null));
     }
 
     @Test
@@ -1848,7 +1857,8 @@ class StayServiceImplTest {
         final UUID id = Objects.requireNonNull(stayId);
         when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundException.class, () -> stayService.extendStay(id, hotelId, LocalDate.now().plusDays(1)));
+        assertThrows(NotFoundException.class,
+                () -> stayService.extendStay(id, hotelId, LocalDate.now().plusDays(1), null));
     }
 
     /**

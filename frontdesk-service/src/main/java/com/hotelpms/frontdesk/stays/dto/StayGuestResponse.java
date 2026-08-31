@@ -24,6 +24,8 @@ import java.util.UUID;
  * @param departureDate        this guest's own departure date, if different from the room's
  * @param alloggiatiSent       whether this guest's own Alloggiati Web schedina was transmitted
  * @param needsResubmit        whether a correction after sending still needs to be retransmitted
+ * @param version              the version to echo back on {@code updateGuest} for
+ *                             optimistic-lock conflict detection
  */
 public record StayGuestResponse(
         UUID id,
@@ -42,6 +44,7 @@ public record StayGuestResponse(
         LocalDate arrivalDate,
         LocalDate departureDate,
         boolean alloggiatiSent,
-        boolean needsResubmit
+        boolean needsResubmit,
+        Long version
 ) {
 }

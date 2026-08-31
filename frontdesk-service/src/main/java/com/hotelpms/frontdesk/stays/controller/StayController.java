@@ -375,7 +375,8 @@ public class StayController {
     @PutMapping("/{id}")
     public StayResponse extendStay(
             @NonNull @PathVariable("id") final UUID id, @NonNull @Valid @RequestBody final StayExtensionRequest request) {
-        return stayService.extendStay(id, Objects.requireNonNull(extractHotelId()), request.newCheckOutDate());
+        return stayService.extendStay(
+                id, Objects.requireNonNull(extractHotelId()), request.newCheckOutDate(), request.version());
     }
 
     /**
