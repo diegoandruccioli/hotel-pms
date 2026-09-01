@@ -1,7 +1,10 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
+import com.hotelpms.frontdesk.citytax.dto.CityTaxApplicabilityRequest;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxApplicabilityResponse;
 import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.stays.domain.AlloggiatiComune;
+import com.hotelpms.frontdesk.stays.domain.CityTaxApplicability;
 import com.hotelpms.frontdesk.stays.domain.HotelSettings;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsRequest;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
@@ -278,5 +281,45 @@ class HotelSettingsServiceImplTest {
                 null, null, null, null, null, null, COMUNE_ROMA, null);
 
         assertThrows(BadRequestException.class, () -> hotelSettingsService.update(hotelId, request));
+    }
+
+    @Test
+    void shouldReturnUnknownApplicabilityByDefaultForANewHotel() {
+        final UUID hotelId = UUID.randomUUID();
+        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
+        when(hotelSettingsRepository.save(ArgumentMatchers.any(HotelSettings.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        final CityTaxApplicabilityResponse result = hotelSettingsService.getCityTaxApplicability(hotelId);
+
+        assertEquals(CityTaxApplicability.UNKNOWN, result.applicability());
+    }
+
+    @Test
+    void shouldUpdateApplicabilityOnExistingSettings() {
+        final UUID hotelId = UUID.randomUUID();
+        final HotelSettings existing = new HotelSettings();
+        existing.setHotelId(hotelId);
+        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.save(existing)).thenReturn(existing);
+
+        final CityTaxApplicabilityResponse result = hotelSettingsService.updateCityTaxApplicability(
+                hotelId, new CityTaxApplicabilityRequest(CityTaxApplicability.NOT_APPLICABLE));
+
+        assertEquals(CityTaxApplicability.NOT_APPLICABLE, result.applicability());
+        assertEquals(CityTaxApplicability.NOT_APPLICABLE, existing.getCityTaxApplicability());
+    }
+
+    @Test
+    void shouldCreateDefaultSettingsWhenUpdatingApplicabilityForANewHotel() {
+        final UUID hotelId = UUID.randomUUID();
+        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
+        when(hotelSettingsRepository.save(ArgumentMatchers.any(HotelSettings.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        final CityTaxApplicabilityResponse result = hotelSettingsService.updateCityTaxApplicability(
+                hotelId, new CityTaxApplicabilityRequest(CityTaxApplicability.APPLICABLE));
+
+        assertEquals(CityTaxApplicability.APPLICABLE, result.applicability());
     }
 }

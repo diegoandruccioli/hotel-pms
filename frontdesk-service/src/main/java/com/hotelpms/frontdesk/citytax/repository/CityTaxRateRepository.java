@@ -58,6 +58,31 @@ public interface CityTaxRateRepository extends JpaRepository<CityTaxRate, UUID> 
             @Param("date") LocalDate date);
 
     /**
+     * Resolves every rate rule that overlaps a date range at all — a stay whose
+     * nights cross a delibera boundary (typically 1 January or 1 April) needs
+     * each night taxed at the rate actually in effect that night, not one rate
+     * applied to the whole stay. Ordered by {@code validFrom} so the caller can
+     * walk the returned rules in effective-date order without re-sorting.
+     *
+     * @param hotelId            the hotel UUID (multi-tenant scoping)
+     * @param comuneCodice       the comune's stable code
+     * @param category           the hotel's classification at the relevant dates
+     * @param fromDate           the range start (inclusive)
+     * @param toDateExclusive    the range end (exclusive) — the stay's checkout date
+     * @return every rule overlapping the range, ordered by {@code validFrom}; may
+     *         leave gaps in coverage, which the caller must check for
+     */
+    @Query("SELECT r FROM CityTaxRate r WHERE r.hotelId = :hotelId AND r.comuneCodice = :comuneCodice "
+            + "AND r.category = :category AND r.validFrom < :toDateExclusive "
+            + "AND (r.validTo IS NULL OR r.validTo > :fromDate) ORDER BY r.validFrom")
+    List<CityTaxRate> findAllApplicableByHotelIdInRange(
+            @Param("hotelId") UUID hotelId,
+            @Param("comuneCodice") String comuneCodice,
+            @Param("category") String category,
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDateExclusive") LocalDate toDateExclusive);
+
+    /**
      * Finds the currently open-ended rule (if any) for a hotel's (comune,
      * category) pair — the row a new rule creation must close by setting its
      * {@code validTo} before inserting the new one.

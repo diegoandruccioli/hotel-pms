@@ -90,6 +90,12 @@
   "guest_id": "ID Ospite",
   "no_active_stays": "Nessun soggiorno attivo trovato.",
   "action_checkout": "Check-out",
+  "action_extend_stay": "Proroga",
+  "stay_extension_title": "Proroga soggiorno",
+  "stay_extension_current_checkout": "Check-out attuale: {{date}}",
+  "stay_extension_new_checkout": "Nuova data di check-out",
+  "stay_extension_success": "Soggiorno prorogato",
+  "stay_extension_failed": "Proroga non riuscita",
   "police_report_title": "Schedine Alloggiati Web",
   "police_report_desc": "Genera il report giornaliero arrivi nel formato italiano Alloggiati Web (tracciato a larghezza fissa). Seleziona una data per scaricare il file.",
   "check_in_date": "Data di Arrivo",
@@ -256,6 +262,10 @@
   "failed_create_reservation": "Errore durante la creazione della prenotazione",
   "room_move_overlap_error": "Impossibile spostare. La camera è già occupata in queste date.",
   "reservation_overlap_error": "Le date selezionate si sovrappongono con un'altra prenotazione per queste camere.",
+  "reservation_already_checked_in_banner": "Questa prenotazione è già in check-in. Le modifiche qui non aggiornano il soggiorno in corso: usa il pannello soggiorni per proroghe, cambio ospiti o partenza anticipata.",
+  "reservation_go_to_stay": "Vai al soggiorno",
+  "reservation_stale_version_title": "Prenotazione modificata nel frattempo",
+  "reservation_stale_version_body": "Un altro utente ha modificato questa prenotazione mentre la stavi guardando. Ricarica per vedere la versione aggiornata prima di salvare di nuovo.",
 
   "skip_to_main": "Vai al contenuto principale",
 
@@ -285,6 +295,10 @@
   "alloggiati_failure_banner_title": "Invio Alloggiati non riuscito",
   "alloggiati_failure_banner_desc_one": "1 soggiorno non è stato segnalato al Portale Alloggiati Web — verifica e reinvia da Soggiorni.",
   "alloggiati_failure_banner_desc_other": "{{count}} soggiorni non sono stati segnalati al Portale Alloggiati Web — verifica e reinvia da Soggiorni.",
+  "city_tax_unassessed_banner_title": "Imposta di soggiorno non addebitata",
+  "city_tax_unassessed_banner_desc_one": "1 soggiorno non ha avuto l'imposta di soggiorno calcolata per una configurazione mancante.",
+  "city_tax_unassessed_banner_desc_other": "{{count}} soggiorni non hanno avuto l'imposta di soggiorno calcolata per una configurazione mancante.",
+  "city_tax_unassessed_banner_action": "Verifica e recupera",
   "download_json_export": "Scarica Esportazione JSON",
   "alloggiati_json_downloaded": "Esportazione JSON del {{date}} scaricata.",
 
@@ -326,6 +340,12 @@
   "delete_guest_gdpr_hold": "Impossibile eliminare: l'ospite ha soggiorni o fatture da conservare per obblighi di legge.",
   "delete_guest_failed": "Impossibile eliminare l'ospite. Riprova.",
   "guest_deleted_success": "Ospite eliminato con successo.",
+
+  "export_guest_data": "Esporta dati (GDPR)",
+  "export_guest_data_confirm_title": "Esportare i dati dell'ospite",
+  "export_guest_data_confirm_body": "Il file scaricato conterrà i dati personali dell'ospite (anagrafica, documenti, soggiorni e fatture). È una comunicazione di dati personali: consegnalo solo alla persona a cui appartengono i dati o a chi ne ha titolo.",
+  "export_guest_data_confirm_action": "Scarica",
+  "export_guest_data_failed": "Impossibile generare l'export. Riprova.",
 
   "delete_reservation": "Elimina",
   "delete_reservation_confirm": "Sei sicuro di voler eliminare questa prenotazione? L'azione non può essere annullata.",

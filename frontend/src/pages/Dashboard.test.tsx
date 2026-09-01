@@ -12,7 +12,7 @@ import type { DaySheetResponse } from '../types/daySheet.types';
 import type { OwnerFinancialSummaryDto } from '../types/ownerReport.types';
 
 vi.mock('../services/stayService', () => ({
-  stayService: { getAlloggiatiFailureSummary: vi.fn() },
+  stayService: { getAlloggiatiFailureSummary: vi.fn(), getCityTaxUnassessedSummary: vi.fn() },
 }));
 
 vi.mock('../services/dashboardService', () => ({
@@ -61,6 +61,10 @@ describe('Dashboard Component', () => {
     vi.mocked(stayService.getAlloggiatiFailureSummary).mockReset();
     vi.mocked(stayService.getAlloggiatiFailureSummary).mockResolvedValue({
       failedCount: 0, mostRecentFailureAt: null, mostRecentFailureReason: null,
+    });
+    vi.mocked(stayService.getCityTaxUnassessedSummary).mockReset();
+    vi.mocked(stayService.getCityTaxUnassessedSummary).mockResolvedValue({
+      unassessedCount: 0, mostRecentUnassessedAt: null, mostRecentReason: null,
     });
     vi.mocked(dashboardService.getDaySheet).mockReset();
     vi.mocked(dashboardService.getDaySheet).mockResolvedValue(MOCK_DAY_SHEET);
@@ -138,6 +142,29 @@ describe('Dashboard Component', () => {
     await waitFor(() => expect(screen.getByTestId('stats-grid')).toBeInTheDocument());
     expect(stayService.getAlloggiatiFailureSummary).not.toHaveBeenCalled();
     expect(screen.queryByText('alloggiati_failure_banner_title')).not.toBeInTheDocument();
+  });
+
+  it('shows city-tax unassessed banner for ADMIN when gaps exist, linking to Settings', async () => {
+    vi.mocked(stayService.getCityTaxUnassessedSummary).mockResolvedValue({
+      unassessedCount: 3, mostRecentUnassessedAt: '2026-06-19T10:00:00', mostRecentReason: 'NO_RATE_FOR_DATE',
+    });
+    renderDashboard();
+    await waitFor(() => {
+      expect(screen.getByText('city_tax_unassessed_banner_title')).toBeInTheDocument();
+    });
+    expect(screen.getByText('city_tax_unassessed_banner_action')).toHaveAttribute('href', '/settings/city-tax');
+  });
+
+  it('does not fetch or show city-tax unassessed banner for RECEPTIONIST', async () => {
+    useAuthStore.setState({
+      user: { sub: 'user2', username: 'reception', role: 'RECEPTIONIST' },
+      isAuthenticated: true,
+      isLoading: false,
+    });
+    renderDashboard();
+    await waitFor(() => expect(screen.getByTestId('stats-grid')).toBeInTheDocument());
+    expect(stayService.getCityTaxUnassessedSummary).not.toHaveBeenCalled();
+    expect(screen.queryByText('city_tax_unassessed_banner_title')).not.toBeInTheDocument();
   });
 
   it('renders error state with retry button', async () => {

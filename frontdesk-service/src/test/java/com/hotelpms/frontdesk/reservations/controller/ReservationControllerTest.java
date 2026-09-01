@@ -92,7 +92,7 @@ class ReservationControllerTest {
         response = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, 2, 0,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.CONFIRMED, null, true, null, null, false, null);
+                ReservationStatus.CONFIRMED, null, true, null, null, false, null, null);
     }
 
     @Test
@@ -215,7 +215,7 @@ class ReservationControllerTest {
         final ReservationResponse checkedInResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, 2, 2,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.CHECKED_IN, null, true, null, null, false, null);
+                ReservationStatus.CHECKED_IN, null, true, null, null, false, null, null);
 
         when(reservationService.updateStatusAndGuests(
                 any(UUID.class), any(ReservationStatus.class), any(Integer.class)))
@@ -281,6 +281,6 @@ class ReservationControllerTest {
                 LocalDate.now().plusDays(1),
                 LocalDate.now().plusDays(3),
                 ReservationStatus.CONFIRMED,
-                List.of(lineItem));
+                List.of(lineItem), null);
     }
 }

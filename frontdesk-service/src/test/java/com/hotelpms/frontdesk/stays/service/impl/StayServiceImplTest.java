@@ -16,7 +16,9 @@ import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.client.dto.NotificationCheckoutRequest;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
+import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
+import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.pricing.dto.NightlyRate;
@@ -37,6 +39,7 @@ import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
 import com.hotelpms.frontdesk.stays.mapper.StayMapper;
+import com.hotelpms.frontdesk.stays.repository.StayGuestRepository;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
 import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
@@ -100,6 +103,7 @@ class StayServiceImplTest {
     private static final String ROOM_NOT_FOUND = "ROOM_NOT_FOUND";
     private static final String PS_PORTAL_DOWN = "PS portal down";
     private static final String PAID_STATUS = "PAID";
+    private static final String OPEN_STATUS = "ISSUED";
     private static final String BILLING_SERVICE_UNAVAILABLE = "BILLING_SERVICE_UNAVAILABLE";
     private static final String HOTEL_NAME_TEST = "Hotel Test";
     private static final String INVOICE_NUMBER_TEST = "2026/0001";
@@ -110,6 +114,9 @@ class StayServiceImplTest {
 
     @Mock
     private StayRepository stayRepository;
+
+    @Mock
+    private StayGuestRepository stayGuestRepository;
 
     @Mock
     private StayMapper stayMapper;
@@ -187,7 +194,7 @@ class StayServiceImplTest {
         validResponse = new StayResponse(stayId, null, reservationId, guestId, roomId,
                 StayStatus.CHECKED_IN, savedStay.getActualCheckInTime(), null,
                 LocalDateTime.now(), LocalDateTime.now(), null, false, false, null, new ArrayList<>(), null, null,
-                null, false, null, false, null);
+                null, false, null, false, null, null, null);
 
         // StayBillingCoordinator now prefers a reservation's snapshotted price over a
         // live resolve (the P10-follow-up reconciliation fix); defaulting the snapshot
@@ -216,22 +223,35 @@ class StayServiceImplTest {
                     return rates;
                 });
 
+        final StayInvoiceResolver stayInvoiceResolver = new StayInvoiceResolver(billingClient);
+
         stayService = new StayServiceImpl(
-                stayRepository, stayMapper, guestClient, roomService,
+                stayRepository, stayGuestRepository, stayMapper, guestClient, roomService, reservationService,
                 new StayCheckInValidator(guestClient, reservationService, roomService),
                 new StayBillingCoordinator(billingClient, roomService, stayRepository, reservationService,
-                        ratePricingService, cityTaxAssessmentService),
+                        ratePricingService, cityTaxAssessmentService, stayInvoiceResolver),
                 new StayAlloggiatiCoordinator(alloggiatiWebSenderService, hotelSettingsService, stayRepository),
                 new StayNotificationCoordinator(
                         notificationClient, guestClient, billingClient, hotelSettingsService, stayRepository),
                 new StayReservationSync(reservationService, stayRepository),
-                gatewayEventsClient);
+                gatewayEventsClient,
+                cityTaxAssessmentService,
+                stayInvoiceResolver);
+
+        // checkIn() always goes through the two-arg toDto(Stay, CityTaxUnassessedReason)
+        // overload now (withCityTaxWarning), not the single-arg one every test below
+        // stubs directly. Delegating here means every existing single-arg stub keeps
+        // working unchanged — the mock resolves stayMapper.toDto(stay) as usual, this
+        // just forwards to it instead of needing a second, parallel stub per test.
+        lenient()
+                .when(stayMapper.toDto(ArgumentMatchers.any(Stay.class), ArgumentMatchers.any()))
+                .thenAnswer(invocation -> stayMapper.toDto(invocation.getArgument(0)));
     }
 
     private ReservationResponse reservationResponse(
             final ReservationStatus status, final List<ReservationLineItemResponse> lineItems) {
         return new ReservationResponse(reservationId, guestId, null, 2, 0,
-                LocalDate.now(), LocalDate.now().plusDays(3), status, lineItems, true, null, null, false, null);
+                LocalDate.now(), LocalDate.now().plusDays(3), status, lineItems, true, null, null, false, null, null);
     }
 
     private RoomResponse room() {
@@ -1743,6 +1763,105 @@ class StayServiceImplTest {
         verify(stayRepository, never())
                 .findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
                         ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+    }
+
+    // -----------------------------------------------------------------
+    // extendStay (Parte 3)
+    // -----------------------------------------------------------------
+
+    @Test
+    void extendStaySuccessfullyPostsRoomChargeAndRectifiesCityTax() {
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay stay = Objects.requireNonNull(savedStay);
+        stay.setHotelId(hotelId);
+        final LocalDate oldCheckOut = stay.getExpectedCheckOutDate();
+        final LocalDate newCheckOut = oldCheckOut.plusDays(2);
+
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(stay));
+        when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
+                .thenReturn(new InvoiceStatusResponse(UUID.randomUUID(), reservationId, OPEN_STATUS, BigDecimal.ZERO));
+        when(reservationService.isRoomBookedByOthers(roomId, oldCheckOut, newCheckOut)).thenReturn(false);
+        when(roomService.getRoomById(roomId, hotelId)).thenReturn(room());
+        when(billingClient.addCharge(ArgumentMatchers.eq(id), ArgumentMatchers.any()))
+                .thenReturn(new ChargeResponse(UUID.randomUUID()));
+        when(stayRepository.save(stay)).thenReturn(stay);
+        when(stayMapper.toDto(stay)).thenReturn(validResponse);
+
+        final StayResponse response = stayService.extendStay(id, hotelId, newCheckOut, null);
+
+        assertNotNull(response);
+        assertEquals(newCheckOut, stay.getExpectedCheckOutDate());
+        verify(billingClient, times(1)).addCharge(ArgumentMatchers.eq(id), ArgumentMatchers.any());
+        verify(cityTaxAssessmentService, times(1)).rectifyForStayExtended(stay, oldCheckOut, newCheckOut);
+    }
+
+    @Test
+    void extendStayRejectsWhenRoomBookedByOthers() {
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay stay = Objects.requireNonNull(savedStay);
+        stay.setHotelId(hotelId);
+        final LocalDate oldCheckOut = stay.getExpectedCheckOutDate();
+        final LocalDate newCheckOut = oldCheckOut.plusDays(2);
+
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(stay));
+        when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
+                .thenReturn(new InvoiceStatusResponse(UUID.randomUUID(), reservationId, OPEN_STATUS, BigDecimal.ZERO));
+        when(reservationService.isRoomBookedByOthers(roomId, oldCheckOut, newCheckOut)).thenReturn(true);
+
+        assertThrows(ConflictException.class, () -> stayService.extendStay(id, hotelId, newCheckOut, null));
+        verify(billingClient, never()).addCharge(ArgumentMatchers.any(), ArgumentMatchers.any());
+        verify(cityTaxAssessmentService, never())
+                .rectifyForStayExtended(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+    }
+
+    @Test
+    void extendStayRejectsWhenInvoiceNotOpen() {
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay stay = Objects.requireNonNull(savedStay);
+        stay.setHotelId(hotelId);
+        final LocalDate newCheckOut = stay.getExpectedCheckOutDate().plusDays(2);
+
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(stay));
+        when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
+                .thenReturn(new InvoiceStatusResponse(UUID.randomUUID(), reservationId, PAID_STATUS, BigDecimal.ZERO));
+
+        assertThrows(ConflictException.class, () -> stayService.extendStay(id, hotelId, newCheckOut, null));
+        verify(reservationService, never())
+                .isRoomBookedByOthers(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+    }
+
+    @Test
+    void extendStayRejectsWhenNewDateNotAfterCurrentCheckout() {
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay stay = Objects.requireNonNull(savedStay);
+        stay.setHotelId(hotelId);
+
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(stay));
+
+        assertThrows(BadRequestException.class,
+                () -> stayService.extendStay(id, hotelId, stay.getExpectedCheckOutDate(), null));
+    }
+
+    @Test
+    void extendStayRejectsWhenStayNotCheckedIn() {
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay stay = Objects.requireNonNull(savedStay);
+        stay.setHotelId(hotelId);
+        stay.setStatus(StayStatus.CHECKED_OUT);
+
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(stay));
+
+        assertThrows(IllegalStateException.class,
+                () -> stayService.extendStay(id, hotelId, stay.getExpectedCheckOutDate().plusDays(1), null));
+    }
+
+    @Test
+    void extendStayThrowsNotFoundForUnknownStay() {
+        final UUID id = Objects.requireNonNull(stayId);
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> stayService.extendStay(id, hotelId, LocalDate.now().plusDays(1), null));
     }
 
     /**

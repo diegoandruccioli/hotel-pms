@@ -1,16 +1,23 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
+import com.hotelpms.frontdesk.citytax.domain.CityTaxAssessment;
+import com.hotelpms.frontdesk.citytax.domain.CityTaxUnassessedReason;
+import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
 import com.hotelpms.frontdesk.client.GatewayEventsClient;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest;
 import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest.GatewayEventType;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
+import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
+import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
+import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.service.RoomService;
 import com.hotelpms.frontdesk.stays.domain.Stay;
+import com.hotelpms.frontdesk.stays.domain.StayGuest;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
@@ -18,6 +25,7 @@ import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
 import com.hotelpms.frontdesk.stays.dto.StaySummaryResponse;
 import com.hotelpms.frontdesk.stays.mapper.StayMapper;
+import com.hotelpms.frontdesk.stays.repository.StayGuestRepository;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import com.hotelpms.frontdesk.stays.service.StayService;
 import feign.FeignException;
@@ -32,6 +40,7 @@ import org.springframework.lang.NonNull;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
@@ -66,19 +75,24 @@ public class StayServiceImpl implements StayService {
 
     private static final String PAID_STATUS = "PAID";
     private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
+    private static final String INVALID_STAY_STATUS_MSG = "INVALID_STAY_STATUS";
     private static final LocalDate EARLIEST_FILTER_DATE = LocalDate.of(1900, 1, 1);
     private static final LocalDate LATEST_FILTER_DATE = LocalDate.of(2100, 12, 31);
 
     private final StayRepository stayRepository;
+    private final StayGuestRepository stayGuestRepository;
     private final StayMapper stayMapper;
     private final GuestClient guestClient;
     private final RoomService roomService;
+    private final ReservationService reservationService;
     private final StayCheckInValidator stayCheckInValidator;
     private final StayBillingCoordinator stayBillingCoordinator;
     private final StayAlloggiatiCoordinator stayAlloggiatiCoordinator;
     private final StayNotificationCoordinator stayNotificationCoordinator;
     private final StayReservationSync stayReservationSync;
     private final GatewayEventsClient gatewayEventsClient;
+    private final CityTaxAssessmentService cityTaxAssessmentService;
+    private final StayInvoiceResolver stayInvoiceResolver;
 
     /** {@inheritDoc} */
     @Override
@@ -98,12 +112,16 @@ public class StayServiceImpl implements StayService {
         newStay.setGuestDisplayName(ctx.guestDisplayName());
         newStay.setRoomNumber(ctx.roomNumber());
 
-        if (newStay.getGuests() != null) {
-            newStay.getGuests().forEach(guest -> guest.setStay(newStay));
-        }
-
         if (newStay.getActualCheckInTime() == null) {
             newStay.setActualCheckInTime(LocalDateTime.now());
+        }
+
+        if (newStay.getGuests() != null) {
+            final LocalDate arrivalDate = newStay.getActualCheckInTime().toLocalDate();
+            newStay.getGuests().forEach(guest -> {
+                guest.setStay(newStay);
+                guest.setArrivalDate(arrivalDate);
+            });
         }
 
         // Never trust a client-supplied status at creation — checkIn() always
@@ -136,7 +154,25 @@ public class StayServiceImpl implements StayService {
             }
         }
 
-        return stayMapper.toDto(savedStay);
+        return withCityTaxWarning(savedStay);
+    }
+
+    /**
+     * Maps the just-checked-in stay, attaching its {@code cityTaxWarning} if any — the
+     * "esito del check-in" surface (Parte 5.3): the operator sees the gap immediately,
+     * not only later via the Dashboard summary. A read-only lookup of the assessment
+     * {@code openInvoiceForStay} just wrote (never {@code assessFor} again — that would
+     * risk persisting a second, wrongly-parameterized assessment if the first call
+     * never actually ran, e.g. because billing-service was unreachable).
+     *
+     * @param stay the just-created stay entity
+     * @return the mapped response, with {@code cityTaxWarning} set if the assessment recorded one
+     */
+    private StayResponse withCityTaxWarning(final Stay stay) {
+        final CityTaxUnassessedReason warning = cityTaxAssessmentService.findAssessment(stay.getId(), stay.getHotelId())
+                .map(CityTaxAssessment::getUnassessedReason)
+                .orElse(null);
+        return stayMapper.toDto(stay, warning);
     }
 
     /** {@inheritDoc} */
@@ -151,7 +187,7 @@ public class StayServiceImpl implements StayService {
         if (stay.getStatus() != StayStatus.CHECKED_IN) {
             log.warn("[STAY] CHECK_OUT_FAILED | stayId={} | reason=INVALID_STATUS | currentStatus={}",
                     stayId, stay.getStatus());
-            throw new IllegalStateException("INVALID_STAY_STATUS");
+            throw new IllegalStateException(INVALID_STAY_STATUS_MSG);
         }
 
         // 1. Verify billing folio is PAID. Walk-in stays have no reservationId — the
@@ -285,8 +321,25 @@ public class StayServiceImpl implements StayService {
             stay.setAlloggiatiFailureReason(null);
         }
         stayRepository.saveAll(Objects.requireNonNull(stays));
-        log.info("[STAY] ALLOGGIATI_MANUAL_SUBMIT_RECORDED | date={} | hotelId={} | staysUpdated={}",
-                date, hotelId, stays.size());
+
+        // Guest-level: the manual submit sends the same report as generateReport()
+        // (Parte 1) — arrival_date=date plus every needsResubmit guest, regardless
+        // of their own arrival date.
+        final List<StayGuest> sentGuests = new ArrayList<>(
+                stayGuestRepository.findByHotelIdAndArrivalDate(hotelId, date));
+        stayGuestRepository.findByHotelIdAndNeedsResubmitTrue(hotelId).stream()
+                .filter(g -> !sentGuests.contains(g))
+                .forEach(sentGuests::add);
+        final LocalDateTime now = LocalDateTime.now();
+        sentGuests.forEach(guest -> {
+            guest.setAlloggiatiSent(true);
+            guest.setAlloggiatiSentAt(now);
+            guest.setNeedsResubmit(false);
+        });
+        stayGuestRepository.saveAll(sentGuests);
+
+        log.info("[STAY] ALLOGGIATI_MANUAL_SUBMIT_RECORDED | date={} | hotelId={} | staysUpdated={} | guestsUpdated={}",
+                date, hotelId, stays.size(), sentGuests.size());
     }
 
     /** {@inheritDoc} */
@@ -306,7 +359,7 @@ public class StayServiceImpl implements StayService {
         final Stay stay = stayRepository.findByIdAndHotelId(stayId, hotelId)
                 .orElseThrow(() -> new NotFoundException(STAY_NOT_FOUND_MSG));
         if (stay.getStatus() != StayStatus.CHECKED_OUT) {
-            throw new IllegalStateException("INVALID_STAY_STATUS");
+            throw new IllegalStateException(INVALID_STAY_STATUS_MSG);
         }
         final InvoiceStatusResponse invoice = stayBillingCoordinator.resolveInvoiceForCheckOut(stay);
         if (invoice == null) {
@@ -370,5 +423,64 @@ public class StayServiceImpl implements StayService {
                         s.getRoomId(),
                         s.getStatus()))
                 .toList();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public StayResponse extendStay(
+            @NonNull final UUID stayId, @NonNull final UUID hotelId, @NonNull final LocalDate newCheckOutDate,
+            final Long clientVersion) {
+        final Stay stay = stayRepository.findByIdAndHotelId(stayId, hotelId)
+                .orElseThrow(() -> new NotFoundException(STAY_NOT_FOUND_MSG));
+        verifyNotStale(stay, clientVersion);
+
+        if (stay.getStatus() != StayStatus.CHECKED_IN) {
+            log.warn("[STAY] EXTENSION_FAILED | stayId={} | reason=INVALID_STATUS | currentStatus={}",
+                    stayId, stay.getStatus());
+            throw new IllegalStateException(INVALID_STAY_STATUS_MSG);
+        }
+        final LocalDate oldCheckOut = stay.getExpectedCheckOutDate();
+        if (oldCheckOut == null || !newCheckOutDate.isAfter(oldCheckOut)) {
+            throw new BadRequestException("EXTENSION_MUST_BE_LATER_THAN_CURRENT_CHECKOUT");
+        }
+
+        if (!stayInvoiceResolver.isOpen(stay)) {
+            log.warn("[STAY] EXTENSION_FAILED | stayId={} | reason=INVOICE_NOT_OPEN", stayId);
+            throw new ConflictException("STAY_EXTENSION_INVOICE_NOT_OPEN");
+        }
+        if (reservationService.isRoomBookedByOthers(stay.getRoomId(), oldCheckOut, newCheckOutDate)) {
+            log.warn("[STAY] EXTENSION_FAILED | stayId={} | reason=ROOM_NOT_AVAILABLE | roomId={}",
+                    stayId, stay.getRoomId());
+            throw new ConflictException("ROOM_NOT_AVAILABLE_FOR_EXTENSION");
+        }
+
+        // Billing before persisting the new date: a failed charge must never leave the
+        // stay silently extended with nothing billed for the added nights.
+        stayBillingCoordinator.postExtensionRoomCharge(stay, oldCheckOut, newCheckOutDate);
+
+        stay.setExpectedCheckOutDate(newCheckOutDate);
+        final Stay saved = stayRepository.save(stay);
+
+        cityTaxAssessmentService.rectifyForStayExtended(saved, oldCheckOut, newCheckOutDate);
+
+        log.info("[STAY] EXTENDED | stayId={} | oldCheckOut={} | newCheckOut={}", stayId, oldCheckOut, newCheckOutDate);
+        return stayMapper.toDto(saved);
+    }
+
+    /**
+     * Rejects a stale extension attempt — mirrors {@code
+     * ReservationServiceImpl#verifyNotStale}: a client that read the stay at an
+     * earlier version must fail fast, before any billing or availability work runs,
+     * if someone else has already saved a change since. {@code null} skips the check
+     * (a client that doesn't send a version yet).
+     *
+     * @param stay          the stay as currently persisted
+     * @param clientVersion the version the client last read, or {@code null} to skip
+     */
+    private static void verifyNotStale(final Stay stay, final Long clientVersion) {
+        if (clientVersion != null && !clientVersion.equals(stay.getVersion())) {
+            throw new ConflictException("STAY_STALE_VERSION");
+        }
     }
 }

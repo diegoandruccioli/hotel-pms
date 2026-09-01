@@ -1,14 +1,23 @@
 package com.hotelpms.frontdesk.stays.controller;
 
+import com.hotelpms.frontdesk.citytax.dto.CityTaxBackfillResponse;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxConfigurationStatusResponse;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxUnassessedSummaryResponse;
+import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
 import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
+import com.hotelpms.frontdesk.stays.dto.StayExtensionRequest;
+import com.hotelpms.frontdesk.stays.dto.StayGuestDepartureRequest;
+import com.hotelpms.frontdesk.stays.dto.StayGuestRequest;
+import com.hotelpms.frontdesk.stays.dto.StayGuestResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
 import com.hotelpms.frontdesk.stays.dto.StaySummaryResponse;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiReportService;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
+import com.hotelpms.frontdesk.stays.service.StayGuestService;
 import com.hotelpms.frontdesk.stays.service.StayService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +31,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -52,10 +62,13 @@ public class StayController {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final String ROLE_ADMIN_OR_OWNER = "hasAnyRole('ADMIN', 'OWNER')";
+    private static final String PATH_VAR_GUEST_ID = "guestId";
 
     private final StayService stayService;
+    private final StayGuestService stayGuestService;
     private final AlloggiatiReportService alloggiatiReportService;
     private final AlloggiatiWebSenderService alloggiatiWebSenderService;
+    private final CityTaxAssessmentService cityTaxAssessmentService;
 
     /**
      * Endpoint to check in a guest and create a stay.
@@ -154,7 +167,7 @@ public class StayController {
      */
     @GetMapping("/guest/{guestId}/latest")
     public ResponseEntity<StayResponse> getLastCompletedStayForGuest(
-            @NonNull @PathVariable("guestId") final UUID guestId) {
+            @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId) {
         return stayService.getLastCompletedStayForGuest(guestId, Objects.requireNonNull(extractHotelId()))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.noContent().build());
@@ -291,6 +304,153 @@ public class StayController {
     @PostMapping("/{id}/checkout-email/retry")
     public StayResponse retryCheckoutEmail(@NonNull @PathVariable("id") final UUID id) {
         return stayService.retryCheckoutEmail(id, Objects.requireNonNull(extractHotelId()));
+    }
+
+    /**
+     * Reports whether a check-in for the caller's hotel today would actually get its
+     * tourist tax assessed — the pre-flight check the check-in form calls before
+     * submitting, so a missing configuration surfaces before the stay is created.
+     *
+     * @return the configuration status
+     */
+    @GetMapping("/city-tax/configuration-status")
+    public ResponseEntity<CityTaxConfigurationStatusResponse> getCityTaxConfigurationStatus() {
+        return ResponseEntity.ok(
+                cityTaxAssessmentService.checkConfigurationStatus(Objects.requireNonNull(extractHotelId())));
+    }
+
+    /**
+     * Summarizes stays whose tourist tax was never assessed because of a configuration
+     * gap, for the caller's hotel — drives the Dashboard alert banner, same pattern as
+     * {@link #getAlloggiatiFailureSummary()}.
+     *
+     * @return the summary
+     */
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
+    @GetMapping("/city-tax/unassessed/summary")
+    public ResponseEntity<CityTaxUnassessedSummaryResponse> getCityTaxUnassessedSummary() {
+        return ResponseEntity.ok(
+                cityTaxAssessmentService.getUnassessedSummary(Objects.requireNonNull(extractHotelId())));
+    }
+
+    /**
+     * Dry-run preview of a tourist-tax backfill for the caller's hotel: computes what
+     * would be charged, against each affected stay's own check-in date, without posting
+     * anything or writing any assessment.
+     *
+     * @return the preview
+     */
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
+    @GetMapping("/city-tax/backfill/preview")
+    public ResponseEntity<CityTaxBackfillResponse> previewCityTaxBackfill() {
+        return ResponseEntity.ok(
+                cityTaxAssessmentService.previewBackfill(Objects.requireNonNull(extractHotelId())));
+    }
+
+    /**
+     * Posts the {@code CITY_TAX} charge for every backfillable stay of the caller's hotel
+     * that still has an open invoice, and corrects its assessment row. A stay whose
+     * invoice is no longer open is left untouched — never re-opens or amends a fiscal
+     * document already closed.
+     *
+     * @return the outcome
+     */
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
+    @PostMapping("/city-tax/backfill/confirm")
+    public ResponseEntity<CityTaxBackfillResponse> confirmCityTaxBackfill() {
+        return ResponseEntity.ok(
+                cityTaxAssessmentService.confirmBackfill(Objects.requireNonNull(extractHotelId())));
+    }
+
+    /**
+     * Extends an open stay's expected check-out date (Parte 3) — "I'm staying another
+     * night" at the desk. Verifies room availability for the added nights and that the
+     * stay's invoice is still open, posts a supplementary {@code ROOM_NIGHT} charge, and
+     * rectifies the tourist tax for the same range. Scoped to the caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param request the new check-out date
+     * @return the updated stay response
+     */
+    @PutMapping("/{id}")
+    public StayResponse extendStay(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @Valid @RequestBody final StayExtensionRequest request) {
+        return stayService.extendStay(
+                id, Objects.requireNonNull(extractHotelId()), request.newCheckOutDate(), request.version());
+    }
+
+    /**
+     * Adds a guest to an open ({@code CHECKED_IN}) stay — the late-arrival and
+     * mid-stay-addition cases (Parte 1). Scoped to the caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param request the new guest's data
+     * @return the created guest
+     */
+    @PostMapping("/{id}/guests")
+    @ResponseStatus(HttpStatus.CREATED)
+    public StayGuestResponse addGuest(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @Valid @RequestBody final StayGuestRequest request) {
+        return stayGuestService.addGuest(id, Objects.requireNonNull(extractHotelId()), request);
+    }
+
+    /**
+     * Corrects an existing guest's data on an open stay. Scoped to the caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param guestId the guest ID
+     * @param request the corrected data
+     * @return the updated guest
+     */
+    @PutMapping("/{id}/guests/{guestId}")
+    public StayGuestResponse updateGuest(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId,
+            @NonNull @Valid @RequestBody final StayGuestRequest request) {
+        return stayGuestService.updateGuest(id, guestId, Objects.requireNonNull(extractHotelId()), request);
+    }
+
+    /**
+     * Removes a guest from an open stay — only allowed before their schedina was ever
+     * sent and when they aren't the stay's primary guest. Scoped to the caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param guestId the guest ID
+     */
+    @DeleteMapping("/{id}/guests/{guestId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeGuest(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId) {
+        stayGuestService.removeGuest(id, guestId, Objects.requireNonNull(extractHotelId()));
+    }
+
+    /**
+     * Records an early departure for one guest of a multi-guest stay, without
+     * checking out the room. Scoped to the caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param guestId the departing guest's ID
+     * @param request the departure date
+     * @return the updated guest
+     */
+    @PutMapping("/{id}/guests/{guestId}/departure")
+    public StayGuestResponse recordGuestDeparture(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId,
+            @NonNull @Valid @RequestBody final StayGuestDepartureRequest request) {
+        return stayGuestService.recordDeparture(
+                id, guestId, Objects.requireNonNull(extractHotelId()), request.departureDate());
+    }
+
+    /**
+     * Promotes another guest of the stay to primary. Scoped to the caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param guestId the guest ID to promote
+     * @return the promoted guest
+     */
+    @PutMapping("/{id}/guests/{guestId}/primary")
+    public StayGuestResponse promoteGuestToPrimary(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId) {
+        return stayGuestService.promotePrimary(id, guestId, Objects.requireNonNull(extractHotelId()));
     }
 
     private UUID extractHotelId() {

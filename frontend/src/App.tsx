@@ -36,6 +36,7 @@ const SettingsAccessibility = lazy(() => import('./pages/Settings/SettingsAccess
 const SettingsAppearance = lazy(() => import('./pages/Settings/SettingsAppearance').then((m) => ({ default: m.SettingsAppearance })));
 const SettingsSystem = lazy(() => import('./pages/Settings/SettingsSystem').then((m) => ({ default: m.SettingsSystem })));
 const SettingsCityTax = lazy(() => import('./pages/Settings/SettingsCityTax').then((m) => ({ default: m.SettingsCityTax })));
+const SettingsPrivacy = lazy(() => import('./pages/Settings/SettingsPrivacy').then((m) => ({ default: m.SettingsPrivacy })));
 
 const OWNER_ADMIN_ROLES = ['OWNER', 'ADMIN'] as const;
 
@@ -115,6 +116,7 @@ function App() {
                 <Route path="/profile/hotel" element={<HotelProfile />} />
                 <Route path="/settings/system" element={<SettingsSystem />} />
                 <Route path="/settings/city-tax" element={<SettingsCityTax />} />
+                <Route path="/settings/privacy" element={<SettingsPrivacy />} />
               </Route>
             </Route>
           </Route>

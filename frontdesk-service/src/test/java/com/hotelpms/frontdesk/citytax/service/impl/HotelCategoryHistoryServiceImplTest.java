@@ -5,6 +5,7 @@ import com.hotelpms.frontdesk.citytax.dto.HotelCategoryHistoryRequest;
 import com.hotelpms.frontdesk.citytax.dto.HotelCategoryHistoryResponse;
 import com.hotelpms.frontdesk.citytax.mapper.HotelCategoryHistoryMapper;
 import com.hotelpms.frontdesk.citytax.repository.HotelCategoryHistoryRepository;
+import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,11 +32,10 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class HotelCategoryHistoryServiceImplTest {
 
+    private static final String CATEGORY = "4_STAR";
     private static final String OLD_CATEGORY = "3_STAR";
-    private static final String NEW_CATEGORY = "4_STAR";
-    private static final LocalDate NEW_CATEGORY_VALID_FROM = LocalDate.of(2026, 6, 1);
-    private static final LocalDate OLD_RESPONSE_VALID_FROM = LocalDate.of(2025, 1, 1);
-    private static final LocalDate OLD_ENTRY_VALID_FROM = LocalDate.of(2020, 1, 1);
+    private static final LocalDate VALID_FROM = LocalDate.of(2026, 1, 1);
+    private static final LocalDate OLD_VALID_FROM = LocalDate.of(2025, 1, 1);
     /** PostgreSQL SQLState for an EXCLUDE constraint violation. */
     private static final String SQLSTATE_EXCLUSION_VIOLATION = "23P01";
 
@@ -54,14 +54,14 @@ class HotelCategoryHistoryServiceImplTest {
     @BeforeEach
     void setUp() {
         hotelId = UUID.randomUUID();
-        request = new HotelCategoryHistoryRequest(NEW_CATEGORY, NEW_CATEGORY_VALID_FROM);
+        request = new HotelCategoryHistoryRequest(CATEGORY, VALID_FROM);
     }
 
     @Test
     void listHistoryReturnsMappedEntries() {
-        final HotelCategoryHistory entry = HotelCategoryHistory.builder().id(UUID.randomUUID()).hotelId(hotelId).build();
-        final HotelCategoryHistoryResponse response =
-                new HotelCategoryHistoryResponse(entry.getId(), OLD_CATEGORY, OLD_RESPONSE_VALID_FROM, null);
+        final HotelCategoryHistory entry = HotelCategoryHistory.builder().id(UUID.randomUUID()).hotelId(hotelId)
+                .build();
+        final HotelCategoryHistoryResponse response = mock(entry);
         when(hotelCategoryHistoryRepository.findAllByHotelIdOrderByValidFromDesc(hotelId)).thenReturn(List.of(entry));
         when(hotelCategoryHistoryMapper.toResponse(entry)).thenReturn(response);
 
@@ -71,10 +71,10 @@ class HotelCategoryHistoryServiceImplTest {
     }
 
     @Test
-    void recordCategoryWithNoExistingOpenEntryJustInserts() {
-        final HotelCategoryHistory saved = HotelCategoryHistory.builder().id(UUID.randomUUID()).build();
-        final HotelCategoryHistoryResponse response =
-                new HotelCategoryHistoryResponse(saved.getId(), NEW_CATEGORY, request.validFrom(), null);
+    void recordCategoryPersistsWhenNoOpenEndedEntryExists() {
+        final HotelCategoryHistory saved = HotelCategoryHistory.builder().id(UUID.randomUUID()).hotelId(hotelId)
+                .build();
+        final HotelCategoryHistoryResponse response = mock(saved);
         when(hotelCategoryHistoryRepository.findByHotelIdAndValidToIsNull(hotelId)).thenReturn(Optional.empty());
         when(hotelCategoryHistoryRepository.saveAndFlush(any(HotelCategoryHistory.class))).thenReturn(saved);
         when(hotelCategoryHistoryMapper.toResponse(saved)).thenReturn(response);
@@ -82,32 +82,58 @@ class HotelCategoryHistoryServiceImplTest {
         final HotelCategoryHistoryResponse result = hotelCategoryHistoryService.recordCategory(hotelId, request);
 
         assertEquals(response, result);
-        verify(hotelCategoryHistoryRepository, never()).save(any());
         final ArgumentCaptor<HotelCategoryHistory> captor = ArgumentCaptor.forClass(HotelCategoryHistory.class);
         verify(hotelCategoryHistoryRepository).saveAndFlush(captor.capture());
         assertEquals(hotelId, captor.getValue().getHotelId());
-        assertEquals(NEW_CATEGORY, captor.getValue().getCategory());
+        assertEquals(CATEGORY, captor.getValue().getCategory());
     }
 
     @Test
-    void recordCategoryUpgradeClosesExistingOpenEntry() {
+    void recordCategoryClosesExistingOpenEndedEntry() {
         final HotelCategoryHistory openEntry = HotelCategoryHistory.builder()
-                .id(UUID.randomUUID()).hotelId(hotelId).category(OLD_CATEGORY)
-                .validFrom(OLD_ENTRY_VALID_FROM).build();
+                .id(UUID.randomUUID()).hotelId(hotelId).category(OLD_CATEGORY).validFrom(OLD_VALID_FROM).build();
         final HotelCategoryHistory saved = HotelCategoryHistory.builder().id(UUID.randomUUID()).build();
         when(hotelCategoryHistoryRepository.findByHotelIdAndValidToIsNull(hotelId)).thenReturn(Optional.of(openEntry));
         when(hotelCategoryHistoryRepository.saveAndFlush(any(HotelCategoryHistory.class))).thenReturn(saved);
-        when(hotelCategoryHistoryMapper.toResponse(saved))
-                .thenReturn(new HotelCategoryHistoryResponse(saved.getId(), NEW_CATEGORY, request.validFrom(), null));
+        when(hotelCategoryHistoryMapper.toResponse(saved)).thenReturn(mock(saved));
 
         hotelCategoryHistoryService.recordCategory(hotelId, request);
 
         assertEquals(request.validFrom(), openEntry.getValidTo());
-        verify(hotelCategoryHistoryRepository).save(openEntry);
+        // Must be saveAndFlush, not save: see CityTaxRateAdminServiceImplTest for why a
+        // plain save() here leaves the old row's valid_to = NULL when the new row's
+        // INSERT reaches the DB (Hibernate flushes INSERTs before UPDATEs), tripping
+        // excl_hotel_category_no_overlap (V16) with a spurious 409 on a legitimate
+        // category change.
+        verify(hotelCategoryHistoryRepository).saveAndFlush(openEntry);
     }
 
     @Test
-    void recordCategoryOverlappingThrowsConflict() {
+    void recordCategoryWithValidFromNotAfterCurrentEntryThrowsBadRequest() {
+        final HotelCategoryHistory openEntry = HotelCategoryHistory.builder()
+                .id(UUID.randomUUID()).hotelId(hotelId).category(OLD_CATEGORY).validFrom(VALID_FROM).build();
+        final HotelCategoryHistoryRequest sameStartDateRequest = new HotelCategoryHistoryRequest(CATEGORY, VALID_FROM);
+        when(hotelCategoryHistoryRepository.findByHotelIdAndValidToIsNull(hotelId)).thenReturn(Optional.of(openEntry));
+
+        assertThrows(BadRequestException.class,
+                () -> hotelCategoryHistoryService.recordCategory(hotelId, sameStartDateRequest));
+        verify(hotelCategoryHistoryRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void recordCategoryWithValidFromBeforeCurrentEntryThrowsBadRequest() {
+        final HotelCategoryHistory openEntry = HotelCategoryHistory.builder()
+                .id(UUID.randomUUID()).hotelId(hotelId).category(OLD_CATEGORY).validFrom(VALID_FROM).build();
+        final HotelCategoryHistoryRequest earlierRequest = new HotelCategoryHistoryRequest(CATEGORY, OLD_VALID_FROM);
+        when(hotelCategoryHistoryRepository.findByHotelIdAndValidToIsNull(hotelId)).thenReturn(Optional.of(openEntry));
+
+        assertThrows(BadRequestException.class,
+                () -> hotelCategoryHistoryService.recordCategory(hotelId, earlierRequest));
+        verify(hotelCategoryHistoryRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void recordCategoryOverlappingAnExistingEntryThrowsConflict() {
         when(hotelCategoryHistoryRepository.findByHotelIdAndValidToIsNull(hotelId)).thenReturn(Optional.empty());
         when(hotelCategoryHistoryRepository.saveAndFlush(any(HotelCategoryHistory.class)))
                 .thenThrow(exclusionViolation());
@@ -126,6 +152,11 @@ class HotelCategoryHistoryServiceImplTest {
         final DataIntegrityViolationException thrown = assertThrows(DataIntegrityViolationException.class,
                 () -> hotelCategoryHistoryService.recordCategory(hotelId, request));
         assertEquals(notNullViolation, thrown);
+    }
+
+    private static HotelCategoryHistoryResponse mock(final HotelCategoryHistory entry) {
+        return new HotelCategoryHistoryResponse(entry.getId(), entry.getCategory(), entry.getValidFrom(),
+                entry.getValidTo());
     }
 
     private static DataIntegrityViolationException exclusionViolation() {

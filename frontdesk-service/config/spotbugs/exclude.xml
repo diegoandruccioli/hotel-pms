@@ -33,4 +33,15 @@
         <Class name="com.hotelpms.frontdesk.rooms.mapper.RoomMapperImpl"/>
         <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE"/>
     </Match>
+    <!--
+      NP_LOAD_OF_KNOWN_NULL_VALUE on the generated StayMapperImpl:
+      StayResponse.cityTaxWarning has no source on the Stay entity (E18 follow-up —
+      it's attached afterward, only on the check-in response, by
+      StayServiceImpl#withCityTaxWarning). Same MapStruct codegen shape as
+      RoomMapperImpl above, same false positive.
+    -->
+    <Match>
+        <Class name="com.hotelpms.frontdesk.stays.mapper.StayMapperImpl"/>
+        <Bug pattern="NP_LOAD_OF_KNOWN_NULL_VALUE"/>
+    </Match>
 </FindBugsFilter>

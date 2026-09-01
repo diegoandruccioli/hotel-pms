@@ -8,6 +8,7 @@ import com.hotelpms.frontdesk.client.dto.ChargeResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
+import com.hotelpms.frontdesk.exception.ExternalServiceException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.pricing.dto.NightlyRate;
 import com.hotelpms.frontdesk.pricing.service.RatePricingService;
@@ -51,6 +52,7 @@ class StayBillingCoordinator {
     private final ReservationService reservationService;
     private final RatePricingService ratePricingService;
     private final CityTaxAssessmentService cityTaxAssessmentService;
+    private final StayInvoiceResolver stayInvoiceResolver;
 
     /**
      * Resolves the invoice to verify at check-out. Reservation-based stays are looked
@@ -66,13 +68,7 @@ class StayBillingCoordinator {
     InvoiceStatusResponse resolveInvoiceForCheckOut(final Stay stay) {
         log.debug("Verifying billing folio for stay: {} | reservationId={} | invoiceId={}",
                 stay.getId(), stay.getReservationId(), stay.getInvoiceId());
-        if (stay.getReservationId() != null) {
-            return billingClient.getLatestInvoiceByReservation(stay.getReservationId());
-        }
-        if (stay.getInvoiceId() != null) {
-            return billingClient.getInvoiceById(stay.getInvoiceId());
-        }
-        return null;
+        return stayInvoiceResolver.resolve(stay);
     }
 
     /**
@@ -150,6 +146,45 @@ class StayBillingCoordinator {
         stayRepository.save(stay);
         log.info("[STAY] INVOICE_CREATED | stayId={} | invoiceId={} | roomChargeId={}",
                 stay.getId(), invoiceId, stay.getRoomChargeId());
+    }
+
+    /**
+     * Posts a supplementary {@code ROOM_NIGHT} charge for a stay extension (Parte 3) —
+     * the added nights only, priced live via {@link RatePricingService} since there is no
+     * reservation-line-item snapshot for nights beyond what was originally booked. The
+     * original check-in {@code ROOM_NIGHT} charge is never touched — extending a stay
+     * appends a charge, exactly like the tourist-tax rectification it runs alongside.
+     *
+     * <p>Unlike the check-in saga, a failure here is not swallowed and recorded for later
+     * retry: an extension is an interactive operator action expecting a definite outcome,
+     * so a billing failure fails the whole extension request.
+     *
+     * @param stay            the stay being extended
+     * @param fromDate        the first added night (inclusive) — the stay's old check-out
+     * @param toDateExclusive the new check-out (exclusive)
+     * @return the posted charge id
+     */
+    UUID postExtensionRoomCharge(final Stay stay, final LocalDate fromDate, final LocalDate toDateExclusive) {
+        final RoomResponse room = roomService.getRoomById(stay.getRoomId(), stay.getHotelId());
+        final List<NightlyRate> nightlyRates = ratePricingService.resolveStayRates(
+                room.roomType().id(), stay.getHotelId(), fromDate, toDateExclusive);
+        final BigDecimal amount = nightlyRates.stream().map(NightlyRate::nightlyPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+        final BigDecimal unitPrice = uniformRate(nightlyRates);
+        final long nights = ChronoUnit.DAYS.between(fromDate, toDateExclusive);
+        final String description = "Room " + stay.getRoomNumber() + " - extension - " + nights + " night(s)";
+        final ChargeRequest chargeRequest =
+                new ChargeRequest(ROOM_NIGHT_CHARGE_TYPE, description, amount, stay.getId(), unitPrice, (int) nights);
+
+        final ChargeResponse response;
+        try {
+            response = billingClient.addCharge(stay.getId(), chargeRequest);
+        } catch (final FeignException ex) {
+            throw new ExternalServiceException("EXTENSION_CHARGE_FAILED: " + ex.getMessage(), ex);
+        }
+        if (response == null || response.id() == null) {
+            throw new ExternalServiceException(BILLING_SERVICE_UNAVAILABLE_REASON);
+        }
+        return response.id();
     }
 
     /**

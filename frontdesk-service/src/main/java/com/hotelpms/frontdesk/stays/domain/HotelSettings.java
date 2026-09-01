@@ -3,6 +3,8 @@ package com.hotelpms.frontdesk.stays.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -39,6 +41,7 @@ public class HotelSettings {
     private static final int LEN_PROVINCIA = 2;
     private static final int LEN_COMUNE = 100;
     private static final int LEN_COMUNE_CODICE = 9;
+    private static final int LEN_CITY_TAX_APPLICABILITY = 20;
 
     /** The hotel this settings row belongs to (primary key). */
     @Id
@@ -96,6 +99,16 @@ public class HotelSettings {
      */
     @Column(name = "comune_codice", length = LEN_COMUNE_CODICE)
     private String comuneCodice;
+
+    /**
+     * Whether this hotel's comune levies a tourist tax at all — see
+     * {@link CityTaxApplicability}. {@code UNKNOWN} until the hotel declares it
+     * from Settings &gt; Imposta di Soggiorno.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "city_tax_applicability", nullable = false, length = LEN_CITY_TAX_APPLICABILITY)
+    @Builder.Default
+    private CityTaxApplicability cityTaxApplicability = CityTaxApplicability.UNKNOWN;
 
     /**
      * Per-hotel Alloggiati Web portal username. Not a secret on its own (a portal

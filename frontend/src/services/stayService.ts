@@ -5,12 +5,19 @@ import type {
   AlloggiatiStato,
   AlloggiatiTipdoc,
   AvailableRoom,
+  CityTaxApplicabilityRequest,
+  CityTaxApplicabilityResponse,
+  CityTaxBackfillResponse,
+  CityTaxConfigurationStatusResponse,
   CityTaxRateRequest,
   CityTaxRateResponse,
+  CityTaxUnassessedSummaryResponse,
   HotelCategoryHistoryRequest,
   HotelCategoryHistoryResponse,
   HotelSettingsRequest,
   HotelSettingsResponse,
+  StayGuestRequest,
+  StayGuestResponse,
   StayRequest,
   StayResponse,
 } from '../types/stay.types';
@@ -29,6 +36,13 @@ export const stayService = {
 
   getStayById: async (id: string): Promise<StayResponse> => {
     const response = await api.get<StayResponse>(`${BASE_PATH}/${id}`);
+    return response.data;
+  },
+
+  getStaysByReservationId: async (reservationId: string): Promise<SpringPage<StayResponse>> => {
+    const response = await api.get<SpringPage<StayResponse>>(
+      `${BASE_PATH}?reservationId=${reservationId}`,
+    );
     return response.data;
   },
 
@@ -169,6 +183,69 @@ export const stayService = {
 
   createCityTaxRate: async (data: CityTaxRateRequest): Promise<CityTaxRateResponse> => {
     const response = await api.post<CityTaxRateResponse>(`${BASE_PATH}/city-tax-rates`, data);
+    return response.data;
+  },
+
+  getCityTaxApplicability: async (): Promise<CityTaxApplicabilityResponse> => {
+    const response = await api.get<CityTaxApplicabilityResponse>(`${BASE_PATH}/city-tax-rates/applicability`);
+    return response.data;
+  },
+
+  updateCityTaxApplicability: async (data: CityTaxApplicabilityRequest): Promise<CityTaxApplicabilityResponse> => {
+    const response = await api.put<CityTaxApplicabilityResponse>(`${BASE_PATH}/city-tax-rates/applicability`, data);
+    return response.data;
+  },
+
+  /** Pre-flight check the check-in form calls before submitting — RECEPTIONIST included. */
+  getCityTaxConfigurationStatus: async (): Promise<CityTaxConfigurationStatusResponse> => {
+    const response = await api.get<CityTaxConfigurationStatusResponse>(`${BASE_PATH}/city-tax/configuration-status`);
+    return response.data;
+  },
+
+  getCityTaxUnassessedSummary: async (): Promise<CityTaxUnassessedSummaryResponse> => {
+    const response = await api.get<CityTaxUnassessedSummaryResponse>(`${BASE_PATH}/city-tax/unassessed/summary`);
+    return response.data;
+  },
+
+  previewCityTaxBackfill: async (): Promise<CityTaxBackfillResponse> => {
+    const response = await api.get<CityTaxBackfillResponse>(`${BASE_PATH}/city-tax/backfill/preview`);
+    return response.data;
+  },
+
+  confirmCityTaxBackfill: async (): Promise<CityTaxBackfillResponse> => {
+    const response = await api.post<CityTaxBackfillResponse>(`${BASE_PATH}/city-tax/backfill/confirm`);
+    return response.data;
+  },
+
+  addGuest: async (stayId: string, data: StayGuestRequest): Promise<StayGuestResponse> => {
+    const response = await api.post<StayGuestResponse>(`${BASE_PATH}/${stayId}/guests`, data);
+    return response.data;
+  },
+
+  updateGuest: async (stayId: string, guestId: string, data: StayGuestRequest): Promise<StayGuestResponse> => {
+    const response = await api.put<StayGuestResponse>(`${BASE_PATH}/${stayId}/guests/${guestId}`, data);
+    return response.data;
+  },
+
+  removeGuest: async (stayId: string, guestId: string): Promise<void> => {
+    await api.delete(`${BASE_PATH}/${stayId}/guests/${guestId}`);
+  },
+
+  recordGuestDeparture: async (stayId: string, guestId: string, departureDate: string): Promise<StayGuestResponse> => {
+    const response = await api.put<StayGuestResponse>(
+      `${BASE_PATH}/${stayId}/guests/${guestId}/departure`,
+      { departureDate },
+    );
+    return response.data;
+  },
+
+  promoteGuestToPrimary: async (stayId: string, guestId: string): Promise<StayGuestResponse> => {
+    const response = await api.put<StayGuestResponse>(`${BASE_PATH}/${stayId}/guests/${guestId}/primary`);
+    return response.data;
+  },
+
+  extendStay: async (stayId: string, newCheckOutDate: string, version?: number | null): Promise<StayResponse> => {
+    const response = await api.put<StayResponse>(`${BASE_PATH}/${stayId}`, { newCheckOutDate, version });
     return response.data;
   },
 };

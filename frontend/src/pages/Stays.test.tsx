@@ -21,7 +21,15 @@ vi.mock('../services/stayService', () => ({
     downloadAlloggiatiReport: vi.fn(),
     retryInvoiceCreation: vi.fn(),
     retryCheckoutEmail: vi.fn(),
+    getStayById: vi.fn(),
+    getLookupStati: vi.fn(),
+    getLookupTipdoc: vi.fn(),
+    extendStay: vi.fn(),
   },
+}));
+
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
 vi.mock('../store/authStore', () => ({
@@ -278,6 +286,32 @@ describe('Stays', () => {
     } as never);
     render(<Stays />);
     await waitFor(() => expect(screen.getByText('2026-07-01')).toBeInTheDocument());
+  });
+
+  it('extends a CHECKED_IN stay via the extension dialog', async () => {
+    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+      content: [
+        { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'John Doe',
+          status: 'CHECKED_IN', expectedCheckOutDate: '2026-07-01' },
+      ],
+      totalElements: 1, totalPages: 1, number: 0, size: 20, numberOfElements: 1, first: true, last: true, empty: false,
+    } as never);
+    vi.mocked(stayService.extendStay).mockResolvedValueOnce({
+      id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1',
+      status: 'CHECKED_IN', expectedCheckOutDate: '2026-07-03',
+    } as never);
+
+    render(<Stays />);
+    await waitFor(() => expect(screen.getByText('2026-07-01')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'action_extend_stay' }));
+    await waitFor(() => expect(screen.getByText('stay_extension_title')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
+
+    await waitFor(() => {
+      expect(stayService.extendStay).toHaveBeenCalledWith('s1', '2026-07-02', undefined);
+    });
   });
 
   it('sorts by expected check-out date when the sort field is changed', async () => {

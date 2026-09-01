@@ -18,7 +18,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../services/guestService', () => ({
-  guestService: { searchGuestsPaged: vi.fn(), deleteGuest: vi.fn() },
+  guestService: { searchGuestsPaged: vi.fn(), deleteGuest: vi.fn(), exportGuestData: vi.fn() },
 }));
 
 vi.mock('../store/authStore', () => ({
@@ -293,6 +293,70 @@ describe('Guests', () => {
     await waitFor(() => {
       expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('', 1, 20, 'lastName,asc');
       expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    });
+  });
+
+  it('should not show export button for RECEPTIONIST', async () => {
+    vi.mocked(useAuthStore).mockImplementation(mockAuthReceptionist);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    render(<Guests />);
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /export_guest_data John Doe/ })).not.toBeInTheDocument();
+  });
+
+  it('should show export button for ADMIN and open a confirmation dialog', async () => {
+    vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    render(<Guests />);
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /export_guest_data John Doe/ }));
+
+    expect(screen.getByText('export_guest_data_confirm_body')).toBeInTheDocument();
+    expect(guestService.exportGuestData).not.toHaveBeenCalled();
+  });
+
+  it('should download the export as JSON on confirm', async () => {
+    vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    vi.mocked(guestService.exportGuestData).mockResolvedValueOnce({ guestId: 'guest-1' } as never);
+    const createObjectURL = vi.fn(() => 'blob:mock');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    render(<Guests />);
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /export_guest_data John Doe/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'export_guest_data_confirm_action' }));
+
+    await waitFor(() => {
+      expect(guestService.exportGuestData).toHaveBeenCalledWith('guest-1');
+      expect(createObjectURL).toHaveBeenCalled();
+      expect(clickSpy).toHaveBeenCalled();
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
+      expect(screen.queryByText('export_guest_data_confirm_body')).not.toBeInTheDocument();
+    });
+
+    clickSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it('should show an error toast when the export fails', async () => {
+    vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    vi.mocked(guestService.exportGuestData).mockRejectedValueOnce(new Error('network'));
+    render(<Guests />);
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /export_guest_data John Doe/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'export_guest_data_confirm_action' }));
+
+    await waitFor(() => {
+      expect(mockAddToast).toHaveBeenCalledWith('export_guest_data_failed', 'error');
+      // Dialog stays open on failure so the operator can retry.
+      expect(screen.getByText('export_guest_data_confirm_body')).toBeInTheDocument();
     });
   });
 

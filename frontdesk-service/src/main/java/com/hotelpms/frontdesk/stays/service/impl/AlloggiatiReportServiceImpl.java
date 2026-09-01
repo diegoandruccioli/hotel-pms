@@ -7,7 +7,7 @@ import com.hotelpms.frontdesk.stays.domain.TravellerType;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
 import com.hotelpms.frontdesk.exception.AlloggiatiRowLimitExceededException;
 import com.hotelpms.frontdesk.exception.AlloggiatiValidationException;
-import com.hotelpms.frontdesk.stays.repository.StayRepository;
+import com.hotelpms.frontdesk.stays.repository.StayGuestRepository;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiLookupService;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiReportService;
 import lombok.RequiredArgsConstructor;
@@ -16,15 +16,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Generates the Italian Alloggiati Web police report (tracciato 168 caratteri).
@@ -38,6 +40,12 @@ import java.util.UUID;
  * <p>Guest data is sourced from {@link StayGuest} records (not the guest-service profile),
  * because Alloggiati fields (9-char codes for stato/comune, tipdoc codes, etc.) are
  * captured at check-in time from the official portale lookup tables.
+ *
+ * <p>Selection for a given date is by each guest's OWN {@code arrivalDate} (Parte 1),
+ * plus every guest still flagged {@code needsResubmit} regardless of theirs — not by
+ * the stay/room's check-in date. Art. 109 TULPS requires the report within 24h of each
+ * guest's own arrival; a guest added mid-stay has their own, later, arrival date, and a
+ * guest corrected after their original send has no rectification path but resubmission.
  *
  * <p>Within each stay the ordering is: CAPOFAMIGLIA/CAPOGRUPPO first (TIPALLOG 17/18),
  * then FAMILIARE/MEMBRO_GRUPPO (19/20), then OSPITE_SINGOLO (16).
@@ -73,7 +81,7 @@ public class AlloggiatiReportServiceImpl implements AlloggiatiReportService {
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-    private final StayRepository stayRepository;
+    private final StayGuestRepository stayGuestRepository;
     private final AlloggiatiLookupService lookupService;
 
     /** {@inheritDoc} */
@@ -115,43 +123,46 @@ public class AlloggiatiReportServiceImpl implements AlloggiatiReportService {
     // -----------------------------------------------------------------------
 
     private List<AlloggiatiRowDto> buildRows(final LocalDate date, final UUID hotelId) {
-        final LocalDateTime start = date.atStartOfDay();
-        final LocalDateTime end = date.plusDays(1).atStartOfDay();
-        final List<Stay> checkIns = stayRepository.findByActualCheckInTimeBetweenAndHotelId(start, end, hotelId);
-        final List<AlloggiatiRowDto> rows = new ArrayList<>();
+        // Parte 1: selection is by each guest's OWN arrival date, plus every guest still
+        // awaiting resubmission regardless of theirs — not by the stay/room's check-in
+        // date. A guest added on day 3 belongs in day 3's file; Alloggiati Web has no
+        // rectification API, so a corrected guest is picked up again until resent.
+        final List<StayGuest> candidates = new ArrayList<>(stayGuestRepository.findByHotelIdAndArrivalDate(hotelId, date));
+        stayGuestRepository.findByHotelIdAndNeedsResubmitTrue(hotelId).stream()
+                .filter(g -> !candidates.contains(g))
+                .forEach(candidates::add);
 
-        for (final Stay stay : checkIns) {
-            final List<StayGuest> guests = stay.getGuests();
-            if (guests == null || guests.isEmpty()) {
-                log.warn("[REPORT] No StayGuest records for stayId={} — skipping", stay.getId());
-                continue;
-            }
+        final Map<UUID, List<StayGuest>> byStay = candidates.stream()
+                .collect(Collectors.groupingBy(g -> g.getStay().getId(), LinkedHashMap::new, Collectors.toList()));
+
+        final List<AlloggiatiRowDto> rows = new ArrayList<>();
+        for (final List<StayGuest> subset : byStay.values()) {
+            final Stay stay = subset.get(0).getStay();
             // A single stay with invalid Alloggiati data (e.g. a FAMILIARE guest with no
             // CAPOFAMIGLIA in the same stay) must not abort the report for every other guest
-            // checked in that day — skip only the offending stay, loudly, and keep going.
+            // reported that day — skip only the offending stay, loudly, and keep going.
+            // Coherence is checked against the stay's FULL guest list, not just today's subset.
             try {
                 validateGroupCoherence(stay);
-                validateDates(stay, date);
+                validateDates(stay, subset);
             } catch (final AlloggiatiValidationException ex) {
                 log.warn("[REPORT] Skipping invalid stay stayId={} hotelId={}: {}",
                         stay.getId(), hotelId, ex.getMessage());
                 continue;
             }
 
-            final int permanenza = computePermanenza(date, stay.getExpectedCheckOutDate());
-
-            guests.stream()
+            subset.stream()
                     .sorted(Comparator.comparingInt(g -> travellerOrder(g.getTravellerType())))
                     .map(guest -> {
                         warnOnInvalidLookupCodes(guest);
-                        return buildRow(guest, date, permanenza);
+                        return buildRow(guest, computePermanenza(guest, stay));
                     })
                     .forEach(rows::add);
         }
         return rows;
     }
 
-    private AlloggiatiRowDto buildRow(final StayGuest g, final LocalDate arrivalDate, final int permanenza) {
+    private AlloggiatiRowDto buildRow(final StayGuest g, final int permanenza) {
         final TravellerType type = g.getTravellerType() != null
                 ? g.getTravellerType()
                 : TravellerType.OSPITE_SINGOLO;
@@ -163,7 +174,7 @@ public class AlloggiatiReportServiceImpl implements AlloggiatiReportService {
 
         return new AlloggiatiRowDto(
                 type.portalCode(),
-                arrivalDate.format(DATE_FMT),
+                g.getArrivalDate().format(DATE_FMT),
                 permanenza,
                 g.getLastName(),
                 g.getFirstName(),
@@ -220,18 +231,25 @@ public class AlloggiatiReportServiceImpl implements AlloggiatiReportService {
     }
 
     /**
-     * Validates that the expected check-out date is not before the arrival date.
+     * Validates that the stay's expected check-out isn't before any of the guests
+     * actually being reported arrived — an impossible date combination, always a data
+     * error rather than a legitimate zero/negative-length stay.
      *
-     * @param stay        the stay to validate
-     * @param arrivalDate the check-in date being reported
-     * @throws AlloggiatiValidationException if checkOut precedes arrivalDate
+     * @param stay          the stay to validate
+     * @param reportedGuests the guests being reported for this stay in this run
+     * @throws AlloggiatiValidationException if checkOut precedes any reported guest's arrival
      */
-    private static void validateDates(final Stay stay, final LocalDate arrivalDate) {
+    private static void validateDates(final Stay stay, final List<StayGuest> reportedGuests) {
         final LocalDate checkOut = stay.getExpectedCheckOutDate();
-        if (checkOut != null && checkOut.isBefore(arrivalDate)) {
-            throw new AlloggiatiValidationException(
-                    "ALLOGGIATI_INVALID_DATES: checkOut=" + checkOut
-                    + " is before arrival=" + arrivalDate + " stayId=" + stay.getId());
+        if (checkOut == null) {
+            return;
+        }
+        for (final StayGuest guest : reportedGuests) {
+            if (checkOut.isBefore(guest.getArrivalDate())) {
+                throw new AlloggiatiValidationException(
+                        "ALLOGGIATI_INVALID_DATES: checkOut=" + checkOut
+                        + " is before arrival=" + guest.getArrivalDate() + " stayId=" + stay.getId());
+            }
         }
     }
 
@@ -369,11 +387,25 @@ public class AlloggiatiReportServiceImpl implements AlloggiatiReportService {
         };
     }
 
-    private static int computePermanenza(final LocalDate arrivalDate, final LocalDate expectedCheckOut) {
-        if (expectedCheckOut == null || !expectedCheckOut.isAfter(arrivalDate)) {
+    /**
+     * Computes {@code permanenza} for one guest: their own departure date if set
+     * (an early leaver), otherwise the stay's expected check-out — never the other
+     * guests' dates, since a guest added mid-stay or leaving early can have a
+     * genuinely different length of stay than the room itself.
+     *
+     * @param guest the guest being reported
+     * @param stay  the guest's stay, for its expected check-out as a fallback
+     * @return the permanenza value, clamped to {@value #MAX_PERMANENZA}
+     */
+    private static int computePermanenza(final StayGuest guest, final Stay stay) {
+        final LocalDate arrivalDate = guest.getArrivalDate();
+        final LocalDate departure = guest.getDepartureDate() != null
+                ? guest.getDepartureDate()
+                : stay.getExpectedCheckOutDate();
+        if (departure == null || !departure.isAfter(arrivalDate)) {
             return DEFAULT_PERMANENZA;
         }
-        final long nights = ChronoUnit.DAYS.between(arrivalDate, expectedCheckOut);
+        final long nights = ChronoUnit.DAYS.between(arrivalDate, departure);
         return (int) Math.min(nights, MAX_PERMANENZA);
     }
 

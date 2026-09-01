@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -219,4 +220,13 @@ public class Stay {
     @OneToMany(mappedBy = "stay", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<StayGuest> guests = new ArrayList<>();
+
+    /**
+     * Optimistic-locking version, checked against a client-echoed version on
+     * {@code extendStay} — same "forgotten tab" protection {@code Reservation.version}
+     * already has.
+     */
+    @Version
+    @Column(name = "version")
+    private Long version;
 }

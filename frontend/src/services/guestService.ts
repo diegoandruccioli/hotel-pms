@@ -1,5 +1,11 @@
 import api from './api';
-import type { GuestRequestDTO, GuestResponseDTO } from '../types/guest.types';
+import type {
+  GuestRequestDTO,
+  GuestResponseDTO,
+  GuestDataExportResponse,
+  GuestPrivacySettingsRequest,
+  GuestPrivacySettingsResponse,
+} from '../types/guest.types';
 import type { SpringPage } from '../types/page.types';
 
 const BASE_PATH = '/api/v1/guests';
@@ -47,5 +53,24 @@ export const guestService = {
 
   deleteGuest: async (id: string): Promise<void> => {
     await api.delete(`${BASE_PATH}/${id}`);
+  },
+
+  /** GDPR Art. 20 — full data-portability export for one guest. Admin/Owner only. */
+  exportGuestData: async (id: string): Promise<GuestDataExportResponse> => {
+    const response = await api.get<GuestDataExportResponse>(`${BASE_PATH}/${id}/export`);
+    return response.data;
+  },
+
+  /** Per-hotel GDPR retention settings. Creates a default row (5 years) if none exists yet. */
+  getPrivacySettings: async (): Promise<GuestPrivacySettingsResponse> => {
+    const response = await api.get<GuestPrivacySettingsResponse>(`${BASE_PATH}/settings`);
+    return response.data;
+  },
+
+  updatePrivacySettings: async (
+    data: GuestPrivacySettingsRequest,
+  ): Promise<GuestPrivacySettingsResponse> => {
+    const response = await api.put<GuestPrivacySettingsResponse>(`${BASE_PATH}/settings`, data);
+    return response.data;
   }
 };

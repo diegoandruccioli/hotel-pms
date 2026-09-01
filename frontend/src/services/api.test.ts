@@ -88,6 +88,20 @@ describe('api (axios instance + interceptors)', () => {
     });
   });
 
+  it('stashes the untranslated code as errorCode alongside the translated detail — '
+      + 'callers need something stable to branch on once detail becomes human text '
+      + '(e.g. distinguishing a stale-optimistic-lock 409 from a room-overlap 409, '
+      + 'both surfaced with the same HTTP status)', async () => {
+    adapter.mockRejectedValueOnce({
+      config: { url: '/api/v1/reservations/r1', headers: {} },
+      response: { status: 409, data: { detail: 'RESERVATION_STALE_VERSION' } },
+    });
+
+    await expect(api.put('/api/v1/reservations/r1')).rejects.toMatchObject({
+      response: { data: { detail: 'TRANSLATED(errors:RESERVATION_STALE_VERSION)', errorCode: 'RESERVATION_STALE_VERSION' } },
+    });
+  });
+
   it('BUG-6: leaves the raw code untouched when i18next has no translation for it '
       + '(real i18next returns the bare key on a miss, not the namespaced one)', async () => {
     // Simulate the actual i18next missing-key fallback: the bare key, no
@@ -102,9 +116,14 @@ describe('api (axios instance + interceptors)', () => {
       response: { status: 400, data: { detail: 'SOME_CODE_WITH_NO_TRANSLATION' } },
     });
 
-    await expect(api.get('/api/v1/reservations')).rejects.toMatchObject({
-      response: { data: { detail: 'SOME_CODE_WITH_NO_TRANSLATION' } },
-    });
+    let caught: { response?: { data?: { detail?: string; errorCode?: string } } } | undefined;
+    try {
+      await api.get('/api/v1/reservations');
+    } catch (err) {
+      caught = err as typeof caught;
+    }
+    expect(caught?.response?.data?.detail).toBe('SOME_CODE_WITH_NO_TRANSLATION');
+    expect(caught?.response?.data?.errorCode).toBeUndefined();
   });
 
   it('BUG-8: a 401 from /me on app bootstrap silently refreshes and retries, instead of forcing a re-login', async () => {

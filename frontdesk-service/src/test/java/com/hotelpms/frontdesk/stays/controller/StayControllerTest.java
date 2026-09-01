@@ -3,15 +3,25 @@ package com.hotelpms.frontdesk.stays.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.hotelpms.frontdesk.citytax.domain.CityTaxUnassessedReason;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxBackfillResponse;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxConfigurationStatusResponse;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxUnassessedSummaryResponse;
+import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
+import com.hotelpms.frontdesk.stays.domain.TravellerType;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
+import com.hotelpms.frontdesk.stays.dto.StayGuestRequest;
+import com.hotelpms.frontdesk.stays.dto.StayGuestResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
+import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.GlobalExceptionHandler;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiReportService;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
+import com.hotelpms.frontdesk.stays.service.StayGuestService;
 import com.hotelpms.frontdesk.stays.service.StayService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +52,9 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -68,6 +80,12 @@ class StayControllerTest {
     private static final String JSON_STATUS = "$.status";
     private static final String TEST_DATE = "2026-05-01";
     private static final String STATO_CODE = "Z000";
+    private static final String PATH_GUESTS = "/guests";
+    private static final String PATH_GUEST_BY_ID = "/guests/{guestId}";
+    private static final String GUEST_FIRST_NAME = "Mario";
+    private static final String GUEST_LAST_NAME = "Rossi";
+    private static final String COMUNE_CODICE_ROMA = "058091000";
+    private static final LocalDate GUEST_DOB = LocalDate.of(1990, 1, 1);
     private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
     private static final LocalDate FILTER_DATE_FROM = LocalDate.of(2026, 8, 1);
     private static final LocalDate FILTER_DATE_TO = LocalDate.of(2026, 8, 31);
@@ -76,10 +94,16 @@ class StayControllerTest {
     private StayService stayService;
 
     @Mock
+    private StayGuestService stayGuestService;
+
+    @Mock
     private AlloggiatiReportService alloggiatiReportService;
 
     @Mock
     private AlloggiatiWebSenderService alloggiatiWebSenderService;
+
+    @Mock
+    private CityTaxAssessmentService cityTaxAssessmentService;
 
     @InjectMocks
     private StayController stayController;
@@ -113,7 +137,7 @@ class StayControllerTest {
         stayResponse = new StayResponse(
                 stayId, hotelId, null, guestId, UUID.randomUUID(),
                 StayStatus.CHECKED_IN, null, null, null, null, null, false, false, null, List.of(), null, null, null,
-                false, null, false, null);
+                false, null, false, null, null, null);
 
         final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 "admin", "", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
@@ -158,7 +182,7 @@ class StayControllerTest {
         final StayResponse checkedOut = new StayResponse(
                 stayId, hotelId, null, guestId, UUID.randomUUID(),
                 StayStatus.CHECKED_OUT, null, null, null, null, null, false, false, null, List.of(), null, null, null,
-                false, null, false, null);
+                false, null, false, null, null, null);
         when(stayService.checkOut(stayId, hotelId)).thenReturn(checkedOut);
 
         mockMvc.perform(put(BASE_URL + PATH_CHECKOUT, stayId))
@@ -274,7 +298,7 @@ class StayControllerTest {
     @Test
     void shouldDownloadAlloggiatiJsonReturn200() throws Exception {
         final AlloggiatiRowDto row = new AlloggiatiRowDto(
-                "16", "01/05/2026", 1, "Rossi", "Mario", "1",
+                "16", "01/05/2026", 1, GUEST_LAST_NAME, GUEST_FIRST_NAME, "1",
                 "01/01/1980", "", "", STATO_CODE, STATO_CODE, "PASSE", "AB12345", STATO_CODE);
         when(alloggiatiReportService.generateJsonReport(any(LocalDate.class), eq(hotelId)))
                 .thenReturn(List.of(row));
@@ -282,7 +306,7 @@ class StayControllerTest {
         mockMvc.perform(get(BASE_URL + PATH_REPORT_JSON)
                         .param(PARAM_DATE, TEST_DATE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].cognome").value("Rossi"));
+                .andExpect(jsonPath("$[0].cognome").value(GUEST_LAST_NAME));
     }
 
     @Test
@@ -319,5 +343,170 @@ class StayControllerTest {
         mockMvc.perform(post(BASE_URL + "/{id}/checkout-email/retry", stayId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(JSON_ID).value(stayId.toString()));
+    }
+
+    @Test
+    void shouldReturnCityTaxConfigurationStatusConfigured() throws Exception {
+        when(cityTaxAssessmentService.checkConfigurationStatus(hotelId))
+                .thenReturn(new CityTaxConfigurationStatusResponse(true, null));
+
+        mockMvc.perform(get(BASE_URL + "/city-tax/configuration-status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.configured").value(true))
+                .andExpect(jsonPath("$.reason").doesNotExist());
+    }
+
+    @Test
+    void shouldReturnCityTaxConfigurationStatusNotConfigured() throws Exception {
+        when(cityTaxAssessmentService.checkConfigurationStatus(hotelId))
+                .thenReturn(new CityTaxConfigurationStatusResponse(false, CityTaxUnassessedReason.COMUNE_NOT_CONFIGURED));
+
+        mockMvc.perform(get(BASE_URL + "/city-tax/configuration-status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.configured").value(false))
+                .andExpect(jsonPath("$.reason").value("COMUNE_NOT_CONFIGURED"));
+    }
+
+    @Test
+    void shouldReturnCityTaxUnassessedSummary() throws Exception {
+        when(cityTaxAssessmentService.getUnassessedSummary(hotelId))
+                .thenReturn(new CityTaxUnassessedSummaryResponse(3, null, CityTaxUnassessedReason.NO_RATE_FOR_DATE));
+
+        mockMvc.perform(get(BASE_URL + "/city-tax/unassessed/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.unassessedCount").value(3))
+                .andExpect(jsonPath("$.mostRecentReason").value("NO_RATE_FOR_DATE"));
+    }
+
+    @Test
+    void shouldReturnCityTaxBackfillPreview() throws Exception {
+        when(cityTaxAssessmentService.previewBackfill(hotelId))
+                .thenReturn(new CityTaxBackfillResponse(List.of(), java.math.BigDecimal.ZERO, 0, 0));
+
+        mockMvc.perform(get(BASE_URL + "/city-tax/backfill/preview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.chargedCount").value(0));
+    }
+
+    @Test
+    void shouldConfirmCityTaxBackfill() throws Exception {
+        when(cityTaxAssessmentService.confirmBackfill(hotelId))
+                .thenReturn(new CityTaxBackfillResponse(List.of(), java.math.BigDecimal.TEN, 1, 0));
+
+        mockMvc.perform(post(BASE_URL + "/city-tax/backfill/confirm"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.chargedCount").value(1));
+    }
+
+    // -----------------------------------------------------------------------
+    // extendStay (Parte 3)
+    // -----------------------------------------------------------------------
+
+    @Test
+    void shouldExtendStaySuccessfully() throws Exception {
+        final LocalDate newCheckOut = LocalDate.now().plusDays(5);
+        when(stayService.extendStay(eq(stayId), eq(hotelId), eq(newCheckOut), any())).thenReturn(stayResponse);
+
+        mockMvc.perform(put(BASE_URL + PATH_BY_ID, stayId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newCheckOutDate\":\"" + newCheckOut + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_ID).value(stayId.toString()));
+    }
+
+    @Test
+    void shouldReturnConflictWhenExtensionRoomUnavailable() throws Exception {
+        final LocalDate newCheckOut = LocalDate.now().plusDays(5);
+        when(stayService.extendStay(eq(stayId), eq(hotelId), eq(newCheckOut), any()))
+                .thenThrow(new ConflictException("ROOM_NOT_AVAILABLE_FOR_EXTENSION"));
+
+        mockMvc.perform(put(BASE_URL + PATH_BY_ID, stayId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newCheckOutDate\":\"" + newCheckOut + "\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    // -----------------------------------------------------------------------
+    // Guest lifecycle (Parte 1)
+    // -----------------------------------------------------------------------
+
+    private StayGuestRequest newGuestRequest() {
+        return new StayGuestRequest(GUEST_FIRST_NAME, GUEST_LAST_NAME, "M", GUEST_DOB,
+                COMUNE_CODICE_ROMA, "100000100", "PASOR", "AA1234567", COMUNE_CODICE_ROMA,
+                false, TravellerType.OSPITE_SINGOLO, null, null);
+    }
+
+    private StayGuestResponse guestResponse(final UUID id) {
+        return new StayGuestResponse(id, GUEST_FIRST_NAME, GUEST_LAST_NAME, "M", GUEST_DOB,
+                COMUNE_CODICE_ROMA, "100000100", "PASOR", "AA1234567", COMUNE_CODICE_ROMA,
+                false, TravellerType.OSPITE_SINGOLO, null, GUEST_DOB, null, false, false, null);
+    }
+
+    @Test
+    void shouldAddGuestToOpenStay() throws Exception {
+        final UUID newGuestId = UUID.randomUUID();
+        when(stayGuestService.addGuest(eq(stayId), eq(hotelId), any(StayGuestRequest.class)))
+                .thenReturn(guestResponse(newGuestId));
+
+        mockMvc.perform(post(BASE_URL + PATH_BY_ID + PATH_GUESTS, stayId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(newGuestRequest())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath(JSON_ID).value(newGuestId.toString()));
+    }
+
+    @Test
+    void shouldUpdateGuestOnOpenStay() throws Exception {
+        final UUID stayGuestId = UUID.randomUUID();
+        when(stayGuestService.updateGuest(eq(stayId), eq(stayGuestId), eq(hotelId), any(StayGuestRequest.class)))
+                .thenReturn(guestResponse(stayGuestId));
+
+        mockMvc.perform(put(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID, stayId, stayGuestId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(newGuestRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_ID).value(stayGuestId.toString()));
+    }
+
+    @Test
+    void shouldRemoveGuestFromOpenStay() throws Exception {
+        final UUID stayGuestId = UUID.randomUUID();
+
+        mockMvc.perform(delete(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID, stayId, stayGuestId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldRejectRemovingAnAlreadySentGuest() throws Exception {
+        final UUID stayGuestId = UUID.randomUUID();
+        doThrow(new ConflictException("STAY_GUEST_ALREADY_SENT"))
+                .when(stayGuestService).removeGuest(stayId, stayGuestId, hotelId);
+
+        mockMvc.perform(delete(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID, stayId, stayGuestId))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void shouldRecordGuestDeparture() throws Exception {
+        final UUID stayGuestId = UUID.randomUUID();
+        when(stayGuestService.recordDeparture(eq(stayId), eq(stayGuestId), eq(hotelId), any(LocalDate.class)))
+                .thenReturn(guestResponse(stayGuestId));
+
+        mockMvc.perform(put(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID + "/departure", stayId, stayGuestId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"departureDate\":\"2026-05-03\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_ID).value(stayGuestId.toString()));
+    }
+
+    @Test
+    void shouldPromoteGuestToPrimary() throws Exception {
+        final UUID stayGuestId = UUID.randomUUID();
+        when(stayGuestService.promotePrimary(stayId, stayGuestId, hotelId))
+                .thenReturn(guestResponse(stayGuestId));
+
+        mockMvc.perform(put(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID + "/primary", stayId, stayGuestId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(JSON_ID).value(stayGuestId.toString()));
     }
 }

@@ -10,7 +10,7 @@ import { stayService } from '../services/stayService';
 import { getErrorMessage } from '../utils/errorMessage';
 import { useDaySheet, useOwnerFinancialSummary } from '../hooks/queries/useDashboard';
 import type { RoomStatus } from '../types/inventory.types';
-import type { AlloggiatiFailureSummaryResponse } from '../types/stay.types';
+import type { AlloggiatiFailureSummaryResponse, CityTaxUnassessedSummaryResponse } from '../types/stay.types';
 
 const ROOM_STATUS_COLORS: Record<RoomStatus, string> = {
   CLEAN:       'bg-tertiary-container/60 text-on-tertiary-container border-tertiary/50',
@@ -42,6 +42,7 @@ export const Dashboard = () => {
   const isOwnerOrAdmin = user?.role === 'OWNER' || user?.role === 'ADMIN';
 
   const [alloggiatiFailures, setAlloggiatiFailures] = useState<AlloggiatiFailureSummaryResponse | null>(null);
+  const [cityTaxUnassessed, setCityTaxUnassessed] = useState<CityTaxUnassessedSummaryResponse | null>(null);
 
   const { data: daySheet, isLoading, error: queryError, refetch } = useDaySheet();
   const { data: ownerSummary } = useOwnerFinancialSummary(SUMMARY_START_DATE, SUMMARY_END_DATE, isOwnerOrAdmin);
@@ -53,6 +54,9 @@ export const Dashboard = () => {
     stayService.getAlloggiatiFailureSummary()
       .then(setAlloggiatiFailures)
       .catch(() => setAlloggiatiFailures(null));
+    stayService.getCityTaxUnassessedSummary()
+      .then(setCityTaxUnassessed)
+      .catch(() => setCityTaxUnassessed(null));
   }, [isOwnerOrAdmin]);
 
   const universalStats = useMemo<StatCardConfig[]>(() => [
@@ -137,6 +141,27 @@ export const Dashboard = () => {
             className="inline-flex items-center min-h-[40px] text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-error-container rounded"
           >
             {t('view_all')}
+          </Link>
+        </div>
+      )}
+
+      {cityTaxUnassessed && cityTaxUnassessed.unassessedCount > 0 && (
+        <div
+          role="alert"
+          className="mt-4 flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container"
+        >
+          <MaterialIcon name="warning" size={20} className="flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-body font-medium">{t('city_tax_unassessed_banner_title')}</p>
+            <p className="text-sm font-body">
+              {t('city_tax_unassessed_banner_desc', { count: cityTaxUnassessed.unassessedCount })}
+            </p>
+          </div>
+          <Link
+            to="/settings/city-tax"
+            className="inline-flex items-center min-h-[40px] text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-error-container rounded"
+          >
+            {t('city_tax_unassessed_banner_action')}
           </Link>
         </div>
       )}

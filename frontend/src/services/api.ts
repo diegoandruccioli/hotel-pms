@@ -79,6 +79,12 @@ api.interceptors.response.use(
       const code = error.response.data.detail;
       const translated = i18n.t(`errors:${code}`);
       if (translated !== code) {
+        // Stash the untranslated code before overwriting `detail` with human text —
+        // callers that need to branch on the specific error (e.g. distinguishing a
+        // stale-optimistic-lock 409 from a room-overlap 409, both surfaced the same
+        // HTTP status) have nothing else to match on once `detail` becomes a
+        // translated sentence instead of a stable code.
+        error.response.data.errorCode = code;
         error.response.data.detail = translated;
       }
     }

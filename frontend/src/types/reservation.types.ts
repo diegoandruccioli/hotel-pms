@@ -24,6 +24,13 @@ export interface ReservationRequest {
   status: string;
   expectedGuests: number;
   lineItems: ReservationLineItemRequest[];
+  /**
+   * The version last read by the client, echoed back on update for optimistic-lock
+   * conflict detection — a stale value (someone else saved in between) makes the
+   * backend reject with 409 RESERVATION_STALE_VERSION instead of silently overwriting
+   * their change. Omit on create; the backend ignores it there either way.
+   */
+  version?: number | null;
 }
 
 export interface ReservationResponse {
@@ -43,4 +50,6 @@ export interface ReservationResponse {
   confirmationEmailFailed: boolean;
   /** Error message from the most recent failed attempt; null once resolved. */
   confirmationEmailFailureReason?: string | null;
+  /** Optimistic-lock version; echo back on update (see ReservationRequest.version). */
+  version?: number | null;
 }

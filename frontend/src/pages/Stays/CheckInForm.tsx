@@ -7,9 +7,11 @@ import { M3Button } from '../../components/m3/M3Button';
 import { stayService } from '../../services/stayService';
 import { guestService } from '../../services/guestService';
 import { reservationService } from '../../services/reservationService';
+import { useToastStore } from '../../store/toastStore';
 import type {
   AlloggiatiStato,
   AlloggiatiTipdoc,
+  CityTaxUnassessedReason,
   StayGuestRequest,
   StayRequest,
   TravellerType,
@@ -43,6 +45,7 @@ interface CheckInState {
 export const CheckInForm = memo(() => {
   const { t } = useTranslation(['stays', 'common']);
   const navigate = useNavigate();
+  const addToast = useToastStore((s) => s.addToast);
   const { reservationId } = useParams<{ reservationId: string }>();
   const location = useLocation();
   const state = location.state as CheckInState | null;
@@ -53,6 +56,16 @@ export const CheckInForm = memo(() => {
   const [prefillSource, setPrefillSource] = useState<'stay' | 'profile' | null>(null);
   const [stati, setStati] = useState<AlloggiatiStato[]>([]);
   const [tipdoc, setTipdoc] = useState<AlloggiatiTipdoc[]>([]);
+  // Pre-flight check (Parte 5.3): tells the operator before submitting that the
+  // tourist tax won't actually be charged, instead of only discovering it later on
+  // the monthly comune declaration. Never blocks the check-in itself.
+  const [cityTaxWarning, setCityTaxWarning] = useState<CityTaxUnassessedReason | null>(null);
+
+  useEffect(() => {
+    stayService.getCityTaxConfigurationStatus()
+      .then((status) => setCityTaxWarning(status.configured ? null : (status.reason ?? null)))
+      .catch(() => { /* non-blocking */ });
+  }, []);
 
   // location.state (set by Reservations.tsx's handleCheckIn) is the normal path — but a
   // direct navigation, bookmark, or page refresh loses it entirely. Fall back to fetching
@@ -197,7 +210,12 @@ export const CheckInForm = memo(() => {
         guests: apiGuests,
       };
 
-      await stayService.createStay(request);
+      const created = await stayService.createStay(request);
+      // NOT_APPLICABLE is a deliberate hotel declaration, never a gap — only the
+      // three configuration-gap reasons are worth surfacing here.
+      if (created.cityTaxWarning && created.cityTaxWarning !== 'NOT_APPLICABLE') {
+        addToast(t(`city_tax_post_checkin_warning_${created.cityTaxWarning.toLowerCase()}`), 'info');
+      }
       navigate('/stays', { replace: true });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
@@ -205,7 +223,7 @@ export const CheckInForm = memo(() => {
     } finally {
       setLoading(false);
     }
-  }, [reservationId, effectiveState, guests, navigate, t]);
+  }, [reservationId, effectiveState, guests, navigate, t, addToast]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -222,6 +240,19 @@ export const CheckInForm = memo(() => {
               ? t('prefill_banner_stay', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })
               : t('prefill_banner_profile', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })}
           </p>
+        </div>
+      )}
+
+      {cityTaxWarning && cityTaxWarning !== 'NOT_APPLICABLE' && (
+        <div
+          role="status"
+          className="bg-secondary-container text-on-secondary-container p-4 rounded-shape-sm flex items-start gap-3"
+        >
+          <MaterialIcon name="info" className="mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-body text-sm font-medium">{t('city_tax_preflight_title')}</p>
+            <p className="font-body text-sm">{t(`city_tax_preflight_reason_${cityTaxWarning.toLowerCase()}`)}</p>
+          </div>
         </div>
       )}
 

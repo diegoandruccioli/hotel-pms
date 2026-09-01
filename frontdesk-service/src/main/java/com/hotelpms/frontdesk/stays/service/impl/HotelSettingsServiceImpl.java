@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.stays.service.impl;
 
+import com.hotelpms.frontdesk.citytax.dto.CityTaxApplicabilityRequest;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxApplicabilityResponse;
 import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.stays.domain.AlloggiatiComune;
 import com.hotelpms.frontdesk.stays.domain.HotelSettings;
@@ -100,6 +102,27 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
             settings.setComuneCodice(resolveComuneCodice(comune, provincia));
         }
         return toResponse(hotelSettingsRepository.save(Objects.requireNonNull(settings)));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public CityTaxApplicabilityResponse getCityTaxApplicability(final UUID hotelId) {
+        final HotelSettings settings = hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))
+                .orElseGet(() -> createDefault(hotelId));
+        return new CityTaxApplicabilityResponse(settings.getCityTaxApplicability());
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public CityTaxApplicabilityResponse updateCityTaxApplicability(
+            final UUID hotelId, final CityTaxApplicabilityRequest request) {
+        final HotelSettings settings = hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))
+                .orElseGet(() -> buildDefault(hotelId));
+        settings.setCityTaxApplicability(request.applicability());
+        final HotelSettings saved = hotelSettingsRepository.save(Objects.requireNonNull(settings));
+        return new CityTaxApplicabilityResponse(saved.getCityTaxApplicability());
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.stays.dto;
 
+import com.hotelpms.frontdesk.citytax.domain.CityTaxUnassessedReason;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
 
 import java.time.LocalDate;
@@ -33,6 +34,16 @@ import java.util.UUID;
  * @param invoiceCreationFailureReason  the reason from the most recent failed attempt, or null
  * @param checkoutEmailFailed           whether the most recent checkout email attempt failed
  * @param checkoutEmailFailureReason    the reason from the most recent failed attempt, or null
+ * @param cityTaxWarning                non-null only on the response from the check-in call itself,
+ *                                      when the tourist tax could not actually be assessed
+ *                                      (configuration gap, or the hotel declared it not applicable);
+ *                                      always null on every other response (see {@code
+ *                                      StayServiceImpl#checkIn}) — the dashboard summary and
+ *                                      backfill endpoints are the surfaces for the aggregate/
+ *                                      historical view
+ * @param version                       the version the client last read, echoed back on {@code
+ *                                      extendStay} for optimistic-lock conflict detection —
+ *                                      same contract as {@code ReservationResponse.version}
  */
 public record StayResponse(
                 UUID id,
@@ -56,7 +67,9 @@ public record StayResponse(
                 boolean invoiceCreationFailed,
                 String invoiceCreationFailureReason,
                 boolean checkoutEmailFailed,
-                String checkoutEmailFailureReason) {
+                String checkoutEmailFailureReason,
+                CityTaxUnassessedReason cityTaxWarning,
+                Long version) {
     /**
      * Compact constructor to ensure defensive copying of the guests list.
      */

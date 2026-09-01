@@ -20,6 +20,10 @@ import java.time.LocalDate;
  * @param isPrimaryGuest       whether the guest is the primary one
  * @param travellerType        the traveller classification type
  * @param travelPurpose        the purpose of travel
+ * @param version              the version the client last read, for optimistic-lock
+ *                             conflict detection on {@code updateGuest}; {@code null}
+ *                             skips the check, and is ignored entirely on {@code
+ *                             addGuest} — same contract as {@code ReservationRequest.version}
  */
 public record StayGuestRequest(
         @NotBlank(message = "First name is required") String firstName,
@@ -33,6 +37,7 @@ public record StayGuestRequest(
         String documentPlaceOfIssue,
         boolean isPrimaryGuest,
         TravellerType travellerType,
-        String travelPurpose
+        String travelPurpose,
+        Long version
 ) {
 }

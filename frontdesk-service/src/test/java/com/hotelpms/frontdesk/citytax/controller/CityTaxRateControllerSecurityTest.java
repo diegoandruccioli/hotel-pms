@@ -2,10 +2,14 @@ package com.hotelpms.frontdesk.citytax.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxApplicabilityRequest;
+import com.hotelpms.frontdesk.citytax.dto.CityTaxApplicabilityResponse;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxRateRequest;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxRateResponse;
+import com.hotelpms.frontdesk.stays.domain.CityTaxApplicability;
 import com.hotelpms.frontdesk.citytax.service.CityTaxRateAdminService;
 import com.hotelpms.frontdesk.security.SecurityConfig;
+import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import com.hotelpms.internalauth.security.NonceStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +42,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -64,6 +69,7 @@ class CityTaxRateControllerSecurityTest {
     private static final String TEST_HOTEL_ID = "00000000-0000-0000-0000-000000000001";
 
     private static final String BASE_URL = "/api/v1/stays/city-tax-rates";
+    private static final String PATH_APPLICABILITY = "/applicability";
 
     private static final String HDR_USER = "X-Auth-User";
     private static final String HDR_ROLE = "X-Auth-Role";
@@ -89,6 +95,9 @@ class CityTaxRateControllerSecurityTest {
 
     @MockitoBean
     private CityTaxRateAdminService cityTaxRateAdminService;
+
+    @MockitoBean
+    private HotelSettingsService hotelSettingsService;
 
     @MockitoBean
     private NonceStore nonceStore;
@@ -129,6 +138,36 @@ class CityTaxRateControllerSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(sampleRequest())))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void fetchApplicabilityReturns200ForReceptionist() throws Exception {
+        when(hotelSettingsService.getCityTaxApplicability(any()))
+                .thenReturn(new CityTaxApplicabilityResponse(CityTaxApplicability.UNKNOWN));
+
+        mockMvc.perform(withAuthHeaders(get(BASE_URL + PATH_APPLICABILITY), USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void updateApplicabilityReturns403ForReceptionist() throws Exception {
+        mockMvc.perform(withAuthHeaders(put(BASE_URL + PATH_APPLICABILITY), USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CityTaxApplicabilityRequest(CityTaxApplicability.NOT_APPLICABLE))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateApplicabilityReturns200ForAdmin() throws Exception {
+        when(hotelSettingsService.updateCityTaxApplicability(any(), any()))
+                .thenReturn(new CityTaxApplicabilityResponse(CityTaxApplicability.NOT_APPLICABLE));
+
+        mockMvc.perform(withAuthHeaders(put(BASE_URL + PATH_APPLICABILITY), USER_ADMIN, ROLE_ADMIN, TEST_HOTEL_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CityTaxApplicabilityRequest(CityTaxApplicability.NOT_APPLICABLE))))
+                .andExpect(status().isOk());
     }
 
     private static CityTaxRateRequest sampleRequest() {

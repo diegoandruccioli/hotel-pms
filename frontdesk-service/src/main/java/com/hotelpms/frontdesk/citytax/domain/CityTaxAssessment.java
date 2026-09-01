@@ -2,6 +2,8 @@ package com.hotelpms.frontdesk.citytax.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -25,10 +27,12 @@ import java.util.UUID;
  *
  * <p>{@code cityTaxRateId} gives provenance (which rule/delibera applied);
  * the {@code *Snapshot} fields make the amount self-sufficiently
- * reconstructable even if that rule row were ever gone. A {@code null}
- * {@code cityTaxRateId} means no rule was configured at check-in time — the
- * row still records that "zero was assessed because unconfigured", distinct
- * from "assessed and zero because every guest was exempt".
+ * reconstructable even if that rule row were ever gone. {@code
+ * unassessedReason} is non-null exactly when no rule was resolvable (or the
+ * hotel declared the tax not applicable) — a row is always written, so
+ * "zero because unconfigured" is queryable and never indistinguishable from
+ * "assessed and zero because every guest was exempt" ({@code
+ * unassessedReason} null, {@code totalAmount} zero).
  */
 @Entity
 @Table(name = "city_tax_assessments")
@@ -82,4 +86,9 @@ public class CityTaxAssessment {
 
     @Column(name = "assessed_at", nullable = false)
     private LocalDateTime assessedAt;
+
+    /** Non-null exactly when nothing was assessed — see class javadoc. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "unassessed_reason", length = 32)
+    private CityTaxUnassessedReason unassessedReason;
 }

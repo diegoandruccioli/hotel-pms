@@ -214,6 +214,7 @@ public class ReservationServiceImpl implements ReservationService {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
         final UUID hotelId = resolveHotelId();
         final Reservation existingReservation = findReservationByIdAndHotelOrThrow(id, hotelId);
+        verifyNotStale(existingReservation, request.version());
 
         final GuestResponse guest = verifyGuestExists(request.guestId());
         final java.util.Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(request.lineItems(), hotelId);
@@ -359,6 +360,17 @@ public class ReservationServiceImpl implements ReservationService {
                 .toList();
     }
 
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isRoomBookedByOthers(final UUID roomId, final LocalDate checkIn, final LocalDate checkOut) {
+        Objects.requireNonNull(roomId, "Room ID cannot be null");
+        Objects.requireNonNull(checkIn, "Check-in date cannot be null");
+        Objects.requireNonNull(checkOut, "Check-out date cannot be null");
+        return checkOut.isAfter(checkIn)
+                && !reservationRepository.findOverlappingRoomIds(List.of(roomId), checkIn, checkOut).isEmpty();
+    }
+
     /**
      * Resolves the total price of {@code room}'s room type for the requested
      * stay, via {@link RatePricingService} — this is what lets the availability
@@ -471,7 +483,8 @@ public class ReservationServiceImpl implements ReservationService {
                 response.createdAt(),
                 response.updatedAt(),
                 response.confirmationEmailFailed(),
-                response.confirmationEmailFailureReason()
+                response.confirmationEmailFailureReason(),
+                response.version()
         );
     }
 
@@ -578,6 +591,27 @@ public class ReservationServiceImpl implements ReservationService {
         }
     }
 
+    /**
+     * Rejects an update whose client-supplied version doesn't match the reservation's
+     * current one — the "forgotten tab" scenario: a user opens the reservation, a
+     * second user edits and saves it, and much later the first user saves too, silently
+     * overwriting the second edit with no conflict warning. {@code @Version}/{@code
+     * ObjectOptimisticLockingFailureException} alone don't catch this: the entity is
+     * loaded fresh within this transaction, so Hibernate never compares it against what
+     * the client actually had open — this explicit check is what closes that gap.
+     *
+     * <p>{@code clientVersion == null} skips the check — backward-compatible for
+     * callers that don't send it yet.
+     *
+     * @param reservation   the reservation as currently persisted
+     * @param clientVersion the version the client last read, or {@code null} to skip
+     */
+    private static void verifyNotStale(final Reservation reservation, final Long clientVersion) {
+        if (clientVersion != null && !clientVersion.equals(reservation.getVersion())) {
+            throw new ConflictException("RESERVATION_STALE_VERSION");
+        }
+    }
+
     private void sendReservationConfirmedEmail(
             final Reservation reservation,
             final UUID hotelId,
@@ -645,7 +679,7 @@ public class ReservationServiceImpl implements ReservationService {
 
         final ReservationRequest pseudoRequest = new ReservationRequest(
                 guestId, Objects.requireNonNullElse(expectedGuests, 1), checkInDate, checkOutDate,
-                ReservationStatus.CONFIRMED, lineItemRequests);
+                ReservationStatus.CONFIRMED, lineItemRequests, null);
         verifyNoOverlappingReservations(null, pseudoRequest);
 
         final Reservation reservation = reservationMapper.toEntity(pseudoRequest);

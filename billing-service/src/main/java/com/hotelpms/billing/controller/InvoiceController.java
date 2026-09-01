@@ -29,6 +29,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -166,6 +167,26 @@ public class InvoiceController {
         log.info("REST request to add {} charge to stay {}", request.type(), stayId);
         final ChargeResponse response = invoiceService.addCharge(stayId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Removes a charge from the open invoice for a stay — the reversal counterpart of
+     * {@link #addCharge}. Called by frontdesk-service when a charge no longer applies
+     * (e.g. a guest removed from an open stay after their tourist-tax charge posted).
+     * Returns 404 if no open invoice exists for the stay, or the charge doesn't belong
+     * to it. Returns 409 if the invoice is not in ISSUED status, or is fiscally locked.
+     *
+     * @param stayId   the stay UUID
+     * @param chargeId the charge UUID to remove
+     * @return HTTP 204 with no body
+     */
+    @DeleteMapping("/stay/{stayId}/charges/{chargeId}")
+    public ResponseEntity<Void> removeCharge(
+            @NonNull @PathVariable final UUID stayId,
+            @NonNull @PathVariable final UUID chargeId) {
+        log.info("REST request to remove charge {} from stay {}", chargeId, stayId);
+        invoiceService.removeCharge(stayId, chargeId);
+        return ResponseEntity.noContent().build();
     }
 
     /**

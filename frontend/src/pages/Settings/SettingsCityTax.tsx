@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { stayService } from '../../services/stayService';
 import type {
+  CityTaxApplicability,
+  CityTaxBackfillResponse,
   CityTaxRateResponse,
   HotelCategoryHistoryRequest,
   HotelCategoryHistoryResponse,
@@ -11,6 +13,7 @@ import type {
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Card } from '../../components/m3/M3Card';
+import { M3Select } from '../../components/m3/M3Select';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
 import { M3TextField } from '../../components/m3/M3TextField';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
@@ -259,13 +262,12 @@ const CityTaxRatesSection = () => {
       setFormData(EMPTY_RATE_FORM);
       await loadRates();
     } catch (err: unknown) {
-      const e = err as { response?: { status?: number } };
-      const errorMsg = e.response?.status === 409
-        ? t('city_tax_err_overlap')
-        : e.response?.status === 400
-          ? t('city_tax_err_comune_not_configured')
-          : getErrorMessage(err, t('city_tax_err_save'));
-      addToast(errorMsg, 'error');
+      // Backend distinguishes CITY_TAX_RATE_OVERLAP (409), CITY_TAX_COMUNE_NOT_CONFIGURED
+      // (400) and CITY_TAX_RATE_VALID_FROM_NOT_AFTER_CURRENT (400) by error code, not by
+      // status alone — two different 400s exist, so branching on status here previously
+      // mislabelled the validFrom-guard error as "comune not configured". The response
+      // interceptor already translates the code via locales/*/errors.json; just use it.
+      addToast(getErrorMessage(err, t('city_tax_err_save')), 'error');
     } finally {
       setSaving(false);
     }
@@ -377,6 +379,191 @@ const CityTaxRatesSection = () => {
 };
 
 // -----------------------------------------------------------------------
+// Applicability section — the tri-state that lets a hotel in a comune with
+// no tourist tax silence the "not configured" warnings for good (Parte 5.2),
+// without that silence also hiding a hotel that simply forgot to configure a
+// real rate.
+// -----------------------------------------------------------------------
+
+const CityTaxApplicabilitySection = () => {
+  const { t } = useTranslation(['settings', 'common']);
+  const addToast = useToastStore((s) => s.addToast);
+
+  const [applicability, setApplicability] = useState<CityTaxApplicability | ''>('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    stayService.getCityTaxApplicability()
+      .then((data) => {
+        if (!cancelled) setApplicability(data.applicability);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) addToast(getErrorMessage(err, t('city_tax_err_loading_applicability')), 'error');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [addToast, t]);
+
+  const options = useMemo(() => [
+    { value: 'UNKNOWN', label: t('city_tax_applicability_unknown') },
+    { value: 'APPLICABLE', label: t('city_tax_applicability_applicable') },
+    { value: 'NOT_APPLICABLE', label: t('city_tax_applicability_not_applicable') },
+  ], [t]);
+
+  const handleChange = useCallback(async (e: ChangeEvent<HTMLSelectElement>) => {
+    const next = e.target.value as CityTaxApplicability;
+    const previous = applicability;
+    setApplicability(next);
+    setSaving(true);
+    try {
+      await stayService.updateCityTaxApplicability({ applicability: next });
+      addToast(t('save'), 'success');
+    } catch (err: unknown) {
+      setApplicability(previous);
+      addToast(getErrorMessage(err, t('city_tax_err_save')), 'error');
+    } finally {
+      setSaving(false);
+    }
+  }, [applicability, addToast, t]);
+
+  return (
+    <M3Card className="p-6 space-y-4">
+      <div>
+        <h2 className="text-sm font-semibold text-on-surface">{t('city_tax_applicability_section_title')}</h2>
+        <p className="text-xs text-on-surface-variant mt-0.5">{t('city_tax_applicability_section_desc')}</p>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center items-center h-16">
+          <MaterialIcon name="progress_activity" size={28} className="text-primary animate-spin" />
+        </div>
+      ) : (
+        <M3Select
+          label={t('city_tax_applicability_label')}
+          options={options}
+          value={applicability}
+          onChange={handleChange}
+          disabled={saving}
+          className="max-w-sm"
+        />
+      )}
+    </M3Card>
+  );
+};
+
+// -----------------------------------------------------------------------
+// Backfill section (Parte 5.4) — recovers tourist tax for stays that were
+// never assessed because of a configuration gap. Preview never writes or
+// charges anything; only the explicit confirm step posts charges, and only
+// for stays whose invoice is still open — a closed/paid invoice is left
+// untouched, never re-opened or amended.
+// -----------------------------------------------------------------------
+
+const BackfillRow = memo(({ line, t }: {
+  line: CityTaxBackfillResponse['lines'][number];
+  t: (key: string) => string;
+}) => (
+  <M3TableRow>
+    <M3TableCell>{line.checkInDate}</M3TableCell>
+    <M3TableCell>€ {line.amount.toFixed(2)}</M3TableCell>
+    <M3TableCell>
+      {line.charged
+        ? t('city_tax_backfill_status_charged')
+        : line.skipReason
+          ? t(`city_tax_backfill_skip_${line.skipReason.toLowerCase()}`)
+          : t('city_tax_backfill_status_pending')}
+    </M3TableCell>
+  </M3TableRow>
+));
+BackfillRow.displayName = 'BackfillRow';
+
+const CityTaxBackfillSection = () => {
+  const { t } = useTranslation(['settings', 'common']);
+  const addToast = useToastStore((s) => s.addToast);
+
+  const [result, setResult] = useState<CityTaxBackfillResponse | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+
+  const handlePreview = useCallback(async () => {
+    setPreviewing(true);
+    setConfirmed(false);
+    try {
+      const data = await stayService.previewCityTaxBackfill();
+      setResult(data);
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('city_tax_backfill_err_preview')), 'error');
+    } finally {
+      setPreviewing(false);
+    }
+  }, [addToast, t]);
+
+  const handleConfirm = useCallback(async () => {
+    setConfirming(true);
+    try {
+      const data = await stayService.confirmCityTaxBackfill();
+      setResult(data);
+      setConfirmed(true);
+      addToast(t('city_tax_backfill_success', { count: data.chargedCount }), 'success');
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('city_tax_backfill_err_confirm')), 'error');
+    } finally {
+      setConfirming(false);
+    }
+  }, [addToast, t]);
+
+  const tableHeaders = useMemo(() => [
+    t('city_tax_backfill_col_checkin'),
+    t('city_tax_backfill_col_amount'),
+    t('city_tax_backfill_col_status'),
+  ], [t]);
+
+  const canConfirm = !!result && !confirmed && result.lines.some((l) => !l.charged && !l.skipReason);
+
+  return (
+    <M3Card className="p-6 space-y-4">
+      <div>
+        <h2 className="text-sm font-semibold text-on-surface">{t('city_tax_backfill_section_title')}</h2>
+        <p className="text-xs text-on-surface-variant mt-0.5">{t('city_tax_backfill_section_desc')}</p>
+      </div>
+
+      <div className="flex gap-3">
+        <M3Button variant="outlined" icon="search" onClick={handlePreview} loading={previewing}>
+          {t('city_tax_backfill_action_preview')}
+        </M3Button>
+        {canConfirm && (
+          <M3Button icon="check" onClick={handleConfirm} loading={confirming}>
+            {t('city_tax_backfill_action_confirm')}
+          </M3Button>
+        )}
+      </div>
+
+      {result && (
+        result.lines.length === 0 ? (
+          <p className="text-sm font-body text-on-surface-variant py-2">{t('city_tax_backfill_none_found')}</p>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-on-surface">
+              {t('city_tax_backfill_total', { total: result.totalAmount.toFixed(2) })}
+            </p>
+            <M3Table headers={tableHeaders}>
+              {result.lines.map((line) => (
+                <BackfillRow key={`${line.stayId}-${line.checkInDate}`} line={line} t={t} />
+              ))}
+            </M3Table>
+          </>
+        )
+      )}
+    </M3Card>
+  );
+};
+
+// -----------------------------------------------------------------------
 // SettingsCityTax page
 // -----------------------------------------------------------------------
 
@@ -393,8 +580,10 @@ export const SettingsCityTax = () => {
         subtitle={t('city_tax_page_subtitle')}
         onBack={handleBack}
       />
+      <CityTaxApplicabilitySection />
       <HotelCategorySection />
       <CityTaxRatesSection />
+      <CityTaxBackfillSection />
     </div>
   );
 };

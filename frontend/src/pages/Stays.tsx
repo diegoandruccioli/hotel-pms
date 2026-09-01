@@ -19,6 +19,8 @@ import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { M3TableActionLink } from '../components/m3/M3TableActionLink';
 import { getStatusTone } from './Stays/stayStatusTone';
 import { AlloggiatiReportSection } from './Stays/AlloggiatiReportSection';
+import { StayGuestManagerDialog } from './Stays/StayGuestManagerDialog';
+import { StayExtensionDialog } from './Stays/StayExtensionDialog';
 import { getErrorMessage } from '../utils/errorMessage';
 import {
   useStaysList,
@@ -101,18 +103,54 @@ const AlloggiatiCell = ({ stay, onRetryInvoice, retryingInvoice, onRetryCheckout
   );
 };
 
-const ActionsCell = ({ stay, onCheckOut, checkingOut, t }: {
+const GuestsCountCell = ({ stay, onManageGuests }: { stay: StayResponse; onManageGuests: (stayId: string) => void }) => {
+  const handleClick = useCallback(() => onManageGuests(stay.id), [onManageGuests, stay.id]);
+  const count = stay.guests?.length || 0;
+
+  if (stay.status !== 'CHECKED_IN') {
+    return (
+      <div className="font-medium flex items-center gap-1.5 text-on-surface">
+        <MaterialIcon name="group" size={18} />
+        <span>{count}</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="font-medium flex items-center gap-1.5 text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs"
+    >
+      <MaterialIcon name="group" size={18} />
+      <span>{count}</span>
+    </button>
+  );
+};
+
+const ActionsCell = ({ stay, onCheckOut, checkingOut, onExtend, t }: {
   stay: StayResponse;
   onCheckOut: (s: StayResponse) => void;
   checkingOut: string | null;
+  onExtend: (s: StayResponse) => void;
   t: TFunction;
 }) => {
   const handleCheckOut = useCallback(() => onCheckOut(stay), [onCheckOut, stay]);
+  const handleExtend = useCallback(() => onExtend(stay), [onExtend, stay]);
 
   if (stay.status !== 'CHECKED_IN') return null;
 
   return (
-    <div className="text-right">
+    <div className="flex justify-end gap-2">
+      <M3Button
+        variant="outlined"
+        icon="event_repeat"
+        onClick={handleExtend}
+        id={`extend-btn-${stay.id}`}
+        className="text-xs h-10 px-3"
+      >
+        {t('action_extend_stay')}
+      </M3Button>
       <M3Button
         variant="tonal"
         icon={checkingOut === stay.id ? 'progress_activity' : 'logout'}
@@ -238,6 +276,15 @@ export const Stays = memo(() => {
   const handleGuestNavigate = useCallback((guestDisplayName: string) => {
     navigate('/guests?search=' + encodeURIComponent(guestDisplayName));
   }, [navigate]);
+
+  const [manageGuestsStayId, setManageGuestsStayId] = useState<string | null>(null);
+  const handleManageGuests = useCallback((stayId: string) => setManageGuestsStayId(stayId), []);
+  const handleCloseGuestManager = useCallback(() => setManageGuestsStayId(null), []);
+
+  const [extendingStay, setExtendingStay] = useState<StayResponse | null>(null);
+  const handleExtendStay = useCallback((stay: StayResponse) => setExtendingStay(stay), []);
+  const handleCloseExtension = useCallback(() => setExtendingStay(null), []);
+  const handleStayExtended = useCallback(() => { refetch(); }, [refetch]);
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
   const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
   const pageOfLabel = useCallback(
@@ -297,12 +344,7 @@ export const Stays = memo(() => {
       id: 'guests',
       header: t('guests'),
       enableSorting: false,
-      cell: ({ row }) => (
-        <div className="font-medium flex items-center gap-1.5 text-on-surface">
-          <MaterialIcon name="group" size={18} />
-          <span>{row.original.guests?.length || 0}</span>
-        </div>
-      ),
+      cell: ({ row }) => <GuestsCountCell stay={row.original} onManageGuests={handleManageGuests} />,
     },
     {
       id: 'status',
@@ -335,11 +377,17 @@ export const Stays = memo(() => {
       header: () => <span className="sr-only">{t('actions')}</span>,
       enableSorting: false,
       cell: ({ row }) => (
-        <ActionsCell stay={row.original} onCheckOut={handleCheckOut} checkingOut={checkingOut} t={t} />
+        <ActionsCell
+          stay={row.original}
+          onCheckOut={handleCheckOut}
+          checkingOut={checkingOut}
+          onExtend={handleExtendStay}
+          t={t}
+        />
       ),
     },
   ], [t, formatDate, handleGuestNavigate, handleRetryInvoice, retryingInvoice, handleRetryCheckoutEmail,
-      retryingEmail, handleCheckOut, checkingOut]);
+      retryingEmail, handleCheckOut, checkingOut, handleManageGuests, handleExtendStay]);
 
   return (
     <div className="space-y-6">
@@ -419,6 +467,9 @@ export const Stays = memo(() => {
       )}
 
       <AlloggiatiReportSection isAdminOrOwner={isAdminOrOwner} />
+
+      <StayGuestManagerDialog stayId={manageGuestsStayId} onClose={handleCloseGuestManager} />
+      <StayExtensionDialog stay={extendingStay} onClose={handleCloseExtension} onExtended={handleStayExtended} />
     </div>
   );
 });
