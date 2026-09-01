@@ -79,6 +79,7 @@
   "HOTEL_CATEGORY_OVERLAP": "Esiste già una categoria con un periodo di validità sovrapposto.",
   "HOTEL_CATEGORY_VALID_FROM_NOT_AFTER_CURRENT": "La decorrenza della nuova categoria deve essere successiva a quella della categoria attualmente in vigore.",
   "RESERVATION_STALE_VERSION": "Un altro utente ha modificato questa prenotazione nel frattempo.",
+  "RESERVATION_HAS_ACTIVE_STAY": "Impossibile modificare date o camere: il check-in è già stato effettuato. Usa la gestione del soggiorno.",
   "STAY_EXTENSION_INVOICE_NOT_OPEN": "Impossibile prorogare: la fattura di questo soggiorno non è più aperta.",
   "ROOM_NOT_AVAILABLE_FOR_EXTENSION": "La camera non è disponibile per le notti aggiuntive richieste.",
   "STAY_STALE_VERSION": "Un altro utente ha modificato questo soggiorno nel frattempo.",

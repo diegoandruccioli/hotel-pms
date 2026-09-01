@@ -52,7 +52,7 @@ class StayReservationSync {
             }
         }
 
-        reservationService.updateStatusAndGuests(reservationId, status, actualGuests);
+        reservationService.updateStatusAndGuests(reservationId, status, actualGuests, res.version());
     }
 
     /**
@@ -76,7 +76,8 @@ class StayReservationSync {
                 .count();
 
         if (totalRooms > 0 && checkedOutRooms >= totalRooms) {
-            reservationService.updateStatusAndGuests(reservationId, ReservationStatus.CHECKED_OUT, null);
+            reservationService.updateStatusAndGuests(
+                    reservationId, ReservationStatus.CHECKED_OUT, null, reservation.version());
         }
     }
 }

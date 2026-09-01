@@ -22,7 +22,9 @@ import com.hotelpms.frontdesk.reservations.repository.ReservationRepository;
 import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomService;
+import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
+import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,6 +77,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final HotelSettingsService hotelSettingsService;
     private final NotificationClient notificationClient;
     private final RatePricingService ratePricingService;
+    private final StayRepository stayRepository;
 
     /** {@inheritDoc} */
     @Override
@@ -215,6 +218,7 @@ public class ReservationServiceImpl implements ReservationService {
         final UUID hotelId = resolveHotelId();
         final Reservation existingReservation = findReservationByIdAndHotelOrThrow(id, hotelId);
         verifyNotStale(existingReservation, request.version());
+        verifyNoActiveStayConflict(id, hotelId, existingReservation, request);
 
         final GuestResponse guest = verifyGuestExists(request.guestId());
         final java.util.Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(request.lineItems(), hotelId);
@@ -269,10 +273,11 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional
     public ReservationResponse updateStatusAndGuests(final UUID id, final ReservationStatus status,
-            final Integer actualGuests) {
+            final Integer actualGuests, final Long clientVersion) {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
         final UUID hotelId = resolveHotelId();
         final Reservation reservation = findReservationByIdAndHotelOrThrow(id, hotelId);
+        verifyNotStale(reservation, clientVersion);
 
         if (status != null) {
             reservation.setStatus(status);
@@ -610,6 +615,52 @@ public class ReservationServiceImpl implements ReservationService {
         if (clientVersion != null && !clientVersion.equals(reservation.getVersion())) {
             throw new ConflictException("RESERVATION_STALE_VERSION");
         }
+    }
+
+    /**
+     * Rejects a dates/rooms edit once check-in has already created a
+     * {@code CHECKED_IN} stay from this reservation. The frontend already
+     * makes the dates/rooms section read-only in that case (see
+     * {@code ReservationForm.tsx}'s {@code checkedInStayId} banner) — this is
+     * the server-side backstop for callers that bypass it, since a stay's own
+     * dates/room/price are snapshotted at check-in and never re-read from the
+     * reservation afterward: an unguarded edit here would silently desync
+     * what the stay is billing from what the reservation now says.
+     *
+     * <p>Fields other than dates/rooms (notes, contact info, {@code
+     * actualGuests}) are unaffected by this guard — only a change to what the
+     * stay actually snapshotted is rejected.
+     *
+     * @param id                  the reservation id
+     * @param hotelId             the authenticated hotel, for tenant scoping
+     * @param existingReservation the reservation as currently persisted
+     * @param request             the incoming update request
+     * @throws ConflictException if dates or rooms changed and a
+     *         {@code CHECKED_IN} stay already exists for this reservation
+     */
+    private void verifyNoActiveStayConflict(
+            final UUID id, final UUID hotelId,
+            final Reservation existingReservation, final ReservationRequest request) {
+        if (!datesOrRoomsChanged(existingReservation, request)) {
+            return;
+        }
+        if (stayRepository.existsByReservationIdAndHotelIdAndStatus(id, hotelId, StayStatus.CHECKED_IN)) {
+            throw new ConflictException("RESERVATION_HAS_ACTIVE_STAY");
+        }
+    }
+
+    private static boolean datesOrRoomsChanged(final Reservation existing, final ReservationRequest request) {
+        if (!existing.getCheckInDate().equals(request.checkInDate())
+                || !existing.getCheckOutDate().equals(request.checkOutDate())) {
+            return true;
+        }
+        final Set<UUID> currentRoomIds = existing.getLineItems().stream()
+                .map(ReservationLineItem::getRoomId)
+                .collect(java.util.stream.Collectors.toSet());
+        final Set<UUID> requestedRoomIds = request.lineItems().stream()
+                .map((@NonNull ReservationLineItemRequest li) -> li.roomId())
+                .collect(java.util.stream.Collectors.toSet());
+        return !currentRoomIds.equals(requestedRoomIds);
     }
 
     private void sendReservationConfirmedEmail(

@@ -6,6 +6,7 @@ import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.GuestSearchPageResponse;
 import com.hotelpms.frontdesk.pricing.dto.NightlyRate;
 import com.hotelpms.frontdesk.pricing.service.RatePricingService;
+import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
 import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import com.hotelpms.frontdesk.reservations.domain.Reservation;
@@ -118,6 +119,9 @@ class ReservationServiceImplTest {
 
     @Mock
     private RatePricingService ratePricingService;
+
+    @Mock
+    private com.hotelpms.frontdesk.stays.repository.StayRepository stayRepository;
 
     @InjectMocks
     private ReservationServiceImpl reservationService;
@@ -648,6 +652,81 @@ class ReservationServiceImplTest {
         verify(reservationRepository, never()).saveAndFlush(any());
     }
 
+    /**
+     * Server-side backstop for the frontend's own dates/rooms lock (see
+     * ReservationForm.tsx's checkedInStayId banner): a direct API caller that
+     * bypasses the UI must still be rejected when it tries to move the dates
+     * of a reservation that already has a CHECKED_IN stay — the stay
+     * snapshotted its own dates at check-in and never re-reads them.
+     */
+    @Test
+    void testUpdateReservationWithActiveStayAndChangedDatesThrowsConflict() {
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(stayRepository.existsByReservationIdAndHotelIdAndStatus(reservationId, HOTEL_ID, StayStatus.CHECKED_IN))
+                .thenReturn(true);
+        final ReservationRequest requestWithMovedDates = new ReservationRequest(
+                GUEST_ID, EXPECTED_GUESTS,
+                request.checkInDate().plusDays(1), request.checkOutDate().plusDays(1),
+                STATUS_CONFIRMED, request.lineItems(), null);
+
+        final ConflictException ex = assertThrows(ConflictException.class,
+                () -> reservationService.updateReservation(reservationId, requestWithMovedDates));
+
+        assertTrue(ex.getMessage().contains("RESERVATION_HAS_ACTIVE_STAY"));
+        verify(guestClient, never()).getGuestById(any());
+        verify(reservationMapper, never()).updateEntityFromRequest(any(), any());
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    /**
+     * Same guard, triggered by a room swap instead of a date change — both are
+     * "what the stay snapshotted" fields.
+     */
+    @Test
+    void testUpdateReservationWithActiveStayAndChangedRoomThrowsConflict() {
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(stayRepository.existsByReservationIdAndHotelIdAndStatus(reservationId, HOTEL_ID, StayStatus.CHECKED_IN))
+                .thenReturn(true);
+        final ReservationLineItemRequest differentRoom = new ReservationLineItemRequest(UUID.randomUUID());
+        final ReservationRequest requestWithDifferentRoom = new ReservationRequest(
+                GUEST_ID, EXPECTED_GUESTS, request.checkInDate(), request.checkOutDate(),
+                STATUS_CONFIRMED, List.of(differentRoom), null);
+
+        assertThrows(ConflictException.class,
+                () -> reservationService.updateReservation(reservationId, requestWithDifferentRoom));
+
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    /**
+     * The guard only blocks a change to what the stay actually snapshotted
+     * (dates/rooms): when the request's dates/rooms match what's already
+     * persisted, the update succeeds without even querying whether an active
+     * stay exists — unrelated edits like expectedGuests are never blocked.
+     */
+    @Test
+    void testUpdateReservationWithUnchangedDatesAndRoomsSucceedsWithoutCheckingForActiveStay() {
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
+        when(reservationMapper.toResponse(entity)).thenReturn(response);
+        when(reservationMapper.toEntity(any(ReservationLineItemRequest.class))).thenAnswer(invocation -> {
+            final ReservationLineItemRequest lineItemRequest = invocation.getArgument(0);
+            final ReservationLineItem newItem = new ReservationLineItem();
+            newItem.setRoomId(lineItemRequest.roomId());
+            return newItem;
+        });
+
+        final ReservationResponse result = reservationService.updateReservation(reservationId, request);
+
+        assertNotNull(result);
+        verify(reservationMapper, times(1)).updateEntityFromRequest(request, entity);
+        verify(stayRepository, never()).existsByReservationIdAndHotelIdAndStatus(any(), any(), any());
+    }
+
     @Test
     void testUpdateReservationRecomputesPriceViaRatePricingServiceNotFromRequest() {
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
@@ -766,7 +845,7 @@ class ReservationServiceImplTest {
         when(reservationMapper.toResponse(entity)).thenReturn(checkedInResponse);
 
         final ReservationResponse result = reservationService.updateStatusAndGuests(
-                reservationId, ReservationStatus.CHECKED_IN, 2);
+                reservationId, ReservationStatus.CHECKED_IN, 2, null);
 
         assertNotNull(result);
         assertEquals(ReservationStatus.CHECKED_IN, entity.getStatus());
@@ -788,7 +867,7 @@ class ReservationServiceImplTest {
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
         when(reservationMapper.toResponse(entity)).thenReturn(cancelledResponse);
 
-        reservationService.updateStatusAndGuests(reservationId, ReservationStatus.CANCELLED, null);
+        reservationService.updateStatusAndGuests(reservationId, ReservationStatus.CANCELLED, null, null);
 
         assertEquals(ReservationStatus.CANCELLED, entity.getStatus());
         verify(reservationRepository).saveAndFlush(entity);
@@ -800,7 +879,24 @@ class ReservationServiceImplTest {
 
         assertThrows(NotFoundException.class,
                 () -> reservationService.updateStatusAndGuests(
-                        reservationId, ReservationStatus.CHECKED_IN, 1));
+                        reservationId, ReservationStatus.CHECKED_IN, 1, null));
+    }
+
+    /**
+     * Same "forgotten tab" guard as {@code updateReservation}, on the
+     * PATCH .../status-and-guests path: a mismatched, non-null client version
+     * is rejected before the status/guests mutation runs.
+     */
+    @Test
+    void testUpdateStatusAndGuestsWithStaleVersionThrowsConflictBeforeAnyOtherWork() {
+        entity.setVersion(CURRENT_VERSION_AFTER_ANOTHER_EDIT);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        assertThrows(ConflictException.class,
+                () -> reservationService.updateStatusAndGuests(
+                        reservationId, ReservationStatus.CHECKED_IN, 1, MATCHING_VERSION));
+
+        verify(reservationRepository, never()).saveAndFlush(any());
     }
 
     @Test

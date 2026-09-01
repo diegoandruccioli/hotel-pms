@@ -211,14 +211,14 @@ class ReservationControllerTest {
     @Test
     void shouldUpdateStatusAndGuestsReturn200() throws Exception {
         final ReservationStatusUpdateRequest statusRequest =
-                new ReservationStatusUpdateRequest(ReservationStatus.CHECKED_IN, 2);
+                new ReservationStatusUpdateRequest(ReservationStatus.CHECKED_IN, 2, null);
         final ReservationResponse checkedInResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, 2, 2,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
                 ReservationStatus.CHECKED_IN, null, true, null, null, false, null, null);
 
         when(reservationService.updateStatusAndGuests(
-                any(UUID.class), any(ReservationStatus.class), any(Integer.class)))
+                any(UUID.class), any(ReservationStatus.class), any(Integer.class), any()))
                 .thenReturn(checkedInResponse);
 
         mockMvc.perform(patch(BASE_URL + PATH_STATUS, reservationId)

@@ -104,7 +104,7 @@ Solo dopo questi passi il sistema è operativo per ricevere prenotazioni e gesti
 
 **Edge case:** Se le date selezionate si sovrappongono con una prenotazione esistente per la stessa camera, il sistema mostra un errore 409 e impedisce la creazione.
 
-**Nota — prenotazione già in check-in:** Se si riapre una prenotazione il cui soggiorno è già attivo (stato **CHECKED_IN**), il form mostra un banner: *"Questa prenotazione è già in check-in. Le modifiche qui non aggiornano il soggiorno in corso: usa il pannello soggiorni per proroghe, cambio ospiti o partenza anticipata."* con collegamento diretto alla pagina Soggiorni. I campi data/camere diventano **non modificabili** (sola lettura) in questo caso, non solo avvisati: il soggiorno già aperto non ha alcun collegamento "vivo" con la prenotazione di origine, quindi il sistema impedisce la modifica invece di lasciarla fare senza effetto — usare §3.5a/§3.5b per agire sul soggiorno.
+**Nota — prenotazione già in check-in:** Se si riapre una prenotazione il cui soggiorno è già attivo (stato **CHECKED_IN**), il form mostra un banner: *"Questa prenotazione è già in check-in. Le modifiche qui non aggiornano il soggiorno in corso: usa il pannello soggiorni per proroghe, cambio ospiti o partenza anticipata."* con collegamento diretto alla pagina Soggiorni. I campi data/camere diventano **non modificabili** (sola lettura) in questo caso, non solo avvisati: il soggiorno già aperto non ha alcun collegamento "vivo" con la prenotazione di origine — la modifica di date o camere è bloccata anche a livello di sistema (non solo nell'interfaccia), quindi non ha effetto nemmeno chiamando direttamente il sistema — usare §3.5a/§3.5b per agire sul soggiorno.
 
 ---
 
@@ -490,6 +490,7 @@ Menu → **Impostazioni** → **Sistema** → **Privacy** (`/settings/privacy`).
 | Rimozione di un ospite aggiunto a soggiorno già fatturato | L'eventuale supplemento di imposta di soggiorno già addebitato viene stornato dalla fattura, se ancora aperta | Nessuna azione — automatico |
 | Proroga di un soggiorno con un ospite già partito in anticipo | L'ospite partito non viene tassato per le notti aggiunte | Nessuna azione — automatico |
 | Cambio di una tariffa di imposta di soggiorno dopo che un ospite ha già fatto check-in | La sua fattura resta calcolata con la tariffa in vigore al check-in | Comportamento voluto (requisito fiscale) — non richiede intervento |
+| Modifica di date/camere su una prenotazione con soggiorno già CHECKED_IN | Errore 409 (bloccato anche fuori dall'interfaccia) | Usare §3.5a/§3.5b sul soggiorno, non la prenotazione di origine |
 
 ---
 
