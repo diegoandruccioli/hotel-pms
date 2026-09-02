@@ -134,16 +134,24 @@ Follow the convention already established by `M3Button.tsx`, `M3Card.tsx`,
    Don't branch variant styling with a chain of ternaries inline in JSX.
 5. **Use `cn()` from `frontend/src/utils/cn.ts`** (`twMerge(clsx(inputs))`) to
    compose the final class string, so a caller's override always wins over the
-   component's default per Tailwind-merge conflict resolution. *Known drift*:
-   `M3Button`, `M3Card`, and `M3StatusChip` currently concatenate class strings by
-   template literal instead of using `cn()` — that's legacy debt in those three
-   files, not the pattern to copy into new components.
+   component's default per Tailwind-merge conflict resolution — see `M3Button.tsx`,
+   `M3Card.tsx`, `M3StatusChip.tsx` for the pattern (all three were migrated off
+   template-literal concatenation on 2026-09-02).
 6. **Disabled state**: `opacity-38 cursor-not-allowed shadow-none` (the `opacity-38`
    Tailwind value is the M3 disabled-state token, not an arbitrary number).
 7. **Focus-visible ring is mandatory on every interactive element**, not just
    inherited from a browser default: `focus-visible:ring-2 focus-visible:ring-primary
-   focus-visible:ring-offset-2`. This is a first-class design element per the
-   Accessibility section below, not an afterthought to add if time allows.
+   focus-visible:ring-offset-2` (use `focus-within:ring-2` on the wrapper instead for
+   a bordered input/select whose focus state lives on a child element, and
+   `focus-visible:ring-inset` for a full-width row inside a menu/listbox where an
+   offset ring would clip against the container edge). This is a first-class design
+   element per the Accessibility section below, not an afterthought to add if time
+   allows.
+8. **A file never imports its own folder's barrel (`index.ts`)** — always import
+   sibling files directly (`./Foo`, not `./index` or `.`). This is the single most
+   common cause of a circular-import bug once a folder has a barrel; `npm run
+   lint:cycles` (`madge --circular`, wired into CI) catches any cycle this rule
+   doesn't prevent, but don't rely on the guard instead of following the rule.
 
 ---
 
