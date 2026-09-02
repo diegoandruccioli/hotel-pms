@@ -286,10 +286,16 @@ public class AuthServiceImpl implements AuthService {
      * Strips CR/LF from a value before it is written to the log, to prevent an
      * attacker-controlled username or client IP from forging log entries (CWE-117).
      *
-     * @param value the raw value to sanitize
-     * @return the value with carriage returns and line feeds replaced
+     * <p>{@code clientIp} is gateway-injected via an optional header and can be
+     * {@code null} (e.g. a request that reaches this service directly, bypassing
+     * the gateway) — null-safe so a login failure without it still resolves to
+     * the normal {@link BadCredentialsException} instead of an unhandled NPE.</p>
+     *
+     * @param value the raw value to sanitize, may be {@code null}
+     * @return the value with carriage returns and line feeds replaced, or
+     *         {@code "unknown"} if {@code value} is {@code null}
      */
     private static String sanitizeForLog(final String value) {
-        return value.replaceAll("[\r\n]", "_");
+        return value == null ? "unknown" : value.replaceAll("[\r\n]", "_");
     }
 }
