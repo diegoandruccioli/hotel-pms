@@ -238,10 +238,10 @@ carta è mai persistito nel sistema. Decisione coerente, nessuna azione richiest
 
 ## 8. Accessibilità (WCAG 2.2 AA) — ✅ Implementato
 
-Standard adottato: WCAG 2.2 AA con contrasto potenziato (7:1/4.5:1), focus ring come
-elemento di design di prima classe, focus trap sui modali, `vitest-axe` su ogni test
-componente. Extra: PDF/UA (ISO 14289) sui documenti fiscali — `usePdfUaAccessibility`
-sempre attivo, verificato con PDFBox reale (`/MarkInfo`, `/StructTreeRoot`, `/Lang`).
+Regole complete (contrasto, focus, touch target, ecc.) ora in `frontend/DESIGN.md` —
+non ripetute qui. Specifico a questo audit: PDF/UA (ISO 14289) sui documenti fiscali —
+`usePdfUaAccessibility` sempre attivo, verificato con PDFBox reale (`/MarkInfo`,
+`/StructTreeRoot`, `/Lang`) — non coperto da DESIGN.md, che è frontend-UI-only.
 
 **Discrepanza documentale trovata** (non un gap funzionale): `backup/DECISIONS.md §4.2`
 rimanda a `backup/archive/ACCESSIBILITY_FIXES.md`, che riporta ancora *"Compliance
