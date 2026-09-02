@@ -19,7 +19,7 @@ import { useToastStore } from '../store';
 import { useGuestsSearch, useDeleteGuest } from '../hooks/queries/useGuests';
 import { queryKeys } from '../lib';
 import { getErrorMessage } from '../utils';
-import { guestService } from '../services/guestService';
+import { guestService } from '../services';
 import { GuestFormModal } from './GuestFormModal';
 
 const PAGE_SIZE = 20;

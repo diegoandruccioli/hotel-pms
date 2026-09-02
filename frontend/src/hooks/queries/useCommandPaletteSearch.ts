@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { guestService } from '../../services/guestService';
-import { reservationService } from '../../services/reservationService';
+import { guestService } from '../../services';
+import { reservationService } from '../../services';
 import { queryKeys } from '../../lib';
 
 const RESULT_LIMIT = 5;

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { GuestFieldSection } from './GuestFieldSection';
 import { emptyGuest } from './stayGuestFieldHelpers';
-import { stayService } from '../../services/stayService';
+import { stayService } from '../../services';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

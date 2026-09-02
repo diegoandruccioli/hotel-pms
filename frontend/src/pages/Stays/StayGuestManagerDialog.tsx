@@ -8,7 +8,7 @@ import { M3TextField } from '../../components/m3';
 import { M3LoadingState } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { useToastStore } from '../../store';
-import { stayService } from '../../services/stayService';
+import { stayService } from '../../services';
 import { getErrorMessage } from '../../utils';
 import { queryKeys } from '../../lib';
 import type {

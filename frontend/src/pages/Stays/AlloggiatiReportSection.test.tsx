@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { AlloggiatiReportSection } from './AlloggiatiReportSection';
-import { stayService } from '../../services/stayService';
+import { stayService } from '../../services';
 import { mockAxiosErrorWithDetail } from '../../test-utils';
 
 vi.mock('react-i18next', () => ({

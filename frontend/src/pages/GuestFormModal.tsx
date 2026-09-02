@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { guestService } from '../services/guestService';
+import { guestService } from '../services';
 import type { GuestResponseDTO, GuestRequestDTO } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3';

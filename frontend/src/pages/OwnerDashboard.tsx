@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, memo } from 'react';
-import { billingReportService } from '../services/billingReportService';
+import { billingReportService } from '../services';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 import type { OwnerFinancialReportDto } from '../types';

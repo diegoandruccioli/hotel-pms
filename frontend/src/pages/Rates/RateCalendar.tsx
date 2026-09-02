@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from 'date-fns';
 import { it, enUS } from 'date-fns/locale';
-import { rateSeasonService } from '../../services/rateSeasonService';
+import { rateSeasonService } from '../../services';
 import type { RateCalendarResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3';

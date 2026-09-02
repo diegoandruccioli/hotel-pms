@@ -11,9 +11,9 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 import { Reservations } from './Reservations';
-import { reservationService } from '../services/reservationService';
+import { reservationService } from '../services';
 import { mockAxiosErrorWithDetail } from '../test-utils';
-import { inventoryService } from '../services/inventoryService';
+import { inventoryService } from '../services';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 

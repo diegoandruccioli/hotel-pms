@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { stayService } from '../../services/stayService';
-import { guestService } from '../../services/guestService';
+import { stayService } from '../../services';
+import { guestService } from '../../services';
 import type {
   AvailableRoom, AlloggiatiStato, AlloggiatiTipdoc, CityTaxUnassessedReason, StayGuestRequest, TravellerType,
 } from '../../types';

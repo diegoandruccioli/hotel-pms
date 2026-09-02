@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, memo } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store';
-import { authService } from '../services/authService';
+import { authService } from '../services';
 import { ToastContainer } from '../components/Toast';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';

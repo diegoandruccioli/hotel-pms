@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, memo } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { stayService } from '../services/stayService';
+import { stayService } from '../services';
 import type { AlloggiatiComune } from '../types';
 import { M3TextField } from './m3/M3TextField';
 

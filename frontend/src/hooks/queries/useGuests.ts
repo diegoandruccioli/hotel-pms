@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { guestService } from '../../services/guestService';
+import { guestService } from '../../services';
 import { queryKeys } from '../../lib';
 
 /**

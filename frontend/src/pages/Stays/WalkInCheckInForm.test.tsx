@@ -4,8 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import userEvent from '@testing-library/user-event';
 import { WalkInCheckInForm } from './WalkInCheckInForm';
-import { stayService } from '../../services/stayService';
-import { guestService } from '../../services/guestService';
+import { stayService } from '../../services';
+import { guestService } from '../../services';
 import type { StayResponse } from '../../types';
 
 const ITALIA_STATO = { codice: '100000100', descrizione: 'ITALIA' };

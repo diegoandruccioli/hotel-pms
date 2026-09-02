@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { PaymentModal } from './PaymentModal';
-import { billingService } from '../../services/billingService';
+import { billingService } from '../../services';
 import { mockAxiosErrorWithDetail } from '../../test-utils';
 
 const mockAddToast = vi.hoisted(() => vi.fn());

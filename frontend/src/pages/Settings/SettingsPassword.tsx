@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store';
 import { useToastStore } from '../../store';
-import { authService } from '../../services/authService';
+import { authService } from '../../services';
 import { M3Card } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';

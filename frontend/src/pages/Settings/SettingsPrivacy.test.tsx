@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { SettingsPrivacy } from './SettingsPrivacy';
-import { guestService } from '../../services/guestService';
+import { guestService } from '../../services';
 import { mockAxiosErrorWithDetail } from '../../test-utils';
 import type { GuestPrivacySettingsResponse } from '../../types';
 

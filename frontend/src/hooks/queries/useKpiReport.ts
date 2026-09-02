@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { kpiReportService } from '../../services/kpiReportService';
+import { kpiReportService } from '../../services';
 import { queryKeys } from '../../lib';
 import type { ReportGranularity } from '../../types';
 

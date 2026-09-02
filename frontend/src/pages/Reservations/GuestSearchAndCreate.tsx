@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
-import { guestService } from '../../services/guestService';
+import { guestService } from '../../services';
 import type { GuestResponseDTO, GuestRequestDTO } from '../../types';
 import { getErrorMessage } from '../../utils';
 

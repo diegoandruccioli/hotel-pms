@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { dashboardService } from '../../services/dashboardService';
-import { billingReportService } from '../../services/billingReportService';
+import { dashboardService } from '../../services';
+import { billingReportService } from '../../services';
 import { queryKeys } from '../../lib';
 
 const getTodayDateString = (): string => {

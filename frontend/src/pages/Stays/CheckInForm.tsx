@@ -4,9 +4,9 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3';
-import { stayService } from '../../services/stayService';
-import { guestService } from '../../services/guestService';
-import { reservationService } from '../../services/reservationService';
+import { stayService } from '../../services';
+import { guestService } from '../../services';
+import { reservationService } from '../../services';
 import { useToastStore } from '../../store';
 import type {
   AlloggiatiStato,

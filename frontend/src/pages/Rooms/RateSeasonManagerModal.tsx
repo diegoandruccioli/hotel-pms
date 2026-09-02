@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { rateSeasonService } from '../../services/rateSeasonService';
+import { rateSeasonService } from '../../services';
 import type { RateSeasonRequest, RateSeasonResponse, RoomTypeResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3';

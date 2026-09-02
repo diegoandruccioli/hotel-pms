@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
 import type { InvoiceResponse } from '../../types';
-import { billingService } from '../../services/billingService';
+import { billingService } from '../../services';
 
 vi.mock('../../services/billingService', () => ({
   billingService: {

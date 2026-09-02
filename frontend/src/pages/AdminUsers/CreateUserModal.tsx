@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { userService } from '../../services/userService';
+import { userService } from '../../services';
 import type { UserResponse, CreateUserRequest } from '../../types';
 import { M3Button } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';

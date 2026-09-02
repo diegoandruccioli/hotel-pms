@@ -8,7 +8,7 @@ const mockUseSearchParams = vi.hoisted(() => vi.fn(() => [new URLSearchParams()]
 vi.mock('react-router-dom', () => ({
   useSearchParams: mockUseSearchParams,
 }));
-import { guestService } from '../services/guestService';
+import { guestService } from '../services';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithQuery as render } from '../../test-utils';
 import { StayGuestManagerDialog } from './StayGuestManagerDialog';
-import { stayService } from '../../services/stayService';
+import { stayService } from '../../services';
 import type { StayGuestResponse, StayResponse } from '../../types';
 
 vi.mock('react-i18next', () => {

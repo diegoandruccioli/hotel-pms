@@ -1,6 +1,6 @@
 import { useState, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { fbService } from '../../services/fbService';
+import { fbService } from '../../services';
 import { useToastStore } from '../../store';
 import { M3Button } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';

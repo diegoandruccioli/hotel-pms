@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { KpiTrendSection } from './KpiTrendSection';
-import { kpiReportService } from '../../services/kpiReportService';
+import { kpiReportService } from '../../services';
 import { renderWithQuery } from '../../test-utils';
 import type { KpiReportDto } from '../../types';
 

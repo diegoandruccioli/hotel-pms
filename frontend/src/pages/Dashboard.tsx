@@ -6,7 +6,7 @@ import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Card } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
-import { stayService } from '../services/stayService';
+import { stayService } from '../services';
 import { getErrorMessage } from '../utils';
 import { useDaySheet, useOwnerFinancialSummary } from '../hooks/queries/useDashboard';
 import type { RoomStatus } from '../types';

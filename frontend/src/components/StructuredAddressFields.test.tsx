@@ -4,7 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
 import { StructuredAddressFields } from './StructuredAddressFields';
-import { stayService } from '../services/stayService';
+import { stayService } from '../services';
 import type { AlloggiatiComune } from '../types';
 
 interface ControlledWrapperProps {

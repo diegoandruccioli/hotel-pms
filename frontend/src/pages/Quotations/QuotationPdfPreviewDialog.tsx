@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { quotationService } from '../../services/quotationService';
+import { quotationService } from '../../services';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';

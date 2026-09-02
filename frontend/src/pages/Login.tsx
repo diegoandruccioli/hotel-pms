@@ -1,7 +1,7 @@
 import React, { useState, memo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store';
-import { authService } from '../services/authService';
+import { authService } from '../services';
 import { useTranslation } from 'react-i18next';
 import { M3TextField } from '../components/m3';
 import { M3Button } from '../components/m3';

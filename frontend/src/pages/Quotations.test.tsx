@@ -9,7 +9,7 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 import { Quotations } from './Quotations';
-import { quotationService } from '../services/quotationService';
+import { quotationService } from '../services';
 import { useToastStore } from '../store';
 
 vi.mock('react-i18next', () => {

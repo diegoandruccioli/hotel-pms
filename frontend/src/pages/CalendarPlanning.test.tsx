@@ -50,8 +50,8 @@ vi.mock('../store/toastStore', () => ({
     (selector as (s: { addToast: () => void }) => unknown)({ addToast: mockAddToast }),
 }));
 
-import { reservationService } from '../services/reservationService';
-import { inventoryService } from '../services/inventoryService';
+import { reservationService } from '../services';
+import { inventoryService } from '../services';
 import { mockAxiosErrorWithDetail } from '../test-utils';
 
 describe('CalendarPlanning', () => {

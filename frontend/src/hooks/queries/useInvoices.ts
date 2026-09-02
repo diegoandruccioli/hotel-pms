@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { billingService } from '../../services/billingService';
+import { billingService } from '../../services';
 import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../../types';
 import type { SpringPage } from '../../types';
 import { queryKeys } from '../../lib';

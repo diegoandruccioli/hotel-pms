@@ -1,5 +1,5 @@
 import { useCallback, memo, useState } from 'react';
-import { billingService } from '../../services/billingService';
+import { billingService } from '../../services';
 import { useToastStore } from '../../store';
 
 const ICON_STYLE: React.CSSProperties = { fontSize: 18 };

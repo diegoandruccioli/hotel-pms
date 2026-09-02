@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { MenuFormModal } from './MenuFormModal';
-import { fbService } from '../../services/fbService';
+import { fbService } from '../../services';
 import { useToastStore } from '../../store';
 import { mockAxiosErrorWithDetail } from '../../test-utils';
 

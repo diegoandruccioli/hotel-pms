@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Calendar, dateFnsLocalizer, type Event, type View } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay, addMonths, subMonths, startOfMonth } from 'date-fns';
 import { enUS, it } from 'date-fns/locale';
-import { reservationService } from '../services/reservationService';
+import { reservationService } from '../services';
 import { useTranslation } from 'react-i18next';
 import { useToastStore } from '../store';
 import type { ReservationResponse } from '../types';
@@ -10,7 +10,7 @@ import { MaterialIcon } from '../components/MaterialIcon';
 import { M3StatusChip } from '../components/m3';
 import { M3Card } from '../components/m3';
 import PlanningBoard from '@/pages/PlanningBoard';
-import { inventoryService } from '../services/inventoryService';
+import { inventoryService } from '../services';
 import type { RoomResponse } from '../types';
 import { getErrorMessage } from '../utils';
 

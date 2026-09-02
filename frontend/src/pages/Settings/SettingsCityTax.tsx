@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, memo, type ChangeEvent, type
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { stayService } from '../../services/stayService';
+import { stayService } from '../../services';
 import type {
   CityTaxApplicability,
   CityTaxBackfillResponse,

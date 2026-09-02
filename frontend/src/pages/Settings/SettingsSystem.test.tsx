@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { MemoryRouter } from 'react-router-dom';
 import { SettingsSystem } from './SettingsSystem';
-import { stayService } from '../../services/stayService';
+import { stayService } from '../../services';
 import type { HotelSettingsResponse } from '../../types';
 
 const mockNavigate = vi.fn();

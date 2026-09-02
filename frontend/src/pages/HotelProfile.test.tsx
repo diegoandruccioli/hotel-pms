@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import userEvent from '@testing-library/user-event';
 import { HotelProfile } from './HotelProfile';
-import { stayService } from '../services/stayService';
+import { stayService } from '../services';
 import { mockAxiosErrorWithDetail } from '../test-utils';
 import type { HotelSettingsResponse } from '../types';
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { quotationService } from '../services/quotationService';
+import { quotationService } from '../services';
 import type { QuotationResponse, QuotationStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3';

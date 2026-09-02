@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, memo, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { stayService } from '../../services/stayService';
+import { stayService } from '../../services';
 import type { HotelSettingsResponse, HotelSettingsRequest } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Card } from '../../components/m3';

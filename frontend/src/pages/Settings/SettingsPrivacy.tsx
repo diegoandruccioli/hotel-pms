@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { guestService } from '../../services/guestService';
+import { guestService } from '../../services';
 import type { GuestPrivacySettingsResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3';

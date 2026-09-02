@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
 import { renderWithQuery as render } from '../test-utils';
 import { Billing } from './Billing';
-import { billingService } from '../services/billingService';
+import { billingService } from '../services';
 import type { InvoiceResponse, InvoiceSearchResult } from '../types';
 
 vi.mock('react-i18next', () => {

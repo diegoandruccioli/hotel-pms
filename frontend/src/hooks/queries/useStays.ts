@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { stayService } from '../../services/stayService';
+import { stayService } from '../../services';
 import type { StayResponse } from '../../types';
 import type { SpringPage } from '../../types';
 import { queryKeys } from '../../lib';

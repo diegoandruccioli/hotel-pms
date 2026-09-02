@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import type { Role } from '../types';
 import { AdminUsers } from './AdminUsers';
-import { userService } from '../services/userService';
+import { userService } from '../services';
 import { mockAxiosErrorWithDetail } from '../test-utils';
 
 vi.mock('react-i18next', () => ({

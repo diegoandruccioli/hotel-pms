@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { ResetPasswordModal } from './ResetPasswordModal';
-import { userService } from '../../services/userService';
+import { userService } from '../../services';
 import type { UserResponse } from '../../types';
 import type { Role } from '../../types';
 
