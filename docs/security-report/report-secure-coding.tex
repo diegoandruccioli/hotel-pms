@@ -1957,17 +1957,130 @@ errata + \texttt{clientIp == null} → \texttt{BadCredentialsException}, non NPE
 \texttt{loginWithNullClientIpOnLockedAccountThrowsAccountLockedNotNpe} (stesso
 scenario sul branch di lockout → \texttt{AccountLockedException}, non NPE).
 
-\paragraph{Follow-up non risolto in questo commit \threat{T-AUTH-15}}
-La stessa revisione di sicurezza ha isolato un secondo problema, reale ma
-volutamente fuori scope qui: \texttt{LoginAttemptServiceImpl.attemptsKey}/
-\texttt{lockKey} concatenano \texttt{clientIp} grezzo nella chiave Redis
-(\texttt{login:fail:<username>:<clientIp>}) --- un \texttt{clientIp} nullo
-produce silenziosamente la chiave letterale \texttt{...\string:null} (concatenazione
-Java, nessuna eccezione), collassando il binding per-IP di T-AUTH-12 in un
-lockout puramente per-username per chiunque ometta l'header. Tracciato in
-\texttt{THREAT\_MODEL.md} come \textbf{\textcolor{warnyellow}{DA ANALIZZARE}}, nessun fix applicato.
+\paragraph{Follow-up}
+La stessa revisione di sicurezza ha isolato un secondo problema nello stesso
+percorso di codice, sulla stessa causa (\texttt{clientIp} nullo su richiesta
+diretta ad \texttt{auth-service} senza gateway) ma in un punto diverso ---
+la chiave di lockout Redis anziché il logging. Risolto separatamente,
+vedi \threat{T-AUTH-15} più sotto.
 
 \paragraph{Riferimento} Commit: \commitref{d6b113a}{fix(security): T-AUTH-14 --- sanitizeForLog NPE on null clientIp}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Collasso della chiave di lockout Redis su clientIp nullo \threat{T-AUTH-15}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato dalla stessa revisione di sicurezza del fix precedente
+(\threat{T-AUTH-14}), stessa causa di fondo ma un punto di codice diverso:
+non il logging, ma la costruzione della chiave Redis del lockout.
+\texttt{LoginAttemptServiceImpl.attemptsKey}/\texttt{lockKey} concatenavano
+\texttt{clientIp} grezzo nella chiave (\texttt{login:fail:<username>:<clientIp>},
+\texttt{login:lock:<username>:<clientIp>}) senza alcun controllo. Quando
+\texttt{clientIp} è \texttt{null} --- qualunque richiesta che raggiunge
+\texttt{auth-service} senza passare dal gateway, stesso scenario di
+T-AUTH-14 --- la concatenazione Java produce silenziosamente la chiave
+letterale \texttt{...\string:null}, senza eccezione. Effetto: ogni richiesta
+priva dell'header \texttt{X-Client-IP} per un dato username finisce nello
+\textbf{stesso} bucket di lockout, indipendentemente dalla sorgente reale
+--- un attaccante che raggiunge la porta del servizio direttamente
+(bypassando il gateway) fa collassare il binding per-\texttt{(username, ip)}
+di T-AUTH-12 in un lockout puramente per-username, riaprendo esattamente
+il DoS contro il vero proprietario dell'account che T-AUTH-12 era nato
+per chiudere. Riprodotto dal vivo su un container \texttt{auth-service}
+pre-fix in esecuzione: tre richieste dirette a \texttt{:8087} senza header
+hanno scritto in Redis la chiave letterale \texttt{login:fail:admin:null}.
+Classificato OWASP A07 --- Identification \& Authentication Failures.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- LoginAttemptServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: nessun controllo su username/clientIp -- un valore null
+// produce silenziosamente la chiave letterale "...:null"
+private static String attemptsKey(final String username, final String clientIp) {
+    return ATTEMPTS_PREFIX + username + ":" + clientIp;
+}
+
+private static String lockKey(final String username, final String clientIp) {
+    return LOCK_PREFIX + username + ":" + clientIp;
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Fix a due livelli, nessuno dei due sufficiente da solo. Primo livello,
+\texttt{AuthController}: \texttt{clientIp} viene risolto prima di chiamare
+il service --- l'header \texttt{X-Client-IP} quando presente e non vuoto,
+altrimenti \texttt{HttpServletRequest.getRemoteAddr()} (indirizzo TCP del
+peer, non un header, quindi non falsificabile dal client per eludere il
+lockout), stesso fallback già applicato dal rate limiter del gateway sullo
+stesso header (\texttt{RateLimiterConfig.resolveClientIp}). Secondo
+livello, \texttt{LoginAttemptServiceImpl}: username/clientIp nulli o vuoti
+vengono comunque normalizzati al letterale fisso \texttt{"unknown"} prima
+di costruire la chiave, così il formato \texttt{...\string:null} resta
+irraggiungibile anche da un futuro chiamante che reintroducesse l'errore.
+
+\begin{securebox}[title={Codice Sicuro --- LoginAttemptServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: username/clientIp nulli o vuoti risolvono a "unknown",
+// mai al letterale ":null"
+private static String attemptsKey(final String username, final String clientIp) {
+    return ATTEMPTS_PREFIX + normalize(username) + ":" + normalize(clientIp);
+}
+
+private static String lockKey(final String username, final String clientIp) {
+    return LOCK_PREFIX + normalize(username) + ":" + normalize(clientIp);
+}
+
+private static String normalize(final String value) {
+    return value == null || value.isBlank() ? UNKNOWN : value;
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Hardening adiacente}
+Trovato nello stesso file durante il fix, stessa radice (nessuna difesa
+sui dati che tornano da Redis). \texttt{getLockedUntil} non proteggeva
+\texttt{Long.parseLong(raw)}: un valore corrotto nella lock key faceva
+uscire una \texttt{NumberFormatException} non gestita da \texttt{login()}
+--- un \texttt{401} pulito diventava un \texttt{500}. Ora fallisce aperto:
+la chiave corrotta viene cancellata e il metodo restituisce nessun lockout,
+mentre il contatore dei tentativi (chiave separata) continua comunque a
+contare. \texttt{recordFailure} impostava il TTL del contatore solo al
+primo tentativo (\texttt{attempts == 1}): se quell'\texttt{expire()}
+falliva per un disservizio momentaneo di Redis, il contatore restava senza
+scadenza e l'account non si sarebbe più sbloccato da solo. Il TTL viene ora
+riparato ad ogni tentativo in cui risulta assente
+(\texttt{redisTemplate.getExpire}), non solo al primo.
+
+\paragraph{Codice morto rimosso}
+Il meccanismo di lockout pre-Redis (T-AUTH-02) teneva il contatore in
+Postgres; è interamente superato da Redis ma i residui non erano mai letti
+né scritti da codice applicativo: colonne \texttt{UserAccount.failedAttempts}/
+\texttt{lockedUntil} e il metodo \texttt{UserAccountRepository.updateFailedAttempts}
+(che portava una \texttt{@TenantScopeExempt} --- un'eccezione documentata
+all'isolamento multi-tenant --- su un metodo che nessuno chiamava).
+Migration \texttt{V8} droppa le colonne ora inutilizzate; \texttt{V2}
+(già applicata negli ambienti esistenti) resta intatta per non rompere il
+checksum Flyway.
+
+\paragraph{Test}
+Sei nuovi test in \texttt{LoginAttemptServiceImplTest}:
+\texttt{clientIp} nullo o vuoto risolve al bucket \texttt{"unknown"}, mai al
+letterale \texttt{":null"}; due IP diversi restano su bucket distinti
+(non-regressione del binding T-AUTH-12); un valore corrotto nella lock key
+fallisce aperto e cancella la chiave; un contatore senza TTL viene riparato
+al tentativo successivo.
+
+\paragraph{Verifica end-to-end}
+Migration Flyway \texttt{V1}$\to$\texttt{V8} su database pulito e
+\texttt{V8} da sola su una baseline \texttt{V1}--\texttt{V7} (che simula un
+ambiente esistente) applicano entrambe senza errori di checksum. Una
+richiesta diretta al container \texttt{auth-service} pre-fix in esecuzione
+ha riprodotto dal vivo la chiave letterale \texttt{login:fail:admin:null}
+in Redis, confermando la premessa della vulnerabilità sull'ambiente reale
+di sviluppo.
+
+\paragraph{Riferimento} Commit: \commitref{1c24f72}{fix(security): T-AUTH-15 --- resolve clientIp instead of collapsing lockout keys on null}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Audit Log e Security Monitoring \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
