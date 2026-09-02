@@ -4,9 +4,9 @@ import { axe } from 'vitest-axe';
 import { OwnerDashboard } from './OwnerDashboard';
 import { billingReportService } from '../services/billingReportService';
 import { kpiReportService } from '../services/kpiReportService';
-import { renderWithQuery } from '../test-utils/renderWithQuery';
+import { renderWithQuery } from '../test-utils';
 import type { OwnerFinancialReportDto } from '../types';
-import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
+import { mockAxiosErrorWithDetail } from '../test-utils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),

@@ -3,7 +3,7 @@ import { renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useServerEvents } from './useServerEvents';
-import { queryKeys } from '../lib/queryKeys';
+import { queryKeys } from '../lib';
 
 class MockEventSource {
   static instances: MockEventSource[] = [];

@@ -5,12 +5,12 @@ import { it, enUS } from 'date-fns/locale';
 import { rateSeasonService } from '../../services/rateSeasonService';
 import type { RateCalendarResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Card } from '../../components/m3/M3Card';
+import { M3Button } from '../../components/m3';
+import { M3Card } from '../../components/m3';
 import { RateCalendarCell } from './RateCalendarCell';
 import { RateBulkApplyDialog } from './RateBulkApplyDialog';
 import { useAuthStore } from '../../store/authStore';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { getErrorMessage } from '../../utils';
 
 const SIDEBAR_WIDTH = 192;
 const CELL_WIDTH = 100;

@@ -2,10 +2,10 @@ import { useCallback, memo } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3TextField } from '../../components/m3/M3TextField';
-import { M3Checkbox } from '../../components/m3/M3Checkbox';
+import { M3Button } from '../../components/m3';
+import { M3Card } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
+import { M3Checkbox } from '../../components/m3';
 import type { AlloggiatiStato, AlloggiatiTipdoc, TravellerType } from '../../types';
 import {
   TYPES_WITHOUT_DOC,

@@ -4,10 +4,10 @@ import { z } from 'zod';
 import { guestService } from '../services/guestService';
 import type { GuestResponseDTO, GuestRequestDTO } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
-import { M3Dialog } from '../components/m3/M3Dialog';
-import { M3TextField } from '../components/m3/M3TextField';
-import { M3Select } from '../components/m3/M3Select';
+import { M3Button } from '../components/m3';
+import { M3Dialog } from '../components/m3';
+import { M3TextField } from '../components/m3';
+import { M3Select } from '../components/m3';
 import { StructuredAddressFields } from '../components/StructuredAddressFields';
 import { useToastStore } from '../store/toastStore';
 

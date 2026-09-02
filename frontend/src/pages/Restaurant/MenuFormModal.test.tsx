@@ -4,7 +4,7 @@ import { axe } from 'vitest-axe';
 import { MenuFormModal } from './MenuFormModal';
 import { fbService } from '../../services/fbService';
 import { useToastStore } from '../../store/toastStore';
-import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
+import { mockAxiosErrorWithDetail } from '../../test-utils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),

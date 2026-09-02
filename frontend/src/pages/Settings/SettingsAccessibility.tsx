@@ -2,9 +2,9 @@ import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useSettingsStore, type FontScale } from '../../store/settingsStore';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3SegmentedRow, type M3SegmentOption } from '../../components/m3/M3SegmentedRow';
-import { M3Switch } from '../../components/m3/M3Switch';
+import { M3Card } from '../../components/m3';
+import { M3SegmentedRow, type M3SegmentOption } from '../../components/m3';
+import { M3Switch } from '../../components/m3';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
 
 const FONT_OPTIONS: M3SegmentOption<FontScale>[] = [

@@ -2,11 +2,11 @@ import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { userService } from '../../services/userService';
 import type { UserResponse, CreateUserRequest } from '../../types';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Dialog } from '../../components/m3/M3Dialog';
-import { M3TextField } from '../../components/m3/M3TextField';
-import { M3Select } from '../../components/m3/M3Select';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { M3Button } from '../../components/m3';
+import { M3Dialog } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
+import { M3Select } from '../../components/m3';
+import { getErrorMessage } from '../../utils';
 import type { Role } from '../../types';
 
 interface CreateUserModalProps {

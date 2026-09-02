@@ -4,7 +4,7 @@ import { axe } from 'vitest-axe';
 import type { Role } from '../types';
 import { AdminUsers } from './AdminUsers';
 import { userService } from '../services/userService';
-import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
+import { mockAxiosErrorWithDetail } from '../test-utils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

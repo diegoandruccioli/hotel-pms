@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
-import { M3Card } from '../../components/m3/M3Card';
+import { M3Card } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
 

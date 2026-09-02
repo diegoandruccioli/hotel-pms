@@ -5,13 +5,13 @@ import { useToastStore } from '../store/toastStore';
 import type { OwnerFinancialReportDto } from '../types';
 import type { InvoiceResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
-import { M3Card } from '../components/m3/M3Card';
-import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
-import { M3StatusChip } from '../components/m3/M3StatusChip';
-import { M3TextField } from '../components/m3/M3TextField';
+import { M3Button } from '../components/m3';
+import { M3Card } from '../components/m3';
+import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
+import { M3StatusChip } from '../components/m3';
+import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage } from '../utils/errorMessage';
+import { getErrorMessage } from '../utils';
 import { KpiTrendSection } from './OwnerDashboard/KpiTrendSection';
 
 const getStatusTone = (status: InvoiceResponse['status']) => {

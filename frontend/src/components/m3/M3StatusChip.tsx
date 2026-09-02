@@ -1,4 +1,4 @@
-import { cn } from '../../utils/cn';
+import { cn } from '../../utils';
 import { MaterialIcon } from '../MaterialIcon';
 
 type ChipTone = 'success' | 'warning' | 'error' | 'info' | 'neutral';

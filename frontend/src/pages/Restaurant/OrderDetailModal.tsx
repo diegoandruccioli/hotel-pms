@@ -1,9 +1,9 @@
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { M3Dialog } from '../../components/m3/M3Dialog';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3StatusChip } from '../../components/m3/M3StatusChip';
-import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
+import { M3Dialog } from '../../components/m3';
+import { M3Button } from '../../components/m3';
+import { M3StatusChip } from '../../components/m3';
+import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import type { RestaurantOrderResponse, OrderStatus } from '../../types';
 
 interface Props {

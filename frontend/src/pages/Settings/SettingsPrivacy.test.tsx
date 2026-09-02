@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { SettingsPrivacy } from './SettingsPrivacy';
 import { guestService } from '../../services/guestService';
-import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
+import { mockAxiosErrorWithDetail } from '../../test-utils';
 import type { GuestPrivacySettingsResponse } from '../../types';
 
 const stableT = (key: string, opts?: Record<string, unknown>) =>

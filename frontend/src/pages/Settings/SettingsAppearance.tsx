@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../../store/themeStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3SegmentedRow, type M3SegmentOption } from '../../components/m3/M3SegmentedRow';
+import { M3Card } from '../../components/m3';
+import { M3SegmentedRow, type M3SegmentOption } from '../../components/m3';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
 
 type ThemeValue = 'light' | 'dark' | 'system';

@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { authService } from '../services/authService';
 import { useTranslation } from 'react-i18next';
-import { M3TextField } from '../components/m3/M3TextField';
-import { M3Button } from '../components/m3/M3Button';
+import { M3TextField } from '../components/m3';
+import { M3Button } from '../components/m3';
 
 const ICON_STYLE = { fontSize: 20 };
 

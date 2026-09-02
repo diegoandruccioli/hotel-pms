@@ -11,14 +11,14 @@ import type {
   HotelCategoryHistoryResponse,
 } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3Select } from '../../components/m3/M3Select';
-import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
-import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Button } from '../../components/m3';
+import { M3Card } from '../../components/m3';
+import { M3Select } from '../../components/m3';
+import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
 import { useToastStore } from '../../store/toastStore';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { getErrorMessage } from '../../utils';
 
 const CATEGORY_MAX_LENGTH = 20;
 const NOTE_MAX_LENGTH = 200;

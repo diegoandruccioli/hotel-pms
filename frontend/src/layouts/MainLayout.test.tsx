@@ -4,7 +4,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { MainLayout } from './MainLayout';
 import { useAuthStore } from '../store/authStore';
-import { renderWithQuery } from '../test-utils/renderWithQuery';
+import { renderWithQuery } from '../test-utils';
 import type { UserPayload } from '../types';
 
 vi.mock('react-i18next', () => ({

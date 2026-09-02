@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, memo, useCallback } from '
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, differenceInCalendarDays, addMonths } from 'date-fns';
 import { it, enUS } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
-import { M3Card } from '../components/m3/M3Card';
+import { M3Card } from '../components/m3';
 import type { RoomResponse } from '../types';
 import type { ReservationResponse } from '../types';
 

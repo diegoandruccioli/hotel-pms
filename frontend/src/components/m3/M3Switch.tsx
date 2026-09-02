@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { MaterialIcon } from '../MaterialIcon';
-import { cn } from '../../utils/cn';
+import { cn } from '../../utils';
 
 interface M3SwitchProps {
   checked: boolean;

@@ -3,21 +3,21 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { ReservationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
-import { M3DataTable } from '../components/m3/M3DataTable';
-import { M3TableActionLink } from '../components/m3/M3TableActionLink';
-import { M3StatusChip } from '../components/m3/M3StatusChip';
-import { M3Dialog } from '../components/m3/M3Dialog';
-import { M3LoadingState } from '../components/m3/M3LoadingState';
-import { M3ErrorState } from '../components/m3/M3ErrorState';
-import { M3Pagination } from '../components/m3/M3Pagination';
-import { M3TextField } from '../components/m3/M3TextField';
+import { M3Button } from '../components/m3';
+import { M3DataTable } from '../components/m3';
+import { M3TableActionLink } from '../components/m3';
+import { M3StatusChip } from '../components/m3';
+import { M3Dialog } from '../components/m3';
+import { M3LoadingState } from '../components/m3';
+import { M3ErrorState } from '../components/m3';
+import { M3Pagination } from '../components/m3';
+import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { RoomResponse } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
-import { getErrorMessage } from '../utils/errorMessage';
+import { getErrorMessage } from '../utils';
 import {
   useReservationsSearch,
   useRoomsLookup,

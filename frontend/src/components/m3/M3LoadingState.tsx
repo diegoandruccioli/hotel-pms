@@ -1,5 +1,5 @@
 import { MaterialIcon } from '../MaterialIcon';
-import { cn } from '../../utils/cn';
+import { cn } from '../../utils';
 
 interface M3LoadingStateProps {
   /** Translated, screen-reader-only label (e.g. t('loading_guests')) — required

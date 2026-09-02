@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
-import { renderWithQuery } from '../test-utils/renderWithQuery';
+import { renderWithQuery } from '../test-utils';
 import { Dashboard } from './Dashboard';
 import { useAuthStore } from '../store/authStore';
 import { stayService } from '../services/stayService';

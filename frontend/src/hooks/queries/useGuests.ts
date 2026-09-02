@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { guestService } from '../../services/guestService';
-import { queryKeys } from '../../lib/queryKeys';
+import { queryKeys } from '../../lib';
 
 /**
  * Server-side-searched, paginated guest list. Replaces the manual

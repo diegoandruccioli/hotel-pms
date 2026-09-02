@@ -4,13 +4,13 @@ import { z } from 'zod';
 import { stayService } from '../services/stayService';
 import type { HotelSettingsResponse, HotelSettingsRequest } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
-import { M3Card } from '../components/m3/M3Card';
-import { M3TextField } from '../components/m3/M3TextField';
-import { M3Checkbox } from '../components/m3/M3Checkbox';
+import { M3Button } from '../components/m3';
+import { M3Card } from '../components/m3';
+import { M3TextField } from '../components/m3';
+import { M3Checkbox } from '../components/m3';
 import { StructuredAddressFields } from '../components/StructuredAddressFields';
 import { useToastStore } from '../store/toastStore';
-import { getErrorMessage } from '../utils/errorMessage';
+import { getErrorMessage } from '../utils';
 
 const VAT_NUMBER_REGEX = /^\d{11}$/;
 const FISCAL_CODE_REGEX = /^(\d{11}|[A-Za-z]{6}\d{2}[A-Za-z]\d{2}[A-Za-z]\d{3}[A-Za-z])$/;

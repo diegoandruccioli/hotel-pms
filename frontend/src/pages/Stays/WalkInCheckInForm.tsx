@@ -10,8 +10,8 @@ import type {
 import type { GuestResponseDTO } from '../../types';
 import { useToastStore } from '../../store/toastStore';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3TextField } from '../../components/m3/M3TextField';
-import { M3Select } from '../../components/m3/M3Select';
+import { M3TextField } from '../../components/m3';
+import { M3Select } from '../../components/m3';
 import { GuestFieldSection } from './GuestFieldSection';
 import {
   emptyGuest,
@@ -19,7 +19,7 @@ import {
   validateAlloggiatiGuests,
 } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { getErrorMessage } from '../../utils';
 
 const todayIso = new Date().toISOString().split('T')[0];
 const GUEST_SEARCH_DEBOUNCE_MS = 300;

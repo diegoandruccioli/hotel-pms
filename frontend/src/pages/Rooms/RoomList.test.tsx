@@ -3,7 +3,7 @@ import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 /* eslint-disable react-perf/jsx-no-new-array-as-prop -- test-only render helper, not the real perf-sensitive render path */
 import { axe } from 'vitest-axe';
-import { renderWithQuery } from '../../test-utils/renderWithQuery';
+import { renderWithQuery } from '../../test-utils';
 import { RoomList } from './RoomList';
 import { inventoryService } from '../../services/inventoryService';
 

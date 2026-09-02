@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { guestService } from '../../services/guestService';
 import { reservationService } from '../../services/reservationService';
-import { queryKeys } from '../../lib/queryKeys';
+import { queryKeys } from '../../lib';
 
 const RESULT_LIMIT = 5;
 /** Below this length a query is too short to be worth a request — avoids

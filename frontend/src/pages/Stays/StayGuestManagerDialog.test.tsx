@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
-import { renderWithQuery as render } from '../../test-utils/renderWithQuery';
+import { renderWithQuery as render } from '../../test-utils';
 import { StayGuestManagerDialog } from './StayGuestManagerDialog';
 import { stayService } from '../../services/stayService';
 import type { StayGuestResponse, StayResponse } from '../../types';

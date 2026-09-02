@@ -4,13 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../../store/toastStore';
 import { authService } from '../../services/authService';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Card } from '../../components/m3';
+import { M3Button } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
 import { PasswordRequirementsChecklist } from '../../components/PasswordRequirementsChecklist';
-import { isPasswordValid } from '../../utils/passwordPolicy';
+import { isPasswordValid } from '../../utils';
 
 export const SettingsPassword = () => {
   const { t } = useTranslation('common');

@@ -7,7 +7,7 @@ import { CommandPalette } from './CommandPalette';
 import { useAuthStore } from '../store/authStore';
 import { guestService } from '../services/guestService';
 import { reservationService } from '../services/reservationService';
-import { renderWithQuery } from '../test-utils/renderWithQuery';
+import { renderWithQuery } from '../test-utils';
 import type { UserPayload } from '../types';
 import type { GuestResponseDTO } from '../types';
 import type { ReservationResponse } from '../types';

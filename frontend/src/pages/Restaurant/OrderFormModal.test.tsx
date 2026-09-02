@@ -5,7 +5,7 @@ import { OrderFormModal } from './OrderFormModal';
 import { fbService } from '../../services/fbService';
 import { stayService } from '../../services/stayService';
 import { useToastStore } from '../../store/toastStore';
-import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
+import { mockAxiosErrorWithDetail } from '../../test-utils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),

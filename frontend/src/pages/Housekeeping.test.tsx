@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../test-utils/renderWithQuery';
+import { renderWithQuery as render } from '../test-utils';
 import { Housekeeping } from './Housekeeping';
 import { inventoryService } from '../services/inventoryService';
 import { dashboardService } from '../services/dashboardService';
-import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
+import { mockAxiosErrorWithDetail } from '../test-utils';
 
 const stableT = (key: string, options?: { count?: number; status?: string }) => {
   if (options?.count !== undefined) return `${key} ${options.count}`;

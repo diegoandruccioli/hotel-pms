@@ -52,7 +52,7 @@ vi.mock('../store/toastStore', () => ({
 
 import { reservationService } from '../services/reservationService';
 import { inventoryService } from '../services/inventoryService';
-import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
+import { mockAxiosErrorWithDetail } from '../test-utils';
 
 describe('CalendarPlanning', () => {
   beforeEach(() => {

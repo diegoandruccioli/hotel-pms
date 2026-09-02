@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { AlloggiatiReportSection } from './AlloggiatiReportSection';
 import { stayService } from '../../services/stayService';
-import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
+import { mockAxiosErrorWithDetail } from '../../test-utils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),

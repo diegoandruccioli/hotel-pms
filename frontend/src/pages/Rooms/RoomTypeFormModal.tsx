@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { inventoryService } from '../../services/inventoryService';
 import type { RoomTypeRequest, RoomTypeResponse } from '../../types';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Dialog } from '../../components/m3/M3Dialog';
-import { M3TextField } from '../../components/m3/M3TextField';
-import { M3Textarea } from '../../components/m3/M3Textarea';
+import { M3Button } from '../../components/m3';
+import { M3Dialog } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
+import { M3Textarea } from '../../components/m3';
 import { useToastStore } from '../../store/toastStore';
 
 interface Props {

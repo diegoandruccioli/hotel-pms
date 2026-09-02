@@ -1,12 +1,12 @@
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { M3Dialog } from '../../components/m3/M3Dialog';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3TextField } from '../../components/m3/M3TextField';
-import { M3Select } from '../../components/m3/M3Select';
+import { M3Dialog } from '../../components/m3';
+import { M3Button } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
+import { M3Select } from '../../components/m3';
 import { billingService } from '../../services/billingService';
 import { useToastStore } from '../../store/toastStore';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { getErrorMessage } from '../../utils';
 import type { InvoiceResponse, PaymentMethod } from '../../types';
 
 interface Props {

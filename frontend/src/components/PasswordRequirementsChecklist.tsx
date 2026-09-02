@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
-import { PASSWORD_REQUIREMENTS } from '../utils/passwordPolicy';
+import { PASSWORD_REQUIREMENTS } from '../utils';
 
 interface PasswordRequirementsChecklistProps {
   password: string;

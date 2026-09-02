@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { stayService } from '../../services/stayService';
 import type { HotelSettingsResponse, HotelSettingsRequest } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Card } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
 
 const EMAIL_GREETING_MAX_LENGTH = 300;

@@ -3,16 +3,16 @@ import { useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { RoomResponse } from '../../types';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
-import { M3StatusChip } from '../../components/m3/M3StatusChip';
-import { M3TableActionLink } from '../../components/m3/M3TableActionLink';
-import { M3LoadingState } from '../../components/m3/M3LoadingState';
-import { M3ErrorState } from '../../components/m3/M3ErrorState';
-import { M3TableEmptyRow } from '../../components/m3/M3EmptyState';
+import { M3Button } from '../../components/m3';
+import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
+import { M3StatusChip } from '../../components/m3';
+import { M3TableActionLink } from '../../components/m3';
+import { M3LoadingState } from '../../components/m3';
+import { M3ErrorState } from '../../components/m3';
+import { M3TableEmptyRow } from '../../components/m3';
 import { useRoomsList, useRoomTypes } from '../../hooks/queries/useRooms';
-import { queryKeys } from '../../lib/queryKeys';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { queryKeys } from '../../lib';
+import { getErrorMessage } from '../../utils';
 import { RoomFormModal } from './RoomFormModal';
 
 interface RoomListNavState {

@@ -4,11 +4,11 @@ import { z } from 'zod';
 import { rateSeasonService } from '../../services/rateSeasonService';
 import type { RateSeasonRequest, RateSeasonResponse, RoomTypeResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Dialog } from '../../components/m3/M3Dialog';
-import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
-import { M3TableActionLink } from '../../components/m3/M3TableActionLink';
-import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Button } from '../../components/m3';
+import { M3Dialog } from '../../components/m3';
+import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
+import { M3TableActionLink } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
 import { useToastStore } from '../../store/toastStore';
 
 interface Props {

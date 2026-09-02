@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { cn } from '../../utils/cn';
+import { cn } from '../../utils';
 
 interface M3CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'id' | 'type'> {
   label: string;

@@ -5,7 +5,7 @@ import { axe } from 'vitest-axe';
 import userEvent from '@testing-library/user-event';
 import { HotelProfile } from './HotelProfile';
 import { stayService } from '../services/stayService';
-import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
+import { mockAxiosErrorWithDetail } from '../test-utils';
 import type { HotelSettingsResponse } from '../types';
 
 // `t`/`i18n` must be module-level stable references: HotelProfile's settings-load

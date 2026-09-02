@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { SettingsCityTax } from './SettingsCityTax';
 import { stayService } from '../../services/stayService';
-import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
+import { mockAxiosErrorWithDetail } from '../../test-utils';
 import type { CityTaxRateResponse, HotelCategoryHistoryResponse } from '../../types';
 
 const stableT = (key: string) => key;

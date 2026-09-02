@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { dashboardService } from '../../services/dashboardService';
 import { billingReportService } from '../../services/billingReportService';
-import { queryKeys } from '../../lib/queryKeys';
+import { queryKeys } from '../../lib';
 
 const getTodayDateString = (): string => {
   const now = new Date();
