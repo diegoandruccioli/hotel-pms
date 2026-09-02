@@ -112,7 +112,7 @@ export const GuestFieldSection = memo(({
         <M3TextField label={t('label_last_name')} name="lastName" value={guest.lastName} onChange={handleSimpleChange} required />
 
         <div className="relative">
-          <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface">
+          <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary">
             <select
               id={`gender-${index}`}
               name="gender"
@@ -144,7 +144,7 @@ export const GuestFieldSection = memo(({
         />
 
         <div className="relative">
-          <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface">
+          <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary">
             <select
               id={`traveller-type-${index}`}
               name="travellerType"
@@ -188,7 +188,7 @@ export const GuestFieldSection = memo(({
         {hasDoc && (
           <>
             <div className="relative">
-              <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface">
+              <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary">
                 <select
                   id={`doc-type-${index}`}
                   name="documentType"

@@ -39,7 +39,7 @@ const GuestOption = memo(({ guest, selected, onSelect }: GuestOptionProps) => {
   return (
     <div role="option" aria-selected={selected}>
       <button type="button" onClick={handleClick}
-        className="w-full text-left px-3 py-2 text-sm hover:bg-surface-variant focus:bg-surface-variant focus:outline-hidden">
+        className="w-full text-left px-3 py-2 text-sm hover:bg-surface-variant focus:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-inset">
         {guest.firstName} {guest.lastName}
         {guest.email ? ` · ${guest.email}` : ''}
       </button>

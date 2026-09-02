@@ -74,7 +74,7 @@ export const LookupAutocomplete = memo(({
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface focus-within:border-primary">
+      <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary">
         <input
           id={id}
           role="combobox"

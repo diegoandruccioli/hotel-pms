@@ -34,10 +34,10 @@ const UserMenuItem = memo(({
     onClick={onClick}
     className={[
       'flex items-center gap-3 w-full px-4 py-3',
-      'text-sm font-body text-left transition-colors focus-visible:outline-hidden',
+      'text-sm font-body text-left transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset',
       isError
-        ? 'text-error hover:bg-error-container/20 focus-visible:bg-error-container/20'
-        : 'text-on-surface hover:bg-surface-container-highest focus-visible:bg-surface-container-highest',
+        ? 'text-error hover:bg-error-container/20 focus-visible:bg-error-container/20 focus-visible:ring-error'
+        : 'text-on-surface hover:bg-surface-container-highest focus-visible:bg-surface-container-highest focus-visible:ring-primary',
     ].join(' ')}
   >
     <MaterialIcon

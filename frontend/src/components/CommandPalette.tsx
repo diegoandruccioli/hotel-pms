@@ -125,7 +125,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
           value={search}
           onValueChange={setSearch}
           placeholder={t('palette_placeholder')}
-          className="h-14 flex-1 bg-transparent text-sm font-body text-on-surface placeholder-on-surface-variant focus:outline-hidden"
+          className="h-14 flex-1 bg-transparent text-sm font-body text-on-surface placeholder-on-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-inset"
         />
       </div>
 
