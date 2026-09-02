@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from './test-utils/renderWithQuery';
+import { renderWithQuery as render } from './test-utils';
 import App from './App';
-import { useAuthStore } from './store/authStore';
-import { authService } from './services/authService';
+import { useAuthStore } from './store';
+import { authService } from './services';
 import type { UserPayload } from './types/auth.types';
 
 const { mockT } = vi.hoisted(() => ({ mockT: (key: string) => key }));
