@@ -9,7 +9,7 @@ import { M3Select } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { M3LoadingState } from '../../components/m3';
 import { M3ErrorState } from '../../components/m3';
-import { useKpiReport } from '../../hooks/queries/useKpiReport';
+import { useKpiReport } from '../../hooks/queries';
 import { getErrorMessage } from '../../utils';
 import type { KpiPeriodDto, ReportGranularity } from '../../types';
 

@@ -8,7 +8,7 @@ import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { stayService } from '../services';
 import { getErrorMessage } from '../utils';
-import { useDaySheet, useOwnerFinancialSummary } from '../hooks/queries/useDashboard';
+import { useDaySheet, useOwnerFinancialSummary } from '../hooks/queries';
 import type { RoomStatus } from '../types';
 import type { AlloggiatiFailureSummaryResponse, CityTaxUnassessedSummaryResponse } from '../types';
 

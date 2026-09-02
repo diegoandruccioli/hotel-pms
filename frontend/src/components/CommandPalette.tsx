@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
 import { useAuthStore } from '../store';
-import { useCommandPaletteGuests, useCommandPaletteReservations } from '../hooks/queries/useCommandPaletteSearch';
+import { useCommandPaletteGuests, useCommandPaletteReservations } from '../hooks/queries';
 import type { Role } from '../types';
 import type { GuestResponseDTO } from '../types';
 import type { ReservationResponse } from '../types';

@@ -26,7 +26,7 @@ import {
   useCheckOutStay,
   useRetryInvoiceCreation,
   useRetryCheckoutEmail,
-} from '../hooks/queries/useStays';
+} from '../hooks/queries';
 
 type StaySortField = 'actualCheckInTime' | 'expectedCheckOutDate' | 'status';
 type SortDir = 'asc' | 'desc';

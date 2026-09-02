@@ -8,8 +8,8 @@ import { MaterialIcon } from '../components/MaterialIcon';
 import { UserMenu } from '../components/UserMenu';
 import { RouteAnnouncer } from '../components/RouteAnnouncer';
 import { CommandPalette } from '../components/CommandPalette';
-import { useEscapeKey } from '../hooks/useEscapeKey';
-import { useServerEvents } from '../hooks/useServerEvents';
+import { useEscapeKey } from '../hooks';
+import { useServerEvents } from '../hooks';
 import * as FocusTrapModule from 'focus-trap-react';
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
 

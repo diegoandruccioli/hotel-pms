@@ -10,7 +10,7 @@ import { M3TableActionLink } from '../../components/m3';
 import { M3LoadingState } from '../../components/m3';
 import { M3ErrorState } from '../../components/m3';
 import { M3TableEmptyRow } from '../../components/m3';
-import { useRoomsList, useRoomTypes } from '../../hooks/queries/useRooms';
+import { useRoomsList, useRoomTypes } from '../../hooks/queries';
 import { queryKeys } from '../../lib';
 import { getErrorMessage } from '../../utils';
 import { RoomFormModal } from './RoomFormModal';

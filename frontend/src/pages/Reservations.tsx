@@ -23,7 +23,7 @@ import {
   useRoomsLookup,
   useDeleteReservation,
   useRetryConfirmationEmail,
-} from '../hooks/queries/useReservations';
+} from '../hooks/queries';
 
 const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 const PAGE_SIZE = 20;

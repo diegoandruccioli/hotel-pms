@@ -11,7 +11,7 @@ import { M3TextField } from '../components/m3';
 import { PaymentModal } from './Billing/PaymentModal';
 import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useTranslation } from 'react-i18next';
-import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries/useInvoices';
+import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries';
 import { getErrorMessage } from '../utils';
 
 const PAGE_SIZE = 20;

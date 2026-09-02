@@ -10,8 +10,8 @@ import { M3ErrorState } from '../components/m3';
 import { M3EmptyState } from '../components/m3';
 import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '../utils';
-import { useRoomsList, useUpdateRoomStatus, useBulkUpdateRoomStatus } from '../hooks/queries/useRooms';
-import { useDaySheet } from '../hooks/queries/useDashboard';
+import { useRoomsList, useUpdateRoomStatus, useBulkUpdateRoomStatus } from '../hooks/queries';
+import { useDaySheet } from '../hooks/queries';
 
 const STATUS_KEYS: Record<RoomStatus, string> = {
   CLEAN: 'room_status_clean',

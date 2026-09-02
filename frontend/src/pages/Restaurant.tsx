@@ -15,7 +15,7 @@ import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 import { getErrorMessage } from '../utils';
 import { useQueryClient } from '@tanstack/react-query';
-import { useOrders, useMenuItems, useConfirmOrder, useDeleteMenuItem } from '../hooks/queries/useFb';
+import { useOrders, useMenuItems, useConfirmOrder, useDeleteMenuItem } from '../hooks/queries';
 import { queryKeys } from '../lib';
 import { OrderFormModal } from './Restaurant/OrderFormModal';
 import { OrderDetailModal } from './Restaurant/OrderDetailModal';

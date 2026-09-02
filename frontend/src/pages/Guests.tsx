@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
-import { useGuestsSearch, useDeleteGuest } from '../hooks/queries/useGuests';
+import { useGuestsSearch, useDeleteGuest } from '../hooks/queries';
 import { queryKeys } from '../lib';
 import { getErrorMessage } from '../utils';
 import { guestService } from '../services';

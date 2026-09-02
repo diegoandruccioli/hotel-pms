@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import * as FocusTrapModule from 'focus-trap-react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../MaterialIcon';
-import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { useEscapeKey } from '../../hooks';
 
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
 
