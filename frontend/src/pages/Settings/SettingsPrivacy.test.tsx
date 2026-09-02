@@ -5,7 +5,7 @@ import { axe } from 'vitest-axe';
 import { SettingsPrivacy } from './SettingsPrivacy';
 import { guestService } from '../../services/guestService';
 import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
-import type { GuestPrivacySettingsResponse } from '../../types/guest.types';
+import type { GuestPrivacySettingsResponse } from '../../types';
 
 const stableT = (key: string, opts?: Record<string, unknown>) =>
   opts ? `${key}:${JSON.stringify(opts)}` : key;

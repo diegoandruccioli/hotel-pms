@@ -5,7 +5,7 @@ import { axe } from 'vitest-axe';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import { useAuthStore } from '../store/authStore';
-import type { UserPayload } from '../types/auth.types';
+import type { UserPayload } from '../types';
 
 vi.mock('../store/authStore');
 

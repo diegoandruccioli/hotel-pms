@@ -4,7 +4,7 @@ import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
-import type { StayResponse, StayStatus } from '../types/stay.types';
+import type { StayResponse, StayStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3DataTable } from '../components/m3/M3DataTable';

@@ -7,7 +7,7 @@ import { M3TextField } from '../../components/m3/M3TextField';
 import { useToastStore } from '../../store/toastStore';
 import { stayService } from '../../services/stayService';
 import { getErrorMessage } from '../../utils/errorMessage';
-import type { StayResponse } from '../../types/stay.types';
+import type { StayResponse } from '../../types';
 
 interface StayExtensionDialogProps {
   /** null closes the dialog. */

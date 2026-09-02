@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
-import type { InvoiceResponse } from '../../types/billing.types';
+import type { InvoiceResponse } from '../../types';
 import { billingService } from '../../services/billingService';
 
 vi.mock('../../services/billingService', () => ({

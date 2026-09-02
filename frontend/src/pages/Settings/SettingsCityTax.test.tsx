@@ -5,7 +5,7 @@ import { axe } from 'vitest-axe';
 import { SettingsCityTax } from './SettingsCityTax';
 import { stayService } from '../../services/stayService';
 import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
-import type { CityTaxRateResponse, HotelCategoryHistoryResponse } from '../../types/stay.types';
+import type { CityTaxRateResponse, HotelCategoryHistoryResponse } from '../../types';
 
 const stableT = (key: string) => key;
 const stableI18n = { language: 'en' };

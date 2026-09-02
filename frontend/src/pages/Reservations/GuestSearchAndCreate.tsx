@@ -4,7 +4,7 @@ import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3TextField } from '../../components/m3/M3TextField';
 import { guestService } from '../../services/guestService';
-import type { GuestResponseDTO, GuestRequestDTO } from '../../types/guest.types';
+import type { GuestResponseDTO, GuestRequestDTO } from '../../types';
 import { getErrorMessage } from '../../utils/errorMessage';
 
 interface GuestSuggestionItemProps {

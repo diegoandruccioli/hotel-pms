@@ -7,7 +7,7 @@ import { M3Select } from '../../components/m3/M3Select';
 import { billingService } from '../../services/billingService';
 import { useToastStore } from '../../store/toastStore';
 import { getErrorMessage } from '../../utils/errorMessage';
-import type { InvoiceResponse, PaymentMethod } from '../../types/billing.types';
+import type { InvoiceResponse, PaymentMethod } from '../../types';
 
 interface Props {
   invoice: InvoiceResponse;

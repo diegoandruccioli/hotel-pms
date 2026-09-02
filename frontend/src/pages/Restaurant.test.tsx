@@ -5,7 +5,7 @@ import { renderWithQuery as render } from '../test-utils/renderWithQuery';
 import { Restaurant } from './Restaurant';
 import { fbService } from '../services/fbService';
 import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
-import type { MenuItemResponse, RestaurantOrderResponse } from '../types/fb.types';
+import type { MenuItemResponse, RestaurantOrderResponse } from '../types';
 
 vi.mock('react-i18next', () => {
   const t = (key: string) => key;

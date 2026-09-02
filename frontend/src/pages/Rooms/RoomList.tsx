@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, memo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import type { RoomResponse } from '../../types/inventory.types';
+import type { RoomResponse } from '../../types';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
 import { M3StatusChip } from '../../components/m3/M3StatusChip';

@@ -1,5 +1,5 @@
 import { useCallback, memo } from 'react';
-import type { StayStatus } from '../../types/stay.types';
+import type { StayStatus } from '../../types';
 
 // ---------------------------------------------------------------------------
 // StayStatusChip — filter chip for the status row above the Stays table.

@@ -6,7 +6,7 @@ import { M3Button } from '../../components/m3/M3Button';
 import { M3Card } from '../../components/m3/M3Card';
 import { M3TextField } from '../../components/m3/M3TextField';
 import { M3Checkbox } from '../../components/m3/M3Checkbox';
-import type { AlloggiatiStato, AlloggiatiTipdoc, TravellerType } from '../../types/stay.types';
+import type { AlloggiatiStato, AlloggiatiTipdoc, TravellerType } from '../../types';
 import {
   TYPES_WITHOUT_DOC,
   CODICE_ITALIA,

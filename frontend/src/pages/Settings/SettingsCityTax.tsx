@@ -9,7 +9,7 @@ import type {
   CityTaxRateResponse,
   HotelCategoryHistoryRequest,
   HotelCategoryHistoryResponse,
-} from '../../types/stay.types';
+} from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Card } from '../../components/m3/M3Card';

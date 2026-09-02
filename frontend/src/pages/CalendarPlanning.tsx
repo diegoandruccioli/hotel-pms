@@ -5,13 +5,13 @@ import { enUS, it } from 'date-fns/locale';
 import { reservationService } from '../services/reservationService';
 import { useTranslation } from 'react-i18next';
 import { useToastStore } from '../store/toastStore';
-import type { ReservationResponse } from '../types/reservation.types';
+import type { ReservationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3StatusChip } from '../components/m3/M3StatusChip';
 import { M3Card } from '../components/m3/M3Card';
 import PlanningBoard from '@/pages/PlanningBoard';
 import { inventoryService } from '../services/inventoryService';
-import type { RoomResponse } from '../types/inventory.types';
+import type { RoomResponse } from '../types';
 import { getErrorMessage } from '../utils/errorMessage';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';

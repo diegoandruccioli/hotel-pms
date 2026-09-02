@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types/billing.types';
+import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3DataTable } from '../components/m3/M3DataTable';
 import { M3StatusChip } from '../components/m3/M3StatusChip';

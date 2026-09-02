@@ -1,5 +1,5 @@
 import { memo, useCallback } from 'react';
-import type { RateCalendarDay } from '../../types/inventory.types';
+import type { RateCalendarDay } from '../../types';
 
 interface RateCalendarCellProps {
   day: RateCalendarDay;

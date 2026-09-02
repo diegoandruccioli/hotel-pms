@@ -2,8 +2,8 @@ import { useCallback, useMemo, memo } from 'react';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3TextField } from '../../components/m3/M3TextField';
 import { useTranslation } from 'react-i18next';
-import type { RoomResponse } from '../../types/inventory.types';
-import type { ReservationResponse } from '../../types/reservation.types';
+import type { RoomResponse } from '../../types';
+import type { ReservationResponse } from '../../types';
 
 interface RoomButtonProps {
   room: RoomResponse;

@@ -1,6 +1,6 @@
 import { useState, useCallback, memo, useMemo } from 'react';
 import { useToastStore } from '../store/toastStore';
-import type { RoomResponse, RoomStatus } from '../types/inventory.types';
+import type { RoomResponse, RoomStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3StatusChip } from '../components/m3/M3StatusChip';

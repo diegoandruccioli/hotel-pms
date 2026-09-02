@@ -8,9 +8,9 @@ import { stayService } from '../../services/stayService';
 import { guestService } from '../../services/guestService';
 import { reservationService } from '../../services/reservationService';
 import userEvent from '@testing-library/user-event';
-import type { StayResponse } from '../../types/stay.types';
-import type { GuestResponseDTO } from '../../types/guest.types';
-import type { ReservationResponse } from '../../types/reservation.types';
+import type { StayResponse } from '../../types';
+import type { GuestResponseDTO } from '../../types';
+import type { ReservationResponse } from '../../types';
 
 const ITALIA_STATO = { codice: '100000100', descrizione: 'ITALIA' };
 const FRANCIA_STATO = { codice: '200000100', descrizione: 'FRANCIA' };

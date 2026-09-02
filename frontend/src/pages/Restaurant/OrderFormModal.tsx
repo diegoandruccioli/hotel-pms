@@ -8,8 +8,8 @@ import { fbService } from '../../services/fbService';
 import { stayService } from '../../services/stayService';
 import { useToastStore } from '../../store/toastStore';
 import { getErrorMessage } from '../../utils/errorMessage';
-import type { MenuItemResponse } from '../../types/fb.types';
-import type { StayResponse } from '../../types/stay.types';
+import type { MenuItemResponse } from '../../types';
+import type { StayResponse } from '../../types';
 
 const ACTIVE_STAYS_PAGE_SIZE = 500;
 

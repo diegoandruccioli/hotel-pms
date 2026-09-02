@@ -9,8 +9,8 @@ import { M3ErrorState } from '../components/m3/M3ErrorState';
 import { stayService } from '../services/stayService';
 import { getErrorMessage } from '../utils/errorMessage';
 import { useDaySheet, useOwnerFinancialSummary } from '../hooks/queries/useDashboard';
-import type { RoomStatus } from '../types/inventory.types';
-import type { AlloggiatiFailureSummaryResponse, CityTaxUnassessedSummaryResponse } from '../types/stay.types';
+import type { RoomStatus } from '../types';
+import type { AlloggiatiFailureSummaryResponse, CityTaxUnassessedSummaryResponse } from '../types';
 
 const ROOM_STATUS_COLORS: Record<RoomStatus, string> = {
   CLEAN:       'bg-tertiary-container/60 text-on-tertiary-container border-tertiary/50',

@@ -5,8 +5,8 @@ import type {
   GuestDataExportResponse,
   GuestPrivacySettingsRequest,
   GuestPrivacySettingsResponse,
-} from '../types/guest.types';
-import type { SpringPage } from '../types/page.types';
+} from '../types';
+import type { SpringPage } from '../types';
 
 const BASE_PATH = '/api/v1/guests';
 

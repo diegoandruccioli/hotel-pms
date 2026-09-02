@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
 import { useAuthStore } from '../store/authStore';
 import { useCommandPaletteGuests, useCommandPaletteReservations } from '../hooks/queries/useCommandPaletteSearch';
-import type { Role } from '../types/auth.types';
-import type { GuestResponseDTO } from '../types/guest.types';
-import type { ReservationResponse } from '../types/reservation.types';
+import type { Role } from '../types';
+import type { GuestResponseDTO } from '../types';
+import type { ReservationResponse } from '../types';
 
 const OWNER_ADMIN_ROLES = ['OWNER', 'ADMIN'] as const;
 const SEARCH_DEBOUNCE_MS = 300;

@@ -3,7 +3,7 @@ import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithQuery as render } from '../../test-utils/renderWithQuery';
 import { StayGuestManagerDialog } from './StayGuestManagerDialog';
 import { stayService } from '../../services/stayService';
-import type { StayGuestResponse, StayResponse } from '../../types/stay.types';
+import type { StayGuestResponse, StayResponse } from '../../types';
 
 vi.mock('react-i18next', () => {
   const t = (key: string, opts?: Record<string, unknown>) =>

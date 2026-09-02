@@ -5,7 +5,7 @@ import { axe } from 'vitest-axe';
 import { renderWithQuery as render } from '../test-utils/renderWithQuery';
 import { Billing } from './Billing';
 import { billingService } from '../services/billingService';
-import type { InvoiceResponse, InvoiceSearchResult } from '../types/billing.types';
+import type { InvoiceResponse, InvoiceSearchResult } from '../types';
 
 vi.mock('react-i18next', () => {
   const t = vi.fn((key: string) => key);

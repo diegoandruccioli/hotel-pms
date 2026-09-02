@@ -8,7 +8,7 @@ import { M3TextField } from '../../components/m3/M3TextField';
 import { M3Textarea } from '../../components/m3/M3Textarea';
 import { M3Checkbox } from '../../components/m3/M3Checkbox';
 import { getErrorMessage } from '../../utils/errorMessage';
-import type { MenuItemRequest, MenuItemResponse } from '../../types/fb.types';
+import type { MenuItemRequest, MenuItemResponse } from '../../types';
 
 interface Props {
   item?: MenuItemResponse;

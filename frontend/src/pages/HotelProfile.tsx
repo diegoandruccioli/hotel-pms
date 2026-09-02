@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { stayService } from '../services/stayService';
-import type { HotelSettingsResponse, HotelSettingsRequest } from '../types/stay.types';
+import type { HotelSettingsResponse, HotelSettingsRequest } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3Card } from '../components/m3/M3Card';

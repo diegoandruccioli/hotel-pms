@@ -4,7 +4,7 @@ import { axe } from 'vitest-axe';
 import { KpiTrendSection } from './KpiTrendSection';
 import { kpiReportService } from '../../services/kpiReportService';
 import { renderWithQuery } from '../../test-utils/renderWithQuery';
-import type { KpiReportDto } from '../../types/ownerReport.types';
+import type { KpiReportDto } from '../../types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),

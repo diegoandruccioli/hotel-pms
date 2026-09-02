@@ -8,8 +8,8 @@ import { useAuthStore } from '../store/authStore';
 import { stayService } from '../services/stayService';
 import { dashboardService } from '../services/dashboardService';
 import { billingReportService } from '../services/billingReportService';
-import type { DaySheetResponse } from '../types/daySheet.types';
-import type { OwnerFinancialSummaryDto } from '../types/ownerReport.types';
+import type { DaySheetResponse } from '../types';
+import type { OwnerFinancialSummaryDto } from '../types';
 
 vi.mock('../services/stayService', () => ({
   stayService: { getAlloggiatiFailureSummary: vi.fn(), getCityTaxUnassessedSummary: vi.fn() },

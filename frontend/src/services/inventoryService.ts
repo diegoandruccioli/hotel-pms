@@ -1,6 +1,6 @@
 import api from './api';
-import type { RoomRequest, RoomResponse, RoomTypeRequest, RoomTypeResponse, RoomStatus } from '../types/inventory.types';
-import type { SpringPage } from '../types/page.types';
+import type { RoomRequest, RoomResponse, RoomTypeRequest, RoomTypeResponse, RoomStatus } from '../types';
+import type { SpringPage } from '../types';
 
 const ROOM_TYPES_PATH = '/api/v1/room-types';
 const ROOMS_PATH = '/api/v1/rooms';

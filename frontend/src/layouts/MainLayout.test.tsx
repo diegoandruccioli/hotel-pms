@@ -5,7 +5,7 @@ import { axe } from 'vitest-axe';
 import { MainLayout } from './MainLayout';
 import { useAuthStore } from '../store/authStore';
 import { renderWithQuery } from '../test-utils/renderWithQuery';
-import type { UserPayload } from '../types/auth.types';
+import type { UserPayload } from '../types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

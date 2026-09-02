@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { StayGuestRequest, TravellerType } from '../../types/stay.types';
+import type { StayGuestRequest, TravellerType } from '../../types';
 
 export const TYPES_WITHOUT_DOC: TravellerType[] = ['FAMILIARE', 'MEMBRO_GRUPPO'];
 export const CODICE_ITALIA = '100000100';

@@ -1,7 +1,7 @@
 import api from './api';
-import type { QuotationRequest, QuotationResponse } from '../types/quotation.types';
-import type { ReservationResponse } from '../types/reservation.types';
-import type { SpringPage } from '../types/page.types';
+import type { QuotationRequest, QuotationResponse } from '../types';
+import type { ReservationResponse } from '../types';
+import type { SpringPage } from '../types';
 
 const BASE_PATH = '/api/v1/quotations';
 const IFRAME_CLEANUP_DELAY_MS = 30000;

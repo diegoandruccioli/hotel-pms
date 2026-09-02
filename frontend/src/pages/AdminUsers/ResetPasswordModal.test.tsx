@@ -3,8 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { ResetPasswordModal } from './ResetPasswordModal';
 import { userService } from '../../services/userService';
-import type { UserResponse } from '../../types/user.types';
-import type { Role } from '../../types/auth.types';
+import type { UserResponse } from '../../types';
+import type { Role } from '../../types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

@@ -17,7 +17,7 @@ import type {
   StayGuestRequest,
   StayGuestResponse,
   StayResponse,
-} from '../../types/stay.types';
+} from '../../types';
 import { GuestFieldSection } from './GuestFieldSection';
 import { emptyGuest, CODICE_ITALIA, TYPES_WITHOUT_DOC, alloggiatiPlaceIssues } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';

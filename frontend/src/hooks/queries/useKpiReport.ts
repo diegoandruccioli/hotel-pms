@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { kpiReportService } from '../../services/kpiReportService';
 import { queryKeys } from '../../lib/queryKeys';
-import type { ReportGranularity } from '../../types/ownerReport.types';
+import type { ReportGranularity } from '../../types';
 
 /** Powers the RevPAR/ADR/Occupancy trend charts on `OwnerDashboard.tsx`.
  * `enabled` mirrors `useOwnerFinancialSummary`'s convention — the caller

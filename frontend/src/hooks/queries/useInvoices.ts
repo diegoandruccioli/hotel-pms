@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { billingService } from '../../services/billingService';
-import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../../types/billing.types';
-import type { SpringPage } from '../../types/page.types';
+import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../../types';
+import type { SpringPage } from '../../types';
 import { queryKeys } from '../../lib/queryKeys';
 
 interface SearchParams {

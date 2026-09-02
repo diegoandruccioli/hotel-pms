@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect, memo } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { stayService } from '../services/stayService';
-import type { AlloggiatiComune } from '../types/stay.types';
+import type { AlloggiatiComune } from '../types';
 import { M3TextField } from './m3/M3TextField';
 
 const AUTOCOMPLETE_DEBOUNCE_MS = 300;

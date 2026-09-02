@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { inventoryService } from '../../services/inventoryService';
-import type { RoomRequest, RoomResponse, RoomTypeResponse } from '../../types/inventory.types';
+import type { RoomRequest, RoomResponse, RoomTypeResponse } from '../../types';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3Select } from '../../components/m3/M3Select';

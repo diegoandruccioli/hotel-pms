@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from 'date-fns';
 import { it, enUS } from 'date-fns/locale';
 import { rateSeasonService } from '../../services/rateSeasonService';
-import type { RateCalendarResponse } from '../../types/inventory.types';
+import type { RateCalendarResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Card } from '../../components/m3/M3Card';

@@ -3,8 +3,8 @@ import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, differe
 import { it, enUS } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
 import { M3Card } from '../components/m3/M3Card';
-import type { RoomResponse } from '../types/inventory.types';
-import type { ReservationResponse } from '../types/reservation.types';
+import type { RoomResponse } from '../types';
+import type { ReservationResponse } from '../types';
 
 interface PlanningBoardProps {
   rooms: RoomResponse[];

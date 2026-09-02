@@ -5,7 +5,7 @@ import { OwnerDashboard } from './OwnerDashboard';
 import { billingReportService } from '../services/billingReportService';
 import { kpiReportService } from '../services/kpiReportService';
 import { renderWithQuery } from '../test-utils/renderWithQuery';
-import type { OwnerFinancialReportDto } from '../types/ownerReport.types';
+import type { OwnerFinancialReportDto } from '../types';
 import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
 
 vi.mock('react-i18next', () => ({

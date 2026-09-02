@@ -4,7 +4,7 @@ import type {
   RateSeasonResponse,
   RateCalendarResponse,
   RateBulkApplyRequest,
-} from '../types/inventory.types';
+} from '../types';
 
 const rateSeasonsPath = (roomTypeId: string) => `/api/v1/room-types/${roomTypeId}/rate-seasons`;
 const RATE_CALENDAR_PATH = '/api/v1/rate-calendar';

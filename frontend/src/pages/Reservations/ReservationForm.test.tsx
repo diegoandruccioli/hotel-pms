@@ -10,9 +10,9 @@ import { reservationService } from '../../services/reservationService';
 import { guestService } from '../../services/guestService';
 import { stayService } from '../../services/stayService';
 
-import type { RoomResponse } from '../../types/inventory.types';
-import type { GuestResponseDTO } from '../../types/guest.types';
-import type { ReservationResponse } from '../../types/reservation.types';
+import type { RoomResponse } from '../../types';
+import type { GuestResponseDTO } from '../../types';
+import type { ReservationResponse } from '../../types';
 
 // Mock the services
 vi.mock('../../services/inventoryService');

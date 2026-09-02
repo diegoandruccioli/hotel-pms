@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import type { ReservationResponse } from '../types/reservation.types';
+import type { ReservationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3DataTable } from '../components/m3/M3DataTable';
@@ -14,7 +14,7 @@ import { M3Pagination } from '../components/m3/M3Pagination';
 import { M3TextField } from '../components/m3/M3TextField';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import type { RoomResponse } from '../types/inventory.types';
+import type { RoomResponse } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import { getErrorMessage } from '../utils/errorMessage';

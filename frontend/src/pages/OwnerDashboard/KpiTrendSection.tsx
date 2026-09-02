@@ -11,7 +11,7 @@ import { M3LoadingState } from '../../components/m3/M3LoadingState';
 import { M3ErrorState } from '../../components/m3/M3ErrorState';
 import { useKpiReport } from '../../hooks/queries/useKpiReport';
 import { getErrorMessage } from '../../utils/errorMessage';
-import type { KpiPeriodDto, ReportGranularity } from '../../types/ownerReport.types';
+import type { KpiPeriodDto, ReportGranularity } from '../../types';
 
 interface KpiTrendSectionProps {
   startDate: string;

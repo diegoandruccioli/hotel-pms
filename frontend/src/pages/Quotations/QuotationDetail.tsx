@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { quotationService } from '../../services/quotationService';
-import type { QuotationResponse, QuotationOptionResponse, QuotationStatus } from '../../types/quotation.types';
+import type { QuotationResponse, QuotationOptionResponse, QuotationStatus } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3/M3Button';
 import { M3Card } from '../../components/m3/M3Card';

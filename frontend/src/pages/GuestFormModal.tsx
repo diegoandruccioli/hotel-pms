@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { guestService } from '../services/guestService';
-import type { GuestResponseDTO, GuestRequestDTO } from '../types/guest.types';
+import type { GuestResponseDTO, GuestRequestDTO } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3Dialog } from '../components/m3/M3Dialog';

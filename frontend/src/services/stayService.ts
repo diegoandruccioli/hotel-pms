@@ -20,8 +20,8 @@ import type {
   StayGuestResponse,
   StayRequest,
   StayResponse,
-} from '../types/stay.types';
-import type { SpringPage } from '../types/page.types';
+} from '../types';
+import type { SpringPage } from '../types';
 
 const BASE_PATH = '/api/v1/stays';
 const IFRAME_CLEANUP_DELAY_MS = 10000;

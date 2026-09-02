@@ -6,7 +6,7 @@ const ICON_STYLE: React.CSSProperties = { fontSize: 18 };
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3/M3Dialog';
 import { M3StatusChip } from '../../components/m3/M3StatusChip';
-import type { DocumentType, InvoiceResponse, InvoiceStatus, PaymentMethod, ChargeType, SdiStatus } from '../../types/billing.types';
+import type { BillingDocumentType as DocumentType, InvoiceResponse, InvoiceStatus, PaymentMethod, ChargeType, SdiStatus } from '../../types';
 
 interface Props {
   invoice: InvoiceResponse;

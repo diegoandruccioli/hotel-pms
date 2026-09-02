@@ -1,6 +1,6 @@
 import { useState, useCallback, memo, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import type { MenuItemResponse, RestaurantOrderResponse, OrderStatus } from '../types/fb.types';
+import type { MenuItemResponse, RestaurantOrderResponse, OrderStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3DataTable } from '../components/m3/M3DataTable';

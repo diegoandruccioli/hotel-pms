@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import { userService } from '../services/userService';
-import type { UserResponse } from '../types/user.types';
+import type { UserResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3/M3Button';
 import { M3DataTable } from '../components/m3/M3DataTable';
