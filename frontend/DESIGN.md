@@ -152,6 +152,34 @@ Follow the convention already established by `M3Button.tsx`, `M3Card.tsx`,
    common cause of a circular-import bug once a folder has a barrel; `npm run
    lint:cycles` (`madge --circular`, wired into CI) catches any cycle this rule
    doesn't prevent, but don't rely on the guard instead of following the rule.
+   **`madge --circular` does not catch every class of import bug** — verified
+   the hard way (2026-09-02): a page file and its own subfolder sharing a name
+   (`pages/AdminUsers.tsx` + `pages/AdminUsers/`) makes `from './AdminUsers'`
+   *inside `AdminUsers.tsx`* resolve back to `AdminUsers.tsx` itself (the exact
+   filename wins module resolution over the same-named directory) — a genuine
+   self-import. `tsc -b` rejected it immediately (`TS2303 Circular definition of
+   import alias`); `madge --circular` reported zero cycles for the same code.
+   The lesson isn't "trust madge less" — `npm run build` (which runs `tsc -b`)
+   is already a separate, mandatory CI step — it's that the two checks catch
+   different things and neither substitutes for the other. Concretely: a
+   page whose subfolder shares its own name can never import that subfolder's
+   barrel from within the page file itself; import the specific sibling file
+   instead (`./AdminUsers/CreateUserModal`, not `./AdminUsers`).
+9. **Never import from `components/index.ts`.** Unlike every other barrel in
+   this codebase, it is unsafe to consume — `./ErrorBoundary` wraps a class
+   component with react-i18next's `withTranslation` HOC at module scope
+   (mandatory: error boundaries can't use the `useTranslation` hook), so
+   merely importing *anything* from this barrel runs that HOC immediately,
+   which broke 38 test files whose `react-i18next` mock only stubbed
+   `useTranslation`. This isn't fixable the way the two eager-i18n-load bugs
+   below were (deferring behind a dynamic `import()`) — the wrapped component
+   has to exist synchronously for JSX to render it. The barrel file is kept
+   only for consistency with the folder-barrel rule; every consumer imports
+   each component directly from its own file (`./components/Toast`, etc.).
+   If a future component in this folder is added *without* a module-scope HOC
+   or other import-time side effect, that alone still doesn't make the whole
+   barrel safe — anything re-exported alongside `ErrorBoundary` inherits its
+   eager evaluation the moment the barrel is touched at all.
 
 ---
 
