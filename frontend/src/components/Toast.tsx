@@ -1,6 +1,6 @@
 import { MaterialIcon } from './MaterialIcon';
-import { useToastStore } from '../store/toastStore';
-import type { Toast, ToastType } from '../store/toastStore';
+import { useToastStore } from '../store';
+import type { Toast, ToastType } from '../store';
 import { useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 

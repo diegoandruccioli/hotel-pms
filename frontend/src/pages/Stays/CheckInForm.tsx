@@ -7,7 +7,7 @@ import { M3Button } from '../../components/m3';
 import { stayService } from '../../services/stayService';
 import { guestService } from '../../services/guestService';
 import { reservationService } from '../../services/reservationService';
-import { useToastStore } from '../../store/toastStore';
+import { useToastStore } from '../../store';
 import type {
   AlloggiatiStato,
   AlloggiatiTipdoc,

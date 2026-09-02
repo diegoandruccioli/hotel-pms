@@ -3,7 +3,7 @@ import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { MainLayout } from './MainLayout';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../store';
 import { renderWithQuery } from '../test-utils';
 import type { UserPayload } from '../types';
 

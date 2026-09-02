@@ -9,7 +9,7 @@ import { M3Dialog } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { M3TableActionLink } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
-import { useToastStore } from '../../store/toastStore';
+import { useToastStore } from '../../store';
 
 interface Props {
   roomType: RoomTypeResponse;

@@ -1,6 +1,6 @@
 import React, { useState, memo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../store';
 import { authService } from '../services/authService';
 import { useTranslation } from 'react-i18next';
 import { M3TextField } from '../components/m3';

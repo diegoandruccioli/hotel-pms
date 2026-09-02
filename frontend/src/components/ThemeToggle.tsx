@@ -1,5 +1,5 @@
 import { MaterialIcon } from './MaterialIcon';
-import { useThemeStore } from '../store/themeStore';
+import { useThemeStore } from '../store';
 import { useTranslation } from 'react-i18next';
 import { useCallback } from 'react';
 

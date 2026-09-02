@@ -16,7 +16,7 @@ import type { ReservationResponse } from '../../types';
 import type { QuotationOptionRequest, QuotationRequest } from '../../types';
 import { RoomSelection } from '../Reservations/RoomSelection';
 import { getErrorMessage } from '../../utils';
-import { useToastStore } from '../../store/toastStore';
+import { useToastStore } from '../../store';
 
 const DEFAULT_VALID_DAYS = 7;
 const MAX_OPTIONS = 5;

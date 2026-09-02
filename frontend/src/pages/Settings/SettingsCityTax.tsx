@@ -17,7 +17,7 @@ import { M3Select } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
-import { useToastStore } from '../../store/toastStore';
+import { useToastStore } from '../../store';
 import { getErrorMessage } from '../../utils';
 
 const CATEGORY_MAX_LENGTH = 20;

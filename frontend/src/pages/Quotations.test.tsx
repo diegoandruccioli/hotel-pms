@@ -10,7 +10,7 @@ vi.mock('react-router-dom', async () => {
 });
 import { Quotations } from './Quotations';
 import { quotationService } from '../services/quotationService';
-import { useToastStore } from '../store/toastStore';
+import { useToastStore } from '../store';
 
 vi.mock('react-i18next', () => {
   const t = (key: string, opts?: Record<string, unknown>) => {

@@ -8,7 +8,7 @@ import type {
   AvailableRoom, AlloggiatiStato, AlloggiatiTipdoc, CityTaxUnassessedReason, StayGuestRequest, TravellerType,
 } from '../../types';
 import type { GuestResponseDTO } from '../../types';
-import { useToastStore } from '../../store/toastStore';
+import { useToastStore } from '../../store';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3TextField } from '../../components/m3';
 import { M3Select } from '../../components/m3';

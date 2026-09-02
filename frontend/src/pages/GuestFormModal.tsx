@@ -9,7 +9,7 @@ import { M3Dialog } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { M3Select } from '../components/m3';
 import { StructuredAddressFields } from '../components/StructuredAddressFields';
-import { useToastStore } from '../store/toastStore';
+import { useToastStore } from '../store';
 
 const COUNTRY_CODES = [
   { code: '+39', label: '🇮🇹 +39' },

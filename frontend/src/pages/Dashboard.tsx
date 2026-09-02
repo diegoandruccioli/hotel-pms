@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../store';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Card } from '../components/m3';

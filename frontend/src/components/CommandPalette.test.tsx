@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { axe } from 'vitest-axe';
 import { CommandPalette } from './CommandPalette';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../store';
 import { guestService } from '../services/guestService';
 import { reservationService } from '../services/reservationService';
 import { renderWithQuery } from '../test-utils';

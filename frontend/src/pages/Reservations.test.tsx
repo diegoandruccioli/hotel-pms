@@ -14,8 +14,8 @@ import { Reservations } from './Reservations';
 import { reservationService } from '../services/reservationService';
 import { mockAxiosErrorWithDetail } from '../test-utils';
 import { inventoryService } from '../services/inventoryService';
-import { useAuthStore } from '../store/authStore';
-import { useToastStore } from '../store/toastStore';
+import { useAuthStore } from '../store';
+import { useToastStore } from '../store';
 
 vi.mock('react-i18next', () => {
   const t = (key: string) => key;

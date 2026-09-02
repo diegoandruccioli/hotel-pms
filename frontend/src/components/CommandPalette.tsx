@@ -3,7 +3,7 @@ import { Command } from 'cmdk';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../store';
 import { useCommandPaletteGuests, useCommandPaletteReservations } from '../hooks/queries/useCommandPaletteSearch';
 import type { Role } from '../types';
 import type { GuestResponseDTO } from '../types';

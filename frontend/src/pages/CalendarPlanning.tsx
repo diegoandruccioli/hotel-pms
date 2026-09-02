@@ -4,7 +4,7 @@ import { format, parse, startOfWeek, getDay, addMonths, subMonths, startOfMonth 
 import { enUS, it } from 'date-fns/locale';
 import { reservationService } from '../services/reservationService';
 import { useTranslation } from 'react-i18next';
-import { useToastStore } from '../store/toastStore';
+import { useToastStore } from '../store';
 import type { ReservationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3StatusChip } from '../components/m3';

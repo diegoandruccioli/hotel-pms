@@ -1,6 +1,6 @@
 import { useCallback, memo, useState } from 'react';
 import { billingService } from '../../services/billingService';
-import { useToastStore } from '../../store/toastStore';
+import { useToastStore } from '../../store';
 
 const ICON_STYLE: React.CSSProperties = { fontSize: 18 };
 import { useTranslation } from 'react-i18next';

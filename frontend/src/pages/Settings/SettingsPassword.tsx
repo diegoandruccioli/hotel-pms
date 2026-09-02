@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuthStore } from '../../store/authStore';
-import { useToastStore } from '../../store/toastStore';
+import { useAuthStore } from '../../store';
+import { useToastStore } from '../../store';
 import { authService } from '../../services/authService';
 import { M3Card } from '../../components/m3';
 import { M3Button } from '../../components/m3';

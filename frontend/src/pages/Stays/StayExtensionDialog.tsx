@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
-import { useToastStore } from '../../store/toastStore';
+import { useToastStore } from '../../store';
 import { stayService } from '../../services/stayService';
 import { getErrorMessage } from '../../utils';
 import type { StayResponse } from '../../types';

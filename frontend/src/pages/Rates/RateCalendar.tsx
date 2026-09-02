@@ -9,7 +9,7 @@ import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
 import { RateCalendarCell } from './RateCalendarCell';
 import { RateBulkApplyDialog } from './RateBulkApplyDialog';
-import { useAuthStore } from '../../store/authStore';
+import { useAuthStore } from '../../store';
 import { getErrorMessage } from '../../utils';
 
 const SIDEBAR_WIDTH = 192;

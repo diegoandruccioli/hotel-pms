@@ -4,7 +4,7 @@ import { axe } from 'vitest-axe';
 import { OrderFormModal } from './OrderFormModal';
 import { fbService } from '../../services/fbService';
 import { stayService } from '../../services/stayService';
-import { useToastStore } from '../../store/toastStore';
+import { useToastStore } from '../../store';
 import { mockAxiosErrorWithDetail } from '../../test-utils';
 
 vi.mock('react-i18next', () => ({

@@ -9,7 +9,7 @@ import { M3Card } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { M3Checkbox } from '../components/m3';
 import { StructuredAddressFields } from '../components/StructuredAddressFields';
-import { useToastStore } from '../store/toastStore';
+import { useToastStore } from '../store';
 import { getErrorMessage } from '../utils';
 
 const VAT_NUMBER_REGEX = /^\d{11}$/;

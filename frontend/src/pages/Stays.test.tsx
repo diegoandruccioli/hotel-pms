@@ -4,7 +4,7 @@ import { axe } from 'vitest-axe';
 import { renderWithQuery as render } from '../test-utils';
 import { Stays } from './Stays';
 import { stayService } from '../services/stayService';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../store';
 
 vi.mock('react-i18next', () => {
   const t = (key: string) => key;

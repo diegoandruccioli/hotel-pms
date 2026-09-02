@@ -9,8 +9,8 @@ vi.mock('react-router-dom', () => ({
   useSearchParams: mockUseSearchParams,
 }));
 import { guestService } from '../services/guestService';
-import { useAuthStore } from '../store/authStore';
-import { useToastStore } from '../store/toastStore';
+import { useAuthStore } from '../store';
+import { useToastStore } from '../store';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),

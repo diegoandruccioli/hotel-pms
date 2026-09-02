@@ -15,8 +15,8 @@ import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { RoomResponse } from '../types';
-import { useAuthStore } from '../store/authStore';
-import { useToastStore } from '../store/toastStore';
+import { useAuthStore } from '../store';
+import { useToastStore } from '../store';
 import { getErrorMessage } from '../utils';
 import {
   useReservationsSearch,

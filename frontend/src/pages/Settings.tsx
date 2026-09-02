@@ -1,7 +1,7 @@
 import { useCallback, useMemo, memo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../store';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Card } from '../components/m3';
 import { SettingsPageHeader } from '../components/SettingsPageHeader';

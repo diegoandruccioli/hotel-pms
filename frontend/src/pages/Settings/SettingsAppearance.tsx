@@ -1,8 +1,8 @@
 import { useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useThemeStore } from '../../store/themeStore';
-import { useSettingsStore } from '../../store/settingsStore';
+import { useThemeStore } from '../../store';
+import { useSettingsStore } from '../../store';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Card } from '../../components/m3';
 import { M3SegmentedRow, type M3SegmentOption } from '../../components/m3';

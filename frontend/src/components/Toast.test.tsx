@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ToastContainer } from './Toast';
-import { useToastStore } from '../store/toastStore';
+import { useToastStore } from '../store';
 import { axe } from 'vitest-axe';
 import { beforeEach, describe, it, expect } from 'vitest';
 

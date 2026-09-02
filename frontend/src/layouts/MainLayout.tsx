@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, memo } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../store';
 import { authService } from '../services/authService';
 import { ToastContainer } from '../components/Toast';
 import { useTranslation } from 'react-i18next';

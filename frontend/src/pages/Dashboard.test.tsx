@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { renderWithQuery } from '../test-utils';
 import { Dashboard } from './Dashboard';
-import { useAuthStore } from '../store/authStore';
+import { useAuthStore } from '../store';
 import { stayService } from '../services/stayService';
 import { dashboardService } from '../services/dashboardService';
 import { billingReportService } from '../services/billingReportService';

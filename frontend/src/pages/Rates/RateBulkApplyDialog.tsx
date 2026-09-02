@@ -7,7 +7,7 @@ import { M3Button } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { M3Checkbox } from '../../components/m3';
-import { useToastStore } from '../../store/toastStore';
+import { useToastStore } from '../../store';
 import { getErrorMessage } from '../../utils';
 
 interface RoomTypeOption {

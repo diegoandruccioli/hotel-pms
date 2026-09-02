@@ -8,7 +8,7 @@ import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
-import { useToastStore } from '../../store/toastStore';
+import { useToastStore } from '../../store';
 import { getErrorMessage } from '../../utils';
 
 // -----------------------------------------------------------------------

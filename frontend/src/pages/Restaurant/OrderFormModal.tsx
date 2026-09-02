@@ -6,7 +6,7 @@ import { M3Select } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { fbService } from '../../services/fbService';
 import { stayService } from '../../services/stayService';
-import { useToastStore } from '../../store/toastStore';
+import { useToastStore } from '../../store';
 import { getErrorMessage } from '../../utils';
 import type { MenuItemResponse } from '../../types';
 import type { StayResponse } from '../../types';
