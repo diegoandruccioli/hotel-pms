@@ -7,6 +7,7 @@ import com.hotelpms.auth.exception.BadCredentialsException;
 import com.hotelpms.auth.service.AuthService;
 import com.hotelpms.auth.service.JwtService;
 import io.jsonwebtoken.JwtException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,17 +68,22 @@ public class AuthController {
      * Returns a body with {@code mustChangePassword} so the SPA can immediately
      * redirect to the change-password page when the flag is set.
      *
-     * @param request  the login request
-     * @param clientIp the trusted client IP injected by the gateway's
+     * @param request      the login request
+     * @param clientIpHeader the trusted client IP injected by the gateway's
      *                 {@code ClientIpFilter} ({@code X-Client-IP}), used to bind the
      *                 brute-force lockout to more than just the username
-     *                 (Finding #4, security-report.md)
+     *                 (Finding #4, security-report.md); {@code null} for requests that
+     *                 reach auth-service without passing through the gateway
+     * @param servletRequest the raw servlet request, used only as a fallback source of
+     *                 the client IP (T-AUTH-15) when {@code clientIpHeader} is absent
      * @return HTTP 200 with access and refresh cookies and a JSON body
      */
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(
             @NonNull final @Valid @RequestBody LoginRequest request,
-            @RequestHeader(value = "X-Client-IP", required = false) final String clientIp) {
+            @RequestHeader(value = "X-Client-IP", required = false) final String clientIpHeader,
+            final HttpServletRequest servletRequest) {
+        final String clientIp = resolveClientIp(clientIpHeader, servletRequest);
         final AuthResponse response = authService.login(request, clientIp);
 
         final Map<String, Object> body = new LinkedHashMap<>();
@@ -241,6 +247,31 @@ public class AuthController {
         } catch (final JwtException | IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
+    }
+
+    /**
+     * Resolves the client IP used to bind the login lockout (T-AUTH-15).
+     *
+     * <p>Prefers the gateway-injected {@code X-Client-IP} header. When absent or blank
+     * (a request that reached auth-service without passing through the gateway — e.g.
+     * the dev Vite proxy, or the internal Docker network), falls back to the raw TCP
+     * peer address of the request, mirroring the same fallback the gateway's own rate
+     * limiter already applies to this header
+     * ({@code RateLimiterConfig.resolveClientIp}). {@code getRemoteAddr()} is not a
+     * client-supplied value, so it cannot be forged to evade the lockout. Without this
+     * fallback, {@code clientIp} reaches {@code LoginAttemptService} as {@code null},
+     * which Java's string concatenation silently turns into the literal key suffix
+     * {@code :null} — collapsing the per-IP lockout binding (T-AUTH-12) back into a
+     * lockout keyed on username alone for every such request.</p>
+     *
+     * @param headerValue the {@code X-Client-IP} header value, or {@code null}/blank
+     * @param request     the raw servlet request, used only for its remote address
+     * @return a non-null, non-blank client IP string
+     */
+    private static String resolveClientIp(final String headerValue, final HttpServletRequest request) {
+        return headerValue != null && !headerValue.isBlank()
+                ? headerValue
+                : request.getRemoteAddr();
     }
 
     private ResponseEntity<Void> buildUnauthorizedResponse() {

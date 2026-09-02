@@ -27,12 +27,18 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class LoginAttemptServiceImplTest {
 
+    private static final String ATTEMPTS_PREFIX = "login:fail:";
     private static final String USERNAME = "admin";
     private static final String CLIENT_IP = "test-client-ip";
-    private static final String ATTEMPTS_KEY = "login:fail:" + USERNAME + ":" + CLIENT_IP;
+    private static final String OTHER_CLIENT_IP = "other-test-client-ip";
+    private static final String UNKNOWN_SUFFIX = "unknown";
+    private static final String ATTEMPTS_KEY = ATTEMPTS_PREFIX + USERNAME + ":" + CLIENT_IP;
     private static final String LOCK_KEY = "login:lock:" + USERNAME + ":" + CLIENT_IP;
+    private static final String UNKNOWN_ATTEMPTS_KEY = ATTEMPTS_PREFIX + USERNAME + ":" + UNKNOWN_SUFFIX;
+    private static final String OTHER_ATTEMPTS_KEY = ATTEMPTS_PREFIX + USERNAME + ":" + OTHER_CLIENT_IP;
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final Duration LOCKOUT_DURATION = Duration.ofMinutes(15);
+    private static final long RESIDUAL_TTL_SECONDS = 300L;
 
     @Mock
     private StringRedisTemplate redisTemplate;
@@ -42,6 +48,42 @@ class LoginAttemptServiceImplTest {
 
     @InjectMocks
     private LoginAttemptServiceImpl loginAttemptService;
+
+    // ─── T-AUTH-15: null/blank clientIp must never collapse the key ────────────
+
+    @Test
+    void recordFailureWithNullClientIpUsesUnknownNotLiteralNull() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.increment(UNKNOWN_ATTEMPTS_KEY)).thenReturn(1L);
+
+        loginAttemptService.recordFailure(USERNAME, null);
+
+        verify(valueOps).increment(UNKNOWN_ATTEMPTS_KEY);
+        verify(valueOps, Mockito.never()).increment(org.mockito.ArgumentMatchers.contains(":null"));
+    }
+
+    @Test
+    void recordFailureWithBlankClientIpUsesUnknownBucket() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.increment(UNKNOWN_ATTEMPTS_KEY)).thenReturn(1L);
+
+        loginAttemptService.recordFailure(USERNAME, "   ");
+
+        verify(valueOps).increment(UNKNOWN_ATTEMPTS_KEY);
+    }
+
+    @Test
+    void recordFailureWithDifferentIpsUsesDistinctBuckets() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.increment(ATTEMPTS_KEY)).thenReturn(1L);
+        when(valueOps.increment(OTHER_ATTEMPTS_KEY)).thenReturn(1L);
+
+        loginAttemptService.recordFailure(USERNAME, CLIENT_IP);
+        loginAttemptService.recordFailure(USERNAME, OTHER_CLIENT_IP);
+
+        verify(valueOps).increment(ATTEMPTS_KEY);
+        verify(valueOps).increment(OTHER_ATTEMPTS_KEY);
+    }
 
     // ─── getLockedUntil ───────────────────────────────────────────────────────
 
@@ -66,6 +108,18 @@ class LoginAttemptServiceImplTest {
         assertEquals(lockedUntil.toEpochMilli(), result.get().toEpochMilli());
     }
 
+    @Test
+    void lockedUntilFailsOpenAndDeletesKeyWhenValueIsCorrupted() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.get(LOCK_KEY)).thenReturn("not-a-number");
+
+        final Optional<Instant> result = loginAttemptService.getLockedUntil(USERNAME, CLIENT_IP);
+
+        assertEquals(Optional.empty(), result,
+                "A corrupted lock value must not lock the account out permanently");
+        verify(redisTemplate).delete(LOCK_KEY);
+    }
+
     // ─── recordFailure ────────────────────────────────────────────────────────
 
     @Test
@@ -84,12 +138,28 @@ class LoginAttemptServiceImplTest {
     void recordFailureDoesNotResetTtlOnSubsequentAttempts() {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         when(valueOps.increment(ATTEMPTS_KEY)).thenReturn(2L);
+        when(redisTemplate.getExpire(ATTEMPTS_KEY)).thenReturn(RESIDUAL_TTL_SECONDS);
 
         final LoginAttemptResult result = loginAttemptService.recordFailure(USERNAME, CLIENT_IP);
 
         assertEquals(2, result.attempts());
         assertFalse(result.locked());
         verify(redisTemplate, Mockito.never()).expire(eq(ATTEMPTS_KEY), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void recordFailureRepairsMissingTtlOnSubsequentAttempt() {
+        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        when(valueOps.increment(ATTEMPTS_KEY)).thenReturn(2L);
+        // Simulates the expire() call from attempt 1 having failed to apply:
+        // the counter survived the increment but carries no TTL (-1) or is
+        // reported missing entirely (-2/null) by the Redis client.
+        when(redisTemplate.getExpire(ATTEMPTS_KEY)).thenReturn(-1L);
+
+        final LoginAttemptResult result = loginAttemptService.recordFailure(USERNAME, CLIENT_IP);
+
+        assertEquals(2, result.attempts());
+        verify(redisTemplate).expire(eq(ATTEMPTS_KEY), eq(LOCKOUT_DURATION));
     }
 
     @Test

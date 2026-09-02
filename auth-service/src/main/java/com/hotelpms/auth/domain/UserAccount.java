@@ -19,7 +19,6 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -82,12 +81,6 @@ public class UserAccount {
      */
     @Column(nullable = false)
     private int tokenVersion;
-
-    @Column(nullable = false)
-    private int failedAttempts;
-
-    @Column
-    private Instant lockedUntil;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
