@@ -1,3 +1,4 @@
+import { cn } from '../../utils/cn';
 import { MaterialIcon } from '../MaterialIcon';
 
 type ChipTone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
@@ -24,7 +25,11 @@ export const M3StatusChip = ({
   className = '',
 }: M3StatusChipProps) => (
   <span
-    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-shape-sm text-xs font-medium font-body ${toneClasses[tone]} ${className}`}
+    className={cn(
+      'inline-flex items-center gap-1 px-2.5 py-1 rounded-shape-sm text-xs font-medium font-body',
+      toneClasses[tone],
+      className
+    )}
   >
     {icon && <MaterialIcon name={icon} size={14} />}
     {label}

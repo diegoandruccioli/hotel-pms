@@ -1,3 +1,5 @@
+import { cn } from '../../utils/cn';
+
 type CardVariant = 'elevated' | 'filled' | 'outlined' | 'glass';
 
 interface M3CardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -17,7 +19,7 @@ export const M3Card = ({
   children,
   ...rest
 }: M3CardProps) => (
-  <div className={`${variantClasses[variant]} ${className}`} {...rest}>
+  <div className={cn(variantClasses[variant], className)} {...rest}>
     {children}
   </div>
 );

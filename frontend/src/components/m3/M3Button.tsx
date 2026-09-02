@@ -1,3 +1,4 @@
+import { cn } from '../../utils/cn';
 import { MaterialIcon } from '../MaterialIcon';
 
 type ButtonVariant = 'filled' | 'tonal' | 'outlined' | 'text';
@@ -32,10 +33,12 @@ export const M3Button = ({
   return (
     <button
       disabled={isDisabled}
-      className={`inline-flex items-center justify-center gap-2 px-6 h-10 rounded-shape-full text-sm font-medium font-body transition-all
-        ${variantClasses[variant]}
-        ${isDisabled ? 'opacity-38 cursor-not-allowed shadow-none' : ''}
-        ${className}`}
+      className={cn(
+        'inline-flex items-center justify-center gap-2 px-6 h-10 rounded-shape-full text-sm font-medium font-body transition-all',
+        variantClasses[variant],
+        isDisabled && 'opacity-38 cursor-not-allowed shadow-none',
+        className
+      )}
       {...rest}
     >
       {loading ? (
