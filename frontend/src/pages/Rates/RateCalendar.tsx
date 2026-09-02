@@ -234,7 +234,7 @@ export const RateCalendar = () => {
         </div>
       ) : error ? (
         <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+          <MaterialIcon name="error" size={20} className="shrink-0" />
           <div>
             <h3 className="text-sm font-medium font-body">{t('error_loading_rate_calendar')}</h3>
             <p className="mt-1 text-sm font-body opacity-80">{error}</p>
@@ -263,7 +263,7 @@ export const RateCalendar = () => {
                     <div
                       key={day.toISOString()}
                       style={CELL_STYLE}
-                      className={`flex-shrink-0 border-r border-outline-variant flex flex-col items-center justify-center ${
+                      className={`shrink-0 border-r border-outline-variant flex flex-col items-center justify-center ${
                         isSameDay(day, new Date()) ? 'bg-primary-container text-on-primary-container' : ''
                       }`}
                     >
@@ -281,7 +281,7 @@ export const RateCalendar = () => {
 
               <div className="flex relative items-start">
                 <div
-                  className="sticky left-0 z-30 flex-shrink-0 bg-surface-container-low border-r border-outline-variant shadow-elevation-1"
+                  className="sticky left-0 z-30 shrink-0 bg-surface-container-low border-r border-outline-variant shadow-elevation-1"
                   style={SIDEBAR_STYLE}
                 >
                   {calendar?.rows.map((row) => (

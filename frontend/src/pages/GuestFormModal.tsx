@@ -294,7 +294,7 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
                   onClick={toggleFiscalSection}
                   aria-expanded={showFiscalSection}
                   aria-controls="fiscal-section"
-                  className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium font-body text-on-surface-variant hover:bg-surface-container-highest/50 rounded-shape-xs transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-none"
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium font-body text-on-surface-variant hover:bg-surface-container-highest/50 rounded-shape-xs transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-hidden"
                 >
                   <span>{t('section_fiscal_data')}</span>
                   <MaterialIcon name={showFiscalSection ? 'expand_less' : 'expand_more'} size={18} />

@@ -54,7 +54,7 @@ export const RateCalendarCell = memo(({
       aria-pressed={isSelected}
       aria-label={ariaLabel}
       style={style}
-      className={`flex-shrink-0 w-[100px] h-16 border-r border-b border-outline-variant flex flex-col items-center justify-center gap-1 text-xs font-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${
+      className={`shrink-0 w-[100px] h-16 border-r border-b border-outline-variant flex flex-col items-center justify-center gap-1 text-xs font-body transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${
         isSelected
           ? 'bg-primary-container'
           : isToday

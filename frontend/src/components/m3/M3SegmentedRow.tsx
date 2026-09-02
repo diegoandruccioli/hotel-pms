@@ -37,7 +37,7 @@ const SegmentedButton = memo(function SegmentedButton<T extends string>({
       className={[
         'relative flex items-center justify-center gap-1.5',
         'flex-1 h-10 px-3 text-sm font-medium font-body',
-        'focus-visible:outline-none focus-visible:z-10',
+        'focus-visible:outline-hidden focus-visible:z-10',
         'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
         'transition-colors',
         isFirst ? 'rounded-l-shape-full' : '',

@@ -95,7 +95,7 @@ const RoomCard = memo(({
             onChange={handleToggle}
           />
         )}
-        <div className="flex-1 min-w-[4rem]">
+        <div className="flex-1 min-w-16">
           <h3 className="text-lg font-display font-bold text-on-surface truncate">{t('room_number', { number: room.roomNumber })}</h3>
           <p className="text-xs font-body font-medium uppercase tracking-wide text-on-surface-variant truncate">{room.roomType?.name}</p>
         </div>

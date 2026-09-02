@@ -280,7 +280,7 @@ export const CalendarPlanning = () => {
         </div>
       ) : error ? (
         <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+          <MaterialIcon name="error" size={20} className="shrink-0" />
           <div>
             <h3 className="text-sm font-medium font-body">{t('error_loading_reservations')}</h3>
             <p className="mt-1 text-sm font-body opacity-80">{error}</p>

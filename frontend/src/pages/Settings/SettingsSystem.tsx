@@ -32,10 +32,10 @@ const ToggleRow = memo(({ icon, label, description, checked, disabled, onToggle 
     disabled={disabled}
     className={[
       'flex items-center justify-between w-full',
-      'px-4 py-3 rounded-[12px]',
+      'px-4 py-3 rounded-shape-md',
       'border border-outline-variant',
       'hover:bg-surface-container-highest',
-      'focus-visible:outline-none focus-visible:ring-2',
+      'focus-visible:outline-hidden focus-visible:ring-2',
       'focus-visible:ring-primary focus-visible:ring-offset-2',
       'transition-colors disabled:opacity-50',
     ].join(' ')}
@@ -242,7 +242,7 @@ export const SettingsSystem = () => {
             onChange={handleGreetingChange}
             onBlur={handleGreetingBlur}
             className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface
-              focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              focus:outline-hidden focus:ring-2 focus:ring-primary resize-none"
           />
           <p className="text-xs text-on-surface-variant text-right mt-1">
             {greetingDraft.length}/{EMAIL_GREETING_MAX_LENGTH}

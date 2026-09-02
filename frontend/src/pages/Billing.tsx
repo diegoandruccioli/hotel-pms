@@ -30,12 +30,12 @@ const getStatusTone = (status: InvoiceStatus) => {
 
 const VIEW_BTN_CLASS = [
   'text-primary hover:text-primary/80 font-medium text-sm mr-4',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded',
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm',
 ].join(' ');
 
 const PAY_BTN_CLASS = [
   'text-tertiary hover:text-tertiary/80 font-medium text-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tertiary rounded',
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-tertiary rounded-sm',
 ].join(' ');
 
 interface ActionsCellProps {

@@ -49,16 +49,16 @@ const SettingsHubRow = memo(({ item }: { item: SettingsHubItem }) => {
   return (
     <Link
       to={item.to}
-      className="flex items-center gap-4 px-4 py-4 rounded-[12px] hover:bg-surface-container-highest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
+      className="flex items-center gap-4 px-4 py-4 rounded-shape-md hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors"
     >
-      <span className="flex items-center justify-center w-10 h-10 rounded-shape-full bg-primary-container text-on-primary-container flex-shrink-0">
+      <span className="flex items-center justify-center w-10 h-10 rounded-shape-full bg-primary-container text-on-primary-container shrink-0">
         <MaterialIcon name={item.icon} size={20} />
       </span>
       <span className="flex-1">
         <p className="text-sm font-medium text-on-surface">{t(item.titleKey)}</p>
         <p className="text-xs text-on-surface-variant mt-0.5">{t(item.descKey)}</p>
       </span>
-      <MaterialIcon name="chevron_right" size={20} className="text-on-surface-variant flex-shrink-0" />
+      <MaterialIcon name="chevron_right" size={20} className="text-on-surface-variant shrink-0" />
     </Link>
   );
 });

@@ -48,7 +48,7 @@ describe('M3TextField', () => {
     expect(screen.getByText('Enter your work email')).toBeInTheDocument();
   });
 
-  it('should handle focus and blur', () => {
+  it('should handle focus and blur-sm', () => {
     render(<M3TextField label="Name" name="name" />);
     const input = screen.getByLabelText('Name');
 

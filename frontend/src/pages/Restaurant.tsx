@@ -47,13 +47,13 @@ const MenuActionsCell = ({ mi, deletingMenuId, onEdit, onDelete, tLabel, tCommon
   return (
     <div className="flex justify-end gap-2">
       <button type="button" onClick={handleEdit}
-        className="text-primary hover:text-primary/80 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary rounded"
+        className="text-primary hover:text-primary/80 text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-primary rounded-sm"
         aria-label={`${tLabel('menu_edit_item')} ${mi.name}`}>
         {tCommon('edit')}
       </button>
       <button type="button" onClick={handleDelete}
         disabled={deletingMenuId === mi.id}
-        className="text-error hover:text-error/80 text-xs font-medium disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-error rounded"
+        className="text-error hover:text-error/80 text-xs font-medium disabled:opacity-50 focus:outline-hidden focus:ring-2 focus:ring-error rounded-sm"
         aria-label={`${tLabel('menu_delete_item')} ${mi.name}`}>
         {tCommon('delete')}
       </button>

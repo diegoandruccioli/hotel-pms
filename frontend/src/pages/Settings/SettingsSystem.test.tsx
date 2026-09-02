@@ -126,7 +126,7 @@ describe('SettingsSystem', () => {
       .toHaveBeenCalledWith({ emailSubjectReservationConfirmed: 'Custom subject' }));
   });
 
-  it('saves the greeting text on blur only when it changed', async () => {
+  it('saves the greeting text on blur-sm only when it changed', async () => {
     vi.mocked(stayService.getHotelSettings).mockResolvedValue(
       { ...SETTINGS, emailGreetingText: 'See you soon' });
     vi.mocked(stayService.updateHotelSettings).mockResolvedValue(

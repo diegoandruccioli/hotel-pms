@@ -89,7 +89,7 @@ export const LookupAutocomplete = memo(({
           aria-haspopup="listbox"
           aria-controls={`${id}-listbox`}
           aria-autocomplete="list"
-          className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-none"
+          className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-hidden"
         />
         <label
           htmlFor={id}

@@ -33,7 +33,7 @@ const RoomButton = memo(({ room, isSelected, isOccupied, readOnly, resolvedTotal
         isOccupied
           ? 'opacity-40 cursor-not-allowed bg-surface-variant border-outline-variant'
           : isSelected
-            ? 'bg-primary/10 border-primary shadow-sm'
+            ? 'bg-primary/10 border-primary shadow-xs'
             : 'border-outline-variant hover:border-outline'
       } ${readOnly && !isOccupied ? 'cursor-default' : ''}`}
     >

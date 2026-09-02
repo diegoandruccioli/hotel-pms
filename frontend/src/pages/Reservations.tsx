@@ -104,7 +104,7 @@ const StatusCell = ({ reservation, onRetryConfirmationEmail, retryingEmail, t }:
             onClick={handleRetry}
             disabled={retryingEmail === reservation.id}
             aria-label={t('retry_confirmation_email')}
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/12 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
           >
             <MaterialIcon name={retryingEmail === reservation.id ? 'progress_activity' : 'refresh'} size={16} />
           </button>

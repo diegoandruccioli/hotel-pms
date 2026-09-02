@@ -78,7 +78,7 @@ export const M3Dialog = ({
           className={[
             'relative w-full max-w-lg max-h-[90dvh] overflow-hidden',
             'flex flex-col',
-            'bg-surface-container-high rounded-[28px]',
+            'bg-surface-container-high rounded-shape-xl',
             'shadow-elevation-3',
           ].join(' ')}
         >
@@ -98,7 +98,7 @@ export const M3Dialog = ({
                 'flex items-center justify-center w-10 h-10',
                 'rounded-shape-full text-on-surface-variant',
                 'hover:bg-surface-container-highest',
-                'focus-visible:outline-none focus-visible:ring-2',
+                'focus-visible:outline-hidden focus-visible:ring-2',
                 'focus-visible:ring-primary focus-visible:ring-offset-2',
                 'transition-colors',
               ].join(' ')}

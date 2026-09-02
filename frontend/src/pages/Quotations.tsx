@@ -60,7 +60,7 @@ const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, 
   return (
     <M3TableRow>
       <M3TableCell className="font-medium">
-        <Link to={`/quotations/${quotation.id}`} className="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs">
+        <Link to={`/quotations/${quotation.id}`} className="hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs">
           {quotation.guestFullName}
         </Link>
       </M3TableCell>
@@ -236,7 +236,7 @@ export const Quotations = () => {
         </div>
       ) : error ? (
         <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+          <MaterialIcon name="error" size={20} className="shrink-0" />
           <div>
             <h3 className="text-sm font-medium font-body">{t('error_loading_quotations')}</h3>
             <p className="mt-1 text-sm font-body opacity-80">{error}</p>

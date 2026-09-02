@@ -33,13 +33,13 @@ const ActionsCell = ({ user, onToggle, onResetPassword, currentUsername, t }: Ac
   return (
     <div className="flex items-center gap-2">
       <button type="button" onClick={handleToggle}
-        className="inline-flex items-center justify-center min-h-[40px] text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary"
+        className="inline-flex items-center justify-center min-h-[40px] text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary"
         aria-label={user.active ? t('btn_deactivate') : t('btn_activate')}>
         {user.active ? t('btn_deactivate') : t('btn_activate')}
       </button>
       {user.username !== currentUsername && (
         <button type="button" onClick={handleReset}
-          className="inline-flex items-center justify-center min-h-[40px] text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary"
+          className="inline-flex items-center justify-center min-h-[40px] text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary"
           aria-label={`${t('btn_reset_password')} ${user.username}`}>
           {t('btn_reset_password')}
         </button>

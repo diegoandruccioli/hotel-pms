@@ -119,7 +119,7 @@ export const GuestFieldSection = memo(({
               value={guest.gender}
               onChange={handleSimpleChange}
               required
-              className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-none appearance-none"
+              className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-hidden appearance-none"
             >
               <option value="" disabled hidden />
               <option value="1">{t('gender_male')}</option>
@@ -151,7 +151,7 @@ export const GuestFieldSection = memo(({
               value={guest.travellerType ?? ''}
               onChange={handleTravellerTypeChange}
               required
-              className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-none appearance-none"
+              className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-hidden appearance-none"
             >
               <option value="" disabled hidden />
               <option value="OSPITE_SINGOLO">{t('guest_type_single')}</option>
@@ -195,7 +195,7 @@ export const GuestFieldSection = memo(({
                   value={guest.documentType ?? ''}
                   onChange={handleSimpleChange}
                   required
-                  className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-none appearance-none"
+                  className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-hidden appearance-none"
                 >
                   <option value="" disabled hidden />
                   {tipdoc.map(d => (

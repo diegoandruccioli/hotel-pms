@@ -169,7 +169,7 @@ export const OwnerDashboard = memo(() => {
 
       {error && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+          <MaterialIcon name="error" size={20} className="shrink-0" />
           <p className="text-sm font-body">{error}</p>
         </div>
       )}

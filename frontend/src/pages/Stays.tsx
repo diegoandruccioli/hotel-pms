@@ -79,7 +79,7 @@ const AlloggiatiCell = ({ stay, onRetryInvoice, retryingInvoice, onRetryCheckout
             onClick={handleRetryInvoice}
             disabled={retryingInvoice === stay.id}
             aria-label={t('retry_invoice_creation')}
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/12 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
           >
             <MaterialIcon name={retryingInvoice === stay.id ? 'progress_activity' : 'refresh'} size={16} />
           </button>
@@ -93,7 +93,7 @@ const AlloggiatiCell = ({ stay, onRetryInvoice, retryingInvoice, onRetryCheckout
             onClick={handleRetryCheckoutEmail}
             disabled={retryingEmail === stay.id}
             aria-label={t('retry_checkout_email')}
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/12 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
           >
             <MaterialIcon name={retryingEmail === stay.id ? 'progress_activity' : 'refresh'} size={16} />
           </button>
@@ -120,7 +120,7 @@ const GuestsCountCell = ({ stay, onManageGuests }: { stay: StayResponse; onManag
     <button
       type="button"
       onClick={handleClick}
-      className="font-medium flex items-center gap-1.5 text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs"
+      className="font-medium flex items-center gap-1.5 text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs"
     >
       <MaterialIcon name="group" size={18} />
       <span>{count}</span>

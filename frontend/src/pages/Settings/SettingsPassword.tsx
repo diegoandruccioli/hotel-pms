@@ -92,7 +92,7 @@ export const SettingsPassword = () => {
 
       {mustChangePassword && (
         <div role="alert" className="flex items-start gap-3 rounded-2xl bg-warning-container text-on-warning-container px-4 py-3 text-sm font-medium">
-          <MaterialIcon name="warning" size={18} className="mt-0.5 flex-shrink-0" />
+          <MaterialIcon name="warning" size={18} className="mt-0.5 shrink-0" />
           {t('must_change_password_banner', 'You must change your password before continuing.')}
         </div>
       )}

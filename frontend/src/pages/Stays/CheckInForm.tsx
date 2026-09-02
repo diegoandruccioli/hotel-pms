@@ -234,7 +234,7 @@ export const CheckInForm = memo(() => {
 
       {prefillFields.length > 0 && (
         <div className="bg-secondary-container text-on-secondary-container p-4 rounded-shape-sm flex items-start gap-3">
-          <MaterialIcon name="auto_fix_high" className="mt-0.5 flex-shrink-0" />
+          <MaterialIcon name="auto_fix_high" className="mt-0.5 shrink-0" />
           <p className="font-body text-sm">
             {prefillSource === 'stay'
               ? t('prefill_banner_stay', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })
@@ -248,7 +248,7 @@ export const CheckInForm = memo(() => {
           role="status"
           className="bg-secondary-container text-on-secondary-container p-4 rounded-shape-sm flex items-start gap-3"
         >
-          <MaterialIcon name="info" className="mt-0.5 flex-shrink-0" />
+          <MaterialIcon name="info" className="mt-0.5 shrink-0" />
           <div>
             <p className="font-body text-sm font-medium">{t('city_tax_preflight_title')}</p>
             <p className="font-body text-sm">{t(`city_tax_preflight_reason_${cityTaxWarning.toLowerCase()}`)}</p>
@@ -258,7 +258,7 @@ export const CheckInForm = memo(() => {
 
       {error && (
         <div className="bg-error-container text-on-error-container p-4 rounded-shape-sm flex items-start gap-3">
-          <MaterialIcon name="error" className="mt-0.5 flex-shrink-0" />
+          <MaterialIcon name="error" className="mt-0.5 shrink-0" />
           <p className="font-body text-sm">{error}</p>
         </div>
       )}

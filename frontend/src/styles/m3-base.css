@@ -246,22 +246,6 @@ html {
 
 /* ── Glassmorphism Utilities ───────────────────────── */
 
-@layer components {
-  .glass-surface {
-    background: var(--md-glass-bg);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--md-glass-border);
-  }
-
-  .glass-surface-elevated {
-    background: var(--md-glass-bg-elevated);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid var(--md-glass-border-elevated);
-  }
-}
-
 /* ── Scrollbar ─────────────────────────────────────── */
 
 @layer base {

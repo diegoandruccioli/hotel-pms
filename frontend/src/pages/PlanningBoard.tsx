@@ -264,7 +264,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
                 <div 
                   key={day.toISOString()} 
                   style={CELL_STYLE}
-                  className={`flex-shrink-0 border-r border-outline-variant flex flex-col items-center justify-center
+                  className={`shrink-0 border-r border-outline-variant flex flex-col items-center justify-center
                     ${isSameDay(day, new Date()) ? 'bg-primary-container text-on-primary-container' : ''}
                   `}
                 >
@@ -284,7 +284,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
           <div className="flex relative items-start">
             
             <div 
-              className="sticky left-0 z-30 flex-shrink-0 bg-surface-container-low border-r border-outline-variant shadow-elevation-1"
+              className="sticky left-0 z-30 shrink-0 bg-surface-container-low border-r border-outline-variant shadow-elevation-1"
               style={SIDEBAR_STYLE}
             >
               {rooms.map(room => (
@@ -313,7 +313,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
                   <div 
                     key={`grid-${day.toISOString()}`} 
                     style={CELL_STYLE}
-                    className="flex-shrink-0 h-full border-r border-outline-variant opacity-20" 
+                    className="shrink-0 h-full border-r border-outline-variant opacity-20" 
                   />
                 ))}
               </div>

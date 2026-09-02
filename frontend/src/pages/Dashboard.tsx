@@ -129,7 +129,7 @@ export const Dashboard = () => {
           role="alert"
           className="mt-4 flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container"
         >
-          <MaterialIcon name="warning" size={20} className="flex-shrink-0" />
+          <MaterialIcon name="warning" size={20} className="shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-body font-medium">{t('alloggiati_failure_banner_title')}</p>
             <p className="text-sm font-body">
@@ -138,7 +138,7 @@ export const Dashboard = () => {
           </div>
           <Link
             to="/stays"
-            className="inline-flex items-center min-h-[40px] text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-error-container rounded"
+            className="inline-flex items-center min-h-[40px] text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
           >
             {t('view_all')}
           </Link>
@@ -150,7 +150,7 @@ export const Dashboard = () => {
           role="alert"
           className="mt-4 flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container"
         >
-          <MaterialIcon name="warning" size={20} className="flex-shrink-0" />
+          <MaterialIcon name="warning" size={20} className="shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-body font-medium">{t('city_tax_unassessed_banner_title')}</p>
             <p className="text-sm font-body">
@@ -159,7 +159,7 @@ export const Dashboard = () => {
           </div>
           <Link
             to="/settings/city-tax"
-            className="inline-flex items-center min-h-[40px] text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-error-container rounded"
+            className="inline-flex items-center min-h-[40px] text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
           >
             {t('city_tax_unassessed_banner_action')}
           </Link>
@@ -183,7 +183,7 @@ export const Dashboard = () => {
               <M3Card key={item.nameKey} variant="glass" className="overflow-hidden">
                 <div className="p-5">
                   <div className="flex items-center">
-                    <div className={`flex items-center justify-center w-12 h-12 rounded-shape-lg flex-shrink-0 ${item.containerClass}`}>
+                    <div className={`flex items-center justify-center w-12 h-12 rounded-shape-lg shrink-0 ${item.containerClass}`}>
                       <MaterialIcon name={item.icon} size={24} />
                     </div>
                     <div className="ml-4 flex-1 min-w-0">
@@ -200,7 +200,7 @@ export const Dashboard = () => {
                   <Link
                     to={item.href}
                     state={item.state}
-                    className="inline-flex items-center min-h-[40px] text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                    className="inline-flex items-center min-h-[40px] text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
                   >
                     {t('view_all')}
                   </Link>
@@ -222,7 +222,7 @@ export const Dashboard = () => {
                 </div>
                 <Link
                   to="/housekeeping"
-                  className="inline-flex items-center min-h-[40px] text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                  className="inline-flex items-center min-h-[40px] text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
                 >
                   {t('view_all')}
                 </Link>

@@ -34,7 +34,7 @@ const UserMenuItem = memo(({
     onClick={onClick}
     className={[
       'flex items-center gap-3 w-full px-4 py-3',
-      'text-sm font-body text-left transition-colors focus-visible:outline-none',
+      'text-sm font-body text-left transition-colors focus-visible:outline-hidden',
       isError
         ? 'text-error hover:bg-error-container/20 focus-visible:bg-error-container/20'
         : 'text-on-surface hover:bg-surface-container-highest focus-visible:bg-surface-container-highest',
@@ -141,7 +141,7 @@ export const UserMenu = ({
           'flex items-center justify-center w-10 h-10',
           'rounded-shape-full bg-primary text-on-primary',
           'text-sm font-display font-bold',
-          'focus-visible:outline-none focus-visible:ring-2',
+          'focus-visible:outline-hidden focus-visible:ring-2',
           'focus-visible:ring-primary focus-visible:ring-offset-2',
           'hover:brightness-110 transition-all cursor-pointer',
           open ? 'ring-2 ring-primary ring-offset-2' : '',
@@ -161,7 +161,7 @@ export const UserMenu = ({
           onKeyDown={handleMenuKeyDown}
           className={[
             'absolute right-0 top-full mt-2 w-56 z-40',
-            'bg-surface-container rounded-[16px]',
+            'bg-surface-container rounded-shape-lg',
             'shadow-elevation-3 border border-outline-variant/30',
             'py-2 overflow-hidden',
             'animate-fade-in',

@@ -217,7 +217,7 @@ export const QuotationDetail = () => {
   if (error || !quotation) {
     return (
       <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-        <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+        <MaterialIcon name="error" size={20} className="shrink-0" />
         <div>
           <h3 className="text-sm font-medium font-body">{t('error_loading_quotation')}</h3>
           <p className="mt-1 text-sm font-body opacity-80">{error}</p>
@@ -255,7 +255,7 @@ export const QuotationDetail = () => {
 
       {quotation.sendFailed && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+          <MaterialIcon name="error" size={20} className="shrink-0" />
           <p className="text-sm font-body">{t('send_failed_banner')}</p>
         </div>
       )}
@@ -346,7 +346,7 @@ export const QuotationDetail = () => {
           icon="delete"
           onClick={openDeleteConfirm}
           disabled={busy}
-          className="text-error hover:bg-error/[0.08]"
+          className="text-error hover:bg-error/8"
         >
           {t('action_delete')}
         </M3Button>

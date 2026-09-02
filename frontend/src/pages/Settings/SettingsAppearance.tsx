@@ -46,10 +46,10 @@ const LanguageButton = memo(({
       aria-checked={isActive}
       onClick={handleClick}
       className={[
-        'flex items-center gap-3 px-4 py-3 rounded-[12px]',
+        'flex items-center gap-3 px-4 py-3 rounded-shape-md',
         'text-sm font-body text-left',
         'border transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2',
+        'focus-visible:outline-hidden focus-visible:ring-2',
         'focus-visible:ring-primary focus-visible:ring-offset-2',
         isActive
           ? 'bg-primary-container text-on-primary-container border-primary'

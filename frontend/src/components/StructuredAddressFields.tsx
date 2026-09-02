@@ -132,7 +132,7 @@ export const StructuredAddressFields = memo(({
             aria-controls={`${comuneId}-listbox`}
             aria-autocomplete="list"
             placeholder={t('placeholder_comune')}
-            className="w-full bg-transparent px-3 py-2 text-sm text-on-surface focus:outline-none"
+            className="w-full bg-transparent px-3 py-2 text-sm text-on-surface focus:outline-hidden"
           />
           {loading && (
             <span className="material-symbols-outlined absolute right-3 animate-spin text-on-surface-variant text-base" aria-hidden="true">

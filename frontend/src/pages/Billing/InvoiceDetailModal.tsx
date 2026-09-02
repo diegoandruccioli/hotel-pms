@@ -131,7 +131,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
               type="button"
               onClick={handleToggleDocumentTypeVoid}
               disabled={switchingType}
-              className="text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded min-h-[40px] px-2"
+              className="text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm min-h-[40px] px-2"
             >
               {invoice.documentType === 'FATTURA'
                 ? t('switch_to_ricevuta', { ns: 'billing' })
@@ -155,7 +155,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
               type="button"
               onClick={handleDownloadFatturaPAXmlVoid}
               disabled={validatingXml}
-              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded min-h-[40px] px-2"
+              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm min-h-[40px] px-2"
             >
               <span className="material-symbols-outlined" style={ICON_STYLE} aria-hidden="true">download</span>
               {t('download_fattura_pa', { ns: 'billing' })}
@@ -261,7 +261,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
         <button
           type="button"
           onClick={handleDownloadPdf}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-medium hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-h-[40px]"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-medium hover:opacity-90 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-h-[40px]"
         >
           <span className="material-symbols-outlined" style={ICON_STYLE} aria-hidden="true">
             download
