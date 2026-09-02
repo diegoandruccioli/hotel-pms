@@ -144,6 +144,15 @@
   morestring=[b]`
 }
 
+% Definizione linguaggio YAML (non incluso in tutte le versioni di listings)
+\lstdefinelanguage{yaml}{
+  keywords={},
+  sensitive=true,
+  comment=[l]{\#},
+  morestring=[b]',
+  morestring=[b]"
+}
+
 % Stile predefinito + UTF-8 + mapping caratteri non-ASCII nei listing
 \lstset{
   style=java,
@@ -1956,7 +1965,7 @@ volutamente fuori scope qui: \texttt{LoginAttemptServiceImpl.attemptsKey}/
 produce silenziosamente la chiave letterale \texttt{...\string:null} (concatenazione
 Java, nessuna eccezione), collassando il binding per-IP di T-AUTH-12 in un
 lockout puramente per-username per chiunque ometta l'header. Tracciato in
-\texttt{THREAT\_MODEL.md} come \texttt{🟡 DA ANALIZZARE}, nessun fix applicato.
+\texttt{THREAT\_MODEL.md} come \textbf{\textcolor{warnyellow}{DA ANALIZZARE}}, nessun fix applicato.
 
 \paragraph{Riferimento} Commit: \commitref{d6b113a}{fix(security): T-AUTH-14 --- sanitizeForLog NPE on null clientIp}
 
@@ -6428,7 +6437,7 @@ Commit: \commitref{a87d329}{fix(security): T-GST-07/T-BILL-07 --- missing RBAC o
 Stesso pattern di T-GST-07, trovato dal round~2 bug~\#5: nessuna
 \texttt{@PreAuthorize} sulle operazioni fiscalmente sensibili di
 \texttt{InvoiceController}. Riprodotto dal vivo con un RECEPTIONIST:
-cambio \texttt{documentType} FATTURA↔RICEVUTA, generazione (e blocco
+cambio \texttt{documentType} FATTURA$\leftrightarrow$RICEVUTA, generazione (e blocco
 permanente) di un export FatturaPA, impostazione dello stato di
 trasmissione SDI, e lancio dell'export batch per il commercialista,
 tutte riuscite senza alcun controllo oltre l'autenticazione.
