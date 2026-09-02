@@ -1882,6 +1882,85 @@ refresh post-cambio fallisce.
 \paragraph{Riferimento} Commit: \commitref{[pending]}{fix(security): T-AUTH-09 --- voluntary password change preserves the session}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{NullPointerException su login fallito senza clientIp --- 401 diventava 500 \threat{T-AUTH-14}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato come effetto collaterale durante una sessione di verifica browser
+end-to-end (2026-09), a seguito di un reset password manuale in ambiente
+di sviluppo che aveva esposto per caso questo percorso di codice.
+\texttt{AuthServiceImpl.sanitizeForLog(String value)} --- il metodo che
+strippa CR/LF da un valore prima che finisca in un log, per prevenire
+log forging da username o IP controllati dall'attaccante (CWE-117,
+T-AUTH-05) --- non gestiva \texttt{null}:
+\texttt{value.replaceAll("[\textbackslash r\textbackslash n]", "\_")} lanciava
+\texttt{NullPointerException} se \texttt{value} era \texttt{null}.
+\texttt{clientIp} è passato a \texttt{sanitizeForLog} in tre punti di
+\texttt{login()} (\texttt{LOGIN\_BLOCKED}, \texttt{ACCOUNT\_LOCKED},
+\texttt{LOGIN\_FAILED}) e arriva da
+\texttt{@RequestHeader(value = "X-Client-IP", required = false)} in
+\texttt{AuthController} --- \texttt{null} per qualunque richiesta che
+raggiunge \texttt{auth-service} senza passare dal gateway (in sviluppo,
+la porta \texttt{:8087} è esposta direttamente sull'host,
+\texttt{docker-compose.yml}). Effetto: un login con password errata, o
+su un account già bloccato, privo di quell'header, restituiva un
+\texttt{500} grezzo invece del normale \texttt{401}/\texttt{ACCOUNT\_TEMPORARILY\_LOCKED}
+--- \texttt{loginAttemptService.recordFailure}/\texttt{getLockedUntil}
+girano comunque prima del logging (il conteggio del lockout non viene
+bypassato), ma il chiamante riceve un'eccezione non gestita invece della
+risposta attesa. Classificato OWASP A09 --- Security Logging \&
+Monitoring Failures (il meccanismo di audit log introdotto per T-AUTH-05
+è il punto di fallimento).
+
+\begin{insecurebox}[title={Codice Vulnerabile --- AuthServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: nessun controllo null -- clientIp puo' essere null
+// (header X-Client-IP opzionale, richiesta diretta senza gateway)
+private static String sanitizeForLog(final String value) {
+    return value.replaceAll("[\r\n]", "_");  // NPE se value == null
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+\texttt{sanitizeForLog} reso null-safe: un valore \texttt{null} risolve al
+letterale fisso \texttt{"unknown"} invece di propagare l'eccezione. Il
+letterale non introduce alcun rischio di log forging (nessun contenuto
+attaccante-controllato) né di information disclosure. Il fix non tocca
+le chiamate a \texttt{loginAttemptService} (che ricevono \texttt{clientIp}
+grezzo, separatamente, per il binding del lockout) né la difesa a tempo
+costante di T-AUTH-13, entrambe verificate invariate in una revisione di
+sicurezza dedicata prima del commit.
+
+\begin{securebox}[title={Codice Sicuro --- AuthServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: null-safe, un login senza clientIp risolve comunque a 401/AccountLocked
+private static String sanitizeForLog(final String value) {
+    return value == null ? "unknown" : value.replaceAll("[\r\n]", "_");
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Due nuovi test in \texttt{AuthServiceImplTest}:
+\texttt{loginWithNullClientIpOnWrongPasswordThrowsCredentialsNotNpe} (password
+errata + \texttt{clientIp == null} → \texttt{BadCredentialsException}, non NPE) e
+\texttt{loginWithNullClientIpOnLockedAccountThrowsAccountLockedNotNpe} (stesso
+scenario sul branch di lockout → \texttt{AccountLockedException}, non NPE).
+
+\paragraph{Follow-up non risolto in questo commit \threat{T-AUTH-15}}
+La stessa revisione di sicurezza ha isolato un secondo problema, reale ma
+volutamente fuori scope qui: \texttt{LoginAttemptServiceImpl.attemptsKey}/
+\texttt{lockKey} concatenano \texttt{clientIp} grezzo nella chiave Redis
+(\texttt{login:fail:<username>:<clientIp>}) --- un \texttt{clientIp} nullo
+produce silenziosamente la chiave letterale \texttt{...\string:null} (concatenazione
+Java, nessuna eccezione), collassando il binding per-IP di T-AUTH-12 in un
+lockout puramente per-username per chiunque ometta l'header. Tracciato in
+\texttt{THREAT\_MODEL.md} come \texttt{🟡 DA ANALIZZARE}, nessun fix applicato.
+
+\paragraph{Riferimento} Commit: \commitref{d6b113a}{fix(security): T-AUTH-14 --- sanitizeForLog NPE on null clientIp}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Audit Log e Security Monitoring \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
 % ─────────────────────────────────────────────────────────────────────────────
 
