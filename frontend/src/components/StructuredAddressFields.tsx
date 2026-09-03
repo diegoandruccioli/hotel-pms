@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { stayService } from '../services';
 import type { AlloggiatiComune } from '../types';
 import { M3TextField } from './m3/M3TextField';
+import { MaterialIcon } from './MaterialIcon';
 
 const AUTOCOMPLETE_DEBOUNCE_MS = 300;
 const AUTOCOMPLETE_MIN_CHARS = 2;
@@ -135,9 +136,10 @@ export const StructuredAddressFields = memo(({
             className="w-full bg-transparent px-3 py-2 text-sm text-on-surface focus:outline-hidden"
           />
           {loading && (
-            <span className="material-symbols-outlined absolute right-3 animate-spin text-on-surface-variant text-base" aria-hidden="true">
-              refresh
-            </span>
+            <MaterialIcon
+              name="refresh"
+              className="absolute right-3 animate-spin text-on-surface-variant text-base"
+            />
           )}
         </div>
         {open && options.length > 0 && (

@@ -2,6 +2,7 @@ import { useState, useCallback, memo, useRef, useMemo, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 import type { LookupOption } from './LookupOptionItem';
 import { LookupOptionItem, AUTOCOMPLETE_MIN_CHARS } from './LookupOptionItem';
+import { MaterialIcon } from '../../components/MaterialIcon';
 
 // ---------------------------------------------------------------------------
 // LookupAutocomplete — server-side typeahead for Alloggiati Web lookup tables
@@ -98,9 +99,10 @@ export const LookupAutocomplete = memo(({
           {label}{required === true && ' *'}
         </label>
         {loading && (
-          <span className="material-symbols-outlined absolute right-3 animate-spin text-on-surface-variant text-base">
-            refresh
-          </span>
+          <MaterialIcon
+            name="refresh"
+            className="absolute right-3 animate-spin text-on-surface-variant text-base"
+          />
         )}
       </div>
       {open && options.length > 0 && (

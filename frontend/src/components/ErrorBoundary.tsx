@@ -1,7 +1,6 @@
-import { Component, type CSSProperties, type ErrorInfo, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { withTranslation, type WithTranslation } from 'react-i18next';
-
-const ICON_STYLE: CSSProperties = { fontSize: 48 };
+import { MaterialIcon } from './MaterialIcon';
 
 interface Props extends WithTranslation {
   children: ReactNode;
@@ -43,9 +42,7 @@ class ErrorBoundaryBase extends Component<Props, State> {
           className="flex h-full min-h-[60vh] items-center justify-center bg-surface p-6"
         >
           <div className="flex max-w-sm flex-col items-center gap-4 rounded-2xl border border-outline-variant bg-surface-container p-8 text-center shadow-elevation-1">
-            <span className="material-symbols-outlined text-error" style={ICON_STYLE}>
-              error
-            </span>
+            <MaterialIcon name="error" size={48} className="text-error" />
             <h2 className="text-lg font-display font-semibold text-on-surface">
               {t('error_unexpected_title')}
             </h2>

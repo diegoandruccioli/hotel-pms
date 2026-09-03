@@ -1,5 +1,6 @@
 import { useState, useId, useCallback } from 'react';
 import { PasswordVisibilityToggle } from './PasswordVisibilityToggle';
+import { MaterialIcon } from '../MaterialIcon';
 
 interface M3TextFieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'id'> {
   label: string;
@@ -14,7 +15,6 @@ interface M3TextFieldProps extends Omit<React.InputHTMLAttributes<HTMLInputEleme
   hideLabel?: boolean;
 }
 
-const ICON_STYLE = { fontSize: 20 };
 
 export const M3TextField = ({
   label,
@@ -62,9 +62,7 @@ export const M3TextField = ({
         `}
       >
         {leadingIcon && (
-          <span className="material-symbols-outlined pl-3 text-on-surface-variant" style={ICON_STYLE}>
-            {leadingIcon}
-          </span>
+          <MaterialIcon name={leadingIcon} size={20} className="pl-3 text-on-surface-variant" />
         )}
 
         <input

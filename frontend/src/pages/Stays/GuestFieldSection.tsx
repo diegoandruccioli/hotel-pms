@@ -15,8 +15,6 @@ import type { IdentifiableGuest } from './stayGuestFieldHelpers';
 import { StatoSelect } from './StatoSelect';
 import { ComuneAutocomplete } from './ComuneAutocomplete';
 
-const ICON_SIZE_20 = { fontSize: 20 };
-
 // ---------------------------------------------------------------------------
 // GuestFieldSection
 // ---------------------------------------------------------------------------
@@ -128,7 +126,11 @@ export const GuestFieldSection = memo(({
             <label htmlFor={`gender-${index}`} className="absolute pointer-events-none font-body left-4 top-1 text-xs text-on-surface-variant">
               {t('label_gender')} *
             </label>
-            <span className="material-symbols-outlined absolute right-3 pointer-events-none text-on-surface-variant z-10" style={ICON_SIZE_20}>arrow_drop_down</span>
+            <MaterialIcon
+              name="arrow_drop_down"
+              size={20}
+              className="absolute right-3 pointer-events-none text-on-surface-variant z-10"
+            />
           </div>
         </div>
 
@@ -163,7 +165,11 @@ export const GuestFieldSection = memo(({
             <label htmlFor={`traveller-type-${index}`} className="absolute pointer-events-none font-body left-4 top-1 text-xs text-on-surface-variant">
               {t('label_guest_type')} *
             </label>
-            <span className="material-symbols-outlined absolute right-3 pointer-events-none text-on-surface-variant z-10" style={ICON_SIZE_20}>arrow_drop_down</span>
+            <MaterialIcon
+              name="arrow_drop_down"
+              size={20}
+              className="absolute right-3 pointer-events-none text-on-surface-variant z-10"
+            />
           </div>
         </div>
 
@@ -205,7 +211,11 @@ export const GuestFieldSection = memo(({
                 <label htmlFor={`doc-type-${index}`} className="absolute pointer-events-none font-body left-4 top-1 text-xs text-on-surface-variant">
                   {t('label_doc_type')} *
                 </label>
-                <span className="material-symbols-outlined absolute right-3 pointer-events-none text-on-surface-variant z-10" style={ICON_SIZE_20}>arrow_drop_down</span>
+                <MaterialIcon
+                  name="arrow_drop_down"
+                  size={20}
+                  className="absolute right-3 pointer-events-none text-on-surface-variant z-10"
+                />
               </div>
             </div>
 
