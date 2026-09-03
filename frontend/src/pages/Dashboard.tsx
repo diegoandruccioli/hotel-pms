@@ -138,7 +138,7 @@ export const Dashboard = () => {
           </div>
           <Link
             to="/stays"
-            className="inline-flex items-center min-h-[40px] text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
+            className="inline-flex items-center min-h-10 text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
           >
             {t('view_all')}
           </Link>
@@ -159,7 +159,7 @@ export const Dashboard = () => {
           </div>
           <Link
             to="/settings/city-tax"
-            className="inline-flex items-center min-h-[40px] text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
+            className="inline-flex items-center min-h-10 text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
           >
             {t('city_tax_unassessed_banner_action')}
           </Link>
@@ -200,7 +200,7 @@ export const Dashboard = () => {
                   <Link
                     to={item.href}
                     state={item.state}
-                    className="inline-flex items-center min-h-[40px] text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+                    className="inline-flex items-center min-h-10 text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
                   >
                     {t('view_all')}
                   </Link>
@@ -222,7 +222,7 @@ export const Dashboard = () => {
                 </div>
                 <Link
                   to="/housekeeping"
-                  className="inline-flex items-center min-h-[40px] text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+                  className="inline-flex items-center min-h-10 text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
                 >
                   {t('view_all')}
                 </Link>
