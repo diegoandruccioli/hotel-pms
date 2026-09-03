@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Login } from './Login';
 import { BrowserRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
-import { authService } from '../services/authService';
+import { authService } from '../services';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {

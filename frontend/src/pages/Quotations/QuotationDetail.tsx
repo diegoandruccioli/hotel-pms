@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { quotationService } from '../../services/quotationService';
-import type { QuotationResponse, QuotationOptionResponse, QuotationStatus } from '../../types/quotation.types';
+import { quotationService } from '../../services';
+import type { QuotationResponse, QuotationOptionResponse, QuotationStatus } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3Dialog } from '../../components/m3/M3Dialog';
-import { M3StatusChip } from '../../components/m3/M3StatusChip';
-import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
+import { M3Button } from '../../components/m3';
+import { M3Card } from '../../components/m3';
+import { M3Dialog } from '../../components/m3';
+import { M3StatusChip } from '../../components/m3';
+import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { QuotationPdfPreviewDialog } from './QuotationPdfPreviewDialog';
-import { useToastStore } from '../../store/toastStore';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { useToastStore } from '../../store';
+import { getErrorMessage, cn } from '../../utils';
 
 const STATUS_TONE: Record<QuotationStatus, 'success' | 'warning' | 'error' | 'neutral' | 'info'> = {
   DRAFT: 'neutral',
@@ -40,7 +40,11 @@ const OptionCard = ({ option, isAccepted, isConvertChoice, selectable, onChoose 
   return (
     <M3Card
       variant="outlined"
-      className={`p-4 space-y-3 ${isAccepted ? 'border-tertiary border-2' : ''} ${isConvertChoice ? 'border-primary border-2' : ''}`}
+      className={cn(
+        'p-4 space-y-3',
+        isAccepted && 'border-tertiary border-2',
+        isConvertChoice && 'border-primary border-2'
+      )}
     >
       <div className="flex items-center justify-between">
         <h3 className="font-medium text-on-surface">{option.label}</h3>
@@ -217,7 +221,7 @@ export const QuotationDetail = () => {
   if (error || !quotation) {
     return (
       <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-        <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+        <MaterialIcon name="error" size={20} className="shrink-0" />
         <div>
           <h3 className="text-sm font-medium font-body">{t('error_loading_quotation')}</h3>
           <p className="mt-1 text-sm font-body opacity-80">{error}</p>
@@ -255,7 +259,7 @@ export const QuotationDetail = () => {
 
       {quotation.sendFailed && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+          <MaterialIcon name="error" size={20} className="shrink-0" />
           <p className="text-sm font-body">{t('send_failed_banner')}</p>
         </div>
       )}
@@ -276,7 +280,7 @@ export const QuotationDetail = () => {
           </div>
           <div>
             <p className="text-xs font-body text-on-surface-variant">{t('col_valid_until')}</p>
-            <p className={`text-sm font-medium ${quotation.status === 'EXPIRED' ? 'text-error' : 'text-on-surface'}`}>
+            <p className={cn('text-sm font-medium', quotation.status === 'EXPIRED' ? 'text-error' : 'text-on-surface')}>
               {quotation.validUntil}
             </p>
           </div>
@@ -346,7 +350,7 @@ export const QuotationDetail = () => {
           icon="delete"
           onClick={openDeleteConfirm}
           disabled={busy}
-          className="text-error hover:bg-error/[0.08]"
+          className="text-error hover:bg-error/8"
         >
           {t('action_delete')}
         </M3Button>

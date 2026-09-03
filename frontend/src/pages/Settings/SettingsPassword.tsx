@@ -1,16 +1,16 @@
 import { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuthStore } from '../../store/authStore';
-import { useToastStore } from '../../store/toastStore';
-import { authService } from '../../services/authService';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3TextField } from '../../components/m3/M3TextField';
+import { useAuthStore } from '../../store';
+import { useToastStore } from '../../store';
+import { authService } from '../../services';
+import { M3Card } from '../../components/m3';
+import { M3Button } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
 import { PasswordRequirementsChecklist } from '../../components/PasswordRequirementsChecklist';
-import { isPasswordValid } from '../../utils/passwordPolicy';
+import { isPasswordValid } from '../../utils';
 
 export const SettingsPassword = () => {
   const { t } = useTranslation('common');
@@ -92,7 +92,7 @@ export const SettingsPassword = () => {
 
       {mustChangePassword && (
         <div role="alert" className="flex items-start gap-3 rounded-2xl bg-warning-container text-on-warning-container px-4 py-3 text-sm font-medium">
-          <MaterialIcon name="warning" size={18} className="mt-0.5 flex-shrink-0" />
+          <MaterialIcon name="warning" size={18} className="mt-0.5 shrink-0" />
           {t('must_change_password_banner', 'You must change your password before continuing.')}
         </div>
       )}

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import api from './api';
-import type { RoomStatus } from '../types/inventory.types';
+import type { RoomStatus } from '../types';
 import { inventoryService } from './inventoryService';
 
 vi.mock('./api');

@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import { userService } from '../services/userService';
-import type { UserResponse } from '../types/user.types';
+import { userService } from '../services';
+import type { UserResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
-import { M3DataTable } from '../components/m3/M3DataTable';
-import { M3LoadingState } from '../components/m3/M3LoadingState';
-import { M3EmptyState } from '../components/m3/M3EmptyState';
-import { useToastStore } from '../store/toastStore';
-import { useAuthStore } from '../store/authStore';
-import { getErrorMessage } from '../utils/errorMessage';
+import { M3Button } from '../components/m3';
+import { M3DataTable } from '../components/m3';
+import { M3LoadingState } from '../components/m3';
+import { M3EmptyState } from '../components/m3';
+import { useToastStore } from '../store';
+import { useAuthStore } from '../store';
+import { getErrorMessage, cn } from '../utils';
 import { CreateUserModal } from './AdminUsers/CreateUserModal';
 import { ResetPasswordModal } from './AdminUsers/ResetPasswordModal';
 import type { TFunction } from 'i18next';
@@ -33,13 +33,13 @@ const ActionsCell = ({ user, onToggle, onResetPassword, currentUsername, t }: Ac
   return (
     <div className="flex items-center gap-2">
       <button type="button" onClick={handleToggle}
-        className="inline-flex items-center justify-center min-h-[40px] text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary"
+        className="inline-flex items-center justify-center min-h-10 text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary"
         aria-label={user.active ? t('btn_deactivate') : t('btn_activate')}>
         {user.active ? t('btn_deactivate') : t('btn_activate')}
       </button>
       {user.username !== currentUsername && (
         <button type="button" onClick={handleReset}
-          className="inline-flex items-center justify-center min-h-[40px] text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary"
+          className="inline-flex items-center justify-center min-h-10 text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary"
           aria-label={`${t('btn_reset_password')} ${user.username}`}>
           {t('btn_reset_password')}
         </button>
@@ -167,9 +167,10 @@ export function AdminUsers() {
       accessorKey: 'active',
       header: t('col_status'),
       cell: ({ row }) => (
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+        <span className={cn(
+          'rounded-full px-2 py-0.5 text-xs font-medium',
           row.original.active ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-error-container text-on-error-container'
-        }`}>
+        )}>
           {row.original.active ? t('status_active') : t('status_inactive')}
         </span>
       ),

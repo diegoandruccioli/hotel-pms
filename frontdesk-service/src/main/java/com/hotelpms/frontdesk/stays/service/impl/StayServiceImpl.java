@@ -15,6 +15,7 @@ import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
+import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomService;
 import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.domain.StayGuest;
@@ -465,6 +466,99 @@ public class StayServiceImpl implements StayService {
         cityTaxAssessmentService.rectifyForStayExtended(saved, oldCheckOut, newCheckOutDate);
 
         log.info("[STAY] EXTENDED | stayId={} | oldCheckOut={} | newCheckOut={}", stayId, oldCheckOut, newCheckOutDate);
+        return stayMapper.toDto(saved);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public StayResponse changeRoom(
+            @NonNull final UUID stayId, @NonNull final UUID hotelId, @NonNull final UUID newRoomId,
+            final Long clientVersion) {
+        final Stay stay = stayRepository.findByIdAndHotelId(stayId, hotelId)
+                .orElseThrow(() -> new NotFoundException(STAY_NOT_FOUND_MSG));
+        verifyNotStale(stay, clientVersion);
+
+        if (stay.getStatus() != StayStatus.CHECKED_IN) {
+            log.warn("[STAY] ROOM_CHANGE_FAILED | stayId={} | reason=INVALID_STATUS | currentStatus={}",
+                    stayId, stay.getStatus());
+            throw new IllegalStateException(INVALID_STAY_STATUS_MSG);
+        }
+        // A stay overdue for check-out (expectedCheckOutDate already in the past — the guest
+        // hasn't left yet and nobody has extended it) has no valid [today, checkOut) range to
+        // search or reprice against: the availability query would see checkOut <= checkIn, and
+        // the remaining-nights repricing further down would divide by a zero/negative night
+        // count. Extending the stay (Proroga) first is the correct fix, not something this
+        // action should paper over silently.
+        if (!stay.getExpectedCheckOutDate().isAfter(LocalDate.now())) {
+            log.warn("[STAY] ROOM_CHANGE_FAILED | stayId={} | reason=CHECKOUT_DATE_IN_PAST | "
+                            + "expectedCheckOutDate={}",
+                    stayId, stay.getExpectedCheckOutDate());
+            throw new BadRequestException("STAY_ROOM_CHANGE_CHECKOUT_IN_PAST");
+        }
+        final UUID oldRoomId = stay.getRoomId();
+        if (newRoomId.equals(oldRoomId)) {
+            throw new BadRequestException("SAME_ROOM_NOT_ALLOWED");
+        }
+
+        final RoomResponse newRoom = roomService.getRoomById(newRoomId, hotelId);
+        if (newRoom.status() != RoomStatus.CLEAN) {
+            log.warn("[STAY] ROOM_CHANGE_FAILED | stayId={} | reason=ROOM_NOT_CLEAN | newRoomId={}",
+                    stayId, newRoomId);
+            throw new ConflictException("ROOM_NOT_CLEAN");
+        }
+
+        final long activeGuestCount = stay.getGuests() == null ? 0 : stay.getGuests().stream()
+                .filter(g -> g.getDepartureDate() == null)
+                .count();
+        if (newRoom.roomType().maxOccupancy() < activeGuestCount) {
+            log.warn("[STAY] ROOM_CHANGE_FAILED | stayId={} | reason=ROOM_CAPACITY_EXCEEDED "
+                            + "| newRoomId={} | maxOccupancy={} | activeGuestCount={}",
+                    stayId, newRoomId, newRoom.roomType().maxOccupancy(), activeGuestCount);
+            throw new BadRequestException("ROOM_CAPACITY_EXCEEDED");
+        }
+
+        final LocalDate today = LocalDate.now();
+        // The destination is already known-CLEAN (above), so it is free of any *current*
+        // physical occupancy by construction (check-in sets OCCUPIED, check-out sets DIRTY
+        // until cleaned) — this only catches a genuine future booking conflict.
+        if (reservationService.isRoomBookedByOthers(newRoomId, today, stay.getExpectedCheckOutDate())) {
+            log.warn("[STAY] ROOM_CHANGE_FAILED | stayId={} | reason=ROOM_NOT_AVAILABLE | newRoomId={}",
+                    stayId, newRoomId);
+            throw new ConflictException("ROOM_NOT_AVAILABLE_FOR_ROOM_CHANGE");
+        }
+
+        final UUID oldRoomTypeId = roomService.getRoomById(oldRoomId, hotelId).roomType().id();
+        if (!newRoom.roomType().id().equals(oldRoomTypeId)) {
+            // Billing before persisting the room change: a failed void/repost must never
+            // leave the stay silently moved with the invoice still reflecting the old room.
+            if (!stayInvoiceResolver.isOpen(stay)) {
+                log.warn("[STAY] ROOM_CHANGE_FAILED | stayId={} | reason=INVOICE_NOT_OPEN", stayId);
+                throw new ConflictException("STAY_ROOM_CHANGE_INVOICE_NOT_OPEN");
+            }
+            if (stay.getRoomChargeUnitPrice() == null || stay.getRoomChargeId() == null) {
+                log.warn("[STAY] ROOM_CHANGE_FAILED | stayId={} | reason=ROOM_CHARGE_SNAPSHOT_MISSING", stayId);
+                throw new ConflictException("ROOM_CHARGE_SNAPSHOT_MISSING");
+            }
+            final StayBillingCoordinator.RoomChangeBillingResult billing =
+                    stayBillingCoordinator.postRoomChangeCharges(stay, newRoom, today);
+            stay.setRoomChargeId(billing.newRoomChargeId());
+            stay.setRoomChargeUnitPrice(billing.newRoomChargeUnitPrice());
+            stay.setRoomChargeNights(billing.newRoomChargeNights());
+        }
+
+        stay.setRoomId(newRoomId);
+        stay.setRoomNumber(newRoom.roomNumber());
+        final Stay saved = stayRepository.save(stay);
+
+        if (saved.getReservationId() != null) {
+            reservationService.syncLineItemRoomForCheckedInStay(saved.getReservationId(), oldRoomId, newRoomId, hotelId);
+        }
+
+        roomService.updateRoomStatus(oldRoomId, hotelId, RoomStatus.DIRTY);
+        roomService.updateRoomStatus(newRoomId, hotelId, RoomStatus.OCCUPIED);
+
+        log.info("[STAY] ROOM_CHANGED | stayId={} | oldRoomId={} | newRoomId={}", stayId, oldRoomId, newRoomId);
         return stayMapper.toDto(saved);
     }
 

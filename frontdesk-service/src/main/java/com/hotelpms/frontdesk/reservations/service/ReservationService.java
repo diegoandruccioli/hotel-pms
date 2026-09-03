@@ -86,12 +86,17 @@ public interface ReservationService {
     /**
      * Updates reservation status and/or actual guests count.
      *
-     * @param id           the reservation ID
-     * @param status       the new status (optional)
-     * @param actualGuests the new actual guests count (optional)
+     * @param id            the reservation ID
+     * @param status        the new status (optional)
+     * @param actualGuests  the new actual guests count (optional)
+     * @param clientVersion the version the caller last read, for optimistic-lock
+     *                      conflict detection; {@code null} skips the check
+     *                      (same backward-compatible contract as {@link
+     *                      #updateReservation})
      * @return the updated reservation response
      */
-    ReservationResponse updateStatusAndGuests(UUID id, ReservationStatus status, Integer actualGuests);
+    ReservationResponse updateStatusAndGuests(UUID id, ReservationStatus status, Integer actualGuests,
+            Long clientVersion);
 
     /**
      * Checks whether a guest has any active (non-terminal) reservation in the
@@ -130,6 +135,31 @@ public interface ReservationService {
      * @return {@code true} if another reservation overlaps the range for this room
      */
     boolean isRoomBookedByOthers(UUID roomId, LocalDate checkIn, LocalDate checkOut);
+
+    /**
+     * Moves the reservation line item that currently reserves {@code oldRoomId}
+     * to {@code newRoomId}, re-pricing it for the new room's rate. Called
+     * exclusively by {@code StayServiceImpl.changeRoom} (Parte 6) right after
+     * it moves the corresponding {@code Stay}'s own room — the only
+     * legitimate way to change the room on a reservation once it already has
+     * a {@code CHECKED_IN} stay.
+     *
+     * <p><strong>Deliberately bypasses</strong> the {@code
+     * RESERVATION_HAS_ACTIVE_STAY} guard {@code updateReservation} enforces:
+     * that guard exists to reject a *manual* edit through the reservation
+     * editor once check-in has happened, precisely because the stay's own
+     * room is otherwise never re-synced from it. This method IS that sync —
+     * without it, the vacated room would stay "phantom-booked" against every
+     * future overlap check (which reads only {@code reservation_line_items},
+     * never {@code stays.room_id}), and the new room would stay invisible to
+     * them.
+     *
+     * @param reservationId the reservation owning the stay being moved
+     * @param oldRoomId     the room being vacated
+     * @param newRoomId     the room being moved into
+     * @param hotelId       the authenticated hotel, for tenant scoping
+     */
+    void syncLineItemRoomForCheckedInStay(UUID reservationId, UUID oldRoomId, UUID newRoomId, UUID hotelId);
 
     /**
      * Retries the reservation-confirmed email for a reservation whose original attempt

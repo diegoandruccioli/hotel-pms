@@ -1,5 +1,5 @@
 import { useState, useCallback, memo, useRef } from 'react';
-import { stayService } from '../../services/stayService';
+import { stayService } from '../../services';
 import type { LookupOption } from './LookupOptionItem';
 import { LookupAutocomplete } from './LookupAutocomplete';
 

@@ -1,4 +1,4 @@
-import type { StayStatus } from '../../types/stay.types';
+import type { StayStatus } from '../../types';
 
 // ---------------------------------------------------------------------------
 // getStatusTone — maps a stay status to the M3StatusChip visual tone.

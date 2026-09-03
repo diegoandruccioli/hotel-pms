@@ -2,7 +2,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { QuotationPdfPreviewDialog } from './QuotationPdfPreviewDialog';
-import { quotationService } from '../../services/quotationService';
+import { quotationService } from '../../services';
 
 vi.mock('../../services/quotationService');
 

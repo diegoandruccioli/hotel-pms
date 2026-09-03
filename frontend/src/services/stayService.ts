@@ -20,8 +20,8 @@ import type {
   StayGuestResponse,
   StayRequest,
   StayResponse,
-} from '../types/stay.types';
-import type { SpringPage } from '../types/page.types';
+} from '../types';
+import type { SpringPage } from '../types';
 
 const BASE_PATH = '/api/v1/stays';
 const IFRAME_CLEANUP_DELAY_MS = 10000;
@@ -246,6 +246,11 @@ export const stayService = {
 
   extendStay: async (stayId: string, newCheckOutDate: string, version?: number | null): Promise<StayResponse> => {
     const response = await api.put<StayResponse>(`${BASE_PATH}/${stayId}`, { newCheckOutDate, version });
+    return response.data;
+  },
+
+  changeRoom: async (stayId: string, newRoomId: string, version?: number | null): Promise<StayResponse> => {
+    const response = await api.put<StayResponse>(`${BASE_PATH}/${stayId}/room`, { newRoomId, version });
     return response.data;
   },
 };

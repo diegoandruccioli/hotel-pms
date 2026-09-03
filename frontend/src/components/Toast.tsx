@@ -1,8 +1,9 @@
 import { MaterialIcon } from './MaterialIcon';
-import { useToastStore } from '../store/toastStore';
-import type { Toast, ToastType } from '../store/toastStore';
+import { useToastStore } from '../store';
+import type { Toast, ToastType } from '../store';
 import { useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { cn } from '../utils';
 
 const iconByType: Record<ToastType, string> = {
   success: 'check_circle',
@@ -26,14 +27,17 @@ const ToastItem = memo(({ toast }: { toast: Toast }) => {
 
   return (
     <div
-      className={`flex items-start gap-3 px-4 py-3 rounded-shape-md border shadow-elevation-2 min-w-[280px] max-w-sm animate-fade-in ${toneByType[toast.type]}`}
+      className={cn(
+        'flex items-start gap-3 px-4 py-3 rounded-shape-md border shadow-elevation-2 min-w-[280px] max-w-sm animate-fade-in',
+        toneByType[toast.type]
+      )}
       role="alert"
     >
-      <MaterialIcon name={iconByType[toast.type]} size={20} className="flex-shrink-0 mt-0.5" />
+      <MaterialIcon name={iconByType[toast.type]} size={20} className="shrink-0 mt-0.5" />
       <p className="text-sm font-body flex-1">{toast.message}</p>
       <button
         onClick={handleRemove}
-        className="flex-shrink-0 flex items-center justify-center min-h-[40px] min-w-[40px] -my-2.5 -mr-2 opacity-60 hover:opacity-100 transition-opacity rounded focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-1 focus-visible:outline-none"
+        className="shrink-0 flex items-center justify-center min-h-10 min-w-10 -my-2.5 -mr-2 opacity-60 hover:opacity-100 transition-opacity rounded-sm focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-1 focus-visible:outline-hidden"
         aria-label={t('dismiss_notification')}
       >
         <MaterialIcon name="close" size={16} />

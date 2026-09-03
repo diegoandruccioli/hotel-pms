@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { MaterialIcon } from '../MaterialIcon';
-import { cn } from '../../utils/cn';
+import { cn } from '../../utils';
 
 interface M3SwitchProps {
   checked: boolean;
@@ -32,7 +32,7 @@ export const M3Switch = ({ checked, onChange, label, description, icon, disabled
       onClick={handleClick}
       className={cn(
         'flex items-center justify-between w-full px-4 py-3 rounded-shape-md border border-outline-variant transition-colors',
-        'hover:bg-surface-container-highest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+        'hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
         disabled && 'opacity-38 cursor-not-allowed hover:bg-transparent',
         className,
       )}
@@ -50,7 +50,7 @@ export const M3Switch = ({ checked, onChange, label, description, icon, disabled
       <span
         aria-hidden="true"
         className={cn(
-          'relative w-12 h-7 flex-shrink-0 rounded-shape-full border-2 transition-colors',
+          'relative w-12 h-7 shrink-0 rounded-shape-full border-2 transition-colors',
           checked ? 'bg-primary border-primary' : 'bg-surface-container-highest border-outline',
         )}
       >

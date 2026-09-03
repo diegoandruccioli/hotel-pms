@@ -1,5 +1,5 @@
 import api from './api';
-import type { UserResponse, CreateUserRequest } from '../types/user.types';
+import type { UserResponse, CreateUserRequest } from '../types';
 
 const BASE_PATH = '/api/v1/auth/users';
 

@@ -4,8 +4,8 @@ import { render, screen } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
-import { useAuthStore } from '../store/authStore';
-import type { UserPayload } from '../types/auth.types';
+import { useAuthStore } from '../store';
+import type { UserPayload } from '../types';
 
 vi.mock('../store/authStore');
 

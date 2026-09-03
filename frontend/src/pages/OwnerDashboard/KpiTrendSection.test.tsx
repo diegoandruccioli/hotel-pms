@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { KpiTrendSection } from './KpiTrendSection';
-import { kpiReportService } from '../../services/kpiReportService';
-import { renderWithQuery } from '../../test-utils/renderWithQuery';
-import type { KpiReportDto } from '../../types/ownerReport.types';
+import { kpiReportService } from '../../services';
+import { renderWithQuery } from '../../test-utils';
+import type { KpiReportDto } from '../../types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),

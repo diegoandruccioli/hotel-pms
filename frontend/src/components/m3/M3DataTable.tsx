@@ -10,7 +10,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MaterialIcon } from '../MaterialIcon';
 import { M3TableEmptyRow } from './M3EmptyState';
-import { cn } from '../../utils/cn';
+import { cn } from '../../utils';
 
 /** CLAUDE.md mandates virtual scrolling past this row count. Every page
  * migrated to M3DataTable so far paginates well under this (20/page), so in
@@ -174,7 +174,7 @@ const SortableHeaderCell = memo(({ columnId, label, canSort, direction, onToggle
         <button
           type="button"
           onClick={handleClick}
-          className="inline-flex items-center gap-1 hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+          className="inline-flex items-center gap-1 hover:text-on-surface focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
         >
           {label}
           <MaterialIcon

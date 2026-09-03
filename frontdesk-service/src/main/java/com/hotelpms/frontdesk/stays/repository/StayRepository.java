@@ -156,6 +156,22 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
             Collection<StayStatus> statuses, Pageable pageable);
 
     /**
+     * Checks whether a reservation has a stay in the given status, scoped to a
+     * hotel. Used by {@code ReservationServiceImpl.updateReservation} to reject
+     * a dates/rooms edit once check-in has already created a stay from this
+     * reservation — the stay's own dates/room are snapshotted at check-in
+     * (never re-read from the reservation), so an unguarded edit here would
+     * silently desync what the stay is billing from what the reservation now
+     * says.
+     *
+     * @param reservationId the reservation UUID
+     * @param hotelId       the hotel UUID (tenant isolation)
+     * @param status        the stay status to check for (e.g. CHECKED_IN)
+     * @return true if a matching stay exists
+     */
+    boolean existsByReservationIdAndHotelIdAndStatus(UUID reservationId, UUID hotelId, StayStatus status);
+
+    /**
      * Counts stays with the given status, scoped to a hotel. Backs the
      * day-sheet "current stays" count (E-DASHBOARD-1) — previously computed
      * client-side by downloading up to 500 stays and filtering in the browser.

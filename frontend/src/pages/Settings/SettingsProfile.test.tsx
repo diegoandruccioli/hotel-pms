@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { MemoryRouter } from 'react-router-dom';
 import { SettingsProfile } from './SettingsProfile';
-import { useAuthStore } from '../../store/authStore';
+import { useAuthStore } from '../../store';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {

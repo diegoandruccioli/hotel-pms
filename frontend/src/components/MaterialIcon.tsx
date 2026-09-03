@@ -1,3 +1,5 @@
+import { cn } from '../utils';
+
 interface MaterialIconProps {
   /** Material Symbols icon name, e.g. "dashboard", "hotel", "group" */
   name: string;
@@ -24,7 +26,7 @@ export const MaterialIcon = ({
 
   return (
     <span
-      className={`material-symbols-outlined${filled ? " filled" : ""} ${className}`.trim()}
+      className={cn('material-symbols-outlined', filled && 'filled', className)}
       style={sizeStyle}
       aria-hidden={!label}
       aria-label={label}

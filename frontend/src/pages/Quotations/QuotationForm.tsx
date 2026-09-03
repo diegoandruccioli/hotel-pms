@@ -3,20 +3,21 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3TextField } from '../../components/m3/M3TextField';
-import { inventoryService } from '../../services/inventoryService';
-import { reservationService } from '../../services/reservationService';
-import { guestService } from '../../services/guestService';
-import { quotationService } from '../../services/quotationService';
-import type { GuestResponseDTO } from '../../types/guest.types';
-import type { RoomResponse } from '../../types/inventory.types';
-import type { ReservationResponse } from '../../types/reservation.types';
-import type { QuotationOptionRequest, QuotationRequest } from '../../types/quotation.types';
+import { M3Button } from '../../components/m3';
+import { M3Card } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
+import { inventoryService } from '../../services';
+import { reservationService } from '../../services';
+import { guestService } from '../../services';
+import { quotationService } from '../../services';
+import type { GuestResponseDTO } from '../../types';
+import type { RoomResponse } from '../../types';
+import type { ReservationResponse } from '../../types';
+import { cn } from '../../utils';
+import type { QuotationOptionRequest, QuotationRequest } from '../../types';
 import { RoomSelection } from '../Reservations/RoomSelection';
-import { getErrorMessage } from '../../utils/errorMessage';
-import { useToastStore } from '../../store/toastStore';
+import { getErrorMessage } from '../../utils';
+import { useToastStore } from '../../store';
 
 const DEFAULT_VALID_DAYS = 7;
 const MAX_OPTIONS = 5;
@@ -58,12 +59,15 @@ const OptionTab = memo(({ option, index, isActive, canRemove, total, onSelect, o
   const handleSelect = useCallback(() => onSelect(index), [onSelect, index]);
   const handleRemove = useCallback(() => onRemove(index), [onRemove, index]);
   return (
-    <div className={`flex items-center rounded-shape-full border ${isActive ? 'border-primary bg-primary-container' : 'border-outline-variant'}`}>
+    <div className={cn('flex items-center rounded-shape-full border', isActive ? 'border-primary bg-primary-container' : 'border-outline-variant')}>
       <button
         type="button"
         onClick={handleSelect}
         aria-pressed={isActive}
-        className={`px-4 py-2 text-sm font-medium font-body rounded-shape-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isActive ? 'text-on-primary-container' : 'text-on-surface-variant'}`}
+        className={cn(
+          'px-4 py-2 text-sm font-medium font-body rounded-shape-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary',
+          isActive ? 'text-on-primary-container' : 'text-on-surface-variant'
+        )}
       >
         {option.label || defaultOptionLabel(index)} · € {total.toFixed(2)}
       </button>
@@ -72,7 +76,7 @@ const OptionTab = memo(({ option, index, isActive, canRemove, total, onSelect, o
           type="button"
           onClick={handleRemove}
           aria-label={`Rimuovi ${option.label || defaultOptionLabel(index)}`}
-          className="pr-3 pl-1 text-on-surface-variant hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-shape-full"
+          className="pr-3 pl-1 text-on-surface-variant hover:text-error focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-full"
         >
           <MaterialIcon name="close" size={16} />
         </button>

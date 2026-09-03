@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import type { Role } from '../types/auth.types';
+import type { Role } from '../types';
 import { AdminUsers } from './AdminUsers';
-import { userService } from '../services/userService';
-import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
+import { userService } from '../services';
+import { mockAxiosErrorWithDetail } from '../test-utils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

@@ -46,8 +46,8 @@ describe('M3TableActionLink', () => {
   it('meets the 40x40 minimum touch target size', () => {
     render(<M3TableActionLink>Edit</M3TableActionLink>);
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('min-h-[40px]');
-    expect(btn.className).toContain('min-w-[40px]');
+    expect(btn.className).toContain('min-h-10');
+    expect(btn.className).toContain('min-w-10');
   });
 
   it('has no accessibility violations', async () => {

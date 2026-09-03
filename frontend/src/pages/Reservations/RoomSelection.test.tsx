@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { RoomSelection } from './RoomSelection';
-import type { RoomResponse } from '../../types/inventory.types';
-import type { ReservationResponse } from '../../types/reservation.types';
+import type { RoomResponse } from '../../types';
+import type { ReservationResponse } from '../../types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

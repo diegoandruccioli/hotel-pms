@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { inventoryService } from '../../services/inventoryService';
-import type { RoomResponse, RoomStatus } from '../../types/inventory.types';
-import { queryKeys } from '../../lib/queryKeys';
+import { inventoryService } from '../../services';
+import type { RoomResponse, RoomStatus } from '../../types';
+import { queryKeys } from '../../lib';
 
 const getTodayString = (): string => {
   const now = new Date();

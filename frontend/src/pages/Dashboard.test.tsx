@@ -2,14 +2,14 @@ import { screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
-import { renderWithQuery } from '../test-utils/renderWithQuery';
+import { renderWithQuery } from '../test-utils';
 import { Dashboard } from './Dashboard';
-import { useAuthStore } from '../store/authStore';
-import { stayService } from '../services/stayService';
-import { dashboardService } from '../services/dashboardService';
-import { billingReportService } from '../services/billingReportService';
-import type { DaySheetResponse } from '../types/daySheet.types';
-import type { OwnerFinancialSummaryDto } from '../types/ownerReport.types';
+import { useAuthStore } from '../store';
+import { stayService } from '../services';
+import { dashboardService } from '../services';
+import { billingReportService } from '../services';
+import type { DaySheetResponse } from '../types';
+import type { OwnerFinancialSummaryDto } from '../types';
 
 vi.mock('../services/stayService', () => ({
   stayService: { getAlloggiatiFailureSummary: vi.fn(), getCityTaxUnassessedSummary: vi.fn() },

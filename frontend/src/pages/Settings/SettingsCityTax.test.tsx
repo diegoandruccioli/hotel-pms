@@ -3,9 +3,9 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { SettingsCityTax } from './SettingsCityTax';
-import { stayService } from '../../services/stayService';
-import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
-import type { CityTaxRateResponse, HotelCategoryHistoryResponse } from '../../types/stay.types';
+import { stayService } from '../../services';
+import { mockAxiosErrorWithDetail } from '../../test-utils';
+import type { CityTaxRateResponse, HotelCategoryHistoryResponse } from '../../types';
 
 const stableT = (key: string) => key;
 const stableI18n = { language: 'en' };

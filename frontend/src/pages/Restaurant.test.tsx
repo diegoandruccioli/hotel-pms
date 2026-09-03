@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../test-utils/renderWithQuery';
+import { renderWithQuery as render } from '../test-utils';
 import { Restaurant } from './Restaurant';
-import { fbService } from '../services/fbService';
-import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
-import type { MenuItemResponse, RestaurantOrderResponse } from '../types/fb.types';
+import { fbService } from '../services';
+import { mockAxiosErrorWithDetail } from '../test-utils';
+import type { MenuItemResponse, RestaurantOrderResponse } from '../types';
 
 vi.mock('react-i18next', () => {
   const t = (key: string) => key;

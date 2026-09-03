@@ -1,11 +1,11 @@
 import { useState, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { userService } from '../../services/userService';
-import type { UserResponse } from '../../types/user.types';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Dialog } from '../../components/m3/M3Dialog';
-import { M3TextField } from '../../components/m3/M3TextField';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { userService } from '../../services';
+import type { UserResponse } from '../../types';
+import { M3Button } from '../../components/m3';
+import { M3Dialog } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
+import { getErrorMessage } from '../../utils';
 
 interface ResetPasswordModalProps {
   user: UserResponse;

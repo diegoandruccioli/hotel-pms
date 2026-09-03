@@ -24,6 +24,10 @@ export default defineConfig({
         '**/*.d.ts',
         // Bootstrap entry point — mounts React to the DOM, nothing to unit test.
         'src/main.tsx',
+        // Barrel re-export files (`export * from './X'`) — pure pass-throughs,
+        // no logic of their own. `.tsx` barrels (e.g. src/pages/Rooms/index.tsx)
+        // are real components and stay covered; this only matches plain `.ts`.
+        'src/**/index.ts',
       ],
       thresholds: {
         // Aligned to the real measured coverage after closing item 13's test

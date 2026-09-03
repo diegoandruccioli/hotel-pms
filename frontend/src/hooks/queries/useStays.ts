@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { stayService } from '../../services/stayService';
-import type { StayResponse } from '../../types/stay.types';
-import type { SpringPage } from '../../types/page.types';
-import { queryKeys } from '../../lib/queryKeys';
+import { stayService } from '../../services';
+import type { StayResponse } from '../../types';
+import type { SpringPage } from '../../types';
+import { queryKeys } from '../../lib';
 
 export function useStaysList(page: number) {
   return useQuery({

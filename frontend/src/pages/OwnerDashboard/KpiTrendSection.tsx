@@ -4,14 +4,14 @@ import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3Select } from '../../components/m3/M3Select';
-import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
-import { M3LoadingState } from '../../components/m3/M3LoadingState';
-import { M3ErrorState } from '../../components/m3/M3ErrorState';
-import { useKpiReport } from '../../hooks/queries/useKpiReport';
-import { getErrorMessage } from '../../utils/errorMessage';
-import type { KpiPeriodDto, ReportGranularity } from '../../types/ownerReport.types';
+import { M3Card } from '../../components/m3';
+import { M3Select } from '../../components/m3';
+import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
+import { M3LoadingState } from '../../components/m3';
+import { M3ErrorState } from '../../components/m3';
+import { useKpiReport } from '../../hooks/queries';
+import { getErrorMessage } from '../../utils';
+import type { KpiPeriodDto, ReportGranularity } from '../../types';
 
 interface KpiTrendSectionProps {
   startDate: string;

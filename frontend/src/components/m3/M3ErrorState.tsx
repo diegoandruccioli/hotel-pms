@@ -1,5 +1,5 @@
 import { MaterialIcon } from '../MaterialIcon';
-import { cn } from '../../utils/cn';
+import { cn } from '../../utils';
 
 interface M3ErrorStateProps {
   title: string;
@@ -21,7 +21,7 @@ export const M3ErrorState = ({ title, message, retryLabel, onRetry, className = 
     role="alert"
     className={cn('flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container', className)}
   >
-    <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+    <MaterialIcon name="error" size={20} className="shrink-0" />
     <div>
       <h3 className="text-sm font-medium font-body">{title}</h3>
       <p className="mt-1 text-sm font-body opacity-80">{message}</p>

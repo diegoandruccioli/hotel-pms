@@ -9,8 +9,8 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 import { Quotations } from './Quotations';
-import { quotationService } from '../services/quotationService';
-import { useToastStore } from '../store/toastStore';
+import { quotationService } from '../services';
+import { useToastStore } from '../store';
 
 vi.mock('react-i18next', () => {
   const t = (key: string, opts?: Record<string, unknown>) => {

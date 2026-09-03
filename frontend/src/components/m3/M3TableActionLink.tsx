@@ -1,3 +1,5 @@
+import { cn } from '../../utils';
+
 type ActionTone = 'primary' | 'error';
 
 interface M3TableActionLinkProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -26,12 +28,14 @@ export const M3TableActionLink = ({
     <button
       type="button"
       disabled={disabled}
-      className={`inline-flex items-center justify-center min-h-[40px] min-w-[40px] px-2
-        font-medium text-sm rounded transition-colors
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
-        disabled:opacity-50 disabled:cursor-not-allowed
-        ${toneClasses[tone]}
-        ${className}`}
+      className={cn(
+        'inline-flex items-center justify-center min-h-10 min-w-10 px-2',
+        'font-medium text-sm rounded transition-colors',
+        'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2',
+        'disabled:opacity-50 disabled:cursor-not-allowed',
+        toneClasses[tone],
+        className
+      )}
       {...rest}
     >
       {children}

@@ -3,7 +3,7 @@ import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 /* eslint-disable react-perf/jsx-no-new-array-as-prop -- test-only render helper, not the real perf-sensitive render path */
 import { MemoryRouter } from 'react-router-dom';
-import { renderWithQuery as render } from '../test-utils/renderWithQuery';
+import { renderWithQuery as render } from '../test-utils';
 
 const mockNavigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router-dom', async () => {
@@ -11,11 +11,11 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 import { Reservations } from './Reservations';
-import { reservationService } from '../services/reservationService';
-import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
-import { inventoryService } from '../services/inventoryService';
-import { useAuthStore } from '../store/authStore';
-import { useToastStore } from '../store/toastStore';
+import { reservationService } from '../services';
+import { mockAxiosErrorWithDetail } from '../test-utils';
+import { inventoryService } from '../services';
+import { useAuthStore } from '../store';
+import { useToastStore } from '../store';
 
 vi.mock('react-i18next', () => {
   const t = (key: string) => key;

@@ -3,11 +3,11 @@ import { Command } from 'cmdk';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
-import { useAuthStore } from '../store/authStore';
-import { useCommandPaletteGuests, useCommandPaletteReservations } from '../hooks/queries/useCommandPaletteSearch';
-import type { Role } from '../types/auth.types';
-import type { GuestResponseDTO } from '../types/guest.types';
-import type { ReservationResponse } from '../types/reservation.types';
+import { useAuthStore } from '../store';
+import { useCommandPaletteGuests, useCommandPaletteReservations } from '../hooks/queries';
+import type { Role } from '../types';
+import type { GuestResponseDTO } from '../types';
+import type { ReservationResponse } from '../types';
 
 const OWNER_ADMIN_ROLES = ['OWNER', 'ADMIN'] as const;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -117,7 +117,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
       onOpenChange={handleOpenChange}
       label={t('palette_label')}
       overlayClassName="fixed inset-0 z-50 bg-scrim/40"
-      contentClassName="fixed left-1/2 top-24 z-50 w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-[28px] bg-surface-container-high shadow-elevation-3"
+      contentClassName="fixed left-1/2 top-24 z-50 w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-shape-xl bg-surface-container-high shadow-elevation-3"
     >
       <div className="flex items-center gap-3 border-b border-outline-variant px-4">
         <MaterialIcon name="search" size={20} className="text-on-surface-variant" />
@@ -125,7 +125,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
           value={search}
           onValueChange={setSearch}
           placeholder={t('palette_placeholder')}
-          className="h-14 flex-1 bg-transparent text-sm font-body text-on-surface placeholder-on-surface-variant focus:outline-none"
+          className="h-14 flex-1 bg-transparent text-sm font-body text-on-surface placeholder-on-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-inset"
         />
       </div>
 
@@ -134,7 +134,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
           {t('palette_empty')}
         </Command.Empty>
 
-        <Command.Group heading={t('palette_group_actions')} className="[&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-on-surface-variant">
+        <Command.Group heading={t('palette_group_actions')} className="**:[[cmdk-group-heading]]:px-4 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-on-surface-variant">
           <Command.Item value="new-reservation" onSelect={handleNewReservation} className={ITEM_CLASS}>
             <MaterialIcon name="add_circle" size={18} className="text-primary" />
             {t('palette_action_new_reservation')}
@@ -145,14 +145,14 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
           </Command.Item>
         </Command.Group>
 
-        <Command.Group heading={t('palette_group_navigate')} className="[&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-on-surface-variant">
+        <Command.Group heading={t('palette_group_navigate')} className="**:[[cmdk-group-heading]]:px-4 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-on-surface-variant">
           {visibleNavItems.map((item) => (
             <NavCommandItem key={item.id} item={item} onSelect={goTo} tCommon={tCommon} tSettings={tSettings} />
           ))}
         </Command.Group>
 
         {guestResults && guestResults.content.length > 0 && (
-          <Command.Group heading={t('palette_group_guests')} className="[&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-on-surface-variant">
+          <Command.Group heading={t('palette_group_guests')} className="**:[[cmdk-group-heading]]:px-4 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-on-surface-variant">
             {guestResults.content.map((guest) => (
               <GuestCommandItem key={guest.id} guest={guest} onSelect={handleGuestSelect} />
             ))}
@@ -160,7 +160,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
         )}
 
         {reservationResults && reservationResults.content.length > 0 && (
-          <Command.Group heading={t('palette_group_reservations')} className="[&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-on-surface-variant">
+          <Command.Group heading={t('palette_group_reservations')} className="**:[[cmdk-group-heading]]:px-4 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-on-surface-variant">
             {reservationResults.content.map((reservation) => (
               <ReservationCommandItem key={reservation.id} reservation={reservation} onSelect={handleReservationSelect} t={t} />
             ))}
@@ -169,9 +169,9 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
       </Command.List>
 
       <div className="flex items-center gap-4 border-t border-outline-variant px-4 py-2 text-xs font-body text-on-surface-variant">
-        <span><kbd className="rounded border border-outline-variant px-1">↑↓</kbd> {t('palette_hint_navigate')}</span>
-        <span><kbd className="rounded border border-outline-variant px-1">↵</kbd> {t('palette_hint_select')}</span>
-        <span><kbd className="rounded border border-outline-variant px-1">esc</kbd> {t('palette_hint_close')}</span>
+        <span><kbd className="rounded-sm border border-outline-variant px-1">↑↓</kbd> {t('palette_hint_navigate')}</span>
+        <span><kbd className="rounded-sm border border-outline-variant px-1">↵</kbd> {t('palette_hint_select')}</span>
+        <span><kbd className="rounded-sm border border-outline-variant px-1">esc</kbd> {t('palette_hint_close')}</span>
       </div>
     </Command.Dialog>
   );

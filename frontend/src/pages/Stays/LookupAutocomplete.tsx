@@ -2,6 +2,7 @@ import { useState, useCallback, memo, useRef, useMemo, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 import type { LookupOption } from './LookupOptionItem';
 import { LookupOptionItem, AUTOCOMPLETE_MIN_CHARS } from './LookupOptionItem';
+import { MaterialIcon } from '../../components/MaterialIcon';
 
 // ---------------------------------------------------------------------------
 // LookupAutocomplete — server-side typeahead for Alloggiati Web lookup tables
@@ -74,7 +75,7 @@ export const LookupAutocomplete = memo(({
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface focus-within:border-primary">
+      <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary">
         <input
           id={id}
           role="combobox"
@@ -89,7 +90,7 @@ export const LookupAutocomplete = memo(({
           aria-haspopup="listbox"
           aria-controls={`${id}-listbox`}
           aria-autocomplete="list"
-          className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-none"
+          className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-hidden"
         />
         <label
           htmlFor={id}
@@ -98,9 +99,10 @@ export const LookupAutocomplete = memo(({
           {label}{required === true && ' *'}
         </label>
         {loading && (
-          <span className="material-symbols-outlined absolute right-3 animate-spin text-on-surface-variant text-base">
-            refresh
-          </span>
+          <MaterialIcon
+            name="refresh"
+            className="absolute right-3 animate-spin text-on-surface-variant text-base"
+          />
         )}
       </div>
       {open && options.length > 0 && (

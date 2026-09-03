@@ -104,7 +104,7 @@ Solo dopo questi passi il sistema è operativo per ricevere prenotazioni e gesti
 
 **Edge case:** Se le date selezionate si sovrappongono con una prenotazione esistente per la stessa camera, il sistema mostra un errore 409 e impedisce la creazione.
 
-**Nota — prenotazione già in check-in:** Se si riapre una prenotazione il cui soggiorno è già attivo (stato **CHECKED_IN**), il form mostra un banner: *"Questa prenotazione è già in check-in. Le modifiche qui non aggiornano il soggiorno in corso: usa il pannello soggiorni per proroghe, cambio ospiti o partenza anticipata."* con collegamento diretto alla pagina Soggiorni. I campi data/camere diventano **non modificabili** (sola lettura) in questo caso, non solo avvisati: il soggiorno già aperto non ha alcun collegamento "vivo" con la prenotazione di origine, quindi il sistema impedisce la modifica invece di lasciarla fare senza effetto — usare §3.5a/§3.5b per agire sul soggiorno.
+**Nota — prenotazione già in check-in:** Se si riapre una prenotazione il cui soggiorno è già attivo (stato **CHECKED_IN**), il form mostra un banner: *"Questa prenotazione è già in check-in. Le modifiche qui non aggiornano il soggiorno in corso: usa il pannello soggiorni per proroghe, cambio ospiti o partenza anticipata."* con collegamento diretto alla pagina Soggiorni. I campi data/camere diventano **non modificabili** (sola lettura) in questo caso, non solo avvisati: il soggiorno già aperto non ha alcun collegamento "vivo" con la prenotazione di origine — la modifica di date o camere è bloccata anche a livello di sistema (non solo nell'interfaccia), quindi non ha effetto nemmeno chiamando direttamente il sistema — usare §3.5a/§3.5b/§3.5c per agire sul soggiorno (proroga, gestione ospiti, cambio camera).
 
 ---
 
@@ -207,6 +207,19 @@ Azioni disponibili per ogni ospite:
 - **Rimuovi** — elimina l'ospite dal soggiorno; **non disponibile** se l'ospite è già stato trasmesso ad Alloggiati Web (usare "Registra partenza") o se è l'ospite principale (promuovere prima un altro ospite). Se per quell'ospite era già stato addebitato un supplemento di imposta di soggiorno (perché aggiunto a soggiorno già in corso), il sistema lo storna automaticamente dalla fattura, se questa è ancora aperta
 
 Per aggiungere un nuovo ospite al soggiorno già aperto: pulsante **Aggiungi Ospite** in fondo alla finestra, compilare gli stessi campi Alloggiati PS del check-in e salvare. Se il soggiorno ha già una fattura aperta, il sistema addebita subito l'imposta di soggiorno per le notti restanti di quel nuovo ospite.
+
+---
+
+### 3.5c Cambiare Camera a un Soggiorno Aperto
+
+1. Menu → **Soggiorni** → sul soggiorno **CHECKED_IN**, pulsante **Cambia camera**
+2. La finestra mostra la camera attuale e un menu con le camere di destinazione **già filtrate**: solo camere **pulite**, **libere** per le notti restanti del soggiorno, e con **capienza sufficiente** per gli ospiti ancora presenti (chi ha già registrato una partenza anticipata non conta)
+3. Seleziona la camera e clicca **Conferma**
+4. Il sistema sposta il soggiorno da subito: la camera lasciata passa a **Da pulire**, quella nuova a **Occupata**
+
+**Prezzo**: se la nuova camera ha la stessa tipologia di quella lasciata, il prezzo non cambia. Se la tipologia è diversa, il sistema ricalcola le notti restanti alla tariffa della nuova camera — le notti già trascorse restano addebitate al prezzo originale, mai ricalcolate — e questo richiede che la fattura del soggiorno sia ancora aperta.
+
+**Edge case:** il sistema rifiuta lo spostamento (errore, nessuna modifica effettuata) se la camera scelta non è pulita, non ha capienza sufficiente, è già prenotata da un'altra prenotazione nelle notti restanti, o — solo quando la tipologia cambia — se la fattura del soggiorno non è più aperta.
 
 ---
 
@@ -490,6 +503,11 @@ Menu → **Impostazioni** → **Sistema** → **Privacy** (`/settings/privacy`).
 | Rimozione di un ospite aggiunto a soggiorno già fatturato | L'eventuale supplemento di imposta di soggiorno già addebitato viene stornato dalla fattura, se ancora aperta | Nessuna azione — automatico |
 | Proroga di un soggiorno con un ospite già partito in anticipo | L'ospite partito non viene tassato per le notti aggiunte | Nessuna azione — automatico |
 | Cambio di una tariffa di imposta di soggiorno dopo che un ospite ha già fatto check-in | La sua fattura resta calcolata con la tariffa in vigore al check-in | Comportamento voluto (requisito fiscale) — non richiede intervento |
+| Modifica di date/camere su una prenotazione con soggiorno già CHECKED_IN | Errore 409 (bloccato anche fuori dall'interfaccia) | Usare §3.5a/§3.5b sul soggiorno, non la prenotazione di origine |
+| Cambio camera su camera non pulita, senza capienza sufficiente, o già prenotata nelle notti restanti | Spostamento rifiutato, errore mostrato nella finestra (§3.5c) | Scegliere un'altra camera tra quelle proposte |
+| Cambio camera con fattura non più aperta, quando la nuova camera ha tipologia diversa | Spostamento rifiutato | Nessuna azione possibile da UI: serve una fattura aperta per ricalcolare l'addebito |
+| Camera diventata "Da pulire" oggi (es. dopo un check-out) | Non compare tra le camere disponibili per il check-in **di oggi**, ma non blocca le nuove prenotazioni per date future | Rimettere la camera a "Pulita" da Housekeeping quando è pronta |
+| Check-in su una camera in stato "In manutenzione" | Check-in rifiutato | Scegliere un'altra camera, o rimettere quella in manutenzione a "Pulita"/"Da pulire" da Housekeeping se il lavoro è concluso |
 
 ---
 

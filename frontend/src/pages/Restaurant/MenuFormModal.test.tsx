@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { MenuFormModal } from './MenuFormModal';
-import { fbService } from '../../services/fbService';
-import { useToastStore } from '../../store/toastStore';
-import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
+import { fbService } from '../../services';
+import { useToastStore } from '../../store';
+import { mockAxiosErrorWithDetail } from '../../test-utils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),

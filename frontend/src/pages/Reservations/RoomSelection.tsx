@@ -1,9 +1,10 @@
 import { useCallback, useMemo, memo } from 'react';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3TextField } from '../../components/m3/M3TextField';
+import { M3TextField } from '../../components/m3';
 import { useTranslation } from 'react-i18next';
-import type { RoomResponse } from '../../types/inventory.types';
-import type { ReservationResponse } from '../../types/reservation.types';
+import type { RoomResponse } from '../../types';
+import type { ReservationResponse } from '../../types';
+import { cn } from '../../utils';
 
 interface RoomButtonProps {
   room: RoomResponse;
@@ -29,16 +30,18 @@ const RoomButton = memo(({ room, isSelected, isOccupied, readOnly, resolvedTotal
       onClick={handleClick}
       disabled={isOccupied}
       aria-label={isOccupied ? `${t('common:room_number', { number: room.roomNumber })} — ${t('common:room_occupied')}` : undefined}
-      className={`p-3 rounded-shape-sm border text-left transition-colors flex flex-col gap-1 ${
+      className={cn(
+        'p-3 rounded-shape-sm border text-left transition-colors flex flex-col gap-1',
         isOccupied
           ? 'opacity-40 cursor-not-allowed bg-surface-variant border-outline-variant'
           : isSelected
-            ? 'bg-primary/10 border-primary shadow-sm'
-            : 'border-outline-variant hover:border-outline'
-      } ${readOnly && !isOccupied ? 'cursor-default' : ''}`}
+            ? 'bg-primary/10 border-primary shadow-xs'
+            : 'border-outline-variant hover:border-outline',
+        readOnly && !isOccupied && 'cursor-default'
+      )}
     >
       <div className="flex justify-between items-center w-full">
-        <span className={`font-medium ${isOccupied ? 'text-on-surface-variant' : isSelected ? 'text-primary' : 'text-on-surface'}`}>
+        <span className={cn('font-medium', isOccupied ? 'text-on-surface-variant' : isSelected ? 'text-primary' : 'text-on-surface')}>
           {t('common:room_number', { number: room.roomNumber })}
         </span>
         {isOccupied
@@ -47,7 +50,7 @@ const RoomButton = memo(({ room, isSelected, isOccupied, readOnly, resolvedTotal
         }
       </div>
       <span className="text-xs text-on-surface-variant">{room.roomType?.name || room.type}</span>
-      <span className={`text-sm font-medium mt-1 ${isOccupied ? 'text-on-surface-variant' : ''}`}>
+      <span className={cn('text-sm font-medium mt-1', isOccupied && 'text-on-surface-variant')}>
         {resolvedTotalPrice !== undefined
           ? t('reservations:price_total_stay', { amount: resolvedTotalPrice })
           : `€${room.roomType?.basePrice}`}

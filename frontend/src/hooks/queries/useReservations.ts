@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { reservationService } from '../../services/reservationService';
-import { inventoryService } from '../../services/inventoryService';
-import type { ReservationResponse } from '../../types/reservation.types';
-import type { SpringPage } from '../../types/page.types';
-import { queryKeys } from '../../lib/queryKeys';
+import { reservationService } from '../../services';
+import { inventoryService } from '../../services';
+import type { ReservationResponse } from '../../types';
+import type { SpringPage } from '../../types';
+import { queryKeys } from '../../lib';
 
 interface SearchParams {
   query: string;

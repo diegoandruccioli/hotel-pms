@@ -1,5 +1,5 @@
 import api from './api';
-import type { KpiReportDto, ReportGranularity } from '../types/ownerReport.types';
+import type { KpiReportDto, ReportGranularity } from '../types';
 
 const KPI_REPORT_PATH = '/api/v1/reports/kpi';
 

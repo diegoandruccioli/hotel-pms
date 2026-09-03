@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { stayService } from '../services/stayService';
-import type { HotelSettingsResponse, HotelSettingsRequest } from '../types/stay.types';
+import { stayService } from '../services';
+import type { HotelSettingsResponse, HotelSettingsRequest } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
-import { M3Card } from '../components/m3/M3Card';
-import { M3TextField } from '../components/m3/M3TextField';
-import { M3Checkbox } from '../components/m3/M3Checkbox';
+import { M3Button } from '../components/m3';
+import { M3Card } from '../components/m3';
+import { M3TextField } from '../components/m3';
+import { M3Checkbox } from '../components/m3';
 import { StructuredAddressFields } from '../components/StructuredAddressFields';
-import { useToastStore } from '../store/toastStore';
-import { getErrorMessage } from '../utils/errorMessage';
+import { useToastStore } from '../store';
+import { getErrorMessage, cn } from '../utils';
 
 const VAT_NUMBER_REGEX = /^\d{11}$/;
 const FISCAL_CODE_REGEX = /^(\d{11}|[A-Za-z]{6}\d{2}[A-Za-z]\d{2}[A-Za-z]\d{3}[A-Za-z])$/;
@@ -232,7 +232,7 @@ export function HotelProfile() {
         </div>
 
         <p
-          className={`text-sm font-medium ${credentialsConfigured ? 'text-primary' : 'text-on-surface-variant'}`}
+          className={cn('text-sm font-medium', credentialsConfigured ? 'text-primary' : 'text-on-surface-variant')}
         >
           {credentialsConfigured
             ? t('status_alloggiati_credentials_configured')

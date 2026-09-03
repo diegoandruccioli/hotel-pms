@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { guestService } from '../../services/guestService';
-import type { GuestPrivacySettingsResponse } from '../../types/guest.types';
+import { guestService } from '../../services';
+import type { GuestPrivacySettingsResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Button } from '../../components/m3';
+import { M3Card } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
-import { useToastStore } from '../../store/toastStore';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { useToastStore } from '../../store';
+import { getErrorMessage } from '../../utils';
 
 // -----------------------------------------------------------------------
 // SettingsPrivacy page — GDPR retention settings (T-GST-05). The backend

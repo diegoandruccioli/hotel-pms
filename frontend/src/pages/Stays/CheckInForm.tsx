@@ -3,11 +3,11 @@ import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { stayService } from '../../services/stayService';
-import { guestService } from '../../services/guestService';
-import { reservationService } from '../../services/reservationService';
-import { useToastStore } from '../../store/toastStore';
+import { M3Button } from '../../components/m3';
+import { stayService } from '../../services';
+import { guestService } from '../../services';
+import { reservationService } from '../../services';
+import { useToastStore } from '../../store';
 import type {
   AlloggiatiStato,
   AlloggiatiTipdoc,
@@ -15,8 +15,8 @@ import type {
   StayGuestRequest,
   StayRequest,
   TravellerType,
-} from '../../types/stay.types';
-import type { DocumentType } from '../../types/guest.types';
+  GuestDocumentType as DocumentType,
+} from '../../types';
 import { GuestFieldSection } from './GuestFieldSection';
 import {
   emptyGuest,
@@ -234,7 +234,7 @@ export const CheckInForm = memo(() => {
 
       {prefillFields.length > 0 && (
         <div className="bg-secondary-container text-on-secondary-container p-4 rounded-shape-sm flex items-start gap-3">
-          <MaterialIcon name="auto_fix_high" className="mt-0.5 flex-shrink-0" />
+          <MaterialIcon name="auto_fix_high" className="mt-0.5 shrink-0" />
           <p className="font-body text-sm">
             {prefillSource === 'stay'
               ? t('prefill_banner_stay', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })
@@ -248,7 +248,7 @@ export const CheckInForm = memo(() => {
           role="status"
           className="bg-secondary-container text-on-secondary-container p-4 rounded-shape-sm flex items-start gap-3"
         >
-          <MaterialIcon name="info" className="mt-0.5 flex-shrink-0" />
+          <MaterialIcon name="info" className="mt-0.5 shrink-0" />
           <div>
             <p className="font-body text-sm font-medium">{t('city_tax_preflight_title')}</p>
             <p className="font-body text-sm">{t(`city_tax_preflight_reason_${cityTaxWarning.toLowerCase()}`)}</p>
@@ -258,7 +258,7 @@ export const CheckInForm = memo(() => {
 
       {error && (
         <div className="bg-error-container text-on-error-container p-4 rounded-shape-sm flex items-start gap-3">
-          <MaterialIcon name="error" className="mt-0.5 flex-shrink-0" />
+          <MaterialIcon name="error" className="mt-0.5 shrink-0" />
           <p className="font-body text-sm">{error}</p>
         </div>
       )}

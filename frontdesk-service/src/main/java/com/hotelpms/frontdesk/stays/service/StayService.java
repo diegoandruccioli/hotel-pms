@@ -178,4 +178,34 @@ public interface StayService {
      */
     StayResponse extendStay(
             @NonNull UUID stayId, @NonNull UUID hotelId, @NonNull LocalDate newCheckOutDate, Long clientVersion);
+
+    /**
+     * Moves an open ({@code CHECKED_IN}) stay to a different room, effective
+     * today (Parte 6) — a guest actually relocating, not a paperwork edit.
+     * Rejects the destination unless it is currently housekeeping-{@code
+     * CLEAN} (no cleaning-window buffer exists for an immediate move, unlike
+     * check-in — see {@code StayCheckInValidator}), has capacity for every
+     * guest still present (excludes anyone already recorded as departed), and
+     * has no other reservation over the stay's remaining nights.
+     *
+     * <p>When the new room shares the old room's {@code RoomType}, billing is
+     * untouched. When it differs, the check-in {@code ROOM_NIGHT} charge is
+     * voided and reposted as two segments — consumed nights at the price
+     * already fixed at check-in, remaining nights at the new room's live
+     * rate — which requires the stay's invoice to still be open. The
+     * reservation this stay was checked in from (if any) has its line item's
+     * room and price synced in the same transaction, and the vacated/entered
+     * rooms' housekeeping status is updated to {@code DIRTY}/{@code
+     * OCCUPIED} respectively.
+     *
+     * <p>Same "forgotten tab" optimistic-lock protection as {@link
+     * #extendStay}.
+     *
+     * @param stayId        the stay ID
+     * @param hotelId       the authenticated hotel UUID; the stay must belong to it
+     * @param newRoomId     the destination room
+     * @param clientVersion the version the client last read, or {@code null} to skip the check
+     * @return the updated stay response
+     */
+    StayResponse changeRoom(@NonNull UUID stayId, @NonNull UUID hotelId, @NonNull UUID newRoomId, Long clientVersion);
 }

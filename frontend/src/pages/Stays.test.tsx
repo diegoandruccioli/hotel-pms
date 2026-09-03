@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../test-utils/renderWithQuery';
+import { renderWithQuery as render } from '../test-utils';
 import { Stays } from './Stays';
-import { stayService } from '../services/stayService';
-import { useAuthStore } from '../store/authStore';
+import { stayService } from '../services';
+import { useAuthStore } from '../store';
 
 vi.mock('react-i18next', () => {
   const t = (key: string) => key;

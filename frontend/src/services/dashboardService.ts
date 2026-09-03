@@ -1,5 +1,5 @@
 import api from './api';
-import type { DaySheetResponse } from '../types/daySheet.types';
+import type { DaySheetResponse } from '../types';
 
 const DAY_SHEET_PATH = '/api/v1/frontdesk/day-sheet';
 

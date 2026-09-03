@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fbService } from '../../services/fbService';
-import { queryKeys } from '../../lib/queryKeys';
+import { fbService } from '../../services';
+import { queryKeys } from '../../lib';
 
 export function useOrders() {
   return useQuery({

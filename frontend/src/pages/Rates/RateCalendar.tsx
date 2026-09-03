@@ -2,15 +2,15 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from 'date-fns';
 import { it, enUS } from 'date-fns/locale';
-import { rateSeasonService } from '../../services/rateSeasonService';
-import type { RateCalendarResponse } from '../../types/inventory.types';
+import { rateSeasonService } from '../../services';
+import type { RateCalendarResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Card } from '../../components/m3/M3Card';
+import { M3Button } from '../../components/m3';
+import { M3Card } from '../../components/m3';
 import { RateCalendarCell } from './RateCalendarCell';
 import { RateBulkApplyDialog } from './RateBulkApplyDialog';
-import { useAuthStore } from '../../store/authStore';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { useAuthStore } from '../../store';
+import { getErrorMessage, cn, resolveDesignToken } from '../../utils';
 
 const SIDEBAR_WIDTH = 192;
 const CELL_WIDTH = 100;
@@ -21,8 +21,10 @@ const CELL_STYLE = { width: CELL_WIDTH };
 
 /** Fixed accent palette for season identification — cycles if there are more
  * distinct seasons in view than colors (rare: a room type rarely has more
- * than a handful of seasons active within one visible month). */
-const SEASON_COLOR_PALETTE = ['#6750A4', '#386A20', '#984061', '#006874', '#8C4A00', '#4A6572'];
+ * than a handful of seasons active within one visible month). CSS var names,
+ * not hex -- resolved live via resolveDesignToken() so this responds to
+ * light/dark/high-contrast mode instead of baking one hex value in. */
+const SEASON_COLOR_TOKENS = ['--md-season-1', '--md-season-2', '--md-season-3', '--md-season-4', '--md-season-5', '--md-season-6'];
 
 interface Selection {
   anchorRow: number;
@@ -31,8 +33,13 @@ interface Selection {
   day: number;
 }
 
+// `color` is a CSS var name (e.g. '--md-season-1'), not a hex value -- resolved
+// via resolveDesignToken(). Re-resolves whenever `color` itself changes (a
+// different season is now shown at this legend slot); a live in-place theme
+// toggle with no other state change won't re-trigger this memo, same
+// known/documented limitation as CalendarPlanning's eventPropGetter.
 const LegendEntry = memo(({ name, color }: { name: string; color: string }) => {
-  const dotStyle = useMemo(() => ({ backgroundColor: color }), [color]);
+  const dotStyle = useMemo(() => ({ backgroundColor: resolveDesignToken(color) }), [color]);
   return (
     <span className="flex items-center gap-1.5">
       <span className="w-2.5 h-2.5 rounded-full" style={dotStyle} aria-hidden="true" />
@@ -138,7 +145,7 @@ export const RateCalendar = () => {
     for (const row of calendar.rows) {
       for (const day of row.days) {
         if (day.rateSeasonId && !map.has(day.rateSeasonId)) {
-          map.set(day.rateSeasonId, SEASON_COLOR_PALETTE[index % SEASON_COLOR_PALETTE.length]);
+          map.set(day.rateSeasonId, SEASON_COLOR_TOKENS[index % SEASON_COLOR_TOKENS.length]);
           index += 1;
         }
       }
@@ -157,7 +164,7 @@ export const RateCalendar = () => {
       }
     }
     return Array.from(seen.entries()).map(([id, name]) => ({
-      id, name, color: seasonColors.get(id) ?? SEASON_COLOR_PALETTE[0],
+      id, name, color: seasonColors.get(id) ?? SEASON_COLOR_TOKENS[0],
     }));
   }, [calendar, seasonColors]);
 
@@ -234,7 +241,7 @@ export const RateCalendar = () => {
         </div>
       ) : error ? (
         <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+          <MaterialIcon name="error" size={20} className="shrink-0" />
           <div>
             <h3 className="text-sm font-medium font-body">{t('error_loading_rate_calendar')}</h3>
             <p className="mt-1 text-sm font-body opacity-80">{error}</p>
@@ -263,14 +270,15 @@ export const RateCalendar = () => {
                     <div
                       key={day.toISOString()}
                       style={CELL_STYLE}
-                      className={`flex-shrink-0 border-r border-outline-variant flex flex-col items-center justify-center ${
-                        isSameDay(day, new Date()) ? 'bg-primary-container text-on-primary-container' : ''
-                      }`}
+                      className={cn(
+                        'shrink-0 border-r border-outline-variant flex flex-col items-center justify-center',
+                        isSameDay(day, new Date()) && 'bg-primary-container text-on-primary-container'
+                      )}
                     >
                       {/* text-on-surface-variant (not opacity-60 on inherited color) — axe
                           flagged the opacity-dimmed text at 4.35:1 against this cell's
                           bg-surface-container-low, below the WCAG AA 4.5:1 minimum. */}
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">
+                      <span className="text-2xs uppercase font-bold tracking-wider text-on-surface-variant">
                         {format(day, 'EEE', { locale })}
                       </span>
                       <span className="text-lg font-display font-medium leading-none">{format(day, 'd')}</span>
@@ -281,7 +289,7 @@ export const RateCalendar = () => {
 
               <div className="flex relative items-start">
                 <div
-                  className="sticky left-0 z-30 flex-shrink-0 bg-surface-container-low border-r border-outline-variant shadow-elevation-1"
+                  className="sticky left-0 z-30 shrink-0 bg-surface-container-low border-r border-outline-variant shadow-elevation-1"
                   style={SIDEBAR_STYLE}
                 >
                   {calendar?.rows.map((row) => (

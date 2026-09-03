@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef, useEffect, memo } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { stayService } from '../services/stayService';
-import type { AlloggiatiComune } from '../types/stay.types';
+import { stayService } from '../services';
+import type { AlloggiatiComune } from '../types';
 import { M3TextField } from './m3/M3TextField';
+import { MaterialIcon } from './MaterialIcon';
 
 const AUTOCOMPLETE_DEBOUNCE_MS = 300;
 const AUTOCOMPLETE_MIN_CHARS = 2;
@@ -132,12 +133,13 @@ export const StructuredAddressFields = memo(({
             aria-controls={`${comuneId}-listbox`}
             aria-autocomplete="list"
             placeholder={t('placeholder_comune')}
-            className="w-full bg-transparent px-3 py-2 text-sm text-on-surface focus:outline-none"
+            className="w-full bg-transparent px-3 py-2 text-sm text-on-surface focus:outline-hidden"
           />
           {loading && (
-            <span className="material-symbols-outlined absolute right-3 animate-spin text-on-surface-variant text-base" aria-hidden="true">
-              refresh
-            </span>
+            <MaterialIcon
+              name="refresh"
+              className="absolute right-3 animate-spin text-on-surface-variant text-base"
+            />
           )}
         </div>
         {open && options.length > 0 && (

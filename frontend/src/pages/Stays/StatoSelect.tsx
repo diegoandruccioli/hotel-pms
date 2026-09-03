@@ -1,5 +1,5 @@
 import { useState, useCallback, memo, useMemo } from 'react';
-import type { AlloggiatiStato } from '../../types/stay.types';
+import type { AlloggiatiStato } from '../../types';
 import type { LookupOption } from './LookupOptionItem';
 import { AUTOCOMPLETE_MIN_CHARS } from './LookupOptionItem';
 import { LookupAutocomplete } from './LookupAutocomplete';

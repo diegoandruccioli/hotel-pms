@@ -1,18 +1,18 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types/billing.types';
+import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3DataTable } from '../components/m3/M3DataTable';
-import { M3StatusChip } from '../components/m3/M3StatusChip';
-import { M3LoadingState } from '../components/m3/M3LoadingState';
-import { M3ErrorState } from '../components/m3/M3ErrorState';
-import { M3Pagination } from '../components/m3/M3Pagination';
-import { M3TextField } from '../components/m3/M3TextField';
+import { M3DataTable } from '../components/m3';
+import { M3StatusChip } from '../components/m3';
+import { M3LoadingState } from '../components/m3';
+import { M3ErrorState } from '../components/m3';
+import { M3Pagination } from '../components/m3';
+import { M3TextField } from '../components/m3';
 import { PaymentModal } from './Billing/PaymentModal';
 import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useTranslation } from 'react-i18next';
-import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries/useInvoices';
-import { getErrorMessage } from '../utils/errorMessage';
+import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries';
+import { getErrorMessage, cn } from '../utils';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -28,15 +28,15 @@ const getStatusTone = (status: InvoiceStatus) => {
   }
 };
 
-const VIEW_BTN_CLASS = [
+const VIEW_BTN_CLASS = cn(
   'text-primary hover:text-primary/80 font-medium text-sm mr-4',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded',
-].join(' ');
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm'
+);
 
-const PAY_BTN_CLASS = [
+const PAY_BTN_CLASS = cn(
   'text-tertiary hover:text-tertiary/80 font-medium text-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tertiary rounded',
-].join(' ');
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-tertiary rounded-sm'
+);
 
 interface ActionsCellProps {
   invoice: InvoiceResponse;
@@ -76,11 +76,12 @@ const StatusFilterChip = memo(({ value, active, label, onClick }: {
       type="button"
       aria-pressed={active}
       onClick={handleClick}
-      className={`px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors ${
+      className={cn(
+        'px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
         active
           ? 'bg-primary text-on-primary border-primary'
           : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
-      }`}
+      )}
     >
       {label}
     </button>

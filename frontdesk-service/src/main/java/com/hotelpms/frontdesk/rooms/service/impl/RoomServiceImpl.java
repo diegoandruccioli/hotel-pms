@@ -330,6 +330,16 @@ public class RoomServiceImpl implements RoomService {
                 .toList();
     }
 
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<RoomResponse> findBookableRooms(final UUID hotelId) {
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
+        return roomRepository.findAllByActiveTrueAndHotelIdAndStatusNot(hotelId, RoomStatus.MAINTENANCE).stream()
+                .map(roomMapper::toResponse)
+                .toList();
+    }
+
     /**
      * Notifies api-gateway of a room status change (T-GW-09b), immediately
      * after {@code saveAndFlush}. Fire-and-forget: {@link GatewayEventsClient}'s

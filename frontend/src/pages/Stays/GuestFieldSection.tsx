@@ -2,11 +2,11 @@ import { useCallback, memo } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3TextField } from '../../components/m3/M3TextField';
-import { M3Checkbox } from '../../components/m3/M3Checkbox';
-import type { AlloggiatiStato, AlloggiatiTipdoc, TravellerType } from '../../types/stay.types';
+import { M3Button } from '../../components/m3';
+import { M3Card } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
+import { M3Checkbox } from '../../components/m3';
+import type { AlloggiatiStato, AlloggiatiTipdoc, TravellerType } from '../../types';
 import {
   TYPES_WITHOUT_DOC,
   CODICE_ITALIA,
@@ -14,8 +14,6 @@ import {
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
 import { StatoSelect } from './StatoSelect';
 import { ComuneAutocomplete } from './ComuneAutocomplete';
-
-const ICON_SIZE_20 = { fontSize: 20 };
 
 // ---------------------------------------------------------------------------
 // GuestFieldSection
@@ -112,14 +110,14 @@ export const GuestFieldSection = memo(({
         <M3TextField label={t('label_last_name')} name="lastName" value={guest.lastName} onChange={handleSimpleChange} required />
 
         <div className="relative">
-          <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface">
+          <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary">
             <select
               id={`gender-${index}`}
               name="gender"
               value={guest.gender}
               onChange={handleSimpleChange}
               required
-              className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-none appearance-none"
+              className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-hidden appearance-none"
             >
               <option value="" disabled hidden />
               <option value="1">{t('gender_male')}</option>
@@ -128,7 +126,11 @@ export const GuestFieldSection = memo(({
             <label htmlFor={`gender-${index}`} className="absolute pointer-events-none font-body left-4 top-1 text-xs text-on-surface-variant">
               {t('label_gender')} *
             </label>
-            <span className="material-symbols-outlined absolute right-3 pointer-events-none text-on-surface-variant z-10" style={ICON_SIZE_20}>arrow_drop_down</span>
+            <MaterialIcon
+              name="arrow_drop_down"
+              size={20}
+              className="absolute right-3 pointer-events-none text-on-surface-variant z-10"
+            />
           </div>
         </div>
 
@@ -144,14 +146,14 @@ export const GuestFieldSection = memo(({
         />
 
         <div className="relative">
-          <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface">
+          <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary">
             <select
               id={`traveller-type-${index}`}
               name="travellerType"
               value={guest.travellerType ?? ''}
               onChange={handleTravellerTypeChange}
               required
-              className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-none appearance-none"
+              className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-hidden appearance-none"
             >
               <option value="" disabled hidden />
               <option value="OSPITE_SINGOLO">{t('guest_type_single')}</option>
@@ -163,7 +165,11 @@ export const GuestFieldSection = memo(({
             <label htmlFor={`traveller-type-${index}`} className="absolute pointer-events-none font-body left-4 top-1 text-xs text-on-surface-variant">
               {t('label_guest_type')} *
             </label>
-            <span className="material-symbols-outlined absolute right-3 pointer-events-none text-on-surface-variant z-10" style={ICON_SIZE_20}>arrow_drop_down</span>
+            <MaterialIcon
+              name="arrow_drop_down"
+              size={20}
+              className="absolute right-3 pointer-events-none text-on-surface-variant z-10"
+            />
           </div>
         </div>
 
@@ -188,14 +194,14 @@ export const GuestFieldSection = memo(({
         {hasDoc && (
           <>
             <div className="relative">
-              <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface">
+              <div className="relative flex items-center rounded-shape-xs border transition-colors border-outline hover:border-on-surface focus-within:border-primary focus-within:ring-2 focus-within:ring-primary">
                 <select
                   id={`doc-type-${index}`}
                   name="documentType"
                   value={guest.documentType ?? ''}
                   onChange={handleSimpleChange}
                   required
-                  className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-none appearance-none"
+                  className="peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface focus:outline-hidden appearance-none"
                 >
                   <option value="" disabled hidden />
                   {tipdoc.map(d => (
@@ -205,7 +211,11 @@ export const GuestFieldSection = memo(({
                 <label htmlFor={`doc-type-${index}`} className="absolute pointer-events-none font-body left-4 top-1 text-xs text-on-surface-variant">
                   {t('label_doc_type')} *
                 </label>
-                <span className="material-symbols-outlined absolute right-3 pointer-events-none text-on-surface-variant z-10" style={ICON_SIZE_20}>arrow_drop_down</span>
+                <MaterialIcon
+                  name="arrow_drop_down"
+                  size={20}
+                  className="absolute right-3 pointer-events-none text-on-surface-variant z-10"
+                />
               </div>
             </div>
 

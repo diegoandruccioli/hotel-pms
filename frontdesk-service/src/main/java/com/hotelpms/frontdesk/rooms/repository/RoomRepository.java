@@ -92,6 +92,22 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
     Page<Room> findAllByActiveTrueAndHotelIdAndStatus(UUID hotelId, RoomStatus status, Pageable pageable);
 
     /**
+     * Finds all active rooms for a hotel EXCLUDING a given housekeeping status,
+     * unpaginated. Used as the candidate pool for date-scoped availability
+     * checks on a future booking (T-ROOM-housekeeping-blind-spot): a room's
+     * transient today-status (CLEAN vs. DIRTY) says nothing about how it will
+     * be on a check-in date weeks or months away, so only {@code MAINTENANCE}
+     * (a deliberate, non-transient "not sellable" state) should exclude a room
+     * from a future date-range search — see {@code ReservationService
+     * #getAvailableRooms}.
+     *
+     * @param hotelId       the hotel UUID extracted from the authenticated user's JWT
+     * @param excludedStatus the housekeeping status to exclude (e.g. {@code MAINTENANCE})
+     * @return active rooms for that hotel, excluding the given status
+     */
+    List<Room> findAllByActiveTrueAndHotelIdAndStatusNot(UUID hotelId, RoomStatus excludedStatus);
+
+    /**
      * Returns a page of active rooms scoped to the given hotel, filtered by
      * room type. Backs the {@code roomTypeId}-only case of {@code
      * getAllRooms}'s room-listing filters.

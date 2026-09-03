@@ -1,22 +1,22 @@
 import { useState, useCallback, memo, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import type { MenuItemResponse, RestaurantOrderResponse, OrderStatus } from '../types/fb.types';
+import type { MenuItemResponse, RestaurantOrderResponse, OrderStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
-import { M3DataTable } from '../components/m3/M3DataTable';
-import { M3StatusChip } from '../components/m3/M3StatusChip';
-import { M3Card } from '../components/m3/M3Card';
-import { M3TableActionLink } from '../components/m3/M3TableActionLink';
-import { M3LoadingState } from '../components/m3/M3LoadingState';
-import { M3ErrorState } from '../components/m3/M3ErrorState';
+import { M3Button } from '../components/m3';
+import { M3DataTable } from '../components/m3';
+import { M3StatusChip } from '../components/m3';
+import { M3Card } from '../components/m3';
+import { M3TableActionLink } from '../components/m3';
+import { M3LoadingState } from '../components/m3';
+import { M3ErrorState } from '../components/m3';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { useAuthStore } from '../store/authStore';
-import { useToastStore } from '../store/toastStore';
-import { getErrorMessage } from '../utils/errorMessage';
+import { useAuthStore } from '../store';
+import { useToastStore } from '../store';
+import { getErrorMessage } from '../utils';
 import { useQueryClient } from '@tanstack/react-query';
-import { useOrders, useMenuItems, useConfirmOrder, useDeleteMenuItem } from '../hooks/queries/useFb';
-import { queryKeys } from '../lib/queryKeys';
+import { useOrders, useMenuItems, useConfirmOrder, useDeleteMenuItem } from '../hooks/queries';
+import { queryKeys } from '../lib';
 import { OrderFormModal } from './Restaurant/OrderFormModal';
 import { OrderDetailModal } from './Restaurant/OrderDetailModal';
 import { MenuFormModal } from './Restaurant/MenuFormModal';
@@ -47,13 +47,13 @@ const MenuActionsCell = ({ mi, deletingMenuId, onEdit, onDelete, tLabel, tCommon
   return (
     <div className="flex justify-end gap-2">
       <button type="button" onClick={handleEdit}
-        className="text-primary hover:text-primary/80 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary rounded"
+        className="text-primary hover:text-primary/80 text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-primary rounded-sm"
         aria-label={`${tLabel('menu_edit_item')} ${mi.name}`}>
         {tCommon('edit')}
       </button>
       <button type="button" onClick={handleDelete}
         disabled={deletingMenuId === mi.id}
-        className="text-error hover:text-error/80 text-xs font-medium disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-error rounded"
+        className="text-error hover:text-error/80 text-xs font-medium disabled:opacity-50 focus:outline-hidden focus:ring-2 focus:ring-error rounded-sm"
         aria-label={`${tLabel('menu_delete_item')} ${mi.name}`}>
         {tCommon('delete')}
       </button>

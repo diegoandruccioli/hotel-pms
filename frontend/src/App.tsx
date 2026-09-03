@@ -1,13 +1,12 @@
 import { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthLayout } from './layouts/AuthLayout';
-import { MainLayout } from './layouts/MainLayout';
+import { AuthLayout, MainLayout } from './layouts';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { useAuthStore } from './store/authStore';
-import { authService } from './services/authService';
-import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './components/MaterialIcon';
+import { useAuthStore } from './store';
+import { authService } from './services';
+import { useTranslation } from 'react-i18next';
 
 const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));

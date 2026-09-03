@@ -4,13 +4,13 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { axe } from 'vitest-axe';
 import { CommandPalette } from './CommandPalette';
-import { useAuthStore } from '../store/authStore';
-import { guestService } from '../services/guestService';
-import { reservationService } from '../services/reservationService';
-import { renderWithQuery } from '../test-utils/renderWithQuery';
-import type { UserPayload } from '../types/auth.types';
-import type { GuestResponseDTO } from '../types/guest.types';
-import type { ReservationResponse } from '../types/reservation.types';
+import { useAuthStore } from '../store';
+import { guestService } from '../services';
+import { reservationService } from '../services';
+import { renderWithQuery } from '../test-utils';
+import type { UserPayload } from '../types';
+import type { GuestResponseDTO } from '../types';
+import type { ReservationResponse } from '../types';
 
 const mockNavigate = vi.fn();
 

@@ -1,6 +1,6 @@
 import api from './api';
-import type { MenuItemRequest, MenuItemResponse, RestaurantOrderRequest, RestaurantOrderResponse } from '../types/fb.types';
-import type { SpringPage } from '../types/page.types';
+import type { MenuItemRequest, MenuItemResponse, RestaurantOrderRequest, RestaurantOrderResponse } from '../types';
+import type { SpringPage } from '../types';
 
 const BASE_PATH = '/api/v1/fb/orders';
 const MENU_ITEMS_PATH = '/api/v1/fb/menu-items';

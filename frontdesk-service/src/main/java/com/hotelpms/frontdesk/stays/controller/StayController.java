@@ -14,6 +14,7 @@ import com.hotelpms.frontdesk.stays.dto.StayGuestRequest;
 import com.hotelpms.frontdesk.stays.dto.StayGuestResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
+import com.hotelpms.frontdesk.stays.dto.StayRoomChangeRequest;
 import com.hotelpms.frontdesk.stays.dto.StaySummaryResponse;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiReportService;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
@@ -377,6 +378,24 @@ public class StayController {
             @NonNull @PathVariable("id") final UUID id, @NonNull @Valid @RequestBody final StayExtensionRequest request) {
         return stayService.extendStay(
                 id, Objects.requireNonNull(extractHotelId()), request.newCheckOutDate(), request.version());
+    }
+
+    /**
+     * Moves an open stay to a different room, effective today (Parte 6). Rejects the
+     * destination unless it is housekeeping-{@code CLEAN}, has capacity for every guest
+     * still present, and has no other reservation over the remaining nights; reprices
+     * billing only when the destination's {@code RoomType} differs. Scoped to the
+     * caller's hotel.
+     *
+     * @param id      the stay ID
+     * @param request the destination room
+     * @return the updated stay response
+     */
+    @PutMapping("/{id}/room")
+    public StayResponse changeRoom(
+            @NonNull @PathVariable("id") final UUID id, @NonNull @Valid @RequestBody final StayRoomChangeRequest request) {
+        return stayService.changeRoom(
+                id, Objects.requireNonNull(extractHotelId()), request.newRoomId(), request.version());
     }
 
     /**

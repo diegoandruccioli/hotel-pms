@@ -30,6 +30,7 @@
   "CHECKOUT_MUST_BE_AFTER_CHECKIN": "Check-out date must be after check-in date.",
   "ROOM_UNAVAILABLE": "The selected room is not available.",
   "ROOM_UNAVAILABLE_DATES": "The room is not available for the selected dates.",
+  "ROOM_IN_MAINTENANCE": "This room is under maintenance and cannot be checked into.",
   "RESERVATION_NOT_DELETABLE": "This reservation cannot be deleted in its current status.",
 
   "GUEST_HAS_ACTIVE_RESERVATIONS": "This guest cannot be deleted: they have active reservations.",
@@ -79,8 +80,16 @@
   "HOTEL_CATEGORY_OVERLAP": "A category with an overlapping validity period already exists.",
   "HOTEL_CATEGORY_VALID_FROM_NOT_AFTER_CURRENT": "The new category's start date must be later than the currently active category's.",
   "RESERVATION_STALE_VERSION": "Another user has changed this reservation in the meantime.",
+  "RESERVATION_HAS_ACTIVE_STAY": "Can't change dates or rooms: check-in has already happened. Use the stay management screen instead.",
   "STAY_EXTENSION_INVOICE_NOT_OPEN": "Can't extend: this stay's invoice is no longer open.",
   "ROOM_NOT_AVAILABLE_FOR_EXTENSION": "The room isn't available for the additional nights requested.",
   "STAY_STALE_VERSION": "Another user has changed this stay in the meantime.",
-  "STAY_GUEST_STALE_VERSION": "Another user has changed this guest in the meantime."
+  "STAY_GUEST_STALE_VERSION": "Another user has changed this guest in the meantime.",
+  "SAME_ROOM_NOT_ALLOWED": "The guest is already in this room.",
+  "ROOM_NOT_CLEAN": "The selected room isn't clean — pick a room with \"Clean\" status.",
+  "ROOM_CAPACITY_EXCEEDED": "The selected room doesn't have enough capacity for every guest still present.",
+  "ROOM_NOT_AVAILABLE_FOR_ROOM_CHANGE": "The selected room isn't available for the stay's remaining nights.",
+  "STAY_ROOM_CHANGE_INVOICE_NOT_OPEN": "Can't change rooms: this stay's invoice is no longer open.",
+  "ROOM_CHARGE_SNAPSHOT_MISSING": "Can't recalculate the charge for this stay — contact technical support.",
+  "STAY_ROOM_CHANGE_CHECKOUT_IN_PAST": "This stay's expected check-out date has already passed — extend the stay first, then change rooms."
 }

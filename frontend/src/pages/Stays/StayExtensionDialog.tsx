@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import type { ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { M3Dialog } from '../../components/m3/M3Dialog';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3TextField } from '../../components/m3/M3TextField';
-import { useToastStore } from '../../store/toastStore';
-import { stayService } from '../../services/stayService';
-import { getErrorMessage } from '../../utils/errorMessage';
-import type { StayResponse } from '../../types/stay.types';
+import { M3Dialog } from '../../components/m3';
+import { M3Button } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
+import { useToastStore } from '../../store';
+import { stayService } from '../../services';
+import { getErrorMessage } from '../../utils';
+import type { StayResponse } from '../../types';
 
 interface StayExtensionDialogProps {
   /** null closes the dialog. */
