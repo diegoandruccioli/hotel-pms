@@ -200,6 +200,30 @@ class AuthServiceImplTest {
     }
 
     @Test
+    void loginWithNullClientIpOnWrongPasswordThrowsCredentialsNotNpe() {
+        // clientIp is an optional gateway-injected header (X-Client-IP) and can be
+        // null if the request reaches auth-service without it; sanitizeForLog must
+        // not NPE on that null before logging the failed-login line.
+        when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(false);
+        when(loginAttemptService.recordFailure(TEST_USER, null))
+                .thenReturn(new LoginAttemptResult(1, null));
+
+        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest, null),
+                "A wrong-password login with no clientIp must still resolve to a clean 401, not an NPE");
+    }
+
+    @Test
+    void loginWithNullClientIpOnLockedAccountThrowsAccountLockedNotNpe() {
+        when(userRepository.findByUsername(TEST_USER)).thenReturn(Optional.of(testUser));
+        when(loginAttemptService.getLockedUntil(TEST_USER, null))
+                .thenReturn(Optional.of(Instant.now().plus(Duration.ofMinutes(10))));
+
+        assertThrows(AccountLockedException.class, () -> authService.login(loginRequest, null),
+                "A locked-account login with no clientIp must still resolve to AccountLockedException, not an NPE");
+    }
+
+    @Test
     void loginLocksPairAfterMaxFailedAttempts() {
         when(userRepository.findByUsername(anyString())).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(RAW_PASSWORD, HASHED_PASSWORD)).thenReturn(false);
