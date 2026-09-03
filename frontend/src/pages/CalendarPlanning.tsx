@@ -2,17 +2,17 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Calendar, dateFnsLocalizer, type Event, type View } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay, addMonths, subMonths, startOfMonth } from 'date-fns';
 import { enUS, it } from 'date-fns/locale';
-import { reservationService } from '../services/reservationService';
+import { reservationService } from '../services';
 import { useTranslation } from 'react-i18next';
-import { useToastStore } from '../store/toastStore';
-import type { ReservationResponse } from '../types/reservation.types';
+import { useToastStore } from '../store';
+import type { ReservationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3StatusChip } from '../components/m3/M3StatusChip';
-import { M3Card } from '../components/m3/M3Card';
+import { M3StatusChip } from '../components/m3';
+import { M3Card } from '../components/m3';
 import PlanningBoard from '@/pages/PlanningBoard';
-import { inventoryService } from '../services/inventoryService';
-import type { RoomResponse } from '../types/inventory.types';
-import { getErrorMessage } from '../utils/errorMessage';
+import { inventoryService } from '../services';
+import type { RoomResponse } from '../types';
+import { getErrorMessage, cn, resolveDesignToken } from '../utils';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
@@ -38,13 +38,31 @@ const mapToEvent = (reservation: ReservationResponse): ReservationEvent => ({
 
 type StatusTone = 'info' | 'warning' | 'success' | 'neutral' | 'error';
 
-const statusLegend: { labelKey: string; color: string; tone: StatusTone }[] = [
-  { labelKey: 'status_confirmed', color: '#1A3A5C', tone: 'info' },
-  { labelKey: 'status_pending', color: '#5C4300', tone: 'warning' },
-  { labelKey: 'status_checked_in', color: '#2E7D6A', tone: 'success' },
-  { labelKey: 'status_checked_out', color: '#73777F', tone: 'neutral' },
-  { labelKey: 'status_cancelled', color: '#BA1A1A', tone: 'error' },
+// `tone` alone drives the rendered swatch (M3StatusChip resolves it to the
+// matching M3 token) -- there is deliberately no `color` field here anymore;
+// see EVENT_STATUS_TOKENS below for the (different) mapping the calendar's
+// solid event blocks use, which needs actual resolved color values, not a tone.
+const statusLegend: { labelKey: string; tone: StatusTone }[] = [
+  { labelKey: 'status_confirmed', tone: 'info' },
+  { labelKey: 'status_pending', tone: 'warning' },
+  { labelKey: 'status_checked_in', tone: 'success' },
+  { labelKey: 'status_checked_out', tone: 'neutral' },
+  { labelKey: 'status_cancelled', tone: 'error' },
 ];
+
+// react-big-calendar renders events as solid-fill blocks via inline style, so
+// this can't use Tailwind classes like M3StatusChip's tones do -- same tone
+// semantics (success->tertiary, warning->secondary, error->error, info->primary,
+// neutral->outline), but the *base* token (not the pale "-container" variant
+// M3StatusChip's tag-shaped chips use) since a solid block needs real contrast
+// against its own on-* text color, not a subdued tag background.
+const EVENT_STATUS_TOKENS: Record<string, { bg: string; text: string }> = {
+  CONFIRMED: { bg: '--md-primary', text: '--md-on-primary' },
+  PENDING: { bg: '--md-secondary', text: '--md-on-secondary' },
+  CHECKED_IN: { bg: '--md-tertiary', text: '--md-on-tertiary' },
+  CHECKED_OUT: { bg: '--md-outline', text: '--md-on-surface' },
+  CANCELLED: { bg: '--md-error', text: '--md-on-error' },
+};
 
 const CALENDAR_VIEWS: View[] = ['month'];
 const CALENDAR_STYLE = { height: 600 };
@@ -174,15 +192,13 @@ export const CalendarPlanning = () => {
 
   const eventPropGetter = useCallback((event: ReservationEvent) => {
     const status = event.resource.status;
-    const colorMap: Record<string, string> = {
-      CONFIRMED: '#1A3A5C',
-      PENDING: '#5C4300',
-      CANCELLED: '#BA1A1A',
-      CHECKED_IN: '#2E7D6A',
-      CHECKED_OUT: '#73777F',
-    };
-    const bg = colorMap[status] ?? '#1A3A5C';
-    return { style: { backgroundColor: bg, borderColor: bg, color: '#fff', borderRadius: '8px' } };
+    const tokens = EVENT_STATUS_TOKENS[status] ?? EVENT_STATUS_TOKENS.CONFIRMED;
+    // Resolved live (not memoized) so a theme change (light/dark, high-contrast)
+    // is reflected on the next render instead of freezing whatever was current
+    // when this callback happened to be created.
+    const bg = resolveDesignToken(tokens.bg);
+    const text = resolveDesignToken(tokens.text);
+    return { style: { backgroundColor: bg, borderColor: bg, color: text, borderRadius: '8px' } };
   }, []);
 
   const currentYear = format(currentDate, 'yyyy');
@@ -206,7 +222,7 @@ export const CalendarPlanning = () => {
         <div className="flex items-center justify-center gap-2 bg-surface-container-low px-4 py-2 rounded-shape-full shadow-elevation-1">
           <button
             onClick={handlePrevMonth}
-            className="flex items-center justify-center min-h-[40px] min-w-[40px] rounded-full hover:bg-surface-container transition-colors text-primary"
+            className="flex items-center justify-center min-h-10 min-w-10 rounded-full hover:bg-surface-container transition-colors text-primary"
             aria-label={t('prev_month')}
           >
             <MaterialIcon name="chevron_left" size={28} />
@@ -223,14 +239,14 @@ export const CalendarPlanning = () => {
 
           <button
             onClick={handleNextMonth}
-            className="flex items-center justify-center min-h-[40px] min-w-[40px] rounded-full hover:bg-surface-container transition-colors text-primary"
+            className="flex items-center justify-center min-h-10 min-w-10 rounded-full hover:bg-surface-container transition-colors text-primary"
             aria-label={t('next_month')}
           >
             <MaterialIcon name="chevron_right" size={28} />
           </button>
 
           {/* Hidden input for the native month picker */}
-          <div className="relative ml-2 flex items-center justify-center min-h-[40px] min-w-[40px]">
+          <div className="relative ml-2 flex items-center justify-center min-h-10 min-w-10">
             <input
               type="month"
               value={monthValue}
@@ -248,17 +264,19 @@ export const CalendarPlanning = () => {
           <div className="flex bg-surface-container rounded-shape-full p-1">
             <button
               onClick={setPlanningView}
-              className={`px-4 py-1.5 text-sm font-medium rounded-shape-full transition-all ${
+              className={cn(
+                'px-4 py-1.5 text-sm font-medium rounded-shape-full transition-all',
                 view === 'planning' ? 'bg-primary text-on-primary shadow-elevation-1' : 'text-on-surface-variant hover:bg-surface-container-high'
-              }`}
+              )}
             >
               {t('view_planning')}
             </button>
             <button
               onClick={setMonthView}
-              className={`px-4 py-1.5 text-sm font-medium rounded-shape-full transition-all ${
+              className={cn(
+                'px-4 py-1.5 text-sm font-medium rounded-shape-full transition-all',
                 view === 'month' ? 'bg-primary text-on-primary shadow-elevation-1' : 'text-on-surface-variant hover:bg-surface-container-high'
-              }`}
+              )}
             >
               {t('view_month')}
             </button>
@@ -280,7 +298,7 @@ export const CalendarPlanning = () => {
         </div>
       ) : error ? (
         <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+          <MaterialIcon name="error" size={20} className="shrink-0" />
           <div>
             <h3 className="text-sm font-medium font-body">{t('error_loading_reservations')}</h3>
             <p className="mt-1 text-sm font-body opacity-80">{error}</p>

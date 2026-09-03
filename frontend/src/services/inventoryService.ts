@@ -1,6 +1,6 @@
 import api from './api';
-import type { RoomRequest, RoomResponse, RoomTypeRequest, RoomTypeResponse, RoomStatus } from '../types/inventory.types';
-import type { SpringPage } from '../types/page.types';
+import type { RoomRequest, RoomResponse, RoomTypeRequest, RoomTypeResponse, RoomStatus } from '../types';
+import type { SpringPage } from '../types';
 
 const ROOM_TYPES_PATH = '/api/v1/room-types';
 const ROOMS_PATH = '/api/v1/rooms';
@@ -49,9 +49,11 @@ export const inventoryService = {
   },
 
   /**
-   * Rooms that are housekeeping-CLEAN and free of any overlapping
-   * reservation for the given range. `checkOutDate` is exclusive, same
-   * convention as reservation booking (a 1-night stay uses tomorrow).
+   * Rooms free of any overlapping reservation for the given range, excluding
+   * only MAINTENANCE ones — today's CLEAN/DIRTY housekeeping status is a
+   * transient fact that says nothing about a future check-in date, so it
+   * never gates this search. `checkOutDate` is exclusive, same convention as
+   * reservation booking (a 1-night stay uses tomorrow).
    */
   getAvailableRooms: async (checkInDate: string, checkOutDate: string): Promise<RoomResponse[]> => {
     const response = await api.get<RoomResponse[]>(`${ROOMS_PATH}/availability`, {

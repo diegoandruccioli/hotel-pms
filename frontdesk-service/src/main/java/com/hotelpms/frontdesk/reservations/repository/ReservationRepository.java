@@ -120,8 +120,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
      * @return distinct room IDs, among {@code roomIds}, that are booked for some
      *         part of the given range
      */
-    @TenantScopeExempt(reason = "roomIds is always the caller's own hotel-scoped clean-room set, "
-            + "sourced from roomService.findCleanRooms(hotelId) in "
+    @TenantScopeExempt(reason = "roomIds is always the caller's own hotel-scoped bookable-room set, "
+            + "sourced from roomService.findBookableRooms(hotelId) in "
             + "ReservationServiceImpl.getAvailableRooms — never attacker-supplied.")
     @Query("""
             SELECT DISTINCT li.roomId FROM Reservation r

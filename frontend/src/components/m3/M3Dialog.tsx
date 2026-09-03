@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import * as FocusTrapModule from 'focus-trap-react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../MaterialIcon';
-import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { useEscapeKey } from '../../hooks';
+import { cn } from '../../utils';
 
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
 
@@ -75,12 +76,12 @@ export const M3Dialog = ({
 
         {/* Dialog surface — M3 elevation-3, rounded-shape-lg */}
         <div
-          className={[
+          className={cn(
             'relative w-full max-w-lg max-h-[90dvh] overflow-hidden',
             'flex flex-col',
-            'bg-surface-container-high rounded-[28px]',
-            'shadow-elevation-3',
-          ].join(' ')}
+            'bg-surface-container-high rounded-shape-xl',
+            'shadow-elevation-3'
+          )}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-6 pb-4">
@@ -94,14 +95,14 @@ export const M3Dialog = ({
               ref={closeButtonRef}
               type="button"
               onClick={onClose}
-              className={[
+              className={cn(
                 'flex items-center justify-center w-10 h-10',
                 'rounded-shape-full text-on-surface-variant',
                 'hover:bg-surface-container-highest',
-                'focus-visible:outline-none focus-visible:ring-2',
+                'focus-visible:outline-hidden focus-visible:ring-2',
                 'focus-visible:ring-primary focus-visible:ring-offset-2',
-                'transition-colors',
-              ].join(' ')}
+                'transition-colors'
+              )}
               aria-label={t('close')}
             >
               <MaterialIcon name="close" size={20} />

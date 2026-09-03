@@ -1,17 +1,17 @@
 import { useState, useCallback, useMemo, memo } from 'react';
-import { billingReportService } from '../services/billingReportService';
-import { useAuthStore } from '../store/authStore';
-import { useToastStore } from '../store/toastStore';
-import type { OwnerFinancialReportDto } from '../types/ownerReport.types';
-import type { InvoiceResponse } from '../types/billing.types';
+import { billingReportService } from '../services';
+import { useAuthStore } from '../store';
+import { useToastStore } from '../store';
+import type { OwnerFinancialReportDto } from '../types';
+import type { InvoiceResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
-import { M3Card } from '../components/m3/M3Card';
-import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
-import { M3StatusChip } from '../components/m3/M3StatusChip';
-import { M3TextField } from '../components/m3/M3TextField';
+import { M3Button } from '../components/m3';
+import { M3Card } from '../components/m3';
+import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
+import { M3StatusChip } from '../components/m3';
+import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage } from '../utils/errorMessage';
+import { getErrorMessage } from '../utils';
 import { KpiTrendSection } from './OwnerDashboard/KpiTrendSection';
 
 const getStatusTone = (status: InvoiceResponse['status']) => {
@@ -169,7 +169,7 @@ export const OwnerDashboard = memo(() => {
 
       {error && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+          <MaterialIcon name="error" size={20} className="shrink-0" />
           <p className="text-sm font-body">{error}</p>
         </div>
       )}

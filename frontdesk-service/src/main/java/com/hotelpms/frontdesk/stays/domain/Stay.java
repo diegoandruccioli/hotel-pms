@@ -20,6 +20,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -151,6 +152,25 @@ public class Stay {
      */
     @Column(name = "room_charge_id")
     private UUID roomChargeId;
+
+    /**
+     * Per-night price {@code roomChargeId} was actually posted at, snapshotted
+     * alongside it (check-in, or the last room change) — never re-derived
+     * live. A room change (Parte 6) needs this to price the already-consumed
+     * nights at what the guest actually agreed to, not a live re-quote
+     * against today's rates (same "an amount already charged never silently
+     * changes" principle as {@code CityTaxAssessment}). {@code null} for
+     * stays checked in before this field existed.
+     */
+    @Column(name = "room_charge_unit_price", precision = 10, scale = 2)
+    private BigDecimal roomChargeUnitPrice;
+
+    /**
+     * Night count {@code roomChargeId} covers, snapshotted alongside {@link
+     * #roomChargeUnitPrice}.
+     */
+    @Column(name = "room_charge_nights")
+    private Integer roomChargeNights;
 
     /**
      * Whether the Alloggiati Web report for this stay has been successfully submitted

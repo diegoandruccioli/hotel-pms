@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { MemoryRouter } from 'react-router-dom';
 import { SettingsPassword } from './SettingsPassword';
-import { authService } from '../../services/authService';
+import { authService } from '../../services';
 
 const mockNavigate = vi.fn();
 const mockUseLocation = vi.fn(() => ({ state: null }));

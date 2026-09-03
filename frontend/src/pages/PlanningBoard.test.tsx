@@ -3,8 +3,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import PlanningBoard from './PlanningBoard';
-import type { RoomResponse } from '../types/inventory.types';
-import type { ReservationResponse } from '../types/reservation.types';
+import type { RoomResponse } from '../types';
+import type { ReservationResponse } from '../types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),

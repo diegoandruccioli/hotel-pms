@@ -3,8 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { MemoryRouter } from 'react-router-dom';
 import { SettingsSystem } from './SettingsSystem';
-import { stayService } from '../../services/stayService';
-import type { HotelSettingsResponse } from '../../types/stay.types';
+import { stayService } from '../../services';
+import type { HotelSettingsResponse } from '../../types';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -126,7 +126,7 @@ describe('SettingsSystem', () => {
       .toHaveBeenCalledWith({ emailSubjectReservationConfirmed: 'Custom subject' }));
   });
 
-  it('saves the greeting text on blur only when it changed', async () => {
+  it('saves the greeting text on blur-sm only when it changed', async () => {
     vi.mocked(stayService.getHotelSettings).mockResolvedValue(
       { ...SETTINGS, emailGreetingText: 'See you soon' });
     vi.mocked(stayService.updateHotelSettings).mockResolvedValue(

@@ -1,14 +1,14 @@
 import api from './api';
 import type {
-  DocumentType,
+  BillingDocumentType as DocumentType,
   InvoiceResponse,
   InvoiceSearchResult,
   InvoiceStatus,
   PaymentRequest,
   PaymentResponse,
   SdiStatus,
-} from '../types/billing.types';
-import type { SpringPage } from '../types/page.types';
+  SpringPage,
+} from '../types';
 
 const BASE_PATH = '/api/v1/invoices';
 const IFRAME_CLEANUP_DELAY_MS = 10000;

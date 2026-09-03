@@ -4,7 +4,7 @@ import { axe } from 'vitest-axe';
 import { createElement, Fragment } from 'react';
 import type { ReactNode } from 'react';
 import { GuestFormModal } from './GuestFormModal';
-import { guestService } from '../services/guestService';
+import { guestService } from '../services';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string, fallback?: string) => fallback ?? key }),

@@ -5,10 +5,10 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { QuotationForm } from './QuotationForm';
-import { inventoryService } from '../../services/inventoryService';
-import { reservationService } from '../../services/reservationService';
-import { quotationService } from '../../services/quotationService';
-import { guestService } from '../../services/guestService';
+import { inventoryService } from '../../services';
+import { reservationService } from '../../services';
+import { quotationService } from '../../services';
+import { guestService } from '../../services';
 
 vi.mock('../../services/inventoryService');
 vi.mock('../../services/reservationService');

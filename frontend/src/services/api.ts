@@ -10,7 +10,6 @@ const api = axios.create({
 });
 
 import { useAuthStore } from '../store/authStore';
-import i18n from '../i18n';
 
 /**
  * Reads the non-httpOnly csrf_token cookie set by auth-service on login/refresh.
@@ -77,6 +76,13 @@ api.interceptors.response.use(
     // the comparison never matched and the guard was a permanent no-op).
     if (error.response?.data?.detail && /^[A-Z_]+$/.test(error.response.data.detail)) {
       const code = error.response.data.detail;
+      // Dynamic import, not a static one: `../i18n` runs i18n.init() as a
+      // module-load side effect, which must NOT fire just because something
+      // imported an unrelated member of the services/ barrel (which
+      // re-exports this module too, via ./api). Deferring to the one call
+      // site that actually needs it means the real i18n singleton only
+      // loads when there's an error response to translate.
+      const { default: i18n } = await import('../i18n');
       const translated = i18n.t(`errors:${code}`);
       if (translated !== code) {
         // Stash the untranslated code before overwriting `detail` with human text —

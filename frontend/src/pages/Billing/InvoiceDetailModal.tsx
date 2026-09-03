@@ -1,12 +1,11 @@
 import { useCallback, memo, useState } from 'react';
-import { billingService } from '../../services/billingService';
-import { useToastStore } from '../../store/toastStore';
-
-const ICON_STYLE: React.CSSProperties = { fontSize: 18 };
+import { billingService } from '../../services';
+import { useToastStore } from '../../store';
 import { useTranslation } from 'react-i18next';
-import { M3Dialog } from '../../components/m3/M3Dialog';
-import { M3StatusChip } from '../../components/m3/M3StatusChip';
-import type { DocumentType, InvoiceResponse, InvoiceStatus, PaymentMethod, ChargeType, SdiStatus } from '../../types/billing.types';
+import { M3Dialog } from '../../components/m3';
+import { M3StatusChip } from '../../components/m3';
+import { MaterialIcon } from '../../components/MaterialIcon';
+import type { BillingDocumentType as DocumentType, InvoiceResponse, InvoiceStatus, PaymentMethod, ChargeType, SdiStatus } from '../../types';
 
 interface Props {
   invoice: InvoiceResponse;
@@ -131,7 +130,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
               type="button"
               onClick={handleToggleDocumentTypeVoid}
               disabled={switchingType}
-              className="text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded min-h-[40px] px-2"
+              className="text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm min-h-10 px-2"
             >
               {invoice.documentType === 'FATTURA'
                 ? t('switch_to_ricevuta', { ns: 'billing' })
@@ -155,9 +154,9 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
               type="button"
               onClick={handleDownloadFatturaPAXmlVoid}
               disabled={validatingXml}
-              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded min-h-[40px] px-2"
+              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm min-h-10 px-2"
             >
-              <span className="material-symbols-outlined" style={ICON_STYLE} aria-hidden="true">download</span>
+              <MaterialIcon name="download" size={18} />
               {t('download_fattura_pa', { ns: 'billing' })}
             </button>
           </div>
@@ -199,9 +198,11 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
               {invoice.charges.map((charge) => (
                 <li key={charge.id} className="flex items-center justify-between py-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="material-symbols-outlined text-on-surface-variant shrink-0" style={ICON_STYLE}>
-                      {chargeTypeIcon[charge.type] ?? 'receipt'}
-                    </span>
+                    <MaterialIcon
+                      name={chargeTypeIcon[charge.type] ?? 'receipt'}
+                      size={18}
+                      className="text-on-surface-variant shrink-0"
+                    />
                     <span className="truncate text-on-surface">
                       {charge.description || t(`charge_type_${charge.type.toLowerCase()}`, { ns: 'billing' })}
                     </span>
@@ -228,9 +229,11 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
                 {invoice.payments.map((p) => (
                   <li key={p.id} className="flex items-center justify-between py-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="material-symbols-outlined text-on-surface-variant shrink-0" style={ICON_STYLE}>
-                        {methodIcon[p.paymentMethod] ?? 'payments'}
-                      </span>
+                      <MaterialIcon
+                        name={methodIcon[p.paymentMethod] ?? 'payments'}
+                        size={18}
+                        className="text-on-surface-variant shrink-0"
+                      />
                       <div className="min-w-0">
                         <p className="text-on-surface">
                           {t(`payment_method_${p.paymentMethod.toLowerCase()}`, { ns: 'billing' })}
@@ -261,11 +264,9 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
         <button
           type="button"
           onClick={handleDownloadPdf}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-medium hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-h-[40px]"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-medium hover:opacity-90 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-h-10"
         >
-          <span className="material-symbols-outlined" style={ICON_STYLE} aria-hidden="true">
-            download
-          </span>
+          <MaterialIcon name="download" size={18} />
           {t('download_pdf', { ns: 'billing' })}
         </button>
       </div>

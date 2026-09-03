@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { RateSeasonManagerModal } from './RateSeasonManagerModal';
-import { rateSeasonService } from '../../services/rateSeasonService';
+import { rateSeasonService } from '../../services';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string, opts?: Record<string, unknown>) => (opts?.roomType ? `${key}:${opts.roomType}` : key), i18n: { language: 'en' } }),

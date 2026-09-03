@@ -2,9 +2,10 @@ import React, { useState, useMemo, useRef, useEffect, memo, useCallback } from '
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, differenceInCalendarDays, addMonths } from 'date-fns';
 import { it, enUS } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
-import { M3Card } from '../components/m3/M3Card';
-import type { RoomResponse } from '../types/inventory.types';
-import type { ReservationResponse } from '../types/reservation.types';
+import { M3Card } from '../components/m3';
+import type { RoomResponse } from '../types';
+import type { ReservationResponse } from '../types';
+import { cn } from '../utils';
 
 interface PlanningBoardProps {
   rooms: RoomResponse[];
@@ -94,14 +95,17 @@ const ReservationBar = memo(({
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      className={`absolute top-2 h-12 rounded-shape-sm shadow-elevation-1 p-2 flex flex-col justify-center cursor-grab hover:shadow-elevation-2 transition-all z-0 overflow-hidden ${STATUS_COLORS[reservation.status] || STATUS_COLORS.CONFIRMED}`}
+      className={cn(
+        'absolute top-2 h-12 rounded-shape-sm shadow-elevation-1 p-2 flex flex-col justify-center cursor-grab hover:shadow-elevation-2 transition-all z-0 overflow-hidden',
+        STATUS_COLORS[reservation.status] || STATUS_COLORS.CONFIRMED
+      )}
       style={style}
       title={`${reservation.guestFullName} (${reservation.status})`}
     >
       <span className="text-xs font-bold truncate leading-tight">
         {reservation.guestFullName || 'Guest'}
       </span>
-      <span className="text-[10px] opacity-80 truncate">
+      <span className="text-2xs opacity-80 truncate">
         {format(startRaw, 'dd/MM')} - {format(endRaw, 'dd/MM')}
       </span>
     </div>
@@ -147,9 +151,10 @@ const RoomRow = memo(({ room, allocations, onDragOver, onDrop, monthStart, month
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
       style={ROW_STYLE}
-      className={`border-b border-outline-variant relative transition-colors ${
-        isDragOver ? 'bg-primary-container/30 border-l-4 border-l-primary' : ''
-      }`}
+      className={cn(
+        'border-b border-outline-variant relative transition-colors',
+        isDragOver && 'bg-primary-container/30 border-l-4 border-l-primary'
+      )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -264,13 +269,14 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
                 <div 
                   key={day.toISOString()} 
                   style={CELL_STYLE}
-                  className={`flex-shrink-0 border-r border-outline-variant flex flex-col items-center justify-center
-                    ${isSameDay(day, new Date()) ? 'bg-primary-container text-on-primary-container' : ''}
-                  `}
+                  className={cn(
+                    'shrink-0 border-r border-outline-variant flex flex-col items-center justify-center',
+                    isSameDay(day, new Date()) && 'bg-primary-container text-on-primary-container'
+                  )}
                 >
                   {/* text-on-surface-variant, not opacity-60 on inherited color — same
                       WCAG AA contrast defect as RateCalendar.tsx's identical weekday label. */}
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">
+                  <span className="text-2xs uppercase font-bold tracking-wider text-on-surface-variant">
                     {format(day, 'EEE', { locale })}
                   </span>
                   <span className="text-lg font-display font-medium leading-none">
@@ -284,7 +290,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
           <div className="flex relative items-start">
             
             <div 
-              className="sticky left-0 z-30 flex-shrink-0 bg-surface-container-low border-r border-outline-variant shadow-elevation-1"
+              className="sticky left-0 z-30 shrink-0 bg-surface-container-low border-r border-outline-variant shadow-elevation-1"
               style={SIDEBAR_STYLE}
             >
               {rooms.map(room => (
@@ -295,7 +301,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-display font-bold text-on-surface">{room.roomNumber}</span>
-                    <div className={`w-2 h-2 rounded-full ${room.status === 'CLEAN' ? 'bg-success' : room.status === 'DIRTY' ? 'bg-error' : 'bg-warning'}`} />
+                    <div className={cn('w-2 h-2 rounded-full', room.status === 'CLEAN' ? 'bg-success' : room.status === 'DIRTY' ? 'bg-error' : 'bg-warning')} />
                   </div>
                   <span className="text-xs text-on-surface-variant line-clamp-1">{room.roomType.name}</span>
                 </div>
@@ -313,7 +319,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
                   <div 
                     key={`grid-${day.toISOString()}`} 
                     style={CELL_STYLE}
-                    className="flex-shrink-0 h-full border-r border-outline-variant opacity-20" 
+                    className="shrink-0 h-full border-r border-outline-variant opacity-20" 
                   />
                 ))}
               </div>

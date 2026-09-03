@@ -3,9 +3,9 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { SettingsPrivacy } from './SettingsPrivacy';
-import { guestService } from '../../services/guestService';
-import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
-import type { GuestPrivacySettingsResponse } from '../../types/guest.types';
+import { guestService } from '../../services';
+import { mockAxiosErrorWithDetail } from '../../test-utils';
+import type { GuestPrivacySettingsResponse } from '../../types';
 
 const stableT = (key: string, opts?: Record<string, unknown>) =>
   opts ? `${key}:${JSON.stringify(opts)}` : key;

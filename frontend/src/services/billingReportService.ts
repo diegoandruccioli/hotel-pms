@@ -1,5 +1,5 @@
 import api from './api';
-import type { OwnerFinancialReportDto, OwnerFinancialSummaryDto } from '../types/ownerReport.types';
+import type { OwnerFinancialReportDto, OwnerFinancialSummaryDto } from '../types';
 
 const REPORT_PATH = '/api/v1/reports/owner';
 const SUMMARY_PATH = '/api/v1/reports/owner/summary';

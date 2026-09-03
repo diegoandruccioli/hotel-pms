@@ -198,13 +198,11 @@ Ogni `@FeignClient` deve avere `@CircuitBreaker` Resilience4j con fallback dichi
 3. Aggiungere la route con `requireAuth` e `allowedRoles`
 4. Aggiungere i18n keys in `src/locales/en/<namespace>.json` e `it/<namespace>.json`
 
-### Accessibilità (obbligatoria)
+### Accessibilità e design system (obbligatorio)
 
-- Contrasto minimo 7:1 per testo normale, 4.5:1 per testo grande
-- `vitest-axe` su ogni component test (già nel template)
-- Focus trap nei modali con `focus-trap-react`
-- Tutti i form con `<label htmlFor>` o `aria-label`
-- Touch target minimo 40×40 px
+Fonte unica: [`frontend/DESIGN.md`](frontend/DESIGN.md) — contrasto, focus/tastiera,
+tema alto-contrasto WCAG AAA, touch target, token di design, convenzioni componenti.
+Leggerlo prima di toccare codice UI; non ripetere le regole qui.
 
 ---
 

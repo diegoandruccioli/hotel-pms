@@ -1,16 +1,16 @@
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import type { RoomTypeResponse } from '../../types/inventory.types';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
-import { M3TableActionLink } from '../../components/m3/M3TableActionLink';
-import { M3LoadingState } from '../../components/m3/M3LoadingState';
-import { M3ErrorState } from '../../components/m3/M3ErrorState';
-import { M3TableEmptyRow } from '../../components/m3/M3EmptyState';
-import { useRoomTypes } from '../../hooks/queries/useRooms';
-import { queryKeys } from '../../lib/queryKeys';
-import { getErrorMessage } from '../../utils/errorMessage';
+import type { RoomTypeResponse } from '../../types';
+import { M3Button } from '../../components/m3';
+import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
+import { M3TableActionLink } from '../../components/m3';
+import { M3LoadingState } from '../../components/m3';
+import { M3ErrorState } from '../../components/m3';
+import { M3TableEmptyRow } from '../../components/m3';
+import { useRoomTypes } from '../../hooks/queries';
+import { queryKeys } from '../../lib';
+import { getErrorMessage } from '../../utils';
 import { RoomTypeFormModal } from './RoomTypeFormModal';
 import { RateSeasonManagerModal } from './RateSeasonManagerModal';
 

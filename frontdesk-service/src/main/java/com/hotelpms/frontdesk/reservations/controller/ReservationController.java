@@ -149,7 +149,7 @@ public class ReservationController {
             @NonNull @PathVariable final UUID id,
             @NonNull @Valid @RequestBody final ReservationStatusUpdateRequest request) {
         final ReservationResponse response = reservationService.updateStatusAndGuests(
-                id, request.status(), request.actualGuests());
+                id, request.status(), request.actualGuests(), request.version());
         return ResponseEntity.ok(response);
     }
 

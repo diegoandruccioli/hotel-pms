@@ -540,4 +540,26 @@ class RoomServiceImplTest {
 
         assertTrue(result.isEmpty());
     }
+
+    @Test
+    void testFindBookableRoomsExcludesOnlyMaintenance() {
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatusNot(hotelId, RoomStatus.MAINTENANCE))
+                .thenReturn(List.of(room));
+        when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
+
+        final List<RoomResponse> result = roomService.findBookableRooms(hotelId);
+
+        assertEquals(1, result.size());
+        assertEquals(ROOM_101, result.get(0).roomNumber());
+    }
+
+    @Test
+    void testFindBookableRoomsEmpty() {
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatusNot(hotelId, RoomStatus.MAINTENANCE))
+                .thenReturn(List.of());
+
+        final List<RoomResponse> result = roomService.findBookableRooms(hotelId);
+
+        assertTrue(result.isEmpty());
+    }
 }

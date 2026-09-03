@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { quotationService } from '../services/quotationService';
-import type { QuotationResponse, QuotationStatus } from '../types/quotation.types';
+import { quotationService } from '../services';
+import type { QuotationResponse, QuotationStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
-import { M3Table, M3TableRow, M3TableCell } from '../components/m3/M3Table';
-import { M3TableActionLink } from '../components/m3/M3TableActionLink';
-import { M3StatusChip } from '../components/m3/M3StatusChip';
-import { M3Dialog } from '../components/m3/M3Dialog';
-import { useToastStore } from '../store/toastStore';
-import { getErrorMessage } from '../utils/errorMessage';
+import { M3Button } from '../components/m3';
+import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
+import { M3TableActionLink } from '../components/m3';
+import { M3StatusChip } from '../components/m3';
+import { M3Dialog } from '../components/m3';
+import { useToastStore } from '../store';
+import { getErrorMessage } from '../utils';
 
 const PAGE_SIZE = 20;
 
@@ -60,7 +60,7 @@ const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, 
   return (
     <M3TableRow>
       <M3TableCell className="font-medium">
-        <Link to={`/quotations/${quotation.id}`} className="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs">
+        <Link to={`/quotations/${quotation.id}`} className="hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs">
           {quotation.guestFullName}
         </Link>
       </M3TableCell>
@@ -236,7 +236,7 @@ export const Quotations = () => {
         </div>
       ) : error ? (
         <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="flex-shrink-0" />
+          <MaterialIcon name="error" size={20} className="shrink-0" />
           <div>
             <h3 className="text-sm font-medium font-body">{t('error_loading_quotations')}</h3>
             <p className="mt-1 text-sm font-body opacity-80">{error}</p>

@@ -1,3 +1,4 @@
+import { cn } from '../../utils';
 import { MaterialIcon } from '../MaterialIcon';
 
 type ButtonVariant = 'filled' | 'tonal' | 'outlined' | 'text';
@@ -14,8 +15,8 @@ const variantClasses: Record<ButtonVariant, string> = {
   tonal:
     'bg-secondary-container text-on-secondary-container hover:shadow-elevation-1 active:shadow-elevation-0 focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2',
   outlined:
-    'border border-outline text-primary bg-transparent hover:bg-primary/[0.08] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-  text: 'text-primary bg-transparent hover:bg-primary/[0.08] focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+    'border border-outline text-primary bg-transparent hover:bg-primary/8 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+  text: 'text-primary bg-transparent hover:bg-primary/8 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
 };
 
 export const M3Button = ({
@@ -32,10 +33,12 @@ export const M3Button = ({
   return (
     <button
       disabled={isDisabled}
-      className={`inline-flex items-center justify-center gap-2 px-6 h-10 rounded-shape-full text-sm font-medium font-body transition-all
-        ${variantClasses[variant]}
-        ${isDisabled ? 'opacity-38 cursor-not-allowed shadow-none' : ''}
-        ${className}`}
+      className={cn(
+        'inline-flex items-center justify-center gap-2 px-6 h-10 rounded-shape-full text-sm font-medium font-body transition-all',
+        variantClasses[variant],
+        isDisabled && 'opacity-38 cursor-not-allowed shadow-none',
+        className
+      )}
       {...rest}
     >
       {loading ? (

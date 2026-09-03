@@ -1,17 +1,17 @@
 import { useState, useCallback, memo, useMemo } from 'react';
-import { useToastStore } from '../store/toastStore';
-import type { RoomResponse, RoomStatus } from '../types/inventory.types';
+import { useToastStore } from '../store';
+import type { RoomResponse, RoomStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
-import { M3StatusChip } from '../components/m3/M3StatusChip';
-import { M3Checkbox } from '../components/m3/M3Checkbox';
-import { M3LoadingState } from '../components/m3/M3LoadingState';
-import { M3ErrorState } from '../components/m3/M3ErrorState';
-import { M3EmptyState } from '../components/m3/M3EmptyState';
+import { M3Button } from '../components/m3';
+import { M3StatusChip } from '../components/m3';
+import { M3Checkbox } from '../components/m3';
+import { M3LoadingState } from '../components/m3';
+import { M3ErrorState } from '../components/m3';
+import { M3EmptyState } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage } from '../utils/errorMessage';
-import { useRoomsList, useUpdateRoomStatus, useBulkUpdateRoomStatus } from '../hooks/queries/useRooms';
-import { useDaySheet } from '../hooks/queries/useDashboard';
+import { getErrorMessage, cn } from '../utils';
+import { useRoomsList, useUpdateRoomStatus, useBulkUpdateRoomStatus } from '../hooks/queries';
+import { useDaySheet } from '../hooks/queries';
 
 const STATUS_KEYS: Record<RoomStatus, string> = {
   CLEAN: 'room_status_clean',
@@ -80,7 +80,7 @@ const RoomCard = memo(({
   }, [onToggleSelected, room.id]);
 
   return (
-    <div className={`rounded-shape-md border-2 p-4 flex flex-col gap-3 shadow-elevation-1 transition-all ${STATUS_CARD_STYLES[room.status]}`}>
+    <div className={cn('rounded-shape-md border-2 p-4 flex flex-col gap-3 shadow-elevation-1 transition-all', STATUS_CARD_STYLES[room.status])}>
       {/* flex-wrap: the checkbox + room-number block + status chip can outgrow a
           4-up grid column for the longer status labels (e.g. "Maintenance").
           Without wrapping, the flex-1 min-w-0 heading block was the only shrinkable
@@ -95,7 +95,7 @@ const RoomCard = memo(({
             onChange={handleToggle}
           />
         )}
-        <div className="flex-1 min-w-[4rem]">
+        <div className="flex-1 min-w-16">
           <h3 className="text-lg font-display font-bold text-on-surface truncate">{t('room_number', { number: room.roomNumber })}</h3>
           <p className="text-xs font-body font-medium uppercase tracking-wide text-on-surface-variant truncate">{room.roomType?.name}</p>
         </div>
@@ -135,7 +135,10 @@ const StatusButton = memo(({ newStatus, updating, onClick, t }: {
     <button
       onClick={handleClick}
       disabled={updating !== null}
-      className={`flex-1 flex items-center justify-center min-h-[40px] text-xs font-medium font-body border rounded-shape-sm px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${STATUS_BUTTON_STYLES[newStatus]}`}
+      className={cn(
+        'flex-1 flex items-center justify-center min-h-10 text-xs font-medium font-body border rounded-shape-sm px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+        STATUS_BUTTON_STYLES[newStatus]
+      )}
     >
       {updating === newStatus ? (
         <span className="flex items-center justify-center gap-1">
@@ -317,7 +320,10 @@ const BulkStatusButton = memo(({ status, disabled, onClick, t }: {
       onClick={handleClick}
       disabled={disabled}
       data-testid={`bulk-status-${status}`}
-      className={`flex items-center justify-center min-h-[40px] text-xs font-medium font-body border rounded-shape-sm px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${STATUS_BUTTON_STYLES[status]}`}
+      className={cn(
+        'flex items-center justify-center min-h-10 text-xs font-medium font-body border rounded-shape-sm px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+        STATUS_BUTTON_STYLES[status]
+      )}
     >
       {t(STATUS_KEYS[status])}
     </button>
@@ -338,11 +344,12 @@ const FilterBadge = memo(({ status, active, count, onClick, t }: {
   return (
     <button
       onClick={handleClick}
-      className={`rounded-shape-md border-2 px-4 py-3 text-center transition-all shadow-elevation-1 ${
+      className={cn(
+        'rounded-shape-md border-2 px-4 py-3 text-center transition-all shadow-elevation-1',
         active
           ? STATUS_CARD_STYLES[status]
           : 'bg-surface border-outline-variant text-on-surface-variant hover:border-outline'
-      }`}
+      )}
     >
       <p className="text-2xl font-display font-bold">{count}</p>
       <p className="text-xs font-body font-semibold uppercase tracking-wide">{t(STATUS_KEYS[status])}</p>

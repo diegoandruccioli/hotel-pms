@@ -2,11 +2,13 @@ package com.hotelpms.frontdesk.stays.service.impl;
 
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
+import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.ExternalServiceException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
 import com.hotelpms.frontdesk.reservations.service.ReservationService;
+import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomService;
 import feign.FeignException;
@@ -70,6 +72,7 @@ class StayCheckInValidator {
 
         log.debug("Validating room ID: {}", roomId);
         final RoomResponse room = roomService.getRoomById(roomId, hotelId);
+        verifyNotInMaintenance(room, reservationId);
 
         final String displayName = guest.lastName() + " " + guest.firstName();
         return new CheckInContext(reservation.checkOutDate(), displayName, room.roomNumber());
@@ -97,7 +100,27 @@ class StayCheckInValidator {
         }
         log.debug("[STAY] WALK_IN validating room={}", roomId);
         final RoomResponse room = roomService.getRoomById(roomId, hotelId);
+        verifyNotInMaintenance(room, null);
         final String displayName = guest.lastName() + " " + guest.firstName();
         return new CheckInContext(expectedCheckOutDate, displayName, room.roomNumber());
+    }
+
+    /**
+     * Rejects check-in into a room currently flagged {@code MAINTENANCE} — the
+     * one housekeeping status that is not transient (unlike {@code DIRTY},
+     * which the morning cleaning cycle is expected to clear before an
+     * afternoon check-in), so it is the only one that should block the actual
+     * check-in action. {@code CLEAN} and {@code DIRTY} both pass unchallenged.
+     *
+     * @param room          the room resolved for this check-in
+     * @param reservationId the reservation being checked in, or {@code null} for a walk-in
+     * @throws ConflictException if the room is {@code MAINTENANCE}
+     */
+    private void verifyNotInMaintenance(final RoomResponse room, final UUID reservationId) {
+        if (room.status() == RoomStatus.MAINTENANCE) {
+            log.warn("[STAY] CHECK_IN_FAILED | reservationId={} | reason=ROOM_IN_MAINTENANCE | roomId={}",
+                    reservationId, room.id());
+            throw new ConflictException("ROOM_IN_MAINTENANCE");
+        }
     }
 }

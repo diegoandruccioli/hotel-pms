@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3TextField } from '../../components/m3/M3TextField';
-import { guestService } from '../../services/guestService';
-import type { GuestResponseDTO, GuestRequestDTO } from '../../types/guest.types';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { M3Button } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
+import { guestService } from '../../services';
+import type { GuestResponseDTO, GuestRequestDTO } from '../../types';
+import { getErrorMessage } from '../../utils';
 
 interface GuestSuggestionItemProps {
   guest: GuestResponseDTO;

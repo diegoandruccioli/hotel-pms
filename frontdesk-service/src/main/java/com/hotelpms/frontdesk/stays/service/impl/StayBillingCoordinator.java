@@ -24,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -45,6 +46,8 @@ class StayBillingCoordinator {
     private static final String BILLING_SERVICE_UNAVAILABLE_REASON = "BILLING_SERVICE_UNAVAILABLE";
     private static final String ROOM_NIGHT_CHARGE_TYPE = "ROOM_NIGHT";
     private static final String CITY_TAX_CHARGE_TYPE = "CITY_TAX";
+    private static final String ROOM_DESCRIPTION_PREFIX = "Room ";
+    private static final String NIGHTS_DESCRIPTION_SUFFIX = " night(s)";
 
     private final BillingClient billingClient;
     private final RoomService roomService;
@@ -135,6 +138,8 @@ class StayBillingCoordinator {
                 return;
             }
             stay.setRoomChargeId(chargeResp.id());
+            stay.setRoomChargeUnitPrice(roomCharge.snapshotUnitPrice());
+            stay.setRoomChargeNights((int) roomCharge.nights());
         }
 
         if (!postCityTaxChargeIfNeeded(stay, roomCharge.nights())) {
@@ -171,7 +176,8 @@ class StayBillingCoordinator {
         final BigDecimal amount = nightlyRates.stream().map(NightlyRate::nightlyPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
         final BigDecimal unitPrice = uniformRate(nightlyRates);
         final long nights = ChronoUnit.DAYS.between(fromDate, toDateExclusive);
-        final String description = "Room " + stay.getRoomNumber() + " - extension - " + nights + " night(s)";
+        final String description = ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber()
+                + " - extension - " + nights + NIGHTS_DESCRIPTION_SUFFIX;
         final ChargeRequest chargeRequest =
                 new ChargeRequest(ROOM_NIGHT_CHARGE_TYPE, description, amount, stay.getId(), unitPrice, (int) nights);
 
@@ -180,6 +186,85 @@ class StayBillingCoordinator {
             response = billingClient.addCharge(stay.getId(), chargeRequest);
         } catch (final FeignException ex) {
             throw new ExternalServiceException("EXTENSION_CHARGE_FAILED: " + ex.getMessage(), ex);
+        }
+        if (response == null || response.id() == null) {
+            throw new ExternalServiceException(BILLING_SERVICE_UNAVAILABLE_REASON);
+        }
+        return response.id();
+    }
+
+    /**
+     * Re-bills the room-night charge for a room change (Parte 6) whose new room has a
+     * different {@code RoomType}: voids the single check-in {@code ROOM_NIGHT} charge
+     * and reposts it as two segments, exactly like the ledger a hotel would actually
+     * keep — never a live re-quote of nights already lived, per the same "an amount
+     * already charged never silently changes" principle {@code CityTaxAssessment}
+     * already applies.
+     *
+     * <ol>
+     *   <li>consumed nights, {@code [actualCheckInTime, moveDate)}, at the OLD room's
+     *       already-fixed {@code stay.getRoomChargeUnitPrice()} — never recomputed live,
+     *       so a rate change since check-in can never alter what was already charged;
+     *       skipped if zero or negative (room changed the same day as check-in);</li>
+     *   <li>remaining nights, {@code [moveDate, expectedCheckOutDate)}, at the NEW
+     *       room's live rate via {@link RatePricingService} — same resolution
+     *       {@link #postExtensionRoomCharge} uses for genuinely new nights.</li>
+     * </ol>
+     *
+     * <p>Like {@link #postExtensionRoomCharge}, a billing failure here is not
+     * swallowed: a room change is an interactive operator action expecting a
+     * definite outcome.
+     *
+     * @param stay      the stay being moved (still holding its OLD roomId/roomNumber —
+     *                  called before those are updated)
+     * @param newRoom   the destination room
+     * @param moveDate  today — the boundary between the consumed and remaining segments
+     * @return the new room's segment charge id and its snapshot, to persist onto
+     *         {@code Stay.roomChargeId}/{@code roomChargeUnitPrice}/{@code roomChargeNights}
+     */
+    RoomChangeBillingResult postRoomChangeCharges(final Stay stay, final RoomResponse newRoom, final LocalDate moveDate) {
+        try {
+            billingClient.removeCharge(stay.getId(), stay.getRoomChargeId());
+        } catch (final FeignException ex) {
+            throw new ExternalServiceException("ROOM_CHANGE_VOID_FAILED: " + ex.getMessage(), ex);
+        }
+
+        final LocalDate consumedFrom = stay.getActualCheckInTime().toLocalDate();
+        final long consumedNights = ChronoUnit.DAYS.between(consumedFrom, moveDate);
+        if (consumedNights > 0) {
+            final BigDecimal consumedAmount = stay.getRoomChargeUnitPrice().multiply(BigDecimal.valueOf(consumedNights));
+            final String consumedDescription =
+                    ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber() + " - " + consumedNights + NIGHTS_DESCRIPTION_SUFFIX;
+            postRoomNightCharge(stay, consumedDescription, consumedAmount, stay.getRoomChargeUnitPrice(), consumedNights);
+        }
+
+        final long remainingNights = ChronoUnit.DAYS.between(moveDate, stay.getExpectedCheckOutDate());
+        final List<NightlyRate> newRoomRates = ratePricingService.resolveStayRates(
+                newRoom.roomType().id(), stay.getHotelId(), moveDate, stay.getExpectedCheckOutDate());
+        final BigDecimal remainingAmount =
+                newRoomRates.stream().map(NightlyRate::nightlyPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+        final BigDecimal remainingUnitPrice = uniformRate(newRoomRates);
+        final BigDecimal snapshotUnitPrice = remainingUnitPrice != null
+                ? remainingUnitPrice
+                : remainingAmount.divide(BigDecimal.valueOf(remainingNights), 2, RoundingMode.HALF_UP);
+        final String remainingDescription =
+                ROOM_DESCRIPTION_PREFIX + newRoom.roomNumber() + " - " + remainingNights + NIGHTS_DESCRIPTION_SUFFIX;
+        final UUID newChargeId = postRoomNightCharge(
+                stay, remainingDescription, remainingAmount, remainingUnitPrice, remainingNights);
+
+        return new RoomChangeBillingResult(newChargeId, snapshotUnitPrice, (int) remainingNights);
+    }
+
+    private UUID postRoomNightCharge(
+            final Stay stay, final String description, final BigDecimal amount,
+            final BigDecimal displayUnitPrice, final long nights) {
+        final ChargeRequest chargeRequest = new ChargeRequest(
+                ROOM_NIGHT_CHARGE_TYPE, description, amount, stay.getId(), displayUnitPrice, (int) nights);
+        final ChargeResponse response;
+        try {
+            response = billingClient.addCharge(stay.getId(), chargeRequest);
+        } catch (final FeignException ex) {
+            throw new ExternalServiceException("ROOM_CHANGE_CHARGE_FAILED: " + ex.getMessage(), ex);
         }
         if (response == null || response.id() == null) {
             throw new ExternalServiceException(BILLING_SERVICE_UNAVAILABLE_REASON);
@@ -296,10 +381,18 @@ class StayBillingCoordinator {
             unitPrice = uniformRate(nightlyRates);
         }
 
-        final String description = "Room " + stay.getRoomNumber() + " - " + nights + " night(s)";
+        final String description =
+                ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber() + " - " + nights + NIGHTS_DESCRIPTION_SUFFIX;
         final ChargeRequest chargeRequest =
                 new ChargeRequest(ROOM_NIGHT_CHARGE_TYPE, description, amount, stay.getId(), unitPrice, (int) nights);
-        return new RoomChargeCalculation(chargeRequest, nights);
+        // unitPrice above is left null for a reservation-based stay (ChargeRequest's own
+        // display-only field, see its javadoc) — the snapshot a future room change needs
+        // (Parte 6) must never be null, so derive it from the total when it wasn't already
+        // resolved per-night.
+        final BigDecimal snapshotUnitPrice = unitPrice != null
+                ? unitPrice
+                : amount.divide(BigDecimal.valueOf(nights), 2, RoundingMode.HALF_UP);
+        return new RoomChargeCalculation(chargeRequest, nights, snapshotUnitPrice);
     }
 
     /**
@@ -322,9 +415,25 @@ class StayBillingCoordinator {
      * The room charge to post (or already posted), paired with the resolved
      * night count for reuse by the {@code CITY_TAX} assessment.
      *
-     * @param chargeRequest the {@code ROOM_NIGHT} charge request
-     * @param nights        the resolved night count
+     * @param chargeRequest      the {@code ROOM_NIGHT} charge request
+     * @param nights             the resolved night count
+     * @param snapshotUnitPrice  the per-night price to persist on {@code
+     *                           Stay.roomChargeUnitPrice} — never {@code null},
+     *                           unlike {@code chargeRequest.unitPrice()} which
+     *                           is display-only and may legitimately be
+     *                           {@code null} for a reservation-based stay
      */
-    private record RoomChargeCalculation(ChargeRequest chargeRequest, long nights) {
+    private record RoomChargeCalculation(ChargeRequest chargeRequest, long nights, BigDecimal snapshotUnitPrice) {
+    }
+
+    /**
+     * The new room's re-billed segment, for {@code StayServiceImpl.changeRoom} to
+     * persist onto the {@code Stay}.
+     *
+     * @param newRoomChargeId        the posted charge id for the remaining-nights segment
+     * @param newRoomChargeUnitPrice its per-night price snapshot
+     * @param newRoomChargeNights    its night count
+     */
+    record RoomChangeBillingResult(UUID newRoomChargeId, BigDecimal newRoomChargeUnitPrice, int newRoomChargeNights) {
     }
 }

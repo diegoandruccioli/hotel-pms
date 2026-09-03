@@ -2,23 +2,23 @@ import { useState, useEffect, useCallback, useMemo, memo, type ChangeEvent, type
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { stayService } from '../../services/stayService';
+import { stayService } from '../../services';
 import type {
   CityTaxApplicability,
   CityTaxBackfillResponse,
   CityTaxRateResponse,
   HotelCategoryHistoryRequest,
   HotelCategoryHistoryResponse,
-} from '../../types/stay.types';
+} from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Card } from '../../components/m3/M3Card';
-import { M3Select } from '../../components/m3/M3Select';
-import { M3Table, M3TableRow, M3TableCell } from '../../components/m3/M3Table';
-import { M3TextField } from '../../components/m3/M3TextField';
+import { M3Button } from '../../components/m3';
+import { M3Card } from '../../components/m3';
+import { M3Select } from '../../components/m3';
+import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
-import { useToastStore } from '../../store/toastStore';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { useToastStore } from '../../store';
+import { getErrorMessage } from '../../utils';
 
 const CATEGORY_MAX_LENGTH = 20;
 const NOTE_MAX_LENGTH = 200;

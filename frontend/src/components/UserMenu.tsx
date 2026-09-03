@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
+import { cn } from '../utils';
 
 interface UserMenuProps {
   /** Display name for the avatar initial */
@@ -32,13 +33,13 @@ const UserMenuItem = memo(({
     type="button"
     role="menuitem"
     onClick={onClick}
-    className={[
+    className={cn(
       'flex items-center gap-3 w-full px-4 py-3',
-      'text-sm font-body text-left transition-colors focus-visible:outline-none',
+      'text-sm font-body text-left transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset',
       isError
-        ? 'text-error hover:bg-error-container/20 focus-visible:bg-error-container/20'
-        : 'text-on-surface hover:bg-surface-container-highest focus-visible:bg-surface-container-highest',
-    ].join(' ')}
+        ? 'text-error hover:bg-error-container/20 focus-visible:bg-error-container/20 focus-visible:ring-error'
+        : 'text-on-surface hover:bg-surface-container-highest focus-visible:bg-surface-container-highest focus-visible:ring-primary'
+    )}
   >
     <MaterialIcon
       name={icon}
@@ -137,15 +138,15 @@ export const UserMenu = ({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls="user-menu-list"
-        className={[
+        className={cn(
           'flex items-center justify-center w-10 h-10',
           'rounded-shape-full bg-primary text-on-primary',
           'text-sm font-display font-bold',
-          'focus-visible:outline-none focus-visible:ring-2',
+          'focus-visible:outline-hidden focus-visible:ring-2',
           'focus-visible:ring-primary focus-visible:ring-offset-2',
           'hover:brightness-110 transition-all cursor-pointer',
-          open ? 'ring-2 ring-primary ring-offset-2' : '',
-        ].join(' ')}
+          open && 'ring-2 ring-primary ring-offset-2'
+        )}
         aria-label={t('user_menu_label', { name: username })}
       >
         {userInitial}
@@ -159,13 +160,13 @@ export const UserMenu = ({
           tabIndex={-1}
           aria-labelledby="user-menu-trigger"
           onKeyDown={handleMenuKeyDown}
-          className={[
+          className={cn(
             'absolute right-0 top-full mt-2 w-56 z-40',
-            'bg-surface-container rounded-[16px]',
+            'bg-surface-container rounded-shape-lg',
             'shadow-elevation-3 border border-outline-variant/30',
             'py-2 overflow-hidden',
-            'animate-fade-in',
-          ].join(' ')}
+            'animate-fade-in'
+          )}
         >
           {/* User info header (non-interactive) */}
           <div className="px-4 py-3 border-b border-outline-variant/30">

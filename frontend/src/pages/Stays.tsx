@@ -2,32 +2,33 @@ import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { TFunction } from 'i18next';
-import { useAuthStore } from '../store/authStore';
-import { useToastStore } from '../store/toastStore';
-import type { StayResponse, StayStatus } from '../types/stay.types';
+import { useAuthStore } from '../store';
+import { useToastStore } from '../store';
+import type { StayResponse, StayStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
-import { M3DataTable } from '../components/m3/M3DataTable';
-import { M3LoadingState } from '../components/m3/M3LoadingState';
-import { M3ErrorState } from '../components/m3/M3ErrorState';
-import { M3Pagination } from '../components/m3/M3Pagination';
-import { M3TextField } from '../components/m3/M3TextField';
+import { M3Button } from '../components/m3';
+import { M3DataTable } from '../components/m3';
+import { M3LoadingState } from '../components/m3';
+import { M3ErrorState } from '../components/m3';
+import { M3Pagination } from '../components/m3';
+import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
 
 import { StayStatusChip } from './Stays/StayStatusChip';
-import { M3StatusChip } from '../components/m3/M3StatusChip';
-import { M3TableActionLink } from '../components/m3/M3TableActionLink';
+import { M3StatusChip } from '../components/m3';
+import { M3TableActionLink } from '../components/m3';
 import { getStatusTone } from './Stays/stayStatusTone';
 import { AlloggiatiReportSection } from './Stays/AlloggiatiReportSection';
 import { StayGuestManagerDialog } from './Stays/StayGuestManagerDialog';
 import { StayExtensionDialog } from './Stays/StayExtensionDialog';
-import { getErrorMessage } from '../utils/errorMessage';
+import { StayRoomChangeDialog } from './Stays/StayRoomChangeDialog';
+import { getErrorMessage } from '../utils';
 import {
   useStaysList,
   useCheckOutStay,
   useRetryInvoiceCreation,
   useRetryCheckoutEmail,
-} from '../hooks/queries/useStays';
+} from '../hooks/queries';
 
 type StaySortField = 'actualCheckInTime' | 'expectedCheckOutDate' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -79,7 +80,7 @@ const AlloggiatiCell = ({ stay, onRetryInvoice, retryingInvoice, onRetryCheckout
             onClick={handleRetryInvoice}
             disabled={retryingInvoice === stay.id}
             aria-label={t('retry_invoice_creation')}
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/12 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
           >
             <MaterialIcon name={retryingInvoice === stay.id ? 'progress_activity' : 'refresh'} size={16} />
           </button>
@@ -93,7 +94,7 @@ const AlloggiatiCell = ({ stay, onRetryInvoice, retryingInvoice, onRetryCheckout
             onClick={handleRetryCheckoutEmail}
             disabled={retryingEmail === stay.id}
             aria-label={t('retry_checkout_email')}
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/12 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
           >
             <MaterialIcon name={retryingEmail === stay.id ? 'progress_activity' : 'refresh'} size={16} />
           </button>
@@ -120,7 +121,7 @@ const GuestsCountCell = ({ stay, onManageGuests }: { stay: StayResponse; onManag
     <button
       type="button"
       onClick={handleClick}
-      className="font-medium flex items-center gap-1.5 text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs"
+      className="font-medium flex items-center gap-1.5 text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs"
     >
       <MaterialIcon name="group" size={18} />
       <span>{count}</span>
@@ -128,15 +129,17 @@ const GuestsCountCell = ({ stay, onManageGuests }: { stay: StayResponse; onManag
   );
 };
 
-const ActionsCell = ({ stay, onCheckOut, checkingOut, onExtend, t }: {
+const ActionsCell = ({ stay, onCheckOut, checkingOut, onExtend, onChangeRoom, t }: {
   stay: StayResponse;
   onCheckOut: (s: StayResponse) => void;
   checkingOut: string | null;
   onExtend: (s: StayResponse) => void;
+  onChangeRoom: (s: StayResponse) => void;
   t: TFunction;
 }) => {
   const handleCheckOut = useCallback(() => onCheckOut(stay), [onCheckOut, stay]);
   const handleExtend = useCallback(() => onExtend(stay), [onExtend, stay]);
+  const handleChangeRoom = useCallback(() => onChangeRoom(stay), [onChangeRoom, stay]);
 
   if (stay.status !== 'CHECKED_IN') return null;
 
@@ -150,6 +153,15 @@ const ActionsCell = ({ stay, onCheckOut, checkingOut, onExtend, t }: {
         className="text-xs h-10 px-3"
       >
         {t('action_extend_stay')}
+      </M3Button>
+      <M3Button
+        variant="outlined"
+        icon="meeting_room"
+        onClick={handleChangeRoom}
+        id={`change-room-btn-${stay.id}`}
+        className="text-xs h-10 px-3"
+      >
+        {t('action_change_room')}
       </M3Button>
       <M3Button
         variant="tonal"
@@ -285,6 +297,11 @@ export const Stays = memo(() => {
   const handleExtendStay = useCallback((stay: StayResponse) => setExtendingStay(stay), []);
   const handleCloseExtension = useCallback(() => setExtendingStay(null), []);
   const handleStayExtended = useCallback(() => { refetch(); }, [refetch]);
+
+  const [changingRoomStay, setChangingRoomStay] = useState<StayResponse | null>(null);
+  const handleChangeRoom = useCallback((stay: StayResponse) => setChangingRoomStay(stay), []);
+  const handleCloseRoomChange = useCallback(() => setChangingRoomStay(null), []);
+  const handleRoomChanged = useCallback(() => { refetch(); }, [refetch]);
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
   const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
   const pageOfLabel = useCallback(
@@ -382,12 +399,13 @@ export const Stays = memo(() => {
           onCheckOut={handleCheckOut}
           checkingOut={checkingOut}
           onExtend={handleExtendStay}
+          onChangeRoom={handleChangeRoom}
           t={t}
         />
       ),
     },
   ], [t, formatDate, handleGuestNavigate, handleRetryInvoice, retryingInvoice, handleRetryCheckoutEmail,
-      retryingEmail, handleCheckOut, checkingOut, handleManageGuests, handleExtendStay]);
+      retryingEmail, handleCheckOut, checkingOut, handleManageGuests, handleExtendStay, handleChangeRoom]);
 
   return (
     <div className="space-y-6">
@@ -470,6 +488,7 @@ export const Stays = memo(() => {
 
       <StayGuestManagerDialog stayId={manageGuestsStayId} onClose={handleCloseGuestManager} />
       <StayExtensionDialog stay={extendingStay} onClose={handleCloseExtension} onExtended={handleStayExtended} />
+      <StayRoomChangeDialog stay={changingRoomStay} onClose={handleCloseRoomChange} onChanged={handleRoomChanged} />
     </div>
   );
 });

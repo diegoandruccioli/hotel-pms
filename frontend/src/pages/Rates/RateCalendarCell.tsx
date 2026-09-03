@@ -1,5 +1,6 @@
 import { memo, useCallback } from 'react';
-import type { RateCalendarDay } from '../../types/inventory.types';
+import type { RateCalendarDay } from '../../types';
+import { cn, resolveDesignToken } from '../../utils';
 
 interface RateCalendarCellProps {
   day: RateCalendarDay;
@@ -7,6 +8,7 @@ interface RateCalendarCellProps {
   dayIndex: number;
   isSelected: boolean;
   isToday: boolean;
+  /** CSS var name (e.g. '--md-season-1'), not a hex value. */
   seasonColor?: string;
   ariaLabel: string;
   onPointerDown: (rowIndex: number, dayIndex: number) => void;
@@ -42,8 +44,9 @@ export const RateCalendarCell = memo(({
   }, [onKeyboardSelect, rowIndex, dayIndex]);
 
   const hasSeason = day.rateSeasonId != null;
-  const style = hasSeason ? { borderLeftColor: seasonColor, borderLeftWidth: 4 } : undefined;
-  const dotStyle = hasSeason ? { backgroundColor: seasonColor } : undefined;
+  const resolvedSeasonColor = hasSeason && seasonColor ? resolveDesignToken(seasonColor) : undefined;
+  const style = hasSeason ? { borderLeftColor: resolvedSeasonColor, borderLeftWidth: 4 } : undefined;
+  const dotStyle = hasSeason ? { backgroundColor: resolvedSeasonColor } : undefined;
 
   return (
     <button
@@ -54,13 +57,14 @@ export const RateCalendarCell = memo(({
       aria-pressed={isSelected}
       aria-label={ariaLabel}
       style={style}
-      className={`flex-shrink-0 w-[100px] h-16 border-r border-b border-outline-variant flex flex-col items-center justify-center gap-1 text-xs font-body transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${
+      className={cn(
+        'shrink-0 w-[100px] h-16 border-r border-b border-outline-variant flex flex-col items-center justify-center gap-1 text-xs font-body transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
         isSelected
           ? 'bg-primary-container'
           : isToday
             ? 'bg-surface-container'
             : 'bg-surface hover:bg-surface-container-low'
-      }`}
+      )}
     >
       {hasSeason && <span className="w-2 h-2 rounded-full" style={dotStyle} aria-hidden="true" />}
       <span className="font-medium text-on-surface">€ {day.price.toFixed(0)}</span>

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { quotationService } from '../../services/quotationService';
+import { quotationService } from '../../services';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Dialog } from '../../components/m3/M3Dialog';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { M3Button } from '../../components/m3';
+import { M3Dialog } from '../../components/m3';
+import { getErrorMessage } from '../../utils';
 
 interface Props {
   quotationId: string;

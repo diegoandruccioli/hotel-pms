@@ -1,23 +1,23 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { M3Dialog } from '../../components/m3/M3Dialog';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3StatusChip } from '../../components/m3/M3StatusChip';
-import { M3TextField } from '../../components/m3/M3TextField';
-import { M3LoadingState } from '../../components/m3/M3LoadingState';
+import { M3Dialog } from '../../components/m3';
+import { M3Button } from '../../components/m3';
+import { M3StatusChip } from '../../components/m3';
+import { M3TextField } from '../../components/m3';
+import { M3LoadingState } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { useToastStore } from '../../store/toastStore';
-import { stayService } from '../../services/stayService';
-import { getErrorMessage } from '../../utils/errorMessage';
-import { queryKeys } from '../../lib/queryKeys';
+import { useToastStore } from '../../store';
+import { stayService } from '../../services';
+import { getErrorMessage } from '../../utils';
+import { queryKeys } from '../../lib';
 import type {
   AlloggiatiStato,
   AlloggiatiTipdoc,
   StayGuestRequest,
   StayGuestResponse,
   StayResponse,
-} from '../../types/stay.types';
+} from '../../types';
 import { GuestFieldSection } from './GuestFieldSection';
 import { emptyGuest, CODICE_ITALIA, TYPES_WITHOUT_DOC, alloggiatiPlaceIssues } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';

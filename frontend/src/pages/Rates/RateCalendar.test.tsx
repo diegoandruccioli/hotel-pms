@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { RateCalendar } from './RateCalendar';
-import { rateSeasonService } from '../../services/rateSeasonService';
+import { rateSeasonService } from '../../services';
 
 // `t` must be a stable reference across renders (as the real react-i18next hook
 // returns) — RateCalendar's data-fetch effect depends on it, and a fresh `t` per

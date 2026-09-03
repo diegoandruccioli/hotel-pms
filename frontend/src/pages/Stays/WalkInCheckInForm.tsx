@@ -2,16 +2,16 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { stayService } from '../../services/stayService';
-import { guestService } from '../../services/guestService';
+import { stayService } from '../../services';
+import { guestService } from '../../services';
 import type {
   AvailableRoom, AlloggiatiStato, AlloggiatiTipdoc, CityTaxUnassessedReason, StayGuestRequest, TravellerType,
-} from '../../types/stay.types';
-import type { GuestResponseDTO } from '../../types/guest.types';
-import { useToastStore } from '../../store/toastStore';
+} from '../../types';
+import type { GuestResponseDTO } from '../../types';
+import { useToastStore } from '../../store';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3TextField } from '../../components/m3/M3TextField';
-import { M3Select } from '../../components/m3/M3Select';
+import { M3TextField } from '../../components/m3';
+import { M3Select } from '../../components/m3';
 import { GuestFieldSection } from './GuestFieldSection';
 import {
   emptyGuest,
@@ -19,7 +19,7 @@ import {
   validateAlloggiatiGuests,
 } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
-import { getErrorMessage } from '../../utils/errorMessage';
+import { getErrorMessage } from '../../utils';
 
 const todayIso = new Date().toISOString().split('T')[0];
 const GUEST_SEARCH_DEBOUNCE_MS = 300;
@@ -39,7 +39,7 @@ const GuestOption = memo(({ guest, selected, onSelect }: GuestOptionProps) => {
   return (
     <div role="option" aria-selected={selected}>
       <button type="button" onClick={handleClick}
-        className="w-full text-left px-3 py-2 text-sm hover:bg-surface-variant focus:bg-surface-variant focus:outline-none">
+        className="w-full text-left px-3 py-2 text-sm hover:bg-surface-variant focus:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-inset">
         {guest.firstName} {guest.lastName}
         {guest.email ? ` · ${guest.email}` : ''}
       </button>
@@ -229,7 +229,7 @@ export function WalkInCheckInForm() {
           role="status"
           className="mb-6 bg-secondary-container text-on-secondary-container p-4 rounded-shape-sm flex items-start gap-3"
         >
-          <MaterialIcon name="info" className="mt-0.5 flex-shrink-0" />
+          <MaterialIcon name="info" className="mt-0.5 shrink-0" />
           <div>
             <p className="font-body text-sm font-medium">{t('city_tax_preflight_title')}</p>
             <p className="font-body text-sm">{t(`city_tax_preflight_reason_${cityTaxWarning.toLowerCase()}`)}</p>
@@ -312,7 +312,7 @@ export function WalkInCheckInForm() {
           <button
             type="button"
             onClick={addGuest}
-            className="rounded-full border border-outline px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary"
+            className="rounded-full border border-outline px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary"
           >
             {t('btn_add_guest')}
           </button>
@@ -322,11 +322,11 @@ export function WalkInCheckInForm() {
 
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={handleNavigateBack}
-            className="flex-1 rounded-full border border-outline px-6 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant focus:outline-none focus:ring-2 focus:ring-primary">
+            className="flex-1 rounded-full border border-outline px-6 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary">
             {t('cancel')}
           </button>
           <button type="submit" disabled={loading || rooms.length === 0}
-            className="flex-1 rounded-full bg-primary px-6 py-2 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary">
+            className="flex-1 rounded-full bg-primary px-6 py-2 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50 focus:outline-hidden focus:ring-2 focus:ring-primary">
             {loading ? t('btn_processing') : t('walkin_btn_checkin')}
           </button>
         </div>

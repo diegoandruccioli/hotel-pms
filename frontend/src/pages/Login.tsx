@@ -1,12 +1,11 @@
 import React, { useState, memo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
-import { authService } from '../services/authService';
+import { useAuthStore } from '../store';
+import { authService } from '../services';
 import { useTranslation } from 'react-i18next';
-import { M3TextField } from '../components/m3/M3TextField';
-import { M3Button } from '../components/m3/M3Button';
-
-const ICON_STYLE = { fontSize: 20 };
+import { M3TextField } from '../components/m3';
+import { M3Button } from '../components/m3';
+import { MaterialIcon } from '../components/MaterialIcon';
 
 export const Login = memo(() => {
   const { t } = useTranslation('auth');
@@ -56,7 +55,7 @@ export const Login = memo(() => {
     <form data-testid="login-form" className="space-y-5" onSubmit={handleSubmit}>
       {error && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container">
-          <span className="material-symbols-outlined" style={ICON_STYLE} aria-hidden="true">error</span>
+          <MaterialIcon name="error" size={20} />
           <p className="text-sm font-body">{error}</p>
         </div>
       )}

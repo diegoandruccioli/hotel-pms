@@ -321,6 +321,35 @@ class StayServiceImplTest {
         verify(stayRepository, times(0)).save(anyNonNull(Stay.class));
     }
 
+    /**
+     * MAINTENANCE is the one housekeeping status that is not transient
+     * (unlike DIRTY, cleared by the morning cycle before an afternoon
+     * check-in), so it is the only one that blocks the actual check-in
+     * action — see StayCheckInValidator#verifyNotInMaintenance.
+     */
+    @Test
+    void shouldRejectCheckInWhenRoomInMaintenance() {
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationService.getReservationById(reservation))
+                .thenReturn(reservationResponse(ReservationStatus.CONFIRMED, null));
+        final RoomTypeResponse roomType = new RoomTypeResponse(
+                UUID.randomUUID(), "Standard", null, 2, BigDecimal.valueOf(90), true, null, null);
+        when(roomService.getRoomById(room, hotelId)).thenReturn(
+                new RoomResponse(room, hotelId, ROOM_NUMBER_101, roomType, RoomStatus.MAINTENANCE,
+                        true, null, null, null));
+
+        final ConflictException ex = assertThrows(ConflictException.class, () -> stayService.checkIn(request));
+
+        assertEquals("ROOM_IN_MAINTENANCE", ex.getMessage());
+        verify(stayRepository, times(0)).save(anyNonNull(Stay.class));
+    }
+
     @Test
     void shouldCheckInAndSetStayForGuests() {
         // Arrange
@@ -395,7 +424,8 @@ class StayServiceImplTest {
         verify(reservationService, times(1)).updateStatusAndGuests(
                 ArgumentMatchers.eq(reservation),
                 ArgumentMatchers.eq(ReservationStatus.PARTIALLY_CHECKED_IN),
-                ArgumentMatchers.eq(1));
+                ArgumentMatchers.eq(1),
+                ArgumentMatchers.any());
     }
 
     @Test
@@ -438,7 +468,8 @@ class StayServiceImplTest {
         verify(reservationService, times(1)).updateStatusAndGuests(
                 ArgumentMatchers.eq(reservation),
                 ArgumentMatchers.eq(ReservationStatus.CHECKED_IN),
-                ArgumentMatchers.eq(2));
+                ArgumentMatchers.eq(2),
+                ArgumentMatchers.any());
     }
 
     @Test
@@ -627,7 +658,7 @@ class StayServiceImplTest {
         assertFalse(checkedInStay.isCheckoutEmailFailed());
         verify(roomService, times(1)).updateRoomStatus(Objects.requireNonNull(roomId), hotelId, RoomStatus.DIRTY);
         verify(reservationService, times(1))
-                .updateStatusAndGuests(reservationId, ReservationStatus.CHECKED_OUT, null);
+                .updateStatusAndGuests(reservationId, ReservationStatus.CHECKED_OUT, null, null);
         verify(notificationClient, times(1)).sendCheckout(ArgumentMatchers.any());
         verify(gatewayEventsClient, times(1))
                 .notify(new GatewayEventNotifyRequest(GatewayEventType.CHECK_OUT));
@@ -848,7 +879,8 @@ class StayServiceImplTest {
 
         // Assert
         verify(reservationService, times(0))
-                .updateStatusAndGuests(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+                .updateStatusAndGuests(ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any(),
+                        ArgumentMatchers.any());
     }
 
     @Test
@@ -1721,7 +1753,8 @@ class StayServiceImplTest {
         when(stayMapper.toDto(saved)).thenReturn(expected);
 
         doThrow(new NotFoundException("RESERVATION_NOT_FOUND")).when(reservationService)
-                .updateStatusAndGuests(ArgumentMatchers.eq(reservation), ArgumentMatchers.any(), ArgumentMatchers.any());
+                .updateStatusAndGuests(ArgumentMatchers.eq(reservation), ArgumentMatchers.any(), ArgumentMatchers.any(),
+                        ArgumentMatchers.any());
 
         // Act — Stay and room remain consistent even if the non-blocking reservation update fails
         final StayResponse response = stayService.checkIn(request);

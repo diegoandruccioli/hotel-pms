@@ -133,4 +133,24 @@ public interface RoomService {
      * @return the clean rooms for that hotel
      */
     List<RoomResponse> findCleanRooms(UUID hotelId);
+
+    /**
+     * Returns every active room belonging to the authenticated hotel that is
+     * not {@code MAINTENANCE}, unpaginated — the candidate pool for a
+     * date-scoped availability search on a future booking.
+     *
+     * <p>Unlike {@link #findCleanRooms}, this deliberately does NOT require
+     * {@code CLEAN}: housekeeping status (CLEAN/DIRTY) is a transient,
+     * point-in-time fact about today, irrelevant to whether a room can be
+     * booked for a check-in weeks or months away — by then it will certainly
+     * have been cleaned. {@code MAINTENANCE} is the one status that is not
+     * transient in the same way (a deliberate "not sellable" declaration), so
+     * it is the only one that should keep a room out of a future search.
+     * Actual bookability for the requested range is still layered on top by
+     * the caller via the overlap check.
+     *
+     * @param hotelId the hotel UUID (from the authenticated user's JWT)
+     * @return the non-{@code MAINTENANCE} rooms for that hotel
+     */
+    List<RoomResponse> findBookableRooms(UUID hotelId);
 }

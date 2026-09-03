@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { OwnerDashboard } from './OwnerDashboard';
-import { billingReportService } from '../services/billingReportService';
-import { kpiReportService } from '../services/kpiReportService';
-import { renderWithQuery } from '../test-utils/renderWithQuery';
-import type { OwnerFinancialReportDto } from '../types/ownerReport.types';
-import { mockAxiosErrorWithDetail } from '../test-utils/mockAxiosError';
+import { billingReportService } from '../services';
+import { kpiReportService } from '../services';
+import { renderWithQuery } from '../test-utils';
+import type { OwnerFinancialReportDto } from '../types';
+import { mockAxiosErrorWithDetail } from '../test-utils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),

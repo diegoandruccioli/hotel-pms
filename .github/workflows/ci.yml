@@ -91,6 +91,10 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
+      - name: Circular import check — madge
+        working-directory: frontend
+        run: npm run lint:cycles
+
       - name: TypeScript check + production build
         working-directory: frontend
         run: npm run build

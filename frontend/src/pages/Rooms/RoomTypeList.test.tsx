@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../../test-utils/renderWithQuery';
+import { renderWithQuery as render } from '../../test-utils';
 import { RoomTypeList } from './RoomTypeList';
-import { inventoryService } from '../../services/inventoryService';
+import { inventoryService } from '../../services';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),

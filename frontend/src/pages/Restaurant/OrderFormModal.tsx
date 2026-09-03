@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { M3Dialog } from '../../components/m3/M3Dialog';
-import { M3Button } from '../../components/m3/M3Button';
-import { M3Select } from '../../components/m3/M3Select';
+import { M3Dialog } from '../../components/m3';
+import { M3Button } from '../../components/m3';
+import { M3Select } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { fbService } from '../../services/fbService';
-import { stayService } from '../../services/stayService';
-import { useToastStore } from '../../store/toastStore';
-import { getErrorMessage } from '../../utils/errorMessage';
-import type { MenuItemResponse } from '../../types/fb.types';
-import type { StayResponse } from '../../types/stay.types';
+import { fbService } from '../../services';
+import { stayService } from '../../services';
+import { useToastStore } from '../../store';
+import { getErrorMessage } from '../../utils';
+import type { MenuItemResponse } from '../../types';
+import type { StayResponse } from '../../types';
 
 const ACTIVE_STAYS_PAGE_SIZE = 500;
 
@@ -50,7 +50,7 @@ const MenuItemRow = memo(
             onClick={handleDecrement}
             disabled={quantity === 0}
             aria-label={`${t('decrease_quantity')} ${item.name}`}
-            className="w-10 h-10 flex items-center justify-center rounded-full text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 transition-colors"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-1 transition-colors"
           >
             <MaterialIcon name="remove" size={18} aria-hidden="true" />
           </button>
@@ -64,7 +64,7 @@ const MenuItemRow = memo(
             type="button"
             onClick={handleIncrement}
             aria-label={`${t('increase_quantity')} ${item.name}`}
-            className="w-10 h-10 flex items-center justify-center rounded-full text-primary hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 transition-colors"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-primary hover:bg-primary/10 focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-1 transition-colors"
           >
             <MaterialIcon name="add" size={18} aria-hidden="true" />
           </button>

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import i18n from '../i18n';
 
 export type FontScale = 'small' | 'normal' | 'large';
 export type ContrastMode = 'normal' | 'high';
@@ -69,7 +68,13 @@ export const useSettingsStore = create<SettingsState>(() => {
       useSettingsStore.setState({ fontScale: scale });
     },
     setLanguage: (lang) => {
-      i18n.changeLanguage(lang);
+      // Dynamic import, not a static one: `../i18n` runs i18n.init() as a
+      // module-load side effect, which must NOT fire just because something
+      // imported an unrelated member of the store/ barrel (which re-exports
+      // this module too). Deferring the import to call time means the real
+      // i18n singleton only loads when a language change is actually
+      // requested, not whenever any store is touched.
+      void import('../i18n').then(({ default: i18n }) => i18n.changeLanguage(lang));
     },
   };
 });

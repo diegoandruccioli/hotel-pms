@@ -1,16 +1,17 @@
 import { useState, useCallback, useEffect, memo } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
-import { authService } from '../services/authService';
+import { useAuthStore } from '../store';
+import { authService } from '../services';
 import { ToastContainer } from '../components/Toast';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { UserMenu } from '../components/UserMenu';
 import { RouteAnnouncer } from '../components/RouteAnnouncer';
 import { CommandPalette } from '../components/CommandPalette';
-import { useEscapeKey } from '../hooks/useEscapeKey';
-import { useServerEvents } from '../hooks/useServerEvents';
+import { useEscapeKey } from '../hooks';
+import { useServerEvents } from '../hooks';
 import * as FocusTrapModule from 'focus-trap-react';
+import { cn } from '../utils';
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
 
 const navigation = [
@@ -35,21 +36,25 @@ const ownerNavigation = [
 // ring at all, unlike the skip-link — same recipe as M3Button/M3TableActionLink
 // so focus indicators are consistent across the whole app.
 const NAV_ITEM_FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2';
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2';
 
 const getRailNavItemClasses = ({ isActive }: { isActive: boolean }) =>
-  `group flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-shape-lg transition-colors w-full ${NAV_ITEM_FOCUS_RING} ${
+  cn(
+    'group flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-shape-lg transition-colors w-full',
+    NAV_ITEM_FOCUS_RING,
     isActive
       ? 'text-on-primary-container'
       : 'text-on-surface-variant hover:text-on-surface'
-  }`;
+  );
 
 const getDrawerNavItemClasses = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-3 px-4 py-3 mx-3 rounded-shape-full text-sm font-medium font-body transition-colors ${NAV_ITEM_FOCUS_RING} ${
+  cn(
+    'flex items-center gap-3 px-4 py-3 mx-3 rounded-shape-full text-sm font-medium font-body transition-colors',
+    NAV_ITEM_FOCUS_RING,
     isActive
       ? 'bg-primary-container text-on-primary-container'
       : 'text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface'
-  }`;
+  );
 
 /* ── Navigation Item (Rail — desktop) ───────────────── */
 
@@ -70,15 +75,16 @@ const RailNavItem = memo(({
     {({ isActive }) => (
       <>
         <span
-          className={`flex items-center justify-center w-14 h-10 rounded-shape-full transition-colors ${
+          className={cn(
+            'flex items-center justify-center w-14 h-10 rounded-shape-full transition-colors',
             isActive
               ? 'bg-primary-container'
               : 'group-hover:bg-surface-container-highest'
-          }`}
+          )}
         >
           <MaterialIcon name={item.icon} filled={isActive} size={24} />
         </span>
-        <span className="text-[11px] font-medium font-body leading-tight text-center truncate w-full">
+        <span className="text-2xs font-medium font-body leading-tight text-center truncate w-full">
           {label}
         </span>
       </>
@@ -229,7 +235,7 @@ export const MainLayout = () => {
       )}
 
       {/* ── Desktop Navigation Rail ─────────────────── */}
-      <aside className="hidden md:flex flex-col items-center md:fixed md:left-0 md:top-0 md:h-full w-24 flex-shrink-0 glass-surface border-r border-outline-variant/50 py-4 gap-1 overflow-y-auto [scrollbar-gutter:stable] md:z-20">
+      <aside className="hidden md:flex flex-col items-center md:fixed md:left-0 md:top-0 md:h-full w-24 shrink-0 glass-surface border-r border-outline-variant/50 py-4 gap-1 overflow-y-auto scrollbar-gutter-stable md:z-20">
         <div className="flex items-center justify-center w-14 h-14 mb-3 bg-primary-container rounded-shape-lg">
           <MaterialIcon name="apartment" size={28} className="text-on-primary-container" />
         </div>
@@ -262,7 +268,7 @@ export const MainLayout = () => {
       {/* ── Main content area ───────────────────────── */}
       <div className="flex flex-col flex-1 w-0 overflow-hidden md:ml-24">
         {/* Top Bar */}
-        <header className="relative z-10 flex-shrink-0 flex items-center h-16 glass-surface-elevated border-b border-outline-variant/30 shadow-elevation-1 px-4">
+        <header className="relative z-10 shrink-0 flex items-center h-16 glass-surface-elevated border-b border-outline-variant/30 shadow-elevation-1 px-4">
           {/* Mobile hamburger */}
           <button
             type="button"
@@ -280,10 +286,10 @@ export const MainLayout = () => {
             type="button"
             onClick={openPalette}
             aria-label={tCommand('palette_open_button')}
-            className="flex items-center gap-2 h-10 px-3 mr-2 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="flex items-center gap-2 h-10 px-3 mr-2 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             <MaterialIcon name="search" size={20} />
-            <kbd className="hidden sm:inline text-xs rounded border border-outline-variant px-1.5 py-0.5">
+            <kbd className="hidden sm:inline text-xs rounded-sm border border-outline-variant px-1.5 py-0.5">
               {navigator.platform.toUpperCase().includes('MAC') ? '⌘K' : 'Ctrl K'}
             </kbd>
           </button>
@@ -307,7 +313,7 @@ export const MainLayout = () => {
         </header>
 
         {/* Page content */}
-        <main id="main-content" className="flex-1 relative overflow-y-auto focus:outline-none" tabIndex={-1}>
+        <main id="main-content" className="flex-1 relative overflow-y-auto focus:outline-hidden" tabIndex={-1}>
           <div className="py-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
               <Outlet />

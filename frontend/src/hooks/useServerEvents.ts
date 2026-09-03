@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '../lib/queryKeys';
+import { queryKeys } from '../lib';
 
 const EVENTS_STREAM_URL = '/api/v1/events/stream';
 

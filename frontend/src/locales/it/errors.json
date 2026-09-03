@@ -30,6 +30,7 @@
   "CHECKOUT_MUST_BE_AFTER_CHECKIN": "La data di check-out deve essere successiva a quella di check-in.",
   "ROOM_UNAVAILABLE": "La camera selezionata non è disponibile.",
   "ROOM_UNAVAILABLE_DATES": "La camera non è disponibile per le date selezionate.",
+  "ROOM_IN_MAINTENANCE": "La camera è in manutenzione e non può ospitare un check-in.",
   "RESERVATION_NOT_DELETABLE": "Questa prenotazione non può essere eliminata nel suo stato attuale.",
 
   "GUEST_HAS_ACTIVE_RESERVATIONS": "Impossibile eliminare l'ospite: ha prenotazioni attive.",
@@ -79,8 +80,16 @@
   "HOTEL_CATEGORY_OVERLAP": "Esiste già una categoria con un periodo di validità sovrapposto.",
   "HOTEL_CATEGORY_VALID_FROM_NOT_AFTER_CURRENT": "La decorrenza della nuova categoria deve essere successiva a quella della categoria attualmente in vigore.",
   "RESERVATION_STALE_VERSION": "Un altro utente ha modificato questa prenotazione nel frattempo.",
+  "RESERVATION_HAS_ACTIVE_STAY": "Impossibile modificare date o camere: il check-in è già stato effettuato. Usa la gestione del soggiorno.",
   "STAY_EXTENSION_INVOICE_NOT_OPEN": "Impossibile prorogare: la fattura di questo soggiorno non è più aperta.",
   "ROOM_NOT_AVAILABLE_FOR_EXTENSION": "La camera non è disponibile per le notti aggiuntive richieste.",
   "STAY_STALE_VERSION": "Un altro utente ha modificato questo soggiorno nel frattempo.",
-  "STAY_GUEST_STALE_VERSION": "Un altro utente ha modificato questo ospite nel frattempo."
+  "STAY_GUEST_STALE_VERSION": "Un altro utente ha modificato questo ospite nel frattempo.",
+  "SAME_ROOM_NOT_ALLOWED": "L'ospite è già in questa camera.",
+  "ROOM_NOT_CLEAN": "La camera scelta non è pulita — seleziona una camera con stato \"Pulita\".",
+  "ROOM_CAPACITY_EXCEEDED": "La camera scelta non ha una capienza sufficiente per tutti gli ospiti ancora presenti.",
+  "ROOM_NOT_AVAILABLE_FOR_ROOM_CHANGE": "La camera scelta non è disponibile per le notti restanti del soggiorno.",
+  "STAY_ROOM_CHANGE_INVOICE_NOT_OPEN": "Impossibile cambiare camera: la fattura di questo soggiorno non è più aperta.",
+  "ROOM_CHARGE_SNAPSHOT_MISSING": "Impossibile ricalcolare l'addebito per questo soggiorno — contatta l'assistenza tecnica.",
+  "STAY_ROOM_CHANGE_CHECKOUT_IN_PAST": "La data di check-out prevista di questo soggiorno è già passata — proroga prima il soggiorno (§3.5a), poi cambia camera."
 }

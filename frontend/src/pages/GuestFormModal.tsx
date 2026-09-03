@@ -1,15 +1,15 @@
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
-import { guestService } from '../services/guestService';
-import type { GuestResponseDTO, GuestRequestDTO } from '../types/guest.types';
+import { guestService } from '../services';
+import type { GuestResponseDTO, GuestRequestDTO } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3/M3Button';
-import { M3Dialog } from '../components/m3/M3Dialog';
-import { M3TextField } from '../components/m3/M3TextField';
-import { M3Select } from '../components/m3/M3Select';
+import { M3Button } from '../components/m3';
+import { M3Dialog } from '../components/m3';
+import { M3TextField } from '../components/m3';
+import { M3Select } from '../components/m3';
 import { StructuredAddressFields } from '../components/StructuredAddressFields';
-import { useToastStore } from '../store/toastStore';
+import { useToastStore } from '../store';
 
 const COUNTRY_CODES = [
   { code: '+39', label: '🇮🇹 +39' },
@@ -294,7 +294,7 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
                   onClick={toggleFiscalSection}
                   aria-expanded={showFiscalSection}
                   aria-controls="fiscal-section"
-                  className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium font-body text-on-surface-variant hover:bg-surface-container-highest/50 rounded-shape-xs transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-none"
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium font-body text-on-surface-variant hover:bg-surface-container-highest/50 rounded-shape-xs transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-hidden"
                 >
                   <span>{t('section_fiscal_data')}</span>
                   <MaterialIcon name={showFiscalSection ? 'expand_less' : 'expand_more'} size={18} />
