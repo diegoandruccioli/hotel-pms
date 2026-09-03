@@ -12,7 +12,7 @@ import { M3Card } from '../components/m3';
 import PlanningBoard from '@/pages/PlanningBoard';
 import { inventoryService } from '../services';
 import type { RoomResponse } from '../types';
-import { getErrorMessage, cn } from '../utils';
+import { getErrorMessage, cn, resolveDesignToken } from '../utils';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
@@ -38,13 +38,31 @@ const mapToEvent = (reservation: ReservationResponse): ReservationEvent => ({
 
 type StatusTone = 'info' | 'warning' | 'success' | 'neutral' | 'error';
 
-const statusLegend: { labelKey: string; color: string; tone: StatusTone }[] = [
-  { labelKey: 'status_confirmed', color: '#1A3A5C', tone: 'info' },
-  { labelKey: 'status_pending', color: '#5C4300', tone: 'warning' },
-  { labelKey: 'status_checked_in', color: '#2E7D6A', tone: 'success' },
-  { labelKey: 'status_checked_out', color: '#73777F', tone: 'neutral' },
-  { labelKey: 'status_cancelled', color: '#BA1A1A', tone: 'error' },
+// `tone` alone drives the rendered swatch (M3StatusChip resolves it to the
+// matching M3 token) -- there is deliberately no `color` field here anymore;
+// see EVENT_STATUS_TOKENS below for the (different) mapping the calendar's
+// solid event blocks use, which needs actual resolved color values, not a tone.
+const statusLegend: { labelKey: string; tone: StatusTone }[] = [
+  { labelKey: 'status_confirmed', tone: 'info' },
+  { labelKey: 'status_pending', tone: 'warning' },
+  { labelKey: 'status_checked_in', tone: 'success' },
+  { labelKey: 'status_checked_out', tone: 'neutral' },
+  { labelKey: 'status_cancelled', tone: 'error' },
 ];
+
+// react-big-calendar renders events as solid-fill blocks via inline style, so
+// this can't use Tailwind classes like M3StatusChip's tones do -- same tone
+// semantics (success->tertiary, warning->secondary, error->error, info->primary,
+// neutral->outline), but the *base* token (not the pale "-container" variant
+// M3StatusChip's tag-shaped chips use) since a solid block needs real contrast
+// against its own on-* text color, not a subdued tag background.
+const EVENT_STATUS_TOKENS: Record<string, { bg: string; text: string }> = {
+  CONFIRMED: { bg: '--md-primary', text: '--md-on-primary' },
+  PENDING: { bg: '--md-secondary', text: '--md-on-secondary' },
+  CHECKED_IN: { bg: '--md-tertiary', text: '--md-on-tertiary' },
+  CHECKED_OUT: { bg: '--md-outline', text: '--md-on-surface' },
+  CANCELLED: { bg: '--md-error', text: '--md-on-error' },
+};
 
 const CALENDAR_VIEWS: View[] = ['month'];
 const CALENDAR_STYLE = { height: 600 };
@@ -174,15 +192,13 @@ export const CalendarPlanning = () => {
 
   const eventPropGetter = useCallback((event: ReservationEvent) => {
     const status = event.resource.status;
-    const colorMap: Record<string, string> = {
-      CONFIRMED: '#1A3A5C',
-      PENDING: '#5C4300',
-      CANCELLED: '#BA1A1A',
-      CHECKED_IN: '#2E7D6A',
-      CHECKED_OUT: '#73777F',
-    };
-    const bg = colorMap[status] ?? '#1A3A5C';
-    return { style: { backgroundColor: bg, borderColor: bg, color: '#fff', borderRadius: '8px' } };
+    const tokens = EVENT_STATUS_TOKENS[status] ?? EVENT_STATUS_TOKENS.CONFIRMED;
+    // Resolved live (not memoized) so a theme change (light/dark, high-contrast)
+    // is reflected on the next render instead of freezing whatever was current
+    // when this callback happened to be created.
+    const bg = resolveDesignToken(tokens.bg);
+    const text = resolveDesignToken(tokens.text);
+    return { style: { backgroundColor: bg, borderColor: bg, color: text, borderRadius: '8px' } };
   }, []);
 
   const currentYear = format(currentDate, 'yyyy');

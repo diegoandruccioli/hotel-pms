@@ -50,6 +50,16 @@ vi.mock('../store/toastStore', () => ({
     (selector as (s: { addToast: () => void }) => unknown)({ addToast: mockAddToast }),
 }));
 
+// resolveDesignToken normally reads a live CSS custom property via
+// getComputedStyle, which jsdom doesn't resolve from an actual stylesheet --
+// mocked here to just echo the requested var name back, so eventPropGetter
+// tests assert "the right token was requested for this status" instead of a
+// hardcoded hex value that would silently stop tracking m3-base.css.
+vi.mock('../utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils')>();
+  return { ...actual, resolveDesignToken: (name: string) => name };
+});
+
 import { reservationService } from '../services';
 import { inventoryService } from '../services';
 import { mockAxiosErrorWithDetail } from '../test-utils';
@@ -180,13 +190,13 @@ describe('CalendarPlanning', () => {
     });
 
     it.each([
-      ['CONFIRMED', '#1A3A5C'],
-      ['PENDING', '#5C4300'],
-      ['CANCELLED', '#BA1A1A'],
-      ['CHECKED_IN', '#2E7D6A'],
-      ['CHECKED_OUT', '#73777F'],
-      ['UNKNOWN_STATUS', '#1A3A5C'],
-    ])('maps status %s to background color %s', async (status, expectedColor) => {
+      ['CONFIRMED', '--md-primary'],
+      ['PENDING', '--md-secondary'],
+      ['CANCELLED', '--md-error'],
+      ['CHECKED_IN', '--md-tertiary'],
+      ['CHECKED_OUT', '--md-outline'],
+      ['UNKNOWN_STATUS', '--md-primary'],
+    ])('maps status %s to design token %s', async (status, expectedColor) => {
       vi.mocked(reservationService.getAllReservations).mockResolvedValue([reservation(status)] as never);
       render(<CalendarPlanning />);
       await waitFor(() => screen.getByText('view_month'));

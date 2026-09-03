@@ -1,6 +1,6 @@
 import { memo, useCallback } from 'react';
 import type { RateCalendarDay } from '../../types';
-import { cn } from '../../utils';
+import { cn, resolveDesignToken } from '../../utils';
 
 interface RateCalendarCellProps {
   day: RateCalendarDay;
@@ -8,6 +8,7 @@ interface RateCalendarCellProps {
   dayIndex: number;
   isSelected: boolean;
   isToday: boolean;
+  /** CSS var name (e.g. '--md-season-1'), not a hex value. */
   seasonColor?: string;
   ariaLabel: string;
   onPointerDown: (rowIndex: number, dayIndex: number) => void;
@@ -43,8 +44,9 @@ export const RateCalendarCell = memo(({
   }, [onKeyboardSelect, rowIndex, dayIndex]);
 
   const hasSeason = day.rateSeasonId != null;
-  const style = hasSeason ? { borderLeftColor: seasonColor, borderLeftWidth: 4 } : undefined;
-  const dotStyle = hasSeason ? { backgroundColor: seasonColor } : undefined;
+  const resolvedSeasonColor = hasSeason && seasonColor ? resolveDesignToken(seasonColor) : undefined;
+  const style = hasSeason ? { borderLeftColor: resolvedSeasonColor, borderLeftWidth: 4 } : undefined;
+  const dotStyle = hasSeason ? { backgroundColor: resolvedSeasonColor } : undefined;
 
   return (
     <button

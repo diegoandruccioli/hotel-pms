@@ -10,7 +10,7 @@ import { M3Card } from '../../components/m3';
 import { RateCalendarCell } from './RateCalendarCell';
 import { RateBulkApplyDialog } from './RateBulkApplyDialog';
 import { useAuthStore } from '../../store';
-import { getErrorMessage, cn } from '../../utils';
+import { getErrorMessage, cn, resolveDesignToken } from '../../utils';
 
 const SIDEBAR_WIDTH = 192;
 const CELL_WIDTH = 100;
@@ -21,8 +21,10 @@ const CELL_STYLE = { width: CELL_WIDTH };
 
 /** Fixed accent palette for season identification — cycles if there are more
  * distinct seasons in view than colors (rare: a room type rarely has more
- * than a handful of seasons active within one visible month). */
-const SEASON_COLOR_PALETTE = ['#6750A4', '#386A20', '#984061', '#006874', '#8C4A00', '#4A6572'];
+ * than a handful of seasons active within one visible month). CSS var names,
+ * not hex -- resolved live via resolveDesignToken() so this responds to
+ * light/dark/high-contrast mode instead of baking one hex value in. */
+const SEASON_COLOR_TOKENS = ['--md-season-1', '--md-season-2', '--md-season-3', '--md-season-4', '--md-season-5', '--md-season-6'];
 
 interface Selection {
   anchorRow: number;
@@ -31,8 +33,13 @@ interface Selection {
   day: number;
 }
 
+// `color` is a CSS var name (e.g. '--md-season-1'), not a hex value -- resolved
+// via resolveDesignToken(). Re-resolves whenever `color` itself changes (a
+// different season is now shown at this legend slot); a live in-place theme
+// toggle with no other state change won't re-trigger this memo, same
+// known/documented limitation as CalendarPlanning's eventPropGetter.
 const LegendEntry = memo(({ name, color }: { name: string; color: string }) => {
-  const dotStyle = useMemo(() => ({ backgroundColor: color }), [color]);
+  const dotStyle = useMemo(() => ({ backgroundColor: resolveDesignToken(color) }), [color]);
   return (
     <span className="flex items-center gap-1.5">
       <span className="w-2.5 h-2.5 rounded-full" style={dotStyle} aria-hidden="true" />
@@ -138,7 +145,7 @@ export const RateCalendar = () => {
     for (const row of calendar.rows) {
       for (const day of row.days) {
         if (day.rateSeasonId && !map.has(day.rateSeasonId)) {
-          map.set(day.rateSeasonId, SEASON_COLOR_PALETTE[index % SEASON_COLOR_PALETTE.length]);
+          map.set(day.rateSeasonId, SEASON_COLOR_TOKENS[index % SEASON_COLOR_TOKENS.length]);
           index += 1;
         }
       }
@@ -157,7 +164,7 @@ export const RateCalendar = () => {
       }
     }
     return Array.from(seen.entries()).map(([id, name]) => ({
-      id, name, color: seasonColors.get(id) ?? SEASON_COLOR_PALETTE[0],
+      id, name, color: seasonColors.get(id) ?? SEASON_COLOR_TOKENS[0],
     }));
   }, [calendar, seasonColors]);
 

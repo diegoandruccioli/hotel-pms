@@ -20,7 +20,7 @@ briefly, then state the rule — read the "why" once, then treat the rule as loa
 
 **Never hardcode a hex color in a component.** Always use the semantic Tailwind
 classes backed by `var(--md-*)` custom properties defined in
-`frontend/src/styles/m3-base.css`, wired into `frontend/tailwind.config.js`:
+`frontend/src/styles/m3-base.css`, wired into the `@theme` block in `src/index.css`:
 
 - `primary` / `on-primary` / `primary-container` / `on-primary-container`
 - `secondary` / `on-secondary` / `secondary-container` / `on-secondary-container`
@@ -50,11 +50,29 @@ dark-high-contrast (`[data-contrast="high"]`). The WCAG AAA high-contrast theme 
 maintained, first-class variant — see Accessibility below — not a legacy or optional
 mode. When you add a new semantic token, you add all four values.
 
+**A categorical (non-semantic) palette is a different, legitimate case.**
+`--md-season-1..6` (`m3-base.css`) distinguishes N concurrent items from each other
+(rate-plan seasons on the calendar) — there's no "meaning" to carry, so it doesn't map
+onto primary/secondary/tertiary the way a status color does. Still gets all four
+values per color for the same reason as above.
+
+**Handing a resolved color to a third-party library that only takes inline
+style/props** (react-big-calendar's `eventPropGetter`, a chart series color, …) —
+not a class name, so a Tailwind utility can't reach it: use
+`resolveDesignToken('--md-primary')` from `utils/designTokens.ts`, which reads the
+custom property's live computed value, instead of hardcoding a hex. It re-resolves on
+every call, so it reflects the current theme correctly *as long as something causes a
+re-render* — a `useMemo`/`useCallback` with stable deps that never change won't
+re-invoke it just because the user flipped a theme toggle with nothing else on screen
+changing; known, accepted limitation (`CalendarPlanning.tsx`'s `eventPropGetter`,
+`RateCalendar.tsx`'s `LegendEntry`), not something to engineer a live theme
+subscription for unless it's an actual reported problem.
+
 ---
 
 ## Shape, elevation, motion
 
-**Border radius (M3 shape scale)** — `frontend/tailwind.config.js`:
+**Border radius (M3 shape scale)** — `@theme` block in `src/index.css`:
 
 | Class | Value |
 |---|---|

@@ -43,6 +43,20 @@
   --md-inverse-on-surface: #F1F0F4;
   --md-inverse-primary: #A6C8ED;
 
+  /* Season/category accent palette — purely categorical (distinguishing N
+     concurrent rate seasons from each other), not semantic like primary/
+     secondary/tertiary, so it doesn't map onto those 3 M3 roles. Read at
+     runtime via resolveDesignToken(), not a Tailwind class — consumed as
+     small decorative accents (legend dot, cell left-border), never as text
+     color, so these are a first-pass derived set (consistent hue-preserving
+     lighten/darken per mode), not a designer-reviewed final palette. */
+  --md-season-1: #6750A4; /* purple */
+  --md-season-2: #386A20; /* green */
+  --md-season-3: #984061; /* rose */
+  --md-season-4: #006874; /* teal */
+  --md-season-5: #8C4A00; /* orange */
+  --md-season-6: #4A6572; /* blue-gray */
+
   /* Elevation shadows — light */
   --md-elevation-1: 0px 1px 3px 1px rgba(0,0,0,0.15), 0px 1px 2px 0px rgba(0,0,0,0.30);
   --md-elevation-2: 0px 2px 6px 2px rgba(0,0,0,0.15), 0px 1px 2px 0px rgba(0,0,0,0.30);
@@ -102,6 +116,15 @@
   --md-inverse-on-surface: #2F3033;
   --md-inverse-primary: #1A3A5C;
 
+  /* Season/category accent palette — dark. Same hue as light, lightened for
+     legibility against a dark surface (see :root's --md-season-* comment). */
+  --md-season-1: #D0BCFF;
+  --md-season-2: #A6D388;
+  --md-season-3: #FFB1C8;
+  --md-season-4: #83D2E0;
+  --md-season-5: #FFB783;
+  --md-season-6: #B2CCDB;
+
   /* Elevation shadows — dark (softer, less contrast) */
   --md-elevation-1: 0px 1px 3px 1px rgba(0,0,0,0.30), 0px 1px 2px 0px rgba(0,0,0,0.50);
   --md-elevation-2: 0px 2px 6px 2px rgba(0,0,0,0.30), 0px 1px 2px 0px rgba(0,0,0,0.50);
@@ -157,6 +180,16 @@
   --md-outline: #000000;
   --md-outline-variant: #43474E;
 
+  /* Season/category accent palette — light high-contrast: same hues pushed
+     darker/more saturated so each stays distinguishable against a pure-white
+     HC surface (decorative accents, not text — see :root's comment). */
+  --md-season-1: #381E72;
+  --md-season-2: #1E3A0F;
+  --md-season-3: #5C1F35;
+  --md-season-4: #003940;
+  --md-season-5: #4A2600;
+  --md-season-6: #263238;
+
   --md-glass-bg: rgba(255, 255, 255, 0.95);
   --md-glass-border: rgba(0, 0, 0, 0.5);
   --md-glass-bg-elevated: rgba(255, 255, 255, 0.98);
@@ -193,6 +226,16 @@
 
   --md-outline: #FFFFFF;
   --md-outline-variant: #C3C7CF;
+
+  /* Season/category accent palette — dark high-contrast: same hues pushed
+     lighter/more saturated so each stays distinguishable against a pure-black
+     HC surface (decorative accents, not text — see :root's comment). */
+  --md-season-1: #EADDFF;
+  --md-season-2: #C9EFB1;
+  --md-season-3: #FFD9E3;
+  --md-season-4: #C2ECF2;
+  --md-season-5: #FFDCC0;
+  --md-season-6: #DCEAF0;
 
   --md-glass-bg: rgba(0, 0, 0, 0.95);
   --md-glass-border: rgba(255, 255, 255, 0.5);
