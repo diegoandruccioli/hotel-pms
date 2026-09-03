@@ -214,6 +214,21 @@ Follow the convention already established by `M3Button.tsx`, `M3Card.tsx`,
    barrel safe — anything re-exported alongside `ErrorBoundary` inherits its
    eager evaluation the moment the barrel is touched at all.
 
+**`knip.json`'s `ignore` list is not stale cruft — it's these exact constraints,
+made permanent.** 10 barrel files are deliberately never imported by anything:
+`components/index.ts` (point 9 above), `pages/index.ts` (App.tsx must keep using
+per-page `import()` for route code-splitting — importing the barrel would pull
+every page into one chunk), and the 8 same-name-as-subfolder pages'
+`pages/<X>/index.ts` (point 8 above — `AdminUsers`, `Billing`, `Quotations`,
+`Rates`, `Reservations`, `Restaurant`, `Settings`, `Stays`; some blocked by the
+self-collision, others simply have no internal consumer since their subfolder is
+reached only via `App.tsx`'s `lazy()` routes). They're kept only so every `src/`
+folder with 2+ files satisfies the barrel-export rule uniformly — without the
+`ignore` list, `npm run knip` would flag all 10 as "unused files" forever, which
+is correct-but-useless noise that trains you to stop reading the report. Add a
+new folder to the list only after confirming (like these) that it truly can't
+have a safe consumer — not just because knip complained once.
+
 ---
 
 ## Dashboard / layout composition rules
