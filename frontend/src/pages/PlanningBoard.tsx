@@ -105,7 +105,7 @@ const ReservationBar = memo(({
       <span className="text-xs font-bold truncate leading-tight">
         {reservation.guestFullName || 'Guest'}
       </span>
-      <span className="text-[10px] opacity-80 truncate">
+      <span className="text-2xs opacity-80 truncate">
         {format(startRaw, 'dd/MM')} - {format(endRaw, 'dd/MM')}
       </span>
     </div>
@@ -276,7 +276,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
                 >
                   {/* text-on-surface-variant, not opacity-60 on inherited color — same
                       WCAG AA contrast defect as RateCalendar.tsx's identical weekday label. */}
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">
+                  <span className="text-2xs uppercase font-bold tracking-wider text-on-surface-variant">
                     {format(day, 'EEE', { locale })}
                   </span>
                   <span className="text-lg font-display font-medium leading-none">

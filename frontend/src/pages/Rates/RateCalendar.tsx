@@ -271,7 +271,7 @@ export const RateCalendar = () => {
                       {/* text-on-surface-variant (not opacity-60 on inherited color) — axe
                           flagged the opacity-dimmed text at 4.35:1 against this cell's
                           bg-surface-container-low, below the WCAG AA 4.5:1 minimum. */}
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">
+                      <span className="text-2xs uppercase font-bold tracking-wider text-on-surface-variant">
                         {format(day, 'EEE', { locale })}
                       </span>
                       <span className="text-lg font-display font-medium leading-none">{format(day, 'd')}</span>

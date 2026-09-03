@@ -106,12 +106,27 @@ scales because Tailwind's type scale is `rem`-based. Use Tailwind's text-size
 utilities (`text-sm`, `text-base`, `text-lg`, …) — never a literal `px` font-size —
 or you silently break that preference for the user who needs larger text.
 
-**Known gap**: there is no custom Tailwind `fontSize` or `spacing` scale in
-`tailwind.config.js` — both are stock Tailwind defaults, extended for nothing else.
-This is intentional-by-default rather than a deliberate design decision on record.
-Use the stock scale consistently (`p-4`, `gap-6`, `text-sm`, …) rather than
+**Known gap**: there is no custom Tailwind `fontSize` or `spacing` scale in the
+`@theme` block in `src/index.css` — both are stock Tailwind defaults, extended for
+nothing else. This is intentional-by-default rather than a deliberate design decision
+on record. Use the stock scale consistently (`p-4`, `gap-6`, `text-sm`, …) rather than
 one-off arbitrary values (`p-[13px]`) — consistency with the existing screens matters
 more than pixel-perfect matching to an external mock.
+
+**Arbitrary-value exceptions, whitelisted (2026-09-03 audit)** — these are legitimate
+pixel-precise geometry, not violations to "fix" on sight:
+- Viewport-relative bounds on scrollable dialog/list regions:
+  `max-h-[60vh]`/`min-h-[60vh]` (`CommandPalette.tsx`, `ErrorBoundary.tsx`),
+  `max-h-[90dvh]` (`M3Dialog.tsx`), `max-w-[85vw]` (`MainLayout.tsx` drawer),
+  `h-[70vh]` (`QuotationPdfPreviewDialog.tsx`).
+- Exact switch-thumb travel distance: `translate-x-[22px]` (`M3Switch.tsx`,
+  `SettingsSystem.tsx`) — must match the track width precisely, not a spacing-scale
+  concern.
+- Fixed-width table/card columns where truncation depends on an exact pixel budget:
+  `max-w-[120px]` (`Stays.tsx` guest/room cells), `w-[100px]` (`RateCalendarCell.tsx`),
+  `min-w-[280px]` (`Toast.tsx`), `min-w-[140px]` (`CalendarPlanning.tsx`).
+Add a new one here (with the file) rather than assuming it's already covered —
+this list isn't exhaustive by construction, it's what existed as of the audit date.
 
 ---
 

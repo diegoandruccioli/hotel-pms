@@ -84,7 +84,7 @@ const RailNavItem = memo(({
         >
           <MaterialIcon name={item.icon} filled={isActive} size={24} />
         </span>
-        <span className="text-[11px] font-medium font-body leading-tight text-center truncate w-full">
+        <span className="text-2xs font-medium font-body leading-tight text-center truncate w-full">
           {label}
         </span>
       </>

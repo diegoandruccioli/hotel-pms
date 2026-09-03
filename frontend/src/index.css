@@ -66,6 +66,12 @@
   --font-display: Outfit, system-ui, sans-serif;
   --font-body: Inter, system-ui, sans-serif;
 
+  /* Below stock text-xs (12px) — compact nav-rail labels, dense timeline
+     captions. Part of the real type scale (responds to --md-font-scale via
+     rem), not an arbitrary text-[10px] escape hatch. */
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 0.875rem;
+
   --shadow-elevation-0: none;
   --shadow-elevation-1: var(--md-elevation-1);
   --shadow-elevation-2: var(--md-elevation-2);
