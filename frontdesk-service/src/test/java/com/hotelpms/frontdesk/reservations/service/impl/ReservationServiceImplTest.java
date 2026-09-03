@@ -758,6 +758,39 @@ class ReservationServiceImplTest {
         assertEquals(PRICE_240, entity.getLineItems().get(0).getPrice());
     }
 
+    /**
+     * StayServiceImpl.changeRoom's internal sync path (Parte 6) — the only
+     * legitimate way to move a reservation's room once it already has a
+     * CHECKED_IN stay, deliberately bypassing verifyNoActiveStayConflict.
+     */
+    @Test
+    void testSyncLineItemRoomForCheckedInStaySuccess() {
+        final UUID newRoomId = Objects.requireNonNull(UUID.randomUUID());
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(roomService.getRoomById(newRoomId, HOTEL_ID)).thenReturn(activeRoom(newRoomId));
+        when(ratePricingService.resolveStayRates(
+                ROOM_TYPE_ID, HOTEL_ID, entity.getCheckInDate(), entity.getCheckOutDate()))
+                .thenReturn(List.of(new NightlyRate(entity.getCheckInDate(), PRICE_120, null)));
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
+
+        reservationService.syncLineItemRoomForCheckedInStay(reservationId, roomId, newRoomId, HOTEL_ID);
+
+        assertEquals(newRoomId, entity.getLineItems().get(0).getRoomId());
+        assertEquals(PRICE_120, entity.getLineItems().get(0).getPrice());
+        verify(reservationRepository, times(1)).saveAndFlush(entity);
+    }
+
+    @Test
+    void testSyncLineItemRoomForCheckedInStayThrowsWhenNoMatchingLineItem() {
+        final UUID newRoomId = Objects.requireNonNull(UUID.randomUUID());
+        final UUID unrelatedRoomId = Objects.requireNonNull(UUID.randomUUID());
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        assertThrows(NotFoundException.class, () -> reservationService
+                .syncLineItemRoomForCheckedInStay(reservationId, unrelatedRoomId, newRoomId, HOTEL_ID));
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
     @Test
     void reservedRoomChargeIsTheSnapshottedPriceAndReservationNightsForTheMatchingRoom() {
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
@@ -1042,19 +1075,42 @@ class ReservationServiceImplTest {
     }
 
     @Test
-    void shouldReturnAllCleanRoomsWhenNoneAreBooked() {
+    void shouldReturnAllBookableRoomsWhenNoneAreBooked() {
         final UUID room1 = Objects.requireNonNull(UUID.randomUUID());
         final UUID room2 = Objects.requireNonNull(UUID.randomUUID());
         final LocalDate checkIn = LocalDate.now();
         final LocalDate checkOut = checkIn.plusDays(1);
 
-        when(roomService.findCleanRooms(HOTEL_ID)).thenReturn(List.of(activeRoom(room1), activeRoom(room2)));
+        when(roomService.findBookableRooms(HOTEL_ID)).thenReturn(List.of(activeRoom(room1), activeRoom(room2)));
         when(reservationRepository.findOverlappingRoomIds(List.of(room1, room2), checkIn, checkOut))
                 .thenReturn(List.of());
 
         final List<RoomResponse> result = reservationService.getAvailableRooms(checkIn, checkOut);
 
         assertEquals(2, result.size());
+    }
+
+    /**
+     * A room's today-housekeeping status (CLEAN vs. DIRTY) must never gate a
+     * future date-range search — only an actual overlapping reservation
+     * should. This is the regression test for the fix: previously the search
+     * started from {@code findCleanRooms}, so a DIRTY room disappeared from
+     * every search, even for dates months away.
+     */
+    @Test
+    void shouldIncludeDirtyRoomInFutureAvailabilitySearch() {
+        final UUID dirtyRoom = Objects.requireNonNull(UUID.randomUUID());
+        final LocalDate checkIn = LocalDate.now().plusMonths(3);
+        final LocalDate checkOut = checkIn.plusDays(1);
+
+        when(roomService.findBookableRooms(HOTEL_ID)).thenReturn(List.of(activeRoom(dirtyRoom)));
+        when(reservationRepository.findOverlappingRoomIds(List.of(dirtyRoom), checkIn, checkOut))
+                .thenReturn(List.of());
+
+        final List<RoomResponse> result = reservationService.getAvailableRooms(checkIn, checkOut);
+
+        assertEquals(1, result.size());
+        assertEquals(dirtyRoom, result.get(0).id());
     }
 
     @Test
@@ -1064,7 +1120,7 @@ class ReservationServiceImplTest {
         final LocalDate checkIn = LocalDate.now();
         final LocalDate checkOut = checkIn.plusDays(1);
 
-        when(roomService.findCleanRooms(HOTEL_ID)).thenReturn(List.of(activeRoom(freeRoom), activeRoom(bookedRoom)));
+        when(roomService.findBookableRooms(HOTEL_ID)).thenReturn(List.of(activeRoom(freeRoom), activeRoom(bookedRoom)));
         when(reservationRepository.findOverlappingRoomIds(List.of(freeRoom, bookedRoom), checkIn, checkOut))
                 .thenReturn(List.of(bookedRoom));
 
@@ -1075,11 +1131,11 @@ class ReservationServiceImplTest {
     }
 
     @Test
-    void shouldSkipOverlapQueryWhenNoCleanRoomsExist() {
+    void shouldSkipOverlapQueryWhenNoBookableRoomsExist() {
         final LocalDate checkIn = LocalDate.now();
         final LocalDate checkOut = checkIn.plusDays(1);
 
-        when(roomService.findCleanRooms(HOTEL_ID)).thenReturn(List.of());
+        when(roomService.findBookableRooms(HOTEL_ID)).thenReturn(List.of());
 
         final List<RoomResponse> result = reservationService.getAvailableRooms(checkIn, checkOut);
 
@@ -1094,6 +1150,6 @@ class ReservationServiceImplTest {
         final BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> reservationService.getAvailableRooms(sameDay, sameDay));
         assertEquals(ERR_CHECKOUT_AFTER_CHECKIN, ex.getMessage());
-        verify(roomService, never()).findCleanRooms(any());
+        verify(roomService, never()).findBookableRooms(any());
     }
 }

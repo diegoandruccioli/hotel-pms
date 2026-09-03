@@ -248,4 +248,9 @@ export const stayService = {
     const response = await api.put<StayResponse>(`${BASE_PATH}/${stayId}`, { newCheckOutDate, version });
     return response.data;
   },
+
+  changeRoom: async (stayId: string, newRoomId: string, version?: number | null): Promise<StayResponse> => {
+    const response = await api.put<StayResponse>(`${BASE_PATH}/${stayId}/room`, { newRoomId, version });
+    return response.data;
+  },
 };

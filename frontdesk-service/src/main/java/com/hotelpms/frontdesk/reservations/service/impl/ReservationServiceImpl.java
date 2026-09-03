@@ -350,16 +350,16 @@ public class ReservationServiceImpl implements ReservationService {
         }
 
         final UUID hotelId = resolveHotelId();
-        final List<RoomResponse> cleanRooms = roomService.findCleanRooms(hotelId);
-        if (cleanRooms.isEmpty()) {
-            return cleanRooms;
+        final List<RoomResponse> bookableRooms = roomService.findBookableRooms(hotelId);
+        if (bookableRooms.isEmpty()) {
+            return bookableRooms;
         }
 
-        final List<UUID> roomIds = cleanRooms.stream().map((@NonNull RoomResponse rr) -> rr.id()).toList();
+        final List<UUID> roomIds = bookableRooms.stream().map((@NonNull RoomResponse rr) -> rr.id()).toList();
         final Set<UUID> bookedRoomIds = Set.copyOf(
                 reservationRepository.findOverlappingRoomIds(roomIds, checkIn, checkOut));
 
-        return cleanRooms.stream()
+        return bookableRooms.stream()
                 .filter(room -> !bookedRoomIds.contains(room.id()))
                 .map(room -> room.withResolvedTotalPrice(resolveTotalPrice(room, hotelId, checkIn, checkOut)))
                 .toList();
@@ -374,6 +374,33 @@ public class ReservationServiceImpl implements ReservationService {
         Objects.requireNonNull(checkOut, "Check-out date cannot be null");
         return checkOut.isAfter(checkIn)
                 && !reservationRepository.findOverlappingRoomIds(List.of(roomId), checkIn, checkOut).isEmpty();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public void syncLineItemRoomForCheckedInStay(
+            final UUID reservationId, final UUID oldRoomId, final UUID newRoomId, final UUID hotelId) {
+        Objects.requireNonNull(reservationId, ID_NOT_NULL_MSG);
+        Objects.requireNonNull(oldRoomId, "Old room ID cannot be null");
+        Objects.requireNonNull(newRoomId, "New room ID cannot be null");
+        Objects.requireNonNull(hotelId, HOTEL_ID_NOT_NULL_MSG);
+
+        final Reservation reservation = findReservationByIdAndHotelOrThrow(reservationId, hotelId);
+        final ReservationLineItem lineItem = reservation.getLineItems().stream()
+                .filter(li -> oldRoomId.equals(li.getRoomId()))
+                .findFirst()
+                .orElseThrow(() -> new NotFoundException("RESERVATION_LINE_ITEM_NOT_FOUND"));
+
+        final RoomResponse newRoom = roomService.getRoomById(newRoomId, hotelId);
+        final List<NightlyRate> nightlyRates = ratePricingService.resolveStayRates(
+                newRoom.roomType().id(), hotelId, reservation.getCheckInDate(), reservation.getCheckOutDate());
+        final BigDecimal newPrice = nightlyRates.stream()
+                .map(NightlyRate::nightlyPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        lineItem.setRoomId(newRoomId);
+        lineItem.setPrice(newPrice);
+        reservationRepository.saveAndFlush(reservation);
     }
 
     /**

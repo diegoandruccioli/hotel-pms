@@ -321,6 +321,35 @@ class StayServiceImplTest {
         verify(stayRepository, times(0)).save(anyNonNull(Stay.class));
     }
 
+    /**
+     * MAINTENANCE is the one housekeeping status that is not transient
+     * (unlike DIRTY, cleared by the morning cycle before an afternoon
+     * check-in), so it is the only one that blocks the actual check-in
+     * action — see StayCheckInValidator#verifyNotInMaintenance.
+     */
+    @Test
+    void shouldRejectCheckInWhenRoomInMaintenance() {
+        final UUID guest = Objects.requireNonNull(guestId);
+        final UUID reservation = Objects.requireNonNull(reservationId);
+        final UUID room = Objects.requireNonNull(roomId);
+        final StayRequest request = Objects.requireNonNull(validRequest);
+
+        when(guestClient.getGuestById(guest))
+                .thenReturn(new GuestResponse(guest, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationService.getReservationById(reservation))
+                .thenReturn(reservationResponse(ReservationStatus.CONFIRMED, null));
+        final RoomTypeResponse roomType = new RoomTypeResponse(
+                UUID.randomUUID(), "Standard", null, 2, BigDecimal.valueOf(90), true, null, null);
+        when(roomService.getRoomById(room, hotelId)).thenReturn(
+                new RoomResponse(room, hotelId, ROOM_NUMBER_101, roomType, RoomStatus.MAINTENANCE,
+                        true, null, null, null));
+
+        final ConflictException ex = assertThrows(ConflictException.class, () -> stayService.checkIn(request));
+
+        assertEquals("ROOM_IN_MAINTENANCE", ex.getMessage());
+        verify(stayRepository, times(0)).save(anyNonNull(Stay.class));
+    }
+
     @Test
     void shouldCheckInAndSetStayForGuests() {
         // Arrange
