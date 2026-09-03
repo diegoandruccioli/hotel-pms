@@ -17,7 +17,7 @@ import type { TFunction } from 'i18next';
 import type { RoomResponse } from '../types';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, cn } from '../utils';
 import {
   useReservationsSearch,
   useRoomsLookup,
@@ -68,11 +68,12 @@ const RoomsCell = ({ reservation, rooms }: { reservation: ReservationResponse; r
 };
 
 const GuestsCountCell = ({ reservation }: { reservation: ReservationResponse }) => (
-  <div className={`font-medium flex items-center gap-1.5 ${
+  <div className={cn(
+    'font-medium flex items-center gap-1.5',
     (reservation.actualGuests || 0) < reservation.expectedGuests ? 'text-warning' :
     (reservation.actualGuests || 0) > reservation.expectedGuests ? 'text-error' :
     'text-on-surface'
-  }`}>
+  )}>
     <MaterialIcon name="group" size={18} />
     <span>{reservation.actualGuests || 0} / {reservation.expectedGuests}</span>
   </div>
@@ -403,11 +404,12 @@ export const Reservations = () => {
             type="button"
             aria-pressed={upcomingOnly}
             onClick={toggleUpcomingOnly}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors ${
+            className={cn(
+              'px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
               upcomingOnly
                 ? 'bg-primary text-on-primary border-primary'
                 : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
-            }`}
+            )}
           >
             {t('reservations_upcoming_filter')}
           </button>

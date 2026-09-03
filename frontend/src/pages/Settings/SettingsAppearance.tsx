@@ -7,6 +7,7 @@ import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Card } from '../../components/m3';
 import { M3SegmentedRow, type M3SegmentOption } from '../../components/m3';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
+import { cn } from '../../utils';
 
 type ThemeValue = 'light' | 'dark' | 'system';
 
@@ -45,7 +46,7 @@ const LanguageButton = memo(({
       role="radio"
       aria-checked={isActive}
       onClick={handleClick}
-      className={[
+      className={cn(
         'flex items-center gap-3 px-4 py-3 rounded-shape-md',
         'text-sm font-body text-left',
         'border transition-colors',
@@ -53,8 +54,8 @@ const LanguageButton = memo(({
         'focus-visible:ring-primary focus-visible:ring-offset-2',
         isActive
           ? 'bg-primary-container text-on-primary-container border-primary'
-          : 'border-outline-variant text-on-surface hover:bg-surface-container-highest',
-      ].join(' ')}
+          : 'border-outline-variant text-on-surface hover:bg-surface-container-highest'
+      )}
     >
       <span className="text-xl leading-none" aria-hidden="true">{lang.flag}</span>
       <span className="flex-1">{t(lang.labelKey)}</span>

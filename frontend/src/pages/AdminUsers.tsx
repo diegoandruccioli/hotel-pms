@@ -10,7 +10,7 @@ import { M3LoadingState } from '../components/m3';
 import { M3EmptyState } from '../components/m3';
 import { useToastStore } from '../store';
 import { useAuthStore } from '../store';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, cn } from '../utils';
 import { CreateUserModal } from './AdminUsers/CreateUserModal';
 import { ResetPasswordModal } from './AdminUsers/ResetPasswordModal';
 import type { TFunction } from 'i18next';
@@ -167,9 +167,10 @@ export function AdminUsers() {
       accessorKey: 'active',
       header: t('col_status'),
       cell: ({ row }) => (
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+        <span className={cn(
+          'rounded-full px-2 py-0.5 text-xs font-medium',
           row.original.active ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-error-container text-on-error-container'
-        }`}>
+        )}>
           {row.original.active ? t('status_active') : t('status_inactive')}
         </span>
       ),

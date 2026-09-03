@@ -12,7 +12,7 @@ import { M3ErrorState } from '../../components/m3';
 import { M3TableEmptyRow } from '../../components/m3';
 import { useRoomsList, useRoomTypes } from '../../hooks/queries';
 import { queryKeys } from '../../lib';
-import { getErrorMessage } from '../../utils';
+import { getErrorMessage, cn } from '../../utils';
 import { RoomFormModal } from './RoomFormModal';
 
 interface RoomListNavState {
@@ -126,11 +126,12 @@ export const RoomList = memo(() => {
             type="button"
             aria-pressed={availableOnly}
             onClick={toggleAvailableOnly}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors ${
+            className={cn(
+              'px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
               availableOnly
                 ? 'bg-primary text-on-primary border-primary'
                 : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
-            }`}
+            )}
           >
             {t('rooms_available_today_filter')}
           </button>

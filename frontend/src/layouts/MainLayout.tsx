@@ -11,6 +11,7 @@ import { CommandPalette } from '../components/CommandPalette';
 import { useEscapeKey } from '../hooks';
 import { useServerEvents } from '../hooks';
 import * as FocusTrapModule from 'focus-trap-react';
+import { cn } from '../utils';
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
 
 const navigation = [
@@ -38,18 +39,22 @@ const NAV_ITEM_FOCUS_RING =
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2';
 
 const getRailNavItemClasses = ({ isActive }: { isActive: boolean }) =>
-  `group flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-shape-lg transition-colors w-full ${NAV_ITEM_FOCUS_RING} ${
+  cn(
+    'group flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-shape-lg transition-colors w-full',
+    NAV_ITEM_FOCUS_RING,
     isActive
       ? 'text-on-primary-container'
       : 'text-on-surface-variant hover:text-on-surface'
-  }`;
+  );
 
 const getDrawerNavItemClasses = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-3 px-4 py-3 mx-3 rounded-shape-full text-sm font-medium font-body transition-colors ${NAV_ITEM_FOCUS_RING} ${
+  cn(
+    'flex items-center gap-3 px-4 py-3 mx-3 rounded-shape-full text-sm font-medium font-body transition-colors',
+    NAV_ITEM_FOCUS_RING,
     isActive
       ? 'bg-primary-container text-on-primary-container'
       : 'text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface'
-  }`;
+  );
 
 /* ── Navigation Item (Rail — desktop) ───────────────── */
 
@@ -70,11 +75,12 @@ const RailNavItem = memo(({
     {({ isActive }) => (
       <>
         <span
-          className={`flex items-center justify-center w-14 h-10 rounded-shape-full transition-colors ${
+          className={cn(
+            'flex items-center justify-center w-14 h-10 rounded-shape-full transition-colors',
             isActive
               ? 'bg-primary-container'
               : 'group-hover:bg-surface-container-highest'
-          }`}
+          )}
         >
           <MaterialIcon name={item.icon} filled={isActive} size={24} />
         </span>

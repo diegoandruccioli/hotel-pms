@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
-import { PASSWORD_REQUIREMENTS } from '../utils';
+import { PASSWORD_REQUIREMENTS, cn } from '../utils';
 
 interface PasswordRequirementsChecklistProps {
   password: string;
@@ -16,9 +16,10 @@ export const PasswordRequirementsChecklist = ({ password }: PasswordRequirements
         return (
           <li
             key={requirement.key}
-            className={`flex items-center gap-2 text-xs font-body transition-colors ${
+            className={cn(
+              'flex items-center gap-2 text-xs font-body transition-colors',
               met ? 'text-tertiary' : 'text-on-surface-variant'
-            }`}
+            )}
           >
             <MaterialIcon name={met ? 'check_circle' : 'radio_button_unchecked'} size={16} />
             <span>{t(requirement.key)}</span>

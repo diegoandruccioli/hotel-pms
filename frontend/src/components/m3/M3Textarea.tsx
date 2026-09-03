@@ -44,7 +44,7 @@ export const M3Textarea = ({
       {(errorText || supportingText) && (
         <p
           id={errorText ? `${id}-error` : `${id}-support`}
-          className={`mt-1 text-sm font-body ${hasError ? 'text-error' : 'text-on-surface-variant'}`}
+          className={cn('mt-1 text-sm font-body', hasError ? 'text-error' : 'text-on-surface-variant')}
         >
           {errorText || supportingText}
         </p>

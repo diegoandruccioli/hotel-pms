@@ -10,7 +10,7 @@ import { M3TextField } from '../components/m3';
 import { M3Checkbox } from '../components/m3';
 import { StructuredAddressFields } from '../components/StructuredAddressFields';
 import { useToastStore } from '../store';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, cn } from '../utils';
 
 const VAT_NUMBER_REGEX = /^\d{11}$/;
 const FISCAL_CODE_REGEX = /^(\d{11}|[A-Za-z]{6}\d{2}[A-Za-z]\d{2}[A-Za-z]\d{3}[A-Za-z])$/;
@@ -232,7 +232,7 @@ export function HotelProfile() {
         </div>
 
         <p
-          className={`text-sm font-medium ${credentialsConfigured ? 'text-primary' : 'text-on-surface-variant'}`}
+          className={cn('text-sm font-medium', credentialsConfigured ? 'text-primary' : 'text-on-surface-variant')}
         >
           {credentialsConfigured
             ? t('status_alloggiati_credentials_configured')

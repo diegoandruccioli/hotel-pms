@@ -12,7 +12,7 @@ import { PaymentModal } from './Billing/PaymentModal';
 import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useTranslation } from 'react-i18next';
 import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, cn } from '../utils';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -28,15 +28,15 @@ const getStatusTone = (status: InvoiceStatus) => {
   }
 };
 
-const VIEW_BTN_CLASS = [
+const VIEW_BTN_CLASS = cn(
   'text-primary hover:text-primary/80 font-medium text-sm mr-4',
-  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm',
-].join(' ');
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm'
+);
 
-const PAY_BTN_CLASS = [
+const PAY_BTN_CLASS = cn(
   'text-tertiary hover:text-tertiary/80 font-medium text-sm',
-  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-tertiary rounded-sm',
-].join(' ');
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-tertiary rounded-sm'
+);
 
 interface ActionsCellProps {
   invoice: InvoiceResponse;
@@ -76,11 +76,12 @@ const StatusFilterChip = memo(({ value, active, label, onClick }: {
       type="button"
       aria-pressed={active}
       onClick={handleClick}
-      className={`px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors ${
+      className={cn(
+        'px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
         active
           ? 'bg-primary text-on-primary border-primary'
           : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
-      }`}
+      )}
     >
       {label}
     </button>

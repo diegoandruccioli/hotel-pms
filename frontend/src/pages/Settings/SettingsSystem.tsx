@@ -7,6 +7,7 @@ import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Card } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
+import { cn } from '../../utils';
 
 const EMAIL_GREETING_MAX_LENGTH = 300;
 
@@ -30,15 +31,15 @@ const ToggleRow = memo(({ icon, label, description, checked, disabled, onToggle 
     aria-checked={checked}
     onClick={onToggle}
     disabled={disabled}
-    className={[
+    className={cn(
       'flex items-center justify-between w-full',
       'px-4 py-3 rounded-shape-md',
       'border border-outline-variant',
       'hover:bg-surface-container-highest',
       'focus-visible:outline-hidden focus-visible:ring-2',
       'focus-visible:ring-primary focus-visible:ring-offset-2',
-      'transition-colors disabled:opacity-50',
-    ].join(' ')}
+      'transition-colors disabled:opacity-50'
+    )}
   >
     <div className="flex items-center gap-3">
       <MaterialIcon name={icon} size={20} className="text-on-surface-variant" />
@@ -50,17 +51,17 @@ const ToggleRow = memo(({ icon, label, description, checked, disabled, onToggle 
 
     <div
       aria-hidden="true"
-      className={[
+      className={cn(
         'relative w-12 h-7 rounded-shape-full border-2 transition-colors shrink-0',
-        checked ? 'bg-primary border-primary' : 'bg-surface-container-highest border-outline',
-      ].join(' ')}
+        checked ? 'bg-primary border-primary' : 'bg-surface-container-highest border-outline'
+      )}
     >
       <span
-        className={[
+        className={cn(
           'absolute top-0.5 block w-5 h-5 rounded-shape-full',
           'shadow-elevation-1 transition-all duration-200',
-          checked ? 'translate-x-[22px] bg-on-primary' : 'translate-x-0.5 bg-outline',
-        ].join(' ')}
+          checked ? 'translate-x-[22px] bg-on-primary' : 'translate-x-0.5 bg-outline'
+        )}
       />
     </div>
   </button>

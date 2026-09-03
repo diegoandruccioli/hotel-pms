@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { M3Card } from '../components/m3';
 import type { RoomResponse } from '../types';
 import type { ReservationResponse } from '../types';
+import { cn } from '../utils';
 
 interface PlanningBoardProps {
   rooms: RoomResponse[];
@@ -94,7 +95,10 @@ const ReservationBar = memo(({
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      className={`absolute top-2 h-12 rounded-shape-sm shadow-elevation-1 p-2 flex flex-col justify-center cursor-grab hover:shadow-elevation-2 transition-all z-0 overflow-hidden ${STATUS_COLORS[reservation.status] || STATUS_COLORS.CONFIRMED}`}
+      className={cn(
+        'absolute top-2 h-12 rounded-shape-sm shadow-elevation-1 p-2 flex flex-col justify-center cursor-grab hover:shadow-elevation-2 transition-all z-0 overflow-hidden',
+        STATUS_COLORS[reservation.status] || STATUS_COLORS.CONFIRMED
+      )}
       style={style}
       title={`${reservation.guestFullName} (${reservation.status})`}
     >
@@ -147,9 +151,10 @@ const RoomRow = memo(({ room, allocations, onDragOver, onDrop, monthStart, month
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
       style={ROW_STYLE}
-      className={`border-b border-outline-variant relative transition-colors ${
-        isDragOver ? 'bg-primary-container/30 border-l-4 border-l-primary' : ''
-      }`}
+      className={cn(
+        'border-b border-outline-variant relative transition-colors',
+        isDragOver && 'bg-primary-container/30 border-l-4 border-l-primary'
+      )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -264,9 +269,10 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
                 <div 
                   key={day.toISOString()} 
                   style={CELL_STYLE}
-                  className={`shrink-0 border-r border-outline-variant flex flex-col items-center justify-center
-                    ${isSameDay(day, new Date()) ? 'bg-primary-container text-on-primary-container' : ''}
-                  `}
+                  className={cn(
+                    'shrink-0 border-r border-outline-variant flex flex-col items-center justify-center',
+                    isSameDay(day, new Date()) && 'bg-primary-container text-on-primary-container'
+                  )}
                 >
                   {/* text-on-surface-variant, not opacity-60 on inherited color — same
                       WCAG AA contrast defect as RateCalendar.tsx's identical weekday label. */}
@@ -295,7 +301,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-display font-bold text-on-surface">{room.roomNumber}</span>
-                    <div className={`w-2 h-2 rounded-full ${room.status === 'CLEAN' ? 'bg-success' : room.status === 'DIRTY' ? 'bg-error' : 'bg-warning'}`} />
+                    <div className={cn('w-2 h-2 rounded-full', room.status === 'CLEAN' ? 'bg-success' : room.status === 'DIRTY' ? 'bg-error' : 'bg-warning')} />
                   </div>
                   <span className="text-xs text-on-surface-variant line-clamp-1">{room.roomType.name}</span>
                 </div>

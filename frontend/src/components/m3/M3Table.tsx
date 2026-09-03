@@ -1,3 +1,5 @@
+import { cn } from '../../utils';
+
 interface M3TableProps {
   headers: React.ReactNode[];
   children: React.ReactNode;
@@ -5,7 +7,7 @@ interface M3TableProps {
 }
 
 export const M3Table = ({ headers, children, className = '' }: M3TableProps) => (
-  <div className={`bg-surface shadow-elevation-1 rounded-shape-md overflow-hidden ${className}`}>
+  <div className={cn('bg-surface shadow-elevation-1 rounded-shape-md overflow-hidden', className)}>
     <div className="overflow-x-auto">
       <table className="min-w-full">
         <thead>
@@ -35,7 +37,7 @@ interface M3TableRowProps extends React.HTMLAttributes<HTMLTableRowElement> {
 
 export const M3TableRow = ({ children, className = '', ...rest }: M3TableRowProps) => (
   <tr
-    className={`hover:bg-surface-container-low transition-colors ${className}`}
+    className={cn('hover:bg-surface-container-low transition-colors', className)}
     {...rest}
   >
     {children}
@@ -48,7 +50,7 @@ export const M3TableCell = ({
   ...rest
 }: React.TdHTMLAttributes<HTMLTableCellElement>) => (
   <td
-    className={`whitespace-nowrap py-4 px-4 text-sm font-body text-on-surface first:pl-6 last:pr-6 ${className}`}
+    className={cn('whitespace-nowrap py-4 px-4 text-sm font-body text-on-surface first:pl-6 last:pr-6', className)}
     {...rest}
   >
     {children}

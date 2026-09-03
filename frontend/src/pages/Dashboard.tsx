@@ -7,7 +7,7 @@ import { M3Card } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { stayService } from '../services';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, cn } from '../utils';
 import { useDaySheet, useOwnerFinancialSummary } from '../hooks/queries';
 import type { RoomStatus } from '../types';
 import type { AlloggiatiFailureSummaryResponse, CityTaxUnassessedSummaryResponse } from '../types';
@@ -183,7 +183,7 @@ export const Dashboard = () => {
               <M3Card key={item.nameKey} variant="glass" className="overflow-hidden">
                 <div className="p-5">
                   <div className="flex items-center">
-                    <div className={`flex items-center justify-center w-12 h-12 rounded-shape-lg shrink-0 ${item.containerClass}`}>
+                    <div className={cn('flex items-center justify-center w-12 h-12 rounded-shape-lg shrink-0', item.containerClass)}>
                       <MaterialIcon name={item.icon} size={24} />
                     </div>
                     <div className="ml-4 flex-1 min-w-0">
@@ -231,7 +231,7 @@ export const Dashboard = () => {
                 {ALL_ROOM_STATUSES.map((status) => (
                   <div
                     key={status}
-                    className={`rounded-shape-sm border p-3 text-center ${ROOM_STATUS_COLORS[status]}`}
+                    className={cn('rounded-shape-sm border p-3 text-center', ROOM_STATUS_COLORS[status])}
                   >
                     <div className="text-xl font-display font-bold">
                       {daySheet.roomStatusCounts[status] ?? 0}

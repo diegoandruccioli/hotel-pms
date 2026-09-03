@@ -11,7 +11,7 @@ import { M3StatusChip } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { QuotationPdfPreviewDialog } from './QuotationPdfPreviewDialog';
 import { useToastStore } from '../../store';
-import { getErrorMessage } from '../../utils';
+import { getErrorMessage, cn } from '../../utils';
 
 const STATUS_TONE: Record<QuotationStatus, 'success' | 'warning' | 'error' | 'neutral' | 'info'> = {
   DRAFT: 'neutral',
@@ -40,7 +40,11 @@ const OptionCard = ({ option, isAccepted, isConvertChoice, selectable, onChoose 
   return (
     <M3Card
       variant="outlined"
-      className={`p-4 space-y-3 ${isAccepted ? 'border-tertiary border-2' : ''} ${isConvertChoice ? 'border-primary border-2' : ''}`}
+      className={cn(
+        'p-4 space-y-3',
+        isAccepted && 'border-tertiary border-2',
+        isConvertChoice && 'border-primary border-2'
+      )}
     >
       <div className="flex items-center justify-between">
         <h3 className="font-medium text-on-surface">{option.label}</h3>
@@ -276,7 +280,7 @@ export const QuotationDetail = () => {
           </div>
           <div>
             <p className="text-xs font-body text-on-surface-variant">{t('col_valid_until')}</p>
-            <p className={`text-sm font-medium ${quotation.status === 'EXPIRED' ? 'text-error' : 'text-on-surface'}`}>
+            <p className={cn('text-sm font-medium', quotation.status === 'EXPIRED' ? 'text-error' : 'text-on-surface')}>
               {quotation.validUntil}
             </p>
           </div>

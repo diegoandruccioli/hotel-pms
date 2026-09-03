@@ -3,6 +3,7 @@ import { useToastStore } from '../store';
 import type { Toast, ToastType } from '../store';
 import { useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { cn } from '../utils';
 
 const iconByType: Record<ToastType, string> = {
   success: 'check_circle',
@@ -26,7 +27,10 @@ const ToastItem = memo(({ toast }: { toast: Toast }) => {
 
   return (
     <div
-      className={`flex items-start gap-3 px-4 py-3 rounded-shape-md border shadow-elevation-2 min-w-[280px] max-w-sm animate-fade-in ${toneByType[toast.type]}`}
+      className={cn(
+        'flex items-start gap-3 px-4 py-3 rounded-shape-md border shadow-elevation-2 min-w-[280px] max-w-sm animate-fade-in',
+        toneByType[toast.type]
+      )}
       role="alert"
     >
       <MaterialIcon name={iconByType[toast.type]} size={20} className="shrink-0 mt-0.5" />

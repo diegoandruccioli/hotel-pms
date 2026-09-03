@@ -13,6 +13,7 @@ import { quotationService } from '../../services';
 import type { GuestResponseDTO } from '../../types';
 import type { RoomResponse } from '../../types';
 import type { ReservationResponse } from '../../types';
+import { cn } from '../../utils';
 import type { QuotationOptionRequest, QuotationRequest } from '../../types';
 import { RoomSelection } from '../Reservations/RoomSelection';
 import { getErrorMessage } from '../../utils';
@@ -58,12 +59,15 @@ const OptionTab = memo(({ option, index, isActive, canRemove, total, onSelect, o
   const handleSelect = useCallback(() => onSelect(index), [onSelect, index]);
   const handleRemove = useCallback(() => onRemove(index), [onRemove, index]);
   return (
-    <div className={`flex items-center rounded-shape-full border ${isActive ? 'border-primary bg-primary-container' : 'border-outline-variant'}`}>
+    <div className={cn('flex items-center rounded-shape-full border', isActive ? 'border-primary bg-primary-container' : 'border-outline-variant')}>
       <button
         type="button"
         onClick={handleSelect}
         aria-pressed={isActive}
-        className={`px-4 py-2 text-sm font-medium font-body rounded-shape-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary ${isActive ? 'text-on-primary-container' : 'text-on-surface-variant'}`}
+        className={cn(
+          'px-4 py-2 text-sm font-medium font-body rounded-shape-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary',
+          isActive ? 'text-on-primary-container' : 'text-on-surface-variant'
+        )}
       >
         {option.label || defaultOptionLabel(index)} · € {total.toFixed(2)}
       </button>

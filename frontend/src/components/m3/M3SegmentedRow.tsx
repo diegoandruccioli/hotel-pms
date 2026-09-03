@@ -1,6 +1,7 @@
 import { useCallback, memo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../MaterialIcon';
+import { cn } from '../../utils';
 
 export interface M3SegmentOption<T extends string> {
   value: T;
@@ -34,19 +35,19 @@ const SegmentedButton = memo(function SegmentedButton<T extends string>({
       role="radio"
       aria-checked={isActive}
       onClick={handleClick}
-      className={[
+      className={cn(
         'relative flex items-center justify-center gap-1.5',
         'flex-1 h-10 px-3 text-sm font-medium font-body',
         'focus-visible:outline-hidden focus-visible:z-10',
         'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
         'transition-colors',
-        isFirst ? 'rounded-l-shape-full' : '',
-        isLast ? 'rounded-r-shape-full' : '',
+        isFirst && 'rounded-l-shape-full',
+        isLast && 'rounded-r-shape-full',
         isActive
           ? 'bg-secondary-container text-on-secondary-container'
           : 'bg-surface text-on-surface-variant hover:bg-surface-container-high',
-        !isFirst ? 'border-l border-outline' : '',
-      ].join(' ')}
+        !isFirst && 'border-l border-outline'
+      )}
       aria-label={t(opt.labelKey)}
     >
       {isActive && <MaterialIcon name="check" size={16} className="shrink-0" />}

@@ -1,6 +1,7 @@
 import { useState, useId, useCallback } from 'react';
 import { PasswordVisibilityToggle } from './PasswordVisibilityToggle';
 import { MaterialIcon } from '../MaterialIcon';
+import { cn } from '../../utils';
 
 interface M3TextFieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'id'> {
   label: string;
@@ -49,17 +50,17 @@ export const M3TextField = ({
   }, [onBlur]);
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={cn('relative', className)}>
       {/* Input Container */}
       <div
-        className={`relative flex items-center rounded-shape-xs border transition-all
-          ${hasError
+        className={cn(
+          'relative flex items-center rounded-shape-xs border transition-all',
+          hasError
             ? 'border-error ring-2 ring-error ring-offset-1'
             : focused
               ? 'border-primary border-2 ring-2 ring-primary ring-offset-1'
               : 'border-outline hover:border-on-surface'
-          }
-        `}
+        )}
       >
         {leadingIcon && (
           <MaterialIcon name={leadingIcon} size={20} className="pl-3 text-on-surface-variant" />
@@ -68,8 +69,11 @@ export const M3TextField = ({
         <input
           id={id}
           type={isPasswordField && showPassword ? 'text' : type}
-          className={`peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface placeholder-transparent
-            focus:outline-hidden ${leadingIcon ? 'pl-2' : ''}`}
+          className={cn(
+            'peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface placeholder-transparent',
+            'focus:outline-hidden',
+            leadingIcon && 'pl-2'
+          )}
           placeholder={label}
           onFocus={handleFocus}
           onBlur={handleBlur}
@@ -85,19 +89,18 @@ export const M3TextField = ({
         {/* Floating Label */}
         <label
           htmlFor={id}
-          className={hideLabel ? 'sr-only' : `absolute transition-all duration-150 pointer-events-none font-body
-            ${leadingIcon ? 'left-10' : 'left-4'}
-            ${isFloating
+          className={hideLabel ? 'sr-only' : cn(
+            'absolute transition-all duration-150 pointer-events-none font-body',
+            leadingIcon ? 'left-10' : 'left-4',
+            isFloating
               ? 'top-1 text-xs'
-              : 'top-1/2 -translate-y-1/2 text-sm'
-            }
-            ${hasError
+              : 'top-1/2 -translate-y-1/2 text-sm',
+            hasError
               ? 'text-error'
               : focused
                 ? 'text-primary'
                 : 'text-on-surface-variant'
-            }
-          `}
+          )}
         >
           {label}
         </label>
@@ -107,7 +110,7 @@ export const M3TextField = ({
       {(errorText || supportingText) && (
         <p
           id={errorText ? `${id}-error` : `${id}-support`}
-          className={`mt-1 px-4 text-xs font-body ${hasError ? 'text-error' : 'text-on-surface-variant'}`}
+          className={cn('mt-1 px-4 text-xs font-body', hasError ? 'text-error' : 'text-on-surface-variant')}
         >
           {errorText || supportingText}
         </p>

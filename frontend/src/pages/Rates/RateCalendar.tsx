@@ -10,7 +10,7 @@ import { M3Card } from '../../components/m3';
 import { RateCalendarCell } from './RateCalendarCell';
 import { RateBulkApplyDialog } from './RateBulkApplyDialog';
 import { useAuthStore } from '../../store';
-import { getErrorMessage } from '../../utils';
+import { getErrorMessage, cn } from '../../utils';
 
 const SIDEBAR_WIDTH = 192;
 const CELL_WIDTH = 100;
@@ -263,9 +263,10 @@ export const RateCalendar = () => {
                     <div
                       key={day.toISOString()}
                       style={CELL_STYLE}
-                      className={`shrink-0 border-r border-outline-variant flex flex-col items-center justify-center ${
-                        isSameDay(day, new Date()) ? 'bg-primary-container text-on-primary-container' : ''
-                      }`}
+                      className={cn(
+                        'shrink-0 border-r border-outline-variant flex flex-col items-center justify-center',
+                        isSameDay(day, new Date()) && 'bg-primary-container text-on-primary-container'
+                      )}
                     >
                       {/* text-on-surface-variant (not opacity-60 on inherited color) — axe
                           flagged the opacity-dimmed text at 4.35:1 against this cell's

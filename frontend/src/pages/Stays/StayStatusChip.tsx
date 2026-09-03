@@ -1,5 +1,6 @@
 import { useCallback, memo } from 'react';
 import type { StayStatus } from '../../types';
+import { cn } from '../../utils';
 
 // ---------------------------------------------------------------------------
 // StayStatusChip — filter chip for the status row above the Stays table.
@@ -18,11 +19,12 @@ export const StayStatusChip = memo(({ value, active, label, onClick }: StayStatu
       type="button"
       aria-pressed={active}
       onClick={handleClick}
-      className={`px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors ${
+      className={cn(
+        'px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
         active
           ? 'bg-primary text-on-primary border-primary'
           : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
-      }`}
+      )}
     >
       {label}
     </button>

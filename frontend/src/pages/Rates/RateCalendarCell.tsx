@@ -1,5 +1,6 @@
 import { memo, useCallback } from 'react';
 import type { RateCalendarDay } from '../../types';
+import { cn } from '../../utils';
 
 interface RateCalendarCellProps {
   day: RateCalendarDay;
@@ -54,13 +55,14 @@ export const RateCalendarCell = memo(({
       aria-pressed={isSelected}
       aria-label={ariaLabel}
       style={style}
-      className={`shrink-0 w-[100px] h-16 border-r border-b border-outline-variant flex flex-col items-center justify-center gap-1 text-xs font-body transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${
+      className={cn(
+        'shrink-0 w-[100px] h-16 border-r border-b border-outline-variant flex flex-col items-center justify-center gap-1 text-xs font-body transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
         isSelected
           ? 'bg-primary-container'
           : isToday
             ? 'bg-surface-container'
             : 'bg-surface hover:bg-surface-container-low'
-      }`}
+      )}
     >
       {hasSeason && <span className="w-2 h-2 rounded-full" style={dotStyle} aria-hidden="true" />}
       <span className="font-medium text-on-surface">€ {day.price.toFixed(0)}</span>

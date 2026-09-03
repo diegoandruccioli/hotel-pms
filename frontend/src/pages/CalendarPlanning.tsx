@@ -12,7 +12,7 @@ import { M3Card } from '../components/m3';
 import PlanningBoard from '@/pages/PlanningBoard';
 import { inventoryService } from '../services';
 import type { RoomResponse } from '../types';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, cn } from '../utils';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
@@ -248,17 +248,19 @@ export const CalendarPlanning = () => {
           <div className="flex bg-surface-container rounded-shape-full p-1">
             <button
               onClick={setPlanningView}
-              className={`px-4 py-1.5 text-sm font-medium rounded-shape-full transition-all ${
+              className={cn(
+                'px-4 py-1.5 text-sm font-medium rounded-shape-full transition-all',
                 view === 'planning' ? 'bg-primary text-on-primary shadow-elevation-1' : 'text-on-surface-variant hover:bg-surface-container-high'
-              }`}
+              )}
             >
               {t('view_planning')}
             </button>
             <button
               onClick={setMonthView}
-              className={`px-4 py-1.5 text-sm font-medium rounded-shape-full transition-all ${
+              className={cn(
+                'px-4 py-1.5 text-sm font-medium rounded-shape-full transition-all',
                 view === 'month' ? 'bg-primary text-on-primary shadow-elevation-1' : 'text-on-surface-variant hover:bg-surface-container-high'
-              }`}
+              )}
             >
               {t('view_month')}
             </button>
