@@ -6511,6 +6511,135 @@ pgBackRest, meno codice infrastrutturale hand-rolled da mantenere
 \texttt{backup/DECISIONS.md~\S3.5b} prima di procedere, non dopo.
 Commit: \commitref{48828ad}{feat(backup): continuous WAL archiving + PITR via pgBackRest, replaces daily dump}
 
+\paragraph{T-OPS-03 --- Ruolo Postgres superuser condiviso da tutti e 5 i servizi}
+Ogni servizio applicativo (auth/guest/frontdesk/billing/fb) si collegava a
+Postgres come \textbf{superuser \texttt{postgres} condiviso}, stessa
+password per tutti (\texttt{docker-compose.yml},
+\texttt{SPRING\_DATASOURCE\_USERNAME=postgres}). L'isolamento
+multi-tenant applicativo (\texttt{TenantIsolationArchTest}, regola ArchUnit
+che verifica lo scoping per \texttt{hotel\_id} sulle query custom dei
+repository tenant-root --- si veda anche l'ADR-004 in
+\texttt{backup/DECISIONS.md}, che aveva deciso esplicitamente contro la
+Row Level Security Postgres proprio perché i due leak cross-tenant reali
+trovati fino a quel momento erano bug applicativi, non un problema che la
+RLS avrebbe prevenuto meglio del filtro stesso) non ha alcun effetto se il
+servizio stesso ha già accesso illimitato in lettura/scrittura ai database
+degli altri 4 a livello di connessione: un servizio compromesso (RCE,
+dipendenza malevola, credenziale trafugata) leggeva/scriveva
+\texttt{hotel\_auth}, \texttt{hotel\_guest}, \texttt{hotel\_billing},
+\texttt{hotel\_fb} oltre al proprio, indipendentemente da qualunque
+scoping applicativo. Trovato rileggendo
+\texttt{docker/postgres/initdb/init.sql} durante l'hardening
+pre-pilota, non da un pentest.
+
+Fix: un ruolo Postgres \emph{least-privilege} per servizio
+(\texttt{auth\_service\_app}, \texttt{guest\_service\_app},
+\texttt{frontdesk\_service\_app}, \texttt{billing\_service\_app},
+\texttt{fb\_service\_app}), ciascuno con \texttt{GRANT ALL} solo sul
+proprio database e sul suo schema \texttt{public} (PostgreSQL~15 non
+concede più \texttt{CREATE} su \texttt{public} a \texttt{PUBLIC} di
+default, va quindi rigranted esplicitamente prima che Flyway possa creare
+la prima tabella). Aggiunto anche un ruolo \texttt{postgres\_exporter} a
+sola lettura (\texttt{pg\_monitor}, nessun accesso ai dati applicativi)
+per il nuovo \texttt{postgres-exporter} (T-OPS-04).
+
+\textbf{Secondo controllo, non ovvio}: PostgreSQL concede
+\texttt{CONNECT} su ogni database a \texttt{PUBLIC} per default --- a
+differenza del cambio sullo schema \texttt{public} introdotto in PG15,
+questo default \emph{non} è cambiato. Verificato dal vivo prima di
+aggiungere il fix: un ruolo con zero grant altrove poteva comunque aprire
+una connessione al database di un altro servizio ed eseguire query
+schema-indipendenti (\texttt{SELECT 1}, cataloghi di sistema) --- non
+dati applicativi, ma comunque una superficie di ricognizione cross-tenant
+che il solo \texttt{GRANT ALL} sul proprio database non chiudeva. Fix:
+\texttt{REVOKE CONNECT ON DATABASE <db> FROM PUBLIC} per ciascuno dei 5
+database, con \texttt{CONNECT} ri-concesso esplicitamente solo al ruolo
+proprietario.
+
+\textbf{Bug trovato durante il test end-to-end su un volume Postgres
+realmente vuoto}, non solo con \texttt{docker compose config}: il nuovo
+file dei ruoli ordinava alfabeticamente \emph{prima} del vecchio
+\texttt{init.sql} che crea i 5 database (\texttt{"0"} precede
+\texttt{"i"} in ASCII, e \texttt{docker-entrypoint-initdb.d} esegue gli
+script in ordine lessicografico) --- i \texttt{CREATE ROLE}/\texttt{GRANT}
+fallivano con \texttt{database "hotel\_auth" does not exist} perché i
+database non erano ancora stati creati. Fix: rinominato \texttt{init.sql}
+in \texttt{01-create-databases.sql}.
+
+Verificato dal vivo su un container Postgres realmente fresco (build
+dell'immagine, volume vuoto, nessun riuso di stato precedente): la
+connessione cross-database ora fallisce con
+\texttt{FATAL: permission denied for database "hotel\_billing"} /
+\texttt{DETAIL: User does not have CONNECT privilege}; lo stesso ruolo
+sul proprio database funziona invariato; il ruolo \texttt{postgres\_exporter}
+legge correttamente \texttt{pg\_stat\_database}; il superuser
+\texttt{postgres} (necessario per le operazioni pgBackRest e per
+l'amministrazione) resta invariato e può ancora connettersi ovunque.
+Commit: \commitref{5195fd0}{feat(infra): per-service Postgres roles + real alerting/backup supervision}
+
+\paragraph{T-OPS-04 --- Alertmanager verso \texttt{null}, scheduler di backup non supervisionato, zero metriche host}
+Tre punti ciechi operativi indipendenti che rendevano un guasto
+\textbf{silenzioso} su un deployment mono-host, esattamente lo scenario
+del pilota reale pianificato: (1)~\texttt{docker/alertmanager/alertmanager.yml}
+aveva \texttt{receiver: 'null'} sia sulla route di default sia su quella
+critica --- ogni alert, incluse le 6 regole Prometheus esistenti
+(\texttt{ServiceDown}, \texttt{HighErrorRate}, \dots) e il
+\texttt{BackupCycleFailed} POST ad-hoc emesso da pgBackRest, finiva solo
+nella UI di Alertmanager su \texttt{:9093} --- porta che
+\texttt{docker-compose.prod.yml} chiude esplicitamente all'host in
+produzione, quindi in produzione l'alert non era nemmeno consultabile
+manualmente; (2)~il loop \texttt{while true} di \texttt{backup-scheduler.sh}
+non era supervisionato: \texttt{entrypoint-wrapper.sh} faceva
+\texttt{wait} solo sul PID di Postgres, quindi un crash dello scheduler
+(OOM, errore su variabile non impostata sotto \texttt{set -u}) lasciava
+il container \texttt{healthy} con zero backup effettivamente in corso,
+senza alcun segnale fino a un controllo manuale; (3)~zero metriche
+infrastrutturali (spazio disco, stato Postgres) oltre alle 8 metriche JVM
+Spring Boot già raccolte --- un disco pieno, il guasto singolo più
+probabile su un deployment a un solo PC, era completamente invisibile.
+
+Fix: receiver \texttt{email-ops} reale al posto di \texttt{null}
+(puntato di default al container \texttt{mailpit} già presente per
+dev/pilota, cosicché funzioni fuori dalla scatola --- da sostituire con
+l'SMTP reale dell'hotel prima del go-live, stessa convenzione già in uso
+nel blocco commentato preesistente del file). \texttt{backup-scheduler.sh}
+ora gira sotto un supervisore in \texttt{entrypoint-wrapper.sh} che
+rileva un'uscita inattesa, invia un alert (\texttt{scheduler-crashed}) e
+riavvia il processo dopo 10s; pubblica inoltre due metriche
+textfile-collector (\texttt{pgbackrest\_scheduler\_heartbeat\_timesta-}
+\texttt{mp\_seconds}, \texttt{pgbackrest\_last\_successful\_backup\_time-}
+\texttt{stamp\_seconds}, scrittura atomica via \texttt{mktemp}+\texttt{mv})
+consumate da due nuove regole Prometheus (\texttt{BackupHeartbeatStale},
+\texttt{BackupNotSucceededRecently}, soglia 26h). Aggiunti
+\texttt{node-exporter} (disco/CPU/RAM host) e \texttt{postgres-exporter}
+(connessioni, \texttt{pg\_up}) al profilo \texttt{observability}, con
+nuove regole \texttt{DiskSpaceLow} e \texttt{PostgresDown}.
+
+\textbf{Secondo bug trovato durante il test dal vivo}, distinto da quello
+di T-OPS-03: il wrapper dichiarava Postgres ``pronto'' al primo
+\texttt{pg\_isready} riuscito, ma l'immagine ufficiale
+\texttt{postgres:15-alpine} avvia un server \emph{temporaneo} per
+eseguire gli script di \texttt{docker-entrypoint-initdb.d/} su un volume
+vuoto, poi lo ferma e avvia quello reale --- un \texttt{pg\_isready}
+riuscito può quindi riferirsi all'istanza temporanea. Il primo ciclo di
+backup (avviato subito dopo, appena Postgres risulta pronto) collideva
+con quel riavvio interno e falliva con
+\texttt{ERROR: [101]: NULL result required to complete request}
+(la connessione di \texttt{pg\_backup\_start} veniva terminata a metà dal
+riavvio). Riprodotto due volte in modo deterministico prima del fix. Fix:
+richiesti 3 controlli \texttt{pg\_isready} consecutivi riusciti (1s di
+distanza) prima di procedere --- il riavvio interno produce una finestra
+di fallimento tra i due server che azzera il contatore, facendo attendere
+l'intero ciclo di riavvio invece di competere con esso.
+
+Verificato dal vivo: rebuild completo dell'immagine, avvio su volume
+vuoto, backup full completato senza collisioni
+(\texttt{backup command end: completed successfully}); processo
+\texttt{backup-scheduler.sh} terminato manualmente con
+\texttt{kill -9} --- log conferma rilevamento del crash, tentativo di
+alert, e processo ripristinato entro 10s.
+Commit: \commitref{5195fd0}{feat(infra): per-service Postgres roles + real alerting/backup supervision}
+
 \paragraph{T-GW-06 --- Propagazione X-Auth-Hotel end-to-end}
 Aggiunto campo \texttt{hotelId} a \texttt{UserAccount} e claim JWT corrispondente.
 L'API Gateway inietta \texttt{X-Auth-Hotel} su ogni richiesta a valle.
