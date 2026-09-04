@@ -3,39 +3,50 @@ global:
 
 # ----------------------------------------------------------------
 # Routing tree
-# Default receiver: null (alerts visible in Alertmanager UI at
-# http://localhost:9093 but no notifications sent).
-# Change receiver on the critical route to 'email-ops' once SMTP
-# is configured below.
+# Every alert reaches 'email-ops' — previously 'null' (visible only in the
+# Alertmanager UI at :9093, which docker-compose.prod.yml closes to the
+# host — every alert, critical included, went nowhere in production).
+# Critical alerts repeat every 30m instead of the default 4h: a single-PC
+# pilot has no on-call rotation, so the operator needs a faster reminder
+# while an incident is ongoing.
 # ----------------------------------------------------------------
 route:
   group_by: ['alertname', 'job']
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
-  receiver: 'null'
+  receiver: 'email-ops'
   routes:
     - matchers:
         - severity = critical
-      receiver: 'null'        # change to 'email-ops' to enable email
+      receiver: 'email-ops'
+      repeat_interval: 30m
       continue: false
 
 receivers:
   - name: 'null'
 
-  # Uncomment and fill in to enable email notifications for critical alerts.
-  # Restart alertmanager after editing this file.
+  # Alertmanager has no built-in ${VAR} expansion in this version, so
+  # (unlike the app services' env-var-driven config) these values are
+  # plain text here, not read from .env — restart alertmanager after
+  # editing this file (`docker compose restart alertmanager`).
   #
-  # - name: 'email-ops'
-  #   email_configs:
-  #     - smarthost: 'smtp.gmail.com:587'   # or your SMTP relay
-  #       from: 'noreply@yourhotel.com'
-  #       to: 'ops@yourhotel.com'
-  #       auth_username: 'noreply@yourhotel.com'
-  #       auth_password: 'YOUR_APP_PASSWORD'  # Gmail: App Password, not account password
-  #       send_resolved: true
-  #       headers:
-  #         Subject: '[{{ .Status | toUpper }}] Hotel PMS – {{ .GroupLabels.alertname }}'
+  # Default below points at the dev/pilot mailpit container (no auth, no
+  # TLS, port 1025) so alerts are visible out of the box — open
+  # http://localhost:8025 to see them land. BEFORE GO-LIVE, replace
+  # smarthost/from/to/auth_username/auth_password with the hotel's real
+  # SMTP relay (same one configured for notification-service,
+  # NOTIFICATION_FROM_ADDRESS in .env) and set require_tls: true, `to` to
+  # the operator's own inbox — not mailpit, not a guest-facing address.
+  - name: 'email-ops'
+    email_configs:
+      - smarthost: 'mailpit:1025'
+        from: 'alerts@hotelpms.local'
+        to: 'ops@hotelpms.local'
+        require_tls: false
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}] Hotel PMS – {{ .GroupLabels.alertname }}'
 
 # Suppress warning-severity alerts when a critical alert fires for
 # the same service, to avoid alert storms.

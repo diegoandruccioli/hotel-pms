@@ -51,3 +51,17 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     static_configs:
       - targets: ["notification-service:8090"]
+
+  # Host-level metrics (disk space, CPU, memory) — the single PC running
+  # this stack has no infra monitoring otherwise. Disk full is the most
+  # likely failure mode on a one-machine pilot and was previously invisible.
+  - job_name: "node-exporter"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  # Postgres-internal metrics (connections, replication lag, table/index
+  # bloat) — the 8 Spring Boot jobs above only see the JVM side (HikariCP
+  # pool usage), never the database process itself.
+  - job_name: "postgres-exporter"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]

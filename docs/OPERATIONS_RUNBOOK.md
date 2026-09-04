@@ -404,3 +404,43 @@ docker compose logs | grep "ERROR" | tail -20
 df -h
 docker system df
 ```
+
+---
+
+## 11. Migrazione a ruoli PostgreSQL per-servizio (deployment esistenti)
+
+`docker/postgres/initdb/02-create-tenant-roles.sql` e `03-create-monitoring-role.sql`
+girano solo al primo init di un volume Postgres vuoto (semantica
+`docker-entrypoint-initdb.d`). Un deployment già avviato prima di questa modifica
+continua a connettersi come superuser `postgres` finché non si applicano i due file a
+mano, una volta sola:
+
+```bash
+# 1. Aggiungere le 6 nuove password a .env (vedi .env.example) — o rigenerarle con:
+#    ./setup-hmac-secret.sh   (Linux/macOS)  oppure  .\setup-hmac-secret.ps1  (Windows)
+#    è idempotente: non tocca i segreti già presenti, aggiunge solo quelli mancanti.
+
+# 2. Esportare le password nell'ambiente della sessione psql (mai in chiaro nella shell history)
+set -a; source .env; set +a
+
+# 3. Applicare i due file nell'ordine corretto (usano \getenv, quindi vanno lanciati
+#    con psql direttamente sull'host che ha queste env var — non "docker exec ... cat | psql",
+#    che perderebbe l'ambiente)
+docker exec -e AUTH_DB_PASSWORD -e GUEST_DB_PASSWORD -e FRONTDESK_DB_PASSWORD \
+  -e BILLING_DB_PASSWORD -e FB_DB_PASSWORD -i hotel_postgres \
+  psql -U postgres -v ON_ERROR_STOP=1 < docker/postgres/initdb/02-create-tenant-roles.sql
+
+docker exec -e POSTGRES_EXPORTER_PASSWORD -i hotel_postgres \
+  psql -U postgres -v ON_ERROR_STOP=1 < docker/postgres/initdb/03-create-monitoring-role.sql
+
+# 4. Passare ogni servizio al proprio ruolo e riavviare (docker-compose.yml
+#    già usa i nuovi SPRING_DATASOURCE_USERNAME/PASSWORD una volta che .env li contiene)
+docker compose up -d auth-service guest-service frontdesk-service billing-service fb-service
+
+# 5. Verificare che ognuno sia partito con il ruolo giusto, non più "postgres"
+docker exec hotel_postgres psql -U postgres -c \
+  "SELECT usename, datname FROM pg_stat_activity WHERE datname LIKE 'hotel_%';"
+```
+
+Se il profilo `observability` è attivo, avviare anche `postgres-exporter` dopo il passo 3
+(prima fallirebbe in loop sul login mancante).
