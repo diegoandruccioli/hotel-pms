@@ -2603,6 +2603,63 @@ Sei nuovi test coprono la mitigazione:
 \paragraph{Riferimento} Commit: \commitref{43be320}{fix(security): T-RES-03 --- cross-field date range validation on reservation-service}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{CSV Formula Injection sul CsvWriter condiviso \threat{GAP-23}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Un nuovo \texttt{CsvWriter} condiviso (\texttt{common-web-lib}) stampa righe verso gli
+export CSV di reservations/guests/invoices/owner-report basandosi su
+\texttt{commons-csv}, che fornisce quoting/escaping RFC 4180 corretto ma nessuna
+protezione contro la \emph{CSV formula injection} (CWE-1236): quando una cella il cui
+valore stringificato comincia per \texttt{=}, \texttt{+}, \texttt{-}, \texttt{@}, tab o
+CR viene aperta in Excel/LibreOffice/Google Sheets, lo spreadsheet la interpreta come
+formula anziché come testo. Le colonne esportate includono campi liberi
+riempiti dall'utente (nome ospite, note), quindi un valore come
+\texttt{=cmd|'/c calc'!A1} salvato come nome ospite eseguirebbe quella formula al primo
+apertura del file da parte dell'operatore. Trovato durante un self-review di sicurezza
+mirato eseguito sulla classe stessa durante la sua implementazione, prima che un
+qualunque endpoint di export la richiamasse in produzione: nessuna finestra di
+sfruttabilità reale nel repository. La mappatura OWASP è \textbf{A03 --- Injection}.
+
+\paragraph{Mitigazione applicata}
+Ogni cella (incluso l'header) passa da un controllo sul primo carattere prima di
+essere data in pasto a \texttt{commons-csv}; se coincide con uno dei caratteri
+trigger, viene prefissata con un apice letterale (\texttt{'}), che ogni spreadsheet
+maggiore interpreta come ``forza testo'' e non mostra nell'interfaccia:
+
+\begin{insecurebox}[title={CsvWriter.java --- nessun controllo sul contenuto della cella (baseline)}]
+\begin{lstlisting}[style=java]
+public void printRow(final List<?> values) throws IOException {
+    printer.printRecord(values);
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={CsvWriter.java --- neutralizzazione dei caratteri-trigger (main)}]
+\begin{lstlisting}[style=java]
+private static final Set<Character> FORMULA_TRIGGER_CHARS =
+        Set.of('=', '+', '-', '@', '\t', '\r');
+
+public void printRow(final List<?> values) throws IOException {
+    printer.printRecord(values.stream().map(CsvWriter::neutralizeFormula).toList());
+}
+
+private static String neutralizeFormula(final Object value) {
+    final String text = value == null ? "" : String.valueOf(value);
+    if (!text.isEmpty() && FORMULA_TRIGGER_CHARS.contains(text.charAt(0))) {
+        return "'" + text;
+    }
+    return text;
+}
+\end{lstlisting}
+\end{securebox}
+
+La stessa neutralizzazione si applica alla riga di header in \texttt{CsvWriter.open()},
+così un nome colonna non può veicolare la stessa iniezione.
+
+\paragraph{Riferimento} Commit: \commitref{627194f}{feat(common-web-lib): shared CsvWriter with CSV formula injection mitigation}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Autorizzazione e Controllo degli Accessi}
 % ─────────────────────────────────────────────────────────────────────────────
 
