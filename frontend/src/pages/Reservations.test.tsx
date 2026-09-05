@@ -30,6 +30,7 @@ vi.mock('../services/reservationService', () => ({
     searchReservations: vi.fn(),
     deleteReservation: vi.fn(),
     retryConfirmationEmail: vi.fn(),
+    updateStatus: vi.fn(),
   },
 }));
 
@@ -246,6 +247,110 @@ describe('Reservations', () => {
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('RESERVATION_HAS_INVOICE', 'error'));
+  });
+
+  it('should show mark-no-show button for a CONFIRMED reservation with a past check-in date', async () => {
+    const pastConfirmed = { ...CONFIRMED_RESERVATION, checkInDate: '2020-01-01', version: 3 };
+    vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmed]) as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
+  });
+
+  it('should not show mark-no-show button when check-in date is still in the future', async () => {
+    const futureConfirmed = { ...CONFIRMED_RESERVATION, checkInDate: '2099-01-01', version: 3 };
+    vi.mocked(reservationService.searchReservations).mockResolvedValue(page([futureConfirmed]) as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /mark_no_show res-1/ })).not.toBeInTheDocument();
+  });
+
+  it('should not show mark-no-show button on a CANCELLED reservation', async () => {
+    const pastCancelled = { ...CANCELLED_RESERVATION, checkInDate: '2020-01-01', version: 3 };
+    vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastCancelled]) as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /mark_no_show res-2/ })).not.toBeInTheDocument();
+  });
+
+  it('should open confirmation dialog when mark-no-show button is clicked', async () => {
+    const pastConfirmed = { ...CONFIRMED_RESERVATION, checkInDate: '2020-01-01', version: 3 };
+    vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmed]) as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+
+    expect(screen.getByText('mark_no_show_confirm')).toBeInTheDocument();
+  });
+
+  it('should close the mark-no-show dialog without calling updateStatus when cancelled', async () => {
+    const pastConfirmed = { ...CONFIRMED_RESERVATION, checkInDate: '2020-01-01', version: 3 };
+    vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmed]) as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
+
+    expect(screen.queryByText('mark_no_show_confirm')).not.toBeInTheDocument();
+    expect(reservationService.updateStatus).not.toHaveBeenCalled();
+  });
+
+  it('shows a toast and skips the request when the reservation has no version', async () => {
+    const pastConfirmedNoVersion = { ...CONFIRMED_RESERVATION, checkInDate: '2020-01-01' };
+    vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmedNoVersion]) as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('mark_no_show_failed', 'error'));
+    expect(reservationService.updateStatus).not.toHaveBeenCalled();
+  });
+
+  it('should call updateStatus with NO_SHOW and the reservation version on confirm', async () => {
+    const pastConfirmed = { ...CONFIRMED_RESERVATION, checkInDate: '2020-01-01', version: 3 };
+    vi.mocked(reservationService.searchReservations)
+      .mockResolvedValueOnce(page([pastConfirmed]) as never)
+      .mockResolvedValueOnce(page([]) as never);
+    vi.mocked(reservationService.updateStatus).mockResolvedValueOnce({
+      ...pastConfirmed, status: 'NO_SHOW', version: 4,
+    } as never);
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
+
+    await waitFor(() => {
+      expect(reservationService.updateStatus).toHaveBeenCalledWith('res-1', 'NO_SHOW', 3);
+      expect(mockAddToast).toHaveBeenCalledWith('no_show_marked_success', 'success');
+    });
+  });
+
+  it('shows the backend detail instead of the generic fallback when updateStatus (no-show) fails', async () => {
+    const pastConfirmed = { ...CONFIRMED_RESERVATION, checkInDate: '2020-01-01', version: 3 };
+    vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmed]) as never);
+    vi.mocked(reservationService.updateStatus).mockRejectedValueOnce(
+      mockAxiosErrorWithDetail('RESERVATION_NO_SHOW_HAS_STAY', 409),
+    );
+    render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('RESERVATION_NO_SHOW_HAS_STAY', 'error'));
   });
 
   it('should search reservations server-side on search input', async () => {

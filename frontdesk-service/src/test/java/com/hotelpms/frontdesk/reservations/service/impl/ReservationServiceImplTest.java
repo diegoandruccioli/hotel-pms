@@ -933,6 +933,88 @@ class ReservationServiceImplTest {
     }
 
     @Test
+    void testUpdateStatusAndGuestsRejectsIllegalTransition() {
+        entity.setStatus(ReservationStatus.CHECKED_OUT);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        assertThrows(ConflictException.class,
+                () -> reservationService.updateStatusAndGuests(
+                        reservationId, ReservationStatus.CONFIRMED, null, null));
+
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void testUpdateStatusAndGuestsAllowsResendingSameStatusForActualGuestsOnlyUpdate() {
+        entity.setStatus(ReservationStatus.CONFIRMED);
+        final ReservationResponse confirmedResponse = new ReservationResponse(
+                reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 3,
+                entity.getCheckInDate(), entity.getCheckOutDate(),
+                ReservationStatus.CONFIRMED, null, true, null, null, false, null, null);
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(reservationMapper.toResponse(entity)).thenReturn(confirmedResponse);
+
+        reservationService.updateStatusAndGuests(reservationId, ReservationStatus.CONFIRMED, 3, null);
+
+        assertEquals(ReservationStatus.CONFIRMED, entity.getStatus());
+        assertEquals(3, entity.getActualGuests());
+    }
+
+    @Test
+    void testUpdateStatusAndGuestsNoShowSucceedsWhenCheckInDatePassedAndNoStay() {
+        entity.setStatus(ReservationStatus.CONFIRMED);
+        entity.setCheckInDate(LocalDate.now().minusDays(1));
+        final ReservationResponse noShowResponse = new ReservationResponse(
+                reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 0,
+                entity.getCheckInDate(), entity.getCheckOutDate(),
+                ReservationStatus.NO_SHOW, null, true, null, null, false, null, null);
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(stayRepository.findAllByReservationIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(List.of());
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(reservationMapper.toResponse(entity)).thenReturn(noShowResponse);
+
+        reservationService.updateStatusAndGuests(reservationId, ReservationStatus.NO_SHOW, null, null);
+
+        assertEquals(ReservationStatus.NO_SHOW, entity.getStatus());
+        verify(reservationRepository).saveAndFlush(entity);
+    }
+
+    @Test
+    void testUpdateStatusAndGuestsNoShowRejectedWhenCheckInDateInFuture() {
+        entity.setStatus(ReservationStatus.CONFIRMED);
+        entity.setCheckInDate(LocalDate.now().plusDays(1));
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        assertThrows(ConflictException.class,
+                () -> reservationService.updateStatusAndGuests(
+                        reservationId, ReservationStatus.NO_SHOW, null, null));
+
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void testUpdateStatusAndGuestsNoShowRejectedWhenStayAlreadyExists() {
+        entity.setStatus(ReservationStatus.CONFIRMED);
+        entity.setCheckInDate(LocalDate.now().minusDays(1));
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(stayRepository.findAllByReservationIdAndHotelId(reservationId, HOTEL_ID))
+                .thenReturn(List.of(mock(com.hotelpms.frontdesk.stays.domain.Stay.class)));
+
+        assertThrows(ConflictException.class,
+                () -> reservationService.updateStatusAndGuests(
+                        reservationId, ReservationStatus.NO_SHOW, null, null));
+
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void testCreateReservationOverlapThrowsBadRequest() {
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);

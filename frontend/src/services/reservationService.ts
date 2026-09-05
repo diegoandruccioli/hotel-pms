@@ -49,6 +49,20 @@ export const reservationService = {
     await api.delete(`${BASE_PATH}/${id}`);
   },
 
+  updateStatus: async (
+    id: string,
+    status: string,
+    version: number,
+    actualGuests?: number | null,
+  ): Promise<ReservationResponse> => {
+    const response = await api.patch<ReservationResponse>(`${BASE_PATH}/${id}/status-and-guests`, {
+      status,
+      actualGuests: actualGuests ?? null,
+      version,
+    });
+    return response.data;
+  },
+
   retryConfirmationEmail: async (id: string): Promise<ReservationResponse> => {
     const response = await api.post<ReservationResponse>(`${BASE_PATH}/${id}/confirmation-email/retry`, {});
     return response.data;

@@ -361,6 +361,11 @@
   "reservation_deleted_success": "Reservation deleted successfully.",
   "delete_reservation_failed": "Failed to delete reservation. Please try again.",
 
+  "mark_no_show": "Mark no-show",
+  "mark_no_show_confirm": "The guest never checked in for this reservation. Mark it as a no-show? This releases the room for other bookings and cannot be undone.",
+  "no_show_marked_success": "Reservation marked as no-show.",
+  "mark_no_show_failed": "Failed to mark the reservation as no-show. Please try again.",
+
   "alloggiati_submit": "Send to police portal",
   "alloggiati_submit_confirm": "Send the Alloggiati report for {{date}} to the Polizia di Stato portal?",
   "alloggiati_submit_success": "Report sent to PS portal successfully.",

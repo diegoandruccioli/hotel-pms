@@ -211,7 +211,7 @@ class ReservationControllerTest {
     @Test
     void shouldUpdateStatusAndGuestsReturn200() throws Exception {
         final ReservationStatusUpdateRequest statusRequest =
-                new ReservationStatusUpdateRequest(ReservationStatus.CHECKED_IN, 2, null);
+                new ReservationStatusUpdateRequest(ReservationStatus.CHECKED_IN, 2, 1L);
         final ReservationResponse checkedInResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, 2, 2,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
@@ -230,7 +230,17 @@ class ReservationControllerTest {
 
     @Test
     void shouldReturnValidationErrorWhenStatusIsNull() throws Exception {
-        final String body = "{\"status\": null, \"actualGuests\": 2}";
+        final String body = "{\"status\": null, \"actualGuests\": 2, \"version\": 1}";
+
+        mockMvc.perform(patch(BASE_URL + PATH_STATUS, reservationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldReturnValidationErrorWhenVersionIsNull() throws Exception {
+        final String body = "{\"status\": \"CHECKED_IN\", \"actualGuests\": 2, \"version\": null}";
 
         mockMvc.perform(patch(BASE_URL + PATH_STATUS, reservationId)
                         .contentType(MediaType.APPLICATION_JSON)
