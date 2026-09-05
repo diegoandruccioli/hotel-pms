@@ -62,6 +62,25 @@ public class ReservationServiceImpl implements ReservationService {
             List.of(ReservationStatus.CHECKED_OUT, ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW);
     private static final List<ReservationStatus> DELETABLE_STATUSES =
             List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
+    /**
+     * Legal next statuses for {@link #updateStatusAndGuests}, keyed by current status.
+     * A status transitioning to itself (e.g. an {@code actualGuests}-only update that
+     * resends the unchanged status) is always allowed regardless of this map — see
+     * {@link #verifyValidTransition}. Terminal statuses map to an empty set.
+     */
+    private static final java.util.Map<ReservationStatus, Set<ReservationStatus>> ALLOWED_TRANSITIONS =
+            java.util.Map.of(
+                    ReservationStatus.PENDING, EnumSet.of(
+                            ReservationStatus.CONFIRMED, ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW),
+                    ReservationStatus.CONFIRMED, EnumSet.of(
+                            ReservationStatus.PARTIALLY_CHECKED_IN, ReservationStatus.CHECKED_IN,
+                            ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW),
+                    ReservationStatus.PARTIALLY_CHECKED_IN, EnumSet.of(
+                            ReservationStatus.CHECKED_IN, ReservationStatus.CHECKED_OUT),
+                    ReservationStatus.CHECKED_IN, EnumSet.of(ReservationStatus.CHECKED_OUT),
+                    ReservationStatus.CHECKED_OUT, EnumSet.noneOf(ReservationStatus.class),
+                    ReservationStatus.CANCELLED, EnumSet.noneOf(ReservationStatus.class),
+                    ReservationStatus.NO_SHOW, EnumSet.noneOf(ReservationStatus.class));
     private static final String NOTIFICATION_SERVICE_UNAVAILABLE_REASON = "NOTIFICATION_SERVICE_UNAVAILABLE";
     private static final String SQLSTATE_EXCLUSION_VIOLATION = "23P01";
     private static final int MAX_FAILURE_REASON_LENGTH = 500;
@@ -266,6 +285,8 @@ public class ReservationServiceImpl implements ReservationService {
         if (!DELETABLE_STATUSES.contains(reservation.getStatus())) {
             throw new ConflictException("RESERVATION_NOT_DELETABLE");
         }
+        log.info("[RESERVATION] DELETED | reservationId={} | hotelId={} | statusAtDeletion={}",
+                id, hotelId, reservation.getStatus());
         reservationRepository.delete(Objects.requireNonNull(reservation));
     }
 
@@ -279,7 +300,13 @@ public class ReservationServiceImpl implements ReservationService {
         final Reservation reservation = findReservationByIdAndHotelOrThrow(id, hotelId);
         verifyNotStale(reservation, clientVersion);
 
-        if (status != null) {
+        if (status != null && status != reservation.getStatus()) {
+            verifyValidTransition(reservation.getStatus(), status);
+            if (status == ReservationStatus.NO_SHOW) {
+                verifyNoShowAllowed(reservation, hotelId);
+            }
+            log.info("[RESERVATION] STATUS_CHANGED | reservationId={} | hotelId={} | from={} | to={}",
+                    id, hotelId, reservation.getStatus(), status);
             reservation.setStatus(status);
         }
         if (actualGuests != null) {
@@ -641,6 +668,40 @@ public class ReservationServiceImpl implements ReservationService {
     private static void verifyNotStale(final Reservation reservation, final Long clientVersion) {
         if (clientVersion != null && !clientVersion.equals(reservation.getVersion())) {
             throw new ConflictException("RESERVATION_STALE_VERSION");
+        }
+    }
+
+    /**
+     * Rejects a status change that isn't a legal move in the reservation lifecycle
+     * (see {@link #ALLOWED_TRANSITIONS}). Callers must skip this entirely when
+     * {@code next} equals the current status — that's a no-op resend (e.g. an
+     * {@code actualGuests}-only update), not a transition.
+     *
+     * @param current the status as currently persisted
+     * @param next    the requested new status
+     */
+    private static void verifyValidTransition(final ReservationStatus current, final ReservationStatus next) {
+        if (!ALLOWED_TRANSITIONS.getOrDefault(current, Set.of()).contains(next)) {
+            throw new ConflictException("RESERVATION_INVALID_TRANSITION");
+        }
+    }
+
+    /**
+     * A reservation can only be marked {@code NO_SHOW} once its check-in date has
+     * passed and no (active) {@link com.hotelpms.frontdesk.stays.domain.Stay} was ever
+     * created against it — a guest who did check in, even briefly, was not a no-show.
+     *
+     * @param reservation the reservation being transitioned to {@code NO_SHOW}
+     * @param hotelId     the caller's hotel, for the stay lookup
+     */
+    private void verifyNoShowAllowed(final Reservation reservation, final UUID hotelId) {
+        if (reservation.getCheckInDate().isAfter(LocalDate.now())) {
+            throw new ConflictException("RESERVATION_NO_SHOW_BEFORE_CHECKIN_DATE");
+        }
+        final boolean hasStay = !stayRepository
+                .findAllByReservationIdAndHotelId(reservation.getId(), hotelId).isEmpty();
+        if (hasStay) {
+            throw new ConflictException("RESERVATION_NO_SHOW_HAS_STAY");
         }
     }
 

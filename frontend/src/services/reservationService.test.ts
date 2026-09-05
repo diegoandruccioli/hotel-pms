@@ -68,4 +68,31 @@ describe('reservationService', () => {
     expect(api.post).toHaveBeenCalledWith('/api/v1/reservations/1/confirmation-email/retry', {});
     expect(result).toEqual(mockResponse);
   });
+
+  it('should update status with the given actualGuests', async () => {
+    const mockResponse = { id: '1', status: 'NO_SHOW', version: 4 };
+    vi.mocked(api.patch).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await reservationService.updateStatus('1', 'NO_SHOW', 3, 2);
+
+    expect(api.patch).toHaveBeenCalledWith('/api/v1/reservations/1/status-and-guests', {
+      status: 'NO_SHOW',
+      actualGuests: 2,
+      version: 3,
+    });
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should update status with actualGuests defaulted to null when omitted', async () => {
+    const mockResponse = { id: '1', status: 'NO_SHOW', version: 4 };
+    vi.mocked(api.patch).mockResolvedValueOnce({ data: mockResponse });
+
+    await reservationService.updateStatus('1', 'NO_SHOW', 3);
+
+    expect(api.patch).toHaveBeenCalledWith('/api/v1/reservations/1/status-and-guests', {
+      status: 'NO_SHOW',
+      actualGuests: null,
+      version: 3,
+    });
+  });
 });

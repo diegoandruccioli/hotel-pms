@@ -361,6 +361,11 @@
   "reservation_deleted_success": "Prenotazione eliminata con successo.",
   "delete_reservation_failed": "Impossibile eliminare la prenotazione. Riprova.",
 
+  "mark_no_show": "Segna no-show",
+  "mark_no_show_confirm": "L'ospite non si è mai presentato per questa prenotazione. Segnarla come no-show? La camera viene liberata per altre prenotazioni e l'azione non può essere annullata.",
+  "no_show_marked_success": "Prenotazione segnata come no-show.",
+  "mark_no_show_failed": "Impossibile segnare la prenotazione come no-show. Riprova.",
+
   "alloggiati_submit": "Invia a Questura",
   "alloggiati_submit_confirm": "Inviare la lista Alloggiati del {{date}} al portale della Polizia di Stato?",
   "alloggiati_submit_success": "Lista inviata al portale PS con successo.",
