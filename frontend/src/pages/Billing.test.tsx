@@ -87,6 +87,12 @@ describe('Billing', () => {
     expect(screen.getByText('progress_activity')).toBeInTheDocument();
   });
 
+  it('should show the pilot-mode fiscal disclaimer banner (VITE_PILOT_MODE defaults to shown)', () => {
+    vi.mocked(billingService.searchInvoices).mockReturnValue(new Promise(() => {}));
+    render(<Billing />);
+    expect(screen.getByText('pilot_mode_fiscal_banner')).toBeInTheDocument();
+  });
+
   it('should render invoices on success', async () => {
     vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
     render(<Billing />);

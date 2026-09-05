@@ -111,6 +111,7 @@
   "generate_and_download": "Genera e Scarica",
   "failed_load_invoices": "Impossibile caricare le fatture",
   "billing_subtitle": "Gestisci fatturazione e registra pagamenti ospiti.",
+  "pilot_mode_fiscal_banner": "Modalità pilota: i documenti fiscali emessi qui (fatture/ricevute) non sono ancora stati validati con un commercialista per i corrispettivi telematici Horeca (obbligo in vigore dal 2026-01-01) e condividono un'unica numerazione senza sezionale pilota separato. Continuare a usare il gestionale fiscale primario dell'hotel in affiancamento fino a conferma.",
   "error_loading_invoices": "Errore nel caricamento delle fatture",
   "total_amount": "Importo Totale",
   "no_invoices": "Nessuna fattura trovata.",

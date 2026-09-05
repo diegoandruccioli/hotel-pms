@@ -22,6 +22,17 @@ const SEARCH_DEBOUNCE_MS = 300;
 const DEFAULT_SORT_FIELD = 'issueDate';
 const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'desc';
 
+/**
+ * Punto 5 (piano pilota) guardrail: corrispettivi telematici Horeca are not
+ * implemented (docs-only decision, see backup/DECISIONS.md ADR-006) and the
+ * fiscal numbering hasn't been separated into a pilot sezionale yet -- every
+ * FATTURA/RICEVUTA generated here still burns a progressive from the same
+ * live sequence. Defaults to shown (safer for the actual pilot deployment);
+ * set VITE_PILOT_MODE=false to hide once corrispettivi/sezionale are settled
+ * with a commercialista.
+ */
+const PILOT_MODE = import.meta.env.VITE_PILOT_MODE !== 'false';
+
 const getStatusTone = (status: InvoiceStatus) => {
   switch (status) {
     case 'ISSUED': return 'warning' as const;
@@ -287,6 +298,12 @@ export const Billing = memo(() => {
 
   return (
     <div className="space-y-6">
+      {PILOT_MODE && (
+        <div role="status" className="flex items-start gap-3 rounded-2xl bg-warning-container text-on-warning-container px-4 py-3 text-sm font-medium">
+          <MaterialIcon name="warning" size={18} className="mt-0.5 shrink-0" />
+          {t('pilot_mode_fiscal_banner')}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">

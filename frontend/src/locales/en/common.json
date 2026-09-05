@@ -111,6 +111,7 @@
   "generate_and_download": "Generate & Download",
   "failed_load_invoices": "Failed to load invoices",
   "billing_subtitle": "Manage guest billing, process payments, and view invoices.",
+  "pilot_mode_fiscal_banner": "Pilot mode: fiscal documents issued here (invoices/receipts) have not yet been validated with an accountant for Horeca digital receipts (\"corrispettivi telematici\", mandatory since 2026-01-01) and share one numbering sequence with no pilot sezionale. Keep using the hotel's primary fiscal system alongside this one until confirmed.",
   "error_loading_invoices": "Error loading invoices",
   "total_amount": "Total Amount",
   "no_invoices": "No invoices found.",
