@@ -38,6 +38,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -119,6 +120,31 @@ public class InvoiceController {
         final Page<InvoiceSearchResultResponse> page =
                 invoiceService.searchInvoices(status, query, dateFrom, dateTo, pageable);
         return ResponseEntity.ok(page);
+    }
+
+    /**
+     * Exports every invoice matching the same filters as {@link #searchInvoices}
+     * as a CSV file -- ADMIN/OWNER only, financial data.
+     *
+     * @param status   optional invoice status filter
+     * @param query    optional free-text query (invoice number or guest name/email)
+     * @param dateFrom optional lower bound on issue date (inclusive day)
+     * @param dateTo   optional upper bound on issue date (inclusive day)
+     * @return a streamed CSV attachment
+     */
+    @GetMapping(value = "/export.csv", produces = "text/csv")
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
+    public ResponseEntity<StreamingResponseBody> exportInvoicesCsv(
+            @RequestParam(required = false) final InvoiceStatus status,
+            @RequestParam(required = false) final String query,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate dateTo) {
+        final StreamingResponseBody body =
+                out -> invoiceService.exportInvoicesCsv(status, query, dateFrom, dateTo, out);
+        return ResponseEntity.ok()
+                .headers(h -> h.setContentDisposition(
+                        ContentDisposition.attachment().filename("invoices.csv").build()))
+                .body(body);
     }
 
     /**

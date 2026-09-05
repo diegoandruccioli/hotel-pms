@@ -9,12 +9,15 @@ import com.hotelpms.billing.mapper.InvoiceMapper;
 import com.hotelpms.billing.repository.InvoiceRepository;
 import com.hotelpms.billing.repository.OwnerFinancialSummaryAggregates;
 import com.hotelpms.billing.service.OwnerReportService;
+import com.hotelpms.commonweb.csv.CsvWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -79,5 +82,31 @@ public class OwnerReportServiceImpl implements OwnerReportService {
                 return new OwnerFinancialSummaryDto(startDate, endDate, aggregates.getTotalRevenue(),
                                 aggregates.getTotalInvoices(), aggregates.getPaidInvoices(),
                                 aggregates.getPendingRevenue());
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        @Transactional(readOnly = true)
+        public void exportFinancialReportCsv(
+                        final UUID hotelId, final LocalDate startDate, final LocalDate endDate, final OutputStream out)
+                        throws IOException {
+                log.info("Exporting owner financial report CSV for hotelId={} from {} to {}",
+                                hotelId, startDate, endDate);
+
+                final LocalDateTime start = startDate.atStartOfDay();
+                final LocalDateTime end = endDate.plusDays(1).atStartOfDay();
+                final List<Invoice> invoices = invoiceRepository.findByHotelIdAndIssueDateBetween(hotelId, start, end);
+
+                try (CsvWriter csv = CsvWriter.open(out, List.of(
+                                "invoiceNumber", "issueDate", "totalAmount", "status", "guestId"))) {
+                        for (final Invoice invoice : invoices) {
+                                csv.printRow(List.of(
+                                                invoice.getInvoiceNumber(),
+                                                String.valueOf(invoice.getIssueDate()),
+                                                String.valueOf(invoice.getTotalAmount()),
+                                                String.valueOf(invoice.getStatus()),
+                                                String.valueOf(invoice.getGuestId())));
+                        }
+                }
         }
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
@@ -13,6 +14,8 @@ import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useTranslation } from 'react-i18next';
 import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries';
 import { getErrorMessage, cn } from '../utils';
+import { billingService } from '../services';
+import { useAuthStore } from '../store';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -93,6 +96,8 @@ const EMPTY_RESULTS: InvoiceSearchResult[] = [];
 
 export const Billing = memo(() => {
   const { t, i18n } = useTranslation('common');
+  const { user } = useAuthStore();
+  const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
   const [page, setPage] = useState(0);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceResponse | null>(null);
   const [detailTarget, setDetailTarget]   = useState<InvoiceResponse | null>(null);
@@ -102,6 +107,14 @@ export const Billing = memo(() => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
+  const handleExportCsv = useCallback(() => {
+    billingService.exportInvoicesCsv({
+      status: statusFilter === 'ALL' ? undefined : statusFilter,
+      query: searchQuery,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+    });
+  }, [statusFilter, searchQuery, dateFrom, dateTo]);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
 
   useEffect(() => {
@@ -321,6 +334,11 @@ export const Billing = memo(() => {
             className="w-40"
           />
         </div>
+        {isAdminOrOwner && (
+          <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
+            {t('export_csv')}
+          </M3Button>
+        )}
       </div>
 
       {loading ? (

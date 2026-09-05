@@ -7,6 +7,7 @@ import type {
   GuestPrivacySettingsResponse,
 } from '../types';
 import type { SpringPage } from '../types';
+import { downloadViaIframe } from '../utils/downloadViaIframe';
 
 const BASE_PATH = '/api/v1/guests';
 
@@ -59,6 +60,17 @@ export const guestService = {
   exportGuestData: async (id: string): Promise<GuestDataExportResponse> => {
     const response = await api.get<GuestDataExportResponse>(`${BASE_PATH}/${id}/export`);
     return response.data;
+  },
+
+  /** Downloads every guest matching `query` (or every guest in the hotel when blank)
+   * as a CSV file via a hidden iframe. Admin/Owner only — PII. */
+  exportGuestsCsv: (query?: string): void => {
+    const params = new URLSearchParams();
+    if (query?.trim()) {
+      params.set('query', query.trim());
+    }
+    const qs = params.toString();
+    downloadViaIframe(`${BASE_PATH}/export.csv${qs ? `?${qs}` : ''}`);
   },
 
   /** Per-hotel GDPR retention settings. Creates a default row (5 years) if none exists yet. */

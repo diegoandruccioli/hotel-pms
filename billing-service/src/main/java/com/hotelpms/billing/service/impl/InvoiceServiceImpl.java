@@ -1,5 +1,6 @@
 package com.hotelpms.billing.service.impl;
 
+import com.hotelpms.commonweb.csv.CsvWriter;
 import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.domain.ChargeType;
@@ -28,13 +29,17 @@ import com.hotelpms.billing.service.InvoiceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -56,6 +61,11 @@ public class InvoiceServiceImpl implements InvoiceService {
 
     private static final String INVOICE_NOT_FOUND = "INVOICE_NOT_FOUND";
     private static final int GUEST_SEARCH_MATCH_CAP = 200;
+    /**
+     * Page size for CSV export's internal pagination loop -- bounds memory to one
+     * page at a time instead of loading the whole matching set before writing.
+     */
+    private static final int EXPORT_PAGE_SIZE = 500;
     /**
      * The FatturaPA {@code Natura} code for the tourist tax — collected by the
      * operator in the comune's name, not as consideration for a service of its own
@@ -235,6 +245,49 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         return results.map(invoice -> new InvoiceSearchResultResponse(
                 invoiceMapper.toResponse(invoice), guestNames.get(invoice.getGuestId())));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public void exportInvoicesCsv(final InvoiceStatus status, final String query, final LocalDate dateFrom,
+            final LocalDate dateTo, final OutputStream out) throws IOException {
+        final UUID hotelId = resolveHotelId();
+        log.info("REST request to export invoices CSV | hotelId={} | status={} | hasQuery={}",
+                hotelId, status, query != null && !query.isBlank());
+        final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
+        final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
+        final LocalDateTime fromInclusive = dateFrom == null ? null : dateFrom.atStartOfDay();
+        final LocalDateTime toExclusive = dateTo == null ? null : dateTo.plusDays(1).atStartOfDay();
+
+        try (CsvWriter csv = CsvWriter.open(out, List.of(
+                "invoiceNumber", "guestName", "issueDate", "status", "documentType", "totalAmount"))) {
+            int pageNumber = 0;
+            Page<Invoice> page;
+            do {
+                final Pageable pageable = PageRequest.of(
+                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("issueDate").descending());
+                page = invoiceRepository.searchInvoicesByHotelId(
+                        hotelId, status, fromInclusive, toExclusive, trimmedQuery, guestIds, pageable);
+
+                final Map<UUID, String> guestNames = resolveGuestNames(
+                        page.getContent().stream()
+                                .map((@NonNull Invoice invoice) -> invoice.getGuestId())
+                                .distinct()
+                                .toList());
+
+                for (final Invoice invoice : page.getContent()) {
+                    csv.printRow(List.of(
+                            invoice.getInvoiceNumber(),
+                            guestNames.getOrDefault(invoice.getGuestId(), ""),
+                            String.valueOf(invoice.getIssueDate()),
+                            String.valueOf(invoice.getStatus()),
+                            String.valueOf(invoice.getDocumentType()),
+                            String.valueOf(invoice.getTotalAmount())));
+                }
+                pageNumber++;
+            } while (page.hasNext());
+        }
     }
 
     /** {@inheritDoc} */

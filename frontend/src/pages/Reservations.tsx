@@ -18,6 +18,7 @@ import type { RoomResponse } from '../types';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 import { getErrorMessage, cn } from '../utils';
+import { reservationService } from '../services';
 import {
   useReservationsSearch,
   useRoomsLookup,
@@ -224,6 +225,10 @@ export const Reservations = () => {
   const [sortField, setSortField] = useState<SortField>(() => navState?.sortField ?? DEFAULT_SORT_FIELD);
   const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? DEFAULT_SORT_DIR);
   const [upcomingOnly, setUpcomingOnly] = useState(() => navState?.upcomingOnly ?? false);
+
+  const handleExportCsv = useCallback(() => {
+    reservationService.exportReservationsCsv({ query: searchQuery, upcomingOnly });
+  }, [searchQuery, upcomingOnly]);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);
@@ -481,6 +486,9 @@ export const Reservations = () => {
           >
             {t('reservations_upcoming_filter')}
           </button>
+          <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
+            {t('export_csv')}
+          </M3Button>
           <M3Button data-testid="new-reservation-btn" icon="add" onClick={handleNewReservation}>
             {t('new_reservation')}
           </M3Button>

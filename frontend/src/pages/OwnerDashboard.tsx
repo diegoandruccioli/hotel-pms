@@ -98,9 +98,9 @@ export const OwnerDashboard = memo(() => {
 
   const handleExport = useCallback(() => {
     if (!report) return;
-    billingReportService.exportToCsv(report, t);
+    billingReportService.exportToCsv(startDate, endDate);
     addToast(t('csv_export_started'), 'success');
-  }, [report, addToast, t]);
+  }, [report, startDate, endDate, addToast, t]);
 
   const handleStartDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setStartDate(e.target.value);

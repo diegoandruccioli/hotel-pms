@@ -1,5 +1,6 @@
 package com.hotelpms.guest.service.impl;
 
+import com.hotelpms.commonweb.csv.CsvWriter;
 import com.hotelpms.guest.client.AlloggiatiComuniClient;
 import com.hotelpms.guest.client.BillingServiceClient;
 import com.hotelpms.guest.client.ReservationClient;
@@ -30,12 +31,16 @@ import com.hotelpms.guest.service.GuestService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -63,6 +68,9 @@ public class GuestServiceImpl implements GuestService {
     private static final String GUEST_NOT_FOUND_MSG = "GUEST_NOT_FOUND";
     private static final String ANON_FIRST = "GDPR";
     private static final String ANON_LAST_PREFIX = "ERASED_";
+    /** Page size for CSV export's internal pagination loop -- bounds memory to one
+     * page at a time instead of loading the whole matching set before writing. */
+    private static final int EXPORT_PAGE_SIZE = 500;
 
     private final GuestRepository guestRepository;
     private final IdentityDocumentRepository identityDocumentRepository;
@@ -311,6 +319,44 @@ public class GuestServiceImpl implements GuestService {
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
         return guestRepository.searchByKeywordAndHotelId(safeQuery, hotelId, safePageable)
                 .map(guestMapper::toResponse);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public void exportGuestsCsv(final String query, final OutputStream out) throws IOException {
+        final UUID hotelId = extractHotelId();
+        final String userId = extractUserId();
+        final String safeQuery = query == null ? "" : query.trim();
+        log.info("[PII-ACCESS] EXPORT | operation=EXPORT_GUESTS_CSV | userId={} | hotelId={}", userId, hotelId);
+
+        try (CsvWriter csv = CsvWriter.open(out, List.of(
+                "firstName", "lastName", "email", "phone", "city", "country"))) {
+            int pageNumber = 0;
+            Page<Guest> page;
+            do {
+                final Pageable pageable = PageRequest.of(
+                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("lastName").ascending());
+                page = safeQuery.isEmpty()
+                        ? guestRepository.findAllByHotelId(hotelId, pageable)
+                        : guestRepository.searchByKeywordAndHotelId(safeQuery, hotelId, pageable);
+
+                for (final Guest guest : page.getContent()) {
+                    csv.printRow(List.of(
+                            nullToEmpty(guest.getFirstName()),
+                            nullToEmpty(guest.getLastName()),
+                            nullToEmpty(guest.getEmail()),
+                            nullToEmpty(guest.getPhone()),
+                            nullToEmpty(guest.getCity()),
+                            nullToEmpty(guest.getCountry())));
+                }
+                pageNumber++;
+            } while (page.hasNext());
+        }
+    }
+
+    private static String nullToEmpty(final String value) {
+        return value == null ? "" : value;
     }
 
     /**

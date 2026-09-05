@@ -1,6 +1,7 @@
 import api from './api';
 import type { ReservationRequest, ReservationResponse } from '../types';
 import type { SpringPage } from '../types';
+import { downloadViaIframe } from '../utils/downloadViaIframe';
 
 const BASE_PATH = '/api/v1/reservations';
 
@@ -66,5 +67,24 @@ export const reservationService = {
   retryConfirmationEmail: async (id: string): Promise<ReservationResponse> => {
     const response = await api.post<ReservationResponse>(`${BASE_PATH}/${id}/confirmation-email/retry`, {});
     return response.data;
+  },
+
+  /** Downloads every reservation matching the same filters as {@link searchReservations}
+   * as a CSV file via a hidden iframe. */
+  exportReservationsCsv: (params: {
+    query?: string;
+    upcomingOnly?: boolean;
+    dateFrom?: string;
+    dateTo?: string;
+    status?: string;
+  }): void => {
+    const searchParams = new URLSearchParams();
+    if (params.query?.trim()) searchParams.set('query', params.query.trim());
+    if (params.upcomingOnly) searchParams.set('upcomingOnly', 'true');
+    if (params.dateFrom) searchParams.set('dateFrom', params.dateFrom);
+    if (params.dateTo) searchParams.set('dateTo', params.dateTo);
+    if (params.status) searchParams.set('status', params.status);
+    const qs = searchParams.toString();
+    downloadViaIframe(`${BASE_PATH}/export.csv${qs ? `?${qs}` : ''}`);
   },
 };

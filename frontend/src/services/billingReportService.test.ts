@@ -1,21 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import api from './api';
 import { billingReportService } from './billingReportService';
 
 vi.mock('./api');
-
-const translate = (key: string): string => {
-  const map: Record<string, string> = {
-    invoice_number: 'N° Fattura',
-    issue_date: 'Data Emissione',
-    amount: 'Importo',
-    status: 'Stato',
-    guest_id: 'ID Ospite',
-    invoice_status_PAID: 'Pagata',
-    invoice_status_PENDING: 'invoice_status_PENDING',
-  };
-  return map[key] ?? key;
-};
 
 describe('billingReportService', () => {
   beforeEach(() => {
@@ -58,68 +45,15 @@ describe('billingReportService', () => {
     expect(result).toEqual(mockSummary);
   });
 
-  it('should export report to CSV with translated headers, translated status, a UTF-8 BOM and a semicolon delimiter', () => {
-    const mockReport = {
-      startDate: '2026-01-01',
-      endDate: '2026-03-31',
-      totalRevenue: 500,
-      invoices: [
-        { invoiceNumber: 'INV-001', issueDate: '2026-01-15T00:00:00', totalAmount: 500, status: 'PAID', guestId: 'g1' },
-      ],
-    };
+  it('downloads the server-generated CSV export via a hidden iframe', () => {
+    billingReportService.exportToCsv('2026-01-01', '2026-03-31');
 
-    const createObjectURL = vi.fn(() => 'blob:http://test/123');
-    const revokeObjectURL = vi.fn();
-    const clickFn = vi.fn();
-    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
-
-    const appendChildSpy = vi.spyOn(document, 'createElement').mockReturnValue({
-      href: '',
-      download: '',
-      click: clickFn,
-    } as unknown as HTMLAnchorElement);
-    const blobSpy = vi.spyOn(globalThis, 'Blob');
-
-    billingReportService.exportToCsv(mockReport as never, translate);
-
-    expect(createObjectURL).toHaveBeenCalled();
-    expect(clickFn).toHaveBeenCalled();
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:http://test/123');
-
-    const [[parts]] = blobSpy.mock.calls;
-    const content = (parts as string[]).join('');
-    expect(content.startsWith('﻿')).toBe(true);
-    expect(content).toContain('"N° Fattura";"Data Emissione";"Importo";"Stato";"ID Ospite"');
-    expect(content).toContain('"Pagata"');
-
-    blobSpy.mockRestore();
-    appendChildSpy.mockRestore();
+    const iframe = document.body.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    expect(iframe?.src).toContain('/api/v1/reports/owner/export.csv?startDate=2026-01-01&endDate=2026-03-31');
   });
 
-  it('uses a dash placeholder when issueDate is missing', () => {
-    const mockReport = {
-      startDate: '2026-01-01',
-      endDate: '2026-03-31',
-      totalRevenue: 500,
-      invoices: [
-        { invoiceNumber: 'INV-002', issueDate: undefined, totalAmount: 250, status: 'PENDING', guestId: 'g2' },
-      ],
-    };
-
-    const createObjectURL = vi.fn(() => 'blob:http://test/456');
-    const revokeObjectURL = vi.fn();
-    const clickFn = vi.fn();
-    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
-
-    const appendChildSpy = vi.spyOn(document, 'createElement').mockReturnValue({
-      href: '',
-      download: '',
-      click: clickFn,
-    } as unknown as HTMLAnchorElement);
-
-    billingReportService.exportToCsv(mockReport as never, translate);
-
-    expect(clickFn).toHaveBeenCalled();
-    appendChildSpy.mockRestore();
+  afterEach(() => {
+    document.body.replaceChildren();
   });
 });

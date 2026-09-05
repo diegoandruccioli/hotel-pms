@@ -14,10 +14,12 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.http.ContentDisposition;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.time.LocalDate;
 import java.util.Objects;
@@ -55,6 +57,32 @@ public class OwnerReportController {
         log.info("REST request for owner financial report | hotelId={} | from {} to {}", hotelId, startDate, endDate);
         final OwnerFinancialReportDto report = ownerReportService.getFinancialReport(hotelId, startDate, endDate);
         return ResponseEntity.ok(report);
+    }
+
+    /**
+     * Streams the same invoice list as {@link #getOwnerFinancialReport} as a CSV
+     * file, scoped to the caller's hotel (T-BILL-04). Access is restricted to
+     * users with the OWNER or ADMIN role.
+     *
+     * @param startDate the start of the period (inclusive), format YYYY-MM-DD
+     * @param endDate   the end of the period (inclusive), format YYYY-MM-DD
+     * @return a streamed CSV attachment
+     */
+    @GetMapping(value = "/owner/export.csv", produces = "text/csv")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    public ResponseEntity<StreamingResponseBody> exportOwnerFinancialReportCsv(
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate startDate,
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate endDate) {
+        final UUID hotelId = Objects.requireNonNull(extractHotelId());
+        log.info("REST request to export owner financial report CSV | hotelId={} | from {} to {}",
+                hotelId, startDate, endDate);
+        final StreamingResponseBody body =
+                out -> ownerReportService.exportFinancialReportCsv(hotelId, startDate, endDate, out);
+        return ResponseEntity.ok()
+                .headers(h -> h.setContentDisposition(ContentDisposition.attachment()
+                        .filename("owner-report-" + startDate + "-to-" + endDate + ".csv")
+                        .build()))
+                .body(body);
     }
 
     /**

@@ -43,7 +43,10 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -1233,5 +1236,59 @@ class ReservationServiceImplTest {
                 () -> reservationService.getAvailableRooms(sameDay, sameDay));
         assertEquals(ERR_CHECKOUT_AFTER_CHECKIN, ex.getMessage());
         verify(roomService, never()).findBookableRooms(any());
+    }
+
+    // ---------------------------------------------------------------
+    // exportReservationsCsv (Point 3 -- CSV export)
+    // ---------------------------------------------------------------
+
+    @Test
+    void testExportReservationsCsvWritesHeaderAndHotelScopedRowsWithResolvedGuestName() throws IOException {
+        final Pageable pageable = PageRequest.of(0, 500, org.springframework.data.domain.Sort.by("checkInDate").descending());
+        final Page<Reservation> reservationPage = new PageImpl<>(List.of(entity), pageable, 1L);
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+
+        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
+                .thenReturn(reservationPage);
+        when(guestClient.getGuestsBatch(List.of(GUEST_ID))).thenReturn(List.of(mockGuestResponse));
+
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        reservationService.exportReservationsCsv(null, false, null, null, null, out);
+
+        final String content = out.toString(StandardCharsets.UTF_8);
+        assertTrue(content.contains("guestName;checkInDate;checkOutDate;status;expectedGuests;actualGuests"));
+        assertTrue(content.contains(FULL_NAME));
+        assertTrue(content.contains(String.valueOf(STATUS_CONFIRMED)));
+    }
+
+    @Test
+    void testExportReservationsCsvSkipsGuestBatchResolutionWhenNoRows() throws IOException {
+        final Pageable pageable = PageRequest.of(0, 500, org.springframework.data.domain.Sort.by("checkInDate").descending());
+        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
+                .thenReturn(Page.empty(pageable));
+
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        reservationService.exportReservationsCsv(null, false, null, null, null, out);
+
+        verify(guestClient, never()).getGuestsBatch(any());
+        assertTrue(out.toString(StandardCharsets.UTF_8).contains("guestName;checkInDate"));
+    }
+
+    @Test
+    void testExportReservationsCsvAppliesStatusFilterViaFilterQuery() throws IOException {
+        final Pageable pageable = PageRequest.of(0, 500, org.springframework.data.domain.Sort.by("checkInDate").descending());
+        when(reservationRepository.filterReservationsByHotelId(
+                eq(HOTEL_ID), any(), any(), eq(Set.of(ReservationStatus.CHECKED_IN)),
+                eq(null), eq(List.of()), eq(pageable)))
+                .thenReturn(Page.empty(pageable));
+
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        reservationService.exportReservationsCsv(
+                null, false, null, null, ReservationStatus.CHECKED_IN, out);
+
+        verify(reservationRepository).filterReservationsByHotelId(
+                eq(HOTEL_ID), any(), any(), eq(Set.of(ReservationStatus.CHECKED_IN)),
+                eq(null), eq(List.of()), eq(pageable));
     }
 }

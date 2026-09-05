@@ -68,6 +68,24 @@ public interface ReservationService {
             LocalDate dateFrom, LocalDate dateTo, ReservationStatus status, Pageable pageable);
 
     /**
+     * Streams every reservation matching the same filters as {@link
+     * #searchReservations} to {@code out} as CSV, unpaginated (internally
+     * paged in fixed-size batches so the whole matching set is never held in
+     * memory at once) — the "export my data" counterpart to the paginated
+     * table view.
+     *
+     * @param query        optional free-text query (guest name/email), or {@code null}/blank to skip it
+     * @param upcomingOnly if {@code true}, only reservations with check-in today or later
+     * @param dateFrom     optional lower bound (inclusive) on check-in date
+     * @param dateTo       optional upper bound (inclusive) on check-in date
+     * @param status       optional reservation status filter
+     * @param out          the stream to write CSV bytes to
+     * @throws java.io.IOException if writing to {@code out} fails
+     */
+    void exportReservationsCsv(String query, boolean upcomingOnly, LocalDate dateFrom, LocalDate dateTo,
+            ReservationStatus status, java.io.OutputStream out) throws java.io.IOException;
+
+    /**
      * Updates an existing reservation.
      *
      * @param id      the reservation ID

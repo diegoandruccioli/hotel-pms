@@ -97,4 +97,25 @@ describe('guestService', () => {
 
     expect(api.get).toHaveBeenCalledWith('/api/v1/guests/search?page=0&size=20&sort=lastName%2Cdesc');
   });
+
+  it('should download the CSV export with a trimmed query param via a hidden iframe', () => {
+    guestService.exportGuestsCsv('  mario  ');
+
+    const iframe = document.body.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    expect(iframe?.src).toContain('/api/v1/guests/export.csv?query=mario');
+
+    document.body.replaceChildren();
+  });
+
+  it('should download every guest as CSV, without a query param, when blank', () => {
+    guestService.exportGuestsCsv('   ');
+
+    const iframe = document.body.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    expect(iframe?.src).toContain('/api/v1/guests/export.csv');
+    expect(iframe?.src).not.toContain('query=');
+
+    document.body.replaceChildren();
+  });
 });

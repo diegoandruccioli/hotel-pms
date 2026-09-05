@@ -13,7 +13,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.util.List;
 import java.util.UUID;
@@ -181,10 +184,34 @@ public class GuestController {
      * @param id the guest UUID; must not be {@code null}
      * @return {@code 200 OK} with the complete export payload
      */
-    @GetMapping("/{id}/export")
+    @GetMapping(value = "/{id}/export", produces = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public ResponseEntity<GuestDataExportResponse> exportGuestData(
             @NonNull @PathVariable final UUID id) {
-        return ResponseEntity.ok(guestService.exportGuestData(id));
+        final ContentDisposition disposition = ContentDisposition.attachment()
+                .filename("guest-export-" + id + ".json")
+                .build();
+        return ResponseEntity.ok()
+                .headers(h -> h.setContentDisposition(disposition))
+                .body(guestService.exportGuestData(id));
+    }
+
+    /**
+     * Exports every guest matching {@code query} (or every guest in the
+     * hotel when blank) as a CSV file -- ADMIN/OWNER only, since this is PII
+     * (same gate as {@link #deleteGuest}/{@link #exportGuestData}).
+     *
+     * @param query optional free-text query, or omitted for every guest
+     * @return a streamed CSV attachment
+     */
+    @GetMapping(value = "/export.csv", produces = "text/csv")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    public ResponseEntity<StreamingResponseBody> exportGuestsCsv(
+            @RequestParam(required = false) final String query) {
+        final StreamingResponseBody body = out -> guestService.exportGuestsCsv(query, out);
+        return ResponseEntity.ok()
+                .headers(h -> h.setContentDisposition(
+                        ContentDisposition.attachment().filename("guests.csv").build()))
+                .body(body);
     }
 }

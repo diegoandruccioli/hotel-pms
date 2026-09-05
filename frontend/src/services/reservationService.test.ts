@@ -95,4 +95,35 @@ describe('reservationService', () => {
       version: 3,
     });
   });
+
+  it('should download the CSV export with every filter as a query param', () => {
+    reservationService.exportReservationsCsv({
+      query: '  mario  ',
+      upcomingOnly: true,
+      dateFrom: '2026-01-01',
+      dateTo: '2026-01-31',
+      status: 'CONFIRMED',
+    });
+
+    const iframe = document.body.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    expect(iframe?.src).toContain('/api/v1/reservations/export.csv?');
+    expect(iframe?.src).toContain('query=mario');
+    expect(iframe?.src).toContain('upcomingOnly=true');
+    expect(iframe?.src).toContain('dateFrom=2026-01-01');
+    expect(iframe?.src).toContain('dateTo=2026-01-31');
+    expect(iframe?.src).toContain('status=CONFIRMED');
+
+    document.body.replaceChildren();
+  });
+
+  it('should download every reservation as CSV, with no query params, when no filters are set', () => {
+    reservationService.exportReservationsCsv({});
+
+    const iframe = document.body.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    expect(iframe?.src).toMatch(/\/api\/v1\/reservations\/export\.csv$/);
+
+    document.body.replaceChildren();
+  });
 });

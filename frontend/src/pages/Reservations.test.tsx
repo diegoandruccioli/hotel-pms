@@ -31,6 +31,7 @@ vi.mock('../services/reservationService', () => ({
     deleteReservation: vi.fn(),
     retryConfirmationEmail: vi.fn(),
     updateStatus: vi.fn(),
+    exportReservationsCsv: vi.fn(),
   },
 }));
 
@@ -127,6 +128,23 @@ describe('Reservations', () => {
 
     await waitFor(() => {
       expect(screen.getByText('no_reservations_found')).toBeInTheDocument();
+    });
+  });
+
+  it('should export the current search as CSV when export is clicked', async () => {
+    vi.mocked(reservationService.searchReservations).mockResolvedValueOnce(page([]) as never);
+    render(
+      <MemoryRouter>
+        <Reservations />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByText('no_reservations_found')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('export_csv'));
+
+    expect(reservationService.exportReservationsCsv).toHaveBeenCalledWith({
+      query: '',
+      upcomingOnly: false,
     });
   });
 

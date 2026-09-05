@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.reservations.service.impl;
 
+import com.hotelpms.commonweb.csv.CsvWriter;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
@@ -31,22 +32,28 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of ReservationService.
@@ -85,6 +92,9 @@ public class ReservationServiceImpl implements ReservationService {
     private static final String SQLSTATE_EXCLUSION_VIOLATION = "23P01";
     private static final int MAX_FAILURE_REASON_LENGTH = 500;
     private static final int GUEST_SEARCH_MATCH_CAP = 200;
+    /** Page size for CSV export's internal pagination loop — bounds memory to one
+     * page at a time instead of loading the whole matching set before writing. */
+    private static final int EXPORT_PAGE_SIZE = 500;
     private static final String UNKNOWN_GUEST = "Unknown Guest";
     private static final LocalDate EARLIEST_FILTER_DATE = LocalDate.of(1900, 1, 1);
     private static final LocalDate LATEST_FILTER_DATE = LocalDate.of(2100, 12, 31);
@@ -175,24 +185,8 @@ public class ReservationServiceImpl implements ReservationService {
             final Pageable pageable) {
         final UUID hotelId = resolveHotelId();
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
-        final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
-        final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
-
-        final Page<Reservation> results;
-        if (dateFrom != null || dateTo != null || status != null) {
-            final LocalDate effectiveFrom = dateFrom != null ? dateFrom : EARLIEST_FILTER_DATE;
-            final LocalDate effectiveTo = dateTo != null ? dateTo : LATEST_FILTER_DATE;
-            final Set<ReservationStatus> effectiveStatuses = status != null
-                    ? Set.of(status) : EnumSet.allOf(ReservationStatus.class);
-            results = reservationRepository.filterReservationsByHotelId(
-                    hotelId, effectiveFrom, effectiveTo, effectiveStatuses, trimmedQuery, guestIds, safePageable);
-        } else if (upcomingOnly) {
-            results = reservationRepository.searchUpcomingReservationsByHotelId(
-                    hotelId, LocalDate.now(), trimmedQuery, guestIds, safePageable);
-        } else {
-            results = reservationRepository.searchReservationsByHotelId(
-                    hotelId, trimmedQuery, guestIds, safePageable);
-        }
+        final Page<Reservation> results =
+                fetchReservationsPage(hotelId, query, upcomingOnly, dateFrom, dateTo, status, safePageable);
 
         final List<UUID> pageGuestIds = results.getContent().stream()
                 .map((@NonNull Reservation r) -> r.getGuestId())
@@ -210,6 +204,74 @@ public class ReservationServiceImpl implements ReservationService {
         return results.map(reservation -> enrichWithGuestName(
                 reservationMapper.toResponse(reservation),
                 guestNameMap.getOrDefault(reservation.getGuestId(), UNKNOWN_GUEST)));
+    }
+
+    /**
+     * Shared filter-branch selection behind both {@link #searchReservations}
+     * and {@link #exportReservationsCsv} — same three search strategies
+     * (date/status filter, upcoming-only, plain query), picked the same way.
+     */
+    private Page<Reservation> fetchReservationsPage(final UUID hotelId, final String query,
+            final boolean upcomingOnly, final LocalDate dateFrom, final LocalDate dateTo,
+            final ReservationStatus status, final Pageable pageable) {
+        final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
+        final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
+
+        if (dateFrom != null || dateTo != null || status != null) {
+            final LocalDate effectiveFrom = dateFrom != null ? dateFrom : EARLIEST_FILTER_DATE;
+            final LocalDate effectiveTo = dateTo != null ? dateTo : LATEST_FILTER_DATE;
+            final Set<ReservationStatus> effectiveStatuses = status != null
+                    ? Set.of(status) : EnumSet.allOf(ReservationStatus.class);
+            return reservationRepository.filterReservationsByHotelId(
+                    hotelId, effectiveFrom, effectiveTo, effectiveStatuses, trimmedQuery, guestIds, pageable);
+        }
+        if (upcomingOnly) {
+            return reservationRepository.searchUpcomingReservationsByHotelId(
+                    hotelId, LocalDate.now(), trimmedQuery, guestIds, pageable);
+        }
+        return reservationRepository.searchReservationsByHotelId(hotelId, trimmedQuery, guestIds, pageable);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public void exportReservationsCsv(final String query, final boolean upcomingOnly,
+            final LocalDate dateFrom, final LocalDate dateTo, final ReservationStatus status,
+            final OutputStream out) throws IOException {
+        final UUID hotelId = resolveHotelId();
+        log.info("[RESERVATION] EXPORT_CSV | hotelId={}", hotelId);
+
+        try (CsvWriter csv = CsvWriter.open(out, List.of(
+                "guestName", "checkInDate", "checkOutDate", "status", "expectedGuests", "actualGuests"))) {
+            int pageNumber = 0;
+            Page<Reservation> page;
+            do {
+                final Pageable pageable = PageRequest.of(
+                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("checkInDate").descending());
+                page = fetchReservationsPage(hotelId, query, upcomingOnly, dateFrom, dateTo, status, pageable);
+
+                final List<UUID> guestIds = page.getContent().stream()
+                        .map((@NonNull Reservation r) -> r.getGuestId())
+                        .distinct()
+                        .toList();
+                final Map<UUID, String> guestNameMap = guestIds.isEmpty() ? Map.of()
+                        : guestClient.getGuestsBatch(guestIds).stream()
+                                .collect(Collectors.toMap(
+                                        (@NonNull GuestResponse gr) -> gr.id(),
+                                        g -> g.firstName() + " " + g.lastName()));
+
+                for (final Reservation reservation : page.getContent()) {
+                    csv.printRow(List.of(
+                            guestNameMap.getOrDefault(reservation.getGuestId(), UNKNOWN_GUEST),
+                            String.valueOf(reservation.getCheckInDate()),
+                            String.valueOf(reservation.getCheckOutDate()),
+                            String.valueOf(reservation.getStatus()),
+                            String.valueOf(reservation.getExpectedGuests()),
+                            String.valueOf(reservation.getActualGuests())));
+                }
+                pageNumber++;
+            } while (page.hasNext());
+        }
     }
 
     /**

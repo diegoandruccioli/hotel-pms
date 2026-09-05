@@ -15,7 +15,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,6 +26,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -188,5 +192,39 @@ class OwnerReportServiceImplTest {
 
                 verify(invoiceRepository).getFinancialSummaryAggregatesByHotelId(
                                 eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class));
+        }
+
+        // ---------------------------------------------------------------
+        // exportFinancialReportCsv (Point 3 -- CSV export)
+        // ---------------------------------------------------------------
+
+        @Test
+        void shouldExportHeaderAndAllInvoicesAsCsvRows() throws IOException {
+                when(invoiceRepository.findByHotelIdAndIssueDateBetween(
+                                eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class)))
+                                .thenReturn(List.of(paidInvoice1, issuedInvoice));
+
+                final ByteArrayOutputStream out = new ByteArrayOutputStream();
+                ownerReportService.exportFinancialReportCsv(hotelId, startDate, endDate, out);
+
+                final String content = out.toString(StandardCharsets.UTF_8);
+                assertTrue(content.contains("invoiceNumber;issueDate;totalAmount;status;guestId"));
+                assertTrue(content.contains("INV-0001"));
+                assertTrue(content.contains("INV-0003"));
+                assertTrue(content.contains(String.valueOf(InvoiceStatus.PAID)));
+        }
+
+        @Test
+        void shouldScopeCsvExportQueryToTheAuthenticatedHotelOnly() throws IOException {
+                when(invoiceRepository.findByHotelIdAndIssueDateBetween(
+                                eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class)))
+                                .thenReturn(List.of());
+
+                final ByteArrayOutputStream out = new ByteArrayOutputStream();
+                ownerReportService.exportFinancialReportCsv(hotelId, startDate, endDate, out);
+
+                verify(invoiceRepository).findByHotelIdAndIssueDateBetween(
+                                eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class));
+                assertTrue(out.toString(StandardCharsets.UTF_8).contains("invoiceNumber;issueDate"));
         }
 }

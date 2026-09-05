@@ -100,6 +100,22 @@ public interface InvoiceService {
             InvoiceStatus status, String query, LocalDate dateFrom, LocalDate dateTo, Pageable pageable);
 
     /**
+     * Streams every invoice matching the same filters as {@link
+     * #searchInvoices} to {@code out} as CSV, unpaginated internally in
+     * fixed-size batches -- financial data, so callers must gate this
+     * ADMIN/OWNER.
+     *
+     * @param status   optional invoice status filter
+     * @param query    optional free-text query (invoice number or guest name/email)
+     * @param dateFrom optional lower bound on issue date (inclusive day)
+     * @param dateTo   optional upper bound on issue date (inclusive day)
+     * @param out      the stream to write CSV bytes to
+     * @throws java.io.IOException if writing to {@code out} fails
+     */
+    void exportInvoicesCsv(InvoiceStatus status, String query, LocalDate dateFrom, LocalDate dateTo,
+            java.io.OutputStream out) throws java.io.IOException;
+
+    /**
      * Retrieves the most recent invoice for a given reservation.
      * Used by the stay-service during check-out to validate billing.
      *

@@ -35,10 +35,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -747,5 +751,87 @@ class InvoiceServiceImplTest {
                 // Assert: fallback fails soft — invoice still returned, just without a guest name
                 assertEquals(1, result.getTotalElements());
                 assertNull(result.getContent().get(0).guestName());
+        }
+
+        // ---------------------------------------------------------------
+        // exportInvoicesCsv (Point 3 -- CSV export)
+        // ---------------------------------------------------------------
+
+        private static final int EXPORT_PAGE_SIZE = 500;
+
+        @Test
+        @DisplayName("exportInvoicesCsv writes the header and hotel-scoped, guest-resolved rows")
+        void exportInvoicesCsvWritesHeaderAndScopedRows() throws IOException {
+                // Arrange
+                final UUID invoiceId = UUID.randomUUID();
+                final Invoice invoice = new Invoice();
+                invoice.setId(invoiceId);
+                invoice.setGuestId(guestId);
+                invoice.setInvoiceNumber(INV_123);
+                invoice.setIssueDate(LocalDateTime.of(SEARCH_YEAR, SEARCH_MONTH, DAY_ONE, 0, 0));
+                invoice.setStatus(InvoiceStatus.ISSUED);
+                invoice.setDocumentType(DocumentType.FATTURA);
+                invoice.setTotalAmount(BigDecimal.TEN);
+                final PageRequest pageable = PageRequest.of(PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by("issueDate").descending());
+
+                when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(InvoiceStatus.ISSUED), eq(null), eq(null),
+                                eq(null), eq(List.of()), eq(pageable)))
+                                .thenReturn(new PageImpl<>(List.of(invoice)));
+                when(guestClient.getGuestsBatch(List.of(guestId)))
+                                .thenReturn(List.of(new GuestResponse(guestId, "Mario", "Rossi", "mario@test.com",
+                                                null, null, null, null, null, null, null, null, null)));
+
+                // Act
+                final ByteArrayOutputStream out = new ByteArrayOutputStream();
+                invoiceService.exportInvoicesCsv(InvoiceStatus.ISSUED, null, null, null, out);
+
+                // Assert
+                final String content = out.toString(StandardCharsets.UTF_8);
+                assertTrue(content.contains("invoiceNumber;guestName;issueDate;status;documentType;totalAmount"));
+                assertTrue(content.contains(INV_123));
+                assertTrue(content.contains("Mario Rossi"));
+                assertTrue(content.contains(String.valueOf(InvoiceStatus.ISSUED)));
+        }
+
+        @Test
+        @DisplayName("exportInvoicesCsv skips guest batch resolution when there are no matching invoices")
+        void exportInvoicesCsvSkipsGuestBatchResolutionWhenEmpty() throws IOException {
+                // Arrange
+                final PageRequest pageable = PageRequest.of(PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by("issueDate").descending());
+                when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
+                                eq(null), eq(List.of()), eq(pageable)))
+                                .thenReturn(new PageImpl<>(List.of()));
+
+                // Act
+                final ByteArrayOutputStream out = new ByteArrayOutputStream();
+                invoiceService.exportInvoicesCsv(null, null, null, null, out);
+
+                // Assert
+                verify(guestClient, never()).getGuestsBatch(any());
+                assertTrue(out.toString(StandardCharsets.UTF_8).contains("invoiceNumber;guestName"));
+        }
+
+        @Test
+        @DisplayName("exportInvoicesCsv resolves matching guest IDs from a free-text query")
+        void exportInvoicesCsvResolvesGuestIdsFromQuery() throws IOException {
+                // Arrange
+                final UUID otherGuestId = UUID.randomUUID();
+                final PageRequest pageable = PageRequest.of(PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by("issueDate").descending());
+                when(guestClient.searchGuests(QUERY_MARIO, GUEST_SEARCH_CAP))
+                                .thenReturn(new GuestSearchPageResponse(List.of(
+                                                new GuestResponse(otherGuestId, "Mario", "Bianchi",
+                                                                "mario.b@test.com", null, null, null, null, null,
+                                                                null, null, null, null))));
+                when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
+                                eq(QUERY_MARIO), eq(List.of(otherGuestId)), eq(pageable)))
+                                .thenReturn(new PageImpl<>(List.of()));
+
+                // Act
+                final ByteArrayOutputStream out = new ByteArrayOutputStream();
+                invoiceService.exportInvoicesCsv(null, "  " + QUERY_MARIO + "  ", null, null, out);
+
+                // Assert
+                verify(invoiceRepository).searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
+                                eq(QUERY_MARIO), eq(List.of(otherGuestId)), eq(pageable));
         }
 }
