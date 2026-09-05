@@ -18,6 +18,7 @@ const navigation = [
   { nameKey: 'dashboard', href: '/', icon: 'dashboard' },
   { nameKey: 'guests', href: '/guests', icon: 'group' },
   { nameKey: 'reservations', href: '/reservations', icon: 'event' },
+  { nameKey: 'reservation_groups', href: '/reservations/groups', icon: 'groups' },
   { nameKey: 'quotations', href: '/quotations', icon: 'request_quote' },
   { nameKey: 'calendar', href: '/calendar', icon: 'date_range' },
   { nameKey: 'stays', href: '/stays', icon: 'hotel' },

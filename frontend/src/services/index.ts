@@ -10,6 +10,7 @@ export * from './kpiReportService';
 export * from './nightAuditService';
 export * from './quotationService';
 export * from './rateSeasonService';
+export * from './reservationGroupService';
 export * from './reservationService';
 export * from './stayService';
 export * from './userService';

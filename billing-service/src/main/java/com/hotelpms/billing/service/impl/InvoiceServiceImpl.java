@@ -5,6 +5,7 @@ import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.domain.ChargeType;
 import com.hotelpms.billing.domain.DocumentType;
+import com.hotelpms.billing.domain.FolioType;
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.domain.InvoiceCharge;
@@ -12,10 +13,12 @@ import com.hotelpms.billing.domain.InvoiceSequence;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
+import com.hotelpms.billing.dto.GroupChargeRequest;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
+import com.hotelpms.billing.dto.MasterFolioRequest;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.exception.NotFoundException;
@@ -111,6 +114,80 @@ public class InvoiceServiceImpl implements InvoiceService {
         log.info("Created invoice {} for stay {}", savedInvoice.getInvoiceNumber(), request.stayId());
 
         return invoiceMapper.toResponse(savedInvoice);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public InvoiceResponse createMasterFolioForGroup(
+            @NonNull final UUID groupId, @NonNull final MasterFolioRequest request) {
+        final UUID hotelId = resolveHotelId();
+        log.info("Opening master folio for group {} | hotelId={}", groupId, hotelId);
+
+        final Optional<Invoice> existing = invoiceRepository
+                .findByGroupIdAndHotelIdAndFolioType(groupId, hotelId, FolioType.MASTER)
+                .filter(inv -> inv.getStatus() == InvoiceStatus.ISSUED);
+        if (existing.isPresent()) {
+            return invoiceMapper.toResponse(existing.get());
+        }
+
+        final Invoice invoice = Invoice.builder()
+                .groupId(groupId)
+                .folioType(FolioType.MASTER)
+                .guestId(request.guestId())
+                .hotelId(hotelId)
+                .totalAmount(BigDecimal.ZERO)
+                .status(InvoiceStatus.ISSUED)
+                .issueDate(LocalDateTime.now())
+                .invoiceNumber(generateInvoiceNumber(hotelId))
+                .build();
+
+        final Invoice savedInvoice = invoiceRepository.save(Objects.requireNonNull(invoice));
+        log.info("Created master folio {} for group {}", savedInvoice.getInvoiceNumber(), groupId);
+
+        return invoiceMapper.toResponse(savedInvoice);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public ChargeResponse addChargeToGroupFolio(
+            @NonNull final UUID groupId, @NonNull final GroupChargeRequest request) {
+        log.info("Adding charge type={} amount={} to master folio of group {}",
+                request.type(), request.amount(), groupId);
+        final UUID hotelId = resolveHotelId();
+
+        final Invoice invoice = invoiceRepository
+                .findByGroupIdAndHotelIdAndFolioType(groupId, hotelId, FolioType.MASTER)
+                .orElseThrow(() -> new NotFoundException("MASTER_FOLIO_NOT_FOUND_FOR_GROUP"));
+
+        if (invoice.getStatus() != InvoiceStatus.ISSUED) {
+            throw new InvoiceConflictException("INVOICE_NOT_OPEN");
+        }
+        assertNotFiscallyLocked(invoice);
+
+        final VatTreatment vatTreatment = vatTreatmentFor(request.type());
+        final InvoiceCharge charge = InvoiceCharge.builder()
+                .type(request.type())
+                .description(request.description())
+                .amount(request.amount())
+                .vatRate(vatTreatment.rate())
+                .naturaCode(vatTreatment.naturaCode())
+                .unitPrice(request.unitPrice())
+                .nights(request.nights())
+                .routedFromStayId(request.routedFromStayId())
+                .build();
+
+        invoice.addCharge(charge);
+        final InvoiceCharge savedCharge = invoiceChargeRepository.save(Objects.requireNonNull(charge));
+
+        invoice.setTotalAmount(invoice.getTotalAmount().add(request.amount()));
+        invoiceRepository.save(Objects.requireNonNull(invoice));
+
+        log.info("Added {} charge of {} to master folio {} (new total: {})",
+                request.type(), request.amount(), invoice.getInvoiceNumber(), invoice.getTotalAmount());
+
+        return invoiceChargeMapper.toResponse(savedCharge);
     }
 
     /** {@inheritDoc} */

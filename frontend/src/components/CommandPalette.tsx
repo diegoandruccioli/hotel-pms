@@ -28,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', href: '/', icon: 'dashboard', labelKey: 'nav_dashboard', ns: 'common' },
   { id: 'guests', href: '/guests', icon: 'group', labelKey: 'nav_guests', ns: 'common' },
   { id: 'reservations', href: '/reservations', icon: 'event', labelKey: 'nav_reservations', ns: 'common' },
+  { id: 'reservation-groups', href: '/reservations/groups', icon: 'groups', labelKey: 'nav_reservation_groups', ns: 'common' },
   { id: 'quotations', href: '/quotations', icon: 'request_quote', labelKey: 'nav_quotations', ns: 'common' },
   { id: 'calendar', href: '/calendar', icon: 'date_range', labelKey: 'nav_calendar', ns: 'common' },
   { id: 'stays', href: '/stays', icon: 'hotel', labelKey: 'nav_stays', ns: 'common' },

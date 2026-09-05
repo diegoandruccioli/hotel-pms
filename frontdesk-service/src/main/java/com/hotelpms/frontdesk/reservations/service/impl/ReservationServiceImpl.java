@@ -14,6 +14,7 @@ import com.hotelpms.frontdesk.pricing.service.RatePricingService;
 import com.hotelpms.frontdesk.reservations.domain.Reservation;
 import com.hotelpms.frontdesk.reservations.domain.ReservationLineItem;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
+import com.hotelpms.frontdesk.reservations.dto.ReservationGroupBillingInfo;
 import com.hotelpms.frontdesk.reservations.dto.ReservationLineItemRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
@@ -904,6 +905,59 @@ public class ReservationServiceImpl implements ReservationService {
         final Reservation saved = saveTranslatingOverlap(Objects.requireNonNull(reservation));
         sendReservationConfirmedEmail(saved, hotelId, guest, roomNumbersOf(roomsById));
         return enrichWithGuestName(reservationMapper.toResponse(saved), guest);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public ReservationResponse createReservationForGroup(
+            final UUID groupId, final UUID guestId, final UUID roomId, final int expectedGuests,
+            final LocalDate checkInDate, final LocalDate checkOutDate,
+            final BigDecimal groupRatePerNight, final boolean billedToMasterFolio) {
+        final UUID hotelId = resolveHotelId();
+        final GuestResponse guest = verifyGuestExists(guestId);
+
+        final List<ReservationLineItemRequest> lineItemRequests = List.of(new ReservationLineItemRequest(roomId));
+        final java.util.Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(lineItemRequests, hotelId);
+
+        final ReservationRequest pseudoRequest = new ReservationRequest(
+                guestId, expectedGuests, checkInDate, checkOutDate,
+                ReservationStatus.CONFIRMED, lineItemRequests, null);
+        verifyNoOverlappingReservations(null, pseudoRequest);
+
+        final Reservation reservation = reservationMapper.toEntity(pseudoRequest);
+        reservation.setHotelId(hotelId);
+        reservation.setActualGuests(0);
+        reservation.setGroupId(groupId);
+        reservation.setBilledToMasterFolio(billedToMasterFolio);
+
+        final BigDecimal price;
+        if (groupRatePerNight != null) {
+            final long nights = ChronoUnit.DAYS.between(checkInDate, checkOutDate);
+            price = groupRatePerNight.multiply(BigDecimal.valueOf(nights));
+        } else {
+            final RoomResponse room = roomsById.get(roomId);
+            price = ratePricingService.resolveStayRates(room.roomType().id(), hotelId, checkInDate, checkOutDate)
+                    .stream().map(NightlyRate::nightlyPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+        Objects.requireNonNull(reservation.getLineItems()).forEach(lineItem -> {
+            lineItem.setReservation(reservation);
+            lineItem.setPrice(price);
+        });
+
+        final Reservation saved = saveTranslatingOverlap(reservation);
+        sendReservationConfirmedEmail(saved, hotelId, guest, roomNumbersOf(roomsById));
+        return enrichWithGuestName(reservationMapper.toResponse(saved), guest);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Optional<ReservationGroupBillingInfo> getGroupBillingInfo(
+            final UUID reservationId, final UUID hotelId) {
+        return reservationRepository.findByIdAndHotelId(reservationId, hotelId)
+                .filter(r -> r.getGroupId() != null)
+                .map(r -> new ReservationGroupBillingInfo(r.getGroupId(), r.isBilledToMasterFolio()));
     }
 
     private void verifyNoOverlappingReservations(final UUID excludeId, final ReservationRequest request) {

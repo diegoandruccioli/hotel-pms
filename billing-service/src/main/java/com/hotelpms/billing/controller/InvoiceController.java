@@ -4,10 +4,12 @@ import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.DocumentTypeRequest;
+import com.hotelpms.billing.dto.GroupChargeRequest;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
+import com.hotelpms.billing.dto.MasterFolioRequest;
 import com.hotelpms.billing.dto.SdiStatusRequest;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.service.FatturaPAService;
@@ -213,6 +215,43 @@ public class InvoiceController {
         log.info("REST request to remove charge {} from stay {}", chargeId, stayId);
         invoiceService.removeCharge(stayId, chargeId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Opens a MASTER folio for a reservation group. Called by frontdesk-service
+     * when a group is created with a master folio option. Idempotent: returns the
+     * existing open master folio instead of creating a duplicate.
+     *
+     * @param groupId the reservation group UUID
+     * @param request the master folio request (contact guest)
+     * @return the created (or existing) master folio invoice with HTTP 201
+     */
+    @PostMapping("/groups/{groupId}/master-folio")
+    public ResponseEntity<InvoiceResponse> createMasterFolioForGroup(
+            @NonNull @PathVariable final UUID groupId,
+            @NonNull @Valid @RequestBody final MasterFolioRequest request) {
+        log.info("REST request to open master folio for group {}", groupId);
+        final InvoiceResponse response = invoiceService.createMasterFolioForGroup(groupId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Adds a charge directly to a reservation group's master folio -- the transfer
+     * counterpart of {@link #addCharge}. Called by frontdesk-service when a room
+     * marked "billed to group" checks out and its ROOM_NIGHT/CITY_TAX charges move
+     * off its individual invoice. Returns 404 if the group has no master folio.
+     *
+     * @param groupId the reservation group UUID
+     * @param request the charge details, tagging the stay it's transferred from
+     * @return the created charge response with HTTP 201
+     */
+    @PostMapping("/groups/{groupId}/charges")
+    public ResponseEntity<ChargeResponse> addChargeToGroupFolio(
+            @NonNull @PathVariable final UUID groupId,
+            @NonNull @Valid @RequestBody final GroupChargeRequest request) {
+        log.info("REST request to add {} charge to master folio of group {}", request.type(), groupId);
+        final ChargeResponse response = invoiceService.addChargeToGroupFolio(groupId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**

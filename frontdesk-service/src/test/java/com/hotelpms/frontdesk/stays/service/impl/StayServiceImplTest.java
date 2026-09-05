@@ -10,6 +10,7 @@ import com.hotelpms.frontdesk.client.dto.ChargeRequest;
 import com.hotelpms.frontdesk.client.dto.ChargeResponse;
 import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest;
 import com.hotelpms.frontdesk.client.dto.GatewayEventNotifyRequest.GatewayEventType;
+import com.hotelpms.frontdesk.client.dto.GroupChargeRequest;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
@@ -24,6 +25,7 @@ import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.pricing.dto.NightlyRate;
 import com.hotelpms.frontdesk.pricing.service.RatePricingService;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
+import com.hotelpms.frontdesk.reservations.dto.ReservationGroupBillingInfo;
 import com.hotelpms.frontdesk.reservations.dto.ReservationLineItemResponse;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
 import com.hotelpms.frontdesk.reservations.dto.ReservedRoomCharge;
@@ -662,6 +664,108 @@ class StayServiceImplTest {
         verify(notificationClient, times(1)).sendCheckout(ArgumentMatchers.any());
         verify(gatewayEventsClient, times(1))
                 .notify(new GatewayEventNotifyRequest(GatewayEventType.CHECK_OUT));
+    }
+
+    @Test
+    void shouldTransferChargesToMasterFolioAndCheckOutWhenRoomIsBilledToGroup() {
+        // Arrange
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay checkedInStay = Objects.requireNonNull(savedStay);
+        checkedInStay.setRoomId(roomId);
+        checkedInStay.setReservationId(reservationId);
+        checkedInStay.setHotelId(hotelId);
+        checkedInStay.setRoomChargeId(UUID.randomUUID());
+        checkedInStay.setRoomChargeUnitPrice(BigDecimal.valueOf(100));
+        checkedInStay.setRoomChargeNights(2);
+
+        final UUID groupId = Objects.requireNonNull(UUID.randomUUID());
+        final UUID invoiceId = UUID.randomUUID();
+        // After the transfer, the individual invoice sits at ISSUED/zero (nothing left
+        // to pay -- no F&B) instead of PAID, which the new checkout guard must still clear.
+        final InvoiceStatusResponse zeroBalanceInvoice = new InvoiceStatusResponse(
+                invoiceId, reservationId, "ISSUED", BigDecimal.ZERO);
+        final ReservationLineItemResponse lineItem =
+                new ReservationLineItemResponse(UUID.randomUUID(), roomId, BigDecimal.TEN, true, null, null);
+
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(checkedInStay));
+        when(reservationService.getGroupBillingInfo(reservationId, hotelId))
+                .thenReturn(Optional.of(new ReservationGroupBillingInfo(groupId, true)));
+        when(billingClient.addChargeToGroupFolio(ArgumentMatchers.eq(groupId), ArgumentMatchers.any(GroupChargeRequest.class)))
+                .thenReturn(new ChargeResponse(UUID.randomUUID()));
+        when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
+                .thenReturn(zeroBalanceInvoice);
+        when(stayRepository.save(checkedInStay)).thenReturn(checkedInStay);
+        when(stayMapper.toDto(checkedInStay)).thenReturn(validResponse);
+        when(reservationService.getReservationById(reservationId))
+                .thenReturn(reservationResponse(ReservationStatus.CHECKED_IN, List.of(lineItem)));
+        when(stayRepository.findAllByReservationId(reservationId)).thenReturn(List.of(checkedInStay));
+        when(guestClient.getGuestById(guestId))
+                .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null, null));
+        when(billingClient.getInvoiceForEmail(invoiceId))
+                .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, "ISSUED",
+                        BigDecimal.ZERO, CURRENCY_EUR, List.of()));
+        when(notificationClient.sendCheckout(ArgumentMatchers.any())).thenReturn(true);
+
+        // Act
+        final StayResponse response = stayService.checkOut(id, hotelId);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(StayStatus.CHECKED_OUT, checkedInStay.getStatus());
+        assertTrue(checkedInStay.isChargesTransferredToMasterFolio());
+        verify(billingClient).removeCharge(id, checkedInStay.getRoomChargeId());
+        verify(billingClient).addChargeToGroupFolio(ArgumentMatchers.eq(groupId), ArgumentMatchers.any(GroupChargeRequest.class));
+    }
+
+    @Test
+    void shouldNotRetransferChargesOnARetriedCheckOutAfterAlreadyTransferred() {
+        // Arrange: the stay already has chargesTransferredToMasterFolio=true from a
+        // prior (successful) check-out attempt -- a retry must not re-transfer.
+        final UUID id = Objects.requireNonNull(stayId);
+        final Stay checkedInStay = Objects.requireNonNull(savedStay);
+        checkedInStay.setRoomId(roomId);
+        checkedInStay.setReservationId(reservationId);
+        checkedInStay.setHotelId(hotelId);
+        checkedInStay.setRoomChargeId(UUID.randomUUID());
+        checkedInStay.setChargesTransferredToMasterFolio(true);
+
+        final UUID groupId = Objects.requireNonNull(UUID.randomUUID());
+        final UUID invoiceId = UUID.randomUUID();
+        final InvoiceStatusResponse zeroBalanceInvoice = new InvoiceStatusResponse(
+                invoiceId, reservationId, "ISSUED", BigDecimal.ZERO);
+        final ReservationLineItemResponse lineItem =
+                new ReservationLineItemResponse(UUID.randomUUID(), roomId, BigDecimal.TEN, true, null, null);
+
+        when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(checkedInStay));
+        when(reservationService.getGroupBillingInfo(reservationId, hotelId))
+                .thenReturn(Optional.of(new ReservationGroupBillingInfo(groupId, true)));
+        when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))
+                .thenReturn(zeroBalanceInvoice);
+        when(stayRepository.save(checkedInStay)).thenReturn(checkedInStay);
+        when(stayMapper.toDto(checkedInStay)).thenReturn(validResponse);
+        when(reservationService.getReservationById(reservationId))
+                .thenReturn(reservationResponse(ReservationStatus.CHECKED_IN, List.of(lineItem)));
+        when(stayRepository.findAllByReservationId(reservationId)).thenReturn(List.of(checkedInStay));
+        when(guestClient.getGuestById(guestId))
+                .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(hotelSettingsService.getOrCreate(hotelId))
+                .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null, null));
+        when(billingClient.getInvoiceForEmail(invoiceId))
+                .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, "ISSUED",
+                        BigDecimal.ZERO, CURRENCY_EUR, List.of()));
+        when(notificationClient.sendCheckout(ArgumentMatchers.any())).thenReturn(true);
+
+        // Act
+        stayService.checkOut(id, hotelId);
+
+        // Assert
+        verify(billingClient, never()).removeCharge(ArgumentMatchers.any(), ArgumentMatchers.any());
+        verify(billingClient, never())
+                .addChargeToGroupFolio(ArgumentMatchers.any(), ArgumentMatchers.any(GroupChargeRequest.class));
     }
 
     @Test

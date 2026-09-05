@@ -1291,4 +1291,102 @@ class ReservationServiceImplTest {
                 eq(HOTEL_ID), any(), any(), eq(Set.of(ReservationStatus.CHECKED_IN)),
                 eq(null), eq(List.of()), eq(pageable));
     }
+
+    // ---------------------------------------------------------------
+    // createReservationForGroup / getGroupBillingInfo (Point 4 -- gestione gruppi)
+    // ---------------------------------------------------------------
+
+    @Test
+    void testCreateReservationForGroupUsesGroupRateInsteadOfLiveResolution() {
+        final UUID groupId = Objects.requireNonNull(UUID.randomUUID());
+        final LocalDate checkIn = LocalDate.now().plusDays(1);
+        final LocalDate checkOut = checkIn.plusDays(2);
+        final Reservation groupEntity = Reservation.builder().id(UUID.randomUUID())
+                .checkInDate(checkIn).checkOutDate(checkOut)
+                .lineItems(new ArrayList<>(List.of(ReservationLineItem.builder().roomId(roomId).build())))
+                .build();
+
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(reservationMapper.toEntity(any(ReservationRequest.class))).thenReturn(groupEntity);
+        when(reservationRepository.saveAndFlush(groupEntity)).thenReturn(groupEntity);
+        when(reservationMapper.toResponse(groupEntity)).thenReturn(response);
+        when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
+                new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null, null));
+        when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
+
+        reservationService.createReservationForGroup(
+                groupId, GUEST_ID, roomId, EXPECTED_GUESTS, checkIn, checkOut,
+                BigDecimal.valueOf(100), true);
+
+        assertEquals(groupId, groupEntity.getGroupId());
+        assertTrue(groupEntity.isBilledToMasterFolio());
+        assertEquals(1, groupEntity.getLineItems().size());
+        // 2 nights * 100/night group rate, never a live rate-calendar resolution.
+        assertEquals(BigDecimal.valueOf(200), groupEntity.getLineItems().get(0).getPrice());
+        verify(ratePricingService, never()).resolveStayRates(any(), any(), any(), any());
+    }
+
+    @Test
+    void testCreateReservationForGroupResolvesLiveRateWhenNoGroupRateGiven() {
+        final UUID groupId = Objects.requireNonNull(UUID.randomUUID());
+        final LocalDate checkIn = LocalDate.now().plusDays(1);
+        final LocalDate checkOut = checkIn.plusDays(2);
+        final Reservation groupEntity = Reservation.builder().id(UUID.randomUUID())
+                .checkInDate(checkIn).checkOutDate(checkOut)
+                .lineItems(new ArrayList<>(List.of(ReservationLineItem.builder().roomId(roomId).build())))
+                .build();
+
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(reservationMapper.toEntity(any(ReservationRequest.class))).thenReturn(groupEntity);
+        when(reservationRepository.saveAndFlush(groupEntity)).thenReturn(groupEntity);
+        when(reservationMapper.toResponse(groupEntity)).thenReturn(response);
+        when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
+                new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null, null));
+        when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
+        when(ratePricingService.resolveStayRates(ROOM_TYPE_ID, HOTEL_ID, checkIn, checkOut))
+                .thenReturn(List.of(new NightlyRate(checkIn, PRICE_120, null), new NightlyRate(checkIn.plusDays(1), PRICE_120, null)));
+
+        reservationService.createReservationForGroup(
+                groupId, GUEST_ID, roomId, EXPECTED_GUESTS, checkIn, checkOut, null, false);
+
+        assertFalse(groupEntity.isBilledToMasterFolio());
+        assertEquals(PRICE_240, groupEntity.getLineItems().get(0).getPrice());
+    }
+
+    @Test
+    void testGetGroupBillingInfoReturnsEmptyWhenReservationHasNoGroup() {
+        entity.setGroupId(null);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        assertTrue(reservationService.getGroupBillingInfo(reservationId, HOTEL_ID).isEmpty());
+    }
+
+    @Test
+    void testGetGroupBillingInfoReturnsGroupIdAndBilledFlagWhenPresent() {
+        final UUID groupId = Objects.requireNonNull(UUID.randomUUID());
+        entity.setGroupId(groupId);
+        entity.setBilledToMasterFolio(true);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        final var result = reservationService.getGroupBillingInfo(reservationId, HOTEL_ID);
+
+        assertTrue(result.isPresent());
+        assertEquals(groupId, result.get().groupId());
+        assertTrue(result.get().billedToMasterFolio());
+    }
+
+    @Test
+    void testGetGroupBillingInfoReturnsEmptyWhenReservationNotFoundForHotel() {
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.empty());
+
+        assertTrue(reservationService.getGroupBillingInfo(reservationId, HOTEL_ID).isEmpty());
+    }
 }

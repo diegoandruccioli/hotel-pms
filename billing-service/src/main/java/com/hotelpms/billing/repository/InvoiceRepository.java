@@ -1,5 +1,6 @@
 package com.hotelpms.billing.repository;
 
+import com.hotelpms.billing.domain.FolioType;
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import org.springframework.data.domain.Page;
@@ -106,6 +107,20 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
      * @return the invoice for the given stay if it belongs to the given hotel
      */
     Optional<Invoice> findByStayIdAndHotelId(UUID stayId, UUID hotelId);
+
+    /**
+     * Finds the MASTER folio for a reservation group, scoped to a hotel
+     * (IDOR-safe lookup). A group has at most one MASTER invoice.
+     *
+     * @param groupId   the reservation group UUID (frontdesk-service)
+     * @param hotelId   the hotel UUID from the authenticated request
+     * @param folioType always {@link com.hotelpms.billing.domain.FolioType#MASTER}
+     *                  at the call site — kept as a parameter (not hardcoded in
+     *                  the query) so the derived-query method name stays honest
+     *                  about what it filters on
+     * @return the group's master folio, if one has been opened
+     */
+    Optional<Invoice> findByGroupIdAndHotelIdAndFolioType(UUID groupId, UUID hotelId, FolioType folioType);
 
     /**
      * Finds the most recent invoice for a guest within a hotel, ordered by

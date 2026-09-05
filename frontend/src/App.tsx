@@ -13,6 +13,9 @@ const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default:
 const Guests = lazy(() => import('./pages/Guests').then((m) => ({ default: m.Guests })));
 const Reservations = lazy(() => import('./pages/Reservations').then((m) => ({ default: m.Reservations })));
 const ReservationForm = lazy(() => import('./pages/Reservations/ReservationForm').then((m) => ({ default: m.ReservationForm })));
+const ReservationGroups = lazy(() => import('./pages/ReservationGroups').then((m) => ({ default: m.ReservationGroups })));
+const ReservationGroupDetail = lazy(() => import('./pages/ReservationGroupDetail').then((m) => ({ default: m.ReservationGroupDetail })));
+const ReservationGroupForm = lazy(() => import('./pages/ReservationGroups/ReservationGroupForm').then((m) => ({ default: m.ReservationGroupForm })));
 const Quotations = lazy(() => import('./pages/Quotations').then((m) => ({ default: m.Quotations })));
 const QuotationForm = lazy(() => import('./pages/Quotations/QuotationForm').then((m) => ({ default: m.QuotationForm })));
 const QuotationDetail = lazy(() => import('./pages/Quotations/QuotationDetail').then((m) => ({ default: m.QuotationDetail })));
@@ -92,6 +95,9 @@ function App() {
               <Route path="/reservations/new" element={<ReservationForm />} />
               <Route path="/reservations/:id" element={<ReservationForm />} />
               <Route path="/reservations/edit/:id" element={<ReservationForm />} />
+              <Route path="/reservations/groups" element={<ReservationGroups />} />
+              <Route path="/reservations/groups/new" element={<ReservationGroupForm />} />
+              <Route path="/reservations/groups/:id" element={<ReservationGroupDetail />} />
               <Route path="/quotations" element={<Quotations />} />
               <Route path="/quotations/new" element={<QuotationForm />} />
               <Route path="/quotations/:id" element={<QuotationDetail />} />

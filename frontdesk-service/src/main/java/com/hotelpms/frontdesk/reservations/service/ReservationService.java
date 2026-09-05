@@ -1,6 +1,7 @@
 package com.hotelpms.frontdesk.reservations.service;
 
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
+import com.hotelpms.frontdesk.reservations.dto.ReservationGroupBillingInfo;
 import com.hotelpms.frontdesk.reservations.dto.ReservationRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
 import com.hotelpms.frontdesk.reservations.dto.ReservedRoomCharge;
@@ -246,4 +247,38 @@ public interface ReservationService {
      */
     ReservationResponse createReservationFromPricedRooms(UUID guestId, LocalDate checkInDate,
             LocalDate checkOutDate, Integer expectedGuests, Map<UUID, BigDecimal> roomPrices);
+
+    /**
+     * Creates a single-room reservation as a rooming-list member of a reservation
+     * group (Punto 4). Called once per {@code RoomingListEntryRequest} row by
+     * {@code ReservationGroupServiceImpl}, inside the group's own transaction — an
+     * overlap or availability failure on any one room rolls back the whole group.
+     *
+     * @param groupId             the owning reservation group's id
+     * @param guestId             the guest occupying this room
+     * @param roomId              the assigned room
+     * @param expectedGuests      expected occupancy for this room
+     * @param checkInDate         check-in date (inclusive)
+     * @param checkOutDate        check-out date (exclusive)
+     * @param groupRatePerNight   when non-null, takes precedence over the room-type
+     *                            rate calendar; when {@code null}, this room prices
+     *                            exactly like a standalone reservation would
+     * @param billedToMasterFolio whether this room's ROOM_NIGHT/CITY_TAX charges
+     *                            should route to the group's master folio at check-out
+     * @return the created reservation response
+     */
+    ReservationResponse createReservationForGroup(UUID groupId, UUID guestId, UUID roomId, int expectedGuests,
+            LocalDate checkInDate, LocalDate checkOutDate, BigDecimal groupRatePerNight, boolean billedToMasterFolio);
+
+    /**
+     * Returns the group-billing facts for a reservation, if it belongs to a group
+     * (Punto 4). Used by {@code StayBillingCoordinator} at check-out to decide
+     * whether a room's charges should transfer to a master folio.
+     *
+     * @param reservationId the reservation UUID
+     * @param hotelId       the hotel UUID (multi-tenant scoping)
+     * @return the group-billing facts, or empty if the reservation has no group
+     *         (or doesn't exist / belongs to a different hotel)
+     */
+    Optional<ReservationGroupBillingInfo> getGroupBillingInfo(UUID reservationId, UUID hotelId);
 }

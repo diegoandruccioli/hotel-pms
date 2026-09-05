@@ -5,10 +5,12 @@ import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
+import com.hotelpms.billing.dto.GroupChargeRequest;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
+import com.hotelpms.billing.dto.MasterFolioRequest;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -177,4 +179,32 @@ public interface InvoiceService {
      * @return matching invoices for the authenticated hotel, ordered by issue date ascending
      */
     List<InvoiceResponse> getInvoicesInPeriod(@NonNull LocalDate from, @NonNull LocalDate to);
+
+    /**
+     * Opens a MASTER folio for a reservation group (Punto 4). Returns the existing
+     * one if the group already has a master folio in {@code ISSUED} status,
+     * instead of creating a duplicate.
+     *
+     * @param groupId the reservation group's id (frontdesk-service)
+     * @param request the master folio request (contact guest)
+     * @return the master folio invoice
+     */
+    InvoiceResponse createMasterFolioForGroup(@NonNull UUID groupId, @NonNull MasterFolioRequest request);
+
+    /**
+     * Adds a charge directly to a reservation group's master folio -- the
+     * transfer counterpart of {@link #addCharge}, used when a room marked
+     * "billed to group" checks out and its ROOM_NIGHT/CITY_TAX charges move off
+     * its individual invoice.
+     *
+     * <p>Returns 404 if no MASTER folio exists for the given group in the
+     * caller's hotel. Returns 409 if the master folio is not in {@code ISSUED}
+     * status, or is fiscally locked after export -- same guards as {@link
+     * #addCharge}.
+     *
+     * @param groupId the reservation group's id
+     * @param request the charge to add, tagging the stay it's transferred from
+     * @return the created charge response
+     */
+    ChargeResponse addChargeToGroupFolio(@NonNull UUID groupId, @NonNull GroupChargeRequest request);
 }

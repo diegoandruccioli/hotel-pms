@@ -5,6 +5,7 @@ import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.client.dto.GuestSearchPageResponse;
 import com.hotelpms.billing.domain.ChargeType;
 import com.hotelpms.billing.domain.DocumentType;
+import com.hotelpms.billing.domain.FolioType;
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.domain.InvoiceCharge;
@@ -13,8 +14,10 @@ import com.hotelpms.billing.domain.InvoiceSequenceId;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
+import com.hotelpms.billing.dto.GroupChargeRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
+import com.hotelpms.billing.dto.MasterFolioRequest;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.exception.NotFoundException;
@@ -60,6 +63,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.notNull;
 import org.mockito.ArgumentCaptor;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -833,5 +837,121 @@ class InvoiceServiceImplTest {
                 // Assert
                 verify(invoiceRepository).searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
                                 eq(QUERY_MARIO), eq(List.of(otherGuestId)), eq(pageable));
+        }
+
+        // ---------------------------------------------------------------
+        // Master folio / group charges (Point 4 -- gestione gruppi)
+        // ---------------------------------------------------------------
+
+        @Test
+        @DisplayName("createMasterFolioForGroup creates a new MASTER invoice when none exists yet")
+        void createMasterFolioForGroupCreatesNewInvoice() {
+                final UUID groupId = UUID.randomUUID();
+                when(invoiceRepository.findByGroupIdAndHotelIdAndFolioType(groupId, hotelId, FolioType.MASTER))
+                                .thenReturn(Optional.empty());
+                when(sequenceRepository.findByHotelIdAndYearForUpdate(eq(hotelId), anyInt()))
+                                .thenReturn(Optional.empty());
+                when(invoiceRepository.save(notNull())).thenAnswer(inv -> inv.getArgument(0));
+                when(invoiceMapper.toResponse(any(Invoice.class))).thenReturn(mock(InvoiceResponse.class));
+
+                final InvoiceResponse response =
+                                invoiceService.createMasterFolioForGroup(groupId, new MasterFolioRequest(guestId));
+
+                assertNotNull(response);
+                final ArgumentCaptor<Invoice> captor = ArgumentCaptor.forClass(Invoice.class);
+                verify(invoiceRepository).save(captor.capture());
+                assertEquals(FolioType.MASTER, captor.getValue().getFolioType());
+                assertEquals(groupId, captor.getValue().getGroupId());
+                assertEquals(guestId, captor.getValue().getGuestId());
+                assertEquals(InvoiceStatus.ISSUED, captor.getValue().getStatus());
+                assertEquals(BigDecimal.ZERO, captor.getValue().getTotalAmount());
+        }
+
+        @Test
+        @DisplayName("createMasterFolioForGroup returns the existing ISSUED master folio instead of duplicating it")
+        void createMasterFolioForGroupReturnsExistingOpenFolio() {
+                final UUID groupId = UUID.randomUUID();
+                final Invoice existing = Invoice.builder()
+                                .id(UUID.randomUUID())
+                                .groupId(groupId)
+                                .folioType(FolioType.MASTER)
+                                .status(InvoiceStatus.ISSUED)
+                                .guestId(guestId)
+                                .totalAmount(BigDecimal.ZERO)
+                                .invoiceNumber(INV_123)
+                                .build();
+                when(invoiceRepository.findByGroupIdAndHotelIdAndFolioType(groupId, hotelId, FolioType.MASTER))
+                                .thenReturn(Optional.of(existing));
+                when(invoiceMapper.toResponse(existing)).thenReturn(mock(InvoiceResponse.class));
+
+                invoiceService.createMasterFolioForGroup(groupId, new MasterFolioRequest(guestId));
+
+                verify(invoiceRepository, never()).save(any(Invoice.class));
+        }
+
+        @Test
+        @DisplayName("addChargeToGroupFolio adds a charge and increments the master folio total")
+        void addChargeToGroupFolioAddsChargeAndUpdatesTotal() {
+                final UUID groupId = UUID.randomUUID();
+                final UUID stayId = UUID.randomUUID();
+                final Invoice masterFolio = Invoice.builder()
+                                .id(UUID.randomUUID())
+                                .groupId(groupId)
+                                .folioType(FolioType.MASTER)
+                                .status(InvoiceStatus.ISSUED)
+                                .totalAmount(BigDecimal.ZERO)
+                                .invoiceNumber(INV_123)
+                                .build();
+                when(invoiceRepository.findByGroupIdAndHotelIdAndFolioType(groupId, hotelId, FolioType.MASTER))
+                                .thenReturn(Optional.of(masterFolio));
+                when(invoiceChargeRepository.save(notNull())).thenAnswer(inv -> inv.getArgument(0));
+                when(invoiceChargeMapper.toResponse(any(InvoiceCharge.class))).thenReturn(mock(ChargeResponse.class));
+
+                final GroupChargeRequest request = new GroupChargeRequest(
+                                ChargeType.ROOM_NIGHT, "Room 101 - 2 night(s)", new BigDecimal("200.00"),
+                                new BigDecimal("100.00"), 2, stayId);
+
+                invoiceService.addChargeToGroupFolio(groupId, request);
+
+                assertEquals(new BigDecimal("200.00"), masterFolio.getTotalAmount());
+                final ArgumentCaptor<InvoiceCharge> captor = ArgumentCaptor.forClass(InvoiceCharge.class);
+                verify(invoiceChargeRepository).save(captor.capture());
+                assertEquals(stayId, captor.getValue().getRoutedFromStayId());
+        }
+
+        @Test
+        @DisplayName("addChargeToGroupFolio throws NotFoundException when the group has no master folio")
+        void addChargeToGroupFolioThrowsWhenNoMasterFolioExists() {
+                final UUID groupId = UUID.randomUUID();
+                when(invoiceRepository.findByGroupIdAndHotelIdAndFolioType(groupId, hotelId, FolioType.MASTER))
+                                .thenReturn(Optional.empty());
+
+                final GroupChargeRequest request = new GroupChargeRequest(
+                                ChargeType.ROOM_NIGHT, "Room 101", BigDecimal.TEN, null, null, UUID.randomUUID());
+
+                assertThrows(NotFoundException.class,
+                                () -> invoiceService.addChargeToGroupFolio(groupId, request));
+        }
+
+        @Test
+        @DisplayName("addChargeToGroupFolio rejects a charge when the master folio is no longer ISSUED")
+        void addChargeToGroupFolioThrowsWhenMasterFolioNotOpen() {
+                final UUID groupId = UUID.randomUUID();
+                final Invoice paidMasterFolio = Invoice.builder()
+                                .id(UUID.randomUUID())
+                                .groupId(groupId)
+                                .folioType(FolioType.MASTER)
+                                .status(InvoiceStatus.PAID)
+                                .totalAmount(BigDecimal.TEN)
+                                .invoiceNumber(INV_123)
+                                .build();
+                when(invoiceRepository.findByGroupIdAndHotelIdAndFolioType(groupId, hotelId, FolioType.MASTER))
+                                .thenReturn(Optional.of(paidMasterFolio));
+
+                final GroupChargeRequest request = new GroupChargeRequest(
+                                ChargeType.ROOM_NIGHT, "Room 101", BigDecimal.TEN, null, null, UUID.randomUUID());
+
+                assertThrows(InvoiceConflictException.class,
+                                () -> invoiceService.addChargeToGroupFolio(groupId, request));
         }
 }

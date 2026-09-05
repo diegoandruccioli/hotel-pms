@@ -5,6 +5,7 @@ export * from './useGuests';
 export * from './useInvoices';
 export * from './useKpiReport';
 export * from './useNightAudit';
+export * from './useReservationGroups';
 export * from './useReservations';
 export * from './useRooms';
 export * from './useStays';

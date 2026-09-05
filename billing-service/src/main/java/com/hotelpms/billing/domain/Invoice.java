@@ -101,6 +101,18 @@ public class Invoice {
     @Column(name = "stay_id")
     private UUID stayId;
 
+    /**
+     * Logical reference to a reservation group in frontdesk-service (cross-service,
+     * no DB FK). {@code null} for an individual-stay invoice.
+     */
+    @Column(name = "group_id")
+    private UUID groupId;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "folio_type", nullable = false, length = 20)
+    private FolioType folioType = FolioType.INDIVIDUAL;
+
     @Builder.Default
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Payment> payments = new ArrayList<>();

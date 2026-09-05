@@ -2,9 +2,11 @@ package com.hotelpms.frontdesk.client;
 
 import com.hotelpms.frontdesk.client.dto.ChargeRequest;
 import com.hotelpms.frontdesk.client.dto.ChargeResponse;
+import com.hotelpms.frontdesk.client.dto.GroupChargeRequest;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
+import com.hotelpms.frontdesk.client.dto.MasterFolioRequest;
 import com.hotelpms.frontdesk.client.dto.PaymentSummaryClientResponse;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
 import feign.FeignException;
@@ -147,6 +149,32 @@ public interface BillingClient {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date);
 
     /**
+     * Opens a MASTER folio in billing-service for a reservation group (Punto 4).
+     *
+     * @param groupId the reservation group's id
+     * @param request the master folio request (contact guest)
+     * @return the created invoice response, or {@code null} when the fallback fires
+     */
+    @PostMapping("/api/v1/invoices/groups/{groupId}/master-folio")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "createMasterFolioForGroupFallback")
+    InvoiceCreatedResponse createMasterFolioForGroup(
+            @PathVariable("groupId") UUID groupId, @RequestBody MasterFolioRequest request);
+
+    /**
+     * Adds a charge directly to a reservation group's master folio -- used to
+     * transfer a room's ROOM_NIGHT/CITY_TAX charge off its individual invoice at
+     * check-out, when that room is marked "billed to group" (Punto 4).
+     *
+     * @param groupId the reservation group's id
+     * @param request the charge to add, tagging the stay it's transferred from
+     * @return the created charge response, or {@code null} when the fallback fires
+     */
+    @PostMapping("/api/v1/invoices/groups/{groupId}/charges")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "addChargeToGroupFolioFallback")
+    ChargeResponse addChargeToGroupFolio(
+            @PathVariable("groupId") UUID groupId, @RequestBody GroupChargeRequest request);
+
+    /**
      * Fallback for getLatestInvoiceByReservation.
      *
      * @param reservationId the reservation id
@@ -246,6 +274,46 @@ public interface BillingClient {
             final UUID stayId, final ChargeRequest request, final Throwable throwable) {
         LOG.error("[BillingClient] addCharge fallback | stayId={} | type={} | cause={}: {}",
                 stayId, request.type(), throwable.getClass().getSimpleName(), throwable.getMessage());
+        if (throwable instanceof FeignException fe && fe.status() >= CLIENT_ERROR_MIN && fe.status() < CLIENT_ERROR_MAX) {
+            throw fe;
+        }
+        return null;
+    }
+
+    /**
+     * Fallback for createMasterFolioForGroup — group creation is an interactive
+     * operator action expecting a definite outcome (same class as {@link
+     * #createInvoiceForStayFallback}): a legitimate 4xx is rethrown, genuine
+     * unavailability returns {@code null} so the caller can fail the whole
+     * create-group request cleanly instead of leaving a half-created group.
+     *
+     * @param groupId   the reservation group's id
+     * @param request   the original request
+     * @param throwable the cause
+     * @return null, only when the cause is genuine unavailability
+     */
+    default InvoiceCreatedResponse createMasterFolioForGroupFallback(
+            final UUID groupId, final MasterFolioRequest request, final Throwable throwable) {
+        LOG.error("[BillingClient] createMasterFolioForGroup fallback | groupId={} | cause={}: {}",
+                groupId, throwable.getClass().getSimpleName(), throwable.getMessage());
+        if (throwable instanceof FeignException fe && fe.status() >= CLIENT_ERROR_MIN && fe.status() < CLIENT_ERROR_MAX) {
+            throw fe;
+        }
+        return null;
+    }
+
+    /**
+     * Fallback for addChargeToGroupFolio — same distinction as {@link #addChargeFallback}.
+     *
+     * @param groupId   the reservation group's id
+     * @param request   the original charge request
+     * @param throwable the cause
+     * @return null, only when the cause is genuine unavailability
+     */
+    default ChargeResponse addChargeToGroupFolioFallback(
+            final UUID groupId, final GroupChargeRequest request, final Throwable throwable) {
+        LOG.error("[BillingClient] addChargeToGroupFolio fallback | groupId={} | type={} | cause={}: {}",
+                groupId, request.type(), throwable.getClass().getSimpleName(), throwable.getMessage());
         if (throwable instanceof FeignException fe && fe.status() >= CLIENT_ERROR_MIN && fe.status() < CLIENT_ERROR_MAX) {
             throw fe;
         }
