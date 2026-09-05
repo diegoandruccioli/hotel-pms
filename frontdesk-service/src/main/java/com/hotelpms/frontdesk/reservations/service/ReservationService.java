@@ -99,6 +99,23 @@ public interface ReservationService {
             Long clientVersion);
 
     /**
+     * Same as {@link #updateStatusAndGuests}, with an explicit {@code hotelId}
+     * instead of resolving it from the request's {@code SecurityContextHolder}.
+     * Exists for callers with no inbound HTTP request context — the scheduled
+     * night audit (see {@code NightAuditServiceImpl}), which already knows
+     * which hotel it's auditing without a security context to read it from.
+     *
+     * @param hotelId       the hotel the reservation belongs to
+     * @param id            the reservation ID
+     * @param status        the new status (optional)
+     * @param actualGuests  the new actual guests count (optional)
+     * @param clientVersion the version the caller last read, or {@code null} to skip the check
+     * @return the updated reservation response
+     */
+    ReservationResponse updateStatusAndGuestsForHotel(UUID hotelId, UUID id, ReservationStatus status,
+            Integer actualGuests, Long clientVersion);
+
+    /**
      * Checks whether a guest has any active (non-terminal) reservation in the
      * caller's hotel. Used by guest-service's GDPR Art. 17 erasure legal-hold
      * guard (T-GST-05).

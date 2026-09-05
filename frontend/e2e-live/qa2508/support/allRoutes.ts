@@ -53,6 +53,7 @@ export const ROUTES: RouteSpec[] = [
   { path: '/profile/hotel', roles: ADMIN_OWNER, headingPattern: /struttura|hotel/i },
   { path: '/settings/system', roles: ADMIN_OWNER, headingPattern: /sistema|system/i },
   { path: '/settings/city-tax', roles: ADMIN_OWNER, headingPattern: /imposta di soggiorno|tourist tax/i }, // settings_section_city_tax EN = "Tourist Tax"
+  { path: '/night-audit', roles: ADMIN_OWNER, headingPattern: /chiusura giornaliera|night audit/i },
 ];
 
 // /stays/check-in/:reservationId needs a CONFIRMED reservation without an

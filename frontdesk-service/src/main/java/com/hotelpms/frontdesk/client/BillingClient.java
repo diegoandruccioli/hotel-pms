@@ -5,19 +5,23 @@ import com.hotelpms.frontdesk.client.dto.ChargeResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
+import com.hotelpms.frontdesk.client.dto.PaymentSummaryClientResponse;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
 import feign.FeignException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.UUID;
 
@@ -126,6 +130,21 @@ public interface BillingClient {
     @DeleteMapping("/api/v1/invoices/stay/{stayId}/charges/{chargeId}")
     @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "removeChargeFallback")
     void removeCharge(@PathVariable("stayId") UUID stayId, @PathVariable("chargeId") UUID chargeId);
+
+    /**
+     * Retrieves the cash-closing summary (payments by method) for a single
+     * business date — the night-audit cash section. The call is signed with
+     * role ADMIN by frontdesk-service's own batch-job context when it runs
+     * outside an HTTP request (the scheduled path), clearing billing-service's
+     * {@code @PreAuthorize("hasAnyRole('ADMIN','OWNER')")} on that endpoint.
+     *
+     * @param date the business date to summarize
+     * @return the cash-closing summary, or a degraded (empty) one when the circuit is open
+     */
+    @GetMapping("/api/v1/payments/summary")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "getPaymentSummaryFallback")
+    PaymentSummaryClientResponse getPaymentSummary(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date);
 
     /**
      * Fallback for getLatestInvoiceByReservation.
@@ -251,5 +270,24 @@ public interface BillingClient {
         if (throwable instanceof FeignException fe && fe.status() >= CLIENT_ERROR_MIN && fe.status() < CLIENT_ERROR_MAX) {
             throw fe;
         }
+    }
+
+    /**
+     * Fallback for getPaymentSummary — returns a sentinel with {@code
+     * grandTotal=null} so the caller (night audit) can tell "billing-service
+     * was unreachable" apart from "genuinely zero payments that day"
+     * ({@code grandTotal=BigDecimal.ZERO}, an empty {@code byMethod}). The
+     * cash-closing section is informational, never blocking: a billing outage
+     * must not prevent the rest of the night audit (no-show detection,
+     * occupancy snapshot) from completing.
+     *
+     * @param date      the requested business date
+     * @param throwable the cause
+     * @return a degraded summary with a null grand total
+     */
+    default PaymentSummaryClientResponse getPaymentSummaryFallback(final LocalDate date, final Throwable throwable) {
+        LOG.warn("[BillingClient] getPaymentSummary fallback | date={} | cause={}: {}",
+                date, throwable.getClass().getSimpleName(), throwable.getMessage());
+        return new PaymentSummaryClientResponse(date, Collections.emptyList(), null);
     }
 }

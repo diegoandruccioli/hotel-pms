@@ -67,7 +67,7 @@ public class GuestRetentionJobServiceImpl {
      * Uses the most conservative pre-filter (FISCAL_MIN_YEARS = 10) so that
      * only guests who are definitely beyond all legal holds enter the pipeline.
      */
-    @Scheduled(cron = "0 0 2 * * *")
+    @Scheduled(cron = "${guest.retention.cron:0 0 2 * * *}")
     @Transactional
     public void runRetentionJob() {
         log.info("{} Starting nightly retention job", LOG_PREFIX);

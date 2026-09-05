@@ -37,6 +37,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'rooms', href: '/rooms', icon: 'meeting_room', labelKey: 'nav_rooms', ns: 'common' },
   { id: 'rates', href: '/rates', icon: 'payments', labelKey: 'nav_rates', ns: 'common' },
   { id: 'owner-dashboard', href: '/owner-dashboard', icon: 'bar_chart', labelKey: 'nav_owner_dashboard', ns: 'common', allowedRoles: OWNER_ADMIN_ROLES },
+  { id: 'night-audit', href: '/night-audit', icon: 'fact_check', labelKey: 'nav_night_audit', ns: 'common', allowedRoles: OWNER_ADMIN_ROLES },
   { id: 'settings', href: '/settings', icon: 'settings', labelKey: 'settings', ns: 'settings' },
   { id: 'settings-profile', href: '/settings/profile', icon: 'person', labelKey: 'my_profile', ns: 'settings' },
   { id: 'settings-password', href: '/settings/password', icon: 'lock', labelKey: 'change_password', ns: 'settings' },

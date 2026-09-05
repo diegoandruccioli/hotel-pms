@@ -295,8 +295,16 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional
     public ReservationResponse updateStatusAndGuests(final UUID id, final ReservationStatus status,
             final Integer actualGuests, final Long clientVersion) {
+        return updateStatusAndGuestsForHotel(resolveHotelId(), id, status, actualGuests, clientVersion);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public ReservationResponse updateStatusAndGuestsForHotel(final UUID hotelId, final UUID id,
+            final ReservationStatus status, final Integer actualGuests, final Long clientVersion) {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
-        final UUID hotelId = resolveHotelId();
+        Objects.requireNonNull(hotelId, HOTEL_ID_NOT_NULL_MSG);
         final Reservation reservation = findReservationByIdAndHotelOrThrow(id, hotelId);
         verifyNotStale(reservation, clientVersion);
 

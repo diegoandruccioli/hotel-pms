@@ -4,6 +4,7 @@ export * from './useFb';
 export * from './useGuests';
 export * from './useInvoices';
 export * from './useKpiReport';
+export * from './useNightAudit';
 export * from './useReservations';
 export * from './useRooms';
 export * from './useStays';

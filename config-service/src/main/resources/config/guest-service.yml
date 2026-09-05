@@ -49,3 +49,10 @@ management:
 logging:
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n"
+
+guest:
+  retention:
+    # GDPR anonymization job (T-GST-05). Was hardcoded in the
+    # @Scheduled annotation; externalized here for the same reason as
+    # frontdesk.night-audit.cron — movable without a redeploy.
+    cron: "0 0 2 * * *"

@@ -26,6 +26,7 @@ const Restaurant = lazy(() => import('./pages/Restaurant').then((m) => ({ defaul
 const CalendarPlanning = lazy(() => import('./pages/CalendarPlanning').then((m) => ({ default: m.CalendarPlanning })));
 const Housekeeping = lazy(() => import('./pages/Housekeeping').then((m) => ({ default: m.Housekeeping })));
 const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard').then((m) => ({ default: m.OwnerDashboard })));
+const NightAudit = lazy(() => import('./pages/NightAudit').then((m) => ({ default: m.NightAudit })));
 const Rooms = lazy(() => import('./pages/Rooms').then((m) => ({ default: m.Rooms })));
 const RateCalendar = lazy(() => import('./pages/Rates/RateCalendar').then((m) => ({ default: m.RateCalendar })));
 const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
@@ -111,6 +112,7 @@ function App() {
               <Route path="/settings/appearance" element={<SettingsAppearance />} />
               <Route element={<ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />}>
                 <Route path="/owner-dashboard" element={<OwnerDashboard />} />
+                <Route path="/night-audit" element={<NightAudit />} />
                 <Route path="/admin/users" element={<AdminUsers />} />
                 <Route path="/profile/hotel" element={<HotelProfile />} />
                 <Route path="/settings/system" element={<SettingsSystem />} />

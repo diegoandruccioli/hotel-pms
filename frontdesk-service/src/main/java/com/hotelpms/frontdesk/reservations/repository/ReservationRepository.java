@@ -260,6 +260,21 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
     int countByHotelIdAndCheckInDateAndStatusIn(UUID hotelId, LocalDate date, Collection<ReservationStatus> statuses);
 
     /**
+     * Finds reservations with one of the given statuses whose check-in date is
+     * on or before the given date, scoped to a hotel — the night audit's
+     * no-show candidate pool. Each candidate is still re-validated by {@code
+     * ReservationServiceImpl#verifyNoShowAllowed} (no active Stay) before
+     * being transitioned; this query only narrows by date/status.
+     *
+     * @param hotelId the hotel UUID
+     * @param date    the business date being audited (inclusive upper bound on check-in)
+     * @param statuses the reservation statuses eligible for NO_SHOW (PENDING, CONFIRMED)
+     * @return the matching reservations
+     */
+    List<Reservation> findByHotelIdAndCheckInDateLessThanEqualAndStatusIn(
+            UUID hotelId, LocalDate date, Collection<ReservationStatus> statuses);
+
+    /**
      * Counts reservations checking out on a given date with one of the given
      * statuses, scoped to a hotel. Backs the day-sheet "departures today" count.
      *

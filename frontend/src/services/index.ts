@@ -7,6 +7,7 @@ export * from './fbService';
 export * from './guestService';
 export * from './inventoryService';
 export * from './kpiReportService';
+export * from './nightAuditService';
 export * from './quotationService';
 export * from './rateSeasonService';
 export * from './reservationService';
