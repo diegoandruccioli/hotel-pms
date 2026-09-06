@@ -63,6 +63,7 @@ import java.util.stream.Collectors;
 public class InvoiceServiceImpl implements InvoiceService {
 
     private static final String INVOICE_NOT_FOUND = "INVOICE_NOT_FOUND";
+    private static final String INVOICE_NOT_OPEN = "INVOICE_NOT_OPEN";
     private static final int GUEST_SEARCH_MATCH_CAP = 200;
     /**
      * Page size for CSV export's internal pagination loop -- bounds memory to one
@@ -162,7 +163,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .orElseThrow(() -> new NotFoundException("MASTER_FOLIO_NOT_FOUND_FOR_GROUP"));
 
         if (invoice.getStatus() != InvoiceStatus.ISSUED) {
-            throw new InvoiceConflictException("INVOICE_NOT_OPEN");
+            throw new InvoiceConflictException(INVOICE_NOT_OPEN);
         }
         assertNotFiscallyLocked(invoice);
 
@@ -201,7 +202,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND_FOR_STAY"));
 
         if (invoice.getStatus() != InvoiceStatus.ISSUED) {
-            throw new InvoiceConflictException("INVOICE_NOT_OPEN");
+            throw new InvoiceConflictException(INVOICE_NOT_OPEN);
         }
         assertNotFiscallyLocked(invoice);
 
@@ -240,7 +241,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND_FOR_STAY"));
 
         if (invoice.getStatus() != InvoiceStatus.ISSUED) {
-            throw new InvoiceConflictException("INVOICE_NOT_OPEN");
+            throw new InvoiceConflictException(INVOICE_NOT_OPEN);
         }
         assertNotFiscallyLocked(invoice);
 

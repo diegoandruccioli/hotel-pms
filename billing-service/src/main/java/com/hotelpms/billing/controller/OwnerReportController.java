@@ -36,6 +36,8 @@ import java.util.UUID;
 @Slf4j
 public class OwnerReportController {
 
+    private static final String ROLE_OWNER_OR_ADMIN = "hasAnyRole('OWNER', 'ADMIN')";
+
     private final OwnerReportService ownerReportService;
     private final KpiReportService kpiReportService;
 
@@ -49,7 +51,7 @@ public class OwnerReportController {
      * @return the aggregated financial report for the caller's hotel
      */
     @GetMapping("/owner")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    @PreAuthorize(ROLE_OWNER_OR_ADMIN)
     public ResponseEntity<OwnerFinancialReportDto> getOwnerFinancialReport(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate startDate,
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate endDate) {
@@ -69,7 +71,7 @@ public class OwnerReportController {
      * @return a streamed CSV attachment
      */
     @GetMapping(value = "/owner/export.csv", produces = "text/csv")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    @PreAuthorize(ROLE_OWNER_OR_ADMIN)
     public ResponseEntity<StreamingResponseBody> exportOwnerFinancialReportCsv(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate startDate,
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate endDate) {
@@ -97,7 +99,7 @@ public class OwnerReportController {
      * @return the aggregated financial summary for the caller's hotel
      */
     @GetMapping("/owner/summary")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    @PreAuthorize(ROLE_OWNER_OR_ADMIN)
     public ResponseEntity<OwnerFinancialSummaryDto> getOwnerFinancialSummary(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate startDate,
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate endDate) {
@@ -119,7 +121,7 @@ public class OwnerReportController {
      * @return the KPI trend report for the caller's hotel
      */
     @GetMapping("/kpi")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    @PreAuthorize(ROLE_OWNER_OR_ADMIN)
     public ResponseEntity<KpiReportDto> getKpiReport(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate startDate,
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate endDate,

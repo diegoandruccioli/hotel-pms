@@ -48,6 +48,8 @@ import java.util.UUID;
 @SQLRestriction("active = true")
 public class ReservationGroup {
 
+    private static final int LEN_STATUS = 20;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Setter(AccessLevel.NONE)
@@ -76,7 +78,7 @@ public class ReservationGroup {
     private LocalDate checkOutDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = LEN_STATUS)
     private GroupStatus status;
 
     @Column(name = "group_rate_per_night")

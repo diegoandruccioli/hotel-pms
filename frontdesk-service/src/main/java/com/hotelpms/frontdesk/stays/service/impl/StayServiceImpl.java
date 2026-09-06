@@ -215,10 +215,10 @@ public class StayServiceImpl implements StayService {
         final InvoiceStatusResponse invoice = stayBillingCoordinator.resolveInvoiceForCheckOut(stay);
         final boolean cleared = invoice != null && (
                 PAID_STATUS.equalsIgnoreCase(invoice.status())
-                || (stay.isChargesTransferredToMasterFolio()
+                || stay.isChargesTransferredToMasterFolio()
                         && ISSUED_STATUS.equalsIgnoreCase(invoice.status())
                         && invoice.totalAmount() != null
-                        && invoice.totalAmount().signum() == 0));
+                        && invoice.totalAmount().signum() == 0);
         if (!cleared) {
             log.warn("[STAY] CHECK_OUT_FAILED | stayId={} | reservationId={} | reason=BILLING_NOT_PAID",
                     stayId, stay.getReservationId());

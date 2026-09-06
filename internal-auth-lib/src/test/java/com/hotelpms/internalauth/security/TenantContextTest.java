@@ -17,6 +17,10 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
  */
 class TenantContextTest {
 
+    private static final String HOTEL_ID_NOT_AVAILABLE = "HOTEL_ID_NOT_AVAILABLE";
+    private static final String USER = "user";
+    private static final int NOT_A_STRING_DETAILS = 42;
+
     @AfterEach
     void clearContext() {
         SecurityContextHolder.clearContext();
@@ -36,29 +40,29 @@ class TenantContextTest {
 
         assertThatIllegalStateException()
                 .isThrownBy(TenantContext::resolveHotelId)
-                .withMessage("HOTEL_ID_NOT_AVAILABLE");
+                .withMessage(HOTEL_ID_NOT_AVAILABLE);
     }
 
     @Test
     void throwsIllegalStateWhenDetailsAreNull() {
-        final var auth = new UsernamePasswordAuthenticationToken("user", "", List.of());
+        final var auth = new UsernamePasswordAuthenticationToken(USER, "", List.of());
         auth.setDetails(null);
         SecurityContextHolder.getContext().setAuthentication(auth);
 
         assertThatIllegalStateException()
                 .isThrownBy(TenantContext::resolveHotelId)
-                .withMessage("HOTEL_ID_NOT_AVAILABLE");
+                .withMessage(HOTEL_ID_NOT_AVAILABLE);
     }
 
     @Test
     void throwsIllegalStateWhenDetailsAreNotAString() {
-        final var auth = new UsernamePasswordAuthenticationToken("user", "", List.of());
-        auth.setDetails(42);
+        final var auth = new UsernamePasswordAuthenticationToken(USER, "", List.of());
+        auth.setDetails(NOT_A_STRING_DETAILS);
         SecurityContextHolder.getContext().setAuthentication(auth);
 
         assertThatIllegalStateException()
                 .isThrownBy(TenantContext::resolveHotelId)
-                .withMessage("HOTEL_ID_NOT_AVAILABLE");
+                .withMessage(HOTEL_ID_NOT_AVAILABLE);
     }
 
     @Test
@@ -67,7 +71,7 @@ class TenantContextTest {
 
         assertThatIllegalStateException()
                 .isThrownBy(TenantContext::resolveHotelId)
-                .withMessage("HOTEL_ID_NOT_AVAILABLE");
+                .withMessage(HOTEL_ID_NOT_AVAILABLE);
     }
 
     @Test
@@ -76,12 +80,12 @@ class TenantContextTest {
 
         assertThatIllegalStateException()
                 .isThrownBy(TenantContext::resolveHotelId)
-                .withMessage("HOTEL_ID_NOT_AVAILABLE")
+                .withMessage(HOTEL_ID_NOT_AVAILABLE)
                 .withCauseInstanceOf(IllegalArgumentException.class);
     }
 
     private static void setAuthDetails(final String details) {
-        final var auth = new UsernamePasswordAuthenticationToken("user", "", List.of());
+        final var auth = new UsernamePasswordAuthenticationToken(USER, "", List.of());
         auth.setDetails(details);
         SecurityContextHolder.getContext().setAuthentication(auth);
     }

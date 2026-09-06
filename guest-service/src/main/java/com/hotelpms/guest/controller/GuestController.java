@@ -46,6 +46,7 @@ import java.util.UUID;
 public class GuestController {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final String ROLE_ADMIN_OR_OWNER = "hasAnyRole('ADMIN', 'OWNER')";
 
     private final GuestService guestService;
 
@@ -111,7 +112,7 @@ public class GuestController {
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     public void deleteGuest(@NonNull @PathVariable final UUID id) {
         guestService.deleteGuest(id);
     }
@@ -157,7 +158,7 @@ public class GuestController {
      */
     @DeleteMapping("/{id}/documents/{documentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     public void removeIdentityDocument(
             @NonNull @PathVariable final UUID id,
             @NonNull @PathVariable final UUID documentId) {
@@ -185,7 +186,7 @@ public class GuestController {
      * @return {@code 200 OK} with the complete export payload
      */
     @GetMapping(value = "/{id}/export", produces = MediaType.APPLICATION_JSON_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     public ResponseEntity<GuestDataExportResponse> exportGuestData(
             @NonNull @PathVariable final UUID id) {
         final ContentDisposition disposition = ContentDisposition.attachment()
@@ -205,7 +206,7 @@ public class GuestController {
      * @return a streamed CSV attachment
      */
     @GetMapping(value = "/export.csv", produces = "text/csv")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     public ResponseEntity<StreamingResponseBody> exportGuestsCsv(
             @RequestParam(required = false) final String query) {
         final StreamingResponseBody body = out -> guestService.exportGuestsCsv(query, out);

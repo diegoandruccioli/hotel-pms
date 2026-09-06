@@ -70,8 +70,10 @@ public class GuestServiceImpl implements GuestService {
     private static final String GUEST_NOT_FOUND_MSG = "GUEST_NOT_FOUND";
     private static final String ANON_FIRST = "GDPR";
     private static final String ANON_LAST_PREFIX = "ERASED_";
-    /** Page size for CSV export's internal pagination loop -- bounds memory to one
-     * page at a time instead of loading the whole matching set before writing. */
+    /**
+     * Page size for CSV export's internal pagination loop -- bounds memory to one
+     * page at a time instead of loading the whole matching set before writing.
+     */
     private static final int EXPORT_PAGE_SIZE = 500;
 
     private final GuestRepository guestRepository;

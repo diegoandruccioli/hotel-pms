@@ -57,6 +57,10 @@ class ReservationGroupServiceImplTest {
     private static final String LAST_NAME = "Rossi";
     private static final String EMAIL = "mario@test.com";
     private static final int EXPECTED_GUESTS = 2;
+    private static final String GROUP_NAME_ACME = "Acme Corp Offsite";
+    private static final String MEMBER_FULL_NAME_JANE_DOE = "Jane Doe";
+    private static final int ROOM_PRICE = 200;
+    private static final long STALE_VERSION = 99L;
 
     @Mock
     private ReservationGroupRepository groupRepository;
@@ -103,7 +107,7 @@ class ReservationGroupServiceImplTest {
                 .id(groupId)
                 .version(0L)
                 .hotelId(hotelId)
-                .name("Acme Corp Offsite")
+                .name(GROUP_NAME_ACME)
                 .contactGuestId(contactGuestId)
                 .checkInDate(LocalDate.now().plusDays(1))
                 .checkOutDate(LocalDate.now().plusDays(3))
@@ -124,7 +128,7 @@ class ReservationGroupServiceImplTest {
                 .build();
         reservation.setLineItems(List.of(ReservationLineItem.builder()
                 .roomId(UUID.randomUUID())
-                .price(BigDecimal.valueOf(200))
+                .price(BigDecimal.valueOf(ROOM_PRICE))
                 .build()));
         return reservation;
     }
@@ -134,7 +138,7 @@ class ReservationGroupServiceImplTest {
         final UUID roomId = UUID.randomUUID();
         final UUID guestId = UUID.randomUUID();
         final ReservationGroupCreateRequest request = new ReservationGroupCreateRequest(
-                "Acme Corp Offsite", "Acme Corp", contactGuestId,
+                GROUP_NAME_ACME, "Acme Corp", contactGuestId,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
                 null, null, false,
                 List.of(new RoomingListEntryRequest(guestId, roomId, EXPECTED_GUESTS, false)));
@@ -144,7 +148,7 @@ class ReservationGroupServiceImplTest {
         when(groupRepository.save(ArgumentMatchers.any(ReservationGroup.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
         final ReservationResponse createdMember = new ReservationResponse(
-                UUID.randomUUID(), guestId, "Jane Doe", EXPECTED_GUESTS, 0,
+                UUID.randomUUID(), guestId, MEMBER_FULL_NAME_JANE_DOE, EXPECTED_GUESTS, 0,
                 request.checkInDate(), request.checkOutDate(), ReservationStatus.CONFIRMED,
                 List.of(), true, null, null, false, null, null);
         when(reservationService.createReservationForGroup(
@@ -164,7 +168,7 @@ class ReservationGroupServiceImplTest {
         final UUID roomId = UUID.randomUUID();
         final UUID guestId = UUID.randomUUID();
         final ReservationGroupCreateRequest request = new ReservationGroupCreateRequest(
-                "Acme Corp Offsite", null, contactGuestId,
+                GROUP_NAME_ACME, null, contactGuestId,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
                 BigDecimal.valueOf(100), null, true,
                 List.of(new RoomingListEntryRequest(guestId, roomId, EXPECTED_GUESTS, true)));
@@ -177,7 +181,7 @@ class ReservationGroupServiceImplTest {
                 ArgumentMatchers.any(), ArgumentMatchers.any(MasterFolioRequest.class)))
                 .thenReturn(new InvoiceCreatedResponse(UUID.randomUUID()));
         final ReservationResponse createdMember = new ReservationResponse(
-                UUID.randomUUID(), guestId, "Jane Doe", EXPECTED_GUESTS, 0,
+                UUID.randomUUID(), guestId, MEMBER_FULL_NAME_JANE_DOE, EXPECTED_GUESTS, 0,
                 request.checkInDate(), request.checkOutDate(), ReservationStatus.CONFIRMED,
                 List.of(), true, null, null, false, null, null);
         when(reservationService.createReservationForGroup(
@@ -201,7 +205,7 @@ class ReservationGroupServiceImplTest {
         final UUID roomId = UUID.randomUUID();
         final UUID guestId = UUID.randomUUID();
         final ReservationGroupCreateRequest request = new ReservationGroupCreateRequest(
-                "Acme Corp Offsite", null, contactGuestId,
+                GROUP_NAME_ACME, null, contactGuestId,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
                 null, null, true,
                 List.of(new RoomingListEntryRequest(guestId, roomId, EXPECTED_GUESTS, true)));
@@ -237,7 +241,7 @@ class ReservationGroupServiceImplTest {
 
         assertEquals("Mario Rossi", response.contactGuestName());
         assertEquals(1, response.members().size());
-        assertEquals("Jane Doe", response.members().get(0).guestFullName());
+        assertEquals(MEMBER_FULL_NAME_JANE_DOE, response.members().get(0).guestFullName());
     }
 
     @Test
@@ -278,7 +282,7 @@ class ReservationGroupServiceImplTest {
 
         assertThrows(
                 com.hotelpms.frontdesk.exception.ConflictException.class,
-                () -> reservationGroupService.cancelGroup(groupId, 99L));
+                () -> reservationGroupService.cancelGroup(groupId, STALE_VERSION));
         verify(groupRepository, never()).save(ArgumentMatchers.any());
     }
 

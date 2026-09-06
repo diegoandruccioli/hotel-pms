@@ -32,20 +32,24 @@ import java.util.UUID;
  * @param rooms              the rooming list; one child reservation per entry
  */
 public record ReservationGroupCreateRequest(
-        @NotBlank(message = "Required") String name,
+        @NotBlank(message = REQUIRED) String name,
         String companyName,
-        @NotNull(message = "Required") UUID contactGuestId,
-        @NotNull(message = "Required") @FutureOrPresent(message = "Future") LocalDate checkInDate,
-        @NotNull(message = "Required") @FutureOrPresent(message = "Future") LocalDate checkOutDate,
+        @NotNull(message = REQUIRED) UUID contactGuestId,
+        @NotNull(message = REQUIRED) @FutureOrPresent(message = "Future") LocalDate checkInDate,
+        @NotNull(message = REQUIRED) @FutureOrPresent(message = "Future") LocalDate checkOutDate,
         @PositiveOrZero(message = "Must not be negative") BigDecimal groupRatePerNight,
         String notes,
         boolean openMasterFolio,
-        @NotEmpty(message = "Required")
+        @NotEmpty(message = REQUIRED)
         @Size(max = MAX_ROOMS, message = "Too many rooms") @Valid List<RoomingListEntryRequest> rooms) {
 
-    /** Upper bound on rooms in a single group, same order of magnitude as {@code
+    static final String REQUIRED = "Required";
+
+    /**
+     * Upper bound on rooms in a single group, same order of magnitude as {@code
      * ReservationRequest.MAX_LINE_ITEMS} (a group is bigger than one reservation,
-     * but still a single hotel-sized event, not an unbounded batch import). */
+     * but still a single hotel-sized event, not an unbounded batch import).
+     */
     static final int MAX_ROOMS = 100;
 
     /**

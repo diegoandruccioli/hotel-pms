@@ -56,6 +56,8 @@ import java.util.UUID;
         })
 public class Invoice {
 
+    private static final int LEN_FOLIO_TYPE = 20;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -110,7 +112,7 @@ public class Invoice {
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    @Column(name = "folio_type", nullable = false, length = 20)
+    @Column(name = "folio_type", nullable = false, length = LEN_FOLIO_TYPE)
     private FolioType folioType = FolioType.INDIVIDUAL;
 
     @Builder.Default

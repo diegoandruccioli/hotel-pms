@@ -78,6 +78,8 @@ class InvoiceServiceImplTest {
         private static final String SIMPLE_DRINK = "Coffee";
         private static final String INV_123 = "INV-123";
         private static final String QUERY_MARIO = "mario";
+        private static final String GUEST_FIRST_NAME_MARIO = "Mario";
+        private static final String SORT_FIELD_ISSUE_DATE = "issueDate";
         private static final int GUEST_SEARCH_CAP = 200;
         private static final int PAGE_ZERO = 0;
         private static final int PAGE_SIZE_TWENTY = 20;
@@ -85,6 +87,7 @@ class InvoiceServiceImplTest {
         private static final int SEARCH_MONTH = 8;
         private static final int DAY_ONE = 1;
         private static final int DAY_FIVE = 5;
+        private static final int EXPORT_PAGE_SIZE = 500;
 
         @Mock
         private InvoiceRepository invoiceRepository;
@@ -656,7 +659,7 @@ class InvoiceServiceImplTest {
                                 .thenReturn(new PageImpl<>(List.of(invoice)));
                 when(invoiceMapper.toResponse(invoice)).thenReturn(mapped);
                 when(guestClient.getGuestsBatch(List.of(guestId)))
-                                .thenReturn(List.of(new GuestResponse(guestId, "Mario", "Rossi", "mario@test.com",
+                                .thenReturn(List.of(new GuestResponse(guestId, GUEST_FIRST_NAME_MARIO, "Rossi", "mario@test.com",
                                                 null, null, null, null, null, null, null, null, null)));
 
                 // Act
@@ -693,7 +696,7 @@ class InvoiceServiceImplTest {
                 final PageRequest pageable = PageRequest.of(PAGE_ZERO, PAGE_SIZE_TWENTY);
                 when(guestClient.searchGuests(QUERY_MARIO, GUEST_SEARCH_CAP))
                                 .thenReturn(new GuestSearchPageResponse(List.of(
-                                                new GuestResponse(otherGuestId, "Mario", "Bianchi",
+                                                new GuestResponse(otherGuestId, GUEST_FIRST_NAME_MARIO, "Bianchi",
                                                                 "mario.b@test.com", null, null, null, null, null,
                                                                 null, null, null, null))));
                 when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
@@ -761,8 +764,6 @@ class InvoiceServiceImplTest {
         // exportInvoicesCsv (Point 3 -- CSV export)
         // ---------------------------------------------------------------
 
-        private static final int EXPORT_PAGE_SIZE = 500;
-
         @Test
         @DisplayName("exportInvoicesCsv writes the header and hotel-scoped, guest-resolved rows")
         void exportInvoicesCsvWritesHeaderAndScopedRows() throws IOException {
@@ -776,13 +777,14 @@ class InvoiceServiceImplTest {
                 invoice.setStatus(InvoiceStatus.ISSUED);
                 invoice.setDocumentType(DocumentType.FATTURA);
                 invoice.setTotalAmount(BigDecimal.TEN);
-                final PageRequest pageable = PageRequest.of(PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by("issueDate").descending());
+                final PageRequest pageable = PageRequest.of(
+                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending());
 
                 when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(InvoiceStatus.ISSUED), eq(null), eq(null),
                                 eq(null), eq(List.of()), eq(pageable)))
                                 .thenReturn(new PageImpl<>(List.of(invoice)));
                 when(guestClient.getGuestsBatch(List.of(guestId)))
-                                .thenReturn(List.of(new GuestResponse(guestId, "Mario", "Rossi", "mario@test.com",
+                                .thenReturn(List.of(new GuestResponse(guestId, GUEST_FIRST_NAME_MARIO, "Rossi", "mario@test.com",
                                                 null, null, null, null, null, null, null, null, null)));
 
                 // Act
@@ -801,7 +803,8 @@ class InvoiceServiceImplTest {
         @DisplayName("exportInvoicesCsv skips guest batch resolution when there are no matching invoices")
         void exportInvoicesCsvSkipsGuestBatchResolutionWhenEmpty() throws IOException {
                 // Arrange
-                final PageRequest pageable = PageRequest.of(PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by("issueDate").descending());
+                final PageRequest pageable = PageRequest.of(
+                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending());
                 when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
                                 eq(null), eq(List.of()), eq(pageable)))
                                 .thenReturn(new PageImpl<>(List.of()));
@@ -820,10 +823,11 @@ class InvoiceServiceImplTest {
         void exportInvoicesCsvResolvesGuestIdsFromQuery() throws IOException {
                 // Arrange
                 final UUID otherGuestId = UUID.randomUUID();
-                final PageRequest pageable = PageRequest.of(PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by("issueDate").descending());
+                final PageRequest pageable = PageRequest.of(
+                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending());
                 when(guestClient.searchGuests(QUERY_MARIO, GUEST_SEARCH_CAP))
                                 .thenReturn(new GuestSearchPageResponse(List.of(
-                                                new GuestResponse(otherGuestId, "Mario", "Bianchi",
+                                                new GuestResponse(otherGuestId, GUEST_FIRST_NAME_MARIO, "Bianchi",
                                                                 "mario.b@test.com", null, null, null, null, null,
                                                                 null, null, null, null))));
                 when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),

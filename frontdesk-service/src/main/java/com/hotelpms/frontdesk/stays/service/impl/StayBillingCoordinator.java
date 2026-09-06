@@ -49,6 +49,7 @@ class StayBillingCoordinator {
     private static final String CITY_TAX_CHARGE_TYPE = "CITY_TAX";
     private static final String ROOM_DESCRIPTION_PREFIX = "Room ";
     private static final String NIGHTS_DESCRIPTION_SUFFIX = " night(s)";
+    private static final String NIGHTS_DESCRIPTION_SEPARATOR = " - ";
 
     private final BillingClient billingClient;
     private final RoomService roomService;
@@ -234,8 +235,8 @@ class StayBillingCoordinator {
         final long consumedNights = ChronoUnit.DAYS.between(consumedFrom, moveDate);
         if (consumedNights > 0) {
             final BigDecimal consumedAmount = stay.getRoomChargeUnitPrice().multiply(BigDecimal.valueOf(consumedNights));
-            final String consumedDescription =
-                    ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber() + " - " + consumedNights + NIGHTS_DESCRIPTION_SUFFIX;
+            final String consumedDescription = ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber()
+                    + NIGHTS_DESCRIPTION_SEPARATOR + consumedNights + NIGHTS_DESCRIPTION_SUFFIX;
             postRoomNightCharge(stay, consumedDescription, consumedAmount, stay.getRoomChargeUnitPrice(), consumedNights);
         }
 
@@ -248,8 +249,8 @@ class StayBillingCoordinator {
         final BigDecimal snapshotUnitPrice = remainingUnitPrice != null
                 ? remainingUnitPrice
                 : remainingAmount.divide(BigDecimal.valueOf(remainingNights), 2, RoundingMode.HALF_UP);
-        final String remainingDescription =
-                ROOM_DESCRIPTION_PREFIX + newRoom.roomNumber() + " - " + remainingNights + NIGHTS_DESCRIPTION_SUFFIX;
+        final String remainingDescription = ROOM_DESCRIPTION_PREFIX + newRoom.roomNumber()
+                + NIGHTS_DESCRIPTION_SEPARATOR + remainingNights + NIGHTS_DESCRIPTION_SUFFIX;
         final UUID newChargeId = postRoomNightCharge(
                 stay, remainingDescription, remainingAmount, remainingUnitPrice, remainingNights);
 
@@ -349,7 +350,7 @@ class StayBillingCoordinator {
             final BigDecimal amount =
                     stay.getRoomChargeUnitPrice().multiply(BigDecimal.valueOf(stay.getRoomChargeNights()));
             final String description = ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber()
-                    + " - " + stay.getRoomChargeNights() + NIGHTS_DESCRIPTION_SUFFIX;
+                    + NIGHTS_DESCRIPTION_SEPARATOR + stay.getRoomChargeNights() + NIGHTS_DESCRIPTION_SUFFIX;
             transferCharge(stay, groupId, stay.getRoomChargeId(), ROOM_NIGHT_CHARGE_TYPE, description,
                     amount, stay.getRoomChargeUnitPrice(), stay.getRoomChargeNights());
         }
@@ -449,8 +450,8 @@ class StayBillingCoordinator {
             unitPrice = uniformRate(nightlyRates);
         }
 
-        final String description =
-                ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber() + " - " + nights + NIGHTS_DESCRIPTION_SUFFIX;
+        final String description = ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber()
+                + NIGHTS_DESCRIPTION_SEPARATOR + nights + NIGHTS_DESCRIPTION_SUFFIX;
         final ChargeRequest chargeRequest =
                 new ChargeRequest(ROOM_NIGHT_CHARGE_TYPE, description, amount, stay.getId(), unitPrice, (int) nights);
         // unitPrice above is left null for a reservation-based stay (ChargeRequest's own

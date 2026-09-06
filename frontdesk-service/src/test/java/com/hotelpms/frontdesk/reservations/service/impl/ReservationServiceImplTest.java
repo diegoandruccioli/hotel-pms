@@ -39,6 +39,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -92,7 +93,9 @@ class ReservationServiceImplTest {
     private static final UUID ROOM_TYPE_ID = Objects.requireNonNull(UUID.randomUUID());
     private static final BigDecimal PRICE_100 = BigDecimal.valueOf(100);
     private static final BigDecimal PRICE_120 = BigDecimal.valueOf(120);
+    private static final BigDecimal PRICE_200 = BigDecimal.valueOf(200);
     private static final BigDecimal PRICE_240 = BigDecimal.valueOf(240);
+    private static final String SORT_FIELD_CHECK_IN_DATE = "checkInDate";
     private static final String QUERY_MARIO = "mario";
     private static final int GUEST_SEARCH_CAP = 200;
 
@@ -1244,7 +1247,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testExportReservationsCsvWritesHeaderAndHotelScopedRowsWithResolvedGuestName() throws IOException {
-        final Pageable pageable = PageRequest.of(0, 500, org.springframework.data.domain.Sort.by("checkInDate").descending());
+        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending());
         final Page<Reservation> reservationPage = new PageImpl<>(List.of(entity), pageable, 1L);
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
@@ -1264,7 +1267,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testExportReservationsCsvSkipsGuestBatchResolutionWhenNoRows() throws IOException {
-        final Pageable pageable = PageRequest.of(0, 500, org.springframework.data.domain.Sort.by("checkInDate").descending());
+        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending());
         when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
                 .thenReturn(Page.empty(pageable));
 
@@ -1277,7 +1280,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testExportReservationsCsvAppliesStatusFilterViaFilterQuery() throws IOException {
-        final Pageable pageable = PageRequest.of(0, 500, org.springframework.data.domain.Sort.by("checkInDate").descending());
+        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending());
         when(reservationRepository.filterReservationsByHotelId(
                 eq(HOTEL_ID), any(), any(), eq(Set.of(ReservationStatus.CHECKED_IN)),
                 eq(null), eq(List.of()), eq(pageable)))
@@ -1326,7 +1329,7 @@ class ReservationServiceImplTest {
         assertTrue(groupEntity.isBilledToMasterFolio());
         assertEquals(1, groupEntity.getLineItems().size());
         // 2 nights * 100/night group rate, never a live rate-calendar resolution.
-        assertEquals(BigDecimal.valueOf(200), groupEntity.getLineItems().get(0).getPrice());
+        assertEquals(PRICE_200, groupEntity.getLineItems().get(0).getPrice());
         verify(ratePricingService, never()).resolveStayRates(any(), any(), any(), any());
     }
 
@@ -1352,7 +1355,8 @@ class ReservationServiceImplTest {
                         true, true, null, null, null, null, null, null, null));
         when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
         when(ratePricingService.resolveStayRates(ROOM_TYPE_ID, HOTEL_ID, checkIn, checkOut))
-                .thenReturn(List.of(new NightlyRate(checkIn, PRICE_120, null), new NightlyRate(checkIn.plusDays(1), PRICE_120, null)));
+                .thenReturn(List.of(new NightlyRate(checkIn, PRICE_120, null),
+                        new NightlyRate(checkIn.plusDays(1), PRICE_120, null)));
 
         reservationService.createReservationForGroup(
                 groupId, GUEST_ID, roomId, EXPECTED_GUESTS, checkIn, checkOut, null, false);

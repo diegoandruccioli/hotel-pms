@@ -65,6 +65,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class GuestServiceImplTest {
 
+    private static final String SORT_FIELD_LAST_NAME = "lastName";
     private static final String TEST_FIRST_NAME = "John";
     private static final String TEST_LAST_NAME = "Doe";
     private static final String TEST_EMAIL = "john.doe@example.com";
@@ -511,7 +512,7 @@ class GuestServiceImplTest {
 
     @Test
     void shouldExportAllGuestsAsCsvWhenQueryIsBlank() throws IOException {
-        final Pageable pageable = PageRequest.of(0, 500, Sort.by("lastName").ascending());
+        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_LAST_NAME).ascending());
         final Page<Guest> guestPage = new PageImpl<>(List.of(Objects.requireNonNull(guest)), pageable, 1L);
         when(guestRepository.findAllByHotelId(hotelId, pageable)).thenReturn(guestPage);
 
@@ -527,7 +528,7 @@ class GuestServiceImplTest {
 
     @Test
     void shouldExportMatchingGuestsAsCsvWhenQueryIsGiven() throws IOException {
-        final Pageable pageable = PageRequest.of(0, 500, Sort.by("lastName").ascending());
+        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_LAST_NAME).ascending());
         final Page<Guest> guestPage = new PageImpl<>(List.of(Objects.requireNonNull(guest)), pageable, 1L);
         when(guestRepository.searchByKeywordAndHotelId("mario", hotelId, pageable)).thenReturn(guestPage);
 
@@ -547,7 +548,7 @@ class GuestServiceImplTest {
                 .lastName("Nome")
                 .active(true)
                 .build();
-        final Pageable pageable = PageRequest.of(0, 500, Sort.by("lastName").ascending());
+        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_LAST_NAME).ascending());
         final Page<Guest> guestPage = new PageImpl<>(List.of(bareGuest), pageable, 1L);
         when(guestRepository.findAllByHotelId(hotelId, pageable)).thenReturn(guestPage);
 
