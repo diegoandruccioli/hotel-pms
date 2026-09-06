@@ -72,6 +72,15 @@ funzioni realmente, più volte:
   umano) scarica l'ultima copia fuori sede e verifica che sia
   effettivamente utilizzabile — non solo che esista.
 
+## Una precisazione sul backup: è dell'intero sistema, non del singolo hotel
+
+Il backup descritto sopra salva **tutti i dati dell'installazione**, non un
+singolo hotel selezionabile a parte. Per questo pilota — un solo hotel su
+questa installazione — non fa alcuna differenza pratica: ripristinare
+"tutto" o ripristinare "il tuo hotel" sono la stessa cosa. Diventerebbe
+rilevante solo se in futuro più hotel condividessero la stessa
+installazione, uno scenario non previsto per questo pilota.
+
 ## Cosa manca ancora, onestamente
 
 - **Nessun avviso automatico oggi raggiunge una persona** in caso di guasto
