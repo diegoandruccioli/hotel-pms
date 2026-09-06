@@ -47,9 +47,14 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
   const [switchingType, setSwitchingType] = useState(false);
   const [validatingXml, setValidatingXml] = useState(false);
 
-  const handleDownloadPdf = useCallback(() => {
-    billingService.downloadPdf(invoice.id);
-  }, [invoice.id]);
+  const handleDownloadPdf = useCallback(async () => {
+    try {
+      await billingService.downloadPdf(invoice.id);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
+      addToast(e.response?.data?.detail ?? e.message ?? t('download_failed', { ns: 'common' }), 'error');
+    }
+  }, [invoice.id, addToast, t]);
 
   // The actual download (below) fires via a hidden iframe (see billingService), which has
   // no way to observe an HTTP error response — a legitimate rejection (e.g. incomplete
@@ -59,7 +64,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
     setValidatingXml(true);
     try {
       await billingService.validateFatturaPAXml(invoice.id);
-      billingService.downloadFatturaPAXml(invoice.id);
+      await billingService.downloadFatturaPAXml(invoice.id);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
       addToast(e.response?.data?.detail ?? e.message ?? t('toast_error', { ns: 'common' }), 'error');

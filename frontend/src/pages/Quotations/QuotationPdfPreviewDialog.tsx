@@ -48,9 +48,13 @@ export const QuotationPdfPreviewDialog = memo(({ quotationId, onClose }: Props) 
     };
   }, [quotationId, t]);
 
-  const handleDownloadFallback = useCallback(() => {
-    quotationService.downloadPdf(quotationId);
-  }, [quotationId]);
+  const handleDownloadFallback = useCallback(async () => {
+    try {
+      await quotationService.downloadPdf(quotationId);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('download_failed', { ns: 'common' })));
+    }
+  }, [quotationId, t]);
 
   return (
     <M3Dialog

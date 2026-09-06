@@ -89,14 +89,15 @@ describe('billingService', () => {
     await expect(billingService.validateFatturaPAXml('inv1')).rejects.toEqual(error);
   });
 
-  it('should trigger the invoice PDF download via a hidden iframe', () => {
+  it('should trigger the invoice PDF download via a hidden iframe', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({});
     vi.useFakeTimers();
     const iframe = { style: {} as CSSStyleDeclaration, src: '' } as HTMLIFrameElement;
     const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(iframe);
     const appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((n) => n);
     const removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((n) => n);
 
-    billingService.downloadPdf('inv1');
+    await billingService.downloadPdf('inv1');
 
     expect(iframe.src).toBe('/api/v1/invoices/inv1/pdf');
     expect(iframe.style.display).toBe('none');
@@ -112,8 +113,10 @@ describe('billingService', () => {
     vi.useRealTimers();
   });
 
-  it('should download the invoices CSV export with every filter as a query param', () => {
-    billingService.exportInvoicesCsv({
+  it('should download the invoices CSV export with every filter as a query param', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({});
+
+    await billingService.exportInvoicesCsv({
       status: 'PAID',
       query: '  mario  ',
       dateFrom: '2026-08-01',
@@ -131,8 +134,10 @@ describe('billingService', () => {
     document.body.replaceChildren();
   });
 
-  it('should download every invoice as CSV, with no query params, when no filters are set', () => {
-    billingService.exportInvoicesCsv({});
+  it('should download every invoice as CSV, with no query params, when no filters are set', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({});
+
+    await billingService.exportInvoicesCsv({});
 
     const iframe = document.body.querySelector('iframe');
     expect(iframe).not.toBeNull();

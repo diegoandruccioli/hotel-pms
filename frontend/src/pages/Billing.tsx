@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries';
 import { getErrorMessage, cn } from '../utils';
 import { billingService } from '../services';
-import { useAuthStore } from '../store';
+import { useAuthStore, useToastStore } from '../store';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -108,6 +108,7 @@ const EMPTY_RESULTS: InvoiceSearchResult[] = [];
 export const Billing = memo(() => {
   const { t, i18n } = useTranslation('common');
   const { user } = useAuthStore();
+  const addToast = useToastStore((s) => s.addToast);
   const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
   const [page, setPage] = useState(0);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceResponse | null>(null);
@@ -118,14 +119,18 @@ export const Billing = memo(() => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
-  const handleExportCsv = useCallback(() => {
-    billingService.exportInvoicesCsv({
-      status: statusFilter === 'ALL' ? undefined : statusFilter,
-      query: searchQuery,
-      dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined,
-    });
-  }, [statusFilter, searchQuery, dateFrom, dateTo]);
+  const handleExportCsv = useCallback(async () => {
+    try {
+      await billingService.exportInvoicesCsv({
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+        query: searchQuery,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      });
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('csv_export_failed')), 'error');
+    }
+  }, [statusFilter, searchQuery, dateFrom, dateTo, addToast, t]);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
 
   useEffect(() => {

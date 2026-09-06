@@ -169,9 +169,13 @@ export const Quotations = () => {
     }
   }, [addToast, t, loadQuotations, quotations, navigate]);
 
-  const handleDownload = useCallback((id: string) => {
-    quotationService.downloadPdf(id);
-  }, []);
+  const handleDownload = useCallback(async (id: string) => {
+    try {
+      await quotationService.downloadPdf(id);
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('download_failed', { ns: 'common' })), 'error');
+    }
+  }, [addToast, t]);
 
   const handleDeclineRequest = useCallback((id: string) => setDeclineTarget(id), []);
   const handleDeclineClose = useCallback(() => setDeclineTarget(null), []);

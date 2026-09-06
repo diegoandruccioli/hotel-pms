@@ -356,6 +356,8 @@
   "export_guest_data_confirm_body": "Il file scaricato conterrà i dati personali dell'ospite (anagrafica, documenti, soggiorni e fatture). È una comunicazione di dati personali: consegnalo solo alla persona a cui appartengono i dati o a chi ne ha titolo.",
   "export_guest_data_confirm_action": "Scarica",
   "export_guest_data_failed": "Impossibile generare l'export. Riprova.",
+  "csv_export_failed": "Impossibile esportare il CSV. Riprova.",
+  "download_failed": "Impossibile avviare il download. Riprova.",
 
   "delete_reservation": "Elimina",
   "delete_reservation_confirm": "Sei sicuro di voler eliminare questa prenotazione? L'azione non può essere annullata.",

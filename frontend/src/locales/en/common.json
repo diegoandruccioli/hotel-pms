@@ -356,6 +356,8 @@
   "export_guest_data_confirm_body": "The downloaded file will contain the guest's personal data (profile, documents, stays and invoices). This is a disclosure of personal data: hand it over only to the person it belongs to, or someone entitled to it.",
   "export_guest_data_confirm_action": "Download",
   "export_guest_data_failed": "Could not generate the export. Please try again.",
+  "csv_export_failed": "Could not export the CSV. Please try again.",
+  "download_failed": "Could not start the download. Please try again.",
 
   "delete_reservation": "Delete",
   "delete_reservation_confirm": "Are you sure you want to delete this reservation? This action cannot be undone.",

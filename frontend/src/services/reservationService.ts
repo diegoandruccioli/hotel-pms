@@ -71,13 +71,13 @@ export const reservationService = {
 
   /** Downloads every reservation matching the same filters as {@link searchReservations}
    * as a CSV file via a hidden iframe. */
-  exportReservationsCsv: (params: {
+  exportReservationsCsv: async (params: {
     query?: string;
     upcomingOnly?: boolean;
     dateFrom?: string;
     dateTo?: string;
     status?: string;
-  }): void => {
+  }): Promise<void> => {
     const searchParams = new URLSearchParams();
     if (params.query?.trim()) searchParams.set('query', params.query.trim());
     if (params.upcomingOnly) searchParams.set('upcomingOnly', 'true');
@@ -85,6 +85,6 @@ export const reservationService = {
     if (params.dateTo) searchParams.set('dateTo', params.dateTo);
     if (params.status) searchParams.set('status', params.status);
     const qs = searchParams.toString();
-    downloadViaIframe(`${BASE_PATH}/export.csv${qs ? `?${qs}` : ''}`);
+    await downloadViaIframe(`${BASE_PATH}/export.csv${qs ? `?${qs}` : ''}`);
   },
 };

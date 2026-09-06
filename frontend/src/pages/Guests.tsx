@@ -96,9 +96,13 @@ export const Guests = memo(() => {
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
 
-  const handleExportCsv = useCallback(() => {
-    guestService.exportGuestsCsv(searchQuery);
-  }, [searchQuery]);
+  const handleExportCsv = useCallback(async () => {
+    try {
+      await guestService.exportGuestsCsv(searchQuery);
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('csv_export_failed')), 'error');
+    }
+  }, [searchQuery, addToast, t]);
 
   const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);

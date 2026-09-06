@@ -69,8 +69,8 @@ export const billingService = {
     await api.get(`${BASE_PATH}/${invoiceId}/fatturaPA/validate`);
   },
 
-  downloadFatturaPAXml: (invoiceId: string): void => {
-    downloadViaIframe(`${BASE_PATH}/${invoiceId}/fatturaPA`);
+  downloadFatturaPAXml: async (invoiceId: string): Promise<void> => {
+    await downloadViaIframe(`${BASE_PATH}/${invoiceId}/fatturaPA`);
   },
 
   /**
@@ -85,24 +85,24 @@ export const billingService = {
    * the same mechanism as a real <a href> click — and keeps any non-download error
    * response (e.g. a 500) contained inside the iframe instead of navigating the SPA away.
    */
-  downloadPdf: (invoiceId: string): void => {
-    downloadViaIframe(`${BASE_PATH}/${invoiceId}/pdf`);
+  downloadPdf: async (invoiceId: string): Promise<void> => {
+    await downloadViaIframe(`${BASE_PATH}/${invoiceId}/pdf`);
   },
 
   /** Downloads every invoice matching the same filters as {@link searchInvoices}
    * as a CSV file via a hidden iframe. Admin/Owner only — financial data. */
-  exportInvoicesCsv: (params: {
+  exportInvoicesCsv: async (params: {
     status?: InvoiceStatus;
     query?: string;
     dateFrom?: string;
     dateTo?: string;
-  }): void => {
+  }): Promise<void> => {
     const searchParams = new URLSearchParams();
     if (params.status) searchParams.set('status', params.status);
     if (params.query?.trim()) searchParams.set('query', params.query.trim());
     if (params.dateFrom) searchParams.set('dateFrom', params.dateFrom);
     if (params.dateTo) searchParams.set('dateTo', params.dateTo);
     const qs = searchParams.toString();
-    downloadViaIframe(`${BASE_PATH}/export.csv${qs ? `?${qs}` : ''}`);
+    await downloadViaIframe(`${BASE_PATH}/export.csv${qs ? `?${qs}` : ''}`);
   },
 };

@@ -96,10 +96,14 @@ export const OwnerDashboard = memo(() => {
     }
   }, [startDate, endDate, addToast, t]);
 
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     if (!report) return;
-    billingReportService.exportToCsv(startDate, endDate);
-    addToast(t('csv_export_started'), 'success');
+    try {
+      await billingReportService.exportToCsv(startDate, endDate);
+      addToast(t('csv_export_started'), 'success');
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('csv_export_failed')), 'error');
+    }
   }, [report, startDate, endDate, addToast, t]);
 
   const handleStartDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
