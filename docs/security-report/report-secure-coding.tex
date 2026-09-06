@@ -5928,6 +5928,80 @@ come gap da riaprire quando si affronta lo schema di \texttt{room\_types}.
 
 \paragraph{Riferimento} Commit: \commitref{797d676}{feat(security): ADR-004 --- ArchUnit rule enforcing hotel\_id scoping}
 
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Regola ArchUnit vacua e lookup globale non scoped \threat{GAP-24}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Un secondo audit di \texttt{TenantIsolationArchTest} (Punto 7 del piano pilota, riconferma
+ADR-004) ha trovato due difetti residui nella regola descritta sopra, entrambi passati
+inosservati perché la regola ``passava'' per assenza di violazioni, non perché avesse
+verificato qualcosa di reale:
+
+\begin{itemize}
+    \item \texttt{HotelSettingsRepository} e \texttt{GuestPrivacySettingsRepository} erano
+    entrambi nel set \texttt{TENANT\_ROOT\_REPOSITORIES} ma dichiaravano \textbf{zero} metodi
+    custom (entrambe le entità usano \texttt{hotel\_id} come proprio \texttt{@Id}, quindi ogni
+    lookup passava dal \texttt{findById} ereditato, fuori scope per costruzione della regola
+    --- vedi sopra). La regola ArchUnit su queste due classi era quindi vacua: non c'era
+    nulla da controllare.
+    \item \texttt{IdentityDocumentRepository.findByGuestId}/
+    \texttt{findByDocumentNumberAndDocumentType} erano lookup globali senza scoping
+    \texttt{hotelId}, e non comparivano in nessun set tenant-root --- ma un'analisi dei
+    chiamanti ha rivelato che erano anche \textbf{codice morto}, zero invocazioni in tutto il
+    repository. Il gap e il codice inutilizzato erano gli stessi due metodi.
+\end{itemize}
+
+Nello stesso giro, l'estrazione di un helper condiviso per l'estrazione dell'hotelId dal
+contesto di sicurezza (\textasciitilde 22 copie quasi identiche di
+\texttt{resolveHotelId()}/\texttt{extractHotelId()} sparse sui 5 servizi) ha rivelato che
+quelle copie erano realmente divergenti, non solo duplicate: circa metà non controllava mai
+\texttt{Authentication == null} prima di dereferenziarla (NPE latente, irraggiungibile solo
+perché \texttt{InternalAuthFilter} garantisce sempre un'autenticazione valida in pratica), e
+un'implementazione propagava una \texttt{IllegalArgumentException} grezza da
+\texttt{UUID.fromString} su un hotelId malformato invece della \texttt{IllegalStateException}
+usata dalle altre --- un fallimento non uniforme sullo stesso invariante di sicurezza.
+Classificato \textbf{OWASP A01 --- Broken Access Control}.
+
+\begin{insecurebox}[title={HotelSettingsRepository.java --- regola ArchUnit vacua (baseline)}]
+\begin{lstlisting}[style=java]
+// hotel_id e' l'@Id di HotelSettings: ogni findById(hotelId) e' gia'
+// scoped per costruzione, ma la regola ArchUnit non ha nulla da
+// verificare finche' questa interfaccia non dichiara un proprio metodo.
+public interface HotelSettingsRepository
+        extends JpaRepository<HotelSettings, UUID> {
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={HotelSettingsRepository.java --- metodo esplicito, regola non piu' vacua (main)}]
+\begin{lstlisting}[style=java]
+public interface HotelSettingsRepository
+        extends JpaRepository<HotelSettings, UUID> {
+
+    /** Sinonimo esplicito e hotelId-scoped di findById. */
+    Optional<HotelSettings> findByHotelId(UUID hotelId);
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Mitigazione applicata}
+Rimossi i due metodi non scoped/non utilizzati di \texttt{IdentityDocumentRepository} (non
+scopati, non annotati \texttt{@TenantScopeExempt}: eliminati alla radice invece di
+documentare un'eccezione per codice morto). Aggiunto un \texttt{findByHotelId} esplicito a
+entrambi i repository con \texttt{hotel\_id} come \texttt{@Id}, rendendo la regola ArchUnit
+verificabile su di loro per la prima volta. Estratto \texttt{TenantContext.resolveHotelId()}
+(\texttt{internal-auth-lib}) come unica implementazione, sostituendo tutte le \textasciitilde
+22 copie sui 5 servizi, con test dedicati per ciascuno dei fallimenti divergenti trovati
+(autenticazione nulla, dettagli nulli, non-\texttt{String}, stringa vuota, UUID malformato).
+
+\paragraph{Verifica}
+88 suite di test sui 5 moduli toccati, zero fallimenti. Conteggio violazioni
+Checkstyle/PMD pre-esistenti confermato invariato per diff contro una baseline
+\texttt{git stash} --- il refactor non introduce nuovo debito, chiude solo il gap.
+
+\paragraph{Riferimento} Commit: \commitref{2f550eff}{refactor(security): close ArchUnit tenant-isolation blind spots, extract shared TenantContext helper}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════
