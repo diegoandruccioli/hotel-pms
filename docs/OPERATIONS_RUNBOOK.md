@@ -433,14 +433,43 @@ docker exec -e AUTH_DB_PASSWORD -e GUEST_DB_PASSWORD -e FRONTDESK_DB_PASSWORD \
 docker exec -e POSTGRES_EXPORTER_PASSWORD -i hotel_postgres \
   psql -U postgres -v ON_ERROR_STOP=1 < docker/postgres/initdb/03-create-monitoring-role.sql
 
-# 4. Passare ogni servizio al proprio ruolo e riavviare (docker-compose.yml
+# 4. GRANT ALL PRIVILEGES sullo schema (passo 3) copre solo la CREAZIONE di
+#    nuove tabelle da parte del nuovo ruolo — su un volume già popolato le
+#    tabelle esistenti restano possedute da "postgres" e ogni operazione
+#    Flyway (ALTER TABLE, ecc.) fallisce con "must be owner of table ...".
+#    Verificato dal vivo (2026-09-06): serve anche trasferire OWNERSHIP,
+#    non solo i privilegi, per ognuna delle 5 coppie database/ruolo:
+for pair in "hotel_auth:auth_service_app" "hotel_guest:guest_service_app" \
+            "hotel_frontdesk:frontdesk_service_app" "hotel_billing:billing_service_app" \
+            "hotel_fb:fb_service_app"; do
+  db="${pair%%:*}"; role="${pair##*:}"
+  docker exec hotel_postgres psql -U postgres -d "$db" -c \
+    "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $role;
+     GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $role;
+     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $role;
+     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $role;"
+  docker exec hotel_postgres psql -U postgres -d "$db" -t -A -c \
+    "SELECT 'ALTER TABLE ' || quote_ident(tablename) || ' OWNER TO $role;' FROM pg_tables WHERE schemaname='public'
+     UNION ALL
+     SELECT 'ALTER SEQUENCE ' || quote_ident(sequencename) || ' OWNER TO $role;' FROM pg_sequences WHERE schemaname='public';" \
+    | docker exec -i hotel_postgres psql -U postgres -d "$db" -v ON_ERROR_STOP=1
+done
+
+# 5. Passare ogni servizio al proprio ruolo e riavviare (docker-compose.yml
 #    già usa i nuovi SPRING_DATASOURCE_USERNAME/PASSWORD una volta che .env li contiene)
 docker compose up -d auth-service guest-service frontdesk-service billing-service fb-service
 
-# 5. Verificare che ognuno sia partito con il ruolo giusto, non più "postgres"
+# 6. Verificare che ognuno sia partito con il ruolo giusto, non più "postgres"
 docker exec hotel_postgres psql -U postgres -c \
   "SELECT usename, datname FROM pg_stat_activity WHERE datname LIKE 'hotel_%';"
 ```
 
 Se il profilo `observability` è attivo, avviare anche `postgres-exporter` dopo il passo 3
 (prima fallirebbe in loop sul login mancante).
+
+**Verificato dal vivo (2026-09-06)** su un'installazione con dati reali già presenti da
+sessioni precedenti: senza il passo 4, ogni servizio falliva all'avvio — prima con
+`permission denied for table flyway_schema_history` (query di sola lettura, mancavano i
+privilegi sulle tabelle esistenti), poi, dopo il solo `GRANT`, con `must be owner of table
+invoices` al primo tentativo di applicare una migration Flyway nuova (`ALTER TABLE` richiede
+ownership, non solo privilegi). Il passo 4 sopra risolve entrambi in un colpo solo.
