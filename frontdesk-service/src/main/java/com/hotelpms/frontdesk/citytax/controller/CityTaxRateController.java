@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.citytax.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.frontdesk.citytax.dto.CityTaxApplicabilityRequest;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxApplicabilityResponse;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxRateRequest;
@@ -12,7 +14,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -21,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Controller for a hotel's tourist-tax rate rules. Append-only — only
@@ -44,7 +44,7 @@ public class CityTaxRateController {
      */
     @GetMapping
     public ResponseEntity<List<CityTaxRateResponse>> listRules() {
-        return ResponseEntity.ok(cityTaxRateAdminService.listRules(resolveHotelId()));
+        return ResponseEntity.ok(cityTaxRateAdminService.listRules(TenantContext.resolveHotelId()));
     }
 
     /**
@@ -56,7 +56,7 @@ public class CityTaxRateController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public ResponseEntity<CityTaxRateResponse> createRule(@NonNull @Valid @RequestBody final CityTaxRateRequest request) {
-        final CityTaxRateResponse response = cityTaxRateAdminService.createRule(resolveHotelId(), request);
+        final CityTaxRateResponse response = cityTaxRateAdminService.createRule(TenantContext.resolveHotelId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -68,7 +68,7 @@ public class CityTaxRateController {
      */
     @GetMapping("/applicability")
     public ResponseEntity<CityTaxApplicabilityResponse> getApplicability() {
-        return ResponseEntity.ok(hotelSettingsService.getCityTaxApplicability(resolveHotelId()));
+        return ResponseEntity.ok(hotelSettingsService.getCityTaxApplicability(TenantContext.resolveHotelId()));
     }
 
     /**
@@ -81,16 +81,7 @@ public class CityTaxRateController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public ResponseEntity<CityTaxApplicabilityResponse> updateApplicability(
             @NonNull @Valid @RequestBody final CityTaxApplicabilityRequest request) {
-        return ResponseEntity.ok(hotelSettingsService.updateCityTaxApplicability(resolveHotelId(), request));
+        return ResponseEntity.ok(hotelSettingsService.updateCityTaxApplicability(TenantContext.resolveHotelId(), request));
     }
 
-    /**
-     * Extracts the hotel UUID from the current security context details.
-     *
-     * @return the hotel UUID of the authenticated user
-     */
-    private UUID resolveHotelId() {
-        final Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        return UUID.fromString(String.valueOf(details));
-    }
 }

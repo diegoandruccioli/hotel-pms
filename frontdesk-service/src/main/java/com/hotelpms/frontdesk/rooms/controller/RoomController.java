@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.rooms.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.dto.RoomBulkStatusRequest;
@@ -18,7 +20,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -58,7 +59,7 @@ public class RoomController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public ResponseEntity<RoomResponse> createRoom(@NonNull @Valid @RequestBody final RoomRequest request) {
-        final RoomResponse response = roomService.createRoom(request, resolveHotelId());
+        final RoomResponse response = roomService.createRoom(request, TenantContext.resolveHotelId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -70,7 +71,7 @@ public class RoomController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<RoomResponse> getRoomById(@NonNull @PathVariable final UUID id) {
-        return ResponseEntity.ok(roomService.getRoomById(id, resolveHotelId()));
+        return ResponseEntity.ok(roomService.getRoomById(id, TenantContext.resolveHotelId()));
     }
 
     /**
@@ -92,9 +93,9 @@ public class RoomController {
             @PageableDefault(size = DEFAULT_PAGE_SIZE, sort = "roomNumber",
                     direction = Sort.Direction.ASC) final Pageable pageable) {
         if (status != null || roomTypeId != null) {
-            return ResponseEntity.ok(roomService.getAllRooms(pageable, resolveHotelId(), status, roomTypeId));
+            return ResponseEntity.ok(roomService.getAllRooms(pageable, TenantContext.resolveHotelId(), status, roomTypeId));
         }
-        return ResponseEntity.ok(roomService.getAllRooms(pageable, resolveHotelId()));
+        return ResponseEntity.ok(roomService.getAllRooms(pageable, TenantContext.resolveHotelId()));
     }
 
     /**
@@ -125,7 +126,7 @@ public class RoomController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public ResponseEntity<RoomResponse> updateRoom(@NonNull @PathVariable final UUID id,
             @NonNull @Valid @RequestBody final RoomRequest request) {
-        return ResponseEntity.ok(roomService.updateRoom(id, resolveHotelId(), request));
+        return ResponseEntity.ok(roomService.updateRoom(id, TenantContext.resolveHotelId(), request));
     }
 
     /**
@@ -139,7 +140,7 @@ public class RoomController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'RECEPTIONIST')")
     public ResponseEntity<RoomResponse> updateRoomStatus(@NonNull @PathVariable final UUID id,
             @NonNull @Valid @RequestBody final RoomStatusRequest request) {
-        return ResponseEntity.ok(roomService.updateHousekeepingStatus(id, resolveHotelId(), request.status()));
+        return ResponseEntity.ok(roomService.updateHousekeepingStatus(id, TenantContext.resolveHotelId(), request.status()));
     }
 
     /**
@@ -157,7 +158,7 @@ public class RoomController {
     public ResponseEntity<List<RoomResponse>> updateRoomStatusBulk(
             @NonNull @Valid @RequestBody final RoomBulkStatusRequest request) {
         return ResponseEntity.ok(
-                roomService.updateHousekeepingStatusBulk(request.roomIds(), resolveHotelId(), request.status()));
+                roomService.updateHousekeepingStatusBulk(request.roomIds(), TenantContext.resolveHotelId(), request.status()));
     }
 
     /**
@@ -169,18 +170,7 @@ public class RoomController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public void deleteRoom(@NonNull @PathVariable final UUID id) {
-        roomService.deleteRoom(id, resolveHotelId());
+        roomService.deleteRoom(id, TenantContext.resolveHotelId());
     }
 
-    /**
-     * Extracts the hotel UUID from the authenticated user's security context.
-     * The value is set by the internal auth filter from the {@code X-Auth-Hotel}
-     * header injected by the API Gateway.
-     *
-     * @return the hotel UUID of the authenticated user
-     */
-    private UUID resolveHotelId() {
-        final Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        return UUID.fromString(String.valueOf(details));
-    }
 }

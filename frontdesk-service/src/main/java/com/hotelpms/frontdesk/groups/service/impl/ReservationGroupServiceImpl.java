@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.groups.service.impl;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
@@ -33,9 +35,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.lang.NonNull;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,7 +55,6 @@ public class ReservationGroupServiceImpl implements ReservationGroupService {
 
     private static final String GROUP_NOT_FOUND = "GROUP_NOT_FOUND";
     private static final String UNKNOWN_GUEST = "Unknown Guest";
-    private static final String HOTEL_ID_NOT_NULL_MSG = "Hotel ID must not be null";
     private static final List<ReservationStatus> TERMINAL_STATUSES = List.of(
             ReservationStatus.CHECKED_OUT, ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW);
 
@@ -75,7 +73,7 @@ public class ReservationGroupServiceImpl implements ReservationGroupService {
         if (!request.checkOutDate().isAfter(request.checkInDate())) {
             throw new BadRequestException("CHECKOUT_MUST_BE_AFTER_CHECKIN");
         }
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final GuestResponse contactGuest = verifyGuestExists(request.contactGuestId());
 
         final ReservationGroup group = ReservationGroup.builder()
@@ -119,7 +117,7 @@ public class ReservationGroupServiceImpl implements ReservationGroupService {
     @Override
     @Transactional(readOnly = true)
     public ReservationGroupResponse getGroup(final UUID id) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final ReservationGroup group = findGroupOrThrow(id, hotelId);
         return enrich(group);
     }
@@ -128,7 +126,7 @@ public class ReservationGroupServiceImpl implements ReservationGroupService {
     @Override
     @Transactional(readOnly = true)
     public Page<ReservationGroupResponse> getAllGroups(final Pageable pageable) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
         return groupRepository.findAllByHotelId(hotelId, safePageable).map(this::enrich);
     }
@@ -137,7 +135,7 @@ public class ReservationGroupServiceImpl implements ReservationGroupService {
     @Override
     @Transactional
     public ReservationGroupResponse cancelGroup(final UUID id, final Long clientVersion) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final ReservationGroup group = findGroupOrThrow(id, hotelId);
         if (clientVersion != null && !clientVersion.equals(group.getVersion())) {
             throw new ConflictException("GROUP_STALE_VERSION");
@@ -170,7 +168,7 @@ public class ReservationGroupServiceImpl implements ReservationGroupService {
      */
     @Override
     public List<GroupCheckoutOutcome> checkoutGroup(final UUID id) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final ReservationGroup group = findGroupOrThrow(id, hotelId);
         final List<Reservation> members = reservationRepository.findAllByGroupIdAndHotelId(id, hotelId);
 
@@ -268,12 +266,4 @@ public class ReservationGroupServiceImpl implements ReservationGroupService {
         }
     }
 
-    @NonNull
-    private UUID resolveHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)) {
-            throw new IllegalStateException(HOTEL_ID_NOT_NULL_MSG);
-        }
-        return UUID.fromString(hotelIdStr);
-    }
 }

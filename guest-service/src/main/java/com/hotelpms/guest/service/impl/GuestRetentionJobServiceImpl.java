@@ -86,7 +86,7 @@ public class GuestRetentionJobServiceImpl {
         for (final Map.Entry<UUID, List<Guest>> entry : byHotel.entrySet()) {
             final UUID hotelId = entry.getKey();
             final GuestPrivacySettings settings = settingsRepository
-                    .findById(Objects.requireNonNull(hotelId))
+                    .findByHotelId(Objects.requireNonNull(hotelId))
                     .orElseGet(() -> GuestPrivacySettings.builder()
                             .hotelId(hotelId)
                             .guestRetentionYears(GuestPrivacySettings.TULPS_MIN_YEARS)

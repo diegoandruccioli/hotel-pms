@@ -51,7 +51,7 @@ public class CityTaxRateAdminServiceImpl implements CityTaxRateAdminService {
     @Transactional
     public CityTaxRateResponse createRule(final UUID hotelId, final CityTaxRateRequest request) {
         Objects.requireNonNull(hotelId, "Hotel ID cannot be null");
-        final String comuneCodice = hotelSettingsRepository.findById(hotelId)
+        final String comuneCodice = hotelSettingsRepository.findByHotelId(hotelId)
                 .map(HotelSettings::getComuneCodice)
                 .filter(code -> !code.isBlank())
                 .orElseThrow(() -> new BadRequestException(COMUNE_NOT_CONFIGURED_MSG));

@@ -1,19 +1,19 @@
 package com.hotelpms.frontdesk.dashboard.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.frontdesk.dashboard.dto.DaySheetResponse;
 import com.hotelpms.frontdesk.dashboard.service.DaySheetService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
-import java.util.UUID;
 
 /**
  * Controller for the front-desk day-sheet summary.
@@ -37,18 +37,7 @@ public class DaySheetController {
     @GetMapping
     public ResponseEntity<DaySheetResponse> getDaySheet(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
-        return ResponseEntity.ok(daySheetService.getDaySheet(date, resolveHotelId()));
+        return ResponseEntity.ok(daySheetService.getDaySheet(date, TenantContext.resolveHotelId()));
     }
 
-    /**
-     * Extracts the hotel UUID from the authenticated user's security context.
-     * The value is set by the internal auth filter from the {@code X-Auth-Hotel}
-     * header injected by the API Gateway.
-     *
-     * @return the hotel UUID of the authenticated user
-     */
-    private UUID resolveHotelId() {
-        final Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        return UUID.fromString(String.valueOf(details));
-    }
 }

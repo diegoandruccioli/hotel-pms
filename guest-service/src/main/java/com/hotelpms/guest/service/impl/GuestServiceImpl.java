@@ -1,5 +1,7 @@
 package com.hotelpms.guest.service.impl;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.commonweb.csv.CsvWriter;
 import com.hotelpms.guest.client.AlloggiatiComuniClient;
 import com.hotelpms.guest.client.BillingServiceClient;
@@ -92,7 +94,7 @@ public class GuestServiceImpl implements GuestService {
     @Transactional
     public GuestResponse createGuest(final GuestRequest request) {
         validateComune(request.comune(), request.provincia());
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Guest entity = guestMapper.toEntity(request);
         entity.setActive(true);
         entity.setHotelId(hotelId);
@@ -111,7 +113,7 @@ public class GuestServiceImpl implements GuestService {
     @Override
     @Transactional(readOnly = true)
     public GuestResponse getGuestById(final UUID id) {
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final String userId = extractUserId();
         log.info("[PII-ACCESS] READ | operation=GET_GUEST | userId={} | guestId={} | hotelId={}", userId, id, hotelId);
         return guestMapper.toResponse(resolveGuest(id, hotelId));
@@ -126,7 +128,7 @@ public class GuestServiceImpl implements GuestService {
     @Override
     @Transactional(readOnly = true)
     public Page<GuestResponse> getAllGuests(final Pageable pageable) {
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final String userId = extractUserId();
         log.info("[PII-ACCESS] READ | operation=LIST_GUESTS | userId={} | hotelId={}", userId, hotelId);
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
@@ -145,7 +147,7 @@ public class GuestServiceImpl implements GuestService {
     @Transactional
     public GuestResponse updateGuest(final UUID id, final GuestRequest request) {
         validateComune(request.comune(), request.provincia());
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Guest guest = Objects.requireNonNull(resolveGuest(id, hotelId));
         guestMapper.updateEntityFromRequest(request, guest);
         final Guest savedGuest = Objects.requireNonNull(guestRepository.save(guest));
@@ -203,7 +205,7 @@ public class GuestServiceImpl implements GuestService {
     @Override
     @Transactional
     public void deleteGuest(final UUID id) {
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Guest guest = resolveGuest(id, hotelId);
 
         if (reservationClient.hasActiveReservations(id)) {
@@ -313,7 +315,7 @@ public class GuestServiceImpl implements GuestService {
         if (safeQuery.isEmpty()) {
             return getAllGuests(pageable);
         }
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final String userId = extractUserId();
         log.info("[PII-ACCESS] READ | operation=SEARCH_GUESTS | userId={} | hotelId={}", userId, hotelId);
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
@@ -325,7 +327,7 @@ public class GuestServiceImpl implements GuestService {
     @Override
     @Transactional(readOnly = true)
     public void exportGuestsCsv(final String query, final OutputStream out) throws IOException {
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final String userId = extractUserId();
         final String safeQuery = query == null ? "" : query.trim();
         log.info("[PII-ACCESS] EXPORT | operation=EXPORT_GUESTS_CSV | userId={} | hotelId={}", userId, hotelId);
@@ -371,7 +373,7 @@ public class GuestServiceImpl implements GuestService {
     @Transactional
     public IdentityDocumentResponseDTO addIdentityDocument(final UUID guestId,
             final IdentityDocumentRequestDTO request) {
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Guest guest = resolveGuest(guestId, hotelId);
         final IdentityDocument document = identityDocumentMapper.toEntity(request);
         document.setGuest(guest);
@@ -397,7 +399,7 @@ public class GuestServiceImpl implements GuestService {
     @Transactional
     public void removeIdentityDocument(final UUID guestId, final UUID documentId) {
         Objects.requireNonNull(documentId, "Document ID cannot be null");
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Guest guest = resolveGuest(guestId, hotelId);
         final IdentityDocument document = identityDocumentRepository.findById(documentId)
                 .orElseThrow(() -> new NotFoundException("DOCUMENT_NOT_FOUND"));
@@ -423,7 +425,7 @@ public class GuestServiceImpl implements GuestService {
         if (ids == null || ids.isEmpty()) {
             return List.of();
         }
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final String userId = extractUserId();
         log.info("[PII-ACCESS] BATCH_GET | userId={} | count={} | hotelId={}", userId, ids.size(), hotelId);
         return guestRepository.findAllByIdInAndHotelId(ids, hotelId).stream()
@@ -435,7 +437,7 @@ public class GuestServiceImpl implements GuestService {
     @Override
     @Transactional(readOnly = true)
     public GuestDataExportResponse exportGuestData(final UUID id) {
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final String userId = extractUserId();
         log.info("[PII-ACCESS] EXPORT | operation=GDPR_EXPORT | userId={} | guestId={} | hotelId={}", userId, id, hotelId);
         final Guest guest = resolveGuest(id, hotelId);
@@ -476,28 +478,6 @@ public class GuestServiceImpl implements GuestService {
         Objects.requireNonNull(id, "Guest ID cannot be null");
         return guestRepository.findByIdAndHotelId(id, hotelId)
                 .orElseThrow(() -> new NotFoundException(GUEST_NOT_FOUND_MSG));
-    }
-
-    /**
-     * Extracts the hotel UUID from the current Spring Security context.
-     * The value is stored as {@link Authentication#getDetails()} by
-     * {@code InternalAuthFilter}, which reads it from the {@code X-Auth-Hotel}
-     * header injected by the API Gateway.
-     *
-     * @return the hotel UUID for the authenticated caller
-     * @throws IllegalStateException if no authentication is present or the hotel ID
-     *                               is missing or malformed
-     */
-    private UUID extractHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null) {
-            throw new IllegalStateException("HOTEL_ID_NOT_AVAILABLE");
-        }
-        final Object details = auth.getDetails();
-        if (!(details instanceof String hotelIdStr) || hotelIdStr.isBlank()) {
-            throw new IllegalStateException("HOTEL_ID_NOT_AVAILABLE");
-        }
-        return UUID.fromString(hotelIdStr);
     }
 
     private String extractUserId() {

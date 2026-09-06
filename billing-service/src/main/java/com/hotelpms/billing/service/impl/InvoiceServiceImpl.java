@@ -1,5 +1,7 @@
 package com.hotelpms.billing.service.impl;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.commonweb.csv.CsvWriter;
 import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
@@ -36,8 +38,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.lang.NonNull;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -91,7 +91,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional
     public InvoiceResponse createInvoiceForStay(@NonNull final StayInvoiceRequest request) {
         log.info("Creating invoice for stay {}", request.stayId());
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
 
         invoiceRepository.findByStayIdAndHotelId(request.stayId(), hotelId)
                 .filter(existing -> existing.getStatus() == InvoiceStatus.ISSUED)
@@ -121,7 +121,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional
     public InvoiceResponse createMasterFolioForGroup(
             @NonNull final UUID groupId, @NonNull final MasterFolioRequest request) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         log.info("Opening master folio for group {} | hotelId={}", groupId, hotelId);
 
         final Optional<Invoice> existing = invoiceRepository
@@ -155,7 +155,7 @@ public class InvoiceServiceImpl implements InvoiceService {
             @NonNull final UUID groupId, @NonNull final GroupChargeRequest request) {
         log.info("Adding charge type={} amount={} to master folio of group {}",
                 request.type(), request.amount(), groupId);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
 
         final Invoice invoice = invoiceRepository
                 .findByGroupIdAndHotelIdAndFolioType(groupId, hotelId, FolioType.MASTER)
@@ -195,7 +195,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional
     public ChargeResponse addCharge(@NonNull final UUID stayId, @NonNull final ChargeRequest request) {
         log.info("Adding charge type={} amount={} to stay {}", request.type(), request.amount(), stayId);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
 
         final Invoice invoice = invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)
                 .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND_FOR_STAY"));
@@ -234,7 +234,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional
     public void removeCharge(@NonNull final UUID stayId, @NonNull final UUID chargeId) {
         log.info("Removing charge {} from stay {}", chargeId, stayId);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
 
         final Invoice invoice = invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)
                 .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND_FOR_STAY"));
@@ -266,7 +266,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional(readOnly = true)
     public InvoiceResponse getInvoice(@NonNull final UUID id) {
         log.info("Fetching invoice with id {}", id);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Invoice invoice = invoiceRepository.findByIdAndHotelId(id, hotelId)
                 .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
         return invoiceMapper.toResponse(invoice);
@@ -277,7 +277,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional(readOnly = true)
     public InvoiceResponse getLatestInvoiceByReservation(@NonNull final UUID reservationId) {
         log.info("Fetching latest invoice for reservation {}", reservationId);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Invoice invoice = invoiceRepository
                 .findFirstByReservationIdAndHotelIdOrderByIssueDateDesc(reservationId, hotelId)
                 .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
@@ -289,7 +289,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional(readOnly = true)
     public Page<InvoiceResponse> getAllInvoices(final Pageable pageable) {
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         return invoiceRepository.findByHotelId(hotelId, safePageable)
                 .map(invoiceMapper::toResponse);
     }
@@ -300,7 +300,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     public Page<InvoiceSearchResultResponse> searchInvoices(
             final InvoiceStatus status, final String query, final LocalDate dateFrom,
             final LocalDate dateTo, final Pageable pageable) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
         final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
         final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
@@ -329,7 +329,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional(readOnly = true)
     public void exportInvoicesCsv(final InvoiceStatus status, final String query, final LocalDate dateFrom,
             final LocalDate dateTo, final OutputStream out) throws IOException {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         log.info("REST request to export invoices CSV | hotelId={} | status={} | hasQuery={}",
                 hotelId, status, query != null && !query.isBlank());
         final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
@@ -371,7 +371,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Override
     @Transactional(readOnly = true)
     public List<InvoiceResponse> getInvoicesInPeriod(@NonNull final LocalDate from, @NonNull final LocalDate to) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         return invoiceRepository
                 .findByHotelIdAndIssueDateBetween(hotelId, from.atStartOfDay(), to.plusDays(1).atStartOfDay())
                 .stream()
@@ -416,23 +416,6 @@ public class InvoiceServiceImpl implements InvoiceService {
     }
 
     /**
-     * Extracts the hotel UUID from the current authentication context.
-     * The hotel ID is stored as {@code details} by
-     * {@link com.hotelpms.internalauth.security.InternalAuthFilter} after reading the
-     * {@code X-Auth-Hotel} header injected by the API Gateway.
-     *
-     * @return the hotel UUID of the authenticated caller
-     * @throws IllegalStateException if the security context is missing or malformed
-     */
-    private UUID resolveHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)) {
-            throw new IllegalStateException("MISSING_HOTEL_CONTEXT");
-        }
-        return UUID.fromString(hotelIdStr);
-    }
-
-    /**
      * Blocks mutation of fiscally-relevant invoice state once at least one FatturaPA
      * export has been generated for it (see {@code InvoiceFiscalExport}). An Italian
      * fiscal invoice is corrected via nota di credito, not by editing the original —
@@ -454,7 +437,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     public InvoiceResponse updateDocumentType(@NonNull final UUID invoiceId,
                                                @NonNull final DocumentType documentType) {
         log.info("Updating document type for invoice {} to {}", invoiceId, documentType);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Invoice invoice = invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)
                 .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
         if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
@@ -478,7 +461,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     public InvoiceResponse updateSdiStatus(@NonNull final UUID invoiceId,
                                             @NonNull final SdiStatus sdiStatus) {
         log.info("Updating SDI status for invoice {} to {}", invoiceId, sdiStatus);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Invoice invoice = invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)
                 .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
         if (invoice.getStatus() == InvoiceStatus.CANCELLED) {

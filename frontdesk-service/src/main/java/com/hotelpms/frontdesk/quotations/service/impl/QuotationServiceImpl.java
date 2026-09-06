@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.quotations.service.impl;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.GuestCreateRequest;
@@ -35,7 +37,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,7 +85,7 @@ public class QuotationServiceImpl implements QuotationService {
     @Override
     @Transactional
     public QuotationResponse createQuotation(final QuotationRequest request) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final GuestResponse guest = request.guestId() != null ? verifyGuestExists(request.guestId()) : null;
         final Map<UUID, RoomResponse> roomsById = resolveRoomsForOptionRequests(request.options(), hotelId);
         final List<ResolvedOption> resolved = resolveOptions(
@@ -113,7 +114,7 @@ public class QuotationServiceImpl implements QuotationService {
     @Override
     @Transactional
     public QuotationResponse updateQuotation(final UUID id, final QuotationRequest request) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         if (quotation.getStatus() != QuotationStatus.DRAFT) {
             throw new ConflictException("QUOTATION_NOT_EDITABLE");
@@ -143,7 +144,7 @@ public class QuotationServiceImpl implements QuotationService {
     @Override
     @Transactional
     public QuotationResponse duplicateQuotation(final UUID id) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Quotation source = findByIdAndHotelOrThrow(id, hotelId);
         final List<UUID> allRoomIds = source.getOptions().stream()
                 .flatMap(option -> option.getLineItems().stream().map(QuotationLineItem::getRoomId))
@@ -190,7 +191,7 @@ public class QuotationServiceImpl implements QuotationService {
     @Override
     @Transactional(readOnly = true)
     public QuotationResponse getQuotationById(final UUID id) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
@@ -201,7 +202,7 @@ public class QuotationServiceImpl implements QuotationService {
     @Override
     @Transactional(readOnly = true)
     public Page<QuotationResponse> getAllQuotations(final Pageable pageable) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Page<Quotation> page = quotationRepository.findAllByHotelId(hotelId,
                 pageable == null ? Pageable.unpaged() : pageable);
 
@@ -225,7 +226,7 @@ public class QuotationServiceImpl implements QuotationService {
     @Override
     @Transactional(readOnly = true)
     public byte[] getQuotationPdf(final UUID id) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
@@ -236,7 +237,7 @@ public class QuotationServiceImpl implements QuotationService {
     @Override
     @Transactional
     public QuotationResponse sendQuotationEmail(final UUID id) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         if (quotation.getStatus() == QuotationStatus.DECLINED) {
             throw new ConflictException("QUOTATION_DECLINED");
@@ -282,7 +283,7 @@ public class QuotationServiceImpl implements QuotationService {
     @Override
     @Transactional
     public ReservationResponse convertToReservation(final UUID id, final UUID optionId) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         if (quotation.getStatus() == QuotationStatus.DECLINED) {
             throw new ConflictException("QUOTATION_DECLINED");
@@ -347,7 +348,7 @@ public class QuotationServiceImpl implements QuotationService {
     @Override
     @Transactional
     public QuotationResponse declineQuotation(final UUID id) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         if (quotation.getStatus() == QuotationStatus.ACCEPTED) {
             throw new ConflictException(ALREADY_ACCEPTED_MSG);
@@ -363,7 +364,7 @@ public class QuotationServiceImpl implements QuotationService {
     @Override
     @Transactional
     public void deleteQuotation(final UUID id) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         quotationRepository.delete(quotation); // Triggers the @SQLDelete soft delete
     }
@@ -612,11 +613,6 @@ public class QuotationServiceImpl implements QuotationService {
                             lineItem.getPrice());
                 })
                 .toList();
-    }
-
-    private UUID resolveHotelId() {
-        final Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        return UUID.fromString(String.valueOf(details));
     }
 
     /**

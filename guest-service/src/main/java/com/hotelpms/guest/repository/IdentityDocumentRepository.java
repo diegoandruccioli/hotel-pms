@@ -4,32 +4,22 @@ import com.hotelpms.guest.model.IdentityDocument;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
  * Repository interface for IdentityDocument entity.
+ *
+ * <p>Declares no custom query methods: every real call site uses only the
+ * inherited {@code findById}/{@code save}/{@code delete}, always guarded by
+ * first resolving the owning guest within the caller's hotel (see
+ * {@code GuestServiceImpl.removeIdentityDocument}, which checks
+ * {@code document.getGuest().getId().equals(guestId)} after the fetch).
+ * {@code findByGuestId} and {@code findByDocumentNumberAndDocumentType} were
+ * removed here (Point 7 item 2, tenant-isolation audit): both were unscoped
+ * global lookups across every hotel's documents and had zero callers anywhere
+ * in the codebase — dead code that was also the one real cross-tenant gap on
+ * this repository.
  */
 @Repository
 public interface IdentityDocumentRepository extends JpaRepository<IdentityDocument, UUID> {
-
-    /**
-     * Finds all identity documents by guest ID.
-     *
-     * @param guestId the guest ID
-     * @return list of identity documents
-     */
-    List<IdentityDocument> findByGuestId(UUID guestId);
-
-    /**
-     * Finds an identity document by document number and type.
-     *
-     * @param documentNumber the document number
-     * @param documentType   the document type enum string
-     * @return the identity document if found
-     */
-    Optional<IdentityDocument> findByDocumentNumberAndDocumentType(
-            String documentNumber,
-            com.hotelpms.guest.model.enums.DocumentType documentType);
 }

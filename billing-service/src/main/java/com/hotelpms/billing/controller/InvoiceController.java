@@ -1,5 +1,7 @@
 package com.hotelpms.billing.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
@@ -29,8 +31,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -264,7 +264,7 @@ public class InvoiceController {
     @GetMapping("/guest/{guestId}/last-date")
     public ResponseEntity<GuestInvoiceCheckResponse> getLastInvoiceDateForGuest(
             @NonNull @PathVariable final UUID guestId) {
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         log.info("REST request for last invoice date — guest={} hotel={}", guestId, hotelId);
         return ResponseEntity.ok(
                 invoiceService.getLastInvoiceDateForGuest(guestId, Objects.requireNonNull(hotelId)));
@@ -280,7 +280,7 @@ public class InvoiceController {
     @GetMapping("/guest/{guestId}/history")
     public ResponseEntity<List<InvoiceSummaryResponse>> getInvoiceHistoryForGuest(
             @NonNull @PathVariable final UUID guestId) {
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         log.info("REST request for invoice history — guest={} hotel={}", guestId, hotelId);
         return ResponseEntity.ok(
                 invoiceService.getInvoiceHistoryForGuest(guestId, Objects.requireNonNull(hotelId)));
@@ -411,11 +411,4 @@ public class InvoiceController {
                 .body(zip);
     }
 
-    private UUID extractHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr) || hotelIdStr.isBlank()) {
-            throw new IllegalStateException("HOTEL_ID_NOT_AVAILABLE");
-        }
-        return UUID.fromString(hotelIdStr);
-    }
 }

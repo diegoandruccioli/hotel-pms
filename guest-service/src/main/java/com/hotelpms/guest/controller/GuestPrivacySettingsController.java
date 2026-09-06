@@ -1,5 +1,7 @@
 package com.hotelpms.guest.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.guest.dto.request.GuestPrivacySettingsRequest;
 import com.hotelpms.guest.dto.response.GuestPrivacySettingsResponse;
 import com.hotelpms.guest.service.GuestPrivacySettingsService;
@@ -8,15 +10,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
 
 /**
  * REST controller exposing per-hotel GDPR retention settings under
@@ -38,7 +37,7 @@ public class GuestPrivacySettingsController {
      */
     @GetMapping
     public ResponseEntity<GuestPrivacySettingsResponse> getSettings() {
-        return ResponseEntity.ok(service.getOrCreate(extractHotelId()));
+        return ResponseEntity.ok(service.getOrCreate(TenantContext.resolveHotelId()));
     }
 
     /**
@@ -51,15 +50,7 @@ public class GuestPrivacySettingsController {
     @PutMapping
     public ResponseEntity<GuestPrivacySettingsResponse> updateSettings(
             @NonNull @Valid @RequestBody final GuestPrivacySettingsRequest request) {
-        return ResponseEntity.ok(service.update(extractHotelId(), request));
+        return ResponseEntity.ok(service.update(TenantContext.resolveHotelId(), request));
     }
 
-    private UUID extractHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)
-                || hotelIdStr.isBlank()) {
-            throw new IllegalStateException("HOTEL_ID_NOT_AVAILABLE");
-        }
-        return UUID.fromString(hotelIdStr);
-    }
 }

@@ -1,19 +1,19 @@
 package com.hotelpms.frontdesk.stays.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsRequest;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
 import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
 
 /**
  * REST controller for per-hotel operational settings.
@@ -33,7 +33,7 @@ public class HotelSettingsController {
      */
     @GetMapping
     public HotelSettingsResponse getSettings() {
-        return hotelSettingsService.getOrCreate(resolveHotelId());
+        return hotelSettingsService.getOrCreate(TenantContext.resolveHotelId());
     }
 
     /**
@@ -47,11 +47,7 @@ public class HotelSettingsController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     @PutMapping
     public HotelSettingsResponse updateSettings(@Valid @RequestBody final HotelSettingsRequest request) {
-        return hotelSettingsService.update(resolveHotelId(), request);
+        return hotelSettingsService.update(TenantContext.resolveHotelId(), request);
     }
 
-    private UUID resolveHotelId() {
-        final Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        return UUID.fromString(String.valueOf(details));
-    }
 }

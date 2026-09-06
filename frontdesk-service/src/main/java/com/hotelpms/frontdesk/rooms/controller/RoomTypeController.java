@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.rooms.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.frontdesk.rooms.dto.RoomTypeRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomTypeResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomTypeService;
@@ -9,7 +11,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,7 +48,7 @@ public class RoomTypeController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public ResponseEntity<RoomTypeResponse> createRoomType(@NonNull @Valid @RequestBody final RoomTypeRequest request) {
-        final RoomTypeResponse response = roomTypeService.createRoomType(request, resolveHotelId());
+        final RoomTypeResponse response = roomTypeService.createRoomType(request, TenantContext.resolveHotelId());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -60,7 +61,7 @@ public class RoomTypeController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<RoomTypeResponse> getRoomTypeById(@NonNull @PathVariable final UUID id) {
-        return ResponseEntity.ok(roomTypeService.getRoomTypeById(id, resolveHotelId()));
+        return ResponseEntity.ok(roomTypeService.getRoomTypeById(id, TenantContext.resolveHotelId()));
     }
 
     /**
@@ -70,7 +71,7 @@ public class RoomTypeController {
      */
     @GetMapping
     public ResponseEntity<List<RoomTypeResponse>> getAllRoomTypes() {
-        return ResponseEntity.ok(roomTypeService.getAllRoomTypes(resolveHotelId()));
+        return ResponseEntity.ok(roomTypeService.getAllRoomTypes(TenantContext.resolveHotelId()));
     }
 
     /**
@@ -84,7 +85,7 @@ public class RoomTypeController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public ResponseEntity<RoomTypeResponse> updateRoomType(@NonNull @PathVariable final UUID id,
             @NonNull @Valid @RequestBody final RoomTypeRequest request) {
-        return ResponseEntity.ok(roomTypeService.updateRoomType(id, resolveHotelId(), request));
+        return ResponseEntity.ok(roomTypeService.updateRoomType(id, TenantContext.resolveHotelId(), request));
     }
 
     /**
@@ -96,18 +97,7 @@ public class RoomTypeController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public void deleteRoomType(@NonNull @PathVariable final UUID id) {
-        roomTypeService.deleteRoomType(id, resolveHotelId());
+        roomTypeService.deleteRoomType(id, TenantContext.resolveHotelId());
     }
 
-    /**
-     * Extracts the hotel UUID from the current security context details.
-     * The value is set by the internal auth filter from the {@code X-Auth-Hotel}
-     * header injected by the API Gateway.
-     *
-     * @return the hotel UUID of the authenticated user
-     */
-    private UUID resolveHotelId() {
-        final Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        return UUID.fromString(String.valueOf(details));
-    }
 }

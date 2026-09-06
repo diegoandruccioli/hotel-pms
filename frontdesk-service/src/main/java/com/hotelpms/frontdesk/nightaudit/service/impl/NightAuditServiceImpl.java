@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.nightaudit.service.impl;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hotelpms.frontdesk.client.BillingClient;
@@ -54,7 +56,6 @@ import java.util.UUID;
 @Slf4j
 public class NightAuditServiceImpl implements NightAuditService {
 
-    private static final String HOTEL_ID_NOT_NULL_MSG = "Hotel ID cannot be null";
     private static final List<ReservationStatus> NO_SHOW_CANDIDATE_STATUSES =
             List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
     private static final int MAX_FAILURE_REASON_LENGTH = 500;
@@ -126,7 +127,7 @@ public class NightAuditServiceImpl implements NightAuditService {
             // is meaningless regardless, so this is rejected up front).
             throw new BadRequestException("NIGHT_AUDIT_BUSINESS_DATE_IN_FUTURE");
         }
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         reclaimOrRejectExisting(hotelId, businessDate);
 
         final NightAuditRun claim = NightAuditRun.builder()
@@ -177,7 +178,7 @@ public class NightAuditServiceImpl implements NightAuditService {
     /** {@inheritDoc} */
     @Override
     public Page<NightAuditRunResponse> getHistory(final Pageable pageable) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         return nightAuditRunRepository.findByHotelIdOrderByBusinessDateDesc(hotelId, pageable)
                 .map(this::toResponse);
     }
@@ -289,11 +290,4 @@ public class NightAuditServiceImpl implements NightAuditService {
                 run.getFailureReason());
     }
 
-    private UUID resolveHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)) {
-            throw new IllegalStateException(HOTEL_ID_NOT_NULL_MSG);
-        }
-        return UUID.fromString(hotelIdStr);
-    }
 }

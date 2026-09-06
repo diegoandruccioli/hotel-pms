@@ -1,5 +1,7 @@
 package com.hotelpms.billing.service.impl;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.domain.Payment;
@@ -18,8 +20,6 @@ import com.hotelpms.billing.repository.PaymentRepository;
 import com.hotelpms.billing.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.lang.NonNull;
@@ -48,7 +48,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public PaymentResponse addPayment(@NonNull final UUID invoiceId, @NonNull final PaymentRequest request) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Invoice invoice = invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)
                 .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND"));
 
@@ -116,7 +116,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional(readOnly = true)
     public PaymentSummaryResponse getPaymentSummary(@NonNull final LocalDate date) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         // Half-open [date 00:00, date+1 00:00) window on paymentDate — a plain
         // DATE(payment_date) = :date comparison would need a native query and
         // wouldn't use an index on the timestamp column the way a range does.
@@ -135,19 +135,4 @@ public class PaymentServiceImpl implements PaymentService {
         return new PaymentSummaryResponse(date, byMethod, grandTotal);
     }
 
-    /**
-     * Extracts the hotel UUID from the current authentication context.
-     * The hotel ID is stored as {@code details} by {@link com.hotelpms.internalauth.security.InternalAuthFilter}
-     * after reading the {@code X-Auth-Hotel} header injected by the API Gateway.
-     *
-     * @return the hotel UUID of the authenticated caller
-     * @throws IllegalStateException if the security context is missing or malformed
-     */
-    private UUID resolveHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)) {
-            throw new IllegalStateException("MISSING_HOTEL_CONTEXT");
-        }
-        return UUID.fromString(hotelIdStr);
-    }
 }
