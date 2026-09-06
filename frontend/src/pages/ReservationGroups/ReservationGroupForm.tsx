@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
@@ -62,15 +62,30 @@ export const ReservationGroupForm = () => {
     [rows],
   );
 
-  const canSubmit = useMemo(() => {
-    if (!name.trim() || !contactGuest || !checkInDate || !checkOutDate) return false;
-    if (!(checkOutDate > checkInDate)) return false;
-    return rows.length > 0 && rows.every((r) => r.guest && r.roomId && Number(r.expectedGuests) >= 1);
-  }, [name, contactGuest, checkInDate, checkOutDate, rows]);
+  // Validated on submit rather than gating a disabled button — the room field
+  // ("label_room") carried a visible required marker but the per-row guest
+  // picker did not, so a disabled "Crea gruppo" with no message left "why
+  // can't I save?" with no on-screen answer (found in live QA). Each check
+  // returns a specific, actionable message instead.
+  const getValidationError = useCallback((): string | null => {
+    if (!name.trim()) return t('group_missing_name');
+    if (!contactGuest) return t('group_missing_contact_guest');
+    if (!checkInDate || !checkOutDate) return t('group_missing_dates');
+    if (!(checkOutDate > checkInDate)) return t('group_invalid_dates');
+    if (rows.length === 0) return t('group_missing_rooms');
+    if (rows.some((r) => !r.guest || !r.roomId || Number(r.expectedGuests) < 1)) {
+      return t('group_incomplete_rooming_list');
+    }
+    return null;
+  }, [name, contactGuest, checkInDate, checkOutDate, rows, t]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit || !contactGuest) return;
+    const validationError = getValidationError();
+    if (validationError || !contactGuest) {
+      setError(validationError);
+      return;
+    }
     setError(null);
 
     const request: ReservationGroupCreateRequest = {
@@ -97,7 +112,7 @@ export const ReservationGroupForm = () => {
     } catch (err: unknown) {
       setError(getErrorMessage(err, t('group_create_failed')));
     }
-  }, [canSubmit, contactGuest, name, companyName, checkInDate, checkOutDate, groupRatePerNight,
+  }, [getValidationError, contactGuest, name, companyName, checkInDate, checkOutDate, groupRatePerNight,
       notes, openMasterFolio, rows, createGroup, addToast, navigate, t]);
 
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value), []);
@@ -173,6 +188,7 @@ export const ReservationGroupForm = () => {
             selectedGuest={contactGuest}
             onSelectGuest={setContactGuest}
             onClearGuest={handleClearContactGuest}
+            required
           />
         </M3Card>
 
@@ -205,7 +221,7 @@ export const ReservationGroupForm = () => {
           <M3Button type="button" variant="outlined" onClick={handleCancelForm}>
             {t('cancel')}
           </M3Button>
-          <M3Button type="submit" disabled={!canSubmit} loading={createGroup.isPending}>
+          <M3Button type="submit" loading={createGroup.isPending}>
             {t('create_group')}
           </M3Button>
         </div>

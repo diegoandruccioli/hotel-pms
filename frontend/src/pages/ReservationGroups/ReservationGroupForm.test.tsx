@@ -111,6 +111,27 @@ describe('ReservationGroupForm', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'remove_room' })).not.toBeInTheDocument());
   });
 
+  it('should show a specific error and not call the API when a room has no guest assigned', async () => {
+    render(<MemoryRouter><ReservationGroupForm /></MemoryRouter>);
+
+    fireEvent.change(screen.getByLabelText('group_name'), { target: { value: 'Acme Corp Offsite' } });
+    fireEvent.change(screen.getByLabelText('label_checkin_date'), { target: { value: '2026-10-01' } });
+    fireEvent.change(screen.getByLabelText('label_checkout_date'), { target: { value: '2026-10-03' } });
+
+    // Contact guest selected; room selected in the rooming list; the room's own
+    // guest picker is deliberately left untouched (this is the BUG-2 scenario).
+    fireEvent.click(screen.getAllByText('select-guest')[0]);
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^label_room/)).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText(/^label_room/), { target: { value: 'room1' } });
+
+    fireEvent.click(screen.getByText('create_group'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('group_incomplete_rooming_list');
+    expect(reservationGroupService.createGroup).not.toHaveBeenCalled();
+  });
+
   it('should navigate back to the list when cancel is clicked', () => {
     render(<MemoryRouter><ReservationGroupForm /></MemoryRouter>);
     fireEvent.click(screen.getByText('cancel'));
