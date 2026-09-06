@@ -9,6 +9,7 @@ import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
@@ -301,10 +302,21 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
         return true;
     }
 
+    /**
+     * Fails the request with {@code httpStatus} and a small JSON body identifying
+     * the reason (e.g. {@code {"error":"PASSWORD_CHANGE_REQUIRED"}}).
+     *
+     * <p>Previously this wrote no body at all, so {@code PASSWORD_CHANGE_REQUIRED}
+     * and {@code ACCESS_DENIED} were both a bare 403 — indistinguishable to any
+     * client, which made a forced-password-rotation account look identical to a
+     * genuine RBAC denial (GAP: found during live QA, 2026-09).
+     */
     private Mono<Void> onError(final ServerWebExchange exchange, final String err, final HttpStatus httpStatus) {
         final ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(httpStatus);
-        return response.setComplete();
+        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+        final byte[] body = ("{\"error\":\"" + err + "\"}").getBytes(StandardCharsets.UTF_8);
+        return response.writeWith(Mono.just(response.bufferFactory().wrap(body)));
     }
 
     /**
