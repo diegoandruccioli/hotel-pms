@@ -115,3 +115,65 @@ groups:
           description: >
             HikariCP active connections exceed 90% of the pool max for 2+ minutes
             on {{ $labels.job }}. Current utilisation: {{ $value | humanizePercentage }}.
+
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Postgres is unreachable from postgres-exporter"
+          description: >
+            postgres-exporter cannot connect to the database. Distinct from
+            ServiceDown (which only proves postgres-exporter itself answers
+            scrapes) — this is the database connection actually failing.
+
+  # ----------------------------------------------------------------
+  # Host — single-PC deployment has no infra monitoring otherwise; a full
+  # disk or a dead backup loop previously failed silently.
+  # ----------------------------------------------------------------
+  - name: hotel_pms_host
+    interval: 60s
+    rules:
+
+      - alert: DiskSpaceLow
+        expr: |
+          (
+            node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"}
+            /
+            node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}
+          ) < 0.15
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.mountpoint }}"
+          description: >
+            {{ $labels.mountpoint }} has less than 15% free space for 10+ minutes.
+            Current free: {{ $value | humanizePercentage }}. On a single-PC
+            deployment this is the most likely way the whole pilot stops.
+
+      - alert: BackupHeartbeatStale
+        expr: time() - pgbackrest_scheduler_heartbeat_timestamp_seconds > 93600
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup scheduler loop has not made progress in 26h+"
+          description: >
+            backup-scheduler.sh's own heartbeat is stale — the loop is either
+            dead (should have been auto-restarted by entrypoint-wrapper.sh's
+            supervisor; check hotel_postgres container logs) or hung mid-cycle.
+
+      - alert: BackupNotSucceededRecently
+        expr: time() - pgbackrest_last_successful_backup_timestamp_seconds > 93600
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No fully successful pgBackRest cycle in the last 26h+"
+          description: >
+            Every configured repo (local repo1, and off-site repo2 if
+            S3_BUCKET is set) succeeding together is what clears this metric —
+            see BackupCycleFailed alerts / hotel_postgres logs for which one
+            is failing.

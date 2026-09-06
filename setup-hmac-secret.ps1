@@ -59,7 +59,14 @@ function New-RandomBase64([int]$bytes) {
 Write-Step "Step 1 - .env file"
 
 if (-Not (Test-Path $ENV_FILE)) {
-    Set-Content -Path $ENV_FILE -Value "INTERNAL_HMAC_SECRET=$(New-RandomHex 32)" -Encoding UTF8
+    # PowerShell 5.1's -Encoding UTF8 always writes a UTF-8 BOM. docker
+    # compose's .env parser reads that BOM as part of the first variable
+    # name, so INTERNAL_HMAC_SECRET silently becomes unreadable
+    # ("﻿INTERNAL_HMAC_SECRET") and every service fails its startup
+    # HMAC check. Write via .NET directly with a BOM-less UTF8Encoding
+    # instead of Set-Content/Out-File, which cannot suppress the BOM here.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($ENV_FILE, "INTERNAL_HMAC_SECRET=$(New-RandomHex 32)`r`n", $utf8NoBom)
     Write-Ok ".env created with a fresh HMAC secret."
 } else {
     Write-Skip ".env already exists - skipping HMAC secret generation to avoid accidental rotation."
@@ -90,6 +97,20 @@ if ($envContent -notmatch '(?m)^CONFIG_SERVER_PASSWORD=') {
     Write-Ok "CONFIG_SERVER_PASSWORD added to .env."
 } else {
     Write-Skip "CONFIG_SERVER_PASSWORD already in .env - skipping."
+}
+
+# Append the 5 per-service PostgreSQL passwords plus the postgres-exporter
+# monitoring password if not already present (idempotent) — one
+# least-privilege role per service database, see
+# docker/postgres/initdb/02-create-tenant-roles.sql and 03-create-monitoring-role.sql.
+foreach ($dbVar in @("AUTH_DB_PASSWORD", "GUEST_DB_PASSWORD", "FRONTDESK_DB_PASSWORD", "BILLING_DB_PASSWORD", "FB_DB_PASSWORD", "POSTGRES_EXPORTER_PASSWORD")) {
+    $envContent = Get-Content $ENV_FILE -Raw -Encoding UTF8
+    if ($envContent -notmatch "(?m)^$dbVar=") {
+        Add-Content -Path $ENV_FILE -Value "$dbVar=$(New-RandomHex 24)" -Encoding UTF8
+        Write-Ok "$dbVar added to .env."
+    } else {
+        Write-Skip "$dbVar already in .env - skipping."
+    }
 }
 
 # ── Step 2: Ensure .env is in .gitignore ──────────────────────────────────────

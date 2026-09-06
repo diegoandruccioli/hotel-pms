@@ -83,6 +83,20 @@ public interface GuestService {
     Page<GuestResponse> searchGuests(String query, Pageable pageable);
 
     /**
+     * Streams every guest matching {@code query} (same matching as {@link
+     * #searchGuests}, or every guest in the hotel when blank) to {@code out}
+     * as CSV, unpaginated internally in fixed-size batches. PII, so callers
+     * must gate this ADMIN/OWNER same as {@code deleteGuest}/{@code
+     * exportGuestData} -- unlike the reservation/invoice exports, which carry
+     * no PII beyond a guest's display name.
+     *
+     * @param query optional free-text query, or {@code null}/blank for every guest
+     * @param out   the stream to write CSV bytes to
+     * @throws java.io.IOException if writing to {@code out} fails
+     */
+    void exportGuestsCsv(String query, java.io.OutputStream out) throws java.io.IOException;
+
+    /**
      * Retrieves a list of guests by their unique IDs.
      *
      * @param ids the list of guest UUIDs

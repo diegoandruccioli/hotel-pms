@@ -28,9 +28,37 @@ alert() {
         >/dev/null 2>&1 || log "WARN could not reach alertmanager to report ${reason} failure"
 }
 
+# node-exporter textfile collector — see docker-compose.yml's pgbackrest_metrics
+# volume and BackupHeartbeatStale/BackupNotSucceededRecently in alert_rules.yml.
+# Without this, entrypoint-wrapper.sh's `wait "${PG_PID}"` never noticed if this
+# script's background process died — Postgres itself stayed healthy, so the
+# container kept reporting healthy with zero backups actually running.
+METRICS_DIR="/var/lib/node_exporter/textfile_collector"
+METRICS_FILE="${METRICS_DIR}/pgbackrest.prom"
+
+write_metrics() {
+    # Atomic write: node-exporter's textfile collector polls this directory
+    # and would otherwise occasionally read a half-written file.
+    [[ -d "${METRICS_DIR}" ]] || return 0
+    local tmp
+    tmp="$(mktemp "${METRICS_DIR}/.pgbackrest.prom.XXXXXX" 2>/dev/null)" || return 0
+    {
+        echo "# HELP pgbackrest_scheduler_heartbeat_timestamp_seconds Unix time this loop last made progress."
+        echo "# TYPE pgbackrest_scheduler_heartbeat_timestamp_seconds gauge"
+        echo "pgbackrest_scheduler_heartbeat_timestamp_seconds $(date +%s)"
+        echo "# HELP pgbackrest_last_successful_backup_timestamp_seconds Unix time of the last cycle where every configured repo succeeded. 0 = never."
+        echo "# TYPE pgbackrest_last_successful_backup_timestamp_seconds gauge"
+        echo "pgbackrest_last_successful_backup_timestamp_seconds ${last_success}"
+    } > "${tmp}"
+    mv -f "${tmp}" "${METRICS_FILE}"
+}
+
 last_full=0
+last_success=0
 
 while true; do
+    write_metrics # heartbeat BEFORE the (potentially long) backup calls below —
+                  # a hang, not just a crash, is exactly what this should catch.
     now=$(date +%s)
     if (( now - last_full >= BACKUP_FULL_INTERVAL_SECONDS )); then
         type=full
@@ -57,6 +85,7 @@ while true; do
         fi
     done
     [[ "${type}" == "full" && "${cycle_ok}" -eq 1 ]] && last_full=${now}
+    [[ "${cycle_ok}" -eq 1 ]] && last_success=$(date +%s)
 
     if pgbackrest --config="${CONF}" --stanza="${BACKUP_STANZA}" check; then
         log "check passed"
@@ -65,5 +94,6 @@ while true; do
         alert "check"
     fi
 
+    write_metrics # publish last_success promptly, not just next iteration's heartbeat
     sleep "${BACKUP_INCR_INTERVAL_SECONDS}"
 done

@@ -87,17 +87,34 @@ docker-entrypoint.sh postgres \
     -c wal_level=replica &
 PG_PID=$!
 
+SHUTTING_DOWN=0
 shutdown() {
+    SHUTTING_DOWN=1
     log "shutting down — forwarding signal to postgres (pid ${PG_PID})"
     kill -TERM "${PG_PID}" 2>/dev/null || true
-    [[ -n "${SCHEDULER_PID:-}" ]] && kill -TERM "${SCHEDULER_PID}" 2>/dev/null || true
+    [[ -n "${SUPERVISOR_PID:-}" ]] && kill -TERM "${SUPERVISOR_PID}" 2>/dev/null || true
     wait "${PG_PID}" 2>/dev/null || true
     exit 0
 }
 trap shutdown TERM INT
 
 log "waiting for postgres to accept connections..."
-until gosu postgres pg_isready -h /var/run/postgresql -U postgres >/dev/null 2>&1; do
+# On a genuinely fresh volume, docker-entrypoint.sh starts a TEMPORARY
+# server to run /docker-entrypoint-initdb.d/* (our 3 role/database SQL
+# scripts), then stops it and starts the real one — pg_isready succeeding
+# once can be that temporary instance. Require 3 consecutive successes
+# (1s apart) before proceeding: the stop/start dip in between resets the
+# counter, so this waits out the whole restart instead of racing it.
+# Verified with a real fresh-volume run: without this, the very first
+# backup cycle below started against the temp server and was aborted mid-
+# flight by its shutdown ("NULL result required to complete request").
+consecutive_ready=0
+until [[ "${consecutive_ready}" -ge 3 ]]; do
+    if gosu postgres pg_isready -h /var/run/postgresql -U postgres >/dev/null 2>&1; then
+        consecutive_ready=$((consecutive_ready + 1))
+    else
+        consecutive_ready=0
+    fi
     sleep 1
 done
 log "postgres is ready"
@@ -109,11 +126,40 @@ else
     alert "stanza-create"
 fi
 
+# Textfile-collector dir for backup-scheduler.sh's heartbeat/last-success
+# metrics (docker-compose.yml pgbackrest_metrics volume, node-exporter reads
+# it read-only). Created here, not in the Dockerfile, since it's a volume
+# mount point — anything baked into the image at that path would be hidden
+# by the mount anyway.
+mkdir -p /var/lib/node_exporter/textfile_collector
+chown postgres:postgres /var/lib/node_exporter/textfile_collector
+
 # NOTE: deliberately NOT prefixed PGBACKREST_ — pgbackrest itself auto-reads
 # any PGBACKREST_* env var as one of its own options; STANZA/CONF picked that
 # prefix up as (invalid) options "conf" etc. and logged noisy WARNs. These
 # two are our own orchestration knobs, not pgbackrest options.
-BACKUP_STANZA="${STANZA}" gosu postgres backup-scheduler.sh &
-SCHEDULER_PID=$!
+#
+# Supervised, not a bare background job: backup-scheduler.sh's own `while
+# true` loop should never exit on its own, so if it ever does (crash, OOM,
+# an unset-variable error under `set -u`), that WAS silent before — this
+# wrapper only ever `wait`ed on Postgres's PID, so the container stayed
+# "healthy" with zero backups actually running until someone noticed by hand.
+supervise_scheduler() {
+    while true; do
+        # `|| EXIT_CODE=$?` (not a bare statement) is required here: this
+        # script runs under `set -e`, and a background job inherits it —
+        # a plain nonzero-exit statement would kill this whole function
+        # immediately on the first crash, before any of the restart/alert
+        # logic below ever ran.
+        EXIT_CODE=0
+        BACKUP_STANZA="${STANZA}" gosu postgres backup-scheduler.sh || EXIT_CODE=$?
+        [[ "${SHUTTING_DOWN}" -eq 1 ]] && return 0
+        log "FATAL backup-scheduler.sh exited unexpectedly (code ${EXIT_CODE}) — restarting in 10s"
+        alert "scheduler-crashed"
+        sleep 10
+    done
+}
+supervise_scheduler &
+SUPERVISOR_PID=$!
 
 wait "${PG_PID}"

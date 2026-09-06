@@ -1,5 +1,7 @@
 package com.hotelpms.fb.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.fb.dto.MenuItemRequest;
 import com.hotelpms.fb.dto.MenuItemResponse;
 import com.hotelpms.fb.service.MenuItemService;
@@ -10,8 +12,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -46,7 +46,7 @@ public class MenuItemController {
     @GetMapping
     public ResponseEntity<List<MenuItemResponse>> getAllMenuItems() {
         log.info("REST request to get all menu items");
-        return ResponseEntity.ok(menuItemService.getAll(resolveHotelId()));
+        return ResponseEntity.ok(menuItemService.getAll(TenantContext.resolveHotelId()));
     }
 
     /**
@@ -60,7 +60,7 @@ public class MenuItemController {
     public ResponseEntity<MenuItemResponse> createMenuItem(
             @NonNull @Valid @RequestBody final MenuItemRequest request) {
         log.info("REST request to create menu item: {}", request.name());
-        return ResponseEntity.status(HttpStatus.CREATED).body(menuItemService.create(resolveHotelId(), request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(menuItemService.create(TenantContext.resolveHotelId(), request));
     }
 
     /**
@@ -76,7 +76,7 @@ public class MenuItemController {
             @NonNull @PathVariable final UUID id,
             @NonNull @Valid @RequestBody final MenuItemRequest request) {
         log.info("REST request to update menu item {}", id);
-        return ResponseEntity.ok(menuItemService.update(resolveHotelId(), id, request));
+        return ResponseEntity.ok(menuItemService.update(TenantContext.resolveHotelId(), id, request));
     }
 
     /**
@@ -89,14 +89,7 @@ public class MenuItemController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteMenuItem(@NonNull @PathVariable final UUID id) {
         log.info("REST request to delete menu item {}", id);
-        menuItemService.delete(resolveHotelId(), id);
+        menuItemService.delete(TenantContext.resolveHotelId(), id);
     }
 
-    private UUID resolveHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr) || hotelIdStr.isBlank()) {
-            throw new IllegalStateException("HOTEL_ID_NOT_AVAILABLE");
-        }
-        return UUID.fromString(hotelIdStr);
-    }
 }

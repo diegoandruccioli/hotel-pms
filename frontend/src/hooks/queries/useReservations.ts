@@ -40,6 +40,28 @@ export function useDeleteReservation() {
   });
 }
 
+interface UpdateReservationStatusVariables {
+  id: string;
+  status: string;
+  version: number;
+}
+
+/** Invalidates (not patches) on success: a status change like NO_SHOW also
+ * frees the room for other bookings server-side (see the GiST exclusion
+ * constraint), so cached availability elsewhere can't be trusted to still
+ * be correct — a full refetch of the current filtered/sorted page is safer
+ * than the single-row patch used by useRetryConfirmationEmail. */
+export function useUpdateReservationStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status, version }: UpdateReservationStatusVariables) =>
+      reservationService.updateStatus(id, status, version),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reservations.all });
+    },
+  });
+}
+
 /** Patches the single updated reservation into whichever cached search-result
  * page(s) it appears in, instead of invalidating — this only clears an
  * email-failed badge on one row and doesn't warrant refetching the current

@@ -25,6 +25,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -33,6 +34,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +48,7 @@ class PaymentServiceImplTest {
     private static final BigDecimal AMOUNT_100 = BigDecimal.valueOf(100);
     private static final BigDecimal AMOUNT_500 = BigDecimal.valueOf(500);
     private static final BigDecimal AMOUNT_600 = BigDecimal.valueOf(600);
+    private static final LocalDate SUMMARY_BUSINESS_DATE = LocalDate.of(2026, 6, 15);
 
     @Mock
     private PaymentRepository paymentRepository;
@@ -241,5 +244,43 @@ class PaymentServiceImplTest {
         // Assert: the payment entity amount is normalized to 2 decimal places
         assertEquals(0, expectedNormalized.compareTo(Objects.requireNonNull(payment.getAmount())));
         assertEquals(InvoiceStatus.ISSUED, invoice.getStatus()); // 100.01 < 500, not fully paid
+    }
+
+    @Test
+    @DisplayName("getPaymentSummary groups by method, sums a grand total, and scopes the query window to the given date")
+    void shouldSummarizePaymentsByMethodForTheBusinessDate() {
+        final LocalDate businessDate = SUMMARY_BUSINESS_DATE;
+        final com.hotelpms.billing.repository.PaymentMethodTotal cashTotal =
+                mock(com.hotelpms.billing.repository.PaymentMethodTotal.class);
+        when(cashTotal.getPaymentMethod()).thenReturn(PaymentMethod.CASH);
+        when(cashTotal.getTotal()).thenReturn(AMOUNT_100);
+        final com.hotelpms.billing.repository.PaymentMethodTotal cardTotal =
+                mock(com.hotelpms.billing.repository.PaymentMethodTotal.class);
+        when(cardTotal.getPaymentMethod()).thenReturn(PaymentMethod.CREDIT_CARD);
+        when(cardTotal.getTotal()).thenReturn(AMOUNT_500);
+
+        when(paymentRepository.sumByHotelIdAndPaymentDateBetweenGroupedByMethod(
+                hotelId, businessDate.atStartOfDay(), businessDate.plusDays(1).atStartOfDay()))
+                .thenReturn(List.of(cashTotal, cardTotal));
+
+        final var summary = paymentService.getPaymentSummary(businessDate);
+
+        assertEquals(businessDate, summary.date());
+        assertEquals(2, summary.byMethod().size());
+        assertEquals(0, AMOUNT_600.compareTo(summary.grandTotal()));
+    }
+
+    @Test
+    @DisplayName("getPaymentSummary returns a zero grand total with no rows when nothing was paid that day")
+    void shouldReturnZeroGrandTotalWhenNoPaymentsThatDay() {
+        final LocalDate businessDate = SUMMARY_BUSINESS_DATE;
+        when(paymentRepository.sumByHotelIdAndPaymentDateBetweenGroupedByMethod(
+                hotelId, businessDate.atStartOfDay(), businessDate.plusDays(1).atStartOfDay()))
+                .thenReturn(List.of());
+
+        final var summary = paymentService.getPaymentSummary(businessDate);
+
+        assertEquals(0, summary.byMethod().size());
+        assertEquals(0, BigDecimal.ZERO.compareTo(summary.grandTotal()));
     }
 }

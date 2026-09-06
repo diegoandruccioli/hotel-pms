@@ -117,7 +117,9 @@ describe('OwnerDashboard', () => {
     expect(screen.getByText('export_csv')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('export_csv'));
-    expect(billingReportService.exportToCsv).toHaveBeenCalledWith(REPORT, expect.any(Function));
+    expect(billingReportService.exportToCsv).toHaveBeenCalledWith(
+      expect.any(String), expect.any(String),
+    );
   });
 
   it('shows the no_invoices_period message when the report has zero invoices', async () => {

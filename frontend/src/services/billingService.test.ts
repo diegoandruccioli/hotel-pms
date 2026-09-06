@@ -111,4 +111,33 @@ describe('billingService', () => {
     removeChildSpy.mockRestore();
     vi.useRealTimers();
   });
+
+  it('should download the invoices CSV export with every filter as a query param', () => {
+    billingService.exportInvoicesCsv({
+      status: 'PAID',
+      query: '  mario  ',
+      dateFrom: '2026-08-01',
+      dateTo: '2026-08-31',
+    });
+
+    const iframe = document.body.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    expect(iframe?.src).toContain('/api/v1/invoices/export.csv?');
+    expect(iframe?.src).toContain('status=PAID');
+    expect(iframe?.src).toContain('query=mario');
+    expect(iframe?.src).toContain('dateFrom=2026-08-01');
+    expect(iframe?.src).toContain('dateTo=2026-08-31');
+
+    document.body.replaceChildren();
+  });
+
+  it('should download every invoice as CSV, with no query params, when no filters are set', () => {
+    billingService.exportInvoicesCsv({});
+
+    const iframe = document.body.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    expect(iframe?.src).toMatch(/\/api\/v1\/invoices\/export\.csv$/);
+
+    document.body.replaceChildren();
+  });
 });

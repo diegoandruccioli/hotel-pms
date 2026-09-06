@@ -1,9 +1,13 @@
 package com.hotelpms.billing.service.impl;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
+import com.hotelpms.commonweb.csv.CsvWriter;
 import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.domain.ChargeType;
 import com.hotelpms.billing.domain.DocumentType;
+import com.hotelpms.billing.domain.FolioType;
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.SdiStatus;
 import com.hotelpms.billing.domain.InvoiceCharge;
@@ -11,10 +15,12 @@ import com.hotelpms.billing.domain.InvoiceSequence;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
+import com.hotelpms.billing.dto.GroupChargeRequest;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
+import com.hotelpms.billing.dto.MasterFolioRequest;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.exception.NotFoundException;
@@ -28,13 +34,15 @@ import com.hotelpms.billing.service.InvoiceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.lang.NonNull;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -55,7 +63,13 @@ import java.util.stream.Collectors;
 public class InvoiceServiceImpl implements InvoiceService {
 
     private static final String INVOICE_NOT_FOUND = "INVOICE_NOT_FOUND";
+    private static final String INVOICE_NOT_OPEN = "INVOICE_NOT_OPEN";
     private static final int GUEST_SEARCH_MATCH_CAP = 200;
+    /**
+     * Page size for CSV export's internal pagination loop -- bounds memory to one
+     * page at a time instead of loading the whole matching set before writing.
+     */
+    private static final int EXPORT_PAGE_SIZE = 500;
     /**
      * The FatturaPA {@code Natura} code for the tourist tax — collected by the
      * operator in the comune's name, not as consideration for a service of its own
@@ -78,7 +92,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional
     public InvoiceResponse createInvoiceForStay(@NonNull final StayInvoiceRequest request) {
         log.info("Creating invoice for stay {}", request.stayId());
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
 
         invoiceRepository.findByStayIdAndHotelId(request.stayId(), hotelId)
                 .filter(existing -> existing.getStatus() == InvoiceStatus.ISSUED)
@@ -106,15 +120,89 @@ public class InvoiceServiceImpl implements InvoiceService {
     /** {@inheritDoc} */
     @Override
     @Transactional
+    public InvoiceResponse createMasterFolioForGroup(
+            @NonNull final UUID groupId, @NonNull final MasterFolioRequest request) {
+        final UUID hotelId = TenantContext.resolveHotelId();
+        log.info("Opening master folio for group {} | hotelId={}", groupId, hotelId);
+
+        final Optional<Invoice> existing = invoiceRepository
+                .findByGroupIdAndHotelIdAndFolioType(groupId, hotelId, FolioType.MASTER)
+                .filter(inv -> inv.getStatus() == InvoiceStatus.ISSUED);
+        if (existing.isPresent()) {
+            return invoiceMapper.toResponse(existing.get());
+        }
+
+        final Invoice invoice = Invoice.builder()
+                .groupId(groupId)
+                .folioType(FolioType.MASTER)
+                .guestId(request.guestId())
+                .hotelId(hotelId)
+                .totalAmount(BigDecimal.ZERO)
+                .status(InvoiceStatus.ISSUED)
+                .issueDate(LocalDateTime.now())
+                .invoiceNumber(generateInvoiceNumber(hotelId))
+                .build();
+
+        final Invoice savedInvoice = invoiceRepository.save(Objects.requireNonNull(invoice));
+        log.info("Created master folio {} for group {}", savedInvoice.getInvoiceNumber(), groupId);
+
+        return invoiceMapper.toResponse(savedInvoice);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public ChargeResponse addChargeToGroupFolio(
+            @NonNull final UUID groupId, @NonNull final GroupChargeRequest request) {
+        log.info("Adding charge type={} amount={} to master folio of group {}",
+                request.type(), request.amount(), groupId);
+        final UUID hotelId = TenantContext.resolveHotelId();
+
+        final Invoice invoice = invoiceRepository
+                .findByGroupIdAndHotelIdAndFolioType(groupId, hotelId, FolioType.MASTER)
+                .orElseThrow(() -> new NotFoundException("MASTER_FOLIO_NOT_FOUND_FOR_GROUP"));
+
+        if (invoice.getStatus() != InvoiceStatus.ISSUED) {
+            throw new InvoiceConflictException(INVOICE_NOT_OPEN);
+        }
+        assertNotFiscallyLocked(invoice);
+
+        final VatTreatment vatTreatment = vatTreatmentFor(request.type());
+        final InvoiceCharge charge = InvoiceCharge.builder()
+                .type(request.type())
+                .description(request.description())
+                .amount(request.amount())
+                .vatRate(vatTreatment.rate())
+                .naturaCode(vatTreatment.naturaCode())
+                .unitPrice(request.unitPrice())
+                .nights(request.nights())
+                .routedFromStayId(request.routedFromStayId())
+                .build();
+
+        invoice.addCharge(charge);
+        final InvoiceCharge savedCharge = invoiceChargeRepository.save(Objects.requireNonNull(charge));
+
+        invoice.setTotalAmount(invoice.getTotalAmount().add(request.amount()));
+        invoiceRepository.save(Objects.requireNonNull(invoice));
+
+        log.info("Added {} charge of {} to master folio {} (new total: {})",
+                request.type(), request.amount(), invoice.getInvoiceNumber(), invoice.getTotalAmount());
+
+        return invoiceChargeMapper.toResponse(savedCharge);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
     public ChargeResponse addCharge(@NonNull final UUID stayId, @NonNull final ChargeRequest request) {
         log.info("Adding charge type={} amount={} to stay {}", request.type(), request.amount(), stayId);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
 
         final Invoice invoice = invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)
                 .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND_FOR_STAY"));
 
         if (invoice.getStatus() != InvoiceStatus.ISSUED) {
-            throw new InvoiceConflictException("INVOICE_NOT_OPEN");
+            throw new InvoiceConflictException(INVOICE_NOT_OPEN);
         }
         assertNotFiscallyLocked(invoice);
 
@@ -147,13 +235,13 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional
     public void removeCharge(@NonNull final UUID stayId, @NonNull final UUID chargeId) {
         log.info("Removing charge {} from stay {}", chargeId, stayId);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
 
         final Invoice invoice = invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)
                 .orElseThrow(() -> new NotFoundException("INVOICE_NOT_FOUND_FOR_STAY"));
 
         if (invoice.getStatus() != InvoiceStatus.ISSUED) {
-            throw new InvoiceConflictException("INVOICE_NOT_OPEN");
+            throw new InvoiceConflictException(INVOICE_NOT_OPEN);
         }
         assertNotFiscallyLocked(invoice);
 
@@ -179,7 +267,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional(readOnly = true)
     public InvoiceResponse getInvoice(@NonNull final UUID id) {
         log.info("Fetching invoice with id {}", id);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Invoice invoice = invoiceRepository.findByIdAndHotelId(id, hotelId)
                 .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
         return invoiceMapper.toResponse(invoice);
@@ -190,7 +278,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional(readOnly = true)
     public InvoiceResponse getLatestInvoiceByReservation(@NonNull final UUID reservationId) {
         log.info("Fetching latest invoice for reservation {}", reservationId);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Invoice invoice = invoiceRepository
                 .findFirstByReservationIdAndHotelIdOrderByIssueDateDesc(reservationId, hotelId)
                 .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
@@ -202,7 +290,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Transactional(readOnly = true)
     public Page<InvoiceResponse> getAllInvoices(final Pageable pageable) {
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         return invoiceRepository.findByHotelId(hotelId, safePageable)
                 .map(invoiceMapper::toResponse);
     }
@@ -213,7 +301,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     public Page<InvoiceSearchResultResponse> searchInvoices(
             final InvoiceStatus status, final String query, final LocalDate dateFrom,
             final LocalDate dateTo, final Pageable pageable) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
         final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
         final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
@@ -240,8 +328,51 @@ public class InvoiceServiceImpl implements InvoiceService {
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
+    public void exportInvoicesCsv(final InvoiceStatus status, final String query, final LocalDate dateFrom,
+            final LocalDate dateTo, final OutputStream out) throws IOException {
+        final UUID hotelId = TenantContext.resolveHotelId();
+        log.info("REST request to export invoices CSV | hotelId={} | status={} | hasQuery={}",
+                hotelId, status, query != null && !query.isBlank());
+        final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
+        final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
+        final LocalDateTime fromInclusive = dateFrom == null ? null : dateFrom.atStartOfDay();
+        final LocalDateTime toExclusive = dateTo == null ? null : dateTo.plusDays(1).atStartOfDay();
+
+        try (CsvWriter csv = CsvWriter.open(out, List.of(
+                "invoiceNumber", "guestName", "issueDate", "status", "documentType", "totalAmount"))) {
+            int pageNumber = 0;
+            Page<Invoice> page;
+            do {
+                final Pageable pageable = PageRequest.of(
+                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("issueDate").descending());
+                page = invoiceRepository.searchInvoicesByHotelId(
+                        hotelId, status, fromInclusive, toExclusive, trimmedQuery, guestIds, pageable);
+
+                final Map<UUID, String> guestNames = resolveGuestNames(
+                        page.getContent().stream()
+                                .map((@NonNull Invoice invoice) -> invoice.getGuestId())
+                                .distinct()
+                                .toList());
+
+                for (final Invoice invoice : page.getContent()) {
+                    csv.printRow(List.of(
+                            invoice.getInvoiceNumber(),
+                            guestNames.getOrDefault(invoice.getGuestId(), ""),
+                            String.valueOf(invoice.getIssueDate()),
+                            String.valueOf(invoice.getStatus()),
+                            String.valueOf(invoice.getDocumentType()),
+                            String.valueOf(invoice.getTotalAmount())));
+                }
+                pageNumber++;
+            } while (page.hasNext());
+        }
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
     public List<InvoiceResponse> getInvoicesInPeriod(@NonNull final LocalDate from, @NonNull final LocalDate to) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         return invoiceRepository
                 .findByHotelIdAndIssueDateBetween(hotelId, from.atStartOfDay(), to.plusDays(1).atStartOfDay())
                 .stream()
@@ -286,23 +417,6 @@ public class InvoiceServiceImpl implements InvoiceService {
     }
 
     /**
-     * Extracts the hotel UUID from the current authentication context.
-     * The hotel ID is stored as {@code details} by
-     * {@link com.hotelpms.internalauth.security.InternalAuthFilter} after reading the
-     * {@code X-Auth-Hotel} header injected by the API Gateway.
-     *
-     * @return the hotel UUID of the authenticated caller
-     * @throws IllegalStateException if the security context is missing or malformed
-     */
-    private UUID resolveHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)) {
-            throw new IllegalStateException("MISSING_HOTEL_CONTEXT");
-        }
-        return UUID.fromString(hotelIdStr);
-    }
-
-    /**
      * Blocks mutation of fiscally-relevant invoice state once at least one FatturaPA
      * export has been generated for it (see {@code InvoiceFiscalExport}). An Italian
      * fiscal invoice is corrected via nota di credito, not by editing the original —
@@ -324,7 +438,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     public InvoiceResponse updateDocumentType(@NonNull final UUID invoiceId,
                                                @NonNull final DocumentType documentType) {
         log.info("Updating document type for invoice {} to {}", invoiceId, documentType);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Invoice invoice = invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)
                 .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
         if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
@@ -348,7 +462,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     public InvoiceResponse updateSdiStatus(@NonNull final UUID invoiceId,
                                             @NonNull final SdiStatus sdiStatus) {
         log.info("Updating SDI status for invoice {} to {}", invoiceId, sdiStatus);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Invoice invoice = invoiceRepository.findByIdAndHotelId(invoiceId, hotelId)
                 .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
         if (invoice.getStatus() == InvoiceStatus.CANCELLED) {

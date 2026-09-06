@@ -130,3 +130,11 @@ resilience4j:
 logging:
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n"
+
+frontdesk:
+  night-audit:
+    # Runs at 03:30 local time, closing the business date that just ended
+    # (LocalDate.now().minusDays(1) at trigger time) for every hotel.
+    # Externalized (not left as the @Scheduled annotation's inline default)
+    # so a pilot deployment can move it without a code change/redeploy.
+    cron: "0 30 3 * * *"

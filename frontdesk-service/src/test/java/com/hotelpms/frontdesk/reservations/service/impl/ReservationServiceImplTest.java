@@ -39,11 +39,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -89,7 +93,9 @@ class ReservationServiceImplTest {
     private static final UUID ROOM_TYPE_ID = Objects.requireNonNull(UUID.randomUUID());
     private static final BigDecimal PRICE_100 = BigDecimal.valueOf(100);
     private static final BigDecimal PRICE_120 = BigDecimal.valueOf(120);
+    private static final BigDecimal PRICE_200 = BigDecimal.valueOf(200);
     private static final BigDecimal PRICE_240 = BigDecimal.valueOf(240);
+    private static final String SORT_FIELD_CHECK_IN_DATE = "checkInDate";
     private static final String QUERY_MARIO = "mario";
     private static final int GUEST_SEARCH_CAP = 200;
 
@@ -933,6 +939,88 @@ class ReservationServiceImplTest {
     }
 
     @Test
+    void testUpdateStatusAndGuestsRejectsIllegalTransition() {
+        entity.setStatus(ReservationStatus.CHECKED_OUT);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        assertThrows(ConflictException.class,
+                () -> reservationService.updateStatusAndGuests(
+                        reservationId, ReservationStatus.CONFIRMED, null, null));
+
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void testUpdateStatusAndGuestsAllowsResendingSameStatusForActualGuestsOnlyUpdate() {
+        entity.setStatus(ReservationStatus.CONFIRMED);
+        final ReservationResponse confirmedResponse = new ReservationResponse(
+                reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 3,
+                entity.getCheckInDate(), entity.getCheckOutDate(),
+                ReservationStatus.CONFIRMED, null, true, null, null, false, null, null);
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(reservationMapper.toResponse(entity)).thenReturn(confirmedResponse);
+
+        reservationService.updateStatusAndGuests(reservationId, ReservationStatus.CONFIRMED, 3, null);
+
+        assertEquals(ReservationStatus.CONFIRMED, entity.getStatus());
+        assertEquals(3, entity.getActualGuests());
+    }
+
+    @Test
+    void testUpdateStatusAndGuestsNoShowSucceedsWhenCheckInDatePassedAndNoStay() {
+        entity.setStatus(ReservationStatus.CONFIRMED);
+        entity.setCheckInDate(LocalDate.now().minusDays(1));
+        final ReservationResponse noShowResponse = new ReservationResponse(
+                reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 0,
+                entity.getCheckInDate(), entity.getCheckOutDate(),
+                ReservationStatus.NO_SHOW, null, true, null, null, false, null, null);
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(stayRepository.findAllByReservationIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(List.of());
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(reservationMapper.toResponse(entity)).thenReturn(noShowResponse);
+
+        reservationService.updateStatusAndGuests(reservationId, ReservationStatus.NO_SHOW, null, null);
+
+        assertEquals(ReservationStatus.NO_SHOW, entity.getStatus());
+        verify(reservationRepository).saveAndFlush(entity);
+    }
+
+    @Test
+    void testUpdateStatusAndGuestsNoShowRejectedWhenCheckInDateInFuture() {
+        entity.setStatus(ReservationStatus.CONFIRMED);
+        entity.setCheckInDate(LocalDate.now().plusDays(1));
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        assertThrows(ConflictException.class,
+                () -> reservationService.updateStatusAndGuests(
+                        reservationId, ReservationStatus.NO_SHOW, null, null));
+
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void testUpdateStatusAndGuestsNoShowRejectedWhenStayAlreadyExists() {
+        entity.setStatus(ReservationStatus.CONFIRMED);
+        entity.setCheckInDate(LocalDate.now().minusDays(1));
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(stayRepository.findAllByReservationIdAndHotelId(reservationId, HOTEL_ID))
+                .thenReturn(List.of(mock(com.hotelpms.frontdesk.stays.domain.Stay.class)));
+
+        assertThrows(ConflictException.class,
+                () -> reservationService.updateStatusAndGuests(
+                        reservationId, ReservationStatus.NO_SHOW, null, null));
+
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void testCreateReservationOverlapThrowsBadRequest() {
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
@@ -1151,5 +1239,158 @@ class ReservationServiceImplTest {
                 () -> reservationService.getAvailableRooms(sameDay, sameDay));
         assertEquals(ERR_CHECKOUT_AFTER_CHECKIN, ex.getMessage());
         verify(roomService, never()).findBookableRooms(any());
+    }
+
+    // ---------------------------------------------------------------
+    // exportReservationsCsv (Point 3 -- CSV export)
+    // ---------------------------------------------------------------
+
+    @Test
+    void testExportReservationsCsvWritesHeaderAndHotelScopedRowsWithResolvedGuestName() throws IOException {
+        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending());
+        final Page<Reservation> reservationPage = new PageImpl<>(List.of(entity), pageable, 1L);
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+
+        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
+                .thenReturn(reservationPage);
+        when(guestClient.getGuestsBatch(List.of(GUEST_ID))).thenReturn(List.of(mockGuestResponse));
+
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        reservationService.exportReservationsCsv(null, false, null, null, null, out);
+
+        final String content = out.toString(StandardCharsets.UTF_8);
+        assertTrue(content.contains("guestName;checkInDate;checkOutDate;status;expectedGuests;actualGuests"));
+        assertTrue(content.contains(FULL_NAME));
+        assertTrue(content.contains(String.valueOf(STATUS_CONFIRMED)));
+    }
+
+    @Test
+    void testExportReservationsCsvSkipsGuestBatchResolutionWhenNoRows() throws IOException {
+        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending());
+        when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
+                .thenReturn(Page.empty(pageable));
+
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        reservationService.exportReservationsCsv(null, false, null, null, null, out);
+
+        verify(guestClient, never()).getGuestsBatch(any());
+        assertTrue(out.toString(StandardCharsets.UTF_8).contains("guestName;checkInDate"));
+    }
+
+    @Test
+    void testExportReservationsCsvAppliesStatusFilterViaFilterQuery() throws IOException {
+        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending());
+        when(reservationRepository.filterReservationsByHotelId(
+                eq(HOTEL_ID), any(), any(), eq(Set.of(ReservationStatus.CHECKED_IN)),
+                eq(null), eq(List.of()), eq(pageable)))
+                .thenReturn(Page.empty(pageable));
+
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        reservationService.exportReservationsCsv(
+                null, false, null, null, ReservationStatus.CHECKED_IN, out);
+
+        verify(reservationRepository).filterReservationsByHotelId(
+                eq(HOTEL_ID), any(), any(), eq(Set.of(ReservationStatus.CHECKED_IN)),
+                eq(null), eq(List.of()), eq(pageable));
+    }
+
+    // ---------------------------------------------------------------
+    // createReservationForGroup / getGroupBillingInfo (Point 4 -- gestione gruppi)
+    // ---------------------------------------------------------------
+
+    @Test
+    void testCreateReservationForGroupUsesGroupRateInsteadOfLiveResolution() {
+        final UUID groupId = Objects.requireNonNull(UUID.randomUUID());
+        final LocalDate checkIn = LocalDate.now().plusDays(1);
+        final LocalDate checkOut = checkIn.plusDays(2);
+        final Reservation groupEntity = Reservation.builder().id(UUID.randomUUID())
+                .checkInDate(checkIn).checkOutDate(checkOut)
+                .lineItems(new ArrayList<>(List.of(ReservationLineItem.builder().roomId(roomId).build())))
+                .build();
+
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(reservationMapper.toEntity(any(ReservationRequest.class))).thenReturn(groupEntity);
+        when(reservationRepository.saveAndFlush(groupEntity)).thenReturn(groupEntity);
+        when(reservationMapper.toResponse(groupEntity)).thenReturn(response);
+        when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
+                new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null, null));
+        when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
+
+        reservationService.createReservationForGroup(
+                groupId, GUEST_ID, roomId, EXPECTED_GUESTS, checkIn, checkOut,
+                BigDecimal.valueOf(100), true);
+
+        assertEquals(groupId, groupEntity.getGroupId());
+        assertTrue(groupEntity.isBilledToMasterFolio());
+        assertEquals(1, groupEntity.getLineItems().size());
+        // 2 nights * 100/night group rate, never a live rate-calendar resolution.
+        assertEquals(PRICE_200, groupEntity.getLineItems().get(0).getPrice());
+        verify(ratePricingService, never()).resolveStayRates(any(), any(), any(), any());
+    }
+
+    @Test
+    void testCreateReservationForGroupResolvesLiveRateWhenNoGroupRateGiven() {
+        final UUID groupId = Objects.requireNonNull(UUID.randomUUID());
+        final LocalDate checkIn = LocalDate.now().plusDays(1);
+        final LocalDate checkOut = checkIn.plusDays(2);
+        final Reservation groupEntity = Reservation.builder().id(UUID.randomUUID())
+                .checkInDate(checkIn).checkOutDate(checkOut)
+                .lineItems(new ArrayList<>(List.of(ReservationLineItem.builder().roomId(roomId).build())))
+                .build();
+
+        final GuestResponse mockGuestResponse =
+                new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
+        when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(reservationMapper.toEntity(any(ReservationRequest.class))).thenReturn(groupEntity);
+        when(reservationRepository.saveAndFlush(groupEntity)).thenReturn(groupEntity);
+        when(reservationMapper.toResponse(groupEntity)).thenReturn(response);
+        when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
+                new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
+                        true, true, null, null, null, null, null, null, null));
+        when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
+        when(ratePricingService.resolveStayRates(ROOM_TYPE_ID, HOTEL_ID, checkIn, checkOut))
+                .thenReturn(List.of(new NightlyRate(checkIn, PRICE_120, null),
+                        new NightlyRate(checkIn.plusDays(1), PRICE_120, null)));
+
+        reservationService.createReservationForGroup(
+                groupId, GUEST_ID, roomId, EXPECTED_GUESTS, checkIn, checkOut, null, false);
+
+        assertFalse(groupEntity.isBilledToMasterFolio());
+        assertEquals(PRICE_240, groupEntity.getLineItems().get(0).getPrice());
+    }
+
+    @Test
+    void testGetGroupBillingInfoReturnsEmptyWhenReservationHasNoGroup() {
+        entity.setGroupId(null);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        assertTrue(reservationService.getGroupBillingInfo(reservationId, HOTEL_ID).isEmpty());
+    }
+
+    @Test
+    void testGetGroupBillingInfoReturnsGroupIdAndBilledFlagWhenPresent() {
+        final UUID groupId = Objects.requireNonNull(UUID.randomUUID());
+        entity.setGroupId(groupId);
+        entity.setBilledToMasterFolio(true);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        final var result = reservationService.getGroupBillingInfo(reservationId, HOTEL_ID);
+
+        assertTrue(result.isPresent());
+        assertEquals(groupId, result.get().groupId());
+        assertTrue(result.get().billedToMasterFolio());
+    }
+
+    @Test
+    void testGetGroupBillingInfoReturnsEmptyWhenReservationNotFoundForHotel() {
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.empty());
+
+        assertTrue(reservationService.getGroupBillingInfo(reservationId, HOTEL_ID).isEmpty());
     }
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAuthStore } from './authStore';
-import type { UserPayload } from '../types/auth.types';
+import type { UserPayload } from '../types';
 
 describe('authStore', () => {
   beforeEach(() => {

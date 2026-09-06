@@ -32,9 +32,11 @@ export type {
   GuestPrivacySettingsRequest,
 } from './guest.types';
 export * from './inventory.types';
+export * from './nightAudit.types';
 export * from './ownerReport.types';
 export * from './page.types';
 export * from './quotation.types';
 export * from './reservation.types';
+export * from './reservationGroup.types';
 export * from './stay.types';
 export * from './user.types';

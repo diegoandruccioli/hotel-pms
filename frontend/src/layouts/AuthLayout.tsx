@@ -7,7 +7,7 @@ export const AuthLayout = () => {
   const { t: tc } = useTranslation('common');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-surface via-primary-container/30 to-surface flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-linear-to-br from-surface via-primary-container/30 to-surface flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:rounded-shape-full focus:bg-primary focus:text-on-primary focus:ring-2 focus:ring-primary focus:ring-offset-2"

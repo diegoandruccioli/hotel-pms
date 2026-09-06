@@ -156,7 +156,7 @@ class CityTaxAssessmentServiceImplTest {
     @Test
     void assessForHotelWithoutComuneConfiguredPersistsUnassessedRow() {
         when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.empty());
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.empty());
         when(cityTaxAssessmentRepository.save(any(CityTaxAssessment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -172,7 +172,7 @@ class CityTaxAssessmentServiceImplTest {
     @Test
     void assessForHotelWithoutCategoryRecordedPersistsUnassessedRow() {
         when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
-        when(hotelSettingsRepository.findById(hotelId))
+        when(hotelSettingsRepository.findByHotelId(hotelId))
                 .thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT)).thenReturn(Optional.empty());
         when(cityTaxAssessmentRepository.save(any(CityTaxAssessment.class)))
@@ -187,7 +187,7 @@ class CityTaxAssessmentServiceImplTest {
     @Test
     void assessForNoApplicableRatePersistsUnassessedRow() {
         when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
-        when(hotelSettingsRepository.findById(hotelId))
+        when(hotelSettingsRepository.findByHotelId(hotelId))
                 .thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
@@ -212,7 +212,7 @@ class CityTaxAssessmentServiceImplTest {
                 .id(UUID.randomUUID()).comuneCodice(COMUNE_CODICE).category(CATEGORY)
                 .amountPerNight(RATE_AMOUNT_PER_NIGHT).validFrom(FIRST_NIGHT).validTo(FIRST_NIGHT.plusDays(1)).build();
         when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
-        when(hotelSettingsRepository.findById(hotelId))
+        when(hotelSettingsRepository.findByHotelId(hotelId))
                 .thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
@@ -234,7 +234,7 @@ class CityTaxAssessmentServiceImplTest {
         when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
         final HotelSettings settings = settingsWithComune(COMUNE_CODICE);
         settings.setCityTaxApplicability(CityTaxApplicability.NOT_APPLICABLE);
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settings));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settings));
         when(cityTaxAssessmentRepository.save(any(CityTaxAssessment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -260,7 +260,7 @@ class CityTaxAssessmentServiceImplTest {
         final LocalDate stayEnd = FIRST_NIGHT.plusDays(NIGHTS);
 
         when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
-        when(hotelSettingsRepository.findById(hotelId))
+        when(hotelSettingsRepository.findByHotelId(hotelId))
                 .thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
@@ -310,7 +310,7 @@ class CityTaxAssessmentServiceImplTest {
         final Stay crossoverStay = Stay.builder().id(stayId).hotelId(hotelId).actualCheckInTime(checkIn.atStartOfDay()).build();
 
         when(cityTaxAssessmentRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
-        when(hotelSettingsRepository.findById(hotelId))
+        when(hotelSettingsRepository.findByHotelId(hotelId))
                 .thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, checkIn))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
@@ -381,7 +381,7 @@ class CityTaxAssessmentServiceImplTest {
         stay.setExpectedCheckOutDate(FIRST_NIGHT.plusDays(remainingNights));
         final CityTaxRate rate = CityTaxRate.builder()
                 .id(UUID.randomUUID()).amountPerNight(RATE_AMOUNT_PER_NIGHT).validFrom(RATE_VALID_FROM).build();
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
         when(cityTaxRateRepository.findAllApplicableByHotelIdInRange(
@@ -415,7 +415,7 @@ class CityTaxAssessmentServiceImplTest {
         stay.setExpectedCheckOutDate(FIRST_NIGHT.plusDays(remainingNights));
         final CityTaxRate rate = CityTaxRate.builder()
                 .id(UUID.randomUUID()).amountPerNight(RATE_AMOUNT_PER_NIGHT).validFrom(RATE_VALID_FROM).build();
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
         when(cityTaxRateRepository.findAllApplicableByHotelIdInRange(
@@ -478,7 +478,7 @@ class CityTaxAssessmentServiceImplTest {
 
     @Test
     void checkConfigurationStatusWithApplicableRateIsConfigured() {
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(eq(hotelId), any(LocalDate.class)))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
         when(cityTaxRateRepository.findApplicableByHotelId(eq(hotelId), eq(COMUNE_CODICE), eq(CATEGORY), any(LocalDate.class)))
@@ -492,7 +492,7 @@ class CityTaxAssessmentServiceImplTest {
 
     @Test
     void checkConfigurationStatusWithoutComuneIsNotConfigured() {
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.empty());
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.empty());
 
         final CityTaxConfigurationStatusResponse status = cityTaxAssessmentService.checkConfigurationStatus(hotelId);
 
@@ -504,7 +504,7 @@ class CityTaxAssessmentServiceImplTest {
     void checkConfigurationStatusDeclaredNotApplicableIsConfiguredWithNoReason() {
         final HotelSettings settings = settingsWithComune(COMUNE_CODICE);
         settings.setCityTaxApplicability(CityTaxApplicability.NOT_APPLICABLE);
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settings));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settings));
 
         final CityTaxConfigurationStatusResponse status = cityTaxAssessmentService.checkConfigurationStatus(hotelId);
 
@@ -561,7 +561,7 @@ class CityTaxAssessmentServiceImplTest {
         when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
                 .thenReturn(List.of(gap));
         when(stayRepository.findAllById(any())).thenReturn(List.of(stay));
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
         when(cityTaxRateRepository.findAllApplicableByHotelIdInRange(
@@ -592,7 +592,7 @@ class CityTaxAssessmentServiceImplTest {
         when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
                 .thenReturn(List.of(gap));
         when(stayRepository.findAllById(any())).thenReturn(List.of(stay));
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
         when(cityTaxRateRepository.findAllApplicableByHotelIdInRange(
@@ -627,7 +627,7 @@ class CityTaxAssessmentServiceImplTest {
         when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
                 .thenReturn(List.of(gap));
         when(stayRepository.findAllById(any())).thenReturn(List.of(stay));
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
         when(cityTaxRateRepository.findAllApplicableByHotelIdInRange(
@@ -654,7 +654,7 @@ class CityTaxAssessmentServiceImplTest {
         when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
                 .thenReturn(List.of(gap));
         when(stayRepository.findAllById(any())).thenReturn(List.of(stay));
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT)).thenReturn(Optional.empty());
 
         final CityTaxBackfillResponse result = cityTaxAssessmentService.confirmBackfill(hotelId);
@@ -670,7 +670,7 @@ class CityTaxAssessmentServiceImplTest {
     void confirmBackfillDoesNothingWhenHotelHasSinceDeclaredNotApplicable() {
         final HotelSettings settings = settingsWithComune(COMUNE_CODICE);
         settings.setCityTaxApplicability(CityTaxApplicability.NOT_APPLICABLE);
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settings));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settings));
 
         final CityTaxBackfillResponse result = cityTaxAssessmentService.confirmBackfill(hotelId);
 
@@ -687,7 +687,7 @@ class CityTaxAssessmentServiceImplTest {
         when(cityTaxAssessmentRepository.findByHotelIdAndUnassessedReasonIn(eq(hotelId), any()))
                 .thenReturn(List.of(gap));
         when(stayRepository.findAllById(any())).thenReturn(List.of(stay));
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(hotelCategoryHistoryRepository.findApplicableByHotelId(hotelId, FIRST_NIGHT))
                 .thenReturn(Optional.of(categoryHistory(CATEGORY)));
         when(cityTaxRateRepository.findAllApplicableByHotelIdInRange(

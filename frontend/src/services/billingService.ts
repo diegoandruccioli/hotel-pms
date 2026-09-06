@@ -9,9 +9,9 @@ import type {
   SdiStatus,
   SpringPage,
 } from '../types';
+import { downloadViaIframe } from '../utils/downloadViaIframe';
 
 const BASE_PATH = '/api/v1/invoices';
-const IFRAME_CLEANUP_DELAY_MS = 10000;
 
 export const billingService = {
   getInvoiceById: async (id: string): Promise<InvoiceResponse> => {
@@ -70,11 +70,7 @@ export const billingService = {
   },
 
   downloadFatturaPAXml: (invoiceId: string): void => {
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = `${BASE_PATH}/${invoiceId}/fatturaPA`;
-    document.body.appendChild(iframe);
-    setTimeout(() => document.body.removeChild(iframe), IFRAME_CLEANUP_DELAY_MS);
+    downloadViaIframe(`${BASE_PATH}/${invoiceId}/fatturaPA`);
   },
 
   /**
@@ -90,10 +86,23 @@ export const billingService = {
    * response (e.g. a 500) contained inside the iframe instead of navigating the SPA away.
    */
   downloadPdf: (invoiceId: string): void => {
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = `${BASE_PATH}/${invoiceId}/pdf`;
-    document.body.appendChild(iframe);
-    setTimeout(() => document.body.removeChild(iframe), IFRAME_CLEANUP_DELAY_MS);
+    downloadViaIframe(`${BASE_PATH}/${invoiceId}/pdf`);
+  },
+
+  /** Downloads every invoice matching the same filters as {@link searchInvoices}
+   * as a CSV file via a hidden iframe. Admin/Owner only — financial data. */
+  exportInvoicesCsv: (params: {
+    status?: InvoiceStatus;
+    query?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): void => {
+    const searchParams = new URLSearchParams();
+    if (params.status) searchParams.set('status', params.status);
+    if (params.query?.trim()) searchParams.set('query', params.query.trim());
+    if (params.dateFrom) searchParams.set('dateFrom', params.dateFrom);
+    if (params.dateTo) searchParams.set('dateTo', params.dateTo);
+    const qs = searchParams.toString();
+    downloadViaIframe(`${BASE_PATH}/export.csv${qs ? `?${qs}` : ''}`);
   },
 };

@@ -10,10 +10,18 @@ import { OTHER_HOTEL_ADMIN } from './fixtures/hotel';
 // This spec creates a second real hotel identity and proves the real
 // backend actually enforces the boundary, not an assumption about it.
 
+// A far-future date no other reservation fixture in this suite would use —
+// the CSV export check below matches on it directly (the CSV's "guestName"
+// column has no unique value to match on: fixture guests all share the same
+// fixed first/last name, see fixtures/api.ts).
+const GROUP_TEST_DATE_MARKER = '2099-06-15';
+
 test.describe('Cross-tenant IDOR and RBAC against the real backend', () => {
     let hotelARoomId: string;
     let hotelAGuestId: string;
+    let hotelAGuestEmail: string;
     let hotelAInvoiceId: string;
+    let hotelAGroupId: string;
     let otherHotelContext: APIRequestContext;
 
     test.beforeAll(async ({ request, baseURL }) => {
@@ -24,8 +32,30 @@ test.describe('Cross-tenant IDOR and RBAC against the real backend', () => {
         hotelARoomId = room.id;
         const guest = await createGuest(request, headers);
         hotelAGuestId = guest.id;
+        hotelAGuestEmail = guest.email;
         const stay = await createWalkInStay(request, headers, { roomId: room.id, guestId: guest.id });
         hotelAInvoiceId = stay.invoiceId;
+
+        // Point 7 item 4 (tenant-isolation audit): the group/master-folio
+        // surface introduced this session had no cross-tenant coverage yet.
+        // A second room, so this reservation doesn't collide with the
+        // walk-in stay already occupying `room` above.
+        const groupRoom = await createCleanRoom(request, headers);
+        const groupResponse = await request.post('/api/v1/reservation-groups', {
+            headers,
+            data: {
+                name: `E2E-LIVE-GROUP-${Date.now()}`,
+                contactGuestId: guest.id,
+                checkInDate: GROUP_TEST_DATE_MARKER,
+                checkOutDate: '2099-06-17',
+                openMasterFolio: false,
+                rooms: [{ guestId: guest.id, roomId: groupRoom.id, expectedGuests: 1, billedToMasterFolio: false }],
+            },
+        });
+        if (groupResponse.status() !== 201) {
+            throw new Error(`Failed to create fixture reservation group: ${groupResponse.status()} ${await groupResponse.text()}`);
+        }
+        hotelAGroupId = (await groupResponse.json()).id as string;
 
         // A second, independent identity for a DIFFERENT hotel — its own
         // browser-less API context, deliberately not sharing the "live"
@@ -74,6 +104,36 @@ test.describe('Cross-tenant IDOR and RBAC against the real backend', () => {
             data: { amount: 1, paymentMethod: 'CASH' },
         });
         expect(response.status()).toBe(404);
+    });
+
+    // Point 7 item 4 (tenant-isolation audit): extends this suite to the
+    // reservation-groups and CSV export surfaces introduced this session,
+    // which had no cross-tenant coverage yet.
+
+    test("Hotel A's reservation group is invisible (404) to Hotel B", async () => {
+        const response = await otherHotelContext.get(`/api/v1/reservation-groups/${hotelAGroupId}`);
+        expect(response.status()).toBe(404);
+    });
+
+    test("Hotel A's reservation group does not appear in Hotel B's group list", async () => {
+        const response = await otherHotelContext.get('/api/v1/reservation-groups?page=0&size=200');
+        expect(response.status()).toBe(200);
+        const groups = (await response.json()).content as Array<{ id: string }>;
+        expect(groups.some((g) => g.id === hotelAGroupId)).toBe(false);
+    });
+
+    test("Hotel A's guest data does not leak into Hotel B's guest CSV export", async () => {
+        const response = await otherHotelContext.get('/api/v1/guests/export.csv');
+        expect(response.status()).toBe(200);
+        const csv = await response.text();
+        expect(csv).not.toContain(hotelAGuestEmail);
+    });
+
+    test("Hotel A's reservation does not leak into Hotel B's reservation CSV export", async () => {
+        const response = await otherHotelContext.get('/api/v1/reservations/export.csv');
+        expect(response.status()).toBe(200);
+        const csv = await response.text();
+        expect(csv).not.toContain(GROUP_TEST_DATE_MARKER);
     });
 
     test('RECEPTIONIST role is rejected from the OWNER/ADMIN-only financial report endpoint', async ({ baseURL }) => {

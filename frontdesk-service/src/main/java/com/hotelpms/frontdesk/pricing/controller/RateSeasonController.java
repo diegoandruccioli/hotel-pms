@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.pricing.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.frontdesk.pricing.dto.RateSeasonRequest;
 import com.hotelpms.frontdesk.pricing.dto.RateSeasonResponse;
 import com.hotelpms.frontdesk.pricing.service.RateSeasonAdminService;
@@ -9,7 +11,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -46,7 +47,7 @@ public class RateSeasonController {
      */
     @GetMapping
     public ResponseEntity<List<RateSeasonResponse>> listSeasons(@NonNull @PathVariable final UUID roomTypeId) {
-        return ResponseEntity.ok(rateSeasonAdminService.listSeasons(roomTypeId, resolveHotelId()));
+        return ResponseEntity.ok(rateSeasonAdminService.listSeasons(roomTypeId, TenantContext.resolveHotelId()));
     }
 
     /**
@@ -62,7 +63,7 @@ public class RateSeasonController {
             @NonNull @PathVariable final UUID roomTypeId,
             @NonNull @Valid @RequestBody final RateSeasonRequest request) {
         final RateSeasonResponse response =
-                rateSeasonAdminService.createSeason(roomTypeId, resolveHotelId(), request);
+                rateSeasonAdminService.createSeason(roomTypeId, TenantContext.resolveHotelId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -81,7 +82,7 @@ public class RateSeasonController {
             @NonNull @PathVariable final UUID roomTypeId,
             @NonNull @PathVariable final UUID id,
             @NonNull @Valid @RequestBody final RateSeasonRequest request) {
-        return ResponseEntity.ok(rateSeasonAdminService.updateSeason(id, resolveHotelId(), request));
+        return ResponseEntity.ok(rateSeasonAdminService.updateSeason(id, TenantContext.resolveHotelId(), request));
     }
 
     /**
@@ -94,16 +95,7 @@ public class RateSeasonController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public void deleteSeason(@NonNull @PathVariable final UUID roomTypeId, @NonNull @PathVariable final UUID id) {
-        rateSeasonAdminService.deleteSeason(id, resolveHotelId());
+        rateSeasonAdminService.deleteSeason(id, TenantContext.resolveHotelId());
     }
 
-    /**
-     * Extracts the hotel UUID from the current security context details.
-     *
-     * @return the hotel UUID of the authenticated user
-     */
-    private UUID resolveHotelId() {
-        final Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        return UUID.fromString(String.valueOf(details));
-    }
 }
