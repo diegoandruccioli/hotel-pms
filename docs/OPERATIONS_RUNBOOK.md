@@ -15,9 +15,12 @@
 docker compose up -d
 
 # Stack completo (raccomandato in produzione): aggiunge Loki/Grafana/Zipkin/
-# Alertmanager/Prometheus (profilo "observability") e il backup automatico
-# Postgres (profilo "backup") — entrambi i --profile sono opt-in, senza non partono
-docker compose --profile observability --profile backup up -d
+# Alertmanager/Prometheus (profilo "observability"). Il backup Postgres
+# (WAL archiving + pgBackRest repo1 locale) è SEMPRE attivo nel servizio
+# "postgres" stesso, non un profilo — non esiste più un profilo "backup".
+# Solo il repo2 off-site (Backblaze B2) è opt-in, e si attiva impostando
+# S3_BUCKET nel .env, non con un --profile.
+docker compose --profile observability up -d
 
 # Verifica che tutti i servizi siano healthy
 docker compose ps
@@ -276,8 +279,79 @@ esplicitamente: *"recovery stopping before commit of transaction ..."* alla
 transazione esatta dell'insert. Verifica visiva sul bucket B2 reale
 (console `secure.backblaze.com`) richiede login con le credenziali
 dell'utente — da fare manualmente, non eseguibile da un agente automatico.
-Drill CI non ancora eseguito dal vivo — richiede prima la configurazione dei
-secret GitHub elencati sopra.
+
+**Aggiornamento 2026-09-06**: i secret GitHub elencati sopra erano già
+configurati dal 2026-08-02, ma il drill CI aveva fallito su **tutte e 10** le
+esecuzioni da allora (schedulate + manuali) — un guasto reale e silenzioso,
+mai notato perché **nessun canale di alert lo segnalava** (Alertmanager instrada
+tutto a `receiver: 'null'`, `docker/alertmanager/alertmanager.yml:16,20` —
+punto ancora aperto, non ancora corretto in questo pilota: un guasto reale in
+produzione avrebbe lo stesso identico esito silenzioso). Causa del fallimento
+CI: la directory di restore viveva sotto `${{ runner.temp }}`
+(`/home/runner/work/_temp/...`), le cui directory genitrici sono `0750` di
+proprietà dell'utente `runner` — l'utente `postgres` non può attraversarle
+nemmeno dopo `chown`/`chmod` sulla sola directory foglia, quindi `pg_ctl`
+falliva sempre con *"could not access directory ...: Permission denied"*.
+Corretto spostando la directory di restore sotto `/tmp` (world-executable,
+sticky bit) — commit su `feature/backup-restore-hardening`. **Primo run verde
+mai ottenuto**: run `34015686615` (workflow_dispatch, 2026-09-06), tutti gli
+8 step completati, incluse le due verifiche che fallivano sempre
+("Start restored data directory" e "Verify each database").
+
+Nello stesso giro, drill di restore **manuale** eseguito dal vivo (container
+scratch isolato, volume nuovo, mai a contatto con lo stack live): backup
+incrementale più recente (64.1MB, 2664 file) ripristinato in 7117ms;
+`flyway_schema_history` per database: auth=8, guest=9, frontdesk=23,
+billing=14, fb=7; conteggi righe reali verificati: guests=206,
+reservations=66, invoices=147. Stack live confermato non impattato,
+container/volume scratch smontati a fine prova.
+
+### Restore da PC vergine (sostituzione hardware / nuova installazione)
+
+Scenario: il PC dell'hotel è perso o irrecuperabile (guasto, furto, incendio)
+e va ricostruito da zero su un hardware nuovo. Nessuna HA in questo pilota
+(hotel a 1 solo PC — `backup/DECISIONS.md`) — questo è l'unico percorso di
+recovery, e finché non è completato **il pilota è fermo**.
+
+**Prerequisito critico**: `.env` (in particolare `PGBACKREST_CIPHER_PASS`,
+la chiave di cifratura simmetrica del backup) **non vive nel repository Git**
+e **non vive sul PC dell'hotel in altra forma che nel container stesso** — se
+va perso insieme al PC, il backup off-site cifrato su B2 è dati illeggibili,
+irrecuperabili, per chiunque. `.env` va conservato **offline, fuori dal PC
+dell'hotel** (es. copia cifrata su una chiavetta USB in cassaforte, o un
+password manager separato dal PC) — non è un dettaglio implementativo, è la
+condizione che rende questo intero runbook eseguibile.
+
+1. **Hardware nuovo**: installare Docker Engine + Docker Compose plugin
+   (nessun altro prerequisito di sistema — tutto il resto gira in container).
+2. **Codice**: `git clone` del repository sul PC nuovo.
+3. **Segreti**: recuperare `.env` dalla custodia offline (vedi sopra) e
+   copiarlo nella root del repository. Verificare che contenga almeno:
+   `PGBACKREST_CIPHER_PASS`, `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`,
+   `S3_SECRET_ACCESS_KEY`, `S3_REGION`, oltre ai secret applicativi standard
+   (`INTERNAL_HMAC_SECRET`, `REDIS_PASSWORD`, credenziali DB).
+4. **Avvio senza dati**: `docker compose up -d postgres` (solo Postgres per
+   ora — gli altri servizi falliscono le migration finché il DB non è
+   ripristinato, atteso).
+5. **Restore da off-site**: stessa procedura di "Restore end-to-end da copia
+   off-site" sopra, con `--repo=2` (B2) invece di `repo1` (che su questo PC
+   nuovo non esiste ancora):
+   ```bash
+   docker exec hotel_postgres gosu postgres pgbackrest --stanza=hotel-pms \
+     --repo=2 --delta restore
+   ```
+6. **Verifica**: `flyway_schema_history` per ognuna delle 5 database (stessa
+   query del drill CI, §"Drill automatico settimanale" sopra) — conferma che
+   lo schema sia coerente prima di avviare il resto dello stack.
+7. **Avvio completo**: `docker compose --profile observability up -d`,
+   verifica `docker compose ps` (tutti `healthy`).
+8. **RTO misurato in questa prova (2026-09-06, dati pilota, ~64MB)**: restore
+   dati in **7.1 secondi** (esclude l'avvio Docker/OS del PC nuovo e il tempo
+   di recupero fisico di `.env` dalla custodia offline, entrambi fuori dal
+   controllo del software). **Da rimisurare sull'hardware reale** prima del
+   go-live — questa cifra viene da un container scratch su hardware di
+   sviluppo, non dal PC dell'hotel, e con un volume dati di pilota, non con
+   mesi di dati reali accumulati.
 
 ---
 

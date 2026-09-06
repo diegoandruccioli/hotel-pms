@@ -66,7 +66,13 @@ jobs:
             echo "repo1-block=y"
             echo ""
             echo "[hotel-pms]"
-            echo "pg1-path=${{ runner.temp }}/restore"
+            # NOT ${{ runner.temp }} (/home/runner/work/_temp): its parent dirs
+            # are mode 0750 owned by `runner`, so the `postgres` system user
+            # can't traverse into them even after chown+chmod on the leaf dir
+            # itself — every run failed here with "could not access directory
+            # ...: Permission denied" despite the restore succeeding. /tmp is
+            # world-executable (sticky bit), so postgres can reach a dir under it.
+            echo "pg1-path=/tmp/pgbackrest-restore"
           } | sudo tee /etc/pgbackrest/pgbackrest.conf >/dev/null
           # Note: this runner's pgbackrest.conf calls the off-site bucket
           # "repo1" (it's the only repo this job knows about) — it is the
@@ -78,7 +84,7 @@ jobs:
 
       - name: Restore latest backup from off-site into a scratch directory
         run: |
-          mkdir -p "${{ runner.temp }}/restore"
+          mkdir -p "/tmp/pgbackrest-restore"
           # No --type/--target-action: this drill just proves "latest backup
           # restores and starts", not a specific point in time (that's the
           # separate, manually-run PITR drill — see docs/OPERATIONS_RUNBOOK.md §5).
@@ -87,14 +93,14 @@ jobs:
           # Postgres replays all available WAL and comes up as a normal
           # read-write primary on its own.
           pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --stanza=hotel-pms \
-            --pg1-path="${{ runner.temp }}/restore" \
+            --pg1-path="/tmp/pgbackrest-restore" \
             restore
 
       - name: Start restored data directory as a standalone Postgres instance
         run: |
-          sudo chown -R postgres:postgres "${{ runner.temp }}/restore"
-          sudo chmod 0700 "${{ runner.temp }}/restore"
-          sudo -u postgres /usr/lib/postgresql/15/bin/pg_ctl -D "${{ runner.temp }}/restore" \
+          sudo chown -R postgres:postgres "/tmp/pgbackrest-restore"
+          sudo chmod 0700 "/tmp/pgbackrest-restore"
+          sudo -u postgres /usr/lib/postgresql/15/bin/pg_ctl -D "/tmp/pgbackrest-restore" \
             -o "-p 5433 -c unix_socket_directories=/tmp" -w -t 120 start
 
       - name: Verify each database is queryable and has a non-empty migration history
@@ -118,4 +124,4 @@ jobs:
 
       - name: Stop the restored instance
         if: always()
-        run: sudo -u postgres /usr/lib/postgresql/15/bin/pg_ctl -D "${{ runner.temp }}/restore" -m fast stop || true
+        run: sudo -u postgres /usr/lib/postgresql/15/bin/pg_ctl -D "/tmp/pgbackrest-restore" -m fast stop || true
