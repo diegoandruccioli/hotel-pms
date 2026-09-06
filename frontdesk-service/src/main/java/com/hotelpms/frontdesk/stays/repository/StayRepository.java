@@ -197,29 +197,56 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
 
     /**
      * Sums occupied room-nights per time bucket for a hotel, for the KPI
-     * occupancy trend report (epic C4). Only {@code CHECKED_OUT} stays count,
-     * attributed to the bucket their {@code actual_check_in_time} falls in —
-     * same arrival-date convention {@link #countByHotelIdAndStatus} and the
-     * day-sheet already use. Native query: {@code date_trunc} and the
-     * {@code date - date} day-count idiom used here are PostgreSQL-specific,
-     * and this project targets only PostgreSQL (see Flyway migrations) — no
-     * portability concern traded away. {@code granularity} is always a
-     * validated {@code ReportGranularity} enum value by the time it reaches
-     * this bind parameter (see {@code OccupancySummaryController}), never a
-     * raw client-supplied string.
+     * occupancy trend report (epic C4).
+     *
+     * <p>Counts night-by-night, not by arrival date: a stay contributes one
+     * occupied room-night for every calendar night in {@code [start, end)}
+     * that falls within its {@code [actual_check_in_time, actual_check_out_time)}
+     * interval — the standard hotel-industry definition (the arrival night
+     * counts, the departure night does not). Both {@code CHECKED_IN} (still
+     * in-house — every night through the window's end counts, since there is
+     * no checkout yet) and {@code CHECKED_OUT} stays count; only those two
+     * statuses represent a room that was physically occupied.
+     *
+     * <p>This replaces an earlier version that summed a stay's ENTIRE length
+     * into whichever single bucket its arrival date fell in, and ignored
+     * in-house ({@code CHECKED_IN}) stays entirely — so a window covering
+     * mostly still-in-progress stays (the common case for "this week") could
+     * report zero occupied nights next to genuine, non-zero revenue for the
+     * same period (found in live QA, 2026-09: confirmed 104 occupied rooms
+     * elsewhere in the app, this query returned 0 for the same week).
+     *
+     * <p>Native query: {@code generate_series} and {@code date_trunc} are
+     * PostgreSQL-specific, and this project targets only PostgreSQL (see
+     * Flyway migrations) — no portability concern traded away.
+     * {@code granularity} is always a validated {@code ReportGranularity}
+     * enum value by the time it reaches this bind parameter (see
+     * {@code OccupancySummaryController}), never a raw client-supplied string.
      *
      * @param hotelId     the hotel UUID (tenant isolation)
-     * @param start       beginning of the window (inclusive), by check-in time
-     * @param end         end of the window (exclusive), by check-in time
+     * @param start       beginning of the window (inclusive)
+     * @param end         end of the window (exclusive)
      * @param granularity {@code date_trunc}'s bucket size — {@code "day"}, {@code "week"}, or {@code "month"}
      * @return one row per non-empty bucket, ordered by {@code periodStart}
      */
-    @Query(value = "SELECT date_trunc(:granularity, s.actual_check_in_time)::date AS periodStart, "
-            + "COALESCE(SUM(s.actual_check_out_time::date - s.actual_check_in_time::date), 0) AS occupiedRoomNights "
-            + "FROM stays s "
-            + "WHERE s.hotel_id = :hotelId AND s.status = 'CHECKED_OUT' "
-            + "AND s.actual_check_in_time >= :start AND s.actual_check_in_time < :end "
-            + "GROUP BY date_trunc(:granularity, s.actual_check_in_time) "
+    @Query(value = "WITH nights AS ("
+            + "  SELECT generate_series(CAST(:start AS date), "
+            + "         (CAST(:end AS date) - INTERVAL '1 day')::date, INTERVAL '1 day')::date AS night"
+            + ") "
+            + "SELECT date_trunc(:granularity, n.night)::date AS periodStart, "
+            + "COUNT(*) AS occupiedRoomNights "
+            + "FROM nights n "
+            + "JOIN stays s ON s.hotel_id = :hotelId "
+            + "  AND s.status IN ('CHECKED_IN', 'CHECKED_OUT') "
+            + "  AND s.actual_check_in_time::date <= n.night "
+            + "  AND (s.actual_check_out_time IS NULL OR s.actual_check_out_time::date > n.night) "
+            // GROUP BY the output alias, not a second date_trunc(:granularity, ...) —
+            // two separate bind-parameter occurrences of the same expression are NOT
+            // recognized by Postgres as equal for GROUP BY validity (42803: "column
+            // must appear in the GROUP BY clause"), even though both bind to the same
+            // runtime value. Grouping by the SELECT-list alias sidesteps the issue —
+            // same fix already in place in InvoiceChargeRepository's revenue query.
+            + "GROUP BY periodStart "
             + "ORDER BY periodStart",
             nativeQuery = true)
     List<StayOccupancyPeriod> sumOccupiedRoomNightsByHotelIdGroupedByPeriod(

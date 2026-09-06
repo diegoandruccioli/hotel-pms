@@ -18,7 +18,9 @@ public interface RoomRevenuePeriod {
     LocalDate getPeriodStart();
 
     /**
-     * Room-night revenue billed within this bucket.
+     * Room-night revenue attributed to the calendar nights that fall within
+     * this bucket — each charge's amount is spread across the nights it
+     * covers, not attributed wholesale to the bucket of its issue date.
      *
      * @return the total revenue for this bucket
      */

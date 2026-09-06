@@ -2,6 +2,8 @@ package com.hotelpms.billing.client;
 
 import com.hotelpms.billing.client.dto.OccupancySummaryResponse;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,6 +20,9 @@ import java.util.List;
 @FeignClient(name = "frontdesk-service-rooms", url = "${application.config.frontdesk-service-url}")
 @SuppressWarnings("PMD.ImplicitFunctionalInterface")
 public interface FrontdeskRoomsClient {
+
+    /** Logger for the fallback below — the only place this interface can observe a real failure. */
+    Logger LOG = LoggerFactory.getLogger(FrontdeskRoomsClient.class);
 
     /**
      * Returns the room count and bucketed occupied-room-nights trend for a
@@ -48,6 +53,11 @@ public interface FrontdeskRoomsClient {
      */
     default OccupancySummaryResponse getOccupancySummaryFallback(
             final LocalDate dateFrom, final LocalDate dateTo, final String granularity, final Throwable throwable) {
+        // This used to swallow the Throwable with zero logging — the KPI report would silently
+        // render all-zero ADR/RevPAR/occupancy with correct revenue alongside it, indistinguishable
+        // from frontdesk-service genuinely reporting zero rooms (found in live QA, 2026-09).
+        LOG.warn("Occupancy summary unavailable for {}..{} ({}), falling back to zero rooms/no periods",
+                dateFrom, dateTo, granularity, throwable);
         return new OccupancySummaryResponse(0, List.of());
     }
 }

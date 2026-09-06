@@ -12,6 +12,38 @@ application:
     # available", silently falling back (PDF invoices showed "Unknown Guest").
     guest-service-url: http://guest-service:8083
 
+resilience4j:
+  circuitbreaker:
+    instances:
+      # Previously unconfigured — all three Feign clients above ran on
+      # Resilience4j's hard-coded defaults, with no health-indicator exposure,
+      # so an open circuit was invisible in actuator health and its fallback
+      # (silent zero/placeholder data) was indistinguishable from a genuine
+      # zero from the upstream service. Found via the KPI report showing
+      # all-zero ADR/RevPAR/occupancy with correct revenue alongside it
+      # (live QA, 2026-09) — see FrontdeskRoomsClient's fallback logging.
+      hotelSettingsService:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+      guestService:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+      frontdeskOccupancy:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+
 internal:
   hmac:
     secret: ${INTERNAL_HMAC_SECRET}
