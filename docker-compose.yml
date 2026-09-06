@@ -68,6 +68,11 @@ services:
       - ./docker/postgres/initdb:/docker-entrypoint-initdb.d
       - postgres_data:/var/lib/postgresql/data
       - pgbackrest_repo:/var/lib/pgbackrest
+      # backup-scheduler.sh writes heartbeat/last-success textfile metrics
+      # here; node-exporter's textfile collector (same volume, read-only)
+      # exposes them to Prometheus. See BackupHeartbeatStale /
+      # BackupNotSucceededRecently in alert_rules.yml.
+      - pgbackrest_metrics:/var/lib/node_exporter/textfile_collector
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -272,6 +277,66 @@ services:
           memory: 256M
 
   # ----------------------------------------------------------
+  # node-exporter — host disk/CPU/memory metrics. On this single-PC
+  # deployment, a full disk is the single most likely failure mode and was
+  # previously invisible to Prometheus (the 8 Spring Boot jobs only expose
+  # JVM-side metrics). Also serves as the textfile-collector endpoint for
+  # backup-scheduler.sh's heartbeat/last-success metrics (see
+  # docker/postgres/backup-scheduler.sh and DiskSpaceLow/BackupHeartbeat*
+  # rules in alert_rules.yml).
+  # ----------------------------------------------------------
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: hotel_node_exporter
+    restart: unless-stopped
+    profiles: ["observability"]
+    volumes:
+      - /:/host:ro,rslave
+      - pgbackrest_metrics:/var/lib/node_exporter/textfile_collector:ro
+    command:
+      - "--path.rootfs=/host"
+      - "--collector.textfile.directory=/var/lib/node_exporter/textfile_collector"
+    networks:
+      - observability-network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+
+  # ----------------------------------------------------------
+  # postgres-exporter — database-internal metrics (connections, locks,
+  # replication lag, table/index bloat) that the JVM-side HikariCP metrics
+  # can't see. Connects as its own least-privilege role (pg_monitor,
+  # read-only system views — see docker/postgres/initdb/03-create-monitoring-role.sql),
+  # not the postgres superuser and not any per-service app role.
+  # ----------------------------------------------------------
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: hotel_postgres_exporter
+    restart: unless-stopped
+    profiles: ["observability"]
+    environment:
+      - DATA_SOURCE_NAME=postgresql://postgres_exporter:${POSTGRES_EXPORTER_PASSWORD}@postgres:5432/postgres?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - observability-network
+      - db-network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 32M
+
+  # ----------------------------------------------------------
   # Config Server
   # ----------------------------------------------------------
   config-server:
@@ -398,8 +463,8 @@ services:
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - INTERNAL_REDIS_PASSWORD=${REDIS_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_auth
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - SPRING_DATASOURCE_USERNAME=auth_service_app
+      - SPRING_DATASOURCE_PASSWORD=${AUTH_DB_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - JWT_SECRET=${JWT_SECRET}
       - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
@@ -452,8 +517,8 @@ services:
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - INTERNAL_REDIS_PASSWORD=${REDIS_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_guest
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - SPRING_DATASOURCE_USERNAME=guest_service_app
+      - SPRING_DATASOURCE_PASSWORD=${GUEST_DB_PASSWORD}
       - APPLICATION_CONFIG_FRONTDESK_SERVICE_URL=http://frontdesk-service:8081
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
@@ -505,8 +570,8 @@ services:
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - INTERNAL_REDIS_PASSWORD=${REDIS_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_frontdesk
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - SPRING_DATASOURCE_USERNAME=frontdesk_service_app
+      - SPRING_DATASOURCE_PASSWORD=${FRONTDESK_DB_PASSWORD}
       - APPLICATION_CONFIG_GUEST_SERVICE_URL=http://guest-service:8083
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       # T-STAY-03: PS portal credentials — real values injected via .env in production
@@ -565,8 +630,8 @@ services:
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - INTERNAL_REDIS_PASSWORD=${REDIS_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_billing
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - SPRING_DATASOURCE_USERNAME=billing_service_app
+      - SPRING_DATASOURCE_PASSWORD=${BILLING_DB_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       # MaxMetaspaceSize raised from 128m (BUG-0b stopgap, docs/LIVE_E2E_AUDIT_2026-07.md):
       # PDF generation was crashing the process with a Metaspace OOM. The root causes
@@ -619,8 +684,8 @@ services:
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - INTERNAL_REDIS_PASSWORD=${REDIS_PASSWORD}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/hotel_fb
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - SPRING_DATASOURCE_USERNAME=fb_service_app
+      - SPRING_DATASOURCE_PASSWORD=${FB_DB_PASSWORD}
       - APPLICATION_CONFIG_FRONTDESK_SERVICE_URL=http://frontdesk-service:8081
       - APPLICATION_CONFIG_BILLING_SERVICE_URL=http://billing-service:8085
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
@@ -733,6 +798,10 @@ services:
       start_period: 10s
     networks:
       - backend-network
+      # Alertmanager's default email-ops receiver points at mailpit:1025 —
+      # see docker/alertmanager/alertmanager.yml — so alerts are visible
+      # out of the box in dev/pilot before a real SMTP relay is configured.
+      - observability-network
     deploy:
       resources:
         limits:
@@ -782,6 +851,7 @@ services:
 volumes:
   postgres_data:
   pgbackrest_repo:
+  pgbackrest_metrics:
   loki_data:
   grafana_data:
   alertmanager_data:

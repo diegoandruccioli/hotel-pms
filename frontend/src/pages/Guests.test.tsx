@@ -18,7 +18,12 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../services/guestService', () => ({
-  guestService: { searchGuestsPaged: vi.fn(), deleteGuest: vi.fn(), exportGuestData: vi.fn() },
+  guestService: {
+    searchGuestsPaged: vi.fn(),
+    deleteGuest: vi.fn(),
+    exportGuestData: vi.fn(),
+    exportGuestsCsv: vi.fn(),
+  },
 }));
 
 vi.mock('../store/authStore', () => ({
@@ -160,6 +165,26 @@ describe('Guests', () => {
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: /delete John Doe/ })).toBeInTheDocument();
+  });
+
+  it('should not show the export CSV button for RECEPTIONIST', async () => {
+    vi.mocked(useAuthStore).mockImplementation(mockAuthReceptionist);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    render(<Guests />);
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    expect(screen.queryByText('export_csv')).not.toBeInTheDocument();
+  });
+
+  it('should export the current search as CSV when ADMIN clicks export', async () => {
+    vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    render(<Guests />);
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('export_csv'));
+
+    expect(guestService.exportGuestsCsv).toHaveBeenCalledWith('');
   });
 
   it('should open confirmation dialog when delete button is clicked', async () => {

@@ -34,10 +34,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -49,6 +53,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -60,6 +65,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class GuestServiceImplTest {
 
+    private static final String SORT_FIELD_LAST_NAME = "lastName";
     private static final String TEST_FIRST_NAME = "John";
     private static final String TEST_LAST_NAME = "Doe";
     private static final String TEST_EMAIL = "john.doe@example.com";
@@ -498,5 +504,58 @@ class GuestServiceImplTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> guestService.removeIdentityDocument(guestId, docId));
+    }
+
+    // ---------------------------------------------------------------
+    // exportGuestsCsv (Point 3 -- CSV export)
+    // ---------------------------------------------------------------
+
+    @Test
+    void shouldExportAllGuestsAsCsvWhenQueryIsBlank() throws IOException {
+        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_LAST_NAME).ascending());
+        final Page<Guest> guestPage = new PageImpl<>(List.of(Objects.requireNonNull(guest)), pageable, 1L);
+        when(guestRepository.findAllByHotelId(hotelId, pageable)).thenReturn(guestPage);
+
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        guestService.exportGuestsCsv("   ", out);
+
+        final String content = out.toString(StandardCharsets.UTF_8);
+        assertTrue(content.contains("firstName;lastName;email;phone;city;country"));
+        assertTrue(content.contains(TEST_FIRST_NAME));
+        assertTrue(content.contains(TEST_EMAIL));
+        verify(guestRepository, never()).searchByKeywordAndHotelId(any(), any(), any());
+    }
+
+    @Test
+    void shouldExportMatchingGuestsAsCsvWhenQueryIsGiven() throws IOException {
+        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_LAST_NAME).ascending());
+        final Page<Guest> guestPage = new PageImpl<>(List.of(Objects.requireNonNull(guest)), pageable, 1L);
+        when(guestRepository.searchByKeywordAndHotelId("mario", hotelId, pageable)).thenReturn(guestPage);
+
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        guestService.exportGuestsCsv("  mario  ", out);
+
+        verify(guestRepository).searchByKeywordAndHotelId("mario", hotelId, pageable);
+        verify(guestRepository, never()).findAllByHotelId(any(), any());
+    }
+
+    @Test
+    void shouldExportEmptyOptionalFieldsAsBlankCells() throws IOException {
+        final Guest bareGuest = Guest.builder()
+                .id(UUID.randomUUID())
+                .hotelId(hotelId)
+                .firstName("Solo")
+                .lastName("Nome")
+                .active(true)
+                .build();
+        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_LAST_NAME).ascending());
+        final Page<Guest> guestPage = new PageImpl<>(List.of(bareGuest), pageable, 1L);
+        when(guestRepository.findAllByHotelId(hotelId, pageable)).thenReturn(guestPage);
+
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        guestService.exportGuestsCsv(null, out);
+
+        final String content = out.toString(StandardCharsets.UTF_8);
+        assertTrue(content.contains("Solo;Nome;;;;"));
     }
 }

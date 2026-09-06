@@ -3,13 +3,10 @@ package com.hotelpms.auth.repository;
 import com.hotelpms.internalauth.architecture.TenantScopeExempt;
 import com.hotelpms.auth.domain.UserAccount;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -88,23 +85,4 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
      */
     @Query(value = "SELECT * FROM user_account WHERE id = :id AND hotel_id = :hotelId", nativeQuery = true)
     Optional<UserAccount> findByIdAndHotelIdIncludingInactive(@Param("id") UUID id, @Param("hotelId") UUID hotelId);
-
-    /**
-     * Atomically increments the failed-login counter and sets the lock expiry.
-     * Runs in its own transaction so the update is committed even when the caller
-     * rolls back (e.g. after throwing BadCredentialsException).
-     *
-     * @param username   the account username
-     * @param attempts   the new failed-attempts value
-     * @param lockedUntil the lock expiry (null = not yet locked)
-     */
-    @TenantScopeExempt(reason = "Updates the account already resolved by findByUsername earlier "
-            + "in the same login attempt — username uniquely identifies one account platform-wide, "
-            + "so there is no other-hotel account this could touch instead.")
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
-    @Modifying
-    @Query("UPDATE UserAccount u SET u.failedAttempts = :attempts, u.lockedUntil = :lockedUntil WHERE u.username = :username")
-    void updateFailedAttempts(@Param("username") String username,
-                              @Param("attempts") int attempts,
-                              @Param("lockedUntil") Instant lockedUntil);
 }

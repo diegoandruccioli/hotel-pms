@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.stays.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.frontdesk.citytax.dto.CityTaxBackfillResponse;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxConfigurationStatusResponse;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxUnassessedSummaryResponse;
@@ -40,8 +42,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.lang.NonNull;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -83,7 +83,7 @@ public class StayController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public StayResponse checkIn(@NonNull @Valid @RequestBody final StayRequest request) {
-        final UUID hotelId = Objects.requireNonNull(extractHotelId());
+        final UUID hotelId = Objects.requireNonNull(TenantContext.resolveHotelId());
         final StayRequest enriched = new StayRequest(
                 hotelId,
                 request.reservationId(),
@@ -107,7 +107,7 @@ public class StayController {
      */
     @PutMapping("/{id}/check-out")
     public StayResponse checkOut(@NonNull @PathVariable("id") final UUID id) {
-        return stayService.checkOut(id, Objects.requireNonNull(extractHotelId()));
+        return stayService.checkOut(id, Objects.requireNonNull(TenantContext.resolveHotelId()));
     }
 
     /**
@@ -119,7 +119,7 @@ public class StayController {
      */
     @GetMapping("/{id}")
     public StayResponse getStayById(@NonNull @PathVariable("id") final UUID id) {
-        return stayService.getStayById(id, Objects.requireNonNull(extractHotelId()));
+        return stayService.getStayById(id, Objects.requireNonNull(TenantContext.resolveHotelId()));
     }
 
     /**
@@ -144,7 +144,7 @@ public class StayController {
                     sort = "actualCheckInTime",
                     direction = Sort.Direction.DESC)
             final Pageable pageable) {
-        final UUID hotelId = Objects.requireNonNull(extractHotelId());
+        final UUID hotelId = Objects.requireNonNull(TenantContext.resolveHotelId());
         if (reservationId != null) {
             return ResponseEntity.ok(stayService.getStaysByReservationId(reservationId, hotelId, pageable));
         }
@@ -169,7 +169,7 @@ public class StayController {
     @GetMapping("/guest/{guestId}/latest")
     public ResponseEntity<StayResponse> getLastCompletedStayForGuest(
             @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId) {
-        return stayService.getLastCompletedStayForGuest(guestId, Objects.requireNonNull(extractHotelId()))
+        return stayService.getLastCompletedStayForGuest(guestId, Objects.requireNonNull(TenantContext.resolveHotelId()))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.noContent().build());
     }
@@ -186,7 +186,8 @@ public class StayController {
     @SuppressWarnings("PMD.LooseCoupling")
     public ResponseEntity<byte[]> downloadAlloggiatiReport(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
-        final String content = alloggiatiReportService.generateReport(date, Objects.requireNonNull(extractHotelId()));
+        final String content = alloggiatiReportService.generateReport(
+                date, Objects.requireNonNull(TenantContext.resolveHotelId()));
         final byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
 
         final HttpHeaders headers = new HttpHeaders();
@@ -213,7 +214,7 @@ public class StayController {
     public ResponseEntity<List<AlloggiatiRowDto>> downloadAlloggiatiJson(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
         final List<AlloggiatiRowDto> rows =
-                alloggiatiReportService.generateJsonReport(date, Objects.requireNonNull(extractHotelId()));
+                alloggiatiReportService.generateJsonReport(date, Objects.requireNonNull(TenantContext.resolveHotelId()));
         final HttpHeaders headers = new HttpHeaders();
         headers.setContentDisposition(
                 ContentDisposition.attachment()
@@ -233,7 +234,7 @@ public class StayController {
     @PostMapping("/reports/alloggiati/submit")
     public ResponseEntity<Void> submitAlloggiatiReport(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
-        final UUID hotelId = Objects.requireNonNull(extractHotelId());
+        final UUID hotelId = Objects.requireNonNull(TenantContext.resolveHotelId());
         alloggiatiWebSenderService.submitReport(date, hotelId);
         stayService.markAlloggiatiSentForDate(date, hotelId);
         return ResponseEntity.ok().build();
@@ -248,7 +249,7 @@ public class StayController {
     @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     @GetMapping("/reports/alloggiati/failures/summary")
     public ResponseEntity<AlloggiatiFailureSummaryResponse> getAlloggiatiFailureSummary() {
-        return ResponseEntity.ok(stayService.getAlloggiatiFailureSummary(Objects.requireNonNull(extractHotelId())));
+        return ResponseEntity.ok(stayService.getAlloggiatiFailureSummary(Objects.requireNonNull(TenantContext.resolveHotelId())));
     }
 
     /**
@@ -261,7 +262,7 @@ public class StayController {
     @GetMapping("/guest/{guestId}/last-date")
     public ResponseEntity<GuestLastStayResponse> getLastStayDateForGuest(
             @NonNull @PathVariable final UUID guestId) {
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         return ResponseEntity.ok(
                 stayService.getLastStayDateForGuest(guestId, Objects.requireNonNull(hotelId)));
     }
@@ -276,7 +277,7 @@ public class StayController {
     @GetMapping("/guest/{guestId}/history")
     public ResponseEntity<List<StaySummaryResponse>> getStayHistoryForGuest(
             @NonNull @PathVariable final UUID guestId) {
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         return ResponseEntity.ok(
                 stayService.getStayHistoryForGuest(guestId, Objects.requireNonNull(hotelId)));
     }
@@ -291,7 +292,7 @@ public class StayController {
      */
     @PostMapping("/{id}/invoice/retry")
     public StayResponse retryInvoiceCreation(@NonNull @PathVariable("id") final UUID id) {
-        return stayService.retryInvoiceCreation(id, Objects.requireNonNull(extractHotelId()));
+        return stayService.retryInvoiceCreation(id, Objects.requireNonNull(TenantContext.resolveHotelId()));
     }
 
     /**
@@ -304,7 +305,7 @@ public class StayController {
      */
     @PostMapping("/{id}/checkout-email/retry")
     public StayResponse retryCheckoutEmail(@NonNull @PathVariable("id") final UUID id) {
-        return stayService.retryCheckoutEmail(id, Objects.requireNonNull(extractHotelId()));
+        return stayService.retryCheckoutEmail(id, Objects.requireNonNull(TenantContext.resolveHotelId()));
     }
 
     /**
@@ -317,7 +318,7 @@ public class StayController {
     @GetMapping("/city-tax/configuration-status")
     public ResponseEntity<CityTaxConfigurationStatusResponse> getCityTaxConfigurationStatus() {
         return ResponseEntity.ok(
-                cityTaxAssessmentService.checkConfigurationStatus(Objects.requireNonNull(extractHotelId())));
+                cityTaxAssessmentService.checkConfigurationStatus(Objects.requireNonNull(TenantContext.resolveHotelId())));
     }
 
     /**
@@ -331,7 +332,7 @@ public class StayController {
     @GetMapping("/city-tax/unassessed/summary")
     public ResponseEntity<CityTaxUnassessedSummaryResponse> getCityTaxUnassessedSummary() {
         return ResponseEntity.ok(
-                cityTaxAssessmentService.getUnassessedSummary(Objects.requireNonNull(extractHotelId())));
+                cityTaxAssessmentService.getUnassessedSummary(Objects.requireNonNull(TenantContext.resolveHotelId())));
     }
 
     /**
@@ -345,7 +346,7 @@ public class StayController {
     @GetMapping("/city-tax/backfill/preview")
     public ResponseEntity<CityTaxBackfillResponse> previewCityTaxBackfill() {
         return ResponseEntity.ok(
-                cityTaxAssessmentService.previewBackfill(Objects.requireNonNull(extractHotelId())));
+                cityTaxAssessmentService.previewBackfill(Objects.requireNonNull(TenantContext.resolveHotelId())));
     }
 
     /**
@@ -360,7 +361,7 @@ public class StayController {
     @PostMapping("/city-tax/backfill/confirm")
     public ResponseEntity<CityTaxBackfillResponse> confirmCityTaxBackfill() {
         return ResponseEntity.ok(
-                cityTaxAssessmentService.confirmBackfill(Objects.requireNonNull(extractHotelId())));
+                cityTaxAssessmentService.confirmBackfill(Objects.requireNonNull(TenantContext.resolveHotelId())));
     }
 
     /**
@@ -377,7 +378,7 @@ public class StayController {
     public StayResponse extendStay(
             @NonNull @PathVariable("id") final UUID id, @NonNull @Valid @RequestBody final StayExtensionRequest request) {
         return stayService.extendStay(
-                id, Objects.requireNonNull(extractHotelId()), request.newCheckOutDate(), request.version());
+                id, Objects.requireNonNull(TenantContext.resolveHotelId()), request.newCheckOutDate(), request.version());
     }
 
     /**
@@ -395,7 +396,7 @@ public class StayController {
     public StayResponse changeRoom(
             @NonNull @PathVariable("id") final UUID id, @NonNull @Valid @RequestBody final StayRoomChangeRequest request) {
         return stayService.changeRoom(
-                id, Objects.requireNonNull(extractHotelId()), request.newRoomId(), request.version());
+                id, Objects.requireNonNull(TenantContext.resolveHotelId()), request.newRoomId(), request.version());
     }
 
     /**
@@ -410,7 +411,7 @@ public class StayController {
     @ResponseStatus(HttpStatus.CREATED)
     public StayGuestResponse addGuest(
             @NonNull @PathVariable("id") final UUID id, @NonNull @Valid @RequestBody final StayGuestRequest request) {
-        return stayGuestService.addGuest(id, Objects.requireNonNull(extractHotelId()), request);
+        return stayGuestService.addGuest(id, Objects.requireNonNull(TenantContext.resolveHotelId()), request);
     }
 
     /**
@@ -425,7 +426,7 @@ public class StayController {
     public StayGuestResponse updateGuest(
             @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId,
             @NonNull @Valid @RequestBody final StayGuestRequest request) {
-        return stayGuestService.updateGuest(id, guestId, Objects.requireNonNull(extractHotelId()), request);
+        return stayGuestService.updateGuest(id, guestId, Objects.requireNonNull(TenantContext.resolveHotelId()), request);
     }
 
     /**
@@ -439,7 +440,7 @@ public class StayController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeGuest(
             @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId) {
-        stayGuestService.removeGuest(id, guestId, Objects.requireNonNull(extractHotelId()));
+        stayGuestService.removeGuest(id, guestId, Objects.requireNonNull(TenantContext.resolveHotelId()));
     }
 
     /**
@@ -456,7 +457,7 @@ public class StayController {
             @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId,
             @NonNull @Valid @RequestBody final StayGuestDepartureRequest request) {
         return stayGuestService.recordDeparture(
-                id, guestId, Objects.requireNonNull(extractHotelId()), request.departureDate());
+                id, guestId, Objects.requireNonNull(TenantContext.resolveHotelId()), request.departureDate());
     }
 
     /**
@@ -469,14 +470,7 @@ public class StayController {
     @PutMapping("/{id}/guests/{guestId}/primary")
     public StayGuestResponse promoteGuestToPrimary(
             @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId) {
-        return stayGuestService.promotePrimary(id, guestId, Objects.requireNonNull(extractHotelId()));
+        return stayGuestService.promotePrimary(id, guestId, Objects.requireNonNull(TenantContext.resolveHotelId()));
     }
 
-    private UUID extractHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr) || hotelIdStr.isBlank()) {
-            throw new IllegalStateException("HOTEL_ID_NOT_AVAILABLE");
-        }
-        return UUID.fromString(hotelIdStr);
-    }
 }

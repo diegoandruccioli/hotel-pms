@@ -74,7 +74,7 @@ class GuestRetentionJobServiceImplTest {
 
         when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
                 .thenReturn(List.of(guest));
-        when(settingsRepository.findById(Objects.requireNonNull(hotelId)))
+        when(settingsRepository.findByHotelId(Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(settings));
         when(stayServiceClient.getLastStayDate(guestId))
                 .thenReturn(new GuestLastStayClientResponse(true,
@@ -102,7 +102,7 @@ class GuestRetentionJobServiceImplTest {
 
         when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
                 .thenReturn(List.of(guest));
-        when(settingsRepository.findById(Objects.requireNonNull(hotelId)))
+        when(settingsRepository.findByHotelId(Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(settings));
         when(stayServiceClient.getLastStayDate(guestId))
                 .thenReturn(new GuestLastStayClientResponse(true,
@@ -124,7 +124,7 @@ class GuestRetentionJobServiceImplTest {
 
         when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
                 .thenReturn(List.of(guest));
-        when(settingsRepository.findById(Objects.requireNonNull(hotelId)))
+        when(settingsRepository.findByHotelId(Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(settings));
         when(stayServiceClient.getLastStayDate(guestId))
                 .thenReturn(new GuestLastStayClientResponse(true,
@@ -154,7 +154,7 @@ class GuestRetentionJobServiceImplTest {
 
         when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
                 .thenReturn(List.of(guestNoHistory));
-        when(settingsRepository.findById(Objects.requireNonNull(hotelId)))
+        when(settingsRepository.findByHotelId(Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(settings));
         when(stayServiceClient.getLastStayDate(guestId))
                 .thenReturn(new GuestLastStayClientResponse(false, null));
@@ -182,7 +182,7 @@ class GuestRetentionJobServiceImplTest {
 
         when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
                 .thenReturn(List.of(guest));
-        when(settingsRepository.findById(Objects.requireNonNull(hotelId)))
+        when(settingsRepository.findByHotelId(Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(settings));
         when(stayServiceClient.getLastStayDate(guestId))
                 .thenReturn(new GuestLastStayClientResponse(true, null));
@@ -204,7 +204,7 @@ class GuestRetentionJobServiceImplTest {
 
         when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
                 .thenReturn(List.of(guest));
-        when(settingsRepository.findById(Objects.requireNonNull(hotelId)))
+        when(settingsRepository.findByHotelId(Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(settings));
         when(stayServiceClient.getLastStayDate(guestId))
                 .thenReturn(new GuestLastStayClientResponse(false, null));
@@ -239,7 +239,7 @@ class GuestRetentionJobServiceImplTest {
 
         when(guestRepository.findByGdprConsentDateBefore(any(LocalDate.class)))
                 .thenReturn(List.of(guest));
-        when(settingsRepository.findById(Objects.requireNonNull(hotelId)))
+        when(settingsRepository.findByHotelId(Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(settings));
         when(stayServiceClient.getLastStayDate(guestId))
                 .thenReturn(new GuestLastStayClientResponse(false, null));

@@ -1,5 +1,7 @@
 package com.hotelpms.billing.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.billing.dto.KpiReportDto;
 import com.hotelpms.billing.dto.OwnerFinancialReportDto;
 import com.hotelpms.billing.dto.OwnerFinancialSummaryDto;
@@ -12,12 +14,12 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.http.ContentDisposition;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.time.LocalDate;
 import java.util.Objects;
@@ -34,6 +36,8 @@ import java.util.UUID;
 @Slf4j
 public class OwnerReportController {
 
+    private static final String ROLE_OWNER_OR_ADMIN = "hasAnyRole('OWNER', 'ADMIN')";
+
     private final OwnerReportService ownerReportService;
     private final KpiReportService kpiReportService;
 
@@ -47,14 +51,40 @@ public class OwnerReportController {
      * @return the aggregated financial report for the caller's hotel
      */
     @GetMapping("/owner")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    @PreAuthorize(ROLE_OWNER_OR_ADMIN)
     public ResponseEntity<OwnerFinancialReportDto> getOwnerFinancialReport(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate startDate,
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate endDate) {
-        final UUID hotelId = Objects.requireNonNull(extractHotelId());
+        final UUID hotelId = Objects.requireNonNull(TenantContext.resolveHotelId());
         log.info("REST request for owner financial report | hotelId={} | from {} to {}", hotelId, startDate, endDate);
         final OwnerFinancialReportDto report = ownerReportService.getFinancialReport(hotelId, startDate, endDate);
         return ResponseEntity.ok(report);
+    }
+
+    /**
+     * Streams the same invoice list as {@link #getOwnerFinancialReport} as a CSV
+     * file, scoped to the caller's hotel (T-BILL-04). Access is restricted to
+     * users with the OWNER or ADMIN role.
+     *
+     * @param startDate the start of the period (inclusive), format YYYY-MM-DD
+     * @param endDate   the end of the period (inclusive), format YYYY-MM-DD
+     * @return a streamed CSV attachment
+     */
+    @GetMapping(value = "/owner/export.csv", produces = "text/csv")
+    @PreAuthorize(ROLE_OWNER_OR_ADMIN)
+    public ResponseEntity<StreamingResponseBody> exportOwnerFinancialReportCsv(
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate startDate,
+            @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate endDate) {
+        final UUID hotelId = Objects.requireNonNull(TenantContext.resolveHotelId());
+        log.info("REST request to export owner financial report CSV | hotelId={} | from {} to {}",
+                hotelId, startDate, endDate);
+        final StreamingResponseBody body =
+                out -> ownerReportService.exportFinancialReportCsv(hotelId, startDate, endDate, out);
+        return ResponseEntity.ok()
+                .headers(h -> h.setContentDisposition(ContentDisposition.attachment()
+                        .filename("owner-report-" + startDate + "-to-" + endDate + ".csv")
+                        .build()))
+                .body(body);
     }
 
     /**
@@ -69,11 +99,11 @@ public class OwnerReportController {
      * @return the aggregated financial summary for the caller's hotel
      */
     @GetMapping("/owner/summary")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    @PreAuthorize(ROLE_OWNER_OR_ADMIN)
     public ResponseEntity<OwnerFinancialSummaryDto> getOwnerFinancialSummary(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate startDate,
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate endDate) {
-        final UUID hotelId = Objects.requireNonNull(extractHotelId());
+        final UUID hotelId = Objects.requireNonNull(TenantContext.resolveHotelId());
         log.info("REST request for owner financial summary | hotelId={} | from {} to {}", hotelId, startDate, endDate);
         final OwnerFinancialSummaryDto summary = ownerReportService.getFinancialSummary(hotelId, startDate, endDate);
         return ResponseEntity.ok(summary);
@@ -91,23 +121,16 @@ public class OwnerReportController {
      * @return the KPI trend report for the caller's hotel
      */
     @GetMapping("/kpi")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN')")
+    @PreAuthorize(ROLE_OWNER_OR_ADMIN)
     public ResponseEntity<KpiReportDto> getKpiReport(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate startDate,
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate endDate,
             @NonNull @RequestParam final ReportGranularity granularity) {
-        final UUID hotelId = Objects.requireNonNull(extractHotelId());
+        final UUID hotelId = Objects.requireNonNull(TenantContext.resolveHotelId());
         log.info("REST request for KPI report | hotelId={} | from {} to {} | granularity={}",
                 hotelId, startDate, endDate, granularity);
         final KpiReportDto report = kpiReportService.getKpiReport(hotelId, startDate, endDate, granularity);
         return ResponseEntity.ok(report);
     }
 
-    private UUID extractHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr) || hotelIdStr.isBlank()) {
-            throw new IllegalStateException("HOTEL_ID_NOT_AVAILABLE");
-        }
-        return UUID.fromString(hotelIdStr);
-    }
 }

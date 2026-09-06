@@ -62,14 +62,14 @@ class HotelSettingsServiceImplTest {
         existing.setHotelId(hotelId);
         existing.setAlloggiatiAutoSend(true);
 
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
 
         final HotelSettingsResponse result = hotelSettingsService.getOrCreate(hotelId);
 
         assertNotNull(result);
         assertEquals(hotelId, result.hotelId());
         assertTrue(result.alloggiatiAutoSend());
-        verify(hotelSettingsRepository, times(1)).findById(Objects.requireNonNull(hotelId));
+        verify(hotelSettingsRepository, times(1)).findByHotelId(Objects.requireNonNull(hotelId));
         verifyNoMoreInteractions(hotelSettingsRepository);
     }
 
@@ -82,7 +82,7 @@ class HotelSettingsServiceImplTest {
         final HotelSettings expectedArg = new HotelSettings();
         expectedArg.setHotelId(hotelId);
 
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
         when(hotelSettingsRepository.save(Objects.requireNonNull(expectedArg))).thenReturn(Objects.requireNonNull(saved));
 
         final HotelSettingsResponse result = hotelSettingsService.getOrCreate(hotelId);
@@ -100,7 +100,7 @@ class HotelSettingsServiceImplTest {
         existing.setHotelId(hotelId);
         existing.setAlloggiatiAutoSend(false);
 
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
         when(hotelSettingsRepository.save(existing)).thenReturn(existing);
 
         final HotelSettingsResponse result = hotelSettingsService.update(
@@ -123,7 +123,7 @@ class HotelSettingsServiceImplTest {
         expectedArg.setHotelId(hotelId);
         expectedArg.setAlloggiatiAutoSend(true);
 
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
         when(hotelSettingsRepository.save(Objects.requireNonNull(expectedArg))).thenReturn(Objects.requireNonNull(created));
 
         final HotelSettingsResponse result = hotelSettingsService.update(
@@ -141,7 +141,7 @@ class HotelSettingsServiceImplTest {
         final HotelSettings existing = new HotelSettings();
         existing.setHotelId(hotelId);
 
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
         when(hotelSettingsRepository.save(existing)).thenReturn(existing);
         when(alloggiatiCredentialEncryptor.encrypt("plainPass")).thenReturn(ENCRYPTED_PASSWORD);
         when(alloggiatiCredentialEncryptor.encrypt("plainKey")).thenReturn(ENCRYPTED_WS_KEY);
@@ -165,7 +165,7 @@ class HotelSettingsServiceImplTest {
         existing.setAlloggiatiPasswordEncrypted(ENCRYPTED_PASSWORD);
         existing.setAlloggiatiWsKeyEncrypted(ENCRYPTED_WS_KEY);
 
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
         when(hotelSettingsRepository.save(existing)).thenReturn(existing);
 
         // Admin only updates hotelName — password/WsKey fields are left blank in the
@@ -192,7 +192,7 @@ class HotelSettingsServiceImplTest {
         existing.setAddress("Via Roma 12");
         existing.setAlloggiatiAutoSend(false);
 
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
         when(hotelSettingsRepository.save(existing)).thenReturn(existing);
 
         // Only alloggiatiAutoSend is set; every other field (including the new email
@@ -214,7 +214,7 @@ class HotelSettingsServiceImplTest {
         final HotelSettings existing = new HotelSettings();
         existing.setHotelId(hotelId);
 
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
         when(hotelSettingsRepository.save(existing)).thenReturn(existing);
 
         final HotelSettingsResponse result = hotelSettingsService.update(hotelId, new HotelSettingsRequest(
@@ -234,7 +234,7 @@ class HotelSettingsServiceImplTest {
         final HotelSettings existing = new HotelSettings();
         existing.setHotelId(hotelId);
 
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
         when(hotelSettingsRepository.save(existing)).thenReturn(existing);
         when(alloggiatiComuneRepository.findActiveByComuneAndProvincia(
                 COMUNE_ROMA, PROVINCIA_RM, LocalDate.now())).thenReturn(Optional.of(
@@ -256,7 +256,7 @@ class HotelSettingsServiceImplTest {
         final HotelSettings existing = new HotelSettings();
         existing.setHotelId(hotelId);
 
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
         when(alloggiatiComuneRepository.findActiveByComuneAndProvincia(
                 "Cittainesistente", PROVINCIA_RM, LocalDate.now())).thenReturn(Optional.empty());
 
@@ -274,7 +274,7 @@ class HotelSettingsServiceImplTest {
         final HotelSettings existing = new HotelSettings();
         existing.setHotelId(hotelId);
 
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
 
         final HotelSettingsRequest request = new HotelSettingsRequest(
                 null, null, null, null, null, null, null, null, null,
@@ -286,7 +286,7 @@ class HotelSettingsServiceImplTest {
     @Test
     void shouldReturnUnknownApplicabilityByDefaultForANewHotel() {
         final UUID hotelId = UUID.randomUUID();
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
         when(hotelSettingsRepository.save(ArgumentMatchers.any(HotelSettings.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -300,7 +300,7 @@ class HotelSettingsServiceImplTest {
         final UUID hotelId = UUID.randomUUID();
         final HotelSettings existing = new HotelSettings();
         existing.setHotelId(hotelId);
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.of(existing));
         when(hotelSettingsRepository.save(existing)).thenReturn(existing);
 
         final CityTaxApplicabilityResponse result = hotelSettingsService.updateCityTaxApplicability(
@@ -313,7 +313,7 @@ class HotelSettingsServiceImplTest {
     @Test
     void shouldCreateDefaultSettingsWhenUpdatingApplicabilityForANewHotel() {
         final UUID hotelId = UUID.randomUUID();
-        when(hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
+        when(hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
         when(hotelSettingsRepository.save(ArgumentMatchers.any(HotelSettings.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 

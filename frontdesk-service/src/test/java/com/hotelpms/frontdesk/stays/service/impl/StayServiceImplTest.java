@@ -664,6 +664,11 @@ class StayServiceImplTest {
                 .notify(new GatewayEventNotifyRequest(GatewayEventType.CHECK_OUT));
     }
 
+    // shouldTransferChargesToMasterFolioAndCheckOutWhenRoomIsBilledToGroup and
+    // shouldNotRetransferChargesOnARetriedCheckOutAfterAlreadyTransferred moved to
+    // StayServiceGroupCheckoutTest (Point 7 tenant-isolation audit pass) to keep
+    // this file under Checkstyle's FileLength limit.
+
     @Test
     void shouldAttachInvoicePdfToCheckoutEmailWhenBillingServiceProvidesIt() {
         // Arrange
@@ -891,7 +896,7 @@ class StayServiceImplTest {
         checkedInStay.setReservationId(reservationId);
 
         final InvoiceStatusResponse unpaidInvoice = new InvoiceStatusResponse(
-                UUID.randomUUID(), reservationId, "ISSUED", BigDecimal.valueOf(200));
+                UUID.randomUUID(), reservationId, OPEN_STATUS, BigDecimal.valueOf(200));
 
         when(stayRepository.findByIdAndHotelId(id, hotelId)).thenReturn(Optional.of(checkedInStay));
         when(billingClient.getLatestInvoiceByReservation(Objects.requireNonNull(reservationId)))

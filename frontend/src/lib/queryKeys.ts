@@ -59,4 +59,13 @@ export const queryKeys = {
     trend: (startDate: string, endDate: string, granularity: string) =>
       ['kpi-report', 'trend', startDate, endDate, granularity] as const,
   },
+  nightAudit: {
+    all: ['night-audit'] as const,
+    history: (page: number, size: number) => ['night-audit', 'history', page, size] as const,
+  },
+  reservationGroups: {
+    all: ['reservation-groups'] as const,
+    list: (page: number, size: number) => ['reservation-groups', 'list', page, size] as const,
+    detail: (id: string) => ['reservation-groups', 'detail', id] as const,
+  },
 } as const;

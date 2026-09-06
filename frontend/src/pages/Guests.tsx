@@ -96,6 +96,10 @@ export const Guests = memo(() => {
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
 
+  const handleExportCsv = useCallback(() => {
+    guestService.exportGuestsCsv(searchQuery);
+  }, [searchQuery]);
+
   const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
 
@@ -277,6 +281,11 @@ export const Guests = memo(() => {
             onChange={handleSearchChange}
             className="w-full sm:w-56"
           />
+          {isAdminOrOwner && (
+            <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
+              {t('export_csv')}
+            </M3Button>
+          )}
           <M3Button icon="add" onClick={handleOpenAddModal}>
             {t('add_guest')}
           </M3Button>

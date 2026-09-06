@@ -13,6 +13,7 @@ import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
+import com.hotelpms.frontdesk.reservations.dto.ReservationGroupBillingInfo;
 import com.hotelpms.frontdesk.reservations.service.ReservationService;
 import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
@@ -75,6 +76,7 @@ import java.util.UUID;
 public class StayServiceImpl implements StayService {
 
     private static final String PAID_STATUS = "PAID";
+    private static final String ISSUED_STATUS = "ISSUED";
     private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
     private static final String INVALID_STAY_STATUS_MSG = "INVALID_STAY_STATUS";
     private static final LocalDate EARLIEST_FILTER_DATE = LocalDate.of(1900, 1, 1);
@@ -191,10 +193,33 @@ public class StayServiceImpl implements StayService {
             throw new IllegalStateException(INVALID_STAY_STATUS_MSG);
         }
 
+        // 0. A room "billed to group" (Punto 4) moves its ROOM_NIGHT/CITY_TAX charges to
+        // the group's master folio before the paid-invoice check below runs -- the guest
+        // isn't the one settling those, the group's master folio is (typically once, at
+        // the very end, not per room). Extras (F&B) are left on the individual invoice
+        // and still must be paid by the guest like today.
+        if (stay.getReservationId() != null) {
+            reservationService.getGroupBillingInfo(stay.getReservationId(), hotelId)
+                    .filter(ReservationGroupBillingInfo::billedToMasterFolio)
+                    .ifPresent(info -> stayBillingCoordinator.transferChargesToMasterFolio(stay, info.groupId()));
+        }
+
         // 1. Verify billing folio is PAID. Walk-in stays have no reservationId — the
         // only way to find their invoice is the invoiceId stored on the Stay itself.
+        // A group-billed room whose ROOM_NIGHT/CITY_TAX charges were just transferred
+        // away (step 0) may now sit at totalAmount=0 with no F&B left to settle — that
+        // counts as cleared too, without requiring an explicit zero-amount payment
+        // record. Checked as literal ISSUED + zero, never a bare "not PAID" fallback,
+        // so a genuinely unreachable billing-service (fallback sentinel, also
+        // totalAmount=ZERO) is never mistaken for a cleared invoice.
         final InvoiceStatusResponse invoice = stayBillingCoordinator.resolveInvoiceForCheckOut(stay);
-        if (invoice == null || !PAID_STATUS.equalsIgnoreCase(invoice.status())) {
+        final boolean cleared = invoice != null && (
+                PAID_STATUS.equalsIgnoreCase(invoice.status())
+                || stay.isChargesTransferredToMasterFolio()
+                        && ISSUED_STATUS.equalsIgnoreCase(invoice.status())
+                        && invoice.totalAmount() != null
+                        && invoice.totalAmount().signum() == 0);
+        if (!cleared) {
             log.warn("[STAY] CHECK_OUT_FAILED | stayId={} | reservationId={} | reason=BILLING_NOT_PAID",
                     stayId, stay.getReservationId());
             throw new BillingNotPaidException("BILLING_NOT_PAID");

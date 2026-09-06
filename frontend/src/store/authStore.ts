@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { UserPayload } from '../types/auth.types';
+import type { UserPayload } from '../types';
 
 interface AuthState {
   user: UserPayload | null;

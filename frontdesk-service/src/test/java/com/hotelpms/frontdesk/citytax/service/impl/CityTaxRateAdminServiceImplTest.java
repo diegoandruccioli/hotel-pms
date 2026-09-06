@@ -82,7 +82,7 @@ class CityTaxRateAdminServiceImplTest {
 
     @Test
     void createRuleWithoutComuneConfiguredThrowsBadRequest() {
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.empty());
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.empty());
 
         assertThrows(BadRequestException.class, () -> cityTaxRateAdminService.createRule(hotelId, request));
         verify(cityTaxRateRepository, never()).saveAndFlush(any());
@@ -90,7 +90,7 @@ class CityTaxRateAdminServiceImplTest {
 
     @Test
     void createRuleWithBlankComuneCodiceThrowsBadRequest() {
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune("")));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune("")));
 
         assertThrows(BadRequestException.class, () -> cityTaxRateAdminService.createRule(hotelId, request));
     }
@@ -99,7 +99,7 @@ class CityTaxRateAdminServiceImplTest {
     void createRuleResolvesComuneServerSideAndPersists() {
         final CityTaxRate saved = CityTaxRate.builder().id(UUID.randomUUID()).hotelId(hotelId).build();
         final CityTaxRateResponse response = mock(saved);
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(cityTaxRateRepository.findByHotelIdAndComuneCodiceAndCategoryAndValidToIsNull(
                 hotelId, COMUNE_CODICE, CATEGORY)).thenReturn(Optional.empty());
         when(cityTaxRateRepository.saveAndFlush(any(CityTaxRate.class))).thenReturn(saved);
@@ -121,7 +121,7 @@ class CityTaxRateAdminServiceImplTest {
                 .id(UUID.randomUUID()).hotelId(hotelId).comuneCodice(COMUNE_CODICE).category(CATEGORY)
                 .validFrom(OLD_RATE_VALID_FROM).build();
         final CityTaxRate saved = CityTaxRate.builder().id(UUID.randomUUID()).build();
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(cityTaxRateRepository.findByHotelIdAndComuneCodiceAndCategoryAndValidToIsNull(
                 hotelId, COMUNE_CODICE, CATEGORY)).thenReturn(Optional.of(openRule));
         when(cityTaxRateRepository.saveAndFlush(any(CityTaxRate.class))).thenReturn(saved);
@@ -147,7 +147,7 @@ class CityTaxRateAdminServiceImplTest {
                 .validFrom(RATE_VALID_FROM).build();
         final CityTaxRateRequest sameStartDateRequest = new CityTaxRateRequest(CATEGORY, AMOUNT_PER_NIGHT,
                 MAX_TAXABLE_NIGHTS, EXEMPT_UNDER_AGE, RATE_VALID_FROM, NOTE);
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(cityTaxRateRepository.findByHotelIdAndComuneCodiceAndCategoryAndValidToIsNull(
                 hotelId, COMUNE_CODICE, CATEGORY)).thenReturn(Optional.of(openRule));
 
@@ -163,7 +163,7 @@ class CityTaxRateAdminServiceImplTest {
                 .validFrom(RATE_VALID_FROM).build();
         final CityTaxRateRequest earlierRequest = new CityTaxRateRequest(CATEGORY, AMOUNT_PER_NIGHT,
                 MAX_TAXABLE_NIGHTS, EXEMPT_UNDER_AGE, OLD_RATE_VALID_FROM, NOTE);
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(cityTaxRateRepository.findByHotelIdAndComuneCodiceAndCategoryAndValidToIsNull(
                 hotelId, COMUNE_CODICE, CATEGORY)).thenReturn(Optional.of(openRule));
 
@@ -173,7 +173,7 @@ class CityTaxRateAdminServiceImplTest {
 
     @Test
     void createRuleOverlappingAnExistingRuleThrowsConflict() {
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(cityTaxRateRepository.findByHotelIdAndComuneCodiceAndCategoryAndValidToIsNull(
                 hotelId, COMUNE_CODICE, CATEGORY)).thenReturn(Optional.empty());
         when(cityTaxRateRepository.saveAndFlush(any(CityTaxRate.class))).thenThrow(exclusionViolation());
@@ -185,7 +185,7 @@ class CityTaxRateAdminServiceImplTest {
     void createRuleWithUnrelatedDataIntegrityViolationRethrowsOriginal() {
         final DataIntegrityViolationException notNullViolation =
                 new DataIntegrityViolationException("not null violation");
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settingsWithComune(COMUNE_CODICE)));
         when(cityTaxRateRepository.findByHotelIdAndComuneCodiceAndCategoryAndValidToIsNull(
                 hotelId, COMUNE_CODICE, CATEGORY)).thenReturn(Optional.empty());
         when(cityTaxRateRepository.saveAndFlush(any(CityTaxRate.class))).thenThrow(notNullViolation);

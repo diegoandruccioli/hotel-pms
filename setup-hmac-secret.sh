@@ -85,6 +85,19 @@ else
     skip "CONFIG_SERVER_PASSWORD already in .env – skipping."
 fi
 
+# Append the 5 per-service PostgreSQL passwords plus the postgres-exporter
+# monitoring password if not already present (idempotent) — one
+# least-privilege role per service database, see
+# docker/postgres/initdb/02-create-tenant-roles.sql and 03-create-monitoring-role.sql.
+for VAR in AUTH_DB_PASSWORD GUEST_DB_PASSWORD FRONTDESK_DB_PASSWORD BILLING_DB_PASSWORD FB_DB_PASSWORD POSTGRES_EXPORTER_PASSWORD; do
+    if ! grep -q "^${VAR}=" "$ENV_FILE"; then
+        printf "%s=%s\n" "$VAR" "$(_gen_hex 24)" >> "$ENV_FILE"
+        ok "$VAR added to .env."
+    else
+        skip "$VAR already in .env – skipping."
+    fi
+done
+
 # ── Step 2: Ensure .env is in .gitignore ──────────────────────────────────────
 step "Step 2 – .gitignore"
 

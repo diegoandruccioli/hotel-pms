@@ -1,13 +1,17 @@
 package com.hotelpms.billing.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.DocumentTypeRequest;
+import com.hotelpms.billing.dto.GroupChargeRequest;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
+import com.hotelpms.billing.dto.MasterFolioRequest;
 import com.hotelpms.billing.dto.SdiStatusRequest;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.service.FatturaPAService;
@@ -27,8 +31,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -38,6 +40,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -122,6 +125,31 @@ public class InvoiceController {
     }
 
     /**
+     * Exports every invoice matching the same filters as {@link #searchInvoices}
+     * as a CSV file -- ADMIN/OWNER only, financial data.
+     *
+     * @param status   optional invoice status filter
+     * @param query    optional free-text query (invoice number or guest name/email)
+     * @param dateFrom optional lower bound on issue date (inclusive day)
+     * @param dateTo   optional upper bound on issue date (inclusive day)
+     * @return a streamed CSV attachment
+     */
+    @GetMapping(value = "/export.csv", produces = "text/csv")
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
+    public ResponseEntity<StreamingResponseBody> exportInvoicesCsv(
+            @RequestParam(required = false) final InvoiceStatus status,
+            @RequestParam(required = false) final String query,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate dateTo) {
+        final StreamingResponseBody body =
+                out -> invoiceService.exportInvoicesCsv(status, query, dateFrom, dateTo, out);
+        return ResponseEntity.ok()
+                .headers(h -> h.setContentDisposition(
+                        ContentDisposition.attachment().filename("invoices.csv").build()))
+                .body(body);
+    }
+
+    /**
      * Retrieves the latest invoice for a reservation. Used by the stay-service
      * during check-out to validate billing status.
      *
@@ -190,6 +218,43 @@ public class InvoiceController {
     }
 
     /**
+     * Opens a MASTER folio for a reservation group. Called by frontdesk-service
+     * when a group is created with a master folio option. Idempotent: returns the
+     * existing open master folio instead of creating a duplicate.
+     *
+     * @param groupId the reservation group UUID
+     * @param request the master folio request (contact guest)
+     * @return the created (or existing) master folio invoice with HTTP 201
+     */
+    @PostMapping("/groups/{groupId}/master-folio")
+    public ResponseEntity<InvoiceResponse> createMasterFolioForGroup(
+            @NonNull @PathVariable final UUID groupId,
+            @NonNull @Valid @RequestBody final MasterFolioRequest request) {
+        log.info("REST request to open master folio for group {}", groupId);
+        final InvoiceResponse response = invoiceService.createMasterFolioForGroup(groupId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Adds a charge directly to a reservation group's master folio -- the transfer
+     * counterpart of {@link #addCharge}. Called by frontdesk-service when a room
+     * marked "billed to group" checks out and its ROOM_NIGHT/CITY_TAX charges move
+     * off its individual invoice. Returns 404 if the group has no master folio.
+     *
+     * @param groupId the reservation group UUID
+     * @param request the charge details, tagging the stay it's transferred from
+     * @return the created charge response with HTTP 201
+     */
+    @PostMapping("/groups/{groupId}/charges")
+    public ResponseEntity<ChargeResponse> addChargeToGroupFolio(
+            @NonNull @PathVariable final UUID groupId,
+            @NonNull @Valid @RequestBody final GroupChargeRequest request) {
+        log.info("REST request to add {} charge to master folio of group {}", request.type(), groupId);
+        final ChargeResponse response = invoiceService.addChargeToGroupFolio(groupId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
      * Returns the most recent invoice date for a guest within a hotel.
      * Called by guest-service GDPR legal-hold guard (T-GST-05).
      *
@@ -199,7 +264,7 @@ public class InvoiceController {
     @GetMapping("/guest/{guestId}/last-date")
     public ResponseEntity<GuestInvoiceCheckResponse> getLastInvoiceDateForGuest(
             @NonNull @PathVariable final UUID guestId) {
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         log.info("REST request for last invoice date — guest={} hotel={}", guestId, hotelId);
         return ResponseEntity.ok(
                 invoiceService.getLastInvoiceDateForGuest(guestId, Objects.requireNonNull(hotelId)));
@@ -215,7 +280,7 @@ public class InvoiceController {
     @GetMapping("/guest/{guestId}/history")
     public ResponseEntity<List<InvoiceSummaryResponse>> getInvoiceHistoryForGuest(
             @NonNull @PathVariable final UUID guestId) {
-        final UUID hotelId = extractHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         log.info("REST request for invoice history — guest={} hotel={}", guestId, hotelId);
         return ResponseEntity.ok(
                 invoiceService.getInvoiceHistoryForGuest(guestId, Objects.requireNonNull(hotelId)));
@@ -346,11 +411,4 @@ public class InvoiceController {
                 .body(zip);
     }
 
-    private UUID extractHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr) || hotelIdStr.isBlank()) {
-            throw new IllegalStateException("HOTEL_ID_NOT_AVAILABLE");
-        }
-        return UUID.fromString(hotelIdStr);
-    }
 }

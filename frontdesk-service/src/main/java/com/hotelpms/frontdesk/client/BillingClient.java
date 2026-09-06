@@ -2,22 +2,28 @@ package com.hotelpms.frontdesk.client;
 
 import com.hotelpms.frontdesk.client.dto.ChargeRequest;
 import com.hotelpms.frontdesk.client.dto.ChargeResponse;
+import com.hotelpms.frontdesk.client.dto.GroupChargeRequest;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
+import com.hotelpms.frontdesk.client.dto.MasterFolioRequest;
+import com.hotelpms.frontdesk.client.dto.PaymentSummaryClientResponse;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
 import feign.FeignException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.UUID;
 
@@ -128,6 +134,47 @@ public interface BillingClient {
     void removeCharge(@PathVariable("stayId") UUID stayId, @PathVariable("chargeId") UUID chargeId);
 
     /**
+     * Retrieves the cash-closing summary (payments by method) for a single
+     * business date — the night-audit cash section. The call is signed with
+     * role ADMIN by frontdesk-service's own batch-job context when it runs
+     * outside an HTTP request (the scheduled path), clearing billing-service's
+     * {@code @PreAuthorize("hasAnyRole('ADMIN','OWNER')")} on that endpoint.
+     *
+     * @param date the business date to summarize
+     * @return the cash-closing summary, or a degraded (empty) one when the circuit is open
+     */
+    @GetMapping("/api/v1/payments/summary")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "getPaymentSummaryFallback")
+    PaymentSummaryClientResponse getPaymentSummary(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date);
+
+    /**
+     * Opens a MASTER folio in billing-service for a reservation group (Punto 4).
+     *
+     * @param groupId the reservation group's id
+     * @param request the master folio request (contact guest)
+     * @return the created invoice response, or {@code null} when the fallback fires
+     */
+    @PostMapping("/api/v1/invoices/groups/{groupId}/master-folio")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "createMasterFolioForGroupFallback")
+    InvoiceCreatedResponse createMasterFolioForGroup(
+            @PathVariable("groupId") UUID groupId, @RequestBody MasterFolioRequest request);
+
+    /**
+     * Adds a charge directly to a reservation group's master folio -- used to
+     * transfer a room's ROOM_NIGHT/CITY_TAX charge off its individual invoice at
+     * check-out, when that room is marked "billed to group" (Punto 4).
+     *
+     * @param groupId the reservation group's id
+     * @param request the charge to add, tagging the stay it's transferred from
+     * @return the created charge response, or {@code null} when the fallback fires
+     */
+    @PostMapping("/api/v1/invoices/groups/{groupId}/charges")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "addChargeToGroupFolioFallback")
+    ChargeResponse addChargeToGroupFolio(
+            @PathVariable("groupId") UUID groupId, @RequestBody GroupChargeRequest request);
+
+    /**
      * Fallback for getLatestInvoiceByReservation.
      *
      * @param reservationId the reservation id
@@ -234,6 +281,46 @@ public interface BillingClient {
     }
 
     /**
+     * Fallback for createMasterFolioForGroup — group creation is an interactive
+     * operator action expecting a definite outcome (same class as {@link
+     * #createInvoiceForStayFallback}): a legitimate 4xx is rethrown, genuine
+     * unavailability returns {@code null} so the caller can fail the whole
+     * create-group request cleanly instead of leaving a half-created group.
+     *
+     * @param groupId   the reservation group's id
+     * @param request   the original request
+     * @param throwable the cause
+     * @return null, only when the cause is genuine unavailability
+     */
+    default InvoiceCreatedResponse createMasterFolioForGroupFallback(
+            final UUID groupId, final MasterFolioRequest request, final Throwable throwable) {
+        LOG.error("[BillingClient] createMasterFolioForGroup fallback | groupId={} | cause={}: {}",
+                groupId, throwable.getClass().getSimpleName(), throwable.getMessage());
+        if (throwable instanceof FeignException fe && fe.status() >= CLIENT_ERROR_MIN && fe.status() < CLIENT_ERROR_MAX) {
+            throw fe;
+        }
+        return null;
+    }
+
+    /**
+     * Fallback for addChargeToGroupFolio — same distinction as {@link #addChargeFallback}.
+     *
+     * @param groupId   the reservation group's id
+     * @param request   the original charge request
+     * @param throwable the cause
+     * @return null, only when the cause is genuine unavailability
+     */
+    default ChargeResponse addChargeToGroupFolioFallback(
+            final UUID groupId, final GroupChargeRequest request, final Throwable throwable) {
+        LOG.error("[BillingClient] addChargeToGroupFolio fallback | groupId={} | type={} | cause={}: {}",
+                groupId, request.type(), throwable.getClass().getSimpleName(), throwable.getMessage());
+        if (throwable instanceof FeignException fe && fe.status() >= CLIENT_ERROR_MIN && fe.status() < CLIENT_ERROR_MAX) {
+            throw fe;
+        }
+        return null;
+    }
+
+    /**
      * Fallback for removeCharge — same distinction as {@link #addChargeFallback}: a
      * legitimate 4xx (e.g. 409 INVOICE_NOT_OPEN, 404 CHARGE_NOT_FOUND) is rethrown so
      * the caller can log the specific reason; genuine unavailability is swallowed here
@@ -251,5 +338,24 @@ public interface BillingClient {
         if (throwable instanceof FeignException fe && fe.status() >= CLIENT_ERROR_MIN && fe.status() < CLIENT_ERROR_MAX) {
             throw fe;
         }
+    }
+
+    /**
+     * Fallback for getPaymentSummary — returns a sentinel with {@code
+     * grandTotal=null} so the caller (night audit) can tell "billing-service
+     * was unreachable" apart from "genuinely zero payments that day"
+     * ({@code grandTotal=BigDecimal.ZERO}, an empty {@code byMethod}). The
+     * cash-closing section is informational, never blocking: a billing outage
+     * must not prevent the rest of the night audit (no-show detection,
+     * occupancy snapshot) from completing.
+     *
+     * @param date      the requested business date
+     * @param throwable the cause
+     * @return a degraded summary with a null grand total
+     */
+    default PaymentSummaryClientResponse getPaymentSummaryFallback(final LocalDate date, final Throwable throwable) {
+        LOG.warn("[BillingClient] getPaymentSummary fallback | date={} | cause={}: {}",
+                date, throwable.getClass().getSimpleName(), throwable.getMessage());
+        return new PaymentSummaryClientResponse(date, Collections.emptyList(), null);
     }
 }

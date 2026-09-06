@@ -18,6 +18,7 @@ const navigation = [
   { nameKey: 'dashboard', href: '/', icon: 'dashboard' },
   { nameKey: 'guests', href: '/guests', icon: 'group' },
   { nameKey: 'reservations', href: '/reservations', icon: 'event' },
+  { nameKey: 'reservation_groups', href: '/reservations/groups', icon: 'groups' },
   { nameKey: 'quotations', href: '/quotations', icon: 'request_quote' },
   { nameKey: 'calendar', href: '/calendar', icon: 'date_range' },
   { nameKey: 'stays', href: '/stays', icon: 'hotel' },
@@ -30,6 +31,7 @@ const navigation = [
 
 const ownerNavigation = [
   { nameKey: 'owner_dashboard', href: '/owner-dashboard', icon: 'bar_chart' },
+  { nameKey: 'night_audit', href: '/night-audit', icon: 'fact_check' },
 ];
 
 // BUG-7 (docs/LIVE_E2E_AUDIT_2026-07.md): the sidebar had no focus-visible

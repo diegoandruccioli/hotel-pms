@@ -110,6 +110,22 @@ public class Reservation {
     @Column(name = "confirmation_email_failure_reason")
     private String confirmationEmailFailureReason;
 
+    /**
+     * The reservation group this room belongs to, if any (Punto 4). A reservation
+     * without a group prices/bills exactly as before -- purely additive.
+     */
+    @Column(name = "group_id")
+    private UUID groupId;
+
+    /**
+     * When {@code true} and the group has a master folio, this room's ROOM_NIGHT/
+     * CITY_TAX charges are transferred to the group's master invoice at check-out
+     * instead of staying on this room's individual invoice. Extras (F&amp;B) always
+     * stay individual. Meaningless when {@link #groupId} is {@code null}.
+     */
+    @Column(name = "billed_to_master_folio", nullable = false)
+    private boolean billedToMasterFolio;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

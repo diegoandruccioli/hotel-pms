@@ -5,6 +5,7 @@ import { axe } from 'vitest-axe';
 import { renderWithQuery as render } from '../test-utils';
 import { Billing } from './Billing';
 import { billingService } from '../services';
+import { useAuthStore } from '../store';
 import type { InvoiceResponse, InvoiceSearchResult } from '../types';
 
 vi.mock('react-i18next', () => {
@@ -19,12 +20,17 @@ vi.mock('../services/billingService', () => ({
   billingService: {
     searchInvoices: vi.fn(),
     processPayment: vi.fn(),
+    exportInvoicesCsv: vi.fn(),
   },
 }));
 
 vi.mock('../store/toastStore', () => ({
   useToastStore: (sel: (s: { addToast: () => void }) => unknown) =>
     sel({ addToast: vi.fn() }),
+}));
+
+vi.mock('../store/authStore', () => ({
+  useAuthStore: vi.fn(),
 }));
 
 vi.mock('focus-trap-react', () => ({
@@ -70,12 +76,21 @@ const result = (invoice: InvoiceResponse, guestName: string | null = null): Invo
   ({ invoice, guestName });
 
 describe('Billing', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useAuthStore).mockReturnValue({ user: { role: 'ADMIN' } } as never);
+  });
 
   it('should show loading spinner initially', () => {
     vi.mocked(billingService.searchInvoices).mockReturnValue(new Promise(() => {}));
     render(<Billing />);
     expect(screen.getByText('progress_activity')).toBeInTheDocument();
+  });
+
+  it('should show the pilot-mode fiscal disclaimer banner (VITE_PILOT_MODE defaults to shown)', () => {
+    vi.mocked(billingService.searchInvoices).mockReturnValue(new Promise(() => {}));
+    render(<Billing />);
+    expect(screen.getByText('pilot_mode_fiscal_banner')).toBeInTheDocument();
   });
 
   it('should render invoices on success', async () => {
@@ -318,6 +333,30 @@ describe('Billing', () => {
         expect.objectContaining({ dateTo: '2026-08-31' }),
       );
     });
+  });
+
+  it('should export the current filters as CSV when ADMIN clicks export', async () => {
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
+    render(<Billing />);
+    await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('export_csv'));
+
+    expect(billingService.exportInvoicesCsv).toHaveBeenCalledWith({
+      status: undefined,
+      query: '',
+      dateFrom: undefined,
+      dateTo: undefined,
+    });
+  });
+
+  it('should not show the export CSV button for RECEPTIONIST', async () => {
+    vi.mocked(useAuthStore).mockReturnValue({ user: { role: 'RECEPTIONIST' } } as never);
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
+    render(<Billing />);
+
+    await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+    expect(screen.queryByText('export_csv')).not.toBeInTheDocument();
   });
 
   it('should show pagination controls and request the next page on click', async () => {

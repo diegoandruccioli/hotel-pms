@@ -98,7 +98,7 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
         }
 
         final LocalDate firstNight = stay.getActualCheckInTime().toLocalDate();
-        final HotelSettings settings = hotelSettingsRepository.findById(stay.getHotelId()).orElse(null);
+        final HotelSettings settings = hotelSettingsRepository.findByHotelId(stay.getHotelId()).orElse(null);
         if (settings != null && settings.getCityTaxApplicability() == CityTaxApplicability.NOT_APPLICABLE) {
             return Optional.of(persistUnassessed(stay, CityTaxUnassessedReason.NOT_APPLICABLE));
         }
@@ -152,7 +152,7 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
     @Transactional(readOnly = true)
     public CityTaxConfigurationStatusResponse checkConfigurationStatus(final UUID hotelId) {
         Objects.requireNonNull(hotelId, HOTEL_ID_NOT_NULL_MSG);
-        final HotelSettings settings = hotelSettingsRepository.findById(hotelId).orElse(null);
+        final HotelSettings settings = hotelSettingsRepository.findByHotelId(hotelId).orElse(null);
         if (settings != null && settings.getCityTaxApplicability() == CityTaxApplicability.NOT_APPLICABLE) {
             return new CityTaxConfigurationStatusResponse(true, null);
         }
@@ -207,7 +207,7 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
     private CityTaxBackfillResponse runBackfill(final UUID hotelId, final boolean apply) {
         Objects.requireNonNull(hotelId, HOTEL_ID_NOT_NULL_MSG);
 
-        final HotelSettings settings = hotelSettingsRepository.findById(hotelId).orElse(null);
+        final HotelSettings settings = hotelSettingsRepository.findByHotelId(hotelId).orElse(null);
         if (settings != null && settings.getCityTaxApplicability() == CityTaxApplicability.NOT_APPLICABLE) {
             // The hotel has since declared the tax doesn't apply — old gaps are moot,
             // not owed, regardless of what configuration existed when they were assessed.
@@ -630,7 +630,7 @@ public class CityTaxAssessmentServiceImpl implements CityTaxAssessmentService {
     }
 
     private String resolveComuneCodice(final UUID hotelId) {
-        return hotelSettingsRepository.findById(hotelId)
+        return hotelSettingsRepository.findByHotelId(hotelId)
                 .map(HotelSettings::getComuneCodice)
                 .filter(code -> !code.isBlank())
                 .orElse(null);

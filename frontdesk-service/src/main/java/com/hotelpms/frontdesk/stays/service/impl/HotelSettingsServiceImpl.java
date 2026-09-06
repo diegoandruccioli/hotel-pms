@@ -34,7 +34,7 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
     @Override
     @Transactional
     public HotelSettingsResponse getOrCreate(final UUID hotelId) {
-        return hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))
+        return hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))
                 .map(HotelSettingsServiceImpl::toResponse)
                 .orElseGet(() -> toResponse(createDefault(hotelId)));
     }
@@ -43,7 +43,7 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
     @Override
     @Transactional
     public HotelSettingsResponse update(final UUID hotelId, final HotelSettingsRequest request) {
-        final HotelSettings settings = hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))
+        final HotelSettings settings = hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))
                 .orElseGet(() -> buildDefault(hotelId));
         // Partial-patch semantics: a null field means "absent from the request", not
         // "clear this value" — callers such as a single settings toggle must be able to
@@ -108,7 +108,7 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
     @Override
     @Transactional
     public CityTaxApplicabilityResponse getCityTaxApplicability(final UUID hotelId) {
-        final HotelSettings settings = hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))
+        final HotelSettings settings = hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))
                 .orElseGet(() -> createDefault(hotelId));
         return new CityTaxApplicabilityResponse(settings.getCityTaxApplicability());
     }
@@ -118,7 +118,7 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
     @Transactional
     public CityTaxApplicabilityResponse updateCityTaxApplicability(
             final UUID hotelId, final CityTaxApplicabilityRequest request) {
-        final HotelSettings settings = hotelSettingsRepository.findById(Objects.requireNonNull(hotelId))
+        final HotelSettings settings = hotelSettingsRepository.findByHotelId(Objects.requireNonNull(hotelId))
                 .orElseGet(() -> buildDefault(hotelId));
         settings.setCityTaxApplicability(request.applicability());
         final HotelSettings saved = hotelSettingsRepository.save(Objects.requireNonNull(settings));

@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.pricing.controller;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.frontdesk.pricing.dto.RateBulkApplyRequest;
 import com.hotelpms.frontdesk.pricing.dto.RateCalendarResponse;
 import com.hotelpms.frontdesk.pricing.dto.RateSeasonResponse;
@@ -10,7 +12,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,7 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Controller for the rate calendar: a whole-hotel, whole-range read of
@@ -51,7 +51,7 @@ public class RateCalendarController {
     public ResponseEntity<RateCalendarResponse> getCalendar(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate from,
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate to) {
-        return ResponseEntity.ok(rateCalendarService.getCalendar(resolveHotelId(), from, to));
+        return ResponseEntity.ok(rateCalendarService.getCalendar(TenantContext.resolveHotelId(), from, to));
     }
 
     /**
@@ -65,16 +65,7 @@ public class RateCalendarController {
     @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
     public ResponseEntity<List<RateSeasonResponse>> bulkApply(
             @NonNull @Valid @RequestBody final RateBulkApplyRequest request) {
-        return ResponseEntity.ok(rateCalendarService.bulkApply(resolveHotelId(), request));
+        return ResponseEntity.ok(rateCalendarService.bulkApply(TenantContext.resolveHotelId(), request));
     }
 
-    /**
-     * Extracts the hotel UUID from the current security context details.
-     *
-     * @return the hotel UUID of the authenticated user
-     */
-    private UUID resolveHotelId() {
-        final Object details = SecurityContextHolder.getContext().getAuthentication().getDetails();
-        return UUID.fromString(String.valueOf(details));
-    }
 }

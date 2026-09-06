@@ -1,6 +1,7 @@
 package com.hotelpms.frontdesk.reservations.service;
 
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
+import com.hotelpms.frontdesk.reservations.dto.ReservationGroupBillingInfo;
 import com.hotelpms.frontdesk.reservations.dto.ReservationRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
 import com.hotelpms.frontdesk.reservations.dto.ReservedRoomCharge;
@@ -68,6 +69,24 @@ public interface ReservationService {
             LocalDate dateFrom, LocalDate dateTo, ReservationStatus status, Pageable pageable);
 
     /**
+     * Streams every reservation matching the same filters as {@link
+     * #searchReservations} to {@code out} as CSV, unpaginated (internally
+     * paged in fixed-size batches so the whole matching set is never held in
+     * memory at once) — the "export my data" counterpart to the paginated
+     * table view.
+     *
+     * @param query        optional free-text query (guest name/email), or {@code null}/blank to skip it
+     * @param upcomingOnly if {@code true}, only reservations with check-in today or later
+     * @param dateFrom     optional lower bound (inclusive) on check-in date
+     * @param dateTo       optional upper bound (inclusive) on check-in date
+     * @param status       optional reservation status filter
+     * @param out          the stream to write CSV bytes to
+     * @throws java.io.IOException if writing to {@code out} fails
+     */
+    void exportReservationsCsv(String query, boolean upcomingOnly, LocalDate dateFrom, LocalDate dateTo,
+            ReservationStatus status, java.io.OutputStream out) throws java.io.IOException;
+
+    /**
      * Updates an existing reservation.
      *
      * @param id      the reservation ID
@@ -97,6 +116,23 @@ public interface ReservationService {
      */
     ReservationResponse updateStatusAndGuests(UUID id, ReservationStatus status, Integer actualGuests,
             Long clientVersion);
+
+    /**
+     * Same as {@link #updateStatusAndGuests}, with an explicit {@code hotelId}
+     * instead of resolving it from the request's {@code SecurityContextHolder}.
+     * Exists for callers with no inbound HTTP request context — the scheduled
+     * night audit (see {@code NightAuditServiceImpl}), which already knows
+     * which hotel it's auditing without a security context to read it from.
+     *
+     * @param hotelId       the hotel the reservation belongs to
+     * @param id            the reservation ID
+     * @param status        the new status (optional)
+     * @param actualGuests  the new actual guests count (optional)
+     * @param clientVersion the version the caller last read, or {@code null} to skip the check
+     * @return the updated reservation response
+     */
+    ReservationResponse updateStatusAndGuestsForHotel(UUID hotelId, UUID id, ReservationStatus status,
+            Integer actualGuests, Long clientVersion);
 
     /**
      * Checks whether a guest has any active (non-terminal) reservation in the
@@ -211,4 +247,38 @@ public interface ReservationService {
      */
     ReservationResponse createReservationFromPricedRooms(UUID guestId, LocalDate checkInDate,
             LocalDate checkOutDate, Integer expectedGuests, Map<UUID, BigDecimal> roomPrices);
+
+    /**
+     * Creates a single-room reservation as a rooming-list member of a reservation
+     * group (Punto 4). Called once per {@code RoomingListEntryRequest} row by
+     * {@code ReservationGroupServiceImpl}, inside the group's own transaction — an
+     * overlap or availability failure on any one room rolls back the whole group.
+     *
+     * @param groupId             the owning reservation group's id
+     * @param guestId             the guest occupying this room
+     * @param roomId              the assigned room
+     * @param expectedGuests      expected occupancy for this room
+     * @param checkInDate         check-in date (inclusive)
+     * @param checkOutDate        check-out date (exclusive)
+     * @param groupRatePerNight   when non-null, takes precedence over the room-type
+     *                            rate calendar; when {@code null}, this room prices
+     *                            exactly like a standalone reservation would
+     * @param billedToMasterFolio whether this room's ROOM_NIGHT/CITY_TAX charges
+     *                            should route to the group's master folio at check-out
+     * @return the created reservation response
+     */
+    ReservationResponse createReservationForGroup(UUID groupId, UUID guestId, UUID roomId, int expectedGuests,
+            LocalDate checkInDate, LocalDate checkOutDate, BigDecimal groupRatePerNight, boolean billedToMasterFolio);
+
+    /**
+     * Returns the group-billing facts for a reservation, if it belongs to a group
+     * (Punto 4). Used by {@code StayBillingCoordinator} at check-out to decide
+     * whether a room's charges should transfer to a master folio.
+     *
+     * @param reservationId the reservation UUID
+     * @param hotelId       the hotel UUID (multi-tenant scoping)
+     * @return the group-billing facts, or empty if the reservation has no group
+     *         (or doesn't exist / belongs to a different hotel)
+     */
+    Optional<ReservationGroupBillingInfo> getGroupBillingInfo(UUID reservationId, UUID hotelId);
 }

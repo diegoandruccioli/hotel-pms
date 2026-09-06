@@ -41,7 +41,7 @@ class GuestPrivacySettingsServiceImplTest {
                 .guestRetentionYears(RETENTION_YEARS_7)
                 .build();
 
-        when(repository.findById(Objects.requireNonNull(hotelId)))
+        when(repository.findByHotelId(Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(existing));
 
         final GuestPrivacySettingsResponse result = service.getOrCreate(hotelId);
@@ -51,7 +51,7 @@ class GuestPrivacySettingsServiceImplTest {
         assertEquals(RETENTION_YEARS_7, result.guestRetentionYears());
         assertEquals(GuestPrivacySettings.TULPS_MIN_YEARS, result.tulpsMinYears());
         assertEquals(GuestPrivacySettings.FISCAL_MIN_YEARS, result.fiscalMinYears());
-        verify(repository, times(1)).findById(Objects.requireNonNull(hotelId));
+        verify(repository, times(1)).findByHotelId(Objects.requireNonNull(hotelId));
         verifyNoMoreInteractions(repository);
     }
 
@@ -63,7 +63,7 @@ class GuestPrivacySettingsServiceImplTest {
                 .guestRetentionYears(GuestPrivacySettings.TULPS_MIN_YEARS)
                 .build();
 
-        when(repository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
+        when(repository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
         when(repository.save(Objects.requireNonNull(defaultSettings)))
                 .thenReturn(Objects.requireNonNull(defaultSettings));
 
@@ -83,7 +83,7 @@ class GuestPrivacySettingsServiceImplTest {
                 .guestRetentionYears(GuestPrivacySettings.TULPS_MIN_YEARS)
                 .build();
 
-        when(repository.findById(Objects.requireNonNull(hotelId)))
+        when(repository.findByHotelId(Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(existing));
         when(repository.save(Objects.requireNonNull(existing)))
                 .thenReturn(Objects.requireNonNull(existing));
@@ -108,7 +108,7 @@ class GuestPrivacySettingsServiceImplTest {
                 .guestRetentionYears(RETENTION_YEARS_6)
                 .build();
 
-        when(repository.findById(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
+        when(repository.findByHotelId(Objects.requireNonNull(hotelId))).thenReturn(Optional.empty());
         when(repository.save(Objects.requireNonNull(toSave)))
                 .thenReturn(Objects.requireNonNull(saved));
         when(repository.save(Objects.requireNonNull(saved)))
@@ -128,12 +128,12 @@ class GuestPrivacySettingsServiceImplTest {
         final GuestPrivacySettings existing = GuestPrivacySettings.builder()
                 .hotelId(hotelId).guestRetentionYears(GuestPrivacySettings.TULPS_MIN_YEARS).build();
 
-        when(repository.findById(Objects.requireNonNull(hotelId)))
+        when(repository.findByHotelId(Objects.requireNonNull(hotelId)))
                 .thenReturn(Optional.of(existing));
 
         service.getOrCreate(hotelId);
 
-        verify(repository, times(1)).findById(Objects.requireNonNull(hotelId));
+        verify(repository, times(1)).findByHotelId(Objects.requireNonNull(hotelId));
         verifyNoMoreInteractions(repository);
     }
 }

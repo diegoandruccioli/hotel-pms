@@ -84,6 +84,15 @@ public class InvoiceCharge {
     @Column(name = "nights")
     private Integer nights;
 
+    /**
+     * The stay this charge originally belonged to, when it was later transferred
+     * from that stay's individual invoice to its reservation group's master folio
+     * (Punto 4). {@code null} for every charge that was posted directly and never
+     * transferred.
+     */
+    @Column(name = "routed_from_stay_id")
+    private UUID routedFromStayId;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

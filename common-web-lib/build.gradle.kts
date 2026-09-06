@@ -40,6 +40,15 @@ dependencies {
     // notification-service (no DB) gets only the compile-time class, no runtime weight added.
     api("org.springframework.data:spring-data-commons")
     api("io.github.openfeign:feign-core")
+    // Shared CsvWriter (server-side CSV export, replaces each service's own
+    // hand-rolled escaping). PINNED at 1.9.0, matching frontdesk-service's
+    // existing pin — commons-csv 1.10.0+ requires commons-io >= 2.15.0,
+    // incompatible with frontdesk-service's own commons-io 2.14.0 pin
+    // (CVE-2024-47554 fix). See frontdesk-service/build.gradle.kts and
+    // .github/dependabot.yml for the full explanation; this version has no
+    // commons-io dependency of its own, so it's safe regardless of what a
+    // given consumer pins there.
+    api("org.apache.commons:commons-csv:1.9.0")
     implementation("org.slf4j:slf4j-api")
     // MissingServletRequestParameterException extends jakarta.servlet.ServletException;
     // every consuming service already has jakarta.servlet-api on its runtime classpath

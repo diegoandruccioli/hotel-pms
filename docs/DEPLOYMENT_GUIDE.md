@@ -51,30 +51,38 @@ cd hotel-pms
 
 ### 2.2 Generare i segreti
 
+**Eseguire lo script PRIMA di toccare `.env` in qualunque altro modo.** Crea il file e
+genera `INTERNAL_HMAC_SECRET`, `JWT_SECRET`, `POSTGRES_PASSWORD`, `CONFIG_SERVER_PASSWORD` e
+le 5 password per-servizio (`AUTH_DB_PASSWORD`, `GUEST_DB_PASSWORD`,
+`FRONTDESK_DB_PASSWORD`, `BILLING_DB_PASSWORD`, `FB_DB_PASSWORD`).
+
 ```bash
 # Linux/macOS
 chmod +x setup-hmac-secret.sh && ./setup-hmac-secret.sh
 
-# Lo script crea/aggiorna il file .env con INTERNAL_HMAC_SECRET
+# Windows PowerShell
+.\setup-hmac-secret.ps1
+
 # Verificare che sia stato generato:
 grep INTERNAL_HMAC_SECRET .env
 ```
 
-### 2.3 Configurare le variabili d'ambiente
+### 2.3 Completare le variabili d'ambiente restanti
+
+**NON eseguire `cp .env.example .env` dopo il passo 2.2** — sovrascriverebbe i segreti
+appena generati con i placeholder del template. `.env.example` serve solo come riferimento
+per le variabili che lo script non genera (`REDIS_PASSWORD`, `ALLOGGIATI_*`, CORS, backup
+off-site). Aprire `.env` esistente e aggiungerle a mano:
 
 ```bash
-cp .env.example .env
 nano .env   # o vim .env
 ```
 
-**Variabili obbligatorie per la produzione:**
+**Variabili da aggiungere per la produzione** (lo script ha già scritto le altre):
 
 ```bash
-# Sicurezza — generare con: openssl rand -base64 48
-INTERNAL_HMAC_SECRET=<stringa-random-base64-48-char-min>
-JWT_SECRET=<stringa-random-base64-48-char-min>
-POSTGRES_PASSWORD=<password-forte-db>
-CONFIG_SERVER_PASSWORD=<password-config-server>
+# Redis (rate limiting gateway + nonce anti-replay) — generare con: openssl rand -hex 16
+REDIS_PASSWORD=<password-forte-redis>
 
 # Portale Alloggiati PS (ottenere dall'hotel)
 ALLOGGIATI_USERNAME=<username-portale-ps>

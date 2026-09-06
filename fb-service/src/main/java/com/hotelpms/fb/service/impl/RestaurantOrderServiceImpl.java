@@ -1,5 +1,7 @@
 package com.hotelpms.fb.service.impl;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
 import com.hotelpms.fb.client.BillingClient;
 import com.hotelpms.fb.client.StayClient;
 import com.hotelpms.fb.client.dto.ChargeRequest;
@@ -23,8 +25,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,7 +63,7 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
     @Override
     @Transactional
     public RestaurantOrderResponse createOrder(final RestaurantOrderRequest request) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         log.info("Creating order for stay: {} hotel: {}", request.stayId(), hotelId);
 
         // Verify the stay is valid and active
@@ -119,7 +119,7 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
     @Override
     @Transactional(readOnly = true)
     public List<RestaurantOrderResponse> getOrdersByStayId(final UUID stayId) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         log.info("Fetching orders for stay: {} hotel: {}", stayId, hotelId);
         // T-FB-01: hotel-scoped — returns empty list for stayIds of other hotels (IDOR-safe)
         final List<RestaurantOrder> orders = orderRepository.findByStayIdAndHotelId(stayId, hotelId);
@@ -134,7 +134,7 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
     @Override
     @Transactional(readOnly = true)
     public Page<RestaurantOrderResponse> getAllOrders(final Pageable pageable) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         log.info("Fetching paginated restaurant orders, page: {}, hotel: {}",
                 pageable.getPageNumber(), hotelId);
         // T-FB-01: hotel-scoped — never returns orders from other hotels
@@ -147,7 +147,7 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
     @Override
     @Transactional
     public RestaurantOrderResponse confirmOrder(final UUID orderId) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         log.info("Confirming order: {} hotel: {}", orderId, hotelId);
 
         final RestaurantOrder order = orderRepository.findByIdAndHotelId(
@@ -217,26 +217,6 @@ public class RestaurantOrderServiceImpl implements RestaurantOrderService {
                 .map(item -> item.getQuantity() + "x " + item.getItemName())
                 .collect(Collectors.joining(", "));
         return StringUtils.hasText(items) ? "F&B: " + items : "F&B " + order.getId();
-    }
-
-    /**
-     * Extracts the hotel identifier from the current security context.
-     *
-     * <p>The hotel ID is stored in {@link org.springframework.security.authentication
-     * .UsernamePasswordAuthenticationToken#getDetails()} by {@code InternalAuthFilter},
-     * which reads it from the {@code X-Auth-Hotel} header injected by the API Gateway
-     * after JWT validation. This prevents any client from supplying a forged hotel scope.
-     *
-     * @return the hotel UUID for the authenticated request
-     * @throws IllegalStateException if the security context does not contain a valid hotel ID
-     */
-    private UUID resolveHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        final Object details = auth.getDetails();
-        if (!(details instanceof String hotelIdStr) || !StringUtils.hasText(hotelIdStr)) {
-            throw new IllegalStateException("X-Auth-Hotel_MISSING");
-        }
-        return UUID.fromString(hotelIdStr);
     }
 
     /**

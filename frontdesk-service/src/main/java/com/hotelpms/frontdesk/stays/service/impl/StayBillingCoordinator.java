@@ -5,6 +5,7 @@ import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.dto.ChargeRequest;
 import com.hotelpms.frontdesk.client.dto.ChargeResponse;
+import com.hotelpms.frontdesk.client.dto.GroupChargeRequest;
 import com.hotelpms.frontdesk.client.dto.InvoiceCreatedResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
@@ -48,6 +49,7 @@ class StayBillingCoordinator {
     private static final String CITY_TAX_CHARGE_TYPE = "CITY_TAX";
     private static final String ROOM_DESCRIPTION_PREFIX = "Room ";
     private static final String NIGHTS_DESCRIPTION_SUFFIX = " night(s)";
+    private static final String NIGHTS_DESCRIPTION_SEPARATOR = " - ";
 
     private final BillingClient billingClient;
     private final RoomService roomService;
@@ -233,8 +235,8 @@ class StayBillingCoordinator {
         final long consumedNights = ChronoUnit.DAYS.between(consumedFrom, moveDate);
         if (consumedNights > 0) {
             final BigDecimal consumedAmount = stay.getRoomChargeUnitPrice().multiply(BigDecimal.valueOf(consumedNights));
-            final String consumedDescription =
-                    ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber() + " - " + consumedNights + NIGHTS_DESCRIPTION_SUFFIX;
+            final String consumedDescription = ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber()
+                    + NIGHTS_DESCRIPTION_SEPARATOR + consumedNights + NIGHTS_DESCRIPTION_SUFFIX;
             postRoomNightCharge(stay, consumedDescription, consumedAmount, stay.getRoomChargeUnitPrice(), consumedNights);
         }
 
@@ -247,8 +249,8 @@ class StayBillingCoordinator {
         final BigDecimal snapshotUnitPrice = remainingUnitPrice != null
                 ? remainingUnitPrice
                 : remainingAmount.divide(BigDecimal.valueOf(remainingNights), 2, RoundingMode.HALF_UP);
-        final String remainingDescription =
-                ROOM_DESCRIPTION_PREFIX + newRoom.roomNumber() + " - " + remainingNights + NIGHTS_DESCRIPTION_SUFFIX;
+        final String remainingDescription = ROOM_DESCRIPTION_PREFIX + newRoom.roomNumber()
+                + NIGHTS_DESCRIPTION_SEPARATOR + remainingNights + NIGHTS_DESCRIPTION_SUFFIX;
         final UUID newChargeId = postRoomNightCharge(
                 stay, remainingDescription, remainingAmount, remainingUnitPrice, remainingNights);
 
@@ -325,6 +327,73 @@ class StayBillingCoordinator {
                 assessment.getAmountPerNightSnapshot(), assessment.getTaxableNights());
     }
 
+    /**
+     * Transfers this stay's ROOM_NIGHT and (if assessed) CITY_TAX charges from its
+     * own individual invoice to its reservation group's master folio (Punto 4) --
+     * called once, at check-out, for a room marked "billed to group". Extras
+     * (F&amp;B) are deliberately left on the individual invoice. Idempotent via
+     * {@link Stay#isChargesTransferredToMasterFolio()}: a retried check-out never
+     * transfers twice.
+     *
+     * <p>An interactive operator action expecting a definite outcome (like {@link
+     * #postExtensionRoomCharge}) -- a billing failure here is not swallowed.
+     *
+     * @param stay    the stay checking out
+     * @param groupId the stay's reservation's group id
+     */
+    void transferChargesToMasterFolio(final Stay stay, final UUID groupId) {
+        if (stay.isChargesTransferredToMasterFolio()) {
+            return;
+        }
+
+        if (stay.getRoomChargeId() != null) {
+            final BigDecimal amount =
+                    stay.getRoomChargeUnitPrice().multiply(BigDecimal.valueOf(stay.getRoomChargeNights()));
+            final String description = ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber()
+                    + NIGHTS_DESCRIPTION_SEPARATOR + stay.getRoomChargeNights() + NIGHTS_DESCRIPTION_SUFFIX;
+            transferCharge(stay, groupId, stay.getRoomChargeId(), ROOM_NIGHT_CHARGE_TYPE, description,
+                    amount, stay.getRoomChargeUnitPrice(), stay.getRoomChargeNights());
+        }
+
+        final Optional<CityTaxAssessment> assessmentOpt =
+                cityTaxAssessmentService.findAssessment(stay.getId(), stay.getHotelId());
+        if (assessmentOpt.isPresent() && assessmentOpt.get().getBillingChargeId() != null) {
+            final CityTaxAssessment assessment = assessmentOpt.get();
+            final String description = "Imposta di soggiorno - " + assessment.getTaxableNights()
+                    + " night(s) x " + assessment.getTaxableGuests() + " guest(s)";
+            final UUID newChargeId = transferCharge(stay, groupId, assessment.getBillingChargeId(),
+                    CITY_TAX_CHARGE_TYPE, description, assessment.getTotalAmount(),
+                    assessment.getAmountPerNightSnapshot(), assessment.getTaxableNights());
+            cityTaxAssessmentService.markCharged(assessment.getId(), newChargeId);
+        }
+
+        stay.setChargesTransferredToMasterFolio(true);
+        stayRepository.save(stay);
+        log.info("[STAY] CHARGES_TRANSFERRED_TO_MASTER_FOLIO | stayId={} | groupId={}", stay.getId(), groupId);
+    }
+
+    private UUID transferCharge(final Stay stay, final UUID groupId, final UUID chargeId,
+            final String type, final String description, final BigDecimal amount,
+            final BigDecimal unitPrice, final Integer nights) {
+        try {
+            billingClient.removeCharge(stay.getId(), chargeId);
+        } catch (final FeignException ex) {
+            throw new ExternalServiceException("GROUP_CHARGE_TRANSFER_REMOVE_FAILED: " + ex.getMessage(), ex);
+        }
+        final GroupChargeRequest request =
+                new GroupChargeRequest(type, description, amount, unitPrice, nights, stay.getId());
+        final ChargeResponse response;
+        try {
+            response = billingClient.addChargeToGroupFolio(groupId, request);
+        } catch (final FeignException ex) {
+            throw new ExternalServiceException("GROUP_CHARGE_TRANSFER_ADD_FAILED: " + ex.getMessage(), ex);
+        }
+        if (response == null || response.id() == null) {
+            throw new ExternalServiceException(BILLING_SERVICE_UNAVAILABLE_REASON);
+        }
+        return response.id();
+    }
+
     private void markInvoiceFlowFailed(final Stay stay, final String reason) {
         stay.setInvoiceCreationFailed(true);
         stay.setInvoiceCreationFailureReason(reason);
@@ -381,8 +450,8 @@ class StayBillingCoordinator {
             unitPrice = uniformRate(nightlyRates);
         }
 
-        final String description =
-                ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber() + " - " + nights + NIGHTS_DESCRIPTION_SUFFIX;
+        final String description = ROOM_DESCRIPTION_PREFIX + stay.getRoomNumber()
+                + NIGHTS_DESCRIPTION_SEPARATOR + nights + NIGHTS_DESCRIPTION_SUFFIX;
         final ChargeRequest chargeRequest =
                 new ChargeRequest(ROOM_NIGHT_CHARGE_TYPE, description, amount, stay.getId(), unitPrice, (int) nights);
         // unitPrice above is left null for a reservation-based stay (ChargeRequest's own

@@ -42,7 +42,7 @@ public class GuestPrivacySettingsServiceImpl implements GuestPrivacySettingsServ
     @Override
     @Transactional
     public GuestPrivacySettings getOrCreateEntity(final UUID hotelId) {
-        return repository.findById(Objects.requireNonNull(hotelId))
+        return repository.findByHotelId(Objects.requireNonNull(hotelId))
                 .orElseGet(() -> repository.save(
                         Objects.requireNonNull(buildDefault(hotelId))));
     }

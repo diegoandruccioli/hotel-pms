@@ -56,6 +56,8 @@ import java.util.UUID;
         })
 public class Invoice {
 
+    private static final int LEN_FOLIO_TYPE = 20;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -100,6 +102,18 @@ public class Invoice {
 
     @Column(name = "stay_id")
     private UUID stayId;
+
+    /**
+     * Logical reference to a reservation group in frontdesk-service (cross-service,
+     * no DB FK). {@code null} for an individual-stay invoice.
+     */
+    @Column(name = "group_id")
+    private UUID groupId;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "folio_type", nullable = false, length = LEN_FOLIO_TYPE)
+    private FolioType folioType = FolioType.INDIVIDUAL;
 
     @Builder.Default
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)

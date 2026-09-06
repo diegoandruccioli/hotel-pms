@@ -1,5 +1,5 @@
 import api from './api';
-import type { LoginRequest, UserPayload } from '../types/auth.types';
+import type { LoginRequest, UserPayload } from '../types';
 
 export const authService = {
   login: async (data: LoginRequest): Promise<{ mustChangePassword: boolean }> => {

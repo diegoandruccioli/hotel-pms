@@ -18,14 +18,22 @@ import type { RoomResponse } from '../types';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 import { getErrorMessage, cn } from '../utils';
+import { reservationService } from '../services';
 import {
   useReservationsSearch,
   useRoomsLookup,
   useDeleteReservation,
   useRetryConfirmationEmail,
+  useUpdateReservationStatus,
 } from '../hooks/queries';
 
 const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
+// Mirrors ReservationServiceImpl.ALLOWED_TRANSITIONS's NO_SHOW edges — a
+// client-side pre-filter so the action isn't offered for a request that
+// would always 409 server-side; the backend re-validates authoritatively
+// (including the check-in-date-passed / no-existing-stay guards this list
+// can't express).
+const NO_SHOW_ELIGIBLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
 const EMPTY_RESERVATIONS: ReservationResponse[] = [];
@@ -42,6 +50,10 @@ interface ReservationsNavState {
   sortDir?: SortDir;
 }
 
+// checkInDate is an ISO 'YYYY-MM-DD' string (see ReservationResponse) — safe
+// to compare lexicographically against another ISO date of the same shape.
+const todayIsoDate = (): string => new Date().toISOString().slice(0, 10);
+
 const getStatusTone = (status: string) => {
   switch (status.toUpperCase()) {
     case 'CONFIRMED': return 'success' as const;
@@ -49,6 +61,7 @@ const getStatusTone = (status: string) => {
     case 'PARTIALLY_CHECKED_IN': return 'warning' as const;
     case 'PENDING': return 'warning' as const;
     case 'CANCELLED': return 'error' as const;
+    case 'NO_SHOW': return 'error' as const;
     default: return 'neutral' as const;
   }
 };
@@ -121,10 +134,14 @@ interface ActionsCellProps {
   onView: (reservationId: string) => void;
   onEdit: (reservationId: string) => void;
   onDelete?: (id: string) => void;
+  onMarkNoShow?: (id: string) => void;
   t: TFunction;
 }
 
-const ActionsCell = ({ reservation, onCheckIn, onView, onEdit, onDelete, t }: ActionsCellProps) => {
+const isNoShowEligible = (reservation: ReservationResponse): boolean =>
+  NO_SHOW_ELIGIBLE_STATUSES.has(reservation.status) && reservation.checkInDate <= todayIsoDate();
+
+const ActionsCell = ({ reservation, onCheckIn, onView, onEdit, onDelete, onMarkNoShow, t }: ActionsCellProps) => {
   const handleCheckInClick = useCallback(() => {
     onCheckIn(
       reservation.id,
@@ -146,6 +163,10 @@ const ActionsCell = ({ reservation, onCheckIn, onView, onEdit, onDelete, t }: Ac
     onDelete?.(reservation.id);
   }, [onDelete, reservation.id]);
 
+  const handleMarkNoShowClick = useCallback(() => {
+    onMarkNoShow?.(reservation.id);
+  }, [onMarkNoShow, reservation.id]);
+
   return (
     <div className="text-right">
       {reservation.status === 'CONFIRMED' && (
@@ -163,6 +184,16 @@ const ActionsCell = ({ reservation, onCheckIn, onView, onEdit, onDelete, t }: Ac
       <M3TableActionLink onClick={handleEditClick}>
         {t('edit')}
       </M3TableActionLink>
+      {onMarkNoShow && isNoShowEligible(reservation) && (
+        <M3TableActionLink
+          tone="error"
+          className="ml-4"
+          aria-label={`${t('mark_no_show')} ${reservation.id}`}
+          onClick={handleMarkNoShowClick}
+        >
+          {t('mark_no_show')}
+        </M3TableActionLink>
+      )}
       {onDelete && DELETABLE_STATUSES.has(reservation.status) && (
         <M3TableActionLink
           tone="error"
@@ -188,11 +219,16 @@ export const Reservations = () => {
 
   const [page, setPage] = useState(0);
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
+  const [reservationToMarkNoShow, setReservationToMarkNoShow] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>(() => navState?.sortField ?? DEFAULT_SORT_FIELD);
   const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? DEFAULT_SORT_DIR);
   const [upcomingOnly, setUpcomingOnly] = useState(() => navState?.upcomingOnly ?? false);
+
+  const handleExportCsv = useCallback(() => {
+    reservationService.exportReservationsCsv({ query: searchQuery, upcomingOnly });
+  }, [searchQuery, upcomingOnly]);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);
@@ -318,6 +354,42 @@ export const Reservations = () => {
     }
   }, [reservationToDelete, addToast, t, deleteReservationMutation]);
 
+  const handleMarkNoShowRequest = useCallback((id: string) => {
+    setReservationToMarkNoShow(id);
+  }, []);
+
+  const handleMarkNoShowDialogClose = useCallback(() => {
+    setReservationToMarkNoShow(null);
+  }, []);
+
+  const updateReservationStatusMutation = useUpdateReservationStatus();
+  const markingNoShow = updateReservationStatusMutation.isPending;
+
+  const handleMarkNoShowConfirm = useCallback(async () => {
+    if (!reservationToMarkNoShow) return;
+    const reservation = reservations.find((r) => r.id === reservationToMarkNoShow);
+    // Explicit null/undefined check, not a truthiness check: a
+    // never-yet-updated reservation's @Version starts at 0, a valid value
+    // that a falsy check would wrongly reject.
+    if (reservation?.version === null || reservation?.version === undefined) {
+      addToast(t('mark_no_show_failed'), 'error');
+      setReservationToMarkNoShow(null);
+      return;
+    }
+    try {
+      await updateReservationStatusMutation.mutateAsync({
+        id: reservationToMarkNoShow,
+        status: 'NO_SHOW',
+        version: reservation.version,
+      });
+      addToast(t('no_show_marked_success'), 'success');
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('mark_no_show_failed')), 'error');
+    } finally {
+      setReservationToMarkNoShow(null);
+    }
+  }, [reservationToMarkNoShow, reservations, addToast, t, updateReservationStatusMutation]);
+
   const columns = useMemo<ColumnDef<ReservationResponse>[]>(() => [
     {
       id: 'guestFullName',
@@ -373,12 +445,13 @@ export const Reservations = () => {
           onView={handleView}
           onEdit={handleEdit}
           onDelete={isAdminOrOwner ? handleDeleteRequest : undefined}
+          onMarkNoShow={handleMarkNoShowRequest}
           t={t}
         />
       ),
     },
   ], [t, rooms, handleRetryConfirmationEmail, retryingEmail, handleCheckIn, handleView, handleEdit,
-      isAdminOrOwner, handleDeleteRequest]);
+      isAdminOrOwner, handleDeleteRequest, handleMarkNoShowRequest]);
 
   return (
     <div className="space-y-6">
@@ -413,6 +486,9 @@ export const Reservations = () => {
           >
             {t('reservations_upcoming_filter')}
           </button>
+          <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
+            {t('export_csv')}
+          </M3Button>
           <M3Button data-testid="new-reservation-btn" icon="add" onClick={handleNewReservation}>
             {t('new_reservation')}
           </M3Button>
@@ -464,6 +540,24 @@ export const Reservations = () => {
               {t('cancel')}
             </M3Button>
             <M3Button type="button" onClick={handleDeleteConfirm} loading={deleting}>
+              {t('confirm')}
+            </M3Button>
+          </div>
+        </M3Dialog>
+      )}
+      {reservationToMarkNoShow && (
+        <M3Dialog
+          open
+          title={t('mark_no_show')}
+          titleId="confirm-mark-no-show-dialog"
+          onClose={handleMarkNoShowDialogClose}
+        >
+          <p className="text-sm font-body text-on-surface">{t('mark_no_show_confirm')}</p>
+          <div className="flex justify-end gap-3 pt-4">
+            <M3Button type="button" variant="outlined" onClick={handleMarkNoShowDialogClose} disabled={markingNoShow}>
+              {t('cancel')}
+            </M3Button>
+            <M3Button type="button" onClick={handleMarkNoShowConfirm} loading={markingNoShow}>
               {t('confirm')}
             </M3Button>
           </div>

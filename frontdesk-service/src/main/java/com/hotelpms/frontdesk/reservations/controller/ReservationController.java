@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -111,6 +113,32 @@ public class ReservationController {
             ) final Pageable pageable) {
         return ResponseEntity.ok(
                 reservationService.searchReservations(query, upcomingOnly, dateFrom, dateTo, status, pageable));
+    }
+
+    /**
+     * Exports every reservation matching the same filters as {@link
+     * #searchReservations} as a CSV file — "export my data", not paginated.
+     *
+     * @param query        optional free-text query (guest name/email)
+     * @param upcomingOnly if {@code true}, only reservations with check-in today or later
+     * @param dateFrom     optional lower bound (inclusive) on check-in date
+     * @param dateTo       optional upper bound (inclusive) on check-in date
+     * @param status       optional reservation status filter
+     * @return a streamed CSV attachment
+     */
+    @GetMapping(value = "/export.csv", produces = "text/csv")
+    public ResponseEntity<StreamingResponseBody> exportReservationsCsv(
+            @RequestParam(required = false) final String query,
+            @RequestParam(defaultValue = "false") final boolean upcomingOnly,
+            @RequestParam(required = false) final LocalDate dateFrom,
+            @RequestParam(required = false) final LocalDate dateTo,
+            @RequestParam(required = false) final ReservationStatus status) {
+        final StreamingResponseBody body = out ->
+                reservationService.exportReservationsCsv(query, upcomingOnly, dateFrom, dateTo, status, out);
+        return ResponseEntity.ok()
+                .headers(h -> h.setContentDisposition(
+                        ContentDisposition.attachment().filename("reservations.csv").build()))
+                .body(body);
     }
 
     /**

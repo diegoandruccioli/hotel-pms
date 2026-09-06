@@ -138,7 +138,7 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
      * @return the credentials to use for this submission
      */
     private AlloggiatiCredentials resolveCredentials(@NonNull final UUID hotelId) {
-        return hotelSettingsRepository.findById(hotelId)
+        return hotelSettingsRepository.findByHotelId(hotelId)
                 .filter((@NonNull HotelSettings hs) -> hs.hasAlloggiatiCredentials())
                 .map(settings -> new AlloggiatiCredentials(
                         settings.getAlloggiatiUsername(),

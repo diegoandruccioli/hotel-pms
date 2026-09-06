@@ -282,7 +282,7 @@ class AlloggiatiWebSenderServiceImplTest {
         settings.setAlloggiatiUsername(HOTEL_USERNAME);
         settings.setAlloggiatiPasswordEncrypted("enc-pass");
         settings.setAlloggiatiWsKeyEncrypted("enc-key");
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settings));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settings));
         when(alloggiatiCredentialEncryptor.decrypt("enc-pass")).thenReturn("hotelPass");
         when(alloggiatiCredentialEncryptor.decrypt("enc-key")).thenReturn("hotelKey");
 
@@ -309,7 +309,7 @@ class AlloggiatiWebSenderServiceImplTest {
         final HotelSettings settings = new HotelSettings();
         settings.setHotelId(hotelId);
         settings.setAlloggiatiUsername(HOTEL_USERNAME);
-        when(hotelSettingsRepository.findById(hotelId)).thenReturn(Optional.of(settings));
+        when(hotelSettingsRepository.findByHotelId(hotelId)).thenReturn(Optional.of(settings));
 
         server.expect(requestTo(SERVICE_URL))
                 .andExpect(content().string(containsString(USERNAME)))

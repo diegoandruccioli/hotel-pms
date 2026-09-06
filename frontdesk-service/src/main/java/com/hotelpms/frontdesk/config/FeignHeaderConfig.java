@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.config;
 
+import com.hotelpms.internalauth.feign.FeignAuthContext;
 import com.hotelpms.internalauth.feign.InternalFeignAuthInterceptor;
 import feign.RequestInterceptor;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +14,12 @@ import java.util.Optional;
  * signature so that downstream service {@code InternalAuthFilter} instances
  * accept them (T-GW-07 / T-GST-05). See {@link InternalFeignAuthInterceptor}
  * for the shared signing logic.
+ *
+ * <p>The scheduled night-audit job also originates a call to billing-service
+ * (the cash-closing summary) outside an HTTP request context, so — same
+ * pattern as guest-service's GDPR retention job — the fallback sources the
+ * auth context from {@link NightAuditJobContext} when no inbound request is
+ * bound to the current thread.
  */
 @Configuration
 public class FeignHeaderConfig {
@@ -29,14 +36,21 @@ public class FeignHeaderConfig {
     }
 
     /**
-     * Registers the shared {@link InternalFeignAuthInterceptor}. This service
-     * has no calls originating outside an HTTP request context, so the
-     * fallback always resolves to empty.
+     * Registers the shared {@link InternalFeignAuthInterceptor} with a
+     * fallback that sources the auth context from {@link NightAuditJobContext}
+     * when no inbound request context is bound to the current thread.
      *
      * @return the configured interceptor
      */
     @Bean
     public RequestInterceptor authHeaderInterceptor() {
-        return new InternalFeignAuthInterceptor(hmacSecret, Optional::empty);
+        return new InternalFeignAuthInterceptor(hmacSecret, FeignHeaderConfig::resolveBatchJobFallback);
+    }
+
+    private static Optional<FeignAuthContext> resolveBatchJobFallback() {
+        final NightAuditJobContext ctx = NightAuditJobContext.get();
+        return ctx == null
+                ? Optional.empty()
+                : Optional.of(new FeignAuthContext(ctx.getUser(), ctx.getRole(), ctx.getHotelId()));
     }
 }

@@ -32,4 +32,18 @@ public interface OwnerReportService {
      * @return the aggregated totals
      */
     OwnerFinancialSummaryDto getFinancialSummary(UUID hotelId, LocalDate startDate, LocalDate endDate);
+
+    /**
+     * Streams the same invoice list as {@link #getFinancialReport} to {@code out} as
+     * CSV -- server-side replacement for the client-side CSV generation previously done
+     * in the frontend, scoped to the authenticated hotel (T-BILL-04).
+     *
+     * @param hotelId   the authenticated hotel UUID; only this hotel's invoices are included
+     * @param startDate the first day of the reporting period (inclusive)
+     * @param endDate   the last day of the reporting period (inclusive)
+     * @param out       the stream to write CSV bytes to
+     * @throws java.io.IOException if writing to {@code out} fails
+     */
+    void exportFinancialReportCsv(UUID hotelId, LocalDate startDate, LocalDate endDate, java.io.OutputStream out)
+            throws java.io.IOException;
 }

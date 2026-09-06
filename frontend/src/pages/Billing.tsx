@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
@@ -13,11 +14,24 @@ import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useTranslation } from 'react-i18next';
 import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries';
 import { getErrorMessage, cn } from '../utils';
+import { billingService } from '../services';
+import { useAuthStore } from '../store';
 
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 300;
 const DEFAULT_SORT_FIELD = 'issueDate';
 const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'desc';
+
+/**
+ * Punto 5 (piano pilota) guardrail: corrispettivi telematici Horeca are not
+ * implemented (docs-only decision, see backup/DECISIONS.md ADR-006) and the
+ * fiscal numbering hasn't been separated into a pilot sezionale yet -- every
+ * FATTURA/RICEVUTA generated here still burns a progressive from the same
+ * live sequence. Defaults to shown (safer for the actual pilot deployment);
+ * set VITE_PILOT_MODE=false to hide once corrispettivi/sezionale are settled
+ * with a commercialista.
+ */
+const PILOT_MODE = import.meta.env.VITE_PILOT_MODE !== 'false';
 
 const getStatusTone = (status: InvoiceStatus) => {
   switch (status) {
@@ -93,6 +107,8 @@ const EMPTY_RESULTS: InvoiceSearchResult[] = [];
 
 export const Billing = memo(() => {
   const { t, i18n } = useTranslation('common');
+  const { user } = useAuthStore();
+  const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
   const [page, setPage] = useState(0);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceResponse | null>(null);
   const [detailTarget, setDetailTarget]   = useState<InvoiceResponse | null>(null);
@@ -102,6 +118,14 @@ export const Billing = memo(() => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
+  const handleExportCsv = useCallback(() => {
+    billingService.exportInvoicesCsv({
+      status: statusFilter === 'ALL' ? undefined : statusFilter,
+      query: searchQuery,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+    });
+  }, [statusFilter, searchQuery, dateFrom, dateTo]);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
 
   useEffect(() => {
@@ -274,6 +298,12 @@ export const Billing = memo(() => {
 
   return (
     <div className="space-y-6">
+      {PILOT_MODE && (
+        <div role="status" className="flex items-start gap-3 rounded-2xl bg-warning-container text-on-warning-container px-4 py-3 text-sm font-medium">
+          <MaterialIcon name="warning" size={18} className="mt-0.5 shrink-0" />
+          {t('pilot_mode_fiscal_banner')}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
@@ -321,6 +351,11 @@ export const Billing = memo(() => {
             className="w-40"
           />
         </div>
+        {isAdminOrOwner && (
+          <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
+            {t('export_csv')}
+          </M3Button>
+        )}
       </div>
 
       {loading ? (

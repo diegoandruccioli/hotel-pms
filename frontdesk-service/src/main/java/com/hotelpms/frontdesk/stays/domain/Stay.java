@@ -173,6 +173,15 @@ public class Stay {
     private Integer roomChargeNights;
 
     /**
+     * Idempotency guard (Punto 4): {@code true} once this stay's ROOM_NIGHT/CITY_TAX
+     * charges have been moved to the reservation's group master folio at check-out,
+     * so a retried check-out never transfers them twice. Meaningless unless the
+     * stay's reservation belongs to a group with {@code billedToMasterFolio = true}.
+     */
+    @Column(name = "charges_transferred_to_master_folio", nullable = false)
+    private boolean chargesTransferredToMasterFolio;
+
+    /**
      * Whether the Alloggiati Web report for this stay has been successfully submitted
      * to the Polizia di Stato portal (either automatically at check-in or manually).
      */

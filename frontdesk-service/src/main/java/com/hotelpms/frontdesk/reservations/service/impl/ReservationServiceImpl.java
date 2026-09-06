@@ -1,5 +1,8 @@
 package com.hotelpms.frontdesk.reservations.service.impl;
 
+import com.hotelpms.internalauth.security.TenantContext;
+
+import com.hotelpms.commonweb.csv.CsvWriter;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
@@ -13,6 +16,7 @@ import com.hotelpms.frontdesk.pricing.service.RatePricingService;
 import com.hotelpms.frontdesk.reservations.domain.Reservation;
 import com.hotelpms.frontdesk.reservations.domain.ReservationLineItem;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
+import com.hotelpms.frontdesk.reservations.dto.ReservationGroupBillingInfo;
 import com.hotelpms.frontdesk.reservations.dto.ReservationLineItemRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationRequest;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
@@ -31,22 +35,26 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.lang.NonNull;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of ReservationService.
@@ -62,10 +70,34 @@ public class ReservationServiceImpl implements ReservationService {
             List.of(ReservationStatus.CHECKED_OUT, ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW);
     private static final List<ReservationStatus> DELETABLE_STATUSES =
             List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
+    /**
+     * Legal next statuses for {@link #updateStatusAndGuests}, keyed by current status.
+     * A status transitioning to itself (e.g. an {@code actualGuests}-only update that
+     * resends the unchanged status) is always allowed regardless of this map — see
+     * {@link #verifyValidTransition}. Terminal statuses map to an empty set.
+     */
+    private static final Map<ReservationStatus, Set<ReservationStatus>> ALLOWED_TRANSITIONS =
+            Map.of(
+                    ReservationStatus.PENDING, EnumSet.of(
+                            ReservationStatus.CONFIRMED, ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW),
+                    ReservationStatus.CONFIRMED, EnumSet.of(
+                            ReservationStatus.PARTIALLY_CHECKED_IN, ReservationStatus.CHECKED_IN,
+                            ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW),
+                    ReservationStatus.PARTIALLY_CHECKED_IN, EnumSet.of(
+                            ReservationStatus.CHECKED_IN, ReservationStatus.CHECKED_OUT),
+                    ReservationStatus.CHECKED_IN, EnumSet.of(ReservationStatus.CHECKED_OUT),
+                    ReservationStatus.CHECKED_OUT, EnumSet.noneOf(ReservationStatus.class),
+                    ReservationStatus.CANCELLED, EnumSet.noneOf(ReservationStatus.class),
+                    ReservationStatus.NO_SHOW, EnumSet.noneOf(ReservationStatus.class));
     private static final String NOTIFICATION_SERVICE_UNAVAILABLE_REASON = "NOTIFICATION_SERVICE_UNAVAILABLE";
     private static final String SQLSTATE_EXCLUSION_VIOLATION = "23P01";
     private static final int MAX_FAILURE_REASON_LENGTH = 500;
     private static final int GUEST_SEARCH_MATCH_CAP = 200;
+    /**
+     * Page size for CSV export's internal pagination loop — bounds memory to one
+     * page at a time instead of loading the whole matching set before writing.
+     */
+    private static final int EXPORT_PAGE_SIZE = 500;
     private static final String UNKNOWN_GUEST = "Unknown Guest";
     private static final LocalDate EARLIEST_FILTER_DATE = LocalDate.of(1900, 1, 1);
     private static final LocalDate LATEST_FILTER_DATE = LocalDate.of(2100, 12, 31);
@@ -84,9 +116,9 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional
     public ReservationResponse createReservation(final ReservationRequest request) {
         verifyDateRange(request);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final GuestResponse guest = verifyGuestExists(request.guestId());
-        final java.util.Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(request.lineItems(), hotelId);
+        final Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(request.lineItems(), hotelId);
         verifyNoOverlappingReservations(null, request);
 
         final Reservation reservation = reservationMapper.toEntity(request);
@@ -112,7 +144,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional(readOnly = true)
     public ReservationResponse getReservationById(final UUID id) {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Reservation reservation = findReservationByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = guestClient.getGuestById(reservation.getGuestId());
         return enrichWithGuestName(reservationMapper.toResponse(reservation), guest);
@@ -123,7 +155,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional(readOnly = true)
     public Page<ReservationResponse> getAllReservations(final Pageable pageable) {
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Page<Reservation> reservationPage = reservationRepository.findAllByHotelId(hotelId, safePageable);
 
         final List<UUID> guestIds = reservationPage.getContent().stream()
@@ -135,8 +167,8 @@ public class ReservationServiceImpl implements ReservationService {
             return reservationPage.map(reservationMapper::toResponse);
         }
 
-        final java.util.Map<UUID, String> guestNameMap = guestClient.getGuestsBatch(guestIds).stream()
-                .collect(java.util.stream.Collectors.toMap(
+        final Map<UUID, String> guestNameMap = guestClient.getGuestsBatch(guestIds).stream()
+                .collect(Collectors.toMap(
                         (@NonNull GuestResponse gr) -> gr.id(),
                         g -> g.firstName() + " " + g.lastName()
                 ));
@@ -154,26 +186,10 @@ public class ReservationServiceImpl implements ReservationService {
             final String query, final boolean upcomingOnly,
             final LocalDate dateFrom, final LocalDate dateTo, final ReservationStatus status,
             final Pageable pageable) {
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
-        final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
-        final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
-
-        final Page<Reservation> results;
-        if (dateFrom != null || dateTo != null || status != null) {
-            final LocalDate effectiveFrom = dateFrom != null ? dateFrom : EARLIEST_FILTER_DATE;
-            final LocalDate effectiveTo = dateTo != null ? dateTo : LATEST_FILTER_DATE;
-            final Set<ReservationStatus> effectiveStatuses = status != null
-                    ? Set.of(status) : EnumSet.allOf(ReservationStatus.class);
-            results = reservationRepository.filterReservationsByHotelId(
-                    hotelId, effectiveFrom, effectiveTo, effectiveStatuses, trimmedQuery, guestIds, safePageable);
-        } else if (upcomingOnly) {
-            results = reservationRepository.searchUpcomingReservationsByHotelId(
-                    hotelId, LocalDate.now(), trimmedQuery, guestIds, safePageable);
-        } else {
-            results = reservationRepository.searchReservationsByHotelId(
-                    hotelId, trimmedQuery, guestIds, safePageable);
-        }
+        final Page<Reservation> results =
+                fetchReservationsPage(hotelId, query, upcomingOnly, dateFrom, dateTo, status, safePageable);
 
         final List<UUID> pageGuestIds = results.getContent().stream()
                 .map((@NonNull Reservation r) -> r.getGuestId())
@@ -183,14 +199,91 @@ public class ReservationServiceImpl implements ReservationService {
             return results.map(reservationMapper::toResponse);
         }
 
-        final java.util.Map<UUID, String> guestNameMap = guestClient.getGuestsBatch(pageGuestIds).stream()
-                .collect(java.util.stream.Collectors.toMap(
+        final Map<UUID, String> guestNameMap = guestClient.getGuestsBatch(pageGuestIds).stream()
+                .collect(Collectors.toMap(
                         (@NonNull GuestResponse gr) -> gr.id(),
                         g -> g.firstName() + " " + g.lastName()));
 
         return results.map(reservation -> enrichWithGuestName(
                 reservationMapper.toResponse(reservation),
                 guestNameMap.getOrDefault(reservation.getGuestId(), UNKNOWN_GUEST)));
+    }
+
+    /**
+     * Shared filter-branch selection behind both {@link #searchReservations}
+     * and {@link #exportReservationsCsv} — same three search strategies
+     * (date/status filter, upcoming-only, plain query), picked the same way.
+     *
+     * @param hotelId      the caller's hotel, for tenant scoping
+     * @param query        optional free-text query (guest name/email)
+     * @param upcomingOnly if {@code true}, only reservations with check-in today or later
+     * @param dateFrom     optional lower bound (inclusive) on check-in date
+     * @param dateTo       optional upper bound (inclusive) on check-in date
+     * @param status       optional reservation status filter
+     * @param pageable     pagination and sorting parameters
+     * @return the matching page of reservations for the selected strategy
+     */
+    private Page<Reservation> fetchReservationsPage(final UUID hotelId, final String query,
+            final boolean upcomingOnly, final LocalDate dateFrom, final LocalDate dateTo,
+            final ReservationStatus status, final Pageable pageable) {
+        final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
+        final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
+
+        if (dateFrom != null || dateTo != null || status != null) {
+            final LocalDate effectiveFrom = dateFrom != null ? dateFrom : EARLIEST_FILTER_DATE;
+            final LocalDate effectiveTo = dateTo != null ? dateTo : LATEST_FILTER_DATE;
+            final Set<ReservationStatus> effectiveStatuses = status != null
+                    ? Set.of(status) : EnumSet.allOf(ReservationStatus.class);
+            return reservationRepository.filterReservationsByHotelId(
+                    hotelId, effectiveFrom, effectiveTo, effectiveStatuses, trimmedQuery, guestIds, pageable);
+        }
+        if (upcomingOnly) {
+            return reservationRepository.searchUpcomingReservationsByHotelId(
+                    hotelId, LocalDate.now(), trimmedQuery, guestIds, pageable);
+        }
+        return reservationRepository.searchReservationsByHotelId(hotelId, trimmedQuery, guestIds, pageable);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public void exportReservationsCsv(final String query, final boolean upcomingOnly,
+            final LocalDate dateFrom, final LocalDate dateTo, final ReservationStatus status,
+            final OutputStream out) throws IOException {
+        final UUID hotelId = TenantContext.resolveHotelId();
+        log.info("[RESERVATION] EXPORT_CSV | hotelId={}", hotelId);
+
+        try (CsvWriter csv = CsvWriter.open(out, List.of(
+                "guestName", "checkInDate", "checkOutDate", "status", "expectedGuests", "actualGuests"))) {
+            int pageNumber = 0;
+            Page<Reservation> page;
+            do {
+                final Pageable pageable = PageRequest.of(
+                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("checkInDate").descending());
+                page = fetchReservationsPage(hotelId, query, upcomingOnly, dateFrom, dateTo, status, pageable);
+
+                final List<UUID> guestIds = page.getContent().stream()
+                        .map((@NonNull Reservation r) -> r.getGuestId())
+                        .distinct()
+                        .toList();
+                final Map<UUID, String> guestNameMap = guestIds.isEmpty() ? Map.of()
+                        : guestClient.getGuestsBatch(guestIds).stream()
+                                .collect(Collectors.toMap(
+                                        (@NonNull GuestResponse gr) -> gr.id(),
+                                        g -> g.firstName() + " " + g.lastName()));
+
+                for (final Reservation reservation : page.getContent()) {
+                    csv.printRow(List.of(
+                            guestNameMap.getOrDefault(reservation.getGuestId(), UNKNOWN_GUEST),
+                            String.valueOf(reservation.getCheckInDate()),
+                            String.valueOf(reservation.getCheckOutDate()),
+                            String.valueOf(reservation.getStatus()),
+                            String.valueOf(reservation.getExpectedGuests()),
+                            String.valueOf(reservation.getActualGuests())));
+                }
+                pageNumber++;
+            } while (page.hasNext());
+        }
     }
 
     /**
@@ -215,13 +308,13 @@ public class ReservationServiceImpl implements ReservationService {
     public ReservationResponse updateReservation(final UUID id, final ReservationRequest request) {
         verifyDateRange(request);
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Reservation existingReservation = findReservationByIdAndHotelOrThrow(id, hotelId);
         verifyNotStale(existingReservation, request.version());
         verifyNoActiveStayConflict(id, hotelId, existingReservation, request);
 
         final GuestResponse guest = verifyGuestExists(request.guestId());
-        final java.util.Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(request.lineItems(), hotelId);
+        final Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(request.lineItems(), hotelId);
         verifyNoOverlappingReservations(id, request);
 
         reservationMapper.updateEntityFromRequest(request, existingReservation);
@@ -261,11 +354,13 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional
     public void deleteReservation(final UUID id) {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Reservation reservation = findReservationByIdAndHotelOrThrow(id, hotelId);
         if (!DELETABLE_STATUSES.contains(reservation.getStatus())) {
             throw new ConflictException("RESERVATION_NOT_DELETABLE");
         }
+        log.info("[RESERVATION] DELETED | reservationId={} | hotelId={} | statusAtDeletion={}",
+                id, hotelId, reservation.getStatus());
         reservationRepository.delete(Objects.requireNonNull(reservation));
     }
 
@@ -274,12 +369,26 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional
     public ReservationResponse updateStatusAndGuests(final UUID id, final ReservationStatus status,
             final Integer actualGuests, final Long clientVersion) {
+        return updateStatusAndGuestsForHotel(TenantContext.resolveHotelId(), id, status, actualGuests, clientVersion);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public ReservationResponse updateStatusAndGuestsForHotel(final UUID hotelId, final UUID id,
+            final ReservationStatus status, final Integer actualGuests, final Long clientVersion) {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
-        final UUID hotelId = resolveHotelId();
+        Objects.requireNonNull(hotelId, HOTEL_ID_NOT_NULL_MSG);
         final Reservation reservation = findReservationByIdAndHotelOrThrow(id, hotelId);
         verifyNotStale(reservation, clientVersion);
 
-        if (status != null) {
+        if (status != null && status != reservation.getStatus()) {
+            verifyValidTransition(reservation.getStatus(), status);
+            if (status == ReservationStatus.NO_SHOW) {
+                verifyNoShowAllowed(reservation, hotelId);
+            }
+            log.info("[RESERVATION] STATUS_CHANGED | reservationId={} | hotelId={} | from={} | to={}",
+                    id, hotelId, reservation.getStatus(), status);
             reservation.setStatus(status);
         }
         if (actualGuests != null) {
@@ -296,10 +405,10 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional
     public ReservationResponse retryConfirmationEmail(final UUID id) {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final Reservation reservation = findReservationByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = guestClient.getGuestById(reservation.getGuestId());
-        final java.util.Map<UUID, String> roomNumbers = new java.util.HashMap<>();
+        final Map<UUID, String> roomNumbers = new java.util.HashMap<>();
         if (reservation.getLineItems() != null) {
             for (final ReservationLineItem lineItem : reservation.getLineItems()) {
                 final RoomResponse room = roomService.getRoomById(lineItem.getRoomId(), hotelId);
@@ -335,7 +444,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional(readOnly = true)
     public boolean hasActiveReservations(final UUID guestId) {
         Objects.requireNonNull(guestId, "Guest ID cannot be null");
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         return reservationRepository.existsByGuestIdAndHotelIdAndStatusNotIn(guestId, hotelId, TERMINAL_STATUSES);
     }
 
@@ -349,7 +458,7 @@ public class ReservationServiceImpl implements ReservationService {
             throw new BadRequestException("CHECKOUT_MUST_BE_AFTER_CHECKIN");
         }
 
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final List<RoomResponse> bookableRooms = roomService.findBookableRooms(hotelId);
         if (bookableRooms.isEmpty()) {
             return bookableRooms;
@@ -420,21 +529,6 @@ public class ReservationServiceImpl implements ReservationService {
         return ratePricingService.resolveStayRates(room.roomType().id(), hotelId, checkIn, checkOut).stream()
                 .map(NightlyRate::nightlyPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    /**
-     * Extracts the hotel UUID from the current security context details.
-     * The value is set by {@code InternalAuthFilter} from the {@code X-Auth-Hotel} header.
-     *
-     * @return the hotel UUID of the authenticated user
-     * @throws IllegalStateException if the hotel ID is absent or not a valid UUID
-     */
-    private UUID resolveHotelId() {
-        final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getDetails() instanceof String hotelIdStr)) {
-            throw new IllegalStateException(HOTEL_ID_NOT_NULL_MSG);
-        }
-        return UUID.fromString(hotelIdStr);
     }
 
     private Reservation findReservationByIdAndHotelOrThrow(final UUID id, final UUID hotelId) {
@@ -542,13 +636,13 @@ public class ReservationServiceImpl implements ReservationService {
      * @throws ExternalServiceException when a room exists but is inactive
      *                                  (soft-deleted)
      */
-    private java.util.Map<UUID, RoomResponse> verifyRoomsAvailability(
+    private Map<UUID, RoomResponse> verifyRoomsAvailability(
             final List<ReservationLineItemRequest> lineItems, final UUID hotelId) {
         if (lineItems == null || lineItems.isEmpty()) {
-            return java.util.Map.of();
+            return Map.of();
         }
 
-        final java.util.Map<UUID, RoomResponse> roomsById = new java.util.HashMap<>();
+        final Map<UUID, RoomResponse> roomsById = new java.util.HashMap<>();
         for (final ReservationLineItemRequest item : lineItems) {
             final RoomResponse room = roomService.getRoomById(item.roomId(), hotelId);
             if (!room.active()) {
@@ -559,8 +653,8 @@ public class ReservationServiceImpl implements ReservationService {
         return roomsById;
     }
 
-    private static java.util.Map<UUID, String> roomNumbersOf(final java.util.Map<UUID, RoomResponse> roomsById) {
-        final java.util.Map<UUID, String> roomNumbers = new java.util.HashMap<>();
+    private static Map<UUID, String> roomNumbersOf(final Map<UUID, RoomResponse> roomsById) {
+        final Map<UUID, String> roomNumbers = new java.util.HashMap<>();
         roomsById.forEach((roomId, room) -> roomNumbers.put(roomId, room.roomNumber()));
         return roomNumbers;
     }
@@ -587,7 +681,7 @@ public class ReservationServiceImpl implements ReservationService {
      * @param checkOut  the reservation's check-out date (exclusive)
      */
     private void applyResolvedPrices(
-            final List<ReservationLineItem> lineItems, final java.util.Map<UUID, RoomResponse> roomsById,
+            final List<ReservationLineItem> lineItems, final Map<UUID, RoomResponse> roomsById,
             final UUID hotelId, final LocalDate checkIn, final LocalDate checkOut) {
         if (lineItems == null) {
             return;
@@ -645,6 +739,40 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     /**
+     * Rejects a status change that isn't a legal move in the reservation lifecycle
+     * (see {@link #ALLOWED_TRANSITIONS}). Callers must skip this entirely when
+     * {@code next} equals the current status — that's a no-op resend (e.g. an
+     * {@code actualGuests}-only update), not a transition.
+     *
+     * @param current the status as currently persisted
+     * @param next    the requested new status
+     */
+    private static void verifyValidTransition(final ReservationStatus current, final ReservationStatus next) {
+        if (!ALLOWED_TRANSITIONS.getOrDefault(current, Set.of()).contains(next)) {
+            throw new ConflictException("RESERVATION_INVALID_TRANSITION");
+        }
+    }
+
+    /**
+     * A reservation can only be marked {@code NO_SHOW} once its check-in date has
+     * passed and no (active) {@link com.hotelpms.frontdesk.stays.domain.Stay} was ever
+     * created against it — a guest who did check in, even briefly, was not a no-show.
+     *
+     * @param reservation the reservation being transitioned to {@code NO_SHOW}
+     * @param hotelId     the caller's hotel, for the stay lookup
+     */
+    private void verifyNoShowAllowed(final Reservation reservation, final UUID hotelId) {
+        if (reservation.getCheckInDate().isAfter(LocalDate.now())) {
+            throw new ConflictException("RESERVATION_NO_SHOW_BEFORE_CHECKIN_DATE");
+        }
+        final boolean hasStay = !stayRepository
+                .findAllByReservationIdAndHotelId(reservation.getId(), hotelId).isEmpty();
+        if (hasStay) {
+            throw new ConflictException("RESERVATION_NO_SHOW_HAS_STAY");
+        }
+    }
+
+    /**
      * Rejects a dates/rooms edit once check-in has already created a
      * {@code CHECKED_IN} stay from this reservation. The frontend already
      * makes the dates/rooms section read-only in that case (see
@@ -683,10 +811,10 @@ public class ReservationServiceImpl implements ReservationService {
         }
         final Set<UUID> currentRoomIds = existing.getLineItems().stream()
                 .map(ReservationLineItem::getRoomId)
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
         final Set<UUID> requestedRoomIds = request.lineItems().stream()
                 .map((@NonNull ReservationLineItemRequest li) -> li.roomId())
-                .collect(java.util.stream.Collectors.toSet());
+                .collect(Collectors.toSet());
         return !currentRoomIds.equals(requestedRoomIds);
     }
 
@@ -694,7 +822,7 @@ public class ReservationServiceImpl implements ReservationService {
             final Reservation reservation,
             final UUID hotelId,
             final GuestResponse guest,
-            final java.util.Map<UUID, String> roomNumbers) {
+            final Map<UUID, String> roomNumbers) {
         try {
             final HotelSettingsResponse settings = hotelSettingsService.getOrCreate(hotelId);
             if (!settings.sendReservationConfirmedEmail()) {
@@ -704,7 +832,7 @@ public class ReservationServiceImpl implements ReservationService {
             final String roomDetails = reservation.getLineItems() != null && !reservation.getLineItems().isEmpty()
                     ? reservation.getLineItems().stream()
                             .map(li -> roomNumbers.getOrDefault(li.getRoomId(), li.getRoomId().toString()))
-                            .collect(java.util.stream.Collectors.joining(", "))
+                            .collect(Collectors.joining(", "))
                     : "";
             final boolean sent = notificationClient.sendReservationConfirmed(new NotificationReservationRequest(
                     guest.email(),
@@ -745,15 +873,15 @@ public class ReservationServiceImpl implements ReservationService {
     @Transactional
     public ReservationResponse createReservationFromPricedRooms(
             final UUID guestId, final LocalDate checkInDate, final LocalDate checkOutDate,
-            final Integer expectedGuests, final java.util.Map<UUID, BigDecimal> roomPrices) {
+            final Integer expectedGuests, final Map<UUID, BigDecimal> roomPrices) {
         Objects.requireNonNull(roomPrices, "Room prices cannot be null");
-        final UUID hotelId = resolveHotelId();
+        final UUID hotelId = TenantContext.resolveHotelId();
         final GuestResponse guest = verifyGuestExists(guestId);
 
         final List<ReservationLineItemRequest> lineItemRequests = roomPrices.keySet().stream()
                 .map(ReservationLineItemRequest::new)
                 .toList();
-        final java.util.Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(lineItemRequests, hotelId);
+        final Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(lineItemRequests, hotelId);
 
         final ReservationRequest pseudoRequest = new ReservationRequest(
                 guestId, Objects.requireNonNullElse(expectedGuests, 1), checkInDate, checkOutDate,
@@ -773,6 +901,59 @@ public class ReservationServiceImpl implements ReservationService {
         final Reservation saved = saveTranslatingOverlap(Objects.requireNonNull(reservation));
         sendReservationConfirmedEmail(saved, hotelId, guest, roomNumbersOf(roomsById));
         return enrichWithGuestName(reservationMapper.toResponse(saved), guest);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public ReservationResponse createReservationForGroup(
+            final UUID groupId, final UUID guestId, final UUID roomId, final int expectedGuests,
+            final LocalDate checkInDate, final LocalDate checkOutDate,
+            final BigDecimal groupRatePerNight, final boolean billedToMasterFolio) {
+        final UUID hotelId = TenantContext.resolveHotelId();
+        final GuestResponse guest = verifyGuestExists(guestId);
+
+        final List<ReservationLineItemRequest> lineItemRequests = List.of(new ReservationLineItemRequest(roomId));
+        final Map<UUID, RoomResponse> roomsById = verifyRoomsAvailability(lineItemRequests, hotelId);
+
+        final ReservationRequest pseudoRequest = new ReservationRequest(
+                guestId, expectedGuests, checkInDate, checkOutDate,
+                ReservationStatus.CONFIRMED, lineItemRequests, null);
+        verifyNoOverlappingReservations(null, pseudoRequest);
+
+        final Reservation reservation = reservationMapper.toEntity(pseudoRequest);
+        reservation.setHotelId(hotelId);
+        reservation.setActualGuests(0);
+        reservation.setGroupId(groupId);
+        reservation.setBilledToMasterFolio(billedToMasterFolio);
+
+        final BigDecimal price;
+        if (groupRatePerNight != null) {
+            final long nights = ChronoUnit.DAYS.between(checkInDate, checkOutDate);
+            price = groupRatePerNight.multiply(BigDecimal.valueOf(nights));
+        } else {
+            final RoomResponse room = roomsById.get(roomId);
+            price = ratePricingService.resolveStayRates(room.roomType().id(), hotelId, checkInDate, checkOutDate)
+                    .stream().map(NightlyRate::nightlyPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+        Objects.requireNonNull(reservation.getLineItems()).forEach(lineItem -> {
+            lineItem.setReservation(reservation);
+            lineItem.setPrice(price);
+        });
+
+        final Reservation saved = saveTranslatingOverlap(reservation);
+        sendReservationConfirmedEmail(saved, hotelId, guest, roomNumbersOf(roomsById));
+        return enrichWithGuestName(reservationMapper.toResponse(saved), guest);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Optional<ReservationGroupBillingInfo> getGroupBillingInfo(
+            final UUID reservationId, final UUID hotelId) {
+        return reservationRepository.findByIdAndHotelId(reservationId, hotelId)
+                .filter(r -> r.getGroupId() != null)
+                .map(r -> new ReservationGroupBillingInfo(r.getGroupId(), r.isBilledToMasterFolio()));
     }
 
     private void verifyNoOverlappingReservations(final UUID excludeId, final ReservationRequest request) {
