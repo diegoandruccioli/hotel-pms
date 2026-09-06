@@ -760,7 +760,10 @@ services:
       api-gateway:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -T10 -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      # Punto 6 item 7 (piano pilota): hits /healthz (nginx -> api-gateway:8090
+      # actuator), not "/" -- a dead gateway now genuinely fails this check
+      # instead of nginx's own static index.html masking it as healthy.
+      test: ["CMD-SHELL", "wget -T10 -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 10
