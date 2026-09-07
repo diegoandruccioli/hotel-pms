@@ -64,6 +64,7 @@ class NightAuditControllerSecurityTest {
 
     private static final String BASE_URL = "/api/v1/frontdesk/night-audit";
     private static final String DATE_PARAM = "2026-06-15";
+    private static final String RUN_URL = BASE_URL + "?date=" + DATE_PARAM;
     private static final LocalDate BUSINESS_DATE = LocalDate.of(2026, 6, 15);
 
     private static final String HDR_USER = "X-Auth-User";
@@ -100,7 +101,7 @@ class NightAuditControllerSecurityTest {
     @Test
     void runReturns403ForGuest() throws Exception {
         mockMvc.perform(withAuthHeaders(
-                        post(BASE_URL + "?date=" + DATE_PARAM),
+                        post(RUN_URL),
                         USER_GUEST, ROLE_GUEST, TEST_HOTEL_ID))
                 .andExpect(status().isForbidden());
     }
@@ -110,7 +111,7 @@ class NightAuditControllerSecurityTest {
         when(nightAuditService.run(any(), anyString())).thenReturn(sampleRun());
 
         mockMvc.perform(withAuthHeaders(
-                        post(BASE_URL + "?date=" + DATE_PARAM),
+                        post(RUN_URL),
                         USER_ADMIN, ROLE_ADMIN, TEST_HOTEL_ID))
                 .andExpect(status().isCreated());
     }
@@ -120,7 +121,7 @@ class NightAuditControllerSecurityTest {
         when(nightAuditService.run(any(), anyString())).thenReturn(sampleRun());
 
         mockMvc.perform(withAuthHeaders(
-                        post(BASE_URL + "?date=" + DATE_PARAM),
+                        post(RUN_URL),
                         USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
                 .andExpect(status().isCreated());
     }

@@ -63,11 +63,13 @@ public class StayController {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final String ROLE_ADMIN_OR_OWNER = "hasAnyRole('ADMIN', 'OWNER')";
-    /** Widened for the two Dashboard-alert-banner summary endpoints only
+    /**
+     * Widened for the two Dashboard-alert-banner summary endpoints only
      * (count-only, no financial figures) — RECEPTIONIST needs to see and act
      * on them just as much as ownership does. See GAP-26 in
      * THREAT_MODEL.md. Every other ADMIN_OR_OWNER endpoint in this
-     * controller (Alloggiati submit/download, city-tax backfill) stays as-is. */
+     * controller (Alloggiati submit/download, city-tax backfill) stays as-is.
+     */
     private static final String ROLE_ADMIN_OWNER_OR_RECEPTIONIST = "hasAnyRole('ADMIN', 'OWNER', 'RECEPTIONIST')";
     private static final String PATH_VAR_GUEST_ID = "guestId";
 
