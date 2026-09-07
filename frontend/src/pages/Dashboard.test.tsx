@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
@@ -18,6 +18,7 @@ vi.mock('../services/stayService', () => ({
     getAlloggiatiFailureSummary: vi.fn(),
     getCityTaxUnassessedSummary: vi.fn(),
     searchStays: vi.fn(),
+    checkOut: vi.fn(),
   },
 }));
 
@@ -93,6 +94,7 @@ describe('Dashboard Component', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(EMPTY_PAGE);
     vi.mocked(stayService.searchStays).mockReset();
     vi.mocked(stayService.searchStays).mockResolvedValue(EMPTY_PAGE);
+    vi.mocked(stayService.checkOut).mockReset();
     vi.mocked(kpiReportService.getKpiReport).mockReset();
     vi.mocked(kpiReportService.getKpiReport).mockResolvedValue({
       periods: [], totals: { periodStart: '', totalRoomRevenue: 0, occupiedRoomNights: 0,
@@ -150,6 +152,47 @@ describe('Dashboard Component', () => {
     await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
     expect(screen.getByTestId('dashboard-check-in-res-1')).toBeInTheDocument();
     expect(screen.getByText('dashboard_no_departures_today')).toBeInTheDocument();
+  });
+
+  it('hides the check-in button on an arrival row that is not yet CONFIRMED', async () => {
+    vi.mocked(reservationService.searchReservations).mockResolvedValue({
+      ...EMPTY_PAGE,
+      content: [{
+        id: 'res-2', guestId: 'g2', guestFullName: 'Anna Bianchi', checkInDate: '2026-08-20',
+        checkOutDate: '2026-08-22', status: 'PENDING', expectedGuests: 1, lineItems: [],
+        active: true, createdAt: '', updatedAt: '', confirmationEmailFailed: false,
+      }],
+    });
+    renderDashboard();
+    await waitFor(() => expect(screen.getByText('Anna Bianchi')).toBeInTheDocument());
+    expect(screen.queryByTestId('dashboard-check-in-res-2')).not.toBeInTheDocument();
+  });
+
+  it('shows a populated departure row and checks a guest out on click', async () => {
+    vi.mocked(stayService.searchStays).mockResolvedValue({
+      ...EMPTY_PAGE,
+      content: [{ id: 'stay-1', roomNumber: '101', expectedCheckOutDate: '2026-08-20', status: 'CHECKED_IN' }],
+    } as never);
+    vi.mocked(stayService.checkOut).mockResolvedValue({} as never);
+    renderDashboard();
+
+    await waitFor(() => expect(screen.getByTestId('dashboard-check-out-stay-1')).toBeInTheDocument());
+    expect(screen.getByText('101')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('dashboard-check-out-stay-1'));
+    await waitFor(() => expect(stayService.checkOut).toHaveBeenCalledWith('stay-1'));
+  });
+
+  it('handles a failed check-out from the departures row without crashing', async () => {
+    vi.mocked(stayService.searchStays).mockResolvedValue({
+      ...EMPTY_PAGE,
+      content: [{ id: 'stay-2', roomNumber: '202', expectedCheckOutDate: '2026-08-20', status: 'CHECKED_IN' }],
+    } as never);
+    vi.mocked(stayService.checkOut).mockRejectedValue(new Error('boom'));
+    renderDashboard();
+
+    await waitFor(() => expect(screen.getByTestId('dashboard-check-out-stay-2')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('dashboard-check-out-stay-2'));
+    await waitFor(() => expect(stayService.checkOut).toHaveBeenCalledWith('stay-2'));
   });
 
   it('shows the owner summary section (occupancy/ADR/RevPAR) for ADMIN', async () => {
