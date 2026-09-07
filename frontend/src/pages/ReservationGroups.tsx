@@ -55,6 +55,7 @@ export const ReservationGroups = () => {
   const error = queryError ? getErrorMessage(queryError, t('groups_load_failed')) : null;
 
   const handleNewGroup = useCallback(() => navigate('/reservations/groups/new'), [navigate]);
+  const handleViewReservations = useCallback(() => navigate('/reservations'), [navigate]);
   const handleViewGroup = useCallback((id: string) => navigate(`/reservations/groups/${id}`), [navigate]);
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
   const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
@@ -117,9 +118,19 @@ export const ReservationGroups = () => {
           </h1>
           <p className="text-sm font-body text-on-surface-variant mt-1">{t('reservation_groups_subtitle')}</p>
         </div>
-        <M3Button icon="add" onClick={handleNewGroup}>
-          {t('new_group')}
-        </M3Button>
+        <div className="flex items-center gap-3">
+          <M3Button
+            data-testid="view-reservations-btn"
+            icon="event"
+            variant="outlined"
+            onClick={handleViewReservations}
+          >
+            {t('nav_reservations')}
+          </M3Button>
+          <M3Button icon="add" onClick={handleNewGroup}>
+            {t('new_group')}
+          </M3Button>
+        </div>
       </div>
 
       {isLoading ? (

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockAuthMe, mockDaySheet, mockOwnerSummary } from './fixtures/mockApi';
+import { mockAuthMe, mockDaySheet, mockOwnerSummary, mockTodayArrivals, mockDueOutStays } from './fixtures/mockApi';
 
 async function mockDashboardApis(page: import('@playwright/test').Page): Promise<void> {
   await mockAuthMe(page);
@@ -11,6 +11,10 @@ async function mockDashboardApis(page: import('@playwright/test').Page): Promise
   await page.route('**/api/v1/stays/reports/alloggiati/failures/summary', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ failedCount: 0 }) }),
   );
+  // ArrivalsDeparturesPanel's own two calls — empty by default so specs see
+  // the panel's empty state unless a test overrides with specific rows.
+  await mockTodayArrivals(page);
+  await mockDueOutStays(page);
 }
 
 test.describe('Dashboard', () => {
@@ -27,9 +31,12 @@ test.describe('Dashboard', () => {
   test('renders stat cards grid', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('stats-grid')).toBeVisible({ timeout: 10000 });
-    // All stat card labels should be present (verify by translation keys rendered as text)
-    await expect(page.getByText(/guests in house|ospiti in struttura/i)).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/today.*(arrivals|check.in)|arrivi/i)).toBeVisible();
+    // All stat card labels should be present (verify by translation keys rendered as text).
+    // Scoped to stats-grid: "Today's Arrivals" now also titles the front-desk
+    // work-list panel below it, which would make an unscoped match ambiguous.
+    const statsGrid = page.getByTestId('stats-grid');
+    await expect(statsGrid.getByText(/guests in house|ospiti in struttura/i)).toBeVisible({ timeout: 10000 });
+    await expect(statsGrid.getByText(/today.*(arrivals|check.in)|arrivi/i)).toBeVisible();
   });
 
   test('shows guests-in-house count after stats load', async ({ page }) => {
@@ -53,7 +60,7 @@ test.describe('Dashboard', () => {
     await mockDaySheet(page, { todayArrivals: 1 });
     await page.goto('/');
     await expect(page.getByTestId('stats-grid')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/today.*(arrivals|check.in)|arrivi/i)).toBeVisible();
+    await expect(page.getByTestId('stats-grid').getByText(/today.*(arrivals|check.in)|arrivi/i)).toBeVisible();
   });
 
   test('pending revenue card visible for ADMIN role', async ({ page }) => {
@@ -66,8 +73,10 @@ test.describe('Dashboard', () => {
   test('stat cards link to correct pages', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('stats-grid')).toBeVisible({ timeout: 10000 });
-    // 4 universal stats + owner pending-revenue stat + room-overview section link, all "View all".
+    // 4 universal stats + owner pending-revenue stat + room-overview section
+    // link + the arrivals/departures work-list panel's own 2 "View all"
+    // links, all "View all".
     const viewAllLinks = page.getByRole('link', { name: /view all|vedi tutto/i });
-    await expect(viewAllLinks).toHaveCount(6);
+    await expect(viewAllLinks).toHaveCount(8);
   });
 });
