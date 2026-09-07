@@ -193,6 +193,7 @@
   "total_invoices": "Total Invoices",
   "paid_invoices": "Paid Invoices",
   "collection_rate": "collection rate",
+  "delta_vs_previous_period": "{{percent}}% vs previous period",
   "no_invoices_period": "No invoices in this period.",
   "nav_menu": "Menu",
   "guest": "Guest",
@@ -399,6 +400,11 @@
   "alloggiati_submit_failed": "Failed to submit report. Check service logs.",
 
   "room_overview_title": "Room Status Overview",
+  "dashboard_arrivals_today": "Today's Arrivals",
+  "dashboard_departures_today": "Today's Departures",
+  "dashboard_no_arrivals_today": "No arrivals expected today",
+  "dashboard_no_departures_today": "No departures due today",
+  "dashboard_owner_summary_title": "Today at a glance",
 
   "search_placeholder": "Search",
   "filter_all": "All",

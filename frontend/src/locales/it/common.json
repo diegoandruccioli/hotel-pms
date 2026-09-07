@@ -193,6 +193,7 @@
   "total_invoices": "Fatture Totali",
   "paid_invoices": "Fatture Pagate",
   "collection_rate": "tasso di incasso",
+  "delta_vs_previous_period": "{{percent}}% rispetto al periodo precedente",
   "no_invoices_period": "Nessuna fattura in questo periodo.",
   "nav_menu": "Menu",
   "guest": "Ospite",
@@ -399,6 +400,11 @@
   "alloggiati_submit_failed": "Invio non riuscito. Verificare i log del servizio.",
 
   "room_overview_title": "Stato Camere",
+  "dashboard_arrivals_today": "Arrivi di oggi",
+  "dashboard_departures_today": "Partenze di oggi",
+  "dashboard_no_arrivals_today": "Nessun arrivo previsto oggi",
+  "dashboard_no_departures_today": "Nessuna partenza prevista oggi",
+  "dashboard_owner_summary_title": "In sintesi oggi",
 
   "search_placeholder": "Cerca",
   "filter_all": "Tutti",

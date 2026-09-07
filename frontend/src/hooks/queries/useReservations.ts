@@ -11,6 +11,9 @@ interface SearchParams {
   page: number;
   size: number;
   sort: string;
+  dateFrom?: string;
+  dateTo?: string;
+  status?: string;
 }
 
 export function useReservationsSearch(params: SearchParams) {

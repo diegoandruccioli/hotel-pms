@@ -11,6 +11,8 @@ import { getErrorMessage, cn } from '../utils';
 import { useDaySheet, useOwnerFinancialSummary } from '../hooks/queries';
 import type { RoomStatus } from '../types';
 import type { AlloggiatiFailureSummaryResponse, CityTaxUnassessedSummaryResponse } from '../types';
+import { ArrivalsDeparturesPanel } from './Dashboard/ArrivalsDeparturesPanel';
+import { OwnerSummarySection } from './Dashboard/OwnerSummarySection';
 
 const ROOM_STATUS_COLORS: Record<RoomStatus, string> = {
   CLEAN:       'bg-tertiary-container/60 text-on-tertiary-container border-tertiary/50',
@@ -208,6 +210,16 @@ export const Dashboard = () => {
               </M3Card>
             ))}
           </div>
+
+          {/* Actionable front-desk work list — arrivals/departures for today,
+              per the front-desk-dashboard convention (Cloudbeds "Today",
+              Mews front-desk timeline): rows with inline actions, not just
+              the counters above. Visible to every role. */}
+          <ArrivalsDeparturesPanel />
+
+          {/* Owner/admin-only "today at a glance" — occupancy/ADR/RevPAR,
+              linking into the full comparative report at /owner-dashboard. */}
+          {isOwnerOrAdmin && <OwnerSummarySection />}
 
           {/* Room status overview — counts only; the day-sheet endpoint doesn't
               carry the full per-room list, see Housekeeping for that. */}
