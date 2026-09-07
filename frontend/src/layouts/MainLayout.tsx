@@ -23,15 +23,17 @@ const navigation = [
   { nameKey: 'calendar', href: '/calendar', icon: 'date_range' },
   { nameKey: 'stays', href: '/stays', icon: 'hotel' },
   { nameKey: 'housekeeping', href: '/housekeeping', icon: 'cleaning_services' },
+  { nameKey: 'night_audit', href: '/night-audit', icon: 'fact_check' },
   { nameKey: 'billing', href: '/billing', icon: 'receipt_long' },
   { nameKey: 'restaurant', href: '/restaurant', icon: 'restaurant' },
   { nameKey: 'rooms', href: '/rooms', icon: 'meeting_room' },
   { nameKey: 'rates', href: '/rates', icon: 'payments' },
 ];
 
+// Night audit moved into `navigation` above (GAP-26, THREAT_MODEL.md) — it's
+// night-shift front-desk work, open to RECEPTIONIST, not ownership-only.
 const ownerNavigation = [
   { nameKey: 'owner_dashboard', href: '/owner-dashboard', icon: 'bar_chart' },
-  { nameKey: 'night_audit', href: '/night-audit', icon: 'fact_check' },
 ];
 
 // BUG-7 (docs/LIVE_E2E_AUDIT_2026-07.md): the sidebar had no focus-visible

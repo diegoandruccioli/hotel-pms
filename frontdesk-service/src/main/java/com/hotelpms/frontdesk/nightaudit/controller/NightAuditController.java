@@ -23,9 +23,12 @@ import java.time.LocalDate;
 
 /**
  * Manual trigger + history for the night audit — closes the operational/
- * financial books for a business date. Includes the cash-closing summary
- * (financial data), so ADMIN/OWNER only, unlike the day-sheet (no figures,
- * open to every role).
+ * financial books for a business date. Open to RECEPTIONIST as well as
+ * ADMIN/OWNER: in practice the night audit is run by whoever is on the night
+ * shift, which is front-desk staff, not ownership — and reconciling the
+ * day's cash drawer against the cash-closing summary this endpoint returns
+ * is exactly that role's job. (Previously ADMIN/OWNER-only; widened
+ * deliberately, not an oversight — see GAP-26 in THREAT_MODEL.md.)
  */
 @RestController
 @RequestMapping("/api/v1/frontdesk/night-audit")
@@ -33,7 +36,7 @@ import java.time.LocalDate;
 public class NightAuditController {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
-    private static final String ROLE_ADMIN_OR_OWNER = "hasAnyRole('ADMIN', 'OWNER')";
+    private static final String ROLE_ADMIN_OWNER_OR_RECEPTIONIST = "hasAnyRole('ADMIN', 'OWNER', 'RECEPTIONIST')";
 
     private final NightAuditService nightAuditService;
 
@@ -47,7 +50,7 @@ public class NightAuditController {
      * @return the resulting run
      */
     @PostMapping
-    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
+    @PreAuthorize(ROLE_ADMIN_OWNER_OR_RECEPTIONIST)
     public ResponseEntity<NightAuditRunResponse> runNightAudit(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
         final String runBy = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -61,7 +64,7 @@ public class NightAuditController {
      * @return a page of runs
      */
     @GetMapping
-    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
+    @PreAuthorize(ROLE_ADMIN_OWNER_OR_RECEPTIONIST)
     public ResponseEntity<Page<NightAuditRunResponse>> getHistory(
             @PageableDefault(size = DEFAULT_PAGE_SIZE, sort = "businessDate",
                     direction = Sort.Direction.DESC) final Pageable pageable) {

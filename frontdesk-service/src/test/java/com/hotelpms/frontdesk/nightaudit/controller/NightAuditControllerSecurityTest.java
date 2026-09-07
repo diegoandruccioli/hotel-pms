@@ -39,12 +39,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Security-slice test for {@link NightAuditController} — both endpoints carry
- * financial data (the cash-closing summary), so ADMIN/OWNER only, unlike
- * {@code DaySheetController} (no figures, open to every role). Same pattern
- * as {@code CityTaxRateControllerSecurityTest}: default Spring Security
- * auto-configuration excluded so only {@link SecurityConfig} + real
- * {@code @EnableMethodSecurity} AOP process the request.
+ * Security-slice test for {@link NightAuditController} — both endpoints are
+ * open to ADMIN/OWNER/RECEPTIONIST (the night audit is night-shift front-desk
+ * work; see GAP-26 in THREAT_MODEL.md) but closed to every other role, e.g.
+ * GUEST. Same pattern as {@code CityTaxRateControllerSecurityTest}: default
+ * Spring Security auto-configuration excluded so only {@link SecurityConfig}
+ * + real {@code @EnableMethodSecurity} AOP process the request.
  */
 @SuppressWarnings({"null", "PMD.HardCodedCryptoKey"})
 @WebMvcTest(
@@ -77,6 +77,8 @@ class NightAuditControllerSecurityTest {
     private static final String ROLE_RECEPTIONIST = "RECEPTIONIST";
     private static final String USER_ADMIN = "admin";
     private static final String ROLE_ADMIN = "ADMIN";
+    private static final String USER_GUEST = "guest";
+    private static final String ROLE_GUEST = "GUEST";
 
     @Autowired
     private MockMvc mockMvc;
@@ -96,10 +98,10 @@ class NightAuditControllerSecurityTest {
     }
 
     @Test
-    void runReturns403ForReceptionist() throws Exception {
+    void runReturns403ForGuest() throws Exception {
         mockMvc.perform(withAuthHeaders(
                         post(BASE_URL + "?date=" + DATE_PARAM),
-                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                        USER_GUEST, ROLE_GUEST, TEST_HOTEL_ID))
                 .andExpect(status().isForbidden());
     }
 
@@ -114,8 +116,18 @@ class NightAuditControllerSecurityTest {
     }
 
     @Test
-    void historyReturns403ForReceptionist() throws Exception {
-        mockMvc.perform(withAuthHeaders(get(BASE_URL), USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+    void runReturns201ForReceptionist() throws Exception {
+        when(nightAuditService.run(any(), anyString())).thenReturn(sampleRun());
+
+        mockMvc.perform(withAuthHeaders(
+                        post(BASE_URL + "?date=" + DATE_PARAM),
+                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void historyReturns403ForGuest() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(BASE_URL), USER_GUEST, ROLE_GUEST, TEST_HOTEL_ID))
                 .andExpect(status().isForbidden());
     }
 
@@ -124,6 +136,14 @@ class NightAuditControllerSecurityTest {
         when(nightAuditService.getHistory(any())).thenReturn(new PageImpl<>(List.of(sampleRun())));
 
         mockMvc.perform(withAuthHeaders(get(BASE_URL), USER_ADMIN, ROLE_ADMIN, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void historyReturns200ForReceptionist() throws Exception {
+        when(nightAuditService.getHistory(any())).thenReturn(new PageImpl<>(List.of(sampleRun())));
+
+        mockMvc.perform(withAuthHeaders(get(BASE_URL), USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
                 .andExpect(status().isOk());
     }
 

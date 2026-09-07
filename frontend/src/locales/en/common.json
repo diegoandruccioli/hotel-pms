@@ -371,6 +371,8 @@
   "night_audit_subtitle": "Close the operational and financial books for a business date.",
   "night_audit_business_date": "Business date",
   "night_audit_run_action": "Run closing",
+  "night_audit_precheck_pending_arrivals": "{{count}} arrival(s) not checked in yet",
+  "night_audit_precheck_pending_departures": "{{count}} departure(s) not checked out yet",
   "night_audit_run_confirm": "Run the night audit for {{date}}? This auto-detects no-shows, snapshots occupancy, and records the cash-closing summary for that date. A date that's already closed can't be re-run.",
   "night_audit_run_success": "Night audit for {{date}} completed.",
   "night_audit_run_failed": "Failed to run the night audit. Please try again.",

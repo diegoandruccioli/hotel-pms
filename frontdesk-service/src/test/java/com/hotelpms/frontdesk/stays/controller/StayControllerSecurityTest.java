@@ -5,6 +5,7 @@ import com.hotelpms.frontdesk.citytax.dto.CityTaxBackfillResponse;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxConfigurationStatusResponse;
 import com.hotelpms.frontdesk.citytax.dto.CityTaxUnassessedSummaryResponse;
 import com.hotelpms.frontdesk.citytax.service.CityTaxAssessmentService;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiFailureSummaryResponse;
 import com.hotelpms.frontdesk.stays.dto.AlloggiatiRowDto;
 import com.hotelpms.frontdesk.security.SecurityConfig;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiReportService;
@@ -79,6 +80,7 @@ class StayControllerSecurityTest {
     private static final String PATH_SUBMIT = "/api/v1/stays/reports/alloggiati/submit";
     private static final String PATH_JSON = "/api/v1/stays/reports/alloggiati/json";
     private static final String PATH_TXT = "/api/v1/stays/reports/alloggiati";
+    private static final String PATH_ALLOGGIATI_FAILURES_SUMMARY = "/api/v1/stays/reports/alloggiati/failures/summary";
     private static final String PATH_CITY_TAX_CONFIG_STATUS = "/api/v1/stays/city-tax/configuration-status";
     private static final String PATH_CITY_TAX_UNASSESSED_SUMMARY = "/api/v1/stays/city-tax/unassessed/summary";
     private static final String PATH_CITY_TAX_BACKFILL_PREVIEW = "/api/v1/stays/city-tax/backfill/preview";
@@ -99,6 +101,8 @@ class StayControllerSecurityTest {
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String USER_OWNER = "owner";
     private static final String ROLE_OWNER = "OWNER";
+    private static final String USER_GUEST = "guest";
+    private static final String ROLE_GUEST = "GUEST";
     private static final String STATO_CODE = "Z000";
 
     @Autowired
@@ -212,11 +216,14 @@ class StayControllerSecurityTest {
     }
 
     // ──────────────────────────────── city-tax unassessed summary ──────────
+    // Drives a Dashboard alert banner RECEPTIONIST needs to act on (GAP-26 in
+    // THREAT_MODEL.md) — count-only, no financial figures, unlike the other
+    // ADMIN/OWNER-only endpoints in this class.
 
     @Test
-    void cityTaxUnassessedSummaryReturns403ForReceptionist() throws Exception {
+    void cityTaxUnassessedSummaryReturns403ForGuest() throws Exception {
         mockMvc.perform(withAuthHeaders(get(PATH_CITY_TAX_UNASSESSED_SUMMARY),
-                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                        USER_GUEST, ROLE_GUEST, TEST_HOTEL_ID))
                 .andExpect(status().isForbidden());
     }
 
@@ -227,6 +234,46 @@ class StayControllerSecurityTest {
 
         mockMvc.perform(withAuthHeaders(get(PATH_CITY_TAX_UNASSESSED_SUMMARY),
                         USER_OWNER, ROLE_OWNER, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void cityTaxUnassessedSummaryReturns200ForReceptionist() throws Exception {
+        when(cityTaxAssessmentService.getUnassessedSummary(any()))
+                .thenReturn(new CityTaxUnassessedSummaryResponse(0, null, null));
+
+        mockMvc.perform(withAuthHeaders(get(PATH_CITY_TAX_UNASSESSED_SUMMARY),
+                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    // ──────────────────────────────── Alloggiati failures summary ──────────
+    // Same rationale and pattern as the city-tax unassessed summary above.
+
+    @Test
+    void alloggiatiFailureSummaryReturns403ForGuest() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(PATH_ALLOGGIATI_FAILURES_SUMMARY),
+                        USER_GUEST, ROLE_GUEST, TEST_HOTEL_ID))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void alloggiatiFailureSummaryReturns200ForOwner() throws Exception {
+        when(stayService.getAlloggiatiFailureSummary(any()))
+                .thenReturn(new AlloggiatiFailureSummaryResponse(0, null, null));
+
+        mockMvc.perform(withAuthHeaders(get(PATH_ALLOGGIATI_FAILURES_SUMMARY),
+                        USER_OWNER, ROLE_OWNER, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void alloggiatiFailureSummaryReturns200ForReceptionist() throws Exception {
+        when(stayService.getAlloggiatiFailureSummary(any()))
+                .thenReturn(new AlloggiatiFailureSummaryResponse(0, null, null));
+
+        mockMvc.perform(withAuthHeaders(get(PATH_ALLOGGIATI_FAILURES_SUMMARY),
+                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
                 .andExpect(status().isOk());
     }
 

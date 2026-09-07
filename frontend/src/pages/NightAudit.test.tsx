@@ -1,10 +1,18 @@
+import type { ReactElement } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
-import { renderWithQuery as render } from '../test-utils';
+import { MemoryRouter } from 'react-router-dom';
+import { renderWithQuery } from '../test-utils';
 import { mockAxiosErrorWithDetail } from '../test-utils';
 import { NightAudit } from './NightAudit';
 import { nightAuditService } from '../services';
+import { reservationService } from '../services';
+import { stayService } from '../services';
 import { useToastStore } from '../store';
+
+// The pre-check widget links to /reservations and /stays (react-router-dom
+// <Link>), so every render needs a Router context now, not just a QueryClient.
+const render = (ui: ReactElement) => renderWithQuery(<MemoryRouter>{ui}</MemoryRouter>);
 
 vi.mock('react-i18next', () => {
   const t = (key: string, opts?: Record<string, unknown>) =>
@@ -20,6 +28,14 @@ vi.mock('../services/nightAuditService', () => ({
     run: vi.fn(),
     getHistory: vi.fn(),
   },
+}));
+
+vi.mock('../services/reservationService', () => ({
+  reservationService: { searchReservations: vi.fn() },
+}));
+
+vi.mock('../services/stayService', () => ({
+  stayService: { searchStays: vi.fn() },
 }));
 
 vi.mock('../store/toastStore', () => ({
@@ -64,6 +80,8 @@ describe('NightAudit', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useToastStore).mockReturnValue(mockAddToast);
+    vi.mocked(reservationService.searchReservations).mockResolvedValue(page([]) as never);
+    vi.mocked(stayService.searchStays).mockResolvedValue(page([]) as never);
   });
 
   it('should show loading state initially', () => {
@@ -153,6 +171,33 @@ describe('NightAudit', () => {
     fireEvent.click(screen.getByRole('button', { name: 'view' }));
 
     expect(screen.getByText('CASH')).toBeInTheDocument();
+  });
+
+  it('shows the pre-check banner when arrivals and departures are still pending', async () => {
+    vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([]) as never);
+    vi.mocked(reservationService.searchReservations).mockResolvedValue({
+      content: [], totalPages: 1, totalElements: 2,
+    } as never);
+    vi.mocked(stayService.searchStays).mockResolvedValue(
+      page([
+        { id: 's1', expectedCheckOutDate: '2026-06-14' },
+        { id: 's2', expectedCheckOutDate: '2099-01-01' }, // not due yet — excluded
+      ]) as never,
+    );
+    render(<NightAudit />);
+
+    await waitFor(() => expect(screen.getByText('night_audit_no_runs_found')).toBeInTheDocument());
+    expect(screen.getByText(/night_audit_precheck_pending_arrivals.*"count":2/)).toBeInTheDocument();
+    expect(screen.getByText(/night_audit_precheck_pending_departures.*"count":1/)).toBeInTheDocument();
+  });
+
+  it('hides the pre-check banner once nothing is pending', async () => {
+    vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([]) as never);
+    render(<NightAudit />);
+
+    await waitFor(() => expect(screen.getByText('night_audit_no_runs_found')).toBeInTheDocument());
+    expect(screen.queryByText(/night_audit_precheck_pending_arrivals/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/night_audit_precheck_pending_departures/)).not.toBeInTheDocument();
   });
 
   it('should show the failure reason in the detail dialog for a FAILED run', async () => {

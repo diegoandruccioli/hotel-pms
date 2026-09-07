@@ -81,6 +81,12 @@ describe('MainLayout', () => {
     expect(screen.getAllByText('nav_owner_dashboard').length).toBeGreaterThan(0);
   });
 
+  it('shows the night-audit nav item for a RECEPTIONIST (GAP-26: night-shift front-desk work, not owner-only)', () => {
+    mockAuthStore(RECEPTIONIST);
+    renderLayout();
+    expect(screen.getAllByText('nav_night_audit').length).toBeGreaterThan(0);
+  });
+
   it('opens the mobile drawer from the hamburger button', () => {
     mockAuthStore(RECEPTIONIST);
     renderLayout();

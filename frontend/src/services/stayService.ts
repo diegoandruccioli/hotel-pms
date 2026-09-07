@@ -34,6 +34,27 @@ export const stayService = {
     return response.data;
   },
 
+  /** Same endpoint as {@link getAllStays}, filtered by status — used by the
+   * night-audit pre-check and the front-desk dashboard to pull the due-out
+   * list (status=CHECKED_IN) without downloading every stay.
+   * `expectedCheckOutDate` isn't a backend filter, so "due today" is
+   * narrowed client-side from this result. */
+  searchStays: async (params: {
+    status?: string;
+    page?: number;
+    size?: number;
+  }): Promise<SpringPage<StayResponse>> => {
+    const searchParams = new URLSearchParams({
+      page: String(params.page ?? 0),
+      size: String(params.size ?? 20),
+    });
+    if (params.status) searchParams.set('status', params.status);
+    const response = await api.get<SpringPage<StayResponse>>(
+      `${BASE_PATH}?${searchParams.toString()}`,
+    );
+    return response.data;
+  },
+
   getStayById: async (id: string): Promise<StayResponse> => {
     const response = await api.get<StayResponse>(`${BASE_PATH}/${id}`);
     return response.data;
