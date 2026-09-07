@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { stayService } from '../services';
@@ -9,6 +10,7 @@ import { M3Card } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { M3Checkbox } from '../components/m3';
 import { StructuredAddressFields } from '../components/StructuredAddressFields';
+import { SettingsPageHeader } from '../components/SettingsPageHeader';
 import { useToastStore } from '../store';
 import { getErrorMessage, cn } from '../utils';
 
@@ -21,7 +23,9 @@ const FISCAL_CODE_REGEX = /^(\d{11}|[A-Za-z]{6}\d{2}[A-Za-z]\d{2}[A-Za-z]\d{3}[A
 
 export function HotelProfile() {
   const { t } = useTranslation('admin');
+  const navigate = useNavigate();
   const { addToast } = useToastStore();
+  const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const [form, setForm] = useState<HotelSettingsRequest>({
     alloggiatiAutoSend: false,
@@ -144,14 +148,13 @@ export function HotelProfile() {
   }
 
   return (
-    <main className="max-w-xl mx-auto p-6 space-y-6" aria-labelledby="hotel-profile-title">
-      <div>
-        <h1 id="hotel-profile-title" className="text-2xl font-semibold text-on-surface flex items-center gap-2">
-          <MaterialIcon name="apartment" className="text-primary" />
-          {t('hotel_profile_title')}
-        </h1>
-        <p className="text-sm text-on-surface-variant mt-1">{t('hotel_profile_subtitle')}</p>
-      </div>
+    <div className="space-y-6 max-w-2xl mx-auto pb-10">
+      <SettingsPageHeader
+        icon="apartment"
+        title={t('hotel_profile_title')}
+        subtitle={t('hotel_profile_subtitle')}
+        onBack={handleBack}
+      />
 
       <M3Card className="p-6 space-y-4">
         {/* Logo preview */}
@@ -276,6 +279,6 @@ export function HotelProfile() {
           {saving ? t('btn_saving') : t('btn_save_profile')}
         </M3Button>
       </div>
-    </main>
+    </div>
   );
 }

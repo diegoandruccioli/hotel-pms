@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import { userService } from '../services';
@@ -8,6 +9,7 @@ import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3EmptyState } from '../components/m3';
+import { SettingsPageHeader } from '../components/SettingsPageHeader';
 import { useToastStore } from '../store';
 import { useAuthStore } from '../store';
 import { getErrorMessage, cn } from '../utils';
@@ -59,8 +61,10 @@ function compareUsers(a: UserResponse, b: UserResponse, field: string): number {
 
 export function AdminUsers() {
   const { t } = useTranslation('admin');
+  const navigate = useNavigate();
   const { addToast } = useToastStore();
   const currentUser = useAuthStore((s) => s.user);
+  const handleBack = useCallback(() => navigate(-1), [navigate]);
   const [users, setUsers] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -205,19 +209,18 @@ export function AdminUsers() {
   ], [t, handleToggle, openReset, currentUser?.username]);
 
   return (
-    <main className="p-6 space-y-6" aria-labelledby="users-title">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 id="users-title" className="text-2xl font-semibold text-on-surface flex items-center gap-2">
-            <MaterialIcon name="manage_accounts" className="text-primary" />
-            {t('page_title')}
-          </h1>
-          <p className="text-sm text-on-surface-variant mt-1">{t('page_subtitle')}</p>
-        </div>
-        <M3Button icon="person_add" onClick={openCreate}>
-          {t('btn_new_user')}
-        </M3Button>
-      </div>
+    <div className="space-y-6">
+      <SettingsPageHeader
+        icon="manage_accounts"
+        title={t('page_title')}
+        subtitle={t('page_subtitle')}
+        onBack={handleBack}
+        actions={
+          <M3Button icon="person_add" onClick={openCreate}>
+            {t('btn_new_user')}
+          </M3Button>
+        }
+      />
 
       {loading ? (
         <M3LoadingState label={t('loading', { ns: 'common' })} />
@@ -244,6 +247,6 @@ export function AdminUsers() {
           onSuccess={handleResetSuccess}
         />
       )}
-    </main>
+    </div>
   );
 }
