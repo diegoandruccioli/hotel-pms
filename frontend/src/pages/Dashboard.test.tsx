@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
@@ -8,11 +8,18 @@ import { useAuthStore } from '../store';
 import { stayService } from '../services';
 import { dashboardService } from '../services';
 import { billingReportService } from '../services';
+import { reservationService } from '../services';
+import { kpiReportService } from '../services';
 import type { DaySheetResponse } from '../types';
 import type { OwnerFinancialSummaryDto } from '../types';
 
 vi.mock('../services/stayService', () => ({
-  stayService: { getAlloggiatiFailureSummary: vi.fn(), getCityTaxUnassessedSummary: vi.fn() },
+  stayService: {
+    getAlloggiatiFailureSummary: vi.fn(),
+    getCityTaxUnassessedSummary: vi.fn(),
+    searchStays: vi.fn(),
+    checkOut: vi.fn(),
+  },
 }));
 
 vi.mock('../services/dashboardService', () => ({
@@ -21,6 +28,14 @@ vi.mock('../services/dashboardService', () => ({
 
 vi.mock('../services/billingReportService', () => ({
   billingReportService: { getOwnerFinancialSummary: vi.fn() },
+}));
+
+vi.mock('../services/reservationService', () => ({
+  reservationService: { searchReservations: vi.fn() },
+}));
+
+vi.mock('../services/kpiReportService', () => ({
+  kpiReportService: { getKpiReport: vi.fn() },
 }));
 
 vi.mock('react-i18next', () => ({
@@ -53,6 +68,11 @@ const MOCK_SUMMARY: OwnerFinancialSummaryDto = {
   pendingRevenue: 10000,
 };
 
+const EMPTY_PAGE = {
+  content: [], totalElements: 0, totalPages: 0, number: 0, size: 8,
+  numberOfElements: 0, first: true, last: true, empty: true,
+};
+
 const renderDashboard = () =>
   renderWithQuery(<MemoryRouter><Dashboard /></MemoryRouter>);
 
@@ -70,6 +90,16 @@ describe('Dashboard Component', () => {
     vi.mocked(dashboardService.getDaySheet).mockResolvedValue(MOCK_DAY_SHEET);
     vi.mocked(billingReportService.getOwnerFinancialSummary).mockReset();
     vi.mocked(billingReportService.getOwnerFinancialSummary).mockResolvedValue(MOCK_SUMMARY);
+    vi.mocked(reservationService.searchReservations).mockReset();
+    vi.mocked(reservationService.searchReservations).mockResolvedValue(EMPTY_PAGE);
+    vi.mocked(stayService.searchStays).mockReset();
+    vi.mocked(stayService.searchStays).mockResolvedValue(EMPTY_PAGE);
+    vi.mocked(stayService.checkOut).mockReset();
+    vi.mocked(kpiReportService.getKpiReport).mockReset();
+    vi.mocked(kpiReportService.getKpiReport).mockResolvedValue({
+      periods: [], totals: { periodStart: '', totalRoomRevenue: 0, occupiedRoomNights: 0,
+        availableRoomNights: 0, adr: 120, revpar: 90, occupancyRate: 0.75 },
+    });
     useAuthStore.setState({
       user: { sub: 'user1', username: 'admin', role: 'ADMIN' },
       isAuthenticated: true,
@@ -107,6 +137,78 @@ describe('Dashboard Component', () => {
     await waitFor(() => expect(screen.getByTestId('stats-grid')).toBeInTheDocument());
     expect(screen.queryByText('stat_pending_revenue')).not.toBeInTheDocument();
     expect(billingReportService.getOwnerFinancialSummary).not.toHaveBeenCalled();
+  });
+
+  it('shows the arrivals/departures work list with an actionable arrival row', async () => {
+    vi.mocked(reservationService.searchReservations).mockResolvedValue({
+      ...EMPTY_PAGE,
+      content: [{
+        id: 'res-1', guestId: 'g1', guestFullName: 'Mario Rossi', checkInDate: '2026-08-20',
+        checkOutDate: '2026-08-22', status: 'CONFIRMED', expectedGuests: 2, lineItems: [],
+        active: true, createdAt: '', updatedAt: '', confirmationEmailFailed: false,
+      }],
+    });
+    renderDashboard();
+    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+    expect(screen.getByTestId('dashboard-check-in-res-1')).toBeInTheDocument();
+    expect(screen.getByText('dashboard_no_departures_today')).toBeInTheDocument();
+  });
+
+  it('hides the check-in button on an arrival row that is not yet CONFIRMED', async () => {
+    vi.mocked(reservationService.searchReservations).mockResolvedValue({
+      ...EMPTY_PAGE,
+      content: [{
+        id: 'res-2', guestId: 'g2', guestFullName: 'Anna Bianchi', checkInDate: '2026-08-20',
+        checkOutDate: '2026-08-22', status: 'PENDING', expectedGuests: 1, lineItems: [],
+        active: true, createdAt: '', updatedAt: '', confirmationEmailFailed: false,
+      }],
+    });
+    renderDashboard();
+    await waitFor(() => expect(screen.getByText('Anna Bianchi')).toBeInTheDocument());
+    expect(screen.queryByTestId('dashboard-check-in-res-2')).not.toBeInTheDocument();
+  });
+
+  it('shows a populated departure row and checks a guest out on click', async () => {
+    vi.mocked(stayService.searchStays).mockResolvedValue({
+      ...EMPTY_PAGE,
+      content: [{ id: 'stay-1', roomNumber: '101', expectedCheckOutDate: '2026-08-20', status: 'CHECKED_IN' }],
+    } as never);
+    vi.mocked(stayService.checkOut).mockResolvedValue({} as never);
+    renderDashboard();
+
+    await waitFor(() => expect(screen.getByTestId('dashboard-check-out-stay-1')).toBeInTheDocument());
+    expect(screen.getByText('101')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('dashboard-check-out-stay-1'));
+    await waitFor(() => expect(stayService.checkOut).toHaveBeenCalledWith('stay-1'));
+  });
+
+  it('handles a failed check-out from the departures row without crashing', async () => {
+    vi.mocked(stayService.searchStays).mockResolvedValue({
+      ...EMPTY_PAGE,
+      content: [{ id: 'stay-2', roomNumber: '202', expectedCheckOutDate: '2026-08-20', status: 'CHECKED_IN' }],
+    } as never);
+    vi.mocked(stayService.checkOut).mockRejectedValue(new Error('boom'));
+    renderDashboard();
+
+    await waitFor(() => expect(screen.getByTestId('dashboard-check-out-stay-2')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('dashboard-check-out-stay-2'));
+    await waitFor(() => expect(stayService.checkOut).toHaveBeenCalledWith('stay-2'));
+  });
+
+  it('shows the owner summary section (occupancy/ADR/RevPAR) for ADMIN', async () => {
+    renderDashboard();
+    await waitFor(() => expect(screen.getByText('dashboard_owner_summary_title')).toBeInTheDocument());
+  });
+
+  it('hides the owner summary section for RECEPTIONIST', async () => {
+    useAuthStore.setState({
+      user: { sub: 'user2', username: 'reception', role: 'RECEPTIONIST' },
+      isAuthenticated: true,
+      isLoading: false,
+    });
+    renderDashboard();
+    await waitFor(() => expect(screen.getByTestId('stats-grid')).toBeInTheDocument());
+    expect(screen.queryByText('dashboard_owner_summary_title')).not.toBeInTheDocument();
   });
 
   it('renders loading state', () => {

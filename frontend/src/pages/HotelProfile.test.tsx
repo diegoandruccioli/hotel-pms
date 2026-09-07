@@ -68,6 +68,13 @@ describe('HotelProfile', () => {
     expect(screen.getByLabelText(/label_alloggiati_auto_send/i)).toBeInTheDocument();
   });
 
+  it('renders the shared SettingsPageHeader with a working back button', async () => {
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+    expect(screen.getByRole('button', { name: 'back' })).toBeInTheDocument();
+  });
+
   it('loads alloggiatiAutoSend=false and renders checkbox unchecked', async () => {
     renderComponent();
     await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());

@@ -317,6 +317,10 @@ export const Reservations = () => {
     navigate('/reservations/new');
   }, [navigate]);
 
+  const handleViewGroups = useCallback(() => {
+    navigate('/reservations/groups');
+  }, [navigate]);
+
   const handleCheckIn = useCallback((reservationId: string, roomId: string, expectedGuests: number, guestId: string) => {
     navigate(`/stays/check-in/${reservationId}`, {
       state: { roomId, expectedGuests, guestId }
@@ -488,6 +492,14 @@ export const Reservations = () => {
           </button>
           <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
             {t('export_csv')}
+          </M3Button>
+          <M3Button
+            data-testid="view-groups-btn"
+            icon="groups"
+            variant="outlined"
+            onClick={handleViewGroups}
+          >
+            {t('nav_reservation_groups')}
           </M3Button>
           <M3Button data-testid="new-reservation-btn" icon="add" onClick={handleNewReservation}>
             {t('new_reservation')}

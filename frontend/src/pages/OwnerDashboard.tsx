@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, memo } from 'react';
 import { billingReportService } from '../services';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
-import type { OwnerFinancialReportDto } from '../types';
+import type { OwnerFinancialReportDto, OwnerFinancialSummaryDto } from '../types';
 import type { InvoiceResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3';
@@ -11,8 +11,51 @@ import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, cn } from '../utils';
 import { KpiTrendSection } from './OwnerDashboard/KpiTrendSection';
+
+/** Same-length period immediately preceding `[start, end]` (both inclusive),
+ * e.g. 2026-09-01..2026-09-07 (7 days) -> 2026-08-25..2026-08-31 — used to
+ * give the KPI cards a comparison instead of a bare absolute figure, per the
+ * "pace/flash report" convention every PMS reviewed uses (Mews, Cloudbeds
+ * Insights, OPERA). No backend `compareWith` param exists, so this fetches
+ * the same aggregates-only summary endpoint a second time. */
+const getPreviousPeriod = (startDate: string, endDate: string): { prevStart: string; prevEnd: string } => {
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  const lengthDays = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  const prevEndDate = new Date(start);
+  prevEndDate.setDate(prevEndDate.getDate() - 1);
+  const prevStartDate = new Date(prevEndDate);
+  prevStartDate.setDate(prevStartDate.getDate() - (lengthDays - 1));
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return { prevStart: fmt(prevStartDate), prevEnd: fmt(prevEndDate) };
+};
+
+/** Percentage change from `previous` to `current`, or `null` when there's no
+ * previous-period baseline to compare against (avoids a nonsensical +∞%). */
+const percentChange = (current: number, previous: number): number | null => {
+  if (previous === 0) return current === 0 ? 0 : null;
+  return ((current - previous) / previous) * 100;
+};
+
+interface DeltaBadgeProps {
+  current: number;
+  previous: number;
+}
+
+const DeltaBadge = ({ current, previous }: DeltaBadgeProps) => {
+  const { t } = useTranslation('common');
+  const delta = percentChange(current, previous);
+  if (delta === null) return null;
+  const isPositive = delta >= 0;
+  return (
+    <p className={cn('text-xs font-body font-medium flex items-center gap-0.5', isPositive ? 'text-success' : 'text-error')}>
+      <MaterialIcon name={isPositive ? 'trending_up' : 'trending_down'} size={14} />
+      {t('delta_vs_previous_period', { percent: Math.round(Math.abs(delta)) })}
+    </p>
+  );
+};
 
 const getStatusTone = (status: InvoiceResponse['status']) => {
   switch (status) {
@@ -63,6 +106,7 @@ export const OwnerDashboard = memo(() => {
   const [startDate, setStartDate] = useState(getFirstDayOfMonth());
   const [endDate, setEndDate] = useState(getTodayString());
   const [report, setReport] = useState<OwnerFinancialReportDto | null>(null);
+  const [previousSummary, setPreviousSummary] = useState<OwnerFinancialSummaryDto | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,8 +129,15 @@ export const OwnerDashboard = memo(() => {
     setLoading(true);
     setError(null);
     try {
-      const data = await billingReportService.getOwnerFinancialReport(startDate, endDate);
+      const { prevStart, prevEnd } = getPreviousPeriod(startDate, endDate);
+      const [data, previous] = await Promise.all([
+        billingReportService.getOwnerFinancialReport(startDate, endDate),
+        // Best-effort: a comparison is a nice-to-have, not worth failing the
+        // whole report load over (e.g. prevStart predating the hotel's data).
+        billingReportService.getOwnerFinancialSummary(prevStart, prevEnd).catch(() => null),
+      ]);
       setReport(data);
+      setPreviousSummary(previous);
     } catch (err: unknown) {
       const message = getErrorMessage(err, t('failed_load_report'));
       setError(message);
@@ -191,6 +242,7 @@ export const OwnerDashboard = memo(() => {
               <div>
                 <p className="text-sm font-body text-on-surface-variant">{t('total_revenue')}</p>
                 <p className="text-2xl font-display font-bold text-on-surface">{formatCurrency(report.totalRevenue)}</p>
+                {previousSummary && <DeltaBadge current={report.totalRevenue} previous={previousSummary.totalRevenue} />}
               </div>
             </M3Card>
             <M3Card variant="glass" className="p-5 flex items-center gap-4">
@@ -200,6 +252,7 @@ export const OwnerDashboard = memo(() => {
               <div>
                 <p className="text-sm font-body text-on-surface-variant">{t('total_invoices')}</p>
                 <p className="text-2xl font-display font-bold text-on-surface">{report.totalInvoices}</p>
+                {previousSummary && <DeltaBadge current={report.totalInvoices} previous={previousSummary.totalInvoices} />}
               </div>
             </M3Card>
             <M3Card variant="glass" className="p-5 flex items-center gap-4">
@@ -214,6 +267,7 @@ export const OwnerDashboard = memo(() => {
                     ? `${Math.round((report.paidInvoices / report.totalInvoices) * 100)}% ${t('collection_rate')}`
                     : t('no_invoices')}
                 </p>
+                {previousSummary && <DeltaBadge current={report.paidInvoices} previous={previousSummary.paidInvoices} />}
               </div>
             </M3Card>
           </div>
