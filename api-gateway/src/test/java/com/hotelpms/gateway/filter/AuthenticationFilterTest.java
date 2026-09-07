@@ -16,6 +16,7 @@ import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.mock.http.server.reactive.MockServerHttpResponse;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -113,6 +114,16 @@ class AuthenticationFilterTest {
                         builder.claim("mustChangePassword", mustChangePassword);
                 }
                 return builder.signWith(key, SignatureAlgorithm.HS256).compact();
+        }
+
+        /**
+         * Reads back the full response body written by {@code onError}, so tests can
+         * assert on the {@code {"error":"..."}} reason instead of just the status
+         * code — {@code PASSWORD_CHANGE_REQUIRED} and {@code ACCESS_DENIED} were
+         * previously both a bare 403 with no body.
+         */
+        private static String bodyAsString(final MockServerWebExchange exchange) {
+                return ((MockServerHttpResponse) exchange.getResponse()).getBodyAsString().block();
         }
 
         /**
@@ -395,6 +406,7 @@ class AuthenticationFilterTest {
                         StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
                                         .verifyComplete();
                         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                        assertThat(bodyAsString(exchange)).isEqualTo("{\"error\":\"ACCESS_DENIED\"}");
                 }
 
                 @Test
@@ -535,6 +547,7 @@ class AuthenticationFilterTest {
                         StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
                                         .verifyComplete();
                         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                        assertThat(bodyAsString(exchange)).isEqualTo("{\"error\":\"PASSWORD_CHANGE_REQUIRED\"}");
                 }
 
                 @Test
@@ -549,6 +562,7 @@ class AuthenticationFilterTest {
                         StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
                                         .verifyComplete();
                         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                        assertThat(bodyAsString(exchange)).isEqualTo("{\"error\":\"PASSWORD_CHANGE_REQUIRED\"}");
                 }
 
                 @Test

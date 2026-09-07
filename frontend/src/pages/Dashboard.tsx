@@ -51,15 +51,17 @@ export const Dashboard = () => {
   const error = queryError ? getErrorMessage(queryError, t('failed_load_dashboard')) : null;
   const handleRetry = useCallback(() => { refetch(); }, [refetch]);
 
+  // Open to every role, not just OWNER/ADMIN (GAP-26 in THREAT_MODEL.md):
+  // these drive alert banners reception needs to act on directly (missing
+  // Alloggiati submissions, unassessed city tax), not just ownership.
   useEffect(() => {
-    if (!isOwnerOrAdmin) return;
     stayService.getAlloggiatiFailureSummary()
       .then(setAlloggiatiFailures)
       .catch(() => setAlloggiatiFailures(null));
     stayService.getCityTaxUnassessedSummary()
       .then(setCityTaxUnassessed)
       .catch(() => setCityTaxUnassessed(null));
-  }, [isOwnerOrAdmin]);
+  }, []);
 
   const universalStats = useMemo<StatCardConfig[]>(() => [
     {

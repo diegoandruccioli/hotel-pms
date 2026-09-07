@@ -372,6 +372,8 @@
   "night_audit_subtitle": "Chiudi i registri operativi e finanziari per una data di gestione.",
   "night_audit_business_date": "Data di gestione",
   "night_audit_run_action": "Esegui chiusura",
+  "night_audit_precheck_pending_arrivals": "{{count}} arrivo/i non ancora registrato/i",
+  "night_audit_precheck_pending_departures": "{{count}} partenza/e non ancora chiusa/e",
   "night_audit_run_confirm": "Eseguire la chiusura giornaliera per il {{date}}? Rileva automaticamente i no-show, fotografa l'occupazione e registra il riepilogo cassa per quella data. Una data già chiusa non può essere rieseguita.",
   "night_audit_run_success": "Chiusura giornaliera del {{date}} completata.",
   "night_audit_run_failed": "Impossibile eseguire la chiusura giornaliera. Riprova.",

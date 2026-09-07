@@ -42,6 +42,10 @@ const SettingsCityTax = lazy(() => import('./pages/Settings/SettingsCityTax').th
 const SettingsPrivacy = lazy(() => import('./pages/Settings/SettingsPrivacy').then((m) => ({ default: m.SettingsPrivacy })));
 
 const OWNER_ADMIN_ROLES = ['OWNER', 'ADMIN'] as const;
+/** Night audit is night-shift front-desk work in practice, not ownership —
+ * open to RECEPTIONIST too, unlike the rest of the owner-only routes below
+ * (GAP-26 in THREAT_MODEL.md; backend @PreAuthorize widened to match). */
+const NIGHT_AUDIT_ROLES = ['OWNER', 'ADMIN', 'RECEPTIONIST'] as const;
 
 function App() {
   const { t } = useTranslation('common');
@@ -116,9 +120,11 @@ function App() {
               <Route path="/settings/password" element={<SettingsPassword />} />
               <Route path="/settings/accessibility" element={<SettingsAccessibility />} />
               <Route path="/settings/appearance" element={<SettingsAppearance />} />
+              <Route element={<ProtectedRoute allowedRoles={NIGHT_AUDIT_ROLES} />}>
+                <Route path="/night-audit" element={<NightAudit />} />
+              </Route>
               <Route element={<ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />}>
                 <Route path="/owner-dashboard" element={<OwnerDashboard />} />
-                <Route path="/night-audit" element={<NightAudit />} />
                 <Route path="/admin/users" element={<AdminUsers />} />
                 <Route path="/profile/hotel" element={<HotelProfile />} />
                 <Route path="/settings/system" element={<SettingsSystem />} />

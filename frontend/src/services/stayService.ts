@@ -35,9 +35,10 @@ export const stayService = {
   },
 
   /** Same endpoint as {@link getAllStays}, filtered by status — used by the
-   * front-desk dashboard to pull the due-out list (status=CHECKED_IN)
-   * without downloading every stay. `expectedCheckOutDate` isn't a backend
-   * filter, so "due today" is narrowed client-side from this result. */
+   * night-audit pre-check and the front-desk dashboard to pull the due-out
+   * list (status=CHECKED_IN) without downloading every stay.
+   * `expectedCheckOutDate` isn't a backend filter, so "due today" is
+   * narrowed client-side from this result. */
   searchStays: async (params: {
     status?: string;
     page?: number;

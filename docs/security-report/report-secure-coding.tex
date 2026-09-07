@@ -6002,6 +6002,132 @@ Checkstyle/PMD pre-esistenti confermato invariato per diff contro una baseline
 
 \paragraph{Riferimento} Commit: \commitref{2f550eff}{refactor(security): close ArchUnit tenant-isolation blind spots, extract shared TenantContext helper}
 
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Risposta 403 ambigua tra rotazione password forzata e diniego RBAC \threat{GAP-25}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante un collaudo live in browser (Claude in Chrome, 2026-09-06) sul flusso
+RBAC di \texttt{AuthenticationFilter} (api-gateway): un account \texttt{RECEPTIONIST}
+appena creato risultava bloccato con \texttt{403} su endpoint di uso quotidiano
+(\texttt{day-sheet}, \texttt{rooms}, \texttt{events/stream}), inizialmente scambiato per
+un bug di autorizzazione. Un'indagine mirata sul codice sorgente (nessuna
+\texttt{@PreAuthorize} presente su nessuno dei tre endpoint, confermato da test
+esistenti) ha escluso un problema RBAC vero e proprio: la causa reale era che
+l'account di test aveva \texttt{mustChangePassword=true} e non aveva mai completato il
+cambio password richiesto prima di navigare altrove --- il gateway blocca
+correttamente ogni richiesta finché la password non viene cambiata (difesa già corretta,
+si veda il commento storico su \texttt{MUST\_CHANGE\_PASSWORD\_ALLOWED\_PATHS}).
+
+Il problema reale, più piccolo ma genuino: \texttt{onError} scriveva un \texttt{403}
+\textbf{senza alcun corpo} sia per il branch \texttt{mustChangePassword} (rotazione
+password forzata, stato di autenticazione legittimo) sia per il branch RBAC
+(\texttt{ACCESS\_DENIED}, diniego di ruolo) --- rendendo i due casi indistinguibili per
+qualunque client e per chi analizza log/incidenti, e mascherando uno stato benigno da un
+diniego di autorizzazione. Classificato \textbf{OWASP A09 --- Security Logging \&
+Monitoring Failures}: non un bypass di enforcement (chi viene bloccato era già corretto
+in entrambi i rami), ma un deficit di osservabilità che ha reso più lento diagnosticare
+l'accaduto.
+
+\begin{insecurebox}[title={AuthenticationFilter.java --- 403 senza corpo, due cause indistinguibili (baseline)}]
+\begin{lstlisting}[style=java]
+private Mono<Void> onError(final ServerWebExchange exchange, final String err,
+        final HttpStatus httpStatus) {
+    final ServerHttpResponse response = exchange.getResponse();
+    response.setStatusCode(httpStatus);
+    return response.setComplete(); // "err" mai scritto da nessuna parte
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={AuthenticationFilter.java --- corpo JSON con il motivo (main)}]
+\begin{lstlisting}[style=java]
+private Mono<Void> onError(final ServerWebExchange exchange, final String err,
+        final HttpStatus httpStatus) {
+    final ServerHttpResponse response = exchange.getResponse();
+    response.setStatusCode(httpStatus);
+    response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+    final byte[] body = ("{\"error\":\"" + err + "\"}").getBytes(StandardCharsets.UTF_8);
+    return response.writeWith(Mono.just(response.bufferFactory().wrap(body)));
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Mitigazione applicata}
+\texttt{onError} scrive ora un corpo JSON minimo con il motivo esatto del rifiuto
+(\texttt{\{"error":"PASSWORD\_CHANGE\_REQUIRED"\}} contro
+\texttt{\{"error":"ACCESS\_DENIED"\}}), riusando lo stesso pattern già in uso in
+\texttt{InternalEventsAuthFilter.reject()} nello stesso package. Test estesi in
+\texttt{AuthenticationFilterTest} per asserire il corpo esatto sui tre casi (RBAC
+denied, mustChangePassword su endpoint di business, mustChangePassword anche per un
+ADMIN) oltre al solo status code già coperto in precedenza.
+
+\paragraph{Riferimento} Commit: \commitref{a33ed7ff}{fix(gateway): distinguish PASSWORD\_CHANGE\_REQUIRED from ACCESS\_DENIED in 403 body}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Allargamento deliberato RBAC: night audit e banner Dashboard aperti a RECEPTIONIST \threat{GAP-26}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Un'analisi di mercato UX commissionata dall'utente (confronto con Mews, Cloudbeds,
+Oracle OPERA Cloud, Ericsoft Suite 5°) ha rilevato che tre endpoint erano
+\texttt{ADMIN}/\texttt{OWNER}-only per default architetturale mai rivalutato, non per
+una reale esigenza di riservatezza: \texttt{NightAuditController} (esecuzione e storico,
+comprensivo del riepilogo cassa) e i due summary che pilotano i banner della Dashboard
+(\texttt{StayController.getAlloggiatiFailureSummary},
+\texttt{getCityTaxUnassessedSummary}). Nella prassi alberghiera reale la chiusura
+giornaliera la esegue il turno di notte --- personale di reception, non la proprietà ---
+e i due banner segnalano condizioni (schedine Alloggiati non inviate, tassa di soggiorno
+non valutata) su cui deve intervenire chi lavora al front desk, non l'owner.
+
+Non è un fix di una vulnerabilità: è un allargamento deliberato del perimetro di
+autorizzazione, deciso dall'utente con piena consapevolezza del trade-off. Prima di
+applicarlo è stato esplicitamente segnalato che l'endpoint di night audit include il
+riepilogo cassa (incassi per metodo di pagamento) e che i due endpoint erano protetti da
+test di sicurezza dedicati che bloccavano \texttt{RECEPTIONIST} proprio su quel dato
+finanziario --- non un dettaglio da retrofit inosservato. L'utente ha confermato la
+scelta due volte, anche dopo questa scoperta: chi esegue il night audit riconcilia
+comunque il cassetto contanti, è prassi ordinaria del ruolo, non un'eccezione.
+
+\begin{securebox}[title={NightAuditController.java --- costante di ruolo dedicata (main)}]
+\begin{lstlisting}[style=java]
+// Prima: private static final String ROLE_ADMIN_OR_OWNER =
+//                "hasAnyRole('ADMIN', 'OWNER')";
+private static final String ROLE_ADMIN_OWNER_OR_RECEPTIONIST =
+        "hasAnyRole('ADMIN', 'OWNER', 'RECEPTIONIST')";
+
+@PostMapping
+@PreAuthorize(ROLE_ADMIN_OWNER_OR_RECEPTIONIST)
+public ResponseEntity<NightAuditRunResponse> runNightAudit(...) { ... }
+
+@GetMapping
+@PreAuthorize(ROLE_ADMIN_OWNER_OR_RECEPTIONIST)
+public ResponseEntity<Page<NightAuditRunResponse>> getHistory(...) { ... }
+\end{lstlisting}
+\end{securebox}
+
+In \texttt{StayController} l'allargamento è scoped a una \emph{nuova} costante distinta
+dalla \texttt{ROLE\_ADMIN\_OR\_OWNER} esistente, applicata solo ai due endpoint summary:
+gli altri cinque endpoint \texttt{ADMIN}/\texttt{OWNER}-only dello stesso controller
+(invio/download Alloggiati, backfill tassa di soggiorno) restano invariati --- un
+allargamento mirato, non una modifica della costante condivisa che li avrebbe aperti
+tutti per effetto collaterale.
+
+\paragraph{Mitigazione applicata}
+Nuova costante \texttt{hasAnyRole('ADMIN','OWNER','RECEPTIONIST')} sui tre endpoint
+sopra. Test di sicurezza aggiornati in entrambe le classi
+(\texttt{NightAuditControllerSecurityTest}, \texttt{StayControllerSecurityTest}): le
+asserzioni \texttt{403 per RECEPTIONIST} sono diventate \texttt{200}/\texttt{201} per
+RECEPTIONIST, con un ruolo \texttt{GUEST} aggiunto come nuovo caso negativo che verifica
+che l'enforcement resti comunque presente. Lato frontend, la rotta \texttt{/night-audit}
+è stata spostata su un \texttt{ProtectedRoute} proprio con un allowlist
+\texttt{NIGHT\_AUDIT\_ROLES} dedicato, separato dal resto delle rotte owner-only in
+\texttt{App.tsx}; la voce di navigazione è uscita dal gruppo owner-only in
+\texttt{MainLayout.tsx}/\texttt{CommandPalette.tsx}; i due fetch dei banner Dashboard non
+sono più condizionati al ruolo owner/admin.
+
+\paragraph{Riferimento} Commit: \commitref{bcf03b8e}{fix(frontdesk,frontend): open night audit and dashboard-alert summaries to RECEPTIONIST}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════

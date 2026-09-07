@@ -108,6 +108,12 @@ describe('CommandPalette', () => {
     expect(screen.getByText('nav_owner_dashboard')).toBeInTheDocument();
   });
 
+  it('shows the night-audit nav item for a RECEPTIONIST (GAP-26)', () => {
+    mockAuthStore(RECEPTIONIST);
+    renderWithQuery(<CommandPalette open onClose={vi.fn()} />);
+    expect(screen.getByText('nav_night_audit')).toBeInTheDocument();
+  });
+
   it('navigates when a nav item is selected', () => {
     const onClose = vi.fn();
     renderWithQuery(<CommandPalette open onClose={onClose} />);
