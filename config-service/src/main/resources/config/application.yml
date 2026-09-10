@@ -12,6 +12,16 @@ spring:
       # already does — no silent fallback to an unauthenticated connection.
       password: ${INTERNAL_REDIS_PASSWORD:}
 
+logging:
+  pattern:
+    # CWE-117 log injection: the gateway's CorrelationIdFilter allowlists
+    # X-Correlation-ID before it reaches MDC, but this is a second, structural
+    # layer for every service that has no logback-spring.xml of its own
+    # (api-gateway, config-service, guest-service, frontdesk-service,
+    # fb-service) — same %replace wrapping already applied in auth-service's,
+    # billing-service's and notification-service's logback-spring.xml.
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%replace(%X{correlationId:-}){'[\\r\\n]','_'}] %logger{36} - %replace(%msg){'[\\r\\n]','_'}%n"
+
 management:
   metrics:
     distribution:
