@@ -102,7 +102,7 @@ services:
   # nonce store (T-GW-08, all 5 InternalAuthFilter validators)
   # ----------------------------------------------------------
   redis:
-    image: redis:8.8.1-alpine
+    build: ./docker/redis
     container_name: hotel_redis
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD}
@@ -161,7 +161,7 @@ services:
   # Grafana - Dashboard SIEM (GAP-4: visualizzazione audit log)
   # ----------------------------------------------------------
   grafana:
-    image: grafana/grafana:13.1.1
+    image: grafana/grafana:13.1.5
     container_name: hotel_grafana
     restart: unless-stopped
     profiles: ["observability"]

@@ -5,7 +5,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:alpine
+FROM nginxinc/nginx-unprivileged:1.31.5-alpine
 # Base image already drops to a non-root "nginx" user (uid 101) by default —
 # apk needs root to update the package index/upgrade packages, so switch back
 # explicitly for this step, then drop to non-root again below.
