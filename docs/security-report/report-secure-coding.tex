@@ -5302,6 +5302,151 @@ percorso felice).
 \paragraph{Riferimento} Commit: \commitref{4db09fc}{fix(security): T-GST-06 --- GDPR legal-hold guard fail-open regression (Feign path, final under CGLIB, fallback semantics)}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Retention GDPR mancante su StayGuest \threat{T-STAY-08}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato da \texttt{docs/COMPLIANCE\_AUDIT\_2026-08.md} \S3, gap gemello di
+\threat{T-GST-05}: il job notturno di anonimizzazione GDPR
+(\texttt{GuestRetentionJobServiceImpl}, guest-service) copre solo l'entità
+\texttt{Guest}. \texttt{StayGuest} (frontdesk-service) conserva però una
+copia indipendente della PII Alloggiati --- nome, data di nascita,
+cittadinanza, numero documento --- per ogni soggiorno storico, popolata al
+check-in e mai più toccata dopo. Anonimizzare \texttt{Guest} non anonimizza
+\texttt{StayGuest}: un profilo ospite formalmente cancellato lasciava
+intatta, a tempo indeterminato, la stessa PII duplicata sotto ogni suo
+soggiorno passato. Classificato OWASP A04 --- Insecure Design, stessa
+categoria di \threat{T-GST-05}: manca un intero meccanismo di protezione,
+non un bug in uno esistente.
+
+\paragraph{Mitigazione applicata}
+Nuovo \texttt{StayGuestRetentionJobServiceImpl}, eseguito ogni notte alle
+02:30, che replica la stessa doppia garanzia legale già validata per
+\texttt{Guest}: il vincolo TULPS (5 anni) è verificato localmente da
+\texttt{StayGuest.departureDate}, senza chiamata inter-servizio; il vincolo
+FISCALE (10 anni) richiede invece un nuovo endpoint in billing-service,
+\texttt{GET /api/v1/invoices/stay/\{stayId\}/last-date}, perché lo stesso
+soggiorno può avere le sue spese trasferite al master folio di un gruppo
+(Punto 4) --- il nuovo endpoint verifica sia il folio individuale dello stay
+sia un eventuale master folio con un addebito instradato da quello stay
+(\texttt{InvoiceCharge.routedFromStayId}), così il vincolo fiscale segue
+sempre il documento che porta davvero l'importo, non necessariamente il
+folio originale dello stay.
+
+\begin{securebox}[title={StayGuestRetentionJobServiceImpl.java --- doppio vincolo legale (main)}]
+\begin{lstlisting}[style=java]
+// SICURO: TULPS locale, FISCALE via billing-service, fail-closed su indeterminazione
+final LocalDate tulpsExpiry = latestDeparture.plusYears(TULPS_MIN_YEARS);
+if (!LocalDate.now().isAfter(tulpsExpiry)) {
+    return false; // vincolo TULPS ancora attivo
+}
+final StayInvoiceDateResponse invoiceInfo = billingClient.getLastInvoiceDateForStay(stayId);
+if (invoiceInfo.hasInvoices()) {
+    if (invoiceInfo.lastInvoiceDate() == null) {
+        return false; // indeterminato (fallback circuit breaker) -- blocca, non libera
+    }
+    final LocalDate fiscalExpiry = invoiceInfo.lastInvoiceDate().plusYears(FISCAL_MIN_YEARS);
+    if (!LocalDate.now().isAfter(fiscalExpiry)) {
+        return false; // vincolo FISCALE ancora attivo
+    }
+}
+return true;
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Dettaglio non ovvio}
+A differenza di \texttt{Guest}, le colonne PII di \texttt{StayGuest}
+(\texttt{gender}, \texttt{dateOfBirth}, \texttt{placeOfBirth},
+\texttt{citizenship}) sono \texttt{NOT NULL} --- vincolo del tracciato
+Alloggiati. L'anonimizzazione non può quindi impostarle a \texttt{null} come
+fa \texttt{GuestRetentionJobServiceImpl} sui campi equivalenti (nullable su
+\texttt{Guest}): sovrascritte invece con sentinel fissi non identificativi
+(\texttt{"ERASED"}, \texttt{LocalDate.EPOCH}), stesso principio già usato
+per \texttt{firstName}/\texttt{lastName} nel job \texttt{Guest}
+(\texttt{"GDPR"}/\texttt{"ERASED\_<id>"}).
+
+\paragraph{Test}
+5 nuovi test in \texttt{StayGuestRetentionJobServiceImplTest}: entrambi i
+vincoli scaduti (anonimizza), TULPS attivo (skip), FISCALE attivo (skip),
+stato fiscale indeterminato dal circuit breaker (skip, non libera), ospite
+ancora in casa senza \texttt{departureDate} (skip).
+
+\paragraph{Riferimento} Commit: \commitref{fe189c76}{feat(security): E22 -- nightly GDPR retention job for StayGuest}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Cifratura a riposo del numero documento \threat{GAP-28}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato da \texttt{docs/COMPLIANCE\_AUDIT\_2026-08.md} \S3: il numero di
+documento d'identità dell'ospite era l'unico campo PII senza protezione a
+riposo in tutto il sistema, salvato in chiaro sia in
+\texttt{guest-service.IdentityDocument.documentNumber} sia in
+\texttt{frontdesk-service.StayGuest.documentNumber} (stesso dato,
+duplicato indipendentemente nei due servizi). Le credenziali Alloggiati Web
+per-hotel avevano già questo trattamento (P8,
+\texttt{AlloggiatiCredentialEncryptor}); il numero di documento no,
+nonostante sia dato identificativo sensibile ai sensi dell'Art. 32 GDPR.
+Classificato OWASP A02 --- Cryptographic Failures.
+
+\begin{insecurebox}[title={IdentityDocument.java --- campo in chiaro (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: nessuna protezione a riposo su un identificativo sensibile
+@Column(nullable = false, length = 100)
+private String documentNumber;
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Due coppie encryptor + \texttt{AttributeConverter} JPA indipendenti, una
+per servizio con chiave/salt proprie (mai condivise: una chiave compromessa
+in un servizio non espone i dati dell'altro) --- stessa scelta di libreria
+già validata per P8, \texttt{Encryptors.delux} (AES-256-GCM, Spring
+Security Crypto). Il converter è transparente: l'entità Java vede sempre il
+testo in chiaro, la cifratura/decifratura avviene solo nel round-trip
+JPA/Hibernate, nessun altro livello applicativo tocca il ciphertext.
+\texttt{@Convert(autoApply = false)} applicato esplicitamente solo al
+campo interessato, non a ogni colonna \texttt{String} dell'entità.
+
+\begin{securebox}[title={IdentityDocument.java --- cifratura trasparente via converter (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: cifrato at-rest, l'entita' vede sempre il plaintext in memoria
+@Convert(converter = DocumentNumberConverter.class)
+@Column(nullable = false, length = 512)
+private String documentNumber;
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Migrazione schema, non dati}
+Nessuna riscrittura di righe esistenti: confermato con l'utente che solo
+dati di test/pilota esistono ad oggi, non un hotel reale in produzione ---
+il lavoro resta puramente di schema. Entrambe le colonne allargate a
+\texttt{VARCHAR(512)} (ciphertext + IV + tag pesa molto più del numero
+documento in chiaro che sostituisce): migrazione \texttt{V10} in
+guest-service, \texttt{V26} in frontdesk-service. Rimosso anche
+\texttt{idx\_id\_docs\_document\_number} su \texttt{identity\_documents} ---
+già codice morto (le query che lo sfruttavano erano state rimosse
+nell'audit di isolamento tenant, Punto 7 item 2, senza più alcun chiamante)
+e ora doppiamente inutile: un indice di uguaglianza su una colonna cifrata
+non deterministica (IV casuale ad ogni scrittura) non può più trovare
+corrispondenze comunque.
+
+\paragraph{Test}
+Nuovi \texttt{DocumentNumberEncryptorTest}/\texttt{StayGuestDocumentEncryptorTest}
+(round-trip cifra/decifra, IV casuale --- due cifrature dello stesso
+plaintext producono ciphertext diverso, gestione \texttt{null}/blank) e
+\texttt{DocumentNumberConverterTest}/\texttt{StayGuestDocumentNumberConverterTest}
+(delega corretta all'encryptor, senza esercitare crypto reale). Due
+suite \texttt{@SpringBootTest} preesistenti in frontdesk-service
+(\texttt{RoomTypeServiceIntegrationTest}, \texttt{SoftDeleteVersionCheckIntegrationTest})
+necessitavano un nuovo \texttt{@MockitoBean} per
+\texttt{StayGuestDocumentEncryptor} --- stesso pattern già in uso lì per
+\texttt{AlloggiatiCredentialEncryptor} --- per evitare di richiedere le
+chiavi di cifratura reali all'avvio del contesto di test.
+
+\paragraph{Riferimento} Commit: \commitref{f20c5904}{fix(security): E23 -- encrypt documentNumber at rest (GDPR Art. 32)}
+
+% ─────────────────────────────────────────────────────────────────────────────
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Analisi SAST con CodeQL e Supply Chain Security \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
 % ═════════════════════════════════════════════════════════════════════════════
