@@ -21,6 +21,7 @@ import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
 import com.hotelpms.billing.dto.MasterFolioRequest;
+import com.hotelpms.billing.dto.StayInvoiceCheckResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.exception.NotFoundException;
@@ -53,6 +54,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Implementation of the InvoiceService interface for billing processing.
@@ -520,6 +522,38 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
         return new GuestInvoiceCheckResponse(true,
                 latest.get().getIssueDate().toLocalDate());
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public StayInvoiceCheckResponse getLastInvoiceDateForStay(
+            @NonNull final UUID stayId, @NonNull final UUID hotelId) {
+        final Optional<LocalDate> ownFolioDate = invoiceRepository
+                .findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId)
+                .map(Invoice::getIssueDate)
+                .filter(Objects::nonNull)
+                .map(LocalDateTime::toLocalDate);
+
+        // A stay's own folio can close at zero once its ROOM_NIGHT/CITY_TAX charges
+        // move to a reservation group's MASTER folio at check-out (Punto 4) — the
+        // fiscal retention clock must follow whichever invoice actually carries
+        // the money, not just the stay's own (possibly empty) folio.
+        final Optional<LocalDate> routedFolioDate = invoiceRepository
+                .findByRoutedFromStayIdAndHotelId(stayId, hotelId)
+                .stream()
+                .map(Invoice::getIssueDate)
+                .filter(Objects::nonNull)
+                .map(LocalDateTime::toLocalDate)
+                .max(LocalDate::compareTo);
+
+        final Optional<LocalDate> mostRecent = Stream.of(ownFolioDate, routedFolioDate)
+                .flatMap(Optional::stream)
+                .max(LocalDate::compareTo);
+
+        return mostRecent
+                .map(date -> new StayInvoiceCheckResponse(true, date))
+                .orElseGet(() -> new StayInvoiceCheckResponse(false, null));
     }
 
     /** {@inheritDoc} */

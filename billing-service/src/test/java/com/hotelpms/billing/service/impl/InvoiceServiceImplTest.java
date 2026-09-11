@@ -18,6 +18,7 @@ import com.hotelpms.billing.dto.GroupChargeRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.MasterFolioRequest;
+import com.hotelpms.billing.dto.StayInvoiceCheckResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.exception.NotFoundException;
@@ -957,5 +958,62 @@ class InvoiceServiceImplTest {
 
                 assertThrows(InvoiceConflictException.class,
                                 () -> invoiceService.addChargeToGroupFolio(groupId, request));
+        }
+
+        @Test
+        @DisplayName("getLastInvoiceDateForStay returns the stay's own folio date when present")
+        void getLastInvoiceDateForStayReturnsOwnFolioDate() {
+                final UUID stayId = UUID.randomUUID();
+                final Invoice ownFolio = Invoice.builder()
+                                .id(UUID.randomUUID())
+                                .issueDate(LocalDateTime.of(SEARCH_YEAR, SEARCH_MONTH, DAY_FIVE, 0, 0))
+                                .build();
+                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
+                                .thenReturn(Optional.of(ownFolio));
+                when(invoiceRepository.findByRoutedFromStayIdAndHotelId(stayId, hotelId))
+                                .thenReturn(List.of());
+
+                final StayInvoiceCheckResponse response =
+                                invoiceService.getLastInvoiceDateForStay(stayId, hotelId);
+
+                assertTrue(response.hasInvoices());
+                assertEquals(LocalDate.of(SEARCH_YEAR, SEARCH_MONTH, DAY_FIVE), response.lastInvoiceDate());
+        }
+
+        @Test
+        @DisplayName("getLastInvoiceDateForStay falls back to a routed master-folio date "
+                        + "when the stay's own folio has none")
+        void getLastInvoiceDateForStayReturnsRoutedFolioDateWhenOwnFolioMissing() {
+                final UUID stayId = UUID.randomUUID();
+                final Invoice masterFolio = Invoice.builder()
+                                .id(UUID.randomUUID())
+                                .folioType(FolioType.MASTER)
+                                .issueDate(LocalDateTime.of(SEARCH_YEAR, SEARCH_MONTH, DAY_ONE, 0, 0))
+                                .build();
+                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
+                                .thenReturn(Optional.empty());
+                when(invoiceRepository.findByRoutedFromStayIdAndHotelId(stayId, hotelId))
+                                .thenReturn(List.of(masterFolio));
+
+                final StayInvoiceCheckResponse response =
+                                invoiceService.getLastInvoiceDateForStay(stayId, hotelId);
+
+                assertTrue(response.hasInvoices());
+                assertEquals(LocalDate.of(SEARCH_YEAR, SEARCH_MONTH, DAY_ONE), response.lastInvoiceDate());
+        }
+
+        @Test
+        @DisplayName("getLastInvoiceDateForStay reports no invoices when neither lookup matches")
+        void getLastInvoiceDateForStayReturnsFalseWhenNoInvoiceExists() {
+                final UUID stayId = UUID.randomUUID();
+                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
+                                .thenReturn(Optional.empty());
+                when(invoiceRepository.findByRoutedFromStayIdAndHotelId(stayId, hotelId))
+                                .thenReturn(List.of());
+
+                final StayInvoiceCheckResponse response =
+                                invoiceService.getLastInvoiceDateForStay(stayId, hotelId);
+
+                assertEquals(new StayInvoiceCheckResponse(false, null), response);
         }
 }

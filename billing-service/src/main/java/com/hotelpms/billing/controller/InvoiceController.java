@@ -13,6 +13,7 @@ import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
 import com.hotelpms.billing.dto.MasterFolioRequest;
 import com.hotelpms.billing.dto.SdiStatusRequest;
+import com.hotelpms.billing.dto.StayInvoiceCheckResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.service.FatturaPAService;
 import com.hotelpms.billing.service.InvoiceService;
@@ -268,6 +269,23 @@ public class InvoiceController {
         log.info("REST request for last invoice date — guest={} hotel={}", guestId, hotelId);
         return ResponseEntity.ok(
                 invoiceService.getLastInvoiceDateForGuest(guestId, Objects.requireNonNull(hotelId)));
+    }
+
+    /**
+     * Returns the most recent invoice date relevant to a stay within a hotel.
+     * Called by frontdesk-service's GDPR legal-hold guard (E22) before
+     * anonymising a {@code StayGuest} record.
+     *
+     * @param stayId the stay UUID
+     * @return response with existence flag and most recent relevant invoice date
+     */
+    @GetMapping("/stay/{stayId}/last-date")
+    public ResponseEntity<StayInvoiceCheckResponse> getLastInvoiceDateForStay(
+            @NonNull @PathVariable final UUID stayId) {
+        final UUID hotelId = TenantContext.resolveHotelId();
+        log.info("REST request for last invoice date — stay={} hotel={}", stayId, hotelId);
+        return ResponseEntity.ok(
+                invoiceService.getLastInvoiceDateForStay(stayId, Objects.requireNonNull(hotelId)));
     }
 
     /**

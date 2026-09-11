@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.dto.PaymentMethodTotalDto;
 import com.hotelpms.frontdesk.client.dto.PaymentSummaryClientResponse;
-import com.hotelpms.frontdesk.config.NightAuditJobContext;
+import com.hotelpms.frontdesk.config.BatchJobContext;
 import com.hotelpms.frontdesk.dashboard.dto.DaySheetResponse;
 import com.hotelpms.frontdesk.dashboard.service.DaySheetService;
 import com.hotelpms.frontdesk.exception.BadRequestException;
@@ -229,7 +229,7 @@ public class NightAuditServiceImpl implements NightAuditService {
 
     /**
      * Fetches the cash-closing summary from billing-service. Wrapped with
-     * {@link NightAuditJobContext} unconditionally: when this call originates
+     * {@link BatchJobContext} unconditionally: when this call originates
      * from an HTTP request (the manual trigger), {@code
      * InternalFeignAuthInterceptor} already prefers the inbound request's own
      * headers and never consults this fallback; the ThreadLocal only matters
@@ -242,11 +242,11 @@ public class NightAuditServiceImpl implements NightAuditService {
      *         BillingClient#getPaymentSummaryFallback})
      */
     private PaymentSummaryClientResponse fetchCashSummary(final UUID hotelId, final LocalDate businessDate) {
-        NightAuditJobContext.set(hotelId.toString());
+        BatchJobContext.set(SCHEDULED_JOB_USER, hotelId.toString());
         try {
             return billingClient.getPaymentSummary(businessDate);
         } finally {
-            NightAuditJobContext.clear();
+            BatchJobContext.clear();
         }
     }
 
