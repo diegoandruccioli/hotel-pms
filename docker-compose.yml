@@ -521,6 +521,8 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${GUEST_DB_PASSWORD}
       - APPLICATION_CONFIG_FRONTDESK_SERVICE_URL=http://frontdesk-service:8081
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - GUEST_DOCUMENTS_ENCRYPTION_KEY=${GUEST_DOCUMENTS_ENCRYPTION_KEY:-ci_placeholder_encryption_key}
+      - GUEST_DOCUMENTS_ENCRYPTION_SALT=${GUEST_DOCUMENTS_ENCRYPTION_SALT:-deadbeefdeadbeefdeadbeefdeadbeef}
       - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
@@ -583,6 +585,9 @@ services:
       # Encrypts per-hotel Alloggiati credentials at rest (P8) — salt MUST be hex.
       - ALLOGGIATI_CREDENTIALS_ENCRYPTION_KEY=${ALLOGGIATI_CREDENTIALS_ENCRYPTION_KEY:-ci_placeholder_encryption_key}
       - ALLOGGIATI_CREDENTIALS_ENCRYPTION_SALT=${ALLOGGIATI_CREDENTIALS_ENCRYPTION_SALT:-deadbeefdeadbeefdeadbeefdeadbeef}
+      # Encrypts stay_guests.document_number at rest (E23) — separate key from above.
+      - FRONTDESK_DOCUMENTS_ENCRYPTION_KEY=${FRONTDESK_DOCUMENTS_ENCRYPTION_KEY:-ci_placeholder_encryption_key}
+      - FRONTDESK_DOCUMENTS_ENCRYPTION_SALT=${FRONTDESK_DOCUMENTS_ENCRYPTION_SALT:-deadbeefdeadbeefdeadbeefdeadbeef}
       - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:

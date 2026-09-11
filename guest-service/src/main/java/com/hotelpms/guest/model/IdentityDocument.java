@@ -1,7 +1,9 @@
 package com.hotelpms.guest.model;
 
 import com.hotelpms.guest.model.enums.DocumentType;
+import com.hotelpms.guest.security.DocumentNumberConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
@@ -55,7 +57,12 @@ public class IdentityDocument {
     @Column(nullable = false)
     private DocumentType documentType;
 
-    @Column(nullable = false, length = 100)
+    /**
+     * Encrypted at rest (E23, GDPR Art. 32) via {@link DocumentNumberConverter} —
+     * this field always holds the decrypted plaintext in memory, never ciphertext.
+     */
+    @Convert(converter = DocumentNumberConverter.class)
+    @Column(nullable = false, length = 512)
     private String documentNumber;
 
     @Column(nullable = false)
