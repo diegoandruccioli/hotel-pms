@@ -12,6 +12,17 @@ CVE-2026-22732
 # Project is now on Spring Cloud 2025.0.0 — suppression retained pending
 # confirmation from next Trivy run. Remove after next clean scan.
 CVE-2026-22739
+# ── tomcat-embed-core CRITICAL — fix version not yet published ─────────────
+# Trivy's DB marks these "fixed" (advisory names 11.0.25/10.1.58/9.0.121), but
+# none of those versions exist on Maven Central as of 2026-09-11 (verified:
+# GET .../tomcat-embed-core/10.1.58/... -> 404; Gradle dependency resolution
+# fails against it — see root build.gradle.kts's tomcat.version comment).
+# Blocks the CI CRITICAL gate on every one of the 8 Boot services otherwise.
+# Remove as soon as 10.1.58 (or newer 10.1.x) is actually published and the
+# root build.gradle.kts pin is bumped to match.
+CVE-2026-65182
+CVE-2026-65905
+CVE-2026-68525
 # ── Go stdlib CVEs (gosu + Grafana binaries) ────────────────────────────────
 # These CVEs are in Go standard library code compiled into gosu and Grafana
 # binaries. They are NOT present in our Java Spring Boot service images.
