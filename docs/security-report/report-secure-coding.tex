@@ -2083,6 +2083,53 @@ di sviluppo.
 \paragraph{Riferimento} Commit: \commitref{1c24f72}{fix(security): T-AUTH-15 --- resolve clientIp instead of collapsing lockout keys on null}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Log Injection sulla chiave di lockout corrotta \threat{T-AUTH-16}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato triagando gli alert CodeQL \texttt{java/log-injection} (CWE-117)
+segnalati da GitHub sul branch. A differenza di \texttt{AuthServiceImpl}
+(già sanitizzato tramite \texttt{sanitizeForLog} sin da T-AUTH-14/T-AUTH-05
+--- i suoi tre alert erano falsi positivi, vedi nota SAST più sotto),
+\texttt{LoginAttemptServiceImpl.getLockedUntil} loggava \texttt{lockKey}
+(costruita da \texttt{username}/\texttt{clientIp} grezzi tramite
+\texttt{normalize()}) e il valore Redis corrotto \texttt{raw} senza alcuno
+strip di CR/LF, sul ramo che gestisce un valore di lock illeggibile
+(\texttt{NumberFormatException} su \texttt{Long.parseLong}, introdotto dal
+fix T-AUTH-15). Un \texttt{username} o \texttt{clientIp} contenente
+\texttt{\textbackslash r\textbackslash n} poteva iniettare righe di audit
+log false nell'output console/Loki --- ad esempio una falsa riga
+\texttt{LOGIN\_SUCCESS} per un altro utente. Classificato OWASP A09.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- LoginAttemptServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: lockKey/raw non sanitizzati -- username/clientIp grezzi
+// possono contenere CR/LF e falsificare righe di log successive
+log.warn("[AUTH] LOCKOUT_KEY_CORRUPTED | key={} | value={}", lockKey, raw);
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Aggiunto un \texttt{sanitizeForLog} locale alla classe, stesso pattern già
+in uso in \texttt{AuthServiceImpl} (\texttt{null} $\to$ \texttt{"unknown"},
+altrimenti strip di \texttt{[\textbackslash r\textbackslash n]}), applicato
+a entrambi gli argomenti del log.
+
+\begin{securebox}[title={Codice Sicuro --- LoginAttemptServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: entrambi gli argomenti passano da sanitizeForLog prima del log
+log.warn("[AUTH] LOCKOUT_KEY_CORRUPTED | key={} | value={}",
+        sanitizeForLog(lockKey), sanitizeForLog(raw));
+
+private static String sanitizeForLog(final String value) {
+    return value == null ? UNKNOWN : value.replaceAll("[\r\n]", "_");
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Riferimento} Commit: \commitref{3b62006}{fix(security): harden CWE-117 log injection across auth-service and gateway}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Audit Log e Security Monitoring \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
 % ─────────────────────────────────────────────────────────────────────────────
 
@@ -4907,6 +4954,77 @@ replay dello stesso nonce rifiutato.
 \paragraph{Riferimento} Commit: \commitref{a2620fc}{feat(secure-coding-hardening): SSE realtime room-status sync (T-GW-11, T-GW-12)}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Log Injection via Header X-Correlation-ID Non Validato \threat{T-GW-13}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante il triage degli alert CodeQL \texttt{java/log-injection} sul
+branch: \texttt{CorrelationIdFilter.resolveCorrelationId} accettava l'header
+\texttt{X-Correlation-ID} così come inviato dal client, senza alcuna
+validazione né limite di lunghezza, quando presente e non vuoto. Il valore
+veniva poi (1) propagato inalterato a ogni servizio downstream come header
+HTTP, (2) riflesso sulla risposta al client, e (3) inserito nell'MDC SLF4J
+da \texttt{InternalAuthFilter} (\texttt{MDC.put("correlationId", ...)},
+condiviso da sei servizi) --- da cui ogni pattern Logback plain-text lo
+rendeva letteralmente via \texttt{\%X\{correlationId:-\}}. Un header
+contenente \texttt{\textbackslash r\textbackslash n} era quindi log
+forging (CWE-117) iniettabile da \emph{qualunque} richiesta pubblica
+attraverso il gateway, senza credenziali né bypass di alcun controllo ---
+un vettore più ampio dei tre alert CodeQL su \texttt{AuthServiceImpl}
+(entrambi falsi positivi, vedi nota SAST), perché non richiedeva neanche
+un flusso di autenticazione per essere raggiunto. Non era coperto da alcun
+threat ID esistente né da alcun alert automatico: CodeQL non analizza il
+modulo \texttt{api-gateway} (WebFlux) con la stessa profondità dei servizi
+servlet, e Trivy fa solo CVE scanning, non taint analysis del codice
+applicativo. Classificato OWASP A09.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- CorrelationIdFilter.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: l'header client e' accettato verbatim, nessun limite di
+// lunghezza o di alfabeto -- puo' contenere CR/LF
+private static String resolveCorrelationId(final ServerHttpRequest request) {
+    final String existing = request.getHeaders().getFirst(CORRELATION_ID_HEADER);
+    if (existing != null && !existing.isBlank()) {
+        return existing;
+    }
+    return UUID.randomUUID().toString();
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Allowlist esplicita sul formato atteso di un correlation ID
+(\texttt{\^{}[A-Za-z0-9\_-]\{1,64\}\$}); un header assente, vuoto, troppo
+lungo o non conforme (incluso qualunque valore con CR/LF) genera un UUID
+nuovo, esattamente come già avveniva per l'header assente --- nessun
+cambio di comportamento per il traffico legittimo.
+
+\begin{securebox}[title={Codice Sicuro --- CorrelationIdFilter.java (fix)}]
+\begin{lstlisting}[style=java]
+private static final Pattern VALID_CORRELATION_ID =
+        Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
+
+// SICURO: solo un valore che rispetta l'allowlist viene propagato;
+// qualunque altro caso (assente, vuoto, CRLF, troppo lungo) genera un UUID
+private static String resolveCorrelationId(final ServerHttpRequest request) {
+    final String existing = request.getHeaders().getFirst(CORRELATION_ID_HEADER);
+    if (existing != null && VALID_CORRELATION_ID.matcher(existing).matches()) {
+        return existing;
+    }
+    return UUID.randomUUID().toString();
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Nuovo \texttt{CorrelationIdFilterTest}, quattro casi: header valido
+preservato invariato; header contenente CR/LF sostituito da un UUID; header
+oltre 64 caratteri sostituito da un UUID; header assente genera un UUID
+(comportamento pre-esistente, verificato come non-regressione).
+
+\paragraph{Riferimento} Commit: \commitref{3b62006}{fix(security): harden CWE-117 log injection across auth-service and gateway}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}
 % ─────────────────────────────────────────────────────────────────────────────
 
@@ -6128,6 +6246,55 @@ sono più condizionati al ruolo owner/admin.
 
 \paragraph{Riferimento} Commit: \commitref{bcf03b8e}{fix(frontdesk,frontend): open night audit and dashboard-alert summaries to RECEPTIONIST}
 
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Hardening strutturale dell'encoder di log contro CWE-117 \threat{GAP-27}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Complementare a \threat{T-AUTH-16} e \threat{T-GW-13}: entrambi quei fix
+sanitizzano il valore \emph{alla sorgente} (il call site di logging, o
+l'header in ingresso al gateway), ma il pattern Logback che rende
+effettivamente la riga di log resta plain-text --- \texttt{\%msg} e
+\texttt{\%X\{correlationId:-\}} scritti letteralmente, senza alcuna
+protezione strutturale. Un futuro call site che dimentichi di chiamare
+\texttt{sanitizeForLog} (i quattro sanitizzatori del progetto sono copie
+indipendenti, non un'unica utility condivisa --- nessun modulo è dipendenza
+di tutti e otto i servizi, \texttt{api-gateway} è WebFlux e non dipende da
+\texttt{common-web-lib}) riaprirebbe silenziosamente lo stesso CWE-117 senza
+che né CodeQL né una revisione manuale se ne accorgano necessariamente.
+
+\begin{insecurebox}[title={logback-spring.xml --- pattern plain-text (baseline)}]
+\begin{lstlisting}[style=xml]
+<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n</pattern>
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+\texttt{\%msg} e \texttt{\%X\{correlationId:-\}} avvolti nel conversion word
+\texttt{\%replace(...)\{'[\textbackslash r\textbackslash n]','\_'\}}, che
+sostituisce ogni CR/LF con \texttt{\_} indipendentemente da cosa produce il
+valore a monte --- CRLF diventa strutturalmente impossibile nell'output,
+non solo scoraggiato per convenzione. Applicato in
+\texttt{auth-service}/\texttt{billing-service}/\texttt{notification-service}
+(\texttt{logback-spring.xml}, sia l'encoder console sia il blocco
+\texttt{<message>} dell'appender Loki) e nell'\texttt{application.yml}
+condiviso servito da \texttt{config-service} via Spring Cloud Config
+(\texttt{logging.pattern.console}), che copre i servizi privi di un proprio
+\texttt{logback-spring.xml} (\texttt{api-gateway}, \texttt{guest-service},
+\texttt{frontdesk-service}, \texttt{fb-service}). \texttt{config-service}
+non importa la configurazione che serve agli altri, quindi replica la
+stessa property nel proprio \texttt{application.yml} locale. Gli stack
+trace (\texttt{\%ex}) restano fuori dal wrapping --- devono restare
+multi-riga.
+
+\begin{securebox}[title={logback-spring.xml --- pattern con encoder rafforzato (fix)}]
+\begin{lstlisting}[style=xml]
+<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%replace(%X{correlationId:-}){'[\r\n]','_'}] %logger{36} - %replace(%msg){'[\r\n]','_'}%n</pattern>
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Riferimento} Commit: \commitref{3b62006}{fix(security): harden CWE-117 log injection across auth-service and gateway}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════
@@ -7093,6 +7260,28 @@ soppressione \texttt{codeql[java/log-injection]} aggiunti ad ogni chiamata
 (documentazione inline, non solo dismissal silenzioso); alert chiusi su GitHub
 con motivazione.
 
+\paragraph{Correzione (2026-09-10): i commenti \texttt{codeql[...]} non sopprimono nulla}
+Durante il triage degli alert \texttt{\#588}/\texttt{\#589}/\texttt{\#590}
+(stesso falso positivo di cui sopra, questa volta su
+\texttt{AuthServiceImpl.java}) è emerso che il repository gira in CodeQL
+\emph{default setup} (nessun workflow \texttt{codeql-analysis.yml} committato
+--- confermato via \texttt{gh api .../code-scanning/analyses}, che mostra
+\texttt{CodeQL} come tool ma nessuna analisi triggerata da un job del
+repository, e da \texttt{docs/ROADMAP.md} P13, che documenta l'aggiornamento
+della query suite a \texttt{extended} fatto via API proprio perché non esiste
+un file di configurazione in-repo). In default setup i commenti di
+soppressione inline \texttt{codeql[...]} \textbf{non hanno alcun effetto}
+sullo stato dell'alert --- funzionano solo con \emph{advanced setup} (un
+workflow CodeQL committato nel repository). I tre alert su
+\texttt{AuthServiceImpl.java} sono quindi rimasti aperti contro ogni commit
+successivo nonostante il commento, esattamente come già documentato per il
+falso positivo CSRF di \threat{GAP-9} (che infatti richiese anche lì un
+dismissal manuale, non il solo commento). Corretto: i tre alert dismissati
+manualmente su GitHub (\texttt{false positive}, stessa motivazione tecnica),
+e i commenti inline in \texttt{AuthServiceImpl.java} riformulati per non
+affermare più un meccanismo di soppressione che non esiste sotto questa
+configurazione.
+
 \paragraph{CVE scanning con Trivy (DEP-CVE-01/02/04)}
 Pipeline CI esegue Trivy su ogni immagine Docker.
 CVE risolte: \texttt{CVE-2026-33870/33871} (Netty request smuggling + HTTP/2 DoS),
@@ -7113,6 +7302,72 @@ Risolte con upgrade mirati senza breaking change (OWASP~A06:2025):
 \end{itemize}
 Tutti i 344 test rimasti verdi; build e lint zero warning.
 Commit: \commitref{b1be3e8}{fix(deps): resolve 7 Dependabot CVEs --- react-router 7.17.0, esbuild 0.28.1}
+
+\paragraph{Centralizzazione pin Tomcat/Netty e bump immagini container (DEP-CVE-08)}
+Triage dei 34 alert code-scanning aperti su GitHub il 2026-09-10 (4 CodeQL,
+30 Trivy). \texttt{tomcat.version}/\texttt{netty.version} erano duplicati
+identici in 8 \texttt{build.gradle.kts} --- esattamente la duplicazione che
+aveva lasciato Tomcat fermo a \texttt{10.1.55} ovunque (3 alert CRITICAL).
+Centralizzati nel blocco \texttt{subprojects\{\}} del \texttt{build.gradle.kts}
+di root, stesso pattern già in uso per l'override \texttt{httpcore5}. Netty
+bumpato a \texttt{4.1.137.Final} (\texttt{CVE-2026-75595}, CRITICAL),
+verificato risolvere correttamente via
+\texttt{./gradlew :auth-service:dependencies}. Tomcat \textbf{non} bumpato a
+\texttt{10.1.58}: la advisory lo cita come fixed version ma quella versione
+non è pubblicata su Maven Central (\texttt{GET .../10.1.58/... -> 404},
+risoluzione Gradle fallisce) --- lasciato alla versione più alta
+realmente esistente, con nota di ricontrollo alla prossima release Apache.
+
+\texttt{docker/postgres/Dockerfile} e il nuovo
+\texttt{docker/redis/Dockerfile} eseguono
+\texttt{apk update \&\& apk upgrade --no-cache} sopra il tag base: il solo
+bump di tag non aggiorna i pacchetti Alpine già cristallizzati nell'immagine
+upstream al momento della sua build (verificato: \texttt{redis:8.8.2-alpine}
+da solo restava su \texttt{libcrypto3}/\texttt{libssl3} \texttt{3.5.7-r0}).
+Con l'\texttt{apk upgrade}, un rescan Trivy locale di entrambe le immagini
+costruite torna a 0 vulnerabilità CRITICAL/HIGH. Redis
+\texttt{8.8.1-alpine}~→~\texttt{8.8.2-alpine}; Grafana
+\texttt{13.1.1}~→~\texttt{13.1.5} (azzera i 2 CRITICAL
+\texttt{golang.org/x/crypto}; gli HIGH residui sono nei plugin datasource Go
+precompilati, fixabili solo upstream); \texttt{frontend/Dockerfile}:
+\texttt{nginxinc/nginx-unprivileged:alpine} --- l'unico tag completamente
+flottante del repository --- pinnato a \texttt{1.31.5-alpine}.
+\texttt{.trivyignore} esteso con 16 nuove CVE Go-stdlib nel binario
+\texttt{gosu} bundlato in postgres, emerse solo ora che la CI scansiona
+l'immagine costruita da noi invece del tag upstream nudo (stessa
+argomentazione di raggiungibilità già in uso nel file: \texttt{gosu} fa solo
+\texttt{setuid}+\texttt{execve}, nessun path di rete/TLS/parsing).
+
+Di conseguenza, \texttt{.github/workflows/ci.yml}: nuovo gate bloccante
+(\texttt{exit-code: 1}, severità CRITICAL) sul job \texttt{trivy} per le 11
+immagini che costruiamo noi --- postgres/redis spostate lì dal job
+\texttt{trivy-thirdparty}, avendo ora un proprio Dockerfile hardenato;
+\texttt{trivy-thirdparty} (solo Grafana rimasto) legge il tag da
+\texttt{docker-compose.yml} a runtime invece di duplicarlo a mano --- quel
+duplicato hardcoded è la causa esatta del drift di \texttt{DEP-CVE-07}; nuovo
+schedule settimanale (lunedì 05:00 UTC) così gli alert di terze parti si
+aggiornano anche senza push; \texttt{trivy-config: trivy.yaml} finalmente
+referenziato da entrambi i job (il file esisteva dalla baseline ma nessuno
+step lo usava, quindi era configurazione morta). 17 alert Trivy rimasti
+orfani dalla migrazione di categoria (postgres/redis) dismissati manualmente
+su GitHub con motivazione, dopo verifica via rescan locale che fossero
+effettivamente risolti.
+Commit: \commitref{c050521}{fix(security): centralize tomcat/netty version overrides, bump netty to 4.1.137.Final},
+\commitref{2eba1cc}{fix(security): patch OS packages in postgres/redis images, bump redis/grafana, pin nginx},
+\commitref{81b3f2f}{fix(ci): gate CRITICAL on our images, scan postgres/redis as built, kill matrix drift}
+
+\paragraph{Bump vitest --- alert Dependabot residui (DEP-CVE-09)}
+4 alert Dependabot sul frontend, tutti su devDependency (nessun impatto sul
+bundle di produzione): \texttt{@vitest/mocker} (path traversal,
+GHSA-82fw-gwwq-j7x9) risolto con bump diretto di \texttt{vitest} e
+\texttt{@vitest/coverage-v8} a \texttt{\^{}4.1.11} --- già dentro il range
+semver dichiarato in \texttt{package.json}, \texttt{npm audit fix} da solo
+non attraversava il bump per una divergenza nella risoluzione delle
+dipendenze peer. \texttt{baseline-browser-mapping}, \texttt{browserslist},
+\texttt{@humanfs/node} risolti transitivamente dallo stesso
+\texttt{npm audit fix}. Verificato: lint pulito, build verde, 1154/1154 test
+Vitest verdi.
+Commit: \commitref{209354e}{fix(deps): bump vitest to 4.1.11, closing @vitest/mocker path-traversal advisory}
 
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Appendice B --- Utilizzo dell'IA e Revisione Critica}

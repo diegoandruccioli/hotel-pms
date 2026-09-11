@@ -92,8 +92,10 @@ public class AuthServiceImpl implements AuthService {
 
         final Optional<Instant> lockedUntil = loginAttemptService.getLockedUntil(user.getUsername(), clientIp);
         if (lockedUntil.isPresent() && Instant.now().isBefore(lockedUntil.get())) {
-            // codeql[java/log-injection]: sanitizeForLog strips CR/LF below (CWE-117) — CodeQL's
-            // standard query doesn't model this project's custom sanitizer as a taint sanitizer.
+            // sanitizeForLog strips CR/LF below (CWE-117). The inline codeql[] comment
+            // this line used to carry has no effect: this repo runs CodeQL default
+            // setup, which doesn't honor inline suppressions. Alert dismissed manually
+            // on GitHub instead (false positive) — see #588/#589/#590.
             log.warn("[AUTH] LOGIN_BLOCKED | user={} | ip={} | reason=ACCOUNT_LOCKED | until={}",
                     sanitizeForLog(user.getUsername()), sanitizeForLog(clientIp), lockedUntil.get());
             throw new AccountLockedException("ACCOUNT_TEMPORARILY_LOCKED");
@@ -102,12 +104,12 @@ public class AuthServiceImpl implements AuthService {
         if (!passwordMatches) {
             final LoginAttemptResult result = loginAttemptService.recordFailure(user.getUsername(), clientIp);
             if (result.locked()) {
-                // codeql[java/log-injection]: see sanitizeForLog note above.
+                // See sanitizeForLog note above (dismissed CodeQL false positive).
                 log.warn("[AUTH] ACCOUNT_LOCKED | user={} | ip={} | attempts={} | until={}",
                         sanitizeForLog(user.getUsername()), sanitizeForLog(clientIp), result.attempts(),
                         result.lockedUntil());
             } else {
-                // codeql[java/log-injection]: see sanitizeForLog note above.
+                // See sanitizeForLog note above (dismissed CodeQL false positive).
                 log.warn("[AUTH] LOGIN_FAILED | user={} | ip={} | reason=BAD_PASSWORD | attempts={}",
                         sanitizeForLog(user.getUsername()), sanitizeForLog(clientIp), result.attempts());
             }

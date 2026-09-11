@@ -57,7 +57,7 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
             // Corrupted lock value: fail open rather than lock the account out
             // permanently on a value this code never wrote. The failed-attempt
             // counter (a separate key) keeps counting regardless.
-            log.warn("[AUTH] LOCKOUT_KEY_CORRUPTED | key={} | value={}", lockKey, raw);
+            log.warn("[AUTH] LOCKOUT_KEY_CORRUPTED | key={} | value={}", sanitizeForLog(lockKey), sanitizeForLog(raw));
             redisTemplate.delete(lockKey);
             return Optional.empty();
         }
@@ -107,5 +107,18 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
 
     private static String normalize(final String value) {
         return value == null || value.isBlank() ? UNKNOWN : value;
+    }
+
+    /**
+     * Strips CR/LF before a value reaches the log (CWE-117): {@code lockKey} and
+     * {@code raw} here are built from caller-supplied {@code username}/{@code clientIp}
+     * (via {@link #normalize}) and an untrusted Redis value respectively.
+     *
+     * @param value the raw value to sanitize, may be {@code null}
+     * @return the value with carriage returns and line feeds replaced, or
+     *         {@code "unknown"} if {@code value} is {@code null}
+     */
+    private static String sanitizeForLog(final String value) {
+        return value == null ? UNKNOWN : value.replaceAll("[\r\n]", "_");
     }
 }
