@@ -34,6 +34,7 @@ class StayGuestRetentionJobServiceImplTest {
     private static final int YEARS_6 = 6;
     private static final int YEARS_11 = 11;
     private static final String FIRST_NAME_MARIO = "Mario";
+    private static final int BIRTH_YEAR_1990 = 1990;
 
     @Mock private StayGuestRepository stayGuestRepository;
     @Mock private BillingClient billingClient;
@@ -49,7 +50,7 @@ class StayGuestRetentionJobServiceImplTest {
                 .firstName(FIRST_NAME_MARIO)
                 .lastName("Rossi")
                 .gender("M")
-                .dateOfBirth(LocalDate.of(1990, 1, 1))
+                .dateOfBirth(LocalDate.of(BIRTH_YEAR_1990, 1, 1))
                 .placeOfBirth("Bologna")
                 .citizenship("IT")
                 .documentType("CI")

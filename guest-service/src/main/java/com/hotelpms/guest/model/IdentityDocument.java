@@ -45,6 +45,9 @@ import java.util.UUID;
 @Builder
 public class IdentityDocument {
 
+    /** Encrypted ciphertext (IV + tag + encoding overhead) needs far more room than the plaintext. */
+    private static final int ENCRYPTED_DOCUMENT_NUMBER_LENGTH = 512;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -62,7 +65,7 @@ public class IdentityDocument {
      * this field always holds the decrypted plaintext in memory, never ciphertext.
      */
     @Convert(converter = DocumentNumberConverter.class)
-    @Column(nullable = false, length = 512)
+    @Column(nullable = false, length = ENCRYPTED_DOCUMENT_NUMBER_LENGTH)
     private String documentNumber;
 
     @Column(nullable = false)

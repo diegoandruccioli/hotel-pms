@@ -17,24 +17,27 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class DocumentNumberConverterTest {
 
+    private static final String PLAINTEXT = "AB123";
+    private static final String CIPHERTEXT = "cipher";
+
     @Mock
     private DocumentNumberEncryptor encryptor;
 
     @Test
     void convertToDatabaseColumnDelegatesToEncryptor() {
-        when(encryptor.encrypt("AB123")).thenReturn("cipher");
+        when(encryptor.encrypt(PLAINTEXT)).thenReturn(CIPHERTEXT);
         final DocumentNumberConverter converter = new DocumentNumberConverter(encryptor);
 
-        assertEquals("cipher", converter.convertToDatabaseColumn("AB123"));
-        verify(encryptor).encrypt("AB123");
+        assertEquals(CIPHERTEXT, converter.convertToDatabaseColumn(PLAINTEXT));
+        verify(encryptor).encrypt(PLAINTEXT);
     }
 
     @Test
     void convertToEntityAttributeDelegatesToEncryptor() {
-        when(encryptor.decrypt("cipher")).thenReturn("AB123");
+        when(encryptor.decrypt(CIPHERTEXT)).thenReturn(PLAINTEXT);
         final DocumentNumberConverter converter = new DocumentNumberConverter(encryptor);
 
-        assertEquals("AB123", converter.convertToEntityAttribute("cipher"));
-        verify(encryptor).decrypt("cipher");
+        assertEquals(PLAINTEXT, converter.convertToEntityAttribute(CIPHERTEXT));
+        verify(encryptor).decrypt(CIPHERTEXT);
     }
 }

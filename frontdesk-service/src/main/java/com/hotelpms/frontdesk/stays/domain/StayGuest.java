@@ -44,6 +44,9 @@ import java.util.UUID;
 public class StayGuest {
 
     private static final int TRAVELLER_TYPE_LENGTH = 20;
+
+    /** Encrypted ciphertext (IV + tag + encoding overhead) needs far more room than the plaintext. */
+    private static final int ENCRYPTED_DOCUMENT_NUMBER_LENGTH = 512;
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -80,7 +83,7 @@ public class StayGuest {
      * this field always holds the decrypted plaintext in memory, never ciphertext.
      */
     @Convert(converter = StayGuestDocumentNumberConverter.class)
-    @Column(name = "document_number", length = 512)
+    @Column(name = "document_number", length = ENCRYPTED_DOCUMENT_NUMBER_LENGTH)
     private String documentNumber;
 
     /** Nullable for FAMILIARE/MEMBRO_GRUPPO (TIPALLOG 19/20) per tracciato rules. */

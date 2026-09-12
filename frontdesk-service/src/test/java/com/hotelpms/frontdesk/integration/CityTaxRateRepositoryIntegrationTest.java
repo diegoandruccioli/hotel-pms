@@ -13,11 +13,13 @@ import com.hotelpms.frontdesk.stays.domain.AlloggiatiComune;
 import com.hotelpms.frontdesk.stays.domain.HotelSettings;
 import com.hotelpms.frontdesk.stays.repository.AlloggiatiComuneRepository;
 import com.hotelpms.frontdesk.stays.repository.HotelSettingsRepository;
+import com.hotelpms.frontdesk.stays.security.StayGuestDocumentEncryptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -46,10 +48,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers(disabledWithoutDocker = true)
+// StayGuestDocumentEncryptor: @DataJpaTest's minimal context doesn't scan plain
+// @Component beans, but Hibernate needs it (via StayGuestDocumentNumberConverter,
+// @Convert on StayGuest.documentNumber) to bootstrap the EntityManagerFactory for
+// this persistence unit, regardless of which entity this test actually exercises.
+@Import(StayGuestDocumentEncryptor.class)
 @TestPropertySource(properties = {
         "spring.jpa.hibernate.ddl-auto=validate",
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect",
-        "spring.flyway.enabled=true"
+        "spring.flyway.enabled=true",
+        "frontdesk.documents.encryption-key=test-encryption-key",
+        "frontdesk.documents.encryption-salt=deadbeefdeadbeefdeadbeefdeadbeef"
 })
 class CityTaxRateRepositoryIntegrationTest {
 
