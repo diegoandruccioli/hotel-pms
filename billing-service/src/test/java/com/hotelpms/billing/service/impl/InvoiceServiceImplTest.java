@@ -962,7 +962,7 @@ class InvoiceServiceImplTest {
 
         @Test
         @DisplayName("getLastInvoiceDateForStay returns the stay's own folio date when present")
-        void getLastInvoiceDateForStayReturnsOwnFolioDate() {
+        void lastInvoiceDateForStayReturnsOwnFolioDate() {
                 final UUID stayId = UUID.randomUUID();
                 final Invoice ownFolio = Invoice.builder()
                                 .id(UUID.randomUUID())
@@ -983,7 +983,7 @@ class InvoiceServiceImplTest {
         @Test
         @DisplayName("getLastInvoiceDateForStay falls back to a routed master-folio date "
                         + "when the stay's own folio has none")
-        void getLastInvoiceDateForStayReturnsRoutedFolioDateWhenOwnFolioMissing() {
+        void lastInvoiceDateForStayReturnsRoutedFolioDateWhenOwnFolioMissing() {
                 final UUID stayId = UUID.randomUUID();
                 final Invoice masterFolio = Invoice.builder()
                                 .id(UUID.randomUUID())
@@ -1004,7 +1004,7 @@ class InvoiceServiceImplTest {
 
         @Test
         @DisplayName("getLastInvoiceDateForStay reports no invoices when neither lookup matches")
-        void getLastInvoiceDateForStayReturnsFalseWhenNoInvoiceExists() {
+        void lastInvoiceDateForStayReturnsFalseWhenNoInvoiceExists() {
                 final UUID stayId = UUID.randomUUID();
                 when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
                                 .thenReturn(Optional.empty());
