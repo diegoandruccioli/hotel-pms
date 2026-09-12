@@ -638,6 +638,8 @@ services:
       - SPRING_DATASOURCE_USERNAME=billing_service_app
       - SPRING_DATASOURCE_PASSWORD=${BILLING_DB_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      # ADR-006: "PILOT/" prefix on generated invoice numbers while true.
+      - BILLING_PILOT_MODE=${BILLING_PILOT_MODE:-false}
       # MaxMetaspaceSize raised from 128m (BUG-0b stopgap, docs/LIVE_E2E_AUDIT_2026-07.md):
       # PDF generation was crashing the process with a Metaspace OOM. The root causes
       # (GuestClient discovery failure + per-render font re-read/re-subset) are fixed

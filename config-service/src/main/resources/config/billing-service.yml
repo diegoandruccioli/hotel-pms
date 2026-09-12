@@ -12,6 +12,18 @@ application:
     # available", silently falling back (PDF invoices showed "Unknown Guest").
     guest-service-url: http://guest-service:8083
 
+billing:
+  # ADR-006 (backup/DECISIONS.md): while a hotel is a pilot (not yet a real
+  # paying customer), every invoiceNumber generated gets a "PILOT/" prefix
+  # (e.g. PILOT/2026/0007) instead of the real YYYY/NNNN series — the pilot's
+  # own gestionale-affiancamento test documents never consume progressivi of
+  # the fiscal series the hotel's primary gestionale may want to use in
+  # autonomy. Same VITE_PILOT_MODE concept already shown as a UI banner in
+  # frontend/src/pages/Billing.tsx, now enforced server-side on the number
+  # itself, not just displayed as a warning. Turning this off later does not
+  # renumber past invoices — InvoiceSequence.lastSeq is untouched either way.
+  pilot-mode: ${BILLING_PILOT_MODE:false}
+
 internal:
   hmac:
     secret: ${INTERNAL_HMAC_SECRET}
