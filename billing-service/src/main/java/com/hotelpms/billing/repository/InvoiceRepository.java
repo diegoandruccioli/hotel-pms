@@ -136,6 +136,38 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     Optional<Invoice> findTopByGuestIdAndHotelIdOrderByIssueDateDesc(UUID guestId, UUID hotelId);
 
     /**
+     * Finds the most recent invoice carrying at least one charge routed from a
+     * given stay's individual folio to a group MASTER folio (Punto 4, {@code
+     * routedFromStayId} on {@link com.hotelpms.billing.domain.InvoiceCharge}).
+     *
+     * <p>Used by {@link #findTopByStayIdAndHotelIdOrderByIssueDateDesc}'s caller
+     * (the frontdesk-service GDPR legal-hold guard for {@code StayGuest}) as a
+     * second lookup: a stay's own individual invoice can close at zero once its
+     * ROOM_NIGHT/CITY_TAX charges move to the group's master folio at check-out,
+     * so the fiscal retention clock must also consider whichever invoice
+     * actually carries the money, not just the stay's own folio.
+     *
+     * @param stayId  the stay UUID (frontdesk-service) the charge was transferred from
+     * @param hotelId the hotel UUID (tenant isolation)
+     * @return the most recent master-folio invoice with a charge routed from this stay
+     */
+    @Query("SELECT i FROM Invoice i JOIN i.charges c "
+            + "WHERE c.routedFromStayId = :stayId AND i.hotelId = :hotelId "
+            + "ORDER BY i.issueDate DESC")
+    List<Invoice> findByRoutedFromStayIdAndHotelId(
+            @Param("stayId") UUID stayId, @Param("hotelId") UUID hotelId);
+
+    /**
+     * Finds the most recent invoice for a stay's own individual folio within a
+     * hotel, ordered by issue date descending.
+     *
+     * @param stayId  the stay UUID
+     * @param hotelId the hotel UUID (tenant isolation)
+     * @return the most recent invoice if present
+     */
+    Optional<Invoice> findTopByStayIdAndHotelIdOrderByIssueDateDesc(UUID stayId, UUID hotelId);
+
+    /**
      * Finds all invoices for a guest within a hotel, ordered by issue date descending.
      * Used by the GDPR Art. 20 data-export endpoint to return full invoice history.
      *

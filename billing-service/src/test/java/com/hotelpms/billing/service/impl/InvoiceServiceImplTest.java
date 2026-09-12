@@ -18,6 +18,7 @@ import com.hotelpms.billing.dto.GroupChargeRequest;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.MasterFolioRequest;
+import com.hotelpms.billing.dto.StayInvoiceCheckResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.exception.InvoiceConflictException;
 import com.hotelpms.billing.exception.NotFoundException;
@@ -41,6 +42,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -77,6 +79,7 @@ class InvoiceServiceImplTest {
 
         private static final String SIMPLE_DRINK = "Coffee";
         private static final String INV_123 = "INV-123";
+        private static final String SEQ_SUFFIX_0001 = "/0001";
         private static final String QUERY_MARIO = "mario";
         private static final String GUEST_FIRST_NAME_MARIO = "Mario";
         private static final String SORT_FIELD_ISSUE_DATE = "issueDate";
@@ -208,7 +211,7 @@ class InvoiceServiceImplTest {
                                 "Invoice number must match YYYY/NNNN format");
                 assertTrue(result.invoiceNumber().startsWith(expectedYear + "/"),
                                 "Invoice number must start with current year");
-                assertEquals(expectedYear + "/0001", result.invoiceNumber());
+                assertEquals(expectedYear + SEQ_SUFFIX_0001, result.invoiceNumber());
                 verify(invoiceRepository).save(notNull());
         }
 
@@ -384,7 +387,7 @@ class InvoiceServiceImplTest {
                 final InvoiceResponse result = invoiceService.createInvoiceForStay(request);
 
                 // Assert — primo numero dell'anno
-                assertEquals(currentYear + "/0001", result.invoiceNumber());
+                assertEquals(currentYear + SEQ_SUFFIX_0001, result.invoiceNumber());
 
                 // Verifica che la sequenza sia stata salvata con lastSeq=1
                 final ArgumentCaptor<InvoiceSequence> seqCaptor =
@@ -497,6 +500,54 @@ class InvoiceServiceImplTest {
                 // Assert — sequenza incrementata da seqBefore a seqBefore+1
                 assertEquals(currentYear + "/000" + (seqBefore + 1), result.invoiceNumber());
                 assertEquals(seqBefore + 1, existingSeq.getLastSeq());
+        }
+
+        @Test
+        @DisplayName("ADR-006: pilot mode prefixes the generated number with PILOT/ without touching the counter")
+        void pilotModePrefixesInvoiceNumber() {
+                final UUID stayId = UUID.randomUUID();
+                final StayInvoiceRequest request = new StayInvoiceRequest(stayId, guestId, reservationId);
+                final int currentYear = LocalDate.now().getYear();
+
+                ReflectionTestUtils.setField(invoiceService, "pilotMode", true);
+
+                when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
+                when(sequenceRepository.findByHotelIdAndYearForUpdate(eq(hotelId), eq(currentYear)))
+                                .thenReturn(Optional.empty());
+                when(invoiceRepository.save(notNull())).thenAnswer(inv -> inv.getArgument(0));
+                when(invoiceMapper.toResponse(any(Invoice.class))).thenAnswer(inv -> {
+                        final Invoice i = inv.getArgument(0);
+                        return new InvoiceResponse(i.getId(), hotelId, i.getInvoiceNumber(),
+                                        LocalDateTime.now(), BigDecimal.ZERO, InvoiceStatus.ISSUED,
+                                        reservationId, guestId, stayId, null, null, List.of(), List.of());
+                });
+
+                final InvoiceResponse result = invoiceService.createInvoiceForStay(request);
+
+                assertEquals("PILOT/" + currentYear + SEQ_SUFFIX_0001, result.invoiceNumber());
+        }
+
+        @Test
+        @DisplayName("Pilot mode off (default) produces the real YYYY/NNNN series unprefixed")
+        void pilotModeOffProducesUnprefixedNumber() {
+                final UUID stayId = UUID.randomUUID();
+                final StayInvoiceRequest request = new StayInvoiceRequest(stayId, guestId, reservationId);
+                final int currentYear = LocalDate.now().getYear();
+
+                when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.empty());
+                when(sequenceRepository.findByHotelIdAndYearForUpdate(eq(hotelId), eq(currentYear)))
+                                .thenReturn(Optional.empty());
+                when(invoiceRepository.save(notNull())).thenAnswer(inv -> inv.getArgument(0));
+                when(invoiceMapper.toResponse(any(Invoice.class))).thenAnswer(inv -> {
+                        final Invoice i = inv.getArgument(0);
+                        return new InvoiceResponse(i.getId(), hotelId, i.getInvoiceNumber(),
+                                        LocalDateTime.now(), BigDecimal.ZERO, InvoiceStatus.ISSUED,
+                                        reservationId, guestId, stayId, null, null, List.of(), List.of());
+                });
+
+                final InvoiceResponse result = invoiceService.createInvoiceForStay(request);
+
+                assertEquals(currentYear + SEQ_SUFFIX_0001, result.invoiceNumber());
         }
 
         // ---------------------------------------------------------------
@@ -957,5 +1008,62 @@ class InvoiceServiceImplTest {
 
                 assertThrows(InvoiceConflictException.class,
                                 () -> invoiceService.addChargeToGroupFolio(groupId, request));
+        }
+
+        @Test
+        @DisplayName("getLastInvoiceDateForStay returns the stay's own folio date when present")
+        void lastInvoiceDateForStayReturnsOwnFolioDate() {
+                final UUID stayId = UUID.randomUUID();
+                final Invoice ownFolio = Invoice.builder()
+                                .id(UUID.randomUUID())
+                                .issueDate(LocalDateTime.of(SEARCH_YEAR, SEARCH_MONTH, DAY_FIVE, 0, 0))
+                                .build();
+                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
+                                .thenReturn(Optional.of(ownFolio));
+                when(invoiceRepository.findByRoutedFromStayIdAndHotelId(stayId, hotelId))
+                                .thenReturn(List.of());
+
+                final StayInvoiceCheckResponse response =
+                                invoiceService.getLastInvoiceDateForStay(stayId, hotelId);
+
+                assertTrue(response.hasInvoices());
+                assertEquals(LocalDate.of(SEARCH_YEAR, SEARCH_MONTH, DAY_FIVE), response.lastInvoiceDate());
+        }
+
+        @Test
+        @DisplayName("getLastInvoiceDateForStay falls back to a routed master-folio date "
+                        + "when the stay's own folio has none")
+        void lastInvoiceDateForStayReturnsRoutedFolioDateWhenOwnFolioMissing() {
+                final UUID stayId = UUID.randomUUID();
+                final Invoice masterFolio = Invoice.builder()
+                                .id(UUID.randomUUID())
+                                .folioType(FolioType.MASTER)
+                                .issueDate(LocalDateTime.of(SEARCH_YEAR, SEARCH_MONTH, DAY_ONE, 0, 0))
+                                .build();
+                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
+                                .thenReturn(Optional.empty());
+                when(invoiceRepository.findByRoutedFromStayIdAndHotelId(stayId, hotelId))
+                                .thenReturn(List.of(masterFolio));
+
+                final StayInvoiceCheckResponse response =
+                                invoiceService.getLastInvoiceDateForStay(stayId, hotelId);
+
+                assertTrue(response.hasInvoices());
+                assertEquals(LocalDate.of(SEARCH_YEAR, SEARCH_MONTH, DAY_ONE), response.lastInvoiceDate());
+        }
+
+        @Test
+        @DisplayName("getLastInvoiceDateForStay reports no invoices when neither lookup matches")
+        void lastInvoiceDateForStayReturnsFalseWhenNoInvoiceExists() {
+                final UUID stayId = UUID.randomUUID();
+                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
+                                .thenReturn(Optional.empty());
+                when(invoiceRepository.findByRoutedFromStayIdAndHotelId(stayId, hotelId))
+                                .thenReturn(List.of());
+
+                final StayInvoiceCheckResponse response =
+                                invoiceService.getLastInvoiceDateForStay(stayId, hotelId);
+
+                assertEquals(new StayInvoiceCheckResponse(false, null), response);
         }
 }

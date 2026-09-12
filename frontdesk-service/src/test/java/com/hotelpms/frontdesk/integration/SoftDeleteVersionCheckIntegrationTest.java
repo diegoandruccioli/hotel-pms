@@ -13,6 +13,7 @@ import com.hotelpms.frontdesk.reservations.repository.ReservationRepository;
 import com.hotelpms.frontdesk.rooms.domain.RoomType;
 import com.hotelpms.frontdesk.rooms.repository.RoomTypeRepository;
 import com.hotelpms.frontdesk.stays.security.AlloggiatiCredentialEncryptor;
+import com.hotelpms.frontdesk.stays.security.StayGuestDocumentEncryptor;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -112,6 +113,9 @@ class SoftDeleteVersionCheckIntegrationTest {
 
     @MockitoBean
     private AlloggiatiCredentialEncryptor alloggiatiCredentialEncryptor;
+
+    @MockitoBean
+    private StayGuestDocumentEncryptor stayGuestDocumentEncryptor;
 
     @Autowired
     private ReservationRepository reservationRepository;

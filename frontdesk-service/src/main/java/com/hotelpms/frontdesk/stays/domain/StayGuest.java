@@ -1,6 +1,8 @@
 package com.hotelpms.frontdesk.stays.domain;
 
+import com.hotelpms.frontdesk.stays.security.StayGuestDocumentNumberConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
@@ -42,6 +44,9 @@ import java.util.UUID;
 public class StayGuest {
 
     private static final int TRAVELLER_TYPE_LENGTH = 20;
+
+    /** Encrypted ciphertext (IV + tag + encoding overhead) needs far more room than the plaintext. */
+    private static final int ENCRYPTED_DOCUMENT_NUMBER_LENGTH = 512;
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -72,8 +77,13 @@ public class StayGuest {
     @Column(name = "document_type")
     private String documentType;
 
-    /** Nullable for FAMILIARE/MEMBRO_GRUPPO (TIPALLOG 19/20) per tracciato rules. */
-    @Column(name = "document_number")
+    /**
+     * Nullable for FAMILIARE/MEMBRO_GRUPPO (TIPALLOG 19/20) per tracciato rules.
+     * Encrypted at rest (E23, GDPR Art. 32) via {@link StayGuestDocumentNumberConverter} —
+     * this field always holds the decrypted plaintext in memory, never ciphertext.
+     */
+    @Convert(converter = StayGuestDocumentNumberConverter.class)
+    @Column(name = "document_number", length = ENCRYPTED_DOCUMENT_NUMBER_LENGTH)
     private String documentNumber;
 
     /** Nullable for FAMILIARE/MEMBRO_GRUPPO (TIPALLOG 19/20) per tracciato rules. */

@@ -138,3 +138,16 @@ frontdesk:
     # Externalized (not left as the @Scheduled annotation's inline default)
     # so a pilot deployment can move it without a code change/redeploy.
     cron: "0 30 3 * * *"
+  retention:
+    # StayGuest GDPR anonymisation (E22), sibling of guest-service's own
+    # nightly retention job for Guest (T-GST-05). Runs before night-audit
+    # so a freshly-anonymised stay's cash figures (unaffected by this job —
+    # only Alloggiati PII is touched) are already settled either way.
+    cron: "0 30 2 * * *"
+  documents:
+    # Encrypts stay_guests.document_number at rest (E23, GDPR Art. 32) via
+    # StayGuestDocumentNumberConverter, AES-256-GCM — separate key from
+    # alloggiati.credentials above (different data, different service secret).
+    # encryption-salt MUST be hex-encoded (e.g. `openssl rand -hex 16`).
+    encryption-key: ${FRONTDESK_DOCUMENTS_ENCRYPTION_KEY}
+    encryption-salt: ${FRONTDESK_DOCUMENTS_ENCRYPTION_SALT}

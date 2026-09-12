@@ -39,4 +39,18 @@ public interface StayGuestRepository extends JpaRepository<StayGuest, UUID> {
      */
     @Query("SELECT g FROM StayGuest g WHERE g.stay.hotelId = :hotelId AND g.needsResubmit = true")
     List<StayGuest> findByHotelIdAndNeedsResubmitTrue(@Param("hotelId") UUID hotelId);
+
+    /**
+     * Candidates for the nightly GDPR retention job (E22): every guest who has
+     * actually departed (excludes anyone still in house, {@code departureDate
+     * IS NULL}) before the given conservative cutoff, across every hotel — the
+     * job itself groups by {@code stay.hotelId} and applies the real dual
+     * TULPS/FISCAL hold check per candidate, the same two-step shape as
+     * guest-service's {@code GuestRepository.findByGdprConsentDateBefore}.
+     *
+     * @param cutoff the conservative (largest-window) pre-filter cutoff date
+     * @return candidate guests, in no particular order
+     */
+    @Query("SELECT g FROM StayGuest g WHERE g.departureDate IS NOT NULL AND g.departureDate < :cutoff")
+    List<StayGuest> findByDepartureDateBefore(@Param("cutoff") LocalDate cutoff);
 }
