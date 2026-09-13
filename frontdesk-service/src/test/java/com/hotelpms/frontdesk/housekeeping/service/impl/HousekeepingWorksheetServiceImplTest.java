@@ -16,9 +16,9 @@ import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.domain.RoomType;
 import com.hotelpms.frontdesk.rooms.repository.RoomRepository;
 import com.hotelpms.frontdesk.stays.domain.Stay;
-import com.hotelpms.frontdesk.stays.domain.StayGuest;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
+import com.hotelpms.frontdesk.stays.repository.StayGuestCount;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import com.hotelpms.pdftemplate.PdfTemplateRenderer;
@@ -85,7 +85,8 @@ class HousekeepingWorksheetServiceImplTest {
                 true, true, null, null, null, null, null, null, null, "Europe/Rome", 4));
         lenient().when(reservationRepository.findByHotelIdAndCheckInDateAndStatusIn(eq(HOTEL_ID), eq(DATE), any()))
                 .thenReturn(List.of());
-        lenient().when(stayRepository.findByHotelIdAndStatusWithGuests(HOTEL_ID, StayStatus.CHECKED_IN))
+        lenient().when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of());
+        lenient().when(stayRepository.countGuestsByStayForHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN))
                 .thenReturn(List.of());
         when(roomRepository.findAllByActiveTrueAndHotelIdAndStatus(HOTEL_ID, RoomStatus.DIRTY)).thenReturn(List.of());
         when(roomRepository.findAllByActiveTrueAndHotelIdAndStatus(HOTEL_ID, RoomStatus.MAINTENANCE)).thenReturn(List.of());
@@ -94,9 +95,10 @@ class HousekeepingWorksheetServiceImplTest {
     @Test
     void classifiesADepartureDueTodayAsDeparture() {
         final Room room = room("101", RoomStatus.OCCUPIED);
+        final Stay stay = stay(room, DATE);
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatusWithGuests(HOTEL_ID, StayStatus.CHECKED_IN))
-                .thenReturn(List.of(stay(room, DATE, 2)));
+        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        stubPax(stay, 2);
 
         final HousekeepingWorksheetResponse worksheet = housekeepingWorksheetService.getWorksheet(HOTEL_ID, DATE);
 
@@ -113,9 +115,10 @@ class HousekeepingWorksheetServiceImplTest {
         // expectedCheckOutDate is in the past relative to the worksheet date —
         // must still surface as a DEPARTURE, never silently vanish.
         final Room room = room("102", RoomStatus.OCCUPIED);
+        final Stay stay = stay(room, DATE.minusDays(2));
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatusWithGuests(HOTEL_ID, StayStatus.CHECKED_IN))
-                .thenReturn(List.of(stay(room, DATE.minusDays(2), 1)));
+        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        stubPax(stay, 1);
 
         final HousekeepingWorksheetResponse worksheet = housekeepingWorksheetService.getWorksheet(HOTEL_ID, DATE);
 
@@ -126,9 +129,10 @@ class HousekeepingWorksheetServiceImplTest {
     @Test
     void classifiesAFutureCheckOutAsStayover() {
         final Room room = room("103", RoomStatus.OCCUPIED);
+        final Stay stay = stay(room, DATE.plusDays(3));
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatusWithGuests(HOTEL_ID, StayStatus.CHECKED_IN))
-                .thenReturn(List.of(stay(room, DATE.plusDays(3), 1)));
+        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        stubPax(stay, 1);
 
         final HousekeepingWorksheetResponse worksheet = housekeepingWorksheetService.getWorksheet(HOTEL_ID, DATE);
 
@@ -141,9 +145,10 @@ class HousekeepingWorksheetServiceImplTest {
     @Test
     void nullExpectedCheckOutDateIsConservativelyStayoverNotDropped() {
         final Room room = room("104", RoomStatus.OCCUPIED);
+        final Stay stay = stay(room, null);
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatusWithGuests(HOTEL_ID, StayStatus.CHECKED_IN))
-                .thenReturn(List.of(stay(room, null, 1)));
+        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        stubPax(stay, 1);
 
         final HousekeepingWorksheetResponse worksheet = housekeepingWorksheetService.getWorksheet(HOTEL_ID, DATE);
 
@@ -154,11 +159,29 @@ class HousekeepingWorksheetServiceImplTest {
     }
 
     @Test
+    void aStayWithNoRowInTheGuestCountProjectionIsZeroPaxNotAnError() {
+        // A stay absent from countGuestsByStayForHotelIdAndStatus's result (the
+        // GROUP BY / JOIN drops stays with zero guests entirely) must resolve to
+        // pax=0, not throw a NullPointerException.
+        final Room room = room("104b", RoomStatus.OCCUPIED);
+        final Stay stay = stay(room, DATE);
+        when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
+        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        // Deliberately no countGuestsByStayForHotelIdAndStatus stub override — stays empty.
+
+        final HousekeepingWorksheetResponse worksheet = housekeepingWorksheetService.getWorksheet(HOTEL_ID, DATE);
+
+        assertEquals(1, worksheet.rows().size());
+        assertEquals(0, worksheet.rows().get(0).pax());
+    }
+
+    @Test
     void sameDayArrivalIntoADepartingRoomIsFoldedIntoTurnoverNotADuplicateRow() {
         final Room room = room("105", RoomStatus.OCCUPIED);
+        final Stay stay = stay(room, DATE);
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatusWithGuests(HOTEL_ID, StayStatus.CHECKED_IN))
-                .thenReturn(List.of(stay(room, DATE, 1)));
+        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        stubPax(stay, 1);
         when(reservationRepository.findByHotelIdAndCheckInDateAndStatusIn(
                 eq(HOTEL_ID), eq(DATE), any())).thenReturn(List.of(reservation(room, 2)));
 
@@ -206,9 +229,10 @@ class HousekeepingWorksheetServiceImplTest {
         // OCCUPIED-with-a-checked-in-stay and MAINTENANCE), but proves the
         // guard filters it out if the invariant were ever violated.
         final Room room = room("108", RoomStatus.OCCUPIED);
+        final Stay stay = stay(room, DATE);
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatusWithGuests(HOTEL_ID, StayStatus.CHECKED_IN))
-                .thenReturn(List.of(stay(room, DATE, 1)));
+        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        stubPax(stay, 1);
         when(roomRepository.findAllByActiveTrueAndHotelIdAndStatus(HOTEL_ID, RoomStatus.MAINTENANCE))
                 .thenReturn(List.of(room));
 
@@ -262,6 +286,25 @@ class HousekeepingWorksheetServiceImplTest {
         assertEquals(3, pdf.length);
     }
 
+    private void stubPax(final Stay stay, final long pax) {
+        when(stayRepository.countGuestsByStayForHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN))
+                .thenReturn(List.of(stayGuestCount(stay.getId(), pax)));
+    }
+
+    private static StayGuestCount stayGuestCount(final UUID stayId, final long guestCount) {
+        return new StayGuestCount() {
+            @Override
+            public UUID getStayId() {
+                return stayId;
+            }
+
+            @Override
+            public long getGuestCount() {
+                return guestCount;
+            }
+        };
+    }
+
     private static Room room(final String roomNumber, final RoomStatus status) {
         return Room.builder()
                 .id(UUID.randomUUID())
@@ -273,7 +316,7 @@ class HousekeepingWorksheetServiceImplTest {
                 .build();
     }
 
-    private static Stay stay(final Room room, final LocalDate expectedCheckOutDate, final int pax) {
+    private static Stay stay(final Room room, final LocalDate expectedCheckOutDate) {
         return Stay.builder()
                 .id(UUID.randomUUID())
                 .hotelId(HOTEL_ID)
@@ -281,14 +324,7 @@ class HousekeepingWorksheetServiceImplTest {
                 .guestId(GUEST_ID)
                 .status(StayStatus.CHECKED_IN)
                 .expectedCheckOutDate(expectedCheckOutDate)
-                .guests(guests(pax))
                 .build();
-    }
-
-    private static List<StayGuest> guests(final int pax) {
-        return java.util.stream.IntStream.range(0, pax)
-                .mapToObj(i -> StayGuest.builder().id(UUID.randomUUID()).build())
-                .toList();
     }
 
     private static Reservation reservation(final Room room, final int expectedGuests) {

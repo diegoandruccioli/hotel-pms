@@ -17,6 +17,7 @@ import com.hotelpms.frontdesk.rooms.repository.RoomRepository;
 import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
+import com.hotelpms.frontdesk.stays.repository.StayGuestCount;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import com.hotelpms.pdftemplate.PdfTemplateRenderer;
@@ -82,9 +83,12 @@ public class HousekeepingWorksheetServiceImpl implements HousekeepingWorksheetSe
                 reservationRepository.findByHotelIdAndCheckInDateAndStatusIn(hotelId, resolvedDate, ARRIVAL_STATUSES);
         final Set<UUID> arrivingRoomIds = arrivingRoomIds(arrivals);
 
+        final Map<UUID, Long> paxByStayId = stayRepository.countGuestsByStayForHotelIdAndStatus(hotelId, StayStatus.CHECKED_IN)
+                .stream().collect(Collectors.toMap(StayGuestCount::getStayId, StayGuestCount::getGuestCount));
+
         final Map<UUID, HousekeepingRow> rowsByRoomId = new LinkedHashMap<>();
         final List<HousekeepingRow> stayoverRows = new ArrayList<>();
-        classifyCheckedInStays(hotelId, resolvedDate, roomsById, arrivingRoomIds, rowsByRoomId, stayoverRows);
+        classifyCheckedInStays(hotelId, resolvedDate, roomsById, paxByStayId, arrivingRoomIds, rowsByRoomId, stayoverRows);
 
         final List<HousekeepingRow> arrivalRows = buildArrivalRows(arrivals, roomsById, rowsByRoomId.keySet());
         final List<HousekeepingRow> vacantDirtyRows =
@@ -124,21 +128,24 @@ public class HousekeepingWorksheetServiceImpl implements HousekeepingWorksheetSe
      * @param hotelId         the hotel to scope stays to
      * @param date            the worksheet's business date
      * @param roomsById       every active room for the hotel, keyed by id
+     * @param paxByStayId     guest count per stay id (see {@link
+     *                        StayRepository#countGuestsByStayForHotelIdAndStatus}) — a
+     *                        stay absent from this map has zero guests, not an error
      * @param arrivingRoomIds room ids with a same-day arrival, for the turnover flag
      * @param rowsByRoomId    mutated: filled with one {@code DEPARTURE} row per room id
      * @param stayoverRows    mutated: appended with one {@code STAYOVER} row per stay
      */
     private void classifyCheckedInStays(
             final UUID hotelId, final LocalDate date, final Map<UUID, Room> roomsById,
-            final Set<UUID> arrivingRoomIds, final Map<UUID, HousekeepingRow> rowsByRoomId,
-            final List<HousekeepingRow> stayoverRows) {
-        for (final Stay stay : stayRepository.findByHotelIdAndStatusWithGuests(hotelId, StayStatus.CHECKED_IN)) {
+            final Map<UUID, Long> paxByStayId, final Set<UUID> arrivingRoomIds,
+            final Map<UUID, HousekeepingRow> rowsByRoomId, final List<HousekeepingRow> stayoverRows) {
+        for (final Stay stay : stayRepository.findByHotelIdAndStatus(hotelId, StayStatus.CHECKED_IN)) {
             final Room room = roomsById.get(stay.getRoomId());
             if (room == null) {
                 // Defensive: the room was deactivated after the stay was created.
                 continue;
             }
-            final int pax = stay.getGuests().size();
+            final int pax = paxByStayId.getOrDefault(stay.getId(), 0L).intValue();
             final LocalDate expected = stay.getExpectedCheckOutDate();
             if (expected == null) {
                 stayoverRows.add(new HousekeepingRow(room.getRoomNumber(), room.getRoomType().getName(),

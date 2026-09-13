@@ -196,20 +196,39 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
     long countGuestsInHouseByHotelId(@Param("hotelId") UUID hotelId, @Param("status") StayStatus status);
 
     /**
-     * Finds every stay with the given status for a hotel, with its guests
-     * eagerly fetched in the same query. Backs the housekeeping worksheet
-     * (DEPARTURE/STAYOVER classification is date arithmetic done in {@code
-     * HousekeepingWorksheetServiceImpl} against {@link Stay#getExpectedCheckOutDate()},
-     * not a separate query per bucket) — {@code DISTINCT} avoids duplicate
-     * rows from the guests join, and the fetch avoids one lazy-load query per
-     * stay just to read {@code guests.size()} for the pax column.
+     * Finds every stay with the given status for a hotel — plain, no fetch
+     * join on {@code guests}. Backs the housekeeping worksheet (DEPARTURE/
+     * STAYOVER classification is date arithmetic in {@code
+     * HousekeepingWorksheetServiceImpl} against {@link Stay#getExpectedCheckOutDate()}).
+     * Deliberately does not touch the {@code guests} association at all —
+     * see {@link #countGuestsByStayForHotelIdAndStatus} for the pax count —
+     * because {@code StayGuest.documentNumber}'s {@code AttributeConverter}
+     * decrypts on load for every row Hibernate materializes, and a single
+     * legacy/malformed ciphertext anywhere in the hotel would otherwise fail
+     * the entire worksheet for every stay, not just the guest it belongs to.
      *
      * @param hotelId the hotel UUID
      * @param status  the stay status to filter by (e.g. CHECKED_IN)
-     * @return matching stays, each with its guest list already loaded
+     * @return matching stays
      */
-    @Query("SELECT DISTINCT s FROM Stay s LEFT JOIN FETCH s.guests WHERE s.hotelId = :hotelId AND s.status = :status")
-    List<Stay> findByHotelIdAndStatusWithGuests(@Param("hotelId") UUID hotelId, @Param("status") StayStatus status);
+    List<Stay> findByHotelIdAndStatus(UUID hotelId, StayStatus status);
+
+    /**
+     * Counts guests per stay, for stays with the given status in a hotel —
+     * the housekeeping worksheet's pax column. A {@code GROUP BY} aggregate
+     * query only ever needs the join's row count, so Hibernate never
+     * materializes a {@code StayGuest} entity or runs its {@code
+     * documentNumber} decryption converter — unlike {@link
+     * #findByHotelIdAndStatus} paired with a fetch join, which would (see
+     * that method's javadoc for why that matters here).
+     *
+     * @param hotelId the hotel UUID
+     * @param status  the stay status to filter by (e.g. CHECKED_IN)
+     * @return one {@link StayGuestCount} per stay that has at least one guest
+     */
+    @Query("SELECT s.id AS stayId, COUNT(g) AS guestCount FROM Stay s JOIN s.guests g "
+            + "WHERE s.hotelId = :hotelId AND s.status = :status GROUP BY s.id")
+    List<StayGuestCount> countGuestsByStayForHotelIdAndStatus(@Param("hotelId") UUID hotelId, @Param("status") StayStatus status);
 
     /**
      * Sums occupied room-nights per time bucket for a hotel, for the KPI
