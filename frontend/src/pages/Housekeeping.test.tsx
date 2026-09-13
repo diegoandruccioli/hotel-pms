@@ -5,6 +5,7 @@ import { renderWithQuery as render } from '../test-utils';
 import { Housekeeping } from './Housekeeping';
 import { inventoryService } from '../services';
 import { dashboardService } from '../services';
+import { housekeepingService } from '../services';
 import { mockAxiosErrorWithDetail } from '../test-utils';
 
 const stableT = (key: string, options?: { count?: number; status?: string }) => {
@@ -28,6 +29,14 @@ vi.mock('../services/dashboardService', () => ({
   dashboardService: { getDaySheet: vi.fn() },
 }));
 
+vi.mock('../services/housekeepingService', () => ({
+  housekeepingService: {
+    getBusinessDate: vi.fn(),
+    getWorksheet: vi.fn(),
+    downloadWorksheetPdf: vi.fn(),
+  },
+}));
+
 const mockAddToast = vi.fn();
 vi.mock('../store/toastStore', () => ({
   useToastStore: (selector: unknown) =>
@@ -48,6 +57,14 @@ describe('Housekeeping', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(dashboardService.getDaySheet).mockResolvedValue(MOCK_DAY_SHEET);
+    vi.mocked(housekeepingService.getBusinessDate).mockResolvedValue(
+      { businessDate: '2026-08-20', timezone: 'Europe/Rome', cutoffHour: 4 });
+    // Two-digit, mutually distinct counts — this page's own room-status-count
+    // assertions below use single digits (3, 1, 0); these must never collide.
+    vi.mocked(housekeepingService.getWorksheet).mockResolvedValue(
+      { date: '2026-08-20', generatedAt: '2026-08-20T04:00:00', provisional: false,
+        hotelName: 'Test Hotel', rows: [],
+        summary: { DEPARTURE: 11, STAYOVER: 12, ARRIVAL_PREP: 13, VACANT_DIRTY: 14, MAINTENANCE: 15 } });
   });
 
   it('should show loading spinner initially', () => {

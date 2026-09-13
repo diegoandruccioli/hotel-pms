@@ -260,6 +260,21 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
     int countByHotelIdAndCheckInDateAndStatusIn(UUID hotelId, LocalDate date, Collection<ReservationStatus> statuses);
 
     /**
+     * Finds reservations checking in on a given date with one of the given
+     * statuses, scoped to a hotel — the row-level counterpart of {@link
+     * #countByHotelIdAndCheckInDateAndStatusIn}. Backs the housekeeping
+     * worksheet's ARRIVAL_PREP rows, where the actual room (via {@code
+     * lineItems}) and guest count are needed, not just a total.
+     *
+     * @param hotelId the hotel UUID
+     * @param date    the check-in date
+     * @param statuses the reservation statuses to include (e.g. CONFIRMED, PENDING)
+     * @return the matching reservations
+     */
+    List<Reservation> findByHotelIdAndCheckInDateAndStatusIn(
+            UUID hotelId, LocalDate date, Collection<ReservationStatus> statuses);
+
+    /**
      * Finds reservations with one of the given statuses whose check-in date is
      * on or before the given date, scoped to a hotel — the night audit's
      * no-show candidate pool. Each candidate is still re-validated by {@code

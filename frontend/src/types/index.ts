@@ -31,6 +31,7 @@ export type {
   GuestPrivacySettingsResponse,
   GuestPrivacySettingsRequest,
 } from './guest.types';
+export * from './housekeeping.types';
 export * from './inventory.types';
 export * from './nightAudit.types';
 export * from './ownerReport.types';

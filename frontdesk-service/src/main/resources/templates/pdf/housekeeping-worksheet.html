@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="it" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8"/>
+<title>Pulizie</title>
+<style>
+    @page { size: A4; margin: 1.8cm 1.6cm; }
+    body { font-family: 'Noto Sans', sans-serif; font-size: 9pt; color: #1a1a1a; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start;
+        border-bottom: 1px solid #333; padding-bottom: 8pt; margin-bottom: 4pt; }
+    .hotel-name { font-size: 13pt; font-weight: bold; }
+    .doc-title { font-size: 17pt; font-weight: bold; text-align: right; margin: 0; }
+    .doc-date { font-size: 11pt; text-align: right; text-transform: capitalize; }
+    .badge { display: inline-block; font-size: 8pt; font-weight: bold; padding: 2pt 6pt;
+        border-radius: 3pt; margin-top: 3pt; }
+    .badge-provisional { background-color: #fef3c7; color: #92400e; border: 0.5px solid #d97706; }
+    .badge-definitive { background-color: #dcfce7; color: #166534; border: 0.5px solid #16a34a; }
+    .generated-at { font-size: 7.5pt; color: #666; margin-bottom: 14pt; }
+    .section-title { font-size: 10pt; font-weight: bold; margin-top: 14pt; margin-bottom: 4pt;
+        background-color: #f3f4f6; padding: 4pt 6pt; }
+    table.rows { width: 100%; border-collapse: collapse; margin-bottom: 4pt; }
+    table.rows th { text-align: left; font-size: 8pt; font-weight: bold;
+        border-bottom: 1px solid #333; padding: 3pt 4pt; }
+    table.rows td { font-size: 9pt; padding: 4pt; border-bottom: 0.5px solid #ccc; }
+    table.rows td.check { text-align: center; width: 24pt; font-size: 12pt; }
+    table.rows td.pax { text-align: center; width: 30pt; }
+    .turnover-tag { font-size: 7pt; font-weight: bold; color: #991b1b; }
+    .unknown-tag { font-size: 7pt; font-style: italic; color: #666; }
+    .empty-note { font-size: 8.5pt; font-style: italic; color: #666; padding: 4pt; }
+    .footer-note { position: running(footer); }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <div class="hotel-name" th:text="${hotelName}">Hotel Name</div>
+        <span class="badge" th:classappend="${provisional} ? 'badge-provisional' : 'badge-definitive'"
+              th:text="${provisional} ? 'PROVVISORIO' : 'DEFINITIVO'">PROVVISORIO</span>
+    </div>
+    <div>
+        <h1 class="doc-title">PULIZIE</h1>
+        <div class="doc-date" th:text="${dateFormatted}">lunedì 1 gennaio 2026</div>
+    </div>
+</div>
+<div class="generated-at">Generato il <span th:text="${generatedAtFormatted}">01/01/2026 00:00</span> —
+    se stampato prima della chiusura notturna, alcune righe potrebbero ancora cambiare.</div>
+
+<div class="section-title">Partenze</div>
+<table class="rows" th:if="${not #lists.isEmpty(departureRows)}">
+    <thead><tr><th class="check">&#9744;</th><th>Camera</th><th>Tipo</th><th class="pax">Ospiti</th><th>Note</th></tr></thead>
+    <tbody>
+    <tr th:each="row : ${departureRows}">
+        <td class="check">&#9744;</td>
+        <td th:text="${row.roomNumber}">101</td>
+        <td th:text="${row.roomTypeName}">Standard</td>
+        <td class="pax" th:text="${row.pax}">2</td>
+        <td><span class="turnover-tag" th:if="${row.turnover}">ARRIVO STESSO GIORNO</span></td>
+    </tr>
+    </tbody>
+</table>
+<p class="empty-note" th:if="${#lists.isEmpty(departureRows)}">Nessuna partenza.</p>
+
+<div class="section-title">Camere occupate (rifornimento)</div>
+<table class="rows" th:if="${not #lists.isEmpty(stayoverRows)}">
+    <thead><tr><th>Camera</th><th>Tipo</th><th class="pax">Ospiti</th><th>Note</th></tr></thead>
+    <tbody>
+    <tr th:each="row : ${stayoverRows}">
+        <td th:text="${row.roomNumber}">101</td>
+        <td th:text="${row.roomTypeName}">Standard</td>
+        <td class="pax" th:text="${row.pax}">2</td>
+        <td><span class="unknown-tag" th:if="${row.departureDateUnknown}">data partenza non nota</span></td>
+    </tr>
+    </tbody>
+</table>
+<p class="empty-note" th:if="${#lists.isEmpty(stayoverRows)}">Nessuna camera occupata.</p>
+
+<div class="section-title">Arrivi in preparazione</div>
+<table class="rows" th:if="${not #lists.isEmpty(arrivalRows)}">
+    <thead><tr><th class="check">&#9744;</th><th>Camera</th><th>Tipo</th><th class="pax">Ospiti attesi</th><th>Stato attuale</th></tr></thead>
+    <tbody>
+    <tr th:each="row : ${arrivalRows}">
+        <td class="check">&#9744;</td>
+        <td th:text="${row.roomNumber}">101</td>
+        <td th:text="${row.roomTypeName}">Standard</td>
+        <td class="pax" th:text="${row.pax}">2</td>
+        <td th:text="${row.currentStatus}">CLEAN</td>
+    </tr>
+    </tbody>
+</table>
+<p class="empty-note" th:if="${#lists.isEmpty(arrivalRows)}">Nessun arrivo in preparazione.</p>
+
+<div class="section-title">Da pulire (camere vuote)</div>
+<table class="rows" th:if="${not #lists.isEmpty(vacantDirtyRows)}">
+    <thead><tr><th class="check">&#9744;</th><th>Camera</th><th>Tipo</th></tr></thead>
+    <tbody>
+    <tr th:each="row : ${vacantDirtyRows}">
+        <td class="check">&#9744;</td>
+        <td th:text="${row.roomNumber}">101</td>
+        <td th:text="${row.roomTypeName}">Standard</td>
+    </tr>
+    </tbody>
+</table>
+<p class="empty-note" th:if="${#lists.isEmpty(vacantDirtyRows)}">Nessuna camera vuota da pulire.</p>
+
+<div class="section-title">In manutenzione (informativo)</div>
+<table class="rows" th:if="${not #lists.isEmpty(maintenanceRows)}">
+    <thead><tr><th>Camera</th><th>Tipo</th></tr></thead>
+    <tbody>
+    <tr th:each="row : ${maintenanceRows}">
+        <td th:text="${row.roomNumber}">101</td>
+        <td th:text="${row.roomTypeName}">Standard</td>
+    </tr>
+    </tbody>
+</table>
+<p class="empty-note" th:if="${#lists.isEmpty(maintenanceRows)}">Nessuna camera in manutenzione.</p>
+
+</body>
+</html>

@@ -40,6 +40,8 @@ const baseSettings: HotelSettingsResponse = {
   alloggiatiCredentialsConfigured: false,
   sendReservationConfirmedEmail: true,
   sendCheckoutEmail: true,
+  timezone: 'Europe/Rome',
+  housekeepingDayCutoffHour: 4,
 };
 
 const renderComponent = () =>
