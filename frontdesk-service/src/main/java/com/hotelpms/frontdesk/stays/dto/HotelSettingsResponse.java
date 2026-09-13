@@ -35,6 +35,10 @@ import java.util.UUID;
  *                                        not ISTAT/Belfiore), or {@code null} if comune/provincia
  *                                        are unset. Read-only — derived from comune/provincia,
  *                                        never accepted directly in a request
+ * @param timezone                       IANA timezone the hotel operates in
+ * @param housekeepingDayCutoffHour      hour of the day (0-12, hotel-local) before which the
+ *                                        housekeeping worksheet's business date still resolves
+ *                                        to yesterday
  */
 public record HotelSettingsResponse(
         UUID hotelId,
@@ -54,5 +58,7 @@ public record HotelSettingsResponse(
         String cap,
         String comune,
         String provincia,
-        String comuneCodice) {
+        String comuneCodice,
+        String timezone,
+        int housekeepingDayCutoffHour) {
 }

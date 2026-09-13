@@ -40,6 +40,8 @@ export function HotelProfile() {
     cap: '',
     comune: '',
     provincia: '',
+    timezone: '',
+    housekeepingDayCutoffHour: undefined,
   });
   const [credentialsConfigured, setCredentialsConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -75,6 +77,8 @@ export function HotelProfile() {
           cap: s.cap ?? '',
           comune: s.comune ?? '',
           provincia: s.provincia ?? '',
+          timezone: s.timezone,
+          housekeepingDayCutoffHour: s.housekeepingDayCutoffHour,
         });
         setCredentialsConfigured(s.alloggiatiCredentialsConfigured);
       })
@@ -107,6 +111,11 @@ export function HotelProfile() {
     (value: string) => setForm((prev) => ({ ...prev, provincia: value })),
     [],
   );
+
+  const handleCutoffHourChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setForm((prev) => ({ ...prev, housekeepingDayCutoffHour: value === '' ? undefined : Number(value) }));
+  }, []);
 
   const handleSave = useCallback(async () => {
     setFieldErrors({});
@@ -226,6 +235,31 @@ export function HotelProfile() {
           label={t('label_alloggiati_auto_send')}
           supportingText={t('hint_alloggiati_auto_send')}
         />
+      </M3Card>
+
+      <M3Card className="p-6 space-y-4">
+        <div>
+          <h2 className="text-base font-semibold text-on-surface">{t('section_title_housekeeping')}</h2>
+          <p className="text-xs text-on-surface-variant mt-0.5">{t('hint_housekeeping')}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <M3TextField
+            label={t('label_timezone')}
+            value={form.timezone ?? ''}
+            placeholder={t('placeholder_timezone')}
+            onChange={handleChange('timezone')}
+          />
+          <M3TextField
+            label={t('label_housekeeping_cutoff_hour')}
+            value={form.housekeepingDayCutoffHour ?? ''}
+            onChange={handleCutoffHourChange}
+            type="number"
+            min={0}
+            max={12}
+            supportingText={t('hint_housekeeping_cutoff_hour')}
+          />
+        </div>
       </M3Card>
 
       <M3Card className="p-6 space-y-4">

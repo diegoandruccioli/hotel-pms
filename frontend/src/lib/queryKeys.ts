@@ -78,4 +78,8 @@ export const queryKeys = {
     list: (page: number, size: number) => ['reservation-groups', 'list', page, size] as const,
     detail: (id: string) => ['reservation-groups', 'detail', id] as const,
   },
+  housekeeping: {
+    businessDate: ['housekeeping', 'business-date'] as const,
+    worksheet: (date: string) => ['housekeeping', 'worksheet', date] as const,
+  },
 } as const;

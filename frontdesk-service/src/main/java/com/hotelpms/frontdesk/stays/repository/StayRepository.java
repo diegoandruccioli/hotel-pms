@@ -196,6 +196,22 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
     long countGuestsInHouseByHotelId(@Param("hotelId") UUID hotelId, @Param("status") StayStatus status);
 
     /**
+     * Finds every stay with the given status for a hotel, with its guests
+     * eagerly fetched in the same query. Backs the housekeeping worksheet
+     * (DEPARTURE/STAYOVER classification is date arithmetic done in {@code
+     * HousekeepingWorksheetServiceImpl} against {@link Stay#getExpectedCheckOutDate()},
+     * not a separate query per bucket) — {@code DISTINCT} avoids duplicate
+     * rows from the guests join, and the fetch avoids one lazy-load query per
+     * stay just to read {@code guests.size()} for the pax column.
+     *
+     * @param hotelId the hotel UUID
+     * @param status  the stay status to filter by (e.g. CHECKED_IN)
+     * @return matching stays, each with its guest list already loaded
+     */
+    @Query("SELECT DISTINCT s FROM Stay s LEFT JOIN FETCH s.guests WHERE s.hotelId = :hotelId AND s.status = :status")
+    List<Stay> findByHotelIdAndStatusWithGuests(@Param("hotelId") UUID hotelId, @Param("status") StayStatus status);
+
+    /**
      * Sums occupied room-nights per time bucket for a hotel, for the KPI
      * occupancy trend report (epic C4). Only {@code CHECKED_OUT} stays count,
      * attributed to the bucket their {@code actual_check_in_time} falls in —

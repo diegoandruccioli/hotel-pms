@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { getErrorMessage, cn } from '../utils';
 import { useRoomsList, useUpdateRoomStatus, useBulkUpdateRoomStatus } from '../hooks/queries';
 import { useDaySheet } from '../hooks/queries';
+import { HousekeepingWorksheetSection } from './Housekeeping/HousekeepingWorksheetSection';
 
 const STATUS_KEYS: Record<RoomStatus, string> = {
   CLEAN: 'room_status_clean',
@@ -230,6 +231,8 @@ export const Housekeeping = memo(() => {
           {t('refresh')}
         </M3Button>
       </div>
+
+      <HousekeepingWorksheetSection />
 
       <div className="grid grid-cols-3 gap-4">
         {ALL_STATUSES.map((status) => (

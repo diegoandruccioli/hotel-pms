@@ -105,7 +105,7 @@ class HotelSettingsServiceImplTest {
 
         final HotelSettingsResponse result = hotelSettingsService.update(
                 hotelId, new HotelSettingsRequest(true, null, null, null, null, null, null, null, null,
-                        null, null, null, null, null, null, null, null));
+                        null, null, null, null, null, null, null, null, null, null));
 
         assertNotNull(result);
         assertTrue(Objects.requireNonNull(result).alloggiatiAutoSend());
@@ -128,7 +128,7 @@ class HotelSettingsServiceImplTest {
 
         final HotelSettingsResponse result = hotelSettingsService.update(
                 hotelId, new HotelSettingsRequest(true, null, null, null, null, null, null, null, null,
-                        null, null, null, null, null, null, null, null));
+                        null, null, null, null, null, null, null, null, null, null));
 
         assertNotNull(result);
         assertTrue(result.alloggiatiAutoSend());
@@ -148,7 +148,7 @@ class HotelSettingsServiceImplTest {
 
         final HotelSettingsResponse result = hotelSettingsService.update(hotelId, new HotelSettingsRequest(
                 false, null, null, null, null, null, HOTEL_USERNAME, "plainPass", "plainKey",
-                null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null, null));
 
         assertEquals(HOTEL_USERNAME, existing.getAlloggiatiUsername());
         assertEquals(ENCRYPTED_PASSWORD, existing.getAlloggiatiPasswordEncrypted());
@@ -172,7 +172,7 @@ class HotelSettingsServiceImplTest {
         // UI (write-only), so the previously stored encrypted values must survive.
         final HotelSettingsResponse result = hotelSettingsService.update(hotelId, new HotelSettingsRequest(
                 false, "New Name", null, null, null, null, HOTEL_USERNAME, "", "",
-                null, null, null, null, null, null, null, null));
+                null, null, null, null, null, null, null, null, null, null));
 
         assertEquals(ENCRYPTED_PASSWORD, existing.getAlloggiatiPasswordEncrypted());
         assertEquals(ENCRYPTED_WS_KEY, existing.getAlloggiatiWsKeyEncrypted());
@@ -199,7 +199,7 @@ class HotelSettingsServiceImplTest {
         // toggles) is null/absent, mirroring a single-switch PUT from the frontend.
         final HotelSettingsResponse result = hotelSettingsService.update(
                 hotelId, new HotelSettingsRequest(true, null, null, null, null, null, null, null, null,
-                        null, null, null, null, null, null, null, null));
+                        null, null, null, null, null, null, null, null, null, null));
 
         assertTrue(result.alloggiatiAutoSend());
         assertEquals("Hotel Bella Vista", result.hotelName());
@@ -219,7 +219,8 @@ class HotelSettingsServiceImplTest {
 
         final HotelSettingsResponse result = hotelSettingsService.update(hotelId, new HotelSettingsRequest(
                 null, null, null, null, null, null, null, null, null,
-                false, false, "Oggetto custom", "Oggetto checkout custom", "A presto!", null, null, null));
+                false, false, "Oggetto custom", "Oggetto checkout custom", "A presto!", null, null, null,
+                null, null));
 
         assertFalse(result.sendReservationConfirmedEmail());
         assertFalse(result.sendCheckoutEmail());
@@ -243,7 +244,7 @@ class HotelSettingsServiceImplTest {
 
         final HotelSettingsResponse result = hotelSettingsService.update(hotelId, new HotelSettingsRequest(
                 null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, "00100", COMUNE_ROMA, PROVINCIA_RM));
+                null, null, null, null, null, "00100", COMUNE_ROMA, PROVINCIA_RM, null, null));
 
         assertEquals("00100", result.cap());
         assertEquals(COMUNE_ROMA, result.comune());
@@ -262,7 +263,7 @@ class HotelSettingsServiceImplTest {
 
         final HotelSettingsRequest request = new HotelSettingsRequest(
                 null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, "Cittainesistente", PROVINCIA_RM);
+                null, null, null, null, null, null, "Cittainesistente", PROVINCIA_RM, null, null);
 
         assertThrows(BadRequestException.class, () -> hotelSettingsService.update(hotelId, request));
         verify(hotelSettingsRepository, times(0)).save(ArgumentMatchers.any());
@@ -278,7 +279,7 @@ class HotelSettingsServiceImplTest {
 
         final HotelSettingsRequest request = new HotelSettingsRequest(
                 null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, COMUNE_ROMA, null);
+                null, null, null, null, null, null, COMUNE_ROMA, null, null, null);
 
         assertThrows(BadRequestException.class, () -> hotelSettingsService.update(hotelId, request));
     }
