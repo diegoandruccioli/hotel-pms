@@ -33,6 +33,17 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
     Page<Room> findAllByActiveTrueAndHotelId(UUID hotelId, Pageable pageable);
 
     /**
+     * Returns every active room for a hotel, unpaginated. Used to build a
+     * single {@code Map<UUID, Room>} for the housekeeping worksheet instead
+     * of one {@code findById} per stay/reservation line item — a hotel's
+     * total room count is always small enough to load in one query.
+     *
+     * @param hotelId the hotel UUID extracted from the authenticated user's JWT
+     * @return every active room for that hotel
+     */
+    List<Room> findAllByActiveTrueAndHotelId(UUID hotelId);
+
+    /**
      * Finds an active room by its UUID scoped to the given hotel.
      * Enforces multi-tenant isolation: a room from hotel A cannot be
      * accessed by a user authenticated to hotel B.

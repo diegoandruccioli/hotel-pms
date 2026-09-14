@@ -1,5 +1,7 @@
 package com.hotelpms.frontdesk.stays.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
@@ -44,6 +46,13 @@ import jakarta.validation.constraints.Size;
  *                                        data (optional; required only to export FatturaPA)
  * @param provincia                      Provincia — 2-letter province code, e.g. {@code "RM"}
  *                                        (optional; required only to export FatturaPA)
+ * @param timezone                       IANA timezone the hotel operates in, e.g.
+ *                                        {@code "Europe/Rome"} ({@code null} = unchanged);
+ *                                        validated against {@link java.time.ZoneId} in the
+ *                                        service layer, not by a regex here
+ * @param housekeepingDayCutoffHour      hour of the day (0-12, hotel-local) before which the
+ *                                        housekeeping worksheet's business date still resolves
+ *                                        to yesterday ({@code null} = unchanged)
  */
 public record HotelSettingsRequest(
         Boolean alloggiatiAutoSend,
@@ -63,10 +72,15 @@ public record HotelSettingsRequest(
         @Size(max = MAX_GREETING_LENGTH) String emailGreetingText,
         @Pattern(regexp = "^$|\\d{5}", message = "CAP must be 5 digits") String cap,
         @Size(max = 100) String comune,
-        @Pattern(regexp = "^$|[A-Za-z]{2}", message = "Provincia must be 2 letters") String provincia) {
+        @Pattern(regexp = "^$|[A-Za-z]{2}", message = "Provincia must be 2 letters") String provincia,
+        @Size(max = 64) String timezone,
+        @Min(0) @Max(MAX_HOUSEKEEPING_CUTOFF_HOUR) Integer housekeepingDayCutoffHour) {
 
     /** Maximum length accepted for the hotel logo URL — matches HotelSettings.LEN_LOGO_URL. */
     public static final int MAX_LOGO_URL_LENGTH = 500;
+
+    /** Upper bound accepted for {@code housekeepingDayCutoffHour} — matches HotelSettings' DB check constraint. */
+    public static final int MAX_HOUSEKEEPING_CUTOFF_HOUR = 12;
 
     /** Maximum length accepted for the Alloggiati Web password/WsKey fields. */
     public static final int MAX_CREDENTIAL_LENGTH = 200;

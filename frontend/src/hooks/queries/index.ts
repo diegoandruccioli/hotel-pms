@@ -2,6 +2,7 @@ export * from './useCommandPaletteSearch';
 export * from './useDashboard';
 export * from './useFb';
 export * from './useGuests';
+export * from './useHousekeeping';
 export * from './useInvoices';
 export * from './useKpiReport';
 export * from './useNightAudit';

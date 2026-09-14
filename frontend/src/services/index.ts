@@ -5,6 +5,7 @@ export * from './billingService';
 export * from './dashboardService';
 export * from './fbService';
 export * from './guestService';
+export * from './housekeepingService';
 export * from './inventoryService';
 export * from './kpiReportService';
 export * from './nightAuditService';

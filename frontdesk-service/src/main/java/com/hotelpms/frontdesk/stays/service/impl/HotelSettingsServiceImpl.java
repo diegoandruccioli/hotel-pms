@@ -15,7 +15,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DateTimeException;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -101,6 +103,12 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
             settings.setProvincia(provincia);
             settings.setComuneCodice(resolveComuneCodice(comune, provincia));
         }
+        if (request.timezone() != null) {
+            settings.setTimezone(validateTimezone(request.timezone()));
+        }
+        if (request.housekeepingDayCutoffHour() != null) {
+            settings.setHousekeepingDayCutoffHour(request.housekeepingDayCutoffHour().shortValue());
+        }
         return toResponse(hotelSettingsRepository.save(Objects.requireNonNull(settings)));
     }
 
@@ -147,6 +155,24 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
                 .orElseThrow(() -> new BadRequestException("COMUNE_NOT_FOUND_FOR_PROVINCIA"));
     }
 
+    /**
+     * Validates that {@code timezone} is a real IANA zone id — a bean-validation regex
+     * can't express that, so it's checked here the same way {@link #resolveComuneCodice}
+     * checks comune/provincia against reference data.
+     *
+     * @param timezone the requested IANA timezone id
+     * @return the same value, once confirmed valid
+     * @throws BadRequestException if it isn't a {@link ZoneId} the JVM recognizes
+     */
+    private String validateTimezone(final String timezone) {
+        try {
+            ZoneId.of(timezone);
+            return timezone;
+        } catch (final DateTimeException e) {
+            throw new BadRequestException("INVALID_TIMEZONE", e);
+        }
+    }
+
     private HotelSettings createDefault(final UUID hotelId) {
         return hotelSettingsRepository.save(Objects.requireNonNull(buildDefault(hotelId)));
     }
@@ -176,6 +202,8 @@ public class HotelSettingsServiceImpl implements HotelSettingsService {
                 entity.getCap(),
                 entity.getComune(),
                 entity.getProvincia(),
-                entity.getComuneCodice());
+                entity.getComuneCodice(),
+                entity.getTimezone(),
+                entity.getHousekeepingDayCutoffHour());
     }
 }

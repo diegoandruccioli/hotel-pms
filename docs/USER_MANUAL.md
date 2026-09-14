@@ -344,6 +344,29 @@ solo manualmente — non controlla TEST vs PRODUZIONE.
 3. Seleziona il nuovo status: **Pulita / Da Pulire / In Manutenzione**
 4. Il cambio è istantaneo
 
+### 3.9b Foglio Pulizie — Download PDF
+
+1. Menu → **Housekeeping** → sezione **Foglio Pulizie** in cima alla pagina
+2. Il campo data è precompilato con la **data operativa corrente** dell'hotel (non
+   necessariamente la data di calendario — vedi sotto), determinata dal fuso orario e
+   dall'ora di taglio configurati in **Profilo Hotel**
+3. Clicca **Scarica PDF** per ottenere il foglio: camere raggruppate per Partenze,
+   Occupate, Arrivi in preparazione, Da pulire, In manutenzione — senza nomi ospite
+4. Ogni foglio riporta un badge **Provvisorio** o **Definitivo**:
+   - **Provvisorio**: la chiusura notturna del giorno precedente non è ancora
+     completata — partenze, arrivi e proroghe potrebbero ancora cambiare
+   - **Definitivo**: la chiusura notturna è completata, il foglio non cambierà più
+5. Il foglio è scaricabile per **qualsiasi data**, anche con giorni di anticipo (utile
+   per prepararlo la sera prima) — cambiando la data si vede un avviso se differisce
+   dalla data operativa corrente
+
+**Data operativa e ora di taglio**: per evitare che il turno di notte stampi
+accidentalmente il foglio del giorno sbagliato (es. alle 2 di notte), l'hotel può
+impostare in **Profilo Hotel** un **fuso orario** e un'**ora di taglio** (default: le
+4 del mattino). Prima di quell'ora, la data operativa resta quella del giorno
+precedente. Esempio: con taglio alle 4:00, un accesso alle 02:00 propone ancora il
+foglio di ieri; alle 05:00 propone quello di oggi.
+
 ---
 
 ### 3.9a Calendario Tariffe
