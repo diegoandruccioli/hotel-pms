@@ -2,7 +2,7 @@
 # backups, replacing the old db-backup sidecar (pg_dumpall on a fixed 24h cadence).
 # archive_command runs as a subprocess of the Postgres engine itself, so pgBackRest
 # has to live in this image, not a satellite container — see backup/DECISIONS.md §3.5.
-FROM postgres:15-alpine
+FROM postgres:18-alpine
 
 # Patch Alpine OS packages on top of the upstream image (same pattern as the 8
 # Java service Dockerfiles): closes CVEs in packages the postgres:15-alpine base
