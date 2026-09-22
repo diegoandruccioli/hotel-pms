@@ -37,6 +37,23 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Read by docker/postgres/initdb/02-create-tenant-roles.sql and
+      # 03-create-monitoring-role.sql via psql's \getenv — those scripts run
+      # only once, on a genuinely empty $PGDATA (docker-entrypoint-initdb.d
+      # semantics). Without these here, a fresh volume never gets the
+      # per-service roles created and every service crash-loops on Flyway/
+      # Hikari "password authentication failed". Same variables already
+      # passed to every application service below (e.g. SPRING_DATASOURCE_
+      # PASSWORD) — this just also wires them to the one container that
+      # needs them to bootstrap those roles in the first place. See
+      # docs/OPERATIONS_RUNBOOK.md for the one-time manual replay needed on
+      # a volume that already existed before this was added.
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      GUEST_DB_PASSWORD: ${GUEST_DB_PASSWORD}
+      FRONTDESK_DB_PASSWORD: ${FRONTDESK_DB_PASSWORD}
+      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD}
+      FB_DB_PASSWORD: ${FB_DB_PASSWORD}
+      POSTGRES_EXPORTER_PASSWORD: ${POSTGRES_EXPORTER_PASSWORD}
       # Continuous WAL archiving + scheduled full/incremental backups via
       # pgBackRest — replaces the old db-backup sidecar (pg_dumpall on a
       # fixed 24h cadence). RPO is now measured in minutes
@@ -291,7 +308,15 @@ services:
     restart: unless-stopped
     profiles: ["observability"]
     volumes:
-      - /:/host:ro,rslave
+      # Plain :ro, no propagation flag — `rslave` fails identically on
+      # Docker Desktop's internal VM and on WSL2/Ubuntu ("path / is mounted
+      # on / but it is not a shared or slave mount", neither marks / as a
+      # shared/slave mount by default). Filesystems already mounted at
+      # container start (i.e. everything, on this single-PC deployment) are
+      # still visible for DiskSpaceLow (alert_rules.yml) — only propagation
+      # of filesystems mounted on the host *after* the container starts is
+      # lost, not relevant here.
+      - /:/host:ro
       - pgbackrest_metrics:/var/lib/node_exporter/textfile_collector:ro
     command:
       - "--path.rootfs=/host"

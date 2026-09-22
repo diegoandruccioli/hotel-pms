@@ -103,7 +103,9 @@ if ($envContent -notmatch '(?m)^CONFIG_SERVER_PASSWORD=') {
 # monitoring password if not already present (idempotent) — one
 # least-privilege role per service database, see
 # docker/postgres/initdb/02-create-tenant-roles.sql and 03-create-monitoring-role.sql.
-foreach ($dbVar in @("AUTH_DB_PASSWORD", "GUEST_DB_PASSWORD", "FRONTDESK_DB_PASSWORD", "BILLING_DB_PASSWORD", "FB_DB_PASSWORD", "POSTGRES_EXPORTER_PASSWORD")) {
+# REDIS_PASSWORD is in the same loop — docker-compose.yml's redis command
+# (`--requirepass ${REDIS_PASSWORD}`) needs it too, same idempotent handling.
+foreach ($dbVar in @("AUTH_DB_PASSWORD", "GUEST_DB_PASSWORD", "FRONTDESK_DB_PASSWORD", "BILLING_DB_PASSWORD", "FB_DB_PASSWORD", "POSTGRES_EXPORTER_PASSWORD", "REDIS_PASSWORD")) {
     $envContent = Get-Content $ENV_FILE -Raw -Encoding UTF8
     if ($envContent -notmatch "(?m)^$dbVar=") {
         Add-Content -Path $ENV_FILE -Value "$dbVar=$(New-RandomHex 24)" -Encoding UTF8
