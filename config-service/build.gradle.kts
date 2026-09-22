@@ -55,8 +55,9 @@ dependencyManagement {
         // in Spring 6.1); dependencyManagement.dependencies forces the version regardless of BOM properties.
         dependency("commons-fileupload:commons-fileupload:1.6.0")
         dependency("commons-io:commons-io:2.14.0")
-        // CVE-2026-5598: fixed in BouncyCastle 1.84.
-        dependency("org.bouncycastle:bcprov-jdk18on:1.84")
+        // CVE-2026-5598: fixed in BouncyCastle 1.84. CVE-2026-8763 (name
+        // constraints bypass via trailing dot, CRITICAL): fixed in 1.85.
+        dependency("org.bouncycastle:bcprov-jdk18on:1.85")
         // CVE-2026-40981 (GCP Secrets Manager backend info disclosure, not used here, defense
         // in depth) + CVE-2026-40982 CRITICAL (path traversal serving arbitrary files via crafted
         // URL): Spring Cloud 2025.0.0 BOM pins spring-cloud-config-server 4.3.0, vulnerable through

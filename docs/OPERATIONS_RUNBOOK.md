@@ -489,6 +489,14 @@ girano solo al primo init di un volume Postgres vuoto (semantica
 continua a connettersi come superuser `postgres` finché non si applicano i due file a
 mano, una volta sola:
 
+> **Nota**: da quando `docker-compose.yml` passa le password dei 5 database +
+> `POSTGRES_EXPORTER_PASSWORD` nell'ambiente del container `postgres` (necessarie a
+> `\getenv` nei due script sopra), un volume `postgres_data` **nuovo** (mai esistito prima)
+> si auto-inizializza da solo al primo `docker compose up` — non serve più applicare nulla a
+> mano. La procedura sotto resta necessaria **solo** per un volume già esistente, creato
+> prima di questa modifica: `docker-entrypoint-initdb.d` non rigira su un `$PGDATA` già
+> popolato (semantica standard dell'immagine Postgres, non specifica di questo progetto).
+
 ```bash
 # 1. Aggiungere le 6 nuove password a .env (vedi .env.example) — o rigenerarle con:
 #    ./setup-hmac-secret.sh   (Linux/macOS)  oppure  .\setup-hmac-secret.ps1  (Windows)
