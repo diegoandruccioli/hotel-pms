@@ -103,8 +103,9 @@ dependencyManagement {
         dependency("commons-io:commons-io:2.16.1")
         // CVE-2026-42198: fixed in PostgreSQL JDBC 42.7.11; CVE-2026-54291 (SCRAM-SHA-256-PLUS channel-binding downgrade): fixed in 42.7.12.
         dependency("org.postgresql:postgresql:42.7.12")
-        // CVE-2026-5598: fixed in BouncyCastle 1.84.
-        dependency("org.bouncycastle:bcprov-jdk18on:1.84")
+        // CVE-2026-5598: fixed in BouncyCastle 1.84. CVE-2026-8763 (name
+        // constraints bypass via trailing dot, CRITICAL): fixed in 1.85.
+        dependency("org.bouncycastle:bcprov-jdk18on:1.85")
     }
 }
 

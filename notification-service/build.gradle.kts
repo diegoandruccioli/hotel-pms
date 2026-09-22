@@ -88,8 +88,9 @@ dependencyManagement {
     dependencies {
         dependency("commons-fileupload:commons-fileupload:1.6.0")
         dependency("commons-io:commons-io:2.16.1")
-        // CVE-2026-5598: fixed in BouncyCastle 1.84
-        dependency("org.bouncycastle:bcprov-jdk18on:1.84")
+        // CVE-2026-5598: fixed in BouncyCastle 1.84. CVE-2026-8763 (name
+        // constraints bypass via trailing dot, CRITICAL): fixed in 1.85.
+        dependency("org.bouncycastle:bcprov-jdk18on:1.85")
     }
 }
 

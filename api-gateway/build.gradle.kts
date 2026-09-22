@@ -61,8 +61,9 @@ dependencyManagement {
     dependencies {
         // CVE-2025-41253: EL injection fixed in spring-cloud-gateway-server 4.3.2.
         dependency("org.springframework.cloud:spring-cloud-gateway-server:4.3.2")
-        // CVE-2026-5598: fixed in BouncyCastle 1.84.
-        dependency("org.bouncycastle:bcprov-jdk18on:1.84")
+        // CVE-2026-5598: fixed in BouncyCastle 1.84. CVE-2026-8763 (name
+        // constraints bypass via trailing dot, CRITICAL): fixed in 1.85.
+        dependency("org.bouncycastle:bcprov-jdk18on:1.85")
     }
 }
 
