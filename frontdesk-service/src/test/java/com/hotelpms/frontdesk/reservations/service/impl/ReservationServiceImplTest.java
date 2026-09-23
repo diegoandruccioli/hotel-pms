@@ -800,6 +800,22 @@ class ReservationServiceImplTest {
     }
 
     @Test
+    void syncLineItemRoomForCheckedInStayTranslatesResidualOverlapIntoConflict() {
+        final UUID newRoomId = Objects.requireNonNull(UUID.randomUUID());
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(roomService.getRoomById(newRoomId, HOTEL_ID)).thenReturn(activeRoom(newRoomId));
+        when(ratePricingService.resolveStayRates(
+                ROOM_TYPE_ID, HOTEL_ID, entity.getCheckInDate(), entity.getCheckOutDate()))
+                .thenReturn(List.of(new NightlyRate(entity.getCheckInDate(), PRICE_120, null)));
+        when(reservationRepository.saveAndFlush(entity)).thenThrow(exclusionViolation());
+
+        final ConflictException ex = assertThrows(ConflictException.class,
+                () -> reservationService.syncLineItemRoomForCheckedInStay(reservationId, roomId, newRoomId, HOTEL_ID),
+                "A room double-booked by someone else concurrently must surface a 409, not a raw 500");
+        assertEquals(ROOM_UNAVAILABLE_DATES_MSG, ex.getMessage());
+    }
+
+    @Test
     void reservedRoomChargeIsTheSnapshottedPriceAndReservationNightsForTheMatchingRoom() {
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
 
