@@ -5625,6 +5625,23 @@ dev/test dal nuovo check.
 
 \paragraph{Riferimento} Commit: \commitref{991436f5}{fix(security): fail-closed startup check for PII encryption keys}
 
+\paragraph{Follow-up --- generazione delle chiavi nel bootstrap segreti}
+Il solo fail-closed lasciava un'installazione fresca senza un modo ovvio
+per generare le 6 chiavi, oltre a leggere \texttt{.env.example} a mano.
+\texttt{setup-hmac-secret.ps1}/\texttt{.sh} --- il bootstrap segreti
+idempotente già eseguito da ogni installazione per
+\texttt{INTERNAL\_HMAC\_SECRET}/\texttt{JWT\_SECRET}/le 7 password
+DB/Redis --- sono stati estesi con lo stesso pattern per le 3 coppie
+chiave/salt (chiave: segreto casuale in base64, equivalente a
+\texttt{openssl rand -base64 32}; salt: byte casuali in hex, equivalente
+a \texttt{openssl rand -hex 16} --- \texttt{Encryptors.delux} richiede il
+salt in hex, a differenza della chiave). Verificato in una directory
+scratch isolata, non sull'installazione tracciata di questa macchina:
+entrambi gli script generano le 6 variabili con il formato corretto e
+sono idempotenti a una seconda esecuzione.
+
+\paragraph{Riferimento} Commit: \commitref{8b9727bf}{fix(security): generate the 6 PII encryption keys in the secrets bootstrap}
+
 % ─────────────────────────────────────────────────────────────────────────────
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Analisi SAST con CodeQL e Supply Chain Security \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
