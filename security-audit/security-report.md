@@ -1,5 +1,15 @@
 # Security Report — hotel-pms
 
+> **STATO: STORICO.** Audit del 2026-09-02. I 2 CRITICAL (#1 self-registration,
+> #2 `Stay.status` client-controllato) e tutti e 4 gli HIGH (#3 rate-limiter
+> X-Forwarded-For, #4 lockout username-only, #5 doppia prenotazione TOCTOU,
+> #6 race conversione preventivo) sono **risolti** in `main` — verificato
+> con lettura diretta del codice attuale, non solo dai commit citati qui.
+> Per lo stato corrente delle mitigazioni vedi `THREAT_MODEL.md` (T-AUTH-11,
+> T-STAY-07, T-GW-10/GAP-17, T-AUTH-12, T-RES-01 residuo, T-QUOT-01).
+> Conservato come riferimento storico del processo di audit, non come stato
+> attuale del progetto.
+
 Consolidamento di 13 controlli di sicurezza (1 ricognizione + 10 audit paralleli read-only
 + 1 scansione dipendenze Trivy + 1 DAST OWASP ZAP contro lo stack live), eseguiti in
 questa sessione. Nessun file di codice sorgente è stato modificato per produrre questo
