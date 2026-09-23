@@ -115,6 +115,33 @@ foreach ($dbVar in @("AUTH_DB_PASSWORD", "GUEST_DB_PASSWORD", "FRONTDESK_DB_PASS
     }
 }
 
+# Append the 3 PII/credential encryption key+salt pairs if not already present
+# (idempotent) — guest-service/frontdesk-service document numbers (GDPR Art.
+# 32) and per-hotel Alloggiati Web credentials. Without these, docker-compose.yml
+# falls back to a placeholder committed in this repository (GAP-29,
+# EncryptionKeyStartupCheck now refuses to start on that placeholder in a real
+# deployment — this loop is what stops that from ever happening on a fresh install).
+foreach ($keyVar in @("GUEST_DOCUMENTS_ENCRYPTION_KEY", "FRONTDESK_DOCUMENTS_ENCRYPTION_KEY", "ALLOGGIATI_CREDENTIALS_ENCRYPTION_KEY")) {
+    $envContent = Get-Content $ENV_FILE -Raw -Encoding UTF8
+    if ($envContent -notmatch "(?m)^$keyVar=") {
+        Add-Content -Path $ENV_FILE -Value "$keyVar=$(New-RandomBase64 32)" -Encoding UTF8
+        Write-Ok "$keyVar added to .env."
+    } else {
+        Write-Skip "$keyVar already in .env - skipping."
+    }
+}
+foreach ($saltVar in @("GUEST_DOCUMENTS_ENCRYPTION_SALT", "FRONTDESK_DOCUMENTS_ENCRYPTION_SALT", "ALLOGGIATI_CREDENTIALS_ENCRYPTION_SALT")) {
+    $envContent = Get-Content $ENV_FILE -Raw -Encoding UTF8
+    if ($envContent -notmatch "(?m)^$saltVar=") {
+        # MUST be hex-encoded — Encryptors.delux (Spring Security Crypto) parses
+        # the salt as hex, unlike the key which is an arbitrary secret string.
+        Add-Content -Path $ENV_FILE -Value "$saltVar=$(New-RandomHex 16)" -Encoding UTF8
+        Write-Ok "$saltVar added to .env."
+    } else {
+        Write-Skip "$saltVar already in .env - skipping."
+    }
+}
+
 # ── Step 2: Ensure .env is in .gitignore ──────────────────────────────────────
 Write-Step "Step 2 - .gitignore"
 

@@ -100,6 +100,31 @@ for VAR in AUTH_DB_PASSWORD GUEST_DB_PASSWORD FRONTDESK_DB_PASSWORD BILLING_DB_P
     fi
 done
 
+# Append the 3 PII/credential encryption key+salt pairs if not already present
+# (idempotent) — guest-service/frontdesk-service document numbers (GDPR Art.
+# 32) and per-hotel Alloggiati Web credentials. Without these, docker-compose.yml
+# falls back to a placeholder committed in this repository (GAP-29,
+# EncryptionKeyStartupCheck now refuses to start on that placeholder in a real
+# deployment — this loop is what stops that from ever happening on a fresh install).
+for VAR in GUEST_DOCUMENTS_ENCRYPTION_KEY FRONTDESK_DOCUMENTS_ENCRYPTION_KEY ALLOGGIATI_CREDENTIALS_ENCRYPTION_KEY; do
+    if ! grep -q "^${VAR}=" "$ENV_FILE"; then
+        printf "%s=%s\n" "$VAR" "$(_gen_b64 32)" >> "$ENV_FILE"
+        ok "$VAR added to .env."
+    else
+        skip "$VAR already in .env – skipping."
+    fi
+done
+# MUST be hex-encoded — Encryptors.delux (Spring Security Crypto) parses the
+# salt as hex, unlike the key above which is an arbitrary secret string.
+for VAR in GUEST_DOCUMENTS_ENCRYPTION_SALT FRONTDESK_DOCUMENTS_ENCRYPTION_SALT ALLOGGIATI_CREDENTIALS_ENCRYPTION_SALT; do
+    if ! grep -q "^${VAR}=" "$ENV_FILE"; then
+        printf "%s=%s\n" "$VAR" "$(_gen_hex 16)" >> "$ENV_FILE"
+        ok "$VAR added to .env."
+    else
+        skip "$VAR already in .env – skipping."
+    fi
+done
+
 # ── Step 2: Ensure .env is in .gitignore ──────────────────────────────────────
 step "Step 2 – .gitignore"
 
