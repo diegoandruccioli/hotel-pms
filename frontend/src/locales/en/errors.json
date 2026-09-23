@@ -43,6 +43,7 @@
   "INVOICE_ALREADY_EXISTS_FOR_STAY": "An invoice already exists for this stay.",
   "INVOICE_NOT_FOUND_FOR_STAY": "No invoice was found for this stay.",
   "INVOICE_NOT_OPEN": "This action requires an invoice that is still open.",
+  "CHARGE_NOT_FOUND": "This charge no longer exists on the invoice.",
   "INVOICE_CANCELLED": "This invoice has been cancelled.",
   "INVOICE_LOCKED_AFTER_EXPORT": "This invoice has been exported for electronic invoicing and can no longer be modified.",
   "CANNOT_UPDATE_CANCELLED_INVOICE": "A cancelled invoice cannot be modified.",

@@ -1,6 +1,8 @@
 import api from './api';
 import type {
   BillingDocumentType as DocumentType,
+  ChargeRequest,
+  ChargeResponse,
   InvoiceResponse,
   InvoiceSearchResult,
   InvoiceStatus,
@@ -22,6 +24,18 @@ export const billingService = {
   processPayment: async (invoiceId: string, data: PaymentRequest): Promise<PaymentResponse> => {
     const response = await api.post<PaymentResponse>(`${BASE_PATH}/${invoiceId}/payments`, data);
     return response.data;
+  },
+
+  /** Adds a manual charge (e.g. minibar, laundry, parking, late check-out) to the
+   * stay's open invoice. Backend derives VAT/Natura server-side. */
+  addCharge: async (stayId: string, data: ChargeRequest): Promise<ChargeResponse> => {
+    const response = await api.post<ChargeResponse>(`${BASE_PATH}/stay/${stayId}/charges`, data);
+    return response.data;
+  },
+
+  /** Removes a previously added manual charge from the stay's invoice. */
+  removeCharge: async (stayId: string, chargeId: string): Promise<void> => {
+    await api.delete(`${BASE_PATH}/stay/${stayId}/charges/${chargeId}`);
   },
 
   searchInvoices: async (params: {
