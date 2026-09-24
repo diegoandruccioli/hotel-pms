@@ -5643,6 +5643,95 @@ sono idempotenti a una seconda esecuzione.
 \paragraph{Riferimento} Commit: \commitref{8b9727bf}{fix(security): generate the 6 PII encryption keys in the secrets bootstrap}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Segreti SMTP scrivibili solo in un file tracciato in git \threat{GAP-30}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante la pianificazione del punto 2 della checklist go-live
+(configurazione di un relay SMTP reale per gli alert operativi), prima
+di scrivere qualunque credenziale. \texttt{docker/alertmanager/alertmanager.yml}
+era tracciato in git --- a differenza di \texttt{.env} --- con un commento
+che invitava esplicitamente a scriverci \texttt{smarthost}/\texttt{from}/
+\texttt{to}/\texttt{auth\_username}/\texttt{auth\_password} reali
+\emph{"BEFORE GO-LIVE"}: Alertmanager non supporta l'espansione
+\texttt{\$\{VAR\}}, quindi l'unico modo suggerito dal commento stesso era
+il valore letterale nel file. Configurare un relay reale avrebbe
+committato le credenziali SMTP nella storia del repository. Classificato
+OWASP A02 --- Cryptographic Failures, stesso trattamento già dato a
+\threat{T-CFG-02} per lo stesso tipo di problema (segreto scrivibile solo
+in chiaro in un file di configurazione).
+
+\begin{insecurebox}[title={docker/alertmanager/alertmanager.yml --- commento che invita al leak (baseline)}]
+\begin{lstlisting}[style=yaml]
+# INSICURO: nessuna espansione ${VAR} in questa versione di Alertmanager --
+# l'unico modo per configurare un relay reale è scrivere il valore qui,
+# in un file TRACCIATO IN GIT (a differenza di .env)
+# ... BEFORE GO-LIVE, replace smarthost/from/to/auth_username/auth_password
+# with the hotel's real SMTP relay ...
+  - name: 'email-ops'
+    email_configs:
+      - smarthost: 'mailpit:1025'
+        from: 'alerts@hotelpms.local'
+        to: 'ops@hotelpms.local'
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Il file tracciato è stato rinominato \texttt{alertmanager.yml.template}:
+resta in git ma con placeholder letterali (\texttt{\$\{SMTP\_HOST\}} ecc.),
+mai un valore reale. Un nuovo \texttt{docker/alertmanager/entrypoint.sh}
+(tracciato, nessun segreto) sostituisce quei placeholder via \texttt{sed}
+--- verificato che l'immagine \texttt{prom/alertmanager:v0.27.0} ha
+\texttt{sed} ma non \texttt{envsubst} --- scrivendo il risultato in
+\texttt{/alertmanager/alertmanager.generated.yml}, dentro il volume Docker
+\emph{named} (\texttt{alertmanager\_data}), mai sul filesystem host, mai
+raggiungibile da git. Le variabili lette sono le stesse già usate da
+\texttt{notification-service} (\texttt{SMTP\_HOST/PORT/USERNAME/PASSWORD/
+STARTTLS} --- stesso relay, nessuna duplicazione) più due nuove dedicate
+agli alert (\texttt{ALERT\_EMAIL\_FROM}/\texttt{ALERT\_EMAIL\_TO}, identità
+mittente/destinatario separata da quella guest-facing). Ogni valore passa
+per una funzione di escaping (\texttt{\textbackslash}, \texttt{|}, \texttt{\&}) prima della
+sostituzione, per evitare che un carattere speciale in una password reale
+corrompa il comando \texttt{sed} o la YAML risultante.
+
+\begin{securebox}[title={docker/alertmanager/entrypoint.sh --- escaping e sostituzione (fix)}]
+\begin{lstlisting}[style=bash]
+# SICURO: ogni valore passa per l'escaping prima di finire nel comando sed,
+# e il file finale non tocca mai il filesystem host o git
+escape_for_sed() {
+    printf '%s' "$1" | sed -e 's/[\\|&]/\\&/g'
+}
+sed \
+    -e "s|\${SMTP_HOST}|${SMTP_HOST_ESC}|g" \
+    -e "s|\${SMTP_PASSWORD}|${SMTP_PASSWORD_ESC}|g" \
+    -e "s|\${ALERT_EMAIL_TO}|${ALERT_EMAIL_TO_ESC}|g" \
+    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+
+exec /bin/alertmanager "--config.file=${OUTPUT_FILE}" "--storage.path=/alertmanager"
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Compatibilità e non-regressione}
+Ogni variabile ha un default identico al valore hardcoded precedente
+(\texttt{mailpit:1025}, nessuna auth, nessun TLS, \texttt{alerts@hotelpms.local}
+--- \texttt{ops@hotelpms.local}) --- un'installazione senza alcuna
+configurazione aggiuntiva in \texttt{.env} continua a comportarsi
+esattamente come prima. Nessuna regressione per gli ambienti dev/CI
+esistenti.
+
+\paragraph{Verifica dal vivo}
+Container ricreato con la configurazione di default: log identico al
+comportamento pre-fix, Alertmanager carica correttamente
+\texttt{alertmanager.generated.yml}. Ripetuto con credenziali fittizie
+contenenti tutti e tre i caratteri da escapare
+(\texttt{test\&user|name} / \texttt{p@ss|with\&special\textbackslash chars}):
+il file generato risulta YAML valida, Alertmanager lo carica senza errori
+(\texttt{"Completed loading of configuration file"}), verificato leggendo
+il contenuto generato direttamente dentro il container.
+
+\paragraph{Riferimento} Commit: --- (non ancora committato al momento della scrittura di questo frammento; aggiornare con l'hash reale)
+
+% ─────────────────────────────────────────────────────────────────────────────
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Analisi SAST con CodeQL e Supply Chain Security \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
 % ═════════════════════════════════════════════════════════════════════════════
