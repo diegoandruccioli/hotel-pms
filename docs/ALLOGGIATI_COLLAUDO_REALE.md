@@ -1,9 +1,11 @@
 # Piano di Collaudo Reale — Integrazione Alloggiati Web (Polizia di Stato)
 
-**Versione:** 2.0  
+**Versione:** 2.1  
 **Classificazione:** Operativo — uso interno pre-pilot  
 **Autore:** Team Hotel PMS  
-**Ultima revisione:** 2026-05-06  
+**Ultima revisione:** 2026-09-24 (corretti riferimenti stale pre-consolidamento
+ADR-001: DB `hotel_stay` → `hotel_frontdesk`, container `postgres` →
+`hotel_postgres`; nessuna modifica alla logica di collaudo)  
 **Validità:** fino al completamento del pilot con albergatori reali
 
 > **Avvertenza:** Questo documento descrive procedure che interagiscono con il portale ufficiale della Polizia di Stato (`alloggiatiweb.poliziadistato.it`). Ogni invio in modalità `Send` (non `Test`) produce una comunicazione ufficiale ai sensi del TULPS. Non eseguire mai un invio reale con dati fittizi su credenziali di produzione.
@@ -67,8 +69,8 @@ Il collaudo è **obbligatorio** prima del pilot perché un errore silenzioso nel
 | Docker Engine ≥ 24 + Compose v2 attivi | `docker info` e `docker compose version` |
 | Stack avviato e tutti i container healthy | `docker compose ps` — tutti `(healthy)` o `Up` |
 | Rete internet dal container `frontdesk-service` raggiungibile | `docker exec frontdesk-service curl -s -o /dev/null -w "%{http_code}" https://alloggiatiweb.poliziadistato.it` → `200` o `302` |
-| PostgreSQL `hotel_stay` DB attivo e migrazioni V1-V8 applicate | `docker exec postgres psql -U postgres -d hotel_stay -c "SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1;"` → `8` |
-| Lookup tables popolate | `docker exec postgres psql -U postgres -d hotel_stay -c "SELECT COUNT(*) FROM alloggiati_comuni;"` → ≥ 7800 |
+| PostgreSQL `hotel_frontdesk` DB attivo e tutte le migrazioni applicate (nessun `success=false`) | `docker exec hotel_postgres psql -U postgres -d hotel_frontdesk -c "SELECT version, success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1;"` → ultima versione presente in `frontdesk-service/src/main/resources/db/migration/`, `success=t` |
+| Lookup tables popolate | `docker exec hotel_postgres psql -U postgres -d hotel_frontdesk -c "SELECT COUNT(*) FROM alloggiati_comuni;"` → ≥ 7800 |
 
 ### 3.2 Variabili di configurazione
 
@@ -133,7 +135,7 @@ Preparare nel sistema almeno **tre ospiti di test** con i seguenti profili, usan
 
 ### 3.6 Backup e sicurezza
 
-- Eseguire `docker exec postgres pg_dump -U postgres hotel_stay > backup-pre-collaudo.sql` prima di ogni sessione di collaudo reale
+- Eseguire `docker exec hotel_postgres pg_dump -U postgres hotel_frontdesk > backup-pre-collaudo.sql` prima di ogni sessione di collaudo reale
 - Avere accesso SSH al server di produzione per interventi di emergenza
 - Il collaudo deve essere pianificato in orari non operativi se si usa il database di produzione
 
@@ -220,12 +222,12 @@ Il collaudo è **APPROVATO** se:
 
 **0.1** Generare un backup completo del database:
 ```bash
-docker exec postgres pg_dump -U postgres hotel_stay > "backup-pre-collaudo-$(date +%Y%m%d).sql"
+docker exec hotel_postgres pg_dump -U postgres hotel_frontdesk > "backup-pre-collaudo-$(date +%Y%m%d).sql"
 ```
 
 **0.2** Verificare che le lookup tables siano aggiornate scaricando i CSV attuali dal portale PS e confrontando i conteggi con quelli in DB:
 ```bash
-docker exec postgres psql -U postgres -d hotel_stay -c \
+docker exec hotel_postgres psql -U postgres -d hotel_frontdesk -c \
   "SELECT 'comuni' AS tab, COUNT(*) FROM alloggiati_comuni
    UNION ALL SELECT 'stati', COUNT(*) FROM alloggiati_stati
    UNION ALL SELECT 'tipdoc', COUNT(*) FROM alloggiati_tipdoc;"
@@ -376,7 +378,7 @@ ALLOGGIATI_SENT | stayId=<uuid> | date=YYYY-MM-DD
 
 **4.1** Creare un backup del DB appena prima dell'invio reale:
 ```bash
-docker exec postgres pg_dump -U postgres hotel_stay > "backup-pre-send-$(date +%Y%m%d-%H%M).sql"
+docker exec hotel_postgres pg_dump -U postgres hotel_frontdesk > "backup-pre-send-$(date +%Y%m%d-%H%M).sql"
 ```
 
 **4.2** Cambiare `ALLOGGIATI_DRY_RUN=false` nel `.env` e riavviare solo lo frontdesk-service:
@@ -496,7 +498,7 @@ cat -A /tmp/alloggiati-test.txt | head -5
 
 **Passo 3 — Verificare i codici lookup:**
 ```bash
-docker exec postgres psql -U postgres -d hotel_stay -c "
+docker exec hotel_postgres psql -U postgres -d hotel_frontdesk -c "
   SELECT codice, descrizione FROM alloggiati_comuni WHERE codice = '058091000';
   SELECT codice, descrizione FROM alloggiati_stati WHERE codice = '100000100';
   SELECT codice, descrizione FROM alloggiati_tipdoc WHERE codice = 'PASOR';
@@ -524,7 +526,7 @@ Se il collaudo ha prodotto dati sporchi nel DB che devono essere rimossi:
 ```bash
 # SOLO se necessario e in ambiente di test
 # Rimuovere soggiorni di test per data specifica (NON in produzione)
-docker exec postgres psql -U postgres -d hotel_stay -c "
+docker exec hotel_postgres psql -U postgres -d hotel_frontdesk -c "
   DELETE FROM stays WHERE hotel_id = '<hotel_id_test>' AND created_at::date = '$(date +%Y-%m-%d)';
 "
 # Verificare backup disponibile prima di eseguire qualsiasi DELETE
