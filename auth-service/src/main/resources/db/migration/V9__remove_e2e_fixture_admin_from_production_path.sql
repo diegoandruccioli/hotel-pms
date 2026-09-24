@@ -1,0 +1,32 @@
+-- ============================================================
+-- Flyway migration: V9__remove_e2e_fixture_admin_from_production_path.sql
+-- Service       : auth-service
+-- Purpose       : Removes the row created by
+--                 V7__seed_second_hotel_admin_for_e2e_tests.sql.
+--
+--                 V7 was meant only for the local live E2E suite
+--                 (frontend/e2e-live/idor-cross-tenant-live.spec.ts) but,
+--                 being a plain Flyway migration, ran unconditionally on
+--                 EVERY installation — including a real hotel's — creating
+--                 an active ADMIN account with a publicly known password
+--                 ("password", must_change_password=false) that this
+--                 migration's own comment documented in plain text.
+--
+--                 Flyway migrations are immutable once applied (checksum),
+--                 so V7 itself is left as historical record — this
+--                 migration undoes its effect instead. The fixture is now
+--                 seeded on demand by E2eFixtureSeeder
+--                 (auth-service/.../config/E2eFixtureSeeder.java), an
+--                 ApplicationRunner gated behind AUTH_SEED_E2E_FIXTURES=true
+--                 (default false everywhere, never set in
+--                 docker-compose.yml/docker-compose.prod.yml) — a developer
+--                 who wants to run the live E2E suite opts in explicitly on
+--                 their own local stack.
+--
+--                 Safe/idempotent on a fresh volume where V7 never ran, and
+--                 removes it retroactively from any dev/CI volume that did.
+--                 (feature/secure-coding-hardening)
+-- ============================================================
+
+DELETE FROM user_account
+ WHERE username = 'e2e-live-other-hotel-admin';
