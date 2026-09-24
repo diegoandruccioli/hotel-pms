@@ -5202,6 +5202,103 @@ internal:
 \paragraph{Riferimento} Commit: \commitref{6dc6ea4}{fix(security): T-CFG-02 --- rimuovi fallback JWT\_SECRET hardcoded da api-gateway JwtUtil}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Account ADMIN fixture con password nota spedito su ogni installazione \threat{T-AUTH-17}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante un audit di pilot-readiness (valutazione se il sistema
+fosse pronto per il primo hotel pilota reale, non un pentest dedicato).
+\texttt{V7\_\_seed\_second\_hotel\_admin\_for\_e2e\_tests.sql} era una
+migration Flyway \emph{permanente}: girava incondizionatamente su
+qualunque installazione che eseguisse le migration del servizio, incluso
+un hotel reale in produzione, non solo l'ambiente di test in cui era
+pensata per vivere. Creava un account \texttt{e2e-live-other-hotel-admin},
+ruolo \texttt{ADMIN}, password nota (\texttt{"password"}, stesso hash
+bcrypt del seed admin di default), \texttt{must\_change\_password=FALSE},
+su un secondo tenant fittizio --- pensata solo come fixture per la suite
+E2E live locale (\texttt{frontend/e2e-live/idor-cross-tenant-live.spec.ts}),
+ma senza alcun gate di profilo/ambiente. Chiunque leggesse il codice
+sorgente pubblico del repository otteneva le credenziali complete di un
+account ADMIN funzionante su qualunque installazione reale. Classificato
+OWASP A05 --- Security Misconfiguration (un default/credenziale nota
+spedita per errore, non un bypass di un controllo di accesso esistente).
+
+\begin{insecurebox}[title={V7\_\_seed\_second\_hotel\_admin\_for\_e2e\_tests.sql --- migration permanente (baseline)}]
+\begin{lstlisting}[style=sql]
+-- INSICURO: nessun gate di profilo/ambiente -- questa riga viene inserita
+-- su OGNI installazione che applica le migration Flyway di auth-service
+INSERT INTO user_account (
+    id, username, password_hash, email, role, hotel_id,
+    active, must_change_password, created_at, updated_at
+) VALUES (
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'e2e-live-other-hotel-admin',
+    '{bcrypt}$2a$10$8aXe/PIDoC/tOecWVAMxsu57InT1n4F4Uq2ObRGB4W8DhGowDrbMi',
+    'e2e-live-other-hotel-admin@hotel-pms.local',
+    'ADMIN', '99999999-9999-9999-9999-999999999999',
+    TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+) ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Flyway tratta le migration come immutabili una volta applicate (checksum
+sul contenuto del file), quindi \texttt{V7} non è stata modificata --- è
+stata annullata. Una nuova migration \texttt{V9} rimuove retroattivamente
+la riga (\texttt{DELETE FROM user\_account WHERE username = ...}),
+idempotente sui volumi dove \texttt{V7} non è mai girata. Il seed è ora
+on-demand, mai parte del path Flyway: un nuovo \texttt{ApplicationRunner}
+(\texttt{E2eFixtureSeeder}) annotato \texttt{@ConditionalOnProperty} lo
+esegue solo se \texttt{auth.seed-e2e-fixtures=true}, valore risolto da
+\texttt{AUTH\_SEED\_E2E\_FIXTURES}, mai settata né in
+\texttt{docker-compose.yml} né in \texttt{docker-compose.prod.yml}. Un
+developer che vuole eseguire la suite E2E live locale la attiva
+esplicitamente sul proprio stack --- non è più un comportamento di
+default su nessuna installazione.
+
+\begin{securebox}[title={E2eFixtureSeeder.java --- seed opt-in, gated da env var (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: questo bean non esiste nemmeno se auth.seed-e2e-fixtures
+// non e' esplicitamente true -- default false ovunque, mai settato
+// in docker-compose.yml/docker-compose.prod.yml
+@Component
+@ConditionalOnProperty(prefix = "auth", name = "seed-e2e-fixtures", havingValue = "true")
+public class E2eFixtureSeeder implements ApplicationRunner {
+
+    @Override
+    @Transactional
+    public void run(final ApplicationArguments args) {
+        log.warn("[AUTH] E2E_FIXTURE_SEED_ENABLED -- ... "
+                + "Never enable this on an installation with real hotel data.");
+        if (userRepository.existsByUsername(FIXTURE_USERNAME)) {
+            return;
+        }
+        userRepository.save(UserAccount.builder()
+                .username(FIXTURE_USERNAME)
+                .passwordHash(passwordEncoder.encode(FIXTURE_PASSWORD))
+                .hotelId(FIXTURE_HOTEL_ID)
+                .role(Role.ADMIN)
+                .active(true)
+                .mustChangePassword(false)
+                .build());
+    }
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Verifica dal vivo}
+Non solo unit test: riavviato \texttt{auth-service} contro un volume
+Postgres di sviluppo esistente che aveva già applicato \texttt{V7} (la riga
+fixture era presente e attiva). Dopo il deploy della nuova immagine,
+\texttt{V9} è girata e la riga è stata rimossa; il seed admin reale
+(\texttt{must\_change\_password=true}) è risultato intatto. Verificato
+anche che il commento di \texttt{V7} stesso documentasse in chiaro la
+password nota --- ulteriore motivo per non modificarla ma limitarsi ad
+annullarne l'effetto.
+
+\paragraph{Riferimento} Commit: \commitref{5e7651a2}{fix(security): remove e2e fixture ADMIN account from production migration path}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \subsection{Regressione della guardia legale GDPR TULPS/fiscale \threat{T-GST-06}}
 % ─────────────────────────────────────────────────────────────────────────────
 
@@ -5445,6 +5542,194 @@ necessitavano un nuovo \texttt{@MockitoBean} per
 chiavi di cifratura reali all'avvio del contesto di test.
 
 \paragraph{Riferimento} Commit: \commitref{f20c5904}{fix(security): E23 -- encrypt documentNumber at rest (GDPR Art. 32)}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Startup check fail-closed sulle chiavi di cifratura PII \threat{GAP-29}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Complementare a \threat{GAP-28}: le due coppie chiave/salt introdotte da
+quel fix (\texttt{guest.documents.encryption-key/-salt} in guest-service;
+\texttt{frontdesk.documents.encryption-key/-salt} e
+\texttt{alloggiati.credentials.encryption-key/-salt} in frontdesk-service)
+non avevano alcun equivalente di \texttt{HmacSecretStartupCheck}
+(api-gateway, già esistente per \texttt{internal.hmac.secret}). Se le
+variabili d'ambiente reali non sono impostate, \texttt{docker-compose.yml}
+ricade sullo stesso placeholder letterale ovunque
+(\texttt{ci\_placeholder\_encryption\_key} /
+\texttt{deadbeefdeadbeefdeadbeefdeadbeef}), committato in chiaro in questo
+stesso repository. Trovato durante lo stesso audit di pilot-readiness di
+\threat{T-AUTH-17}: verificato che il file \texttt{.env} reale di questa
+installazione non conteneva nessuna delle sei variabili --- lo stack
+girava cifrando numeri di documento d'identità e credenziali Alloggiati
+con una chiave pubblica. Classificato OWASP A02 --- Cryptographic
+Failures (una chiave nota equivale, ai fini pratici, a nessuna cifratura).
+
+\begin{insecurebox}[title={docker-compose.yml --- fallback a placeholder pubblico (baseline)}]
+\begin{lstlisting}[style=yaml]
+# INSICURO: se la env var reale non e' nell'.env, il servizio parte
+# comunque, cifrando con una chiave pubblicamente nota nel repository
+- GUEST_DOCUMENTS_ENCRYPTION_KEY=${GUEST_DOCUMENTS_ENCRYPTION_KEY:-ci_placeholder_encryption_key}
+- GUEST_DOCUMENTS_ENCRYPTION_SALT=${GUEST_DOCUMENTS_ENCRYPTION_SALT:-deadbeefdeadbeefdeadbeefdeadbeef}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Nuovo \texttt{EncryptionKeyStartupCheck} in entrambi i servizi, stesso
+pattern di \texttt{HmacSecretStartupCheck}: un \texttt{@EventListener} su
+\texttt{ApplicationReadyEvent} che blocca il boot
+(\texttt{IllegalStateException}) se una coppia chiave/salt è placeholder
+noto, vuota, o sotto 16 caratteri --- ma solo quando il profilo Spring
+attivo indica un deployment reale (\texttt{SPRING\_PROFILES\_ACTIVE=
+<nome-servizio>}, come impostato da \texttt{docker-compose.yml} per ogni
+servizio). Degrada a semplice WARN quando il profilo è vuoto o contiene
+\texttt{dev}/\texttt{test} --- condizione che copre sia i test Gradle a
+contesto pieno sia un avvio locale ad-hoc senza Docker, senza richiedere
+una chiave reale in quei casi.
+
+\begin{securebox}[title={EncryptionKeyStartupCheck.java (guest-service) --- fail-closed in produzione (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: in un deployment reale (profilo = nome servizio, mai vuoto/dev/test)
+// il boot si interrompe se la chiave e' un placeholder noto o troppo corta
+@EventListener(ApplicationReadyEvent.class)
+public void validateEncryptionKey() {
+    final boolean insecure = KNOWN_INSECURE_KEYS.contains(encryptionKey.trim())
+            || KNOWN_INSECURE_SALTS.contains(encryptionSalt.trim())
+            || encryptionKey.length() < MIN_KEY_LENGTH;
+    if (!insecure) {
+        return;
+    }
+    final boolean isDevOrTest = activeProfile.isBlank()
+            || activeProfile.contains("dev") || activeProfile.contains("test");
+    if (!isDevOrTest) {
+        throw new IllegalStateException(
+                "guest.documents.encryption-key/-salt is insecure. "
+                        + "Set strong values before starting in production.");
+    }
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Verifica dal vivo}
+Generate sei chiavi/salt reali (\texttt{openssl rand -base64 32} /
+\texttt{openssl rand -hex 16}) e aggiunte al \texttt{.env} locale (non
+committato --- \texttt{.gitignore}). Riavviati guest-service e
+frontdesk-service contro il volume esistente: i log mostrano
+\texttt{ENCRYPTION\_KEY\_OK} / \texttt{ENCRYPTION\_KEYS\_OK}. Verificato
+anche che le due suite \texttt{@SpringBootTest} preesistenti che avevano
+richiesto un \texttt{@MockitoBean} per evitare le chiavi reali
+(\texttt{RoomTypeServiceIntegrationTest},
+\texttt{SoftDeleteVersionCheckIntegrationTest}, si veda \threat{GAP-28})
+continuano a passare: girano a profilo vuoto, trattato come segnale
+dev/test dal nuovo check.
+
+\paragraph{Riferimento} Commit: \commitref{991436f5}{fix(security): fail-closed startup check for PII encryption keys}
+
+\paragraph{Follow-up --- generazione delle chiavi nel bootstrap segreti}
+Il solo fail-closed lasciava un'installazione fresca senza un modo ovvio
+per generare le 6 chiavi, oltre a leggere \texttt{.env.example} a mano.
+\texttt{setup-hmac-secret.ps1}/\texttt{.sh} --- il bootstrap segreti
+idempotente già eseguito da ogni installazione per
+\texttt{INTERNAL\_HMAC\_SECRET}/\texttt{JWT\_SECRET}/le 7 password
+DB/Redis --- sono stati estesi con lo stesso pattern per le 3 coppie
+chiave/salt (chiave: segreto casuale in base64, equivalente a
+\texttt{openssl rand -base64 32}; salt: byte casuali in hex, equivalente
+a \texttt{openssl rand -hex 16} --- \texttt{Encryptors.delux} richiede il
+salt in hex, a differenza della chiave). Verificato in una directory
+scratch isolata, non sull'installazione tracciata di questa macchina:
+entrambi gli script generano le 6 variabili con il formato corretto e
+sono idempotenti a una seconda esecuzione.
+
+\paragraph{Riferimento} Commit: \commitref{8b9727bf}{fix(security): generate the 6 PII encryption keys in the secrets bootstrap}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Segreti SMTP scrivibili solo in un file tracciato in git \threat{GAP-30}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante la pianificazione del punto 2 della checklist go-live
+(configurazione di un relay SMTP reale per gli alert operativi), prima
+di scrivere qualunque credenziale. \texttt{docker/alertmanager/alertmanager.yml}
+era tracciato in git --- a differenza di \texttt{.env} --- con un commento
+che invitava esplicitamente a scriverci \texttt{smarthost}/\texttt{from}/
+\texttt{to}/\texttt{auth\_username}/\texttt{auth\_password} reali
+\emph{"BEFORE GO-LIVE"}: Alertmanager non supporta l'espansione
+\texttt{\$\{VAR\}}, quindi l'unico modo suggerito dal commento stesso era
+il valore letterale nel file. Configurare un relay reale avrebbe
+committato le credenziali SMTP nella storia del repository. Classificato
+OWASP A02 --- Cryptographic Failures, stesso trattamento già dato a
+\threat{T-CFG-02} per lo stesso tipo di problema (segreto scrivibile solo
+in chiaro in un file di configurazione).
+
+\begin{insecurebox}[title={docker/alertmanager/alertmanager.yml --- commento che invita al leak (baseline)}]
+\begin{lstlisting}[style=yaml]
+# INSICURO: nessuna espansione ${VAR} in questa versione di Alertmanager --
+# l'unico modo per configurare un relay reale è scrivere il valore qui,
+# in un file TRACCIATO IN GIT (a differenza di .env)
+# ... BEFORE GO-LIVE, replace smarthost/from/to/auth_username/auth_password
+# with the hotel's real SMTP relay ...
+  - name: 'email-ops'
+    email_configs:
+      - smarthost: 'mailpit:1025'
+        from: 'alerts@hotelpms.local'
+        to: 'ops@hotelpms.local'
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Il file tracciato è stato rinominato \texttt{alertmanager.yml.template}:
+resta in git ma con placeholder letterali (\texttt{\$\{SMTP\_HOST\}} ecc.),
+mai un valore reale. Un nuovo \texttt{docker/alertmanager/entrypoint.sh}
+(tracciato, nessun segreto) sostituisce quei placeholder via \texttt{sed}
+--- verificato che l'immagine \texttt{prom/alertmanager:v0.27.0} ha
+\texttt{sed} ma non \texttt{envsubst} --- scrivendo il risultato in
+\texttt{/alertmanager/alertmanager.generated.yml}, dentro il volume Docker
+\emph{named} (\texttt{alertmanager\_data}), mai sul filesystem host, mai
+raggiungibile da git. Le variabili lette sono le stesse già usate da
+\texttt{notification-service} (\texttt{SMTP\_HOST/PORT/USERNAME/PASSWORD/
+STARTTLS} --- stesso relay, nessuna duplicazione) più due nuove dedicate
+agli alert (\texttt{ALERT\_EMAIL\_FROM}/\texttt{ALERT\_EMAIL\_TO}, identità
+mittente/destinatario separata da quella guest-facing). Ogni valore passa
+per una funzione di escaping (\texttt{\textbackslash}, \texttt{|}, \texttt{\&}) prima della
+sostituzione, per evitare che un carattere speciale in una password reale
+corrompa il comando \texttt{sed} o la YAML risultante.
+
+\begin{securebox}[title={docker/alertmanager/entrypoint.sh --- escaping e sostituzione (fix)}]
+\begin{lstlisting}[style=bash]
+# SICURO: ogni valore passa per l'escaping prima di finire nel comando sed,
+# e il file finale non tocca mai il filesystem host o git
+escape_for_sed() {
+    printf '%s' "$1" | sed -e 's/[\\|&]/\\&/g'
+}
+sed \
+    -e "s|\${SMTP_HOST}|${SMTP_HOST_ESC}|g" \
+    -e "s|\${SMTP_PASSWORD}|${SMTP_PASSWORD_ESC}|g" \
+    -e "s|\${ALERT_EMAIL_TO}|${ALERT_EMAIL_TO_ESC}|g" \
+    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+
+exec /bin/alertmanager "--config.file=${OUTPUT_FILE}" "--storage.path=/alertmanager"
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Compatibilità e non-regressione}
+Ogni variabile ha un default identico al valore hardcoded precedente
+(\texttt{mailpit:1025}, nessuna auth, nessun TLS, \texttt{alerts@hotelpms.local}
+--- \texttt{ops@hotelpms.local}) --- un'installazione senza alcuna
+configurazione aggiuntiva in \texttt{.env} continua a comportarsi
+esattamente come prima. Nessuna regressione per gli ambienti dev/CI
+esistenti.
+
+\paragraph{Verifica dal vivo}
+Container ricreato con la configurazione di default: log identico al
+comportamento pre-fix, Alertmanager carica correttamente
+\texttt{alertmanager.generated.yml}. Ripetuto con credenziali fittizie
+contenenti tutti e tre i caratteri da escapare
+(\texttt{test\&user|name} / \texttt{p@ss|with\&special\textbackslash chars}):
+il file generato risulta YAML valida, Alertmanager lo carica senza errori
+(\texttt{"Completed loading of configuration file"}), verificato leggendo
+il contenuto generato direttamente dentro il container.
+
+\paragraph{Riferimento} Commit: \commitref{ae9121d7}{fix(security): render alertmanager SMTP secrets at runtime, never in git}
 
 % ─────────────────────────────────────────────────────────────────────────────
 % ═════════════════════════════════════════════════════════════════════════════

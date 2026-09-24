@@ -245,13 +245,25 @@ services:
     profiles: ["observability"]
     ports:
       - "9093:9093"
+    # entrypoint.sh renders alertmanager.yml.template (tracked, no secrets)
+    # into alertmanager_data (the named volume, never the host filesystem)
+    # by substituting SMTP_*/ALERT_EMAIL_* from .env via sed -- the image
+    # has no envsubst. Invoked via "/bin/sh <path>" rather than executing
+    # the file directly so the host's executable bit (unreliable on a
+    # Windows bind mount) never matters. See docker/alertmanager/entrypoint.sh.
+    entrypoint: ["/bin/sh", "/etc/alertmanager/entrypoint.sh"]
+    environment:
+      - SMTP_HOST=${SMTP_HOST:-mailpit}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_STARTTLS=${SMTP_STARTTLS:-false}
+      - ALERT_EMAIL_FROM=${ALERT_EMAIL_FROM:-alerts@hotelpms.local}
+      - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-ops@hotelpms.local}
     volumes:
-      - ./docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - ./docker/alertmanager/alertmanager.yml.template:/etc/alertmanager/alertmanager.yml.template:ro
+      - ./docker/alertmanager/entrypoint.sh:/etc/alertmanager/entrypoint.sh:ro
       - alertmanager_data:/alertmanager
-    command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
-      - "--storage.path=/alertmanager"
-      - "--log.level=info"
     networks:
       - observability-network
     deploy:

@@ -1,0 +1,65 @@
+global:
+  resolve_timeout: 5m
+
+# ----------------------------------------------------------------
+# Routing tree
+# Every alert reaches 'email-ops' — previously 'null' (visible only in the
+# Alertmanager UI at :9093, which docker-compose.prod.yml closes to the
+# host — every alert, critical included, went nowhere in production).
+# Critical alerts repeat every 30m instead of the default 4h: a single-PC
+# pilot has no on-call rotation, so the operator needs a faster reminder
+# while an incident is ongoing.
+# ----------------------------------------------------------------
+route:
+  group_by: ['alertname', 'job']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'email-ops'
+  routes:
+    - matchers:
+        - severity = critical
+      receiver: 'email-ops'
+      repeat_interval: 30m
+      continue: false
+
+receivers:
+  - name: 'null'
+
+  # This is a TEMPLATE (docker/alertmanager/entrypoint.sh renders it into
+  # /alertmanager/alertmanager.generated.yml inside the container at
+  # startup, never on the host, never in this repository) — Alertmanager
+  # itself has no built-in ${VAR} expansion, so the substitution happens
+  # in the entrypoint script via `sed` before the binary ever reads this
+  # file. GAP-29-style secret handling: never put a real SMTP password in
+  # THIS file (it's tracked in git, unlike .env) — set the env vars below
+  # in your `.env` instead. Restart alertmanager after editing `.env`
+  # (`docker compose restart alertmanager`).
+  #
+  # Every placeholder below defaults (in entrypoint.sh) to the dev/pilot
+  # mailpit container (no auth, no TLS, port 1025) so alerts are visible
+  # out of the box with zero configuration — open http://localhost:8025 to
+  # see them land. BEFORE GO-LIVE, set SMTP_HOST/PORT/USERNAME/PASSWORD
+  # (same relay as notification-service), ALERT_EMAIL_FROM, and
+  # ALERT_EMAIL_TO (the operator's own inbox — not mailpit, not a
+  # guest-facing address) in `.env`.
+  - name: 'email-ops'
+    email_configs:
+      - smarthost: '${SMTP_HOST}:${SMTP_PORT}'
+        from: '${ALERT_EMAIL_FROM}'
+        to: '${ALERT_EMAIL_TO}'
+        auth_username: '${SMTP_USERNAME}'
+        auth_password: '${SMTP_PASSWORD}'
+        require_tls: ${ALERT_REQUIRE_TLS}
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}] Hotel PMS – {{ .GroupLabels.alertname }}'
+
+# Suppress warning-severity alerts when a critical alert fires for
+# the same service, to avoid alert storms.
+inhibit_rules:
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
+    equal: ['alertname', 'job']
