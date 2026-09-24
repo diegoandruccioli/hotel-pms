@@ -13,31 +13,67 @@ L'integrazione gestisce tre operazioni:
 
 ---
 
-## 2. Credenziali e variabili d'ambiente
+## 2. Credenziali — come le inserisce l'hotel (percorso consigliato)
 
-> Queste variabili DEVONO essere impostate via `.env` in produzione.
+**L'hotel inserisce le proprie credenziali direttamente dall'applicazione,
+senza bisogno di accesso al server o a file di configurazione.**
+
+1. Accedere come ADMIN o OWNER.
+2. Andare su **Profilo Hotel** (menu utente → Profilo Hotel, o
+   `/profile/hotel`).
+3. Compilare i tre campi nella sezione Alloggiati: **Username**, **Password**,
+   **Chiave Web Service** (WsKey) — vedi §2.2 per come ottenere la WsKey dal
+   portale (Username e Password sono le stesse dell'account PS esistente).
+4. Salvare.
+
+Cosa succede dopo il salvataggio:
+- Username, password e WsKey vengono **cifrati** prima di essere salvati nel
+  database (AES-256-GCM) — mai in chiaro.
+- Dopo il salvataggio, i campi password/WsKey **appaiono sempre vuoti** alla
+  successiva apertura della pagina: è comportamento voluto (write-only), non
+  un errore. Il sistema non li rimostra mai, nemmeno all'ADMIN che li ha
+  inseriti. Per cambiarli, basta compilare di nuovo il campo — lasciarlo
+  vuoto significa "non modificare" quello già salvato.
+- Da quel momento l'hotel usa le **proprie** credenziali per ogni invio,
+  indipendentemente dalle altre installazioni.
+
+**Non serve mai comunicare queste credenziali a chi gestisce il software** —
+l'hotel le inserisce da solo, direttamente sul portale, e nessun'altra
+persona le vede mai.
+
+### 2.1 Variabili d'ambiente (`.env`) — solo fallback, non per l'uso quotidiano
+
+Le variabili sotto sono un **fallback globale a livello di installazione**,
+usato solo se l'hotel non ha ancora compilato i campi in §2 sopra — pensate
+per chi gestisce il server (accesso a `.env`), non per l'hotel stesso.
+Se l'hotel ha già inserito le proprie credenziali da UI, queste variabili
+non vengono più usate per quell'hotel.
+
+> Queste variabili DEVONO essere impostate via `.env` in produzione se usate.
 > Non inserirle mai nel codice o nei file YAML sotto controllo di versione.
 
 | Variabile | Descrizione | Obbligatoria |
 |---|---|---|
 | `ALLOGGIATI_USERNAME` | Username del portale PS (es. `HOTELALFA01`) | Sì |
 | `ALLOGGIATI_PASSWORD` | Password del portale PS | Sì |
-| `ALLOGGIATI_WS_KEY` | Chiave Web Service (vedi §2.1) | Sì |
+| `ALLOGGIATI_WS_KEY` | Chiave Web Service (vedi §2.2) | Sì |
 | `ALLOGGIATI_SERVICE_URL` | Endpoint SOAP (default: `/service/Service.asmx`) | No (default OK) |
 | `ALLOGGIATI_WS_NAMESPACE` | Namespace SOAP (default già configurato) | No |
 | `ALLOGGIATI_DRY_RUN` | `true` = chiama `Test` invece di `Send` (default: `true`) | No |
 
-### 2.1 Come ottenere la Web Service Key
+### 2.2 Come ottenere la Web Service Key
 
 1. Accedere al portale: https://alloggiatiweb.poliziadistato.it
 2. Cliccare sull'icona account in alto a destra
 3. Selezionare **"Chiave Web Service"**
 4. Cliccare **"Genera nuova chiave"**
-5. Copiare la chiave nel file `.env`: `ALLOGGIATI_WS_KEY=xxxx-xxxx-xxxx`
+5. Copiarla nel campo **Chiave Web Service** di Profilo Hotel (§2 — percorso
+   consigliato per l'hotel), oppure in `ALLOGGIATI_WS_KEY` nel file `.env`
+   (solo per chi usa il fallback §2.1, gestito da chi amministra il server).
 
 La chiave può essere rigenerata se compromessa; la vecchia chiave viene invalidata immediatamente.
 
-### 2.2 Esempio di file `.env` (non committare questo file)
+### 2.3 Esempio di file `.env` (fallback §2.1 — non committare questo file)
 
 ```
 ALLOGGIATI_USERNAME=HOTELALFA01
@@ -147,14 +183,35 @@ docker restart frontdesk-service
 
 ## 8. Test dell'integrazione sul portale reale
 
-Procedura raccomandata per il collaudo prima del go-live:
+`ALLOGGIATI_DRY_RUN` è un'impostazione di sistema (chi gestisce
+l'installazione, non l'hotel): di default resta `true` finché non si
+decide esplicitamente di passare a invii reali. Con `DRY_RUN=true` il
+sistema chiama comunque il portale PS reale (serve comunque che l'hotel
+abbia già inserito le proprie credenziali in §2), ma con l'operazione
+`Test` — valida i dati senza registrarli definitivamente. È il modo sicuro
+per l'hotel di verificare da solo, con le proprie credenziali reali, che
+tutto funzioni prima che chiunque decida di passare a `Send`.
 
-1. Impostare `ALLOGGIATI_DRY_RUN=false` su un ambiente staging con credenziali reali
-2. Effettuare un check-in di test con dati validi
-3. Verificare nei log che appaia `ALLOGGIATI_SUBMISSION_SUCCESS | operation=Send`
-4. Accedere al portale PS e confermare che la schedina sia presente nella sezione "Archivio"
-5. Verificare che la colonna "PS Portal" nel frontend mostri l'icona verde
-6. Se l'invio automatico non è desiderato: lasciare `ALLOGGIATI_DRY_RUN=true` e usare sempre il download manuale
+**Cosa può verificare l'hotel da solo, senza bisogno di accesso al server:**
+
+1. Inserire le proprie credenziali PS (§2).
+2. Effettuare un check-in reale (o il primo check-in con il sistema).
+3. Aprire **Soggiorni** e controllare la colonna "PS Portal": icona verde =
+   invio riuscito, icona rossa = fallito (con possibilità di reinvio manuale).
+4. Solo se si vuole la conferma definitiva sul portale PS: accedere a
+   `alloggiatiweb.poliziadistato.it` — in modalità `Test` la schedina viene
+   validata ma **non** compare nell'Archivio (è la modalità `Send` che
+   registra davvero, vedi sotto).
+
+**Passaggio a invio reale (`Send`) — decisione di chi gestisce
+l'installazione, non dell'hotel:**
+
+5. Solo dopo aver visto badge verdi in modalità `Test` per un periodo
+   ragionevole, impostare `ALLOGGIATI_DRY_RUN=false` (richiede accesso al
+   server/`.env`) — da quel momento ogni invio è una comunicazione ufficiale
+   ai sensi del TULPS art. 109, verificabile nell'Archivio del portale PS.
+6. Se l'invio automatico non è desiderato: lasciare `ALLOGGIATI_DRY_RUN=true`
+   indefinitamente e usare sempre il download manuale del file .txt.
 
 ---
 
