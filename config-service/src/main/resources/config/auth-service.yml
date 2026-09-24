@@ -6,6 +6,12 @@ jwt:
   expiration: "${JWT_EXPIRATION:900000}"               # 15 minutes (T-AUTH-04)
   refresh-expiration: "${JWT_REFRESH_EXPIRATION:604800000}"  # 7 days
 
+auth:
+  # Opt-in seed of the second-tenant ADMIN fixture used only by the local
+  # live E2E suite (frontend/e2e-live). Default false everywhere — leave
+  # false on any installation with real hotel data. See E2eFixtureSeeder.
+  seed-e2e-fixtures: "${AUTH_SEED_E2E_FIXTURES:false}"
+
 spring:
   data:
     redis:

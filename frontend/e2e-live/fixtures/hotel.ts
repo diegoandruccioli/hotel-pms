@@ -21,9 +21,13 @@ export const SEED_ADMIN = {
 };
 
 // A second, independent tenant for cross-tenant IDOR/RBAC checks
-// (idor-cross-tenant-live.spec.ts). Seeded directly in
-// V7__seed_second_hotel_admin_for_e2e_tests.sql — not created on the fly
-// via /register, which no longer exists.
+// (idor-cross-tenant-live.spec.ts). Seeded by E2eFixtureSeeder
+// (auth-service/.../config/E2eFixtureSeeder.java), an ApplicationRunner
+// gated behind AUTH_SEED_E2E_FIXTURES=true — set that env var on your
+// local stack before running this suite. Not created on the fly via
+// /register, which no longer exists. Previously a permanent Flyway
+// migration (V7) that ran on every installation; removed by V9 — see
+// V9__remove_e2e_fixture_admin_from_production_path.sql.
 export const OTHER_HOTEL_ID = '99999999-9999-9999-9999-999999999999';
 
 export const OTHER_HOTEL_ADMIN = {
