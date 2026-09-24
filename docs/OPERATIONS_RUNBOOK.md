@@ -8,7 +8,31 @@
 
 ## 1. Avvio e arresto del sistema
 
-### Avvio completo
+### Avvio su un PC hotel reale (Windows) — `start-pilot.ps1`
+
+Per un'installazione reale su un solo PC Windows (lo scenario del pilota),
+usare `start-pilot.ps1` invece dei comandi manuali sotto o di `start.ps1`
+(quello è il flusso di **sviluppo**: dev server Vite su porta 5173,
+`npm install` ad ogni avvio, e spegne l'intero stack alla chiusura del
+terminale — inadatto a un PC di reception).
+
+```powershell
+.\start-pilot.ps1
+```
+
+Cosa fa, in ordine: verifica/avvia Docker Desktop; genera i segreti
+mancanti (`setup-hmac-secret.ps1`, idempotente — include le 6 chiavi di
+cifratura PII da GAP-29); esegue `./gradlew clean build -x test` (i
+Dockerfile backend copiano un jar pre-buildato, serve prima di
+`docker compose build`); avvia lo stack con l'overlay di produzione
+(`docker-compose.prod.yml`, solo la porta 80 del frontend resta pubblicata
+sull'host); apre il browser su `http://localhost` (il container nginx del
+frontend, non Vite). **Non ferma mai i container alla chiusura della
+finestra** — ogni container ha già `restart: unless-stopped`, lo stack
+resta attivo anche dopo un riavvio del PC. Per fermarlo davvero:
+`docker compose down` (manuale, mai automatico).
+
+### Avvio manuale (sviluppo/debug)
 
 ```bash
 # Stack core (11 servizi) — SENZA osservabilità/backup
@@ -421,13 +445,19 @@ docker exec hotel_postgres pg_dumpall -U postgres > "backup-pre-update-$(date +%
 # 2. Pull dell'ultima versione del codice
 git pull origin main
 
-# 3. Rebuild delle immagini
+# 3. Build dei microservizi (OBBLIGATORIO prima del passo 4 — i Dockerfile
+#    backend sono single-stage, copiano un jar da build/libs/ già pronto:
+#    "docker compose build" da solo non lo rigenera, riuserebbe jar stantii
+#    o fallirebbe apertamente su un clone fresco senza build/ locali)
+./gradlew clean build -x test
+
+# 4. Rebuild delle immagini
 docker compose build
 
-# 4. Riavvio con le nuove immagini (rolling)
+# 5. Riavvio con le nuove immagini (rolling)
 docker compose up -d
 
-# 5. Verificare che tutti i servizi siano healthy
+# 6. Verificare che tutti i servizi siano healthy
 docker compose ps
 docker compose logs --tail=50 | grep -E "ERROR|Started.*in"
 ```
