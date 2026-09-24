@@ -13,6 +13,7 @@ export type {
   SdiStatus,
   PaymentMethod,
   ChargeType,
+  ChargeRequest,
   ChargeResponse,
   PaymentRequest,
   PaymentResponse,

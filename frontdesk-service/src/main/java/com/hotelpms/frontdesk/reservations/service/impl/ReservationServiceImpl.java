@@ -509,7 +509,7 @@ public class ReservationServiceImpl implements ReservationService {
 
         lineItem.setRoomId(newRoomId);
         lineItem.setPrice(newPrice);
-        reservationRepository.saveAndFlush(reservation);
+        saveTranslatingOverlap(reservation);
     }
 
     /**
