@@ -184,12 +184,33 @@ class NightAuditServiceImplTest {
     }
 
     @Test
-    void recordsAFailedRowWhenTheAuditWorkThrows() {
+    void snapshotsExpectedArrivalsBeforeNoShowsButOccupancyAfter() {
+        final Reservation candidate = reservationWithId();
         when(nightAuditRunRepository.findByHotelIdAndBusinessDate(HOTEL_ID, BUSINESS_DATE))
                 .thenReturn(Optional.empty());
         when(nightAuditRunRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
         when(reservationRepository.findByHotelIdAndCheckInDateLessThanEqualAndStatusIn(
-                eq(HOTEL_ID), eq(BUSINESS_DATE), anyList())).thenReturn(List.of());
+                eq(HOTEL_ID), eq(BUSINESS_DATE), anyList())).thenReturn(List.of(candidate));
+        final DaySheetResponse beforeNoShows = new DaySheetResponse(BUSINESS_DATE, ARRIVALS, DEPARTURES,
+                GUESTS_IN_HOUSE, CURRENT_STAYS, AVAILABLE_ROOMS, java.util.Map.of());
+        final DaySheetResponse afterNoShows = new DaySheetResponse(BUSINESS_DATE, ARRIVALS - 1, DEPARTURES,
+                GUESTS_IN_HOUSE, CURRENT_STAYS, AVAILABLE_ROOMS + 1, java.util.Map.of());
+        when(daySheetService.getDaySheet(BUSINESS_DATE, HOTEL_ID)).thenReturn(beforeNoShows, afterNoShows);
+        when(billingClient.getPaymentSummary(BUSINESS_DATE))
+                .thenReturn(new PaymentSummaryClientResponse(BUSINESS_DATE, List.of(), BigDecimal.ZERO));
+
+        final NightAuditRunResponse result = service.run(BUSINESS_DATE, RUN_BY);
+
+        assertEquals(1, result.noShowsMarked());
+        assertEquals(ARRIVALS, result.arrivals());
+        assertEquals(AVAILABLE_ROOMS + 1, result.availableRooms());
+    }
+
+    @Test
+    void recordsAFailedRowWhenTheAuditWorkThrows() {
+        when(nightAuditRunRepository.findByHotelIdAndBusinessDate(HOTEL_ID, BUSINESS_DATE))
+                .thenReturn(Optional.empty());
+        when(nightAuditRunRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
         when(daySheetService.getDaySheet(BUSINESS_DATE, HOTEL_ID))
                 .thenThrow(new org.springframework.dao.DataRetrievalFailureException("DAY_SHEET_BOOM"));
 

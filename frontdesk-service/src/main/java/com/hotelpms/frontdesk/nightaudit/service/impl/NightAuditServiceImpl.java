@@ -142,13 +142,18 @@ public class NightAuditServiceImpl implements NightAuditService {
         log.info("[NIGHT_AUDIT] STARTED | hotelId={} | businessDate={} | runBy={}", hotelId, businessDate, runBy);
 
         try {
+            // Arrivals are the EXPECTED ones (no-shows included), so they are read before
+            // markNoShows flips reservations to NO_SHOW — the day sheet excludes NO_SHOW.
+            // Everything else (occupancy, available rooms) is read after, so rooms freed by
+            // the no-shows show up as available.
+            final int expectedArrivals = daySheetService.getDaySheet(businessDate, hotelId).todayArrivals();
             final int noShowsMarked = markNoShows(hotelId, businessDate);
             final DaySheetResponse daySheet = daySheetService.getDaySheet(businessDate, hotelId);
             final PaymentSummaryClientResponse cashSummary = fetchCashSummary(hotelId, businessDate);
 
             saved.setStatus(NightAuditStatus.COMPLETED);
             saved.setCompletedAt(LocalDateTime.now());
-            saved.setArrivals(daySheet.todayArrivals());
+            saved.setArrivals(expectedArrivals);
             saved.setDepartures(daySheet.todayDepartures());
             saved.setGuestsInHouse(daySheet.guestsInHouse());
             saved.setCurrentStays(daySheet.currentStays());
