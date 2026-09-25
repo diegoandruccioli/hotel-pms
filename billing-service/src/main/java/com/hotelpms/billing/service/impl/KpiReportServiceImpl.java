@@ -100,7 +100,17 @@ public class KpiReportServiceImpl implements KpiReportService {
             final BigDecimal revenue, final long occupiedNights) {
         final long availableNights = totalRooms * daysInBucketWithinWindow(
                 periodStart, queryStart, queryEnd, granularity);
-        return toDto(periodStart, revenue, occupiedNights, availableNights);
+        // date_trunc reports the bucket's natural boundary, which for a partial
+        // leading bucket (e.g. a WEEK query starting mid-week) falls BEFORE
+        // queryStart — e.g. a report requested for 2026-09-01 (a Tuesday) gets
+        // back periodStart=2026-08-31 (that week's Monday), one day earlier than
+        // anything the caller asked for. daysInBucketWithinWindow already clips
+        // the denominator to the real window; clip the label the same way so
+        // it's consistent with buildTotals below (which always reports the
+        // actual queryStart) instead of a raw, unclipped date_trunc boundary
+        // (found in live QA, 2026-09).
+        final LocalDate clippedPeriodStart = periodStart.isBefore(queryStart) ? queryStart : periodStart;
+        return toDto(clippedPeriodStart, revenue, occupiedNights, availableNights);
     }
 
     private KpiPeriodDto buildTotals(final LocalDate startDate, final LocalDate exclusiveEnd,

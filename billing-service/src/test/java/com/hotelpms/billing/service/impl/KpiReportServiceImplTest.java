@@ -175,6 +175,56 @@ class KpiReportServiceImplTest {
     }
 
     @Test
+    void clipsAPartialLeadingBucketsPeriodStartToTheActualQueryStartNotTheRawDateTrunc() {
+        // date_trunc('week', ...) reports the natural ISO-Monday boundary of the
+        // bucket, which for a query starting mid-week falls BEFORE queryStart —
+        // e.g. a report requested from 2026-09-01 (Tuesday) gets periodStart
+        // 2026-08-31 (that week's Monday) back from both collaborators. The
+        // service must clip this to queryStart, the same way it already clips
+        // the available-nights denominator (found in live QA, 2026-09).
+        final LocalDate queryStart = LocalDate.of(2026, 9, 1);
+        final LocalDate queryEnd = LocalDate.of(2026, 9, 6);
+        final LocalDate queryExclusiveEnd = LocalDate.of(2026, 9, 7);
+        final LocalDate rawWeekBucketStart = LocalDate.of(2026, 8, 31);
+
+        final RoomRevenuePeriod revenueRow = mock(RoomRevenuePeriod.class);
+        when(revenueRow.getPeriodStart()).thenReturn(rawWeekBucketStart);
+        when(revenueRow.getTotalRevenue()).thenReturn(REVENUE_1000);
+        when(invoiceChargeRepository.sumRoomRevenueByHotelIdGroupedByPeriod(
+                eq(HOTEL_ID), eq(queryStart.atStartOfDay()), eq(queryExclusiveEnd.atStartOfDay()), eq("week")))
+                .thenReturn(List.of(revenueRow));
+        when(frontdeskRoomsClient.getOccupancySummary(queryStart, queryExclusiveEnd, "WEEK"))
+                .thenReturn(new OccupancySummaryResponse(TEN_ROOMS,
+                        List.of(new OccupancyPeriodResponse(rawWeekBucketStart, NIGHTS_8))));
+
+        final KpiReportDto report = kpiReportService.getKpiReport(
+                HOTEL_ID, queryStart, queryEnd, ReportGranularity.WEEK);
+
+        assertEquals(1, report.periods().size());
+        assertEquals(queryStart, report.periods().get(0).periodStart());
+    }
+
+    @Test
+    void doesNotClipAPeriodStartThatAlreadyFallsOnOrAfterTheQueryStart() {
+        // Guards the fix above against over-clipping: a bucket that genuinely
+        // starts on/after queryStart (the common case — every bucket but a
+        // possible partial leading one) must keep its own periodStart verbatim.
+        final LocalDate secondWeekStart = DAY.plusWeeks(1);
+        final RoomRevenuePeriod revenueRow = mock(RoomRevenuePeriod.class);
+        when(revenueRow.getPeriodStart()).thenReturn(secondWeekStart);
+        when(revenueRow.getTotalRevenue()).thenReturn(REVENUE_1000);
+        when(invoiceChargeRepository.sumRoomRevenueByHotelIdGroupedByPeriod(
+                eq(HOTEL_ID), eq(DAY.atStartOfDay()), eq(DAY_EXCLUSIVE_END.atStartOfDay()), eq(GRANULARITY_DAY_SQL)))
+                .thenReturn(List.of(revenueRow));
+        when(frontdeskRoomsClient.getOccupancySummary(DAY, DAY_EXCLUSIVE_END, GRANULARITY_DAY_PARAM))
+                .thenReturn(new OccupancySummaryResponse(TEN_ROOMS, List.of()));
+
+        final KpiReportDto report = kpiReportService.getKpiReport(HOTEL_ID, DAY, DAY, ReportGranularity.DAY);
+
+        assertEquals(secondWeekStart, report.periods().get(0).periodStart());
+    }
+
+    @Test
     void doesNotDivideByZeroWhenThereIsNoRevenueOrNoRooms() {
         when(invoiceChargeRepository.sumRoomRevenueByHotelIdGroupedByPeriod(
                 eq(HOTEL_ID), eq(DAY.atStartOfDay()), eq(DAY_EXCLUSIVE_END.atStartOfDay()), eq(GRANULARITY_DAY_SQL)))

@@ -63,6 +63,7 @@ export const RoomingListRow = memo(({
             selectedGuest={row.guest}
             onSelectGuest={handleSelectGuest}
             onClearGuest={handleClearGuest}
+            required
           />
         </div>
         {canRemove && (

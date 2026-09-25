@@ -32,14 +32,15 @@ describe('housekeepingService', () => {
     expect(result).toEqual(mock);
   });
 
-  it('should trigger the worksheet PDF download via a hidden iframe', () => {
+  it('should trigger the worksheet PDF download via a hidden iframe', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({});
     vi.useFakeTimers();
     const iframe = { style: {} as CSSStyleDeclaration, src: '' } as HTMLIFrameElement;
     const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(iframe);
     const appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((n) => n);
     const removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((n) => n);
 
-    housekeepingService.downloadWorksheetPdf('2026-10-05');
+    await housekeepingService.downloadWorksheetPdf('2026-10-05');
 
     expect(iframe.src).toBe('/api/v1/frontdesk/housekeeping/worksheet.pdf?date=2026-10-05');
     expect(iframe.style.display).toBe('none');

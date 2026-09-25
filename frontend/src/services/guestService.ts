@@ -64,13 +64,13 @@ export const guestService = {
 
   /** Downloads every guest matching `query` (or every guest in the hotel when blank)
    * as a CSV file via a hidden iframe. Admin/Owner only — PII. */
-  exportGuestsCsv: (query?: string): void => {
+  exportGuestsCsv: async (query?: string): Promise<void> => {
     const params = new URLSearchParams();
     if (query?.trim()) {
       params.set('query', query.trim());
     }
     const qs = params.toString();
-    downloadViaIframe(`${BASE_PATH}/export.csv${qs ? `?${qs}` : ''}`);
+    await downloadViaIframe(`${BASE_PATH}/export.csv${qs ? `?${qs}` : ''}`);
   },
 
   /** Per-hotel GDPR retention settings. Creates a default row (5 years) if none exists yet. */

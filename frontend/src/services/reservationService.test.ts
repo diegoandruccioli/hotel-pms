@@ -96,8 +96,10 @@ describe('reservationService', () => {
     });
   });
 
-  it('should download the CSV export with every filter as a query param', () => {
-    reservationService.exportReservationsCsv({
+  it('should download the CSV export with every filter as a query param', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({});
+
+    await reservationService.exportReservationsCsv({
       query: '  mario  ',
       upcomingOnly: true,
       dateFrom: '2026-01-01',
@@ -117,8 +119,10 @@ describe('reservationService', () => {
     document.body.replaceChildren();
   });
 
-  it('should download every reservation as CSV, with no query params, when no filters are set', () => {
-    reservationService.exportReservationsCsv({});
+  it('should download every reservation as CSV, with no query params, when no filters are set', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({});
+
+    await reservationService.exportReservationsCsv({});
 
     const iframe = document.body.querySelector('iframe');
     expect(iframe).not.toBeNull();

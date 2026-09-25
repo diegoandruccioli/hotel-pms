@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 /**
@@ -52,6 +53,14 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
  * not recognized as equal for grouping-validity purposes, even though both resolve to
  * the same runtime value. {@code KpiReportServiceImplTest} mocks the repository and
  * cannot see this class of bug — only a real Postgres, via Testcontainers here, can.
+ *
+ * <p>Also covers the per-night revenue distribution rewrite (live QA, 2026-09): a
+ * {@code ROOM_NIGHT} charge is posted once at check-in for the whole stay length, so
+ * the query must spread its {@code amount} across the {@code nights} calendar nights
+ * it actually covers rather than crediting all of it to the single bucket containing
+ * {@code issue_date} (the check-in day) — see
+ * {@code distributesMultiNightChargeAcrossItsActualNights} below, which only a real
+ * Postgres running {@code generate_series} can verify.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -145,16 +154,68 @@ class KpiReportGranularityIntegrationTest {
                 "expected a bucket totalling " + ROOM_CHARGE_AMOUNT + ", got: " + periods);
     }
 
+    @Test
+    @DisplayName("distributes a multi-night charge's revenue across the individual nights it covers, "
+            + "not just the single issue-date bucket")
+    void distributesMultiNightChargeAcrossItsActualNights() {
+        // A ROOM_NIGHT charge is posted once, at check-in — issueDate is the check-in
+        // instant, `nights` covers forward from it. Issuing 2 days ago for a 3-night
+        // stay means tonight and tomorrow night are covered too, not just 2 days ago.
+        final int nights = 3;
+        final BigDecimal totalAmount = new BigDecimal("270.00");
+        final LocalDateTime issueDate = LocalDateTime.now().minusDays(2);
+        seedRoomNightCharge(totalAmount, nights, issueDate);
+
+        final LocalDateTime start = LocalDateTime.now().minusDays(10);
+        final LocalDateTime end = LocalDateTime.now().plusDays(10);
+
+        final List<RoomRevenuePeriod> periods = invoiceChargeRepository
+                .sumRoomRevenueByHotelIdGroupedByPeriod(HOTEL_ID, start, end, "day");
+
+        final long nonZeroBuckets = periods.stream()
+                .filter(p -> p.getTotalRevenue().compareTo(BigDecimal.ZERO) > 0)
+                .count();
+        assertEquals(nights, nonZeroBuckets,
+                "expected exactly " + nights + " non-zero day buckets (one per covered night), got: " + periods);
+
+        final BigDecimal summedBack = periods.stream()
+                .map(RoomRevenuePeriod::getTotalRevenue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(0, totalAmount.compareTo(summedBack),
+                "the per-night amounts should sum back to the full charge, got: " + summedBack);
+    }
+
     private void seedOneRoomNightCharge() {
+        seedRoomNightCharge(ROOM_CHARGE_AMOUNT, null, null);
+    }
+
+    /**
+     * Persists an invoice (via the real service, so ID/invoice-number generation and
+     * defaults stay realistic) plus one ROOM_NIGHT charge on it.
+     *
+     * @param amount    the charge's total amount, covering every night it spans
+     * @param nights    how many nights forward from {@code issueDate} the charge covers,
+     *                  or {@code null} to leave it unset (defaults to a single night at
+     *                  the query layer)
+     * @param issueDate overrides the invoice's issue date (normally "now", set by
+     *                  {@code invoiceService.createInvoiceForStay}) to backdate the
+     *                  charge's covered nights for the test, or {@code null} to leave
+     *                  the service-assigned "now" timestamp untouched
+     */
+    private void seedRoomNightCharge(final BigDecimal amount, final Integer nights, final LocalDateTime issueDate) {
         final InvoiceResponse invoice = invoiceService.createInvoiceForStay(
                 new StayInvoiceRequest(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()));
         final Invoice invoiceEntity = invoiceRepository.findById(invoice.id()).orElseThrow();
+        if (issueDate != null) {
+            invoiceEntity.setIssueDate(issueDate);
+        }
 
         final InvoiceCharge charge = InvoiceCharge.builder()
                 .invoice(invoiceEntity)
                 .type(ChargeType.ROOM_NIGHT)
                 .description("Room charge — KPI regression test")
-                .amount(ROOM_CHARGE_AMOUNT)
+                .amount(amount)
+                .nights(nights)
                 .vatRate(new BigDecimal("0.10"))
                 .build();
         testEntityManager.persist(charge);

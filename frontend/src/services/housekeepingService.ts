@@ -21,7 +21,7 @@ export const housekeepingService = {
   },
 
   /** Downloads the worksheet PDF via a hidden iframe — see `downloadViaIframe`. */
-  downloadWorksheetPdf: (date: string): void => {
-    downloadViaIframe(`${BASE_PATH}/worksheet.pdf?date=${encodeURIComponent(date)}`);
+  downloadWorksheetPdf: async (date: string): Promise<void> => {
+    await downloadViaIframe(`${BASE_PATH}/worksheet.pdf?date=${encodeURIComponent(date)}`);
   },
 };

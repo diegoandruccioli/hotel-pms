@@ -119,14 +119,15 @@ describe('quotationService', () => {
     expect(api.delete).toHaveBeenCalledWith('/api/v1/quotations/q1');
   });
 
-  it('should trigger the quotation PDF download via a hidden iframe', () => {
+  it('should trigger the quotation PDF download via a hidden iframe', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({});
     vi.useFakeTimers();
     const iframe = { style: {} as CSSStyleDeclaration, src: '' } as HTMLIFrameElement;
     const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(iframe);
     const appendChildSpy = vi.spyOn(document.body, 'appendChild').mockImplementation((n) => n);
     const removeChildSpy = vi.spyOn(document.body, 'removeChild').mockImplementation((n) => n);
 
-    quotationService.downloadPdf('q1');
+    await quotationService.downloadPdf('q1');
 
     expect(iframe.src).toBe('/api/v1/quotations/q1/pdf');
     expect(iframe.style.display).toBe('none');

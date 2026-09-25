@@ -2,11 +2,18 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import eslint from '@nabla/vite-plugin-eslint'
+import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), eslint()],
+  // @tailwindcss/vite (replaces the former @tailwindcss/postcss + postcss.config.js
+  // setup) integrates Tailwind v4 directly with Vite's asset pipeline, so font url()
+  // references pulled in via `@import '...' layer(base)` in src/index.css
+  // (material-symbols, @fontsource) get copied/hashed into dist/assets like any other
+  // asset. The PostCSS-only plugin never coordinated with Vite's asset resolver, so
+  // those fonts were 404ing in every build (found in live QA, 2026-09).
+  plugins: [react(), tailwindcss(), eslint()],
   test: {
     globals: true,
     environment: 'jsdom',

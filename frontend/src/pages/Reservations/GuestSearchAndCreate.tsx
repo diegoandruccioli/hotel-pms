@@ -41,13 +41,16 @@ interface GuestSearchAndCreateProps {
   onSelectGuest: (guest: GuestResponseDTO) => void;
   onClearGuest: () => void;
   readOnly?: boolean;
+  /** Shows a required marker (*) on the search field when no guest is selected yet. */
+  required?: boolean;
 }
 
 export const GuestSearchAndCreate = memo(({
   selectedGuest,
   onSelectGuest,
   onClearGuest,
-  readOnly = false
+  readOnly = false,
+  required = false
 }: GuestSearchAndCreateProps) => {
   const { t } = useTranslation(['guests', 'common']);
   const [searchQuery, setSearchQuery] = useState('');
@@ -160,6 +163,7 @@ export const GuestSearchAndCreate = memo(({
           onChange={handleSearchChange}
           className="flex-1"
           readOnly={readOnly}
+          required={required}
         />
         {!readOnly && <M3Button variant="tonal" icon="person_add" onClick={handleStartCreation}>{t('btn_new_guest')}</M3Button>}
       </div>

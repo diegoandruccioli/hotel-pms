@@ -45,8 +45,10 @@ describe('billingReportService', () => {
     expect(result).toEqual(mockSummary);
   });
 
-  it('downloads the server-generated CSV export via a hidden iframe', () => {
-    billingReportService.exportToCsv('2026-01-01', '2026-03-31');
+  it('downloads the server-generated CSV export via a hidden iframe', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({});
+
+    await billingReportService.exportToCsv('2026-01-01', '2026-03-31');
 
     const iframe = document.body.querySelector('iframe');
     expect(iframe).not.toBeNull();

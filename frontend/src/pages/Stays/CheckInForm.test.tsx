@@ -356,6 +356,45 @@ describe('CheckInForm', () => {
     });
   });
 
+  describe('multi-guest Alloggiati fields (BUG-3 regression — live QA, 2026-09)', () => {
+    // Live QA flagged "comune di nascita never appears for a Membro Gruppo guest" —
+    // reading the source showed the render condition (GuestFieldSection.tsx,
+    // `isItalianBorn = guest._statoDiNascita === CODICE_ITALIA`) is identical for
+    // every guest index and traveller type, so this exercises the ONE thing that
+    // actually differs for a non-first guest: a real typed-and-clicked selection
+    // (not just a prop set directly), addressed at index 1 specifically, the same
+    // way a second/third check-in guest is filled in the real form.
+    async function selectStatoAt(index: number, label: string, statoLabel: string) {
+      const combo = screen.getAllByLabelText(new RegExp(`^${label}`), { selector: 'input' })[index];
+      fireEvent.change(combo, { target: { value: statoLabel.slice(0, 3) } });
+      const option = await screen.findByRole('option', { name: new RegExp(statoLabel) });
+      fireEvent.mouseDown(option);
+    }
+
+    it('shows comune di nascita for a second guest set to Membro Gruppo after a real stato-nascita selection', async () => {
+      vi.mocked(stayService.getLookupStati).mockResolvedValue([ITALIA_STATO]);
+      renderComponent(1);
+      await waitFor(() => expect(screen.getByText('checkin_title')).toBeInTheDocument());
+      const user = userEvent.setup();
+
+      await user.click(screen.getByRole('button', { name: 'btn_add_guest' }));
+      expect(screen.getAllByText('guest_number')).toHaveLength(2);
+
+      const travellerTypeSelects = screen.getAllByLabelText(/^label_guest_type/, { selector: 'select' });
+      fireEvent.change(travellerTypeSelects[1], { target: { value: 'MEMBRO_GRUPPO' } });
+
+      // Membro Gruppo suppresses the whole document block (correct, by design —
+      // TYPES_WITHOUT_DOC), but citizenship/birth fields are unaffected by it.
+      await selectStatoAt(1, 'label_stato_nascita', 'ITALIA');
+
+      // Guest 1 (index 0) never had its own stato di nascita touched, so exactly
+      // one comune-nascita field should exist — confirms the field tracks the
+      // guest that was actually edited, not every guest indiscriminately, and
+      // that it isn't suppressed by Membro Gruppo (only the document block is).
+      expect(await screen.findAllByLabelText(/^label_comune_nascita/)).toHaveLength(1);
+    });
+  });
+
   describe('prefill from guest profile', () => {
     const mockProfile = (overrides: Partial<GuestResponseDTO> = {}): GuestResponseDTO => ({
       id: 'g1', firstName: 'Anna', lastName: 'Bianchi', email: 'anna@test.com',

@@ -31,8 +31,8 @@ export const billingReportService = {
 
   /** Downloads the owner financial report for the given period as a CSV file,
    * generated server-side, via a hidden iframe. Owner/Admin only. */
-  exportToCsv: (startDate: string, endDate: string): void => {
+  exportToCsv: async (startDate: string, endDate: string): Promise<void> => {
     const params = new URLSearchParams({ startDate, endDate });
-    downloadViaIframe(`${EXPORT_CSV_PATH}?${params.toString()}`);
+    await downloadViaIframe(`${EXPORT_CSV_PATH}?${params.toString()}`);
   },
 };

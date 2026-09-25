@@ -98,8 +98,10 @@ describe('guestService', () => {
     expect(api.get).toHaveBeenCalledWith('/api/v1/guests/search?page=0&size=20&sort=lastName%2Cdesc');
   });
 
-  it('should download the CSV export with a trimmed query param via a hidden iframe', () => {
-    guestService.exportGuestsCsv('  mario  ');
+  it('should download the CSV export with a trimmed query param via a hidden iframe', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({});
+
+    await guestService.exportGuestsCsv('  mario  ');
 
     const iframe = document.body.querySelector('iframe');
     expect(iframe).not.toBeNull();
@@ -108,8 +110,10 @@ describe('guestService', () => {
     document.body.replaceChildren();
   });
 
-  it('should download every guest as CSV, without a query param, when blank', () => {
-    guestService.exportGuestsCsv('   ');
+  it('should download every guest as CSV, without a query param, when blank', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({});
+
+    await guestService.exportGuestsCsv('   ');
 
     const iframe = document.body.querySelector('iframe');
     expect(iframe).not.toBeNull();

@@ -226,9 +226,13 @@ export const Reservations = () => {
   const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? DEFAULT_SORT_DIR);
   const [upcomingOnly, setUpcomingOnly] = useState(() => navState?.upcomingOnly ?? false);
 
-  const handleExportCsv = useCallback(() => {
-    reservationService.exportReservationsCsv({ query: searchQuery, upcomingOnly });
-  }, [searchQuery, upcomingOnly]);
+  const handleExportCsv = useCallback(async () => {
+    try {
+      await reservationService.exportReservationsCsv({ query: searchQuery, upcomingOnly });
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('csv_export_failed')), 'error');
+    }
+  }, [searchQuery, upcomingOnly, addToast, t]);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);

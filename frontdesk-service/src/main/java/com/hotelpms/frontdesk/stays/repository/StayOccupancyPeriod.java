@@ -17,8 +17,10 @@ public interface StayOccupancyPeriod {
     LocalDate getPeriodStart();
 
     /**
-     * Nights actually stayed, summed across every {@code CHECKED_OUT} stay
-     * whose arrival falls in this bucket.
+     * Nights actually occupied within this bucket, counted night-by-night
+     * across every {@code CHECKED_IN} or {@code CHECKED_OUT} stay whose
+     * occupied interval overlaps a night in this bucket — not summed by
+     * arrival date.
      *
      * @return the occupied room-nights for this bucket
      */

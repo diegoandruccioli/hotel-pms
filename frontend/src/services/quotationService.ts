@@ -1,4 +1,5 @@
 import api from './api';
+import { downloadViaIframe } from '../utils/downloadViaIframe';
 import type { QuotationRequest, QuotationResponse } from '../types';
 import type { ReservationResponse } from '../types';
 import type { SpringPage } from '../types';
@@ -57,14 +58,12 @@ export const quotationService = {
   /**
    * Triggers the browser's native download for the quotation PDF via a hidden
    * iframe — same pattern as billingService.downloadPdf (see that file for
-   * why fetch+Blob+synthetic-click was abandoned).
+   * why fetch+Blob+synthetic-click was abandoned), via the shared
+   * `downloadViaIframe` helper so this download also benefits from its
+   * pre-flight auth-refresh (BUG-5).
    */
-  downloadPdf: (id: string): void => {
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = `${BASE_PATH}/${id}/pdf`;
-    document.body.appendChild(iframe);
-    setTimeout(() => document.body.removeChild(iframe), IFRAME_CLEANUP_DELAY_MS);
+  downloadPdf: async (id: string): Promise<void> => {
+    await downloadViaIframe(`${BASE_PATH}/${id}/pdf`, IFRAME_CLEANUP_DELAY_MS);
   },
 
   /**

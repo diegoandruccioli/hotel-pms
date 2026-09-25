@@ -107,9 +107,14 @@ export const QuotationDetail = () => {
   const handleEdit = useCallback(() => navigate(`/quotations/${id}/edit`), [navigate, id]);
   const openPreview = useCallback(() => setPreviewOpen(true), []);
   const closePreview = useCallback(() => setPreviewOpen(false), []);
-  const handleDownload = useCallback(() => {
-    if (id) quotationService.downloadPdf(id);
-  }, [id]);
+  const handleDownload = useCallback(async () => {
+    if (!id) return;
+    try {
+      await quotationService.downloadPdf(id);
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('download_failed', { ns: 'common' })), 'error');
+    }
+  }, [id, addToast, t]);
 
   const handleSend = useCallback(async () => {
     if (!id) return;
