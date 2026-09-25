@@ -19,6 +19,54 @@ export async function csrfHeader(request: APIRequestContext): Promise<Record<str
     return { 'X-CSRF-Token': csrf.value };
 }
 
+/**
+ * Guarantees the hotel has the fiscal identity FatturaPAServiceImpl requires
+ * (HOTEL_FISCAL_IDENTITY_INCOMPLETE / structured-address checks otherwise).
+ * Fills only the fields that are blank and never overwrites a real value, so
+ * it is safe on a DB that already carries a genuine profile. The 11-digit
+ * Partita IVA is a syntactic placeholder, not a real one — dev stack only.
+ */
+export async function ensureHotelFiscalProfile(
+    request: APIRequestContext,
+    headers: Record<string, string>,
+): Promise<void> {
+    const response = await request.get('/api/v1/stays/settings');
+    if (response.status() !== 200) {
+        throw new Error(`Failed to read hotel settings: ${response.status()} ${await response.text()}`);
+    }
+    const current = await response.json() as Record<string, unknown>;
+    const pick = (key: string, fallback: string): string => {
+        const value = current[key];
+        return typeof value === 'string' && value.trim() !== '' ? value : fallback;
+    };
+    const fiscalKeys = ['hotelName', 'vatNumber', 'address', 'cap', 'comune', 'provincia'];
+    if (fiscalKeys.every((key) => pick(key, '') !== '')) {
+        return;
+    }
+    const update = await request.put('/api/v1/stays/settings', {
+        headers,
+        data: {
+            hotelName: pick('hotelName', 'E2E Live Hotel'),
+            address: pick('address', 'Via Test 1'),
+            vatNumber: pick('vatNumber', '01234567890'),
+            fiscalCode: pick('fiscalCode', ''),
+            logoUrl: pick('logoUrl', ''),
+            cap: pick('cap', '00100'),
+            comune: pick('comune', 'Roma'),
+            provincia: pick('provincia', 'RM'),
+            alloggiatiAutoSend: current.alloggiatiAutoSend,
+            sendReservationConfirmedEmail: current.sendReservationConfirmedEmail,
+            sendCheckoutEmail: current.sendCheckoutEmail,
+            emailSubjectReservationConfirmed: pick('emailSubjectReservationConfirmed', ''),
+            emailSubjectCheckout: pick('emailSubjectCheckout', ''),
+            emailGreetingText: pick('emailGreetingText', ''),
+        },
+    });
+    if (update.status() !== 200) {
+        throw new Error(`Failed to set hotel fiscal profile: ${update.status()} ${await update.text()}`);
+    }
+}
+
 export interface CreatedRoom {
     id: string;
     roomNumber: string;
