@@ -16,6 +16,14 @@ spring:
       name: ${CONFIG_SERVER_USERNAME:configuser}
       password: ${CONFIG_SERVER_PASSWORD}
 
+logging:
+  pattern:
+    # CWE-117 log injection, structural layer (see config/application.yml for the
+    # rationale): config-service serves that shared file to every other service
+    # but does not import it for itself (no spring.config.import here), so the
+    # same console pattern is repeated locally.
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%replace(%X{correlationId:-}){'[\\r\\n]','_'}] %logger{36} - %replace(%msg){'[\\r\\n]','_'}%n"
+
 management:
   server:
     port: 8090

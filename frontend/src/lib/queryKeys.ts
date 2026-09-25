@@ -26,8 +26,16 @@ export const queryKeys = {
   },
   reservations: {
     all: ['reservations'] as const,
-    search: (params: { query: string; upcomingOnly: boolean; page: number; sort: string }) =>
-      ['reservations', 'search', params] as const,
+    search: (params: {
+      query: string;
+      upcomingOnly: boolean;
+      page: number;
+      sort: string;
+      dateFrom?: string;
+      dateTo?: string;
+      status?: string;
+      size?: number;
+    }) => ['reservations', 'search', params] as const,
   },
   invoices: {
     all: ['invoices'] as const,
@@ -43,6 +51,8 @@ export const queryKeys = {
   stays: {
     all: ['stays'] as const,
     list: (page: number) => ['stays', 'list', page] as const,
+    search: (params: { status?: string; page: number; size?: number }) =>
+      ['stays', 'search', params] as const,
   },
   dashboard: {
     daySheet: (date: string) => ['dashboard', 'day-sheet', date] as const,
@@ -67,5 +77,9 @@ export const queryKeys = {
     all: ['reservation-groups'] as const,
     list: (page: number, size: number) => ['reservation-groups', 'list', page, size] as const,
     detail: (id: string) => ['reservation-groups', 'detail', id] as const,
+  },
+  housekeeping: {
+    businessDate: ['housekeeping', 'business-date'] as const,
+    worksheet: (date: string) => ['housekeeping', 'worksheet', date] as const,
   },
 } as const;

@@ -2,12 +2,14 @@ package com.hotelpms.guest.integration;
 
 import com.hotelpms.guest.model.Guest;
 import com.hotelpms.guest.repository.GuestRepository;
+import com.hotelpms.guest.security.DocumentNumberEncryptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -39,10 +41,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers(disabledWithoutDocker = true)
+// DocumentNumberEncryptor: @DataJpaTest's minimal context doesn't scan plain
+// @Component beans, but Hibernate needs it (via DocumentNumberConverter, @Convert
+// on IdentityDocument.documentNumber) to bootstrap the EntityManagerFactory for
+// this persistence unit, regardless of which entity this test actually exercises.
+@Import(DocumentNumberEncryptor.class)
 @TestPropertySource(properties = {
         "spring.jpa.hibernate.ddl-auto=validate",
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect",
-        "spring.flyway.enabled=true"
+        "spring.flyway.enabled=true",
+        "guest.documents.encryption-key=test-encryption-key",
+        "guest.documents.encryption-salt=deadbeefdeadbeefdeadbeefdeadbeef"
 })
 class GuestSearchIntegrationTest {
 

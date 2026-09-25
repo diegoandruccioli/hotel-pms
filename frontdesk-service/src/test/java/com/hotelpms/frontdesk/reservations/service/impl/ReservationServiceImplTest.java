@@ -104,6 +104,8 @@ class ReservationServiceImplTest {
     private static final String GUEST_EMAIL = "test@example.com";
     private static final String FULL_NAME = "Test Guest";
     private static final String HOTEL_NAME_TEST = "Hotel Test";
+    private static final String TEST_TIMEZONE = "Europe/Rome";
+    private static final int TEST_CUTOFF_HOUR = 4;
 
     @Mock
     private ReservationRepository reservationRepository;
@@ -208,7 +210,7 @@ class ReservationServiceImplTest {
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null, null, null, null, null));
+                        true, true, null, null, null, null, null, null, null, TEST_TIMEZONE, TEST_CUTOFF_HOUR));
         when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
 
         final ReservationResponse result = reservationService.createReservation(request);
@@ -234,7 +236,7 @@ class ReservationServiceImplTest {
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null, null, null, null, null));
+                        true, true, null, null, null, null, null, null, null, TEST_TIMEZONE, TEST_CUTOFF_HOUR));
         when(notificationClient.sendReservationConfirmed(any())).thenReturn(false);
 
         reservationService.createReservation(request);
@@ -255,7 +257,7 @@ class ReservationServiceImplTest {
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null, null, null, null, null));
+                        true, true, null, null, null, null, null, null, null, TEST_TIMEZONE, TEST_CUTOFF_HOUR));
         when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
 
         final ReservationResponse result = reservationService.createReservationFromPricedRooms(
@@ -278,7 +280,7 @@ class ReservationServiceImplTest {
         when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null, null, null, null, null));
+                        true, true, null, null, null, null, null, null, null, TEST_TIMEZONE, TEST_CUTOFF_HOUR));
         when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
         when(reservationRepository.save(entity)).thenReturn(entity);
         when(reservationMapper.toResponse(entity)).thenReturn(response);
@@ -307,7 +309,7 @@ class ReservationServiceImplTest {
         when(reservationMapper.toResponse(entity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        false, true, null, null, null, null, null, null, null));
+                        false, true, null, null, null, null, null, null, null, TEST_TIMEZONE, TEST_CUTOFF_HOUR));
 
         final ReservationResponse result = reservationService.createReservation(request);
 
@@ -340,7 +342,7 @@ class ReservationServiceImplTest {
         when(reservationMapper.toResponse(entityWithNullStatus)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null, null, null, null, null));
+                        true, true, null, null, null, null, null, null, null, TEST_TIMEZONE, TEST_CUTOFF_HOUR));
 
         reservationService.createReservation(requestWithNullStatus);
 
@@ -795,6 +797,22 @@ class ReservationServiceImplTest {
         assertThrows(NotFoundException.class, () -> reservationService
                 .syncLineItemRoomForCheckedInStay(reservationId, unrelatedRoomId, newRoomId, HOTEL_ID));
         verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void syncLineItemRoomForCheckedInStayTranslatesResidualOverlapIntoConflict() {
+        final UUID newRoomId = Objects.requireNonNull(UUID.randomUUID());
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(roomService.getRoomById(newRoomId, HOTEL_ID)).thenReturn(activeRoom(newRoomId));
+        when(ratePricingService.resolveStayRates(
+                ROOM_TYPE_ID, HOTEL_ID, entity.getCheckInDate(), entity.getCheckOutDate()))
+                .thenReturn(List.of(new NightlyRate(entity.getCheckInDate(), PRICE_120, null)));
+        when(reservationRepository.saveAndFlush(entity)).thenThrow(exclusionViolation());
+
+        final ConflictException ex = assertThrows(ConflictException.class,
+                () -> reservationService.syncLineItemRoomForCheckedInStay(reservationId, roomId, newRoomId, HOTEL_ID),
+                "A room double-booked by someone else concurrently must surface a 409, not a raw 500");
+        assertEquals(ROOM_UNAVAILABLE_DATES_MSG, ex.getMessage());
     }
 
     @Test
@@ -1318,7 +1336,7 @@ class ReservationServiceImplTest {
         when(reservationMapper.toResponse(groupEntity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null, null, null, null, null));
+                        true, true, null, null, null, null, null, null, null, TEST_TIMEZONE, TEST_CUTOFF_HOUR));
         when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
 
         reservationService.createReservationForGroup(
@@ -1352,7 +1370,7 @@ class ReservationServiceImplTest {
         when(reservationMapper.toResponse(groupEntity)).thenReturn(response);
         when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null, null, null, null, null));
+                        true, true, null, null, null, null, null, null, null, TEST_TIMEZONE, TEST_CUTOFF_HOUR));
         when(notificationClient.sendReservationConfirmed(any())).thenReturn(true);
         when(ratePricingService.resolveStayRates(ROOM_TYPE_ID, HOTEL_ID, checkIn, checkOut))
                 .thenReturn(List.of(new NightlyRate(checkIn, PRICE_120, null),

@@ -12,6 +12,16 @@ export function useStaysList(page: number) {
   });
 }
 
+/** Powers the night-audit pre-check and the front-desk dashboard's due-out
+ * widget — a small, status-filtered slice rather than the full paginated
+ * list `useStaysList` backs. */
+export function useStaysSearch(params: { status?: string; page: number; size?: number }) {
+  return useQuery({
+    queryKey: queryKeys.stays.search(params),
+    queryFn: () => stayService.searchStays(params),
+  });
+}
+
 /** checkOut/retryInvoiceCreation/retryCheckoutEmail all patch the single
  * updated stay into the cached page in place — same reasoning as the
  * equivalent room-status and reservation-email mutations: these are

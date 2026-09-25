@@ -30,11 +30,9 @@ repositories {
 
 ext {
     set("springCloudVersion", "2025.0.0")
-    // CVE-2026-42583/42584/42579/42587: fixed in 4.1.133.Final; CVE-2026-47691/45674/45416/44249: fixed in 4.1.135.Final; CVE-2026-56745/55833/55831/59901: fixed in 4.1.136.Final — override Spring Boot BOM pin.
-    set("netty.version", "4.1.136.Final")
     set("mapStructVersion", "1.6.3")
-    // CVE-2026-43512/43513/43515/41284/41293/42498: fixed in Tomcat 10.1.55 (2026-05-05).
-    set("tomcat.version", "10.1.55")
+    // tomcat.version / netty.version: centralized in the root build.gradle.kts's
+    // subprojects{} block — see that file for the CVE history.
 }
 
 dependencies {
@@ -98,8 +96,9 @@ dependencyManagement {
         dependency("commons-io:commons-io:2.14.0")
         // CVE-2026-42198: fixed in PostgreSQL JDBC 42.7.11; CVE-2026-54291 (SCRAM-SHA-256-PLUS channel-binding downgrade): fixed in 42.7.12.
         dependency("org.postgresql:postgresql:42.7.12")
-        // CVE-2026-5598: fixed in BouncyCastle 1.84.
-        dependency("org.bouncycastle:bcprov-jdk18on:1.84")
+        // CVE-2026-5598: fixed in BouncyCastle 1.84. CVE-2026-8763 (name
+        // constraints bypass via trailing dot, CRITICAL): fixed in 1.85.
+        dependency("org.bouncycastle:bcprov-jdk18on:1.85")
     }
 }
 

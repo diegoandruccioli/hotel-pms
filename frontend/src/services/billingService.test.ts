@@ -30,6 +30,25 @@ describe('billingService', () => {
     expect(result).toEqual(mockResponse);
   });
 
+  it('should add a manual charge to a stay', async () => {
+    const request = { type: 'EXTRA' as const, description: 'Minibar', amount: 15 };
+    const mockResponse = { id: 'c1', invoiceId: 'inv1', ...request, vatRate: 0.22 };
+    vi.mocked(api.post).mockResolvedValueOnce({ data: mockResponse });
+
+    const result = await billingService.addCharge('stay1', request);
+
+    expect(api.post).toHaveBeenCalledWith('/api/v1/invoices/stay/stay1/charges', request);
+    expect(result).toEqual(mockResponse);
+  });
+
+  it('should remove a manual charge from a stay', async () => {
+    vi.mocked(api.delete).mockResolvedValueOnce({ data: undefined });
+
+    await billingService.removeCharge('stay1', 'c1');
+
+    expect(api.delete).toHaveBeenCalledWith('/api/v1/invoices/stay/stay1/charges/c1');
+  });
+
   it('should search invoices with default pagination when no filters are given', async () => {
     const mockPage = { content: [{ invoice: { id: 'inv1', status: 'ISSUED' }, guestName: 'Mario Rossi' }] };
     vi.mocked(api.get).mockResolvedValueOnce({ data: mockPage });

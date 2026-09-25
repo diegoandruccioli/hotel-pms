@@ -4,6 +4,12 @@
 # has to live in this image, not a satellite container — see backup/DECISIONS.md §3.5.
 FROM postgres:15-alpine
 
+# Patch Alpine OS packages on top of the upstream image (same pattern as the 8
+# Java service Dockerfiles): closes CVEs in packages the postgres:15-alpine base
+# doesn't rebuild on its own release cadence, e.g. libuuid 2.42.1-r0 (Trivy
+# alerts #606-#612, HIGH — fixed in 2.42.3-r0/r1).
+RUN apk update && apk upgrade --no-cache
+
 # Alpine's pgbackrest package depends on the generic "postgresql" meta-package
 # (currently Alpine 3.24's postgresql18), which pulls in a second, unused
 # Postgres server + client under /usr/ alongside this image's real v15 server

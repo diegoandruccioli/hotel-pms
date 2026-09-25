@@ -8,6 +8,7 @@ import com.hotelpms.frontdesk.client.dto.InvoiceForEmailResponse;
 import com.hotelpms.frontdesk.client.dto.InvoiceStatusResponse;
 import com.hotelpms.frontdesk.client.dto.MasterFolioRequest;
 import com.hotelpms.frontdesk.client.dto.PaymentSummaryClientResponse;
+import com.hotelpms.frontdesk.client.dto.StayInvoiceDateResponse;
 import com.hotelpms.frontdesk.client.dto.StayInvoiceRequest;
 import feign.FeignException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -132,6 +133,34 @@ public interface BillingClient {
     @DeleteMapping("/api/v1/invoices/stay/{stayId}/charges/{chargeId}")
     @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "removeChargeFallback")
     void removeCharge(@PathVariable("stayId") UUID stayId, @PathVariable("chargeId") UUID chargeId);
+
+    /**
+     * Returns the most recent invoice date relevant to a stay, for the GDPR
+     * legal-hold guard (E22) that gates {@code StayGuest} anonymisation.
+     *
+     * @param stayId the stay UUID
+     * @return response with existence flag and most recent relevant invoice date
+     */
+    @GetMapping("/api/v1/invoices/stay/{stayId}/last-date")
+    @CircuitBreaker(name = CB_BILLING_SERVICE, fallbackMethod = "getLastInvoiceDateForStayFallback")
+    StayInvoiceDateResponse getLastInvoiceDateForStay(@PathVariable("stayId") UUID stayId);
+
+    /**
+     * Fail-safe fallback: if billing-service is unavailable, assume the stay
+     * has a recent invoice and block anonymisation to prevent accidental data
+     * loss — same conservative posture as guest-service's equivalent GDPR
+     * legal-hold fallback.
+     *
+     * @param stayId    the stay UUID
+     * @param throwable the cause of the failure
+     * @return a response indicating an invoice exists (conservative block)
+     */
+    default StayInvoiceDateResponse getLastInvoiceDateForStayFallback(
+            final UUID stayId, final Throwable throwable) {
+        LOG.warn("[BillingClient] getLastInvoiceDateForStay fallback | stayId={} | cause={}: {}",
+                stayId, throwable.getClass().getSimpleName(), throwable.getMessage());
+        return new StayInvoiceDateResponse(true, null);
+    }
 
     /**
      * Retrieves the cash-closing summary (payments by method) for a single

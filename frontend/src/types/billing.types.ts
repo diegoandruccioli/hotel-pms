@@ -18,8 +18,21 @@ export interface ChargeResponse {
   description?: string;
   amount: number;
   vatRate?: number;
+  naturaCode?: string;
   referenceId?: string;
+  unitPrice?: number;
+  nights?: number;
   createdAt?: string;
+}
+
+/** Request body for POST /invoices/stay/{stayId}/charges — always type EXTRA from this UI. */
+export interface ChargeRequest {
+  type: ChargeType;
+  description: string;
+  amount: number;
+  referenceId?: string;
+  unitPrice?: number;
+  nights?: number;
 }
 
 export interface PaymentRequest {

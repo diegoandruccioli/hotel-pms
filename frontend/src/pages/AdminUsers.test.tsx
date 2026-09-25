@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import type { Role } from '../types';
 import { AdminUsers } from './AdminUsers';
 import { userService } from '../services';
 import { mockAxiosErrorWithDetail } from '../test-utils';
+
+// SettingsPageHeader's back button needs react-router-dom's useNavigate,
+// which throws outside a Router — every render needs this wrapper now.
+const renderAdminUsers = () => render(<MemoryRouter><AdminUsers /></MemoryRouter>);
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -59,13 +64,20 @@ describe('AdminUsers', () => {
 
   it('renders page heading', async () => {
     vi.mocked(userService.listUsers).mockResolvedValue([]);
-    render(<AdminUsers />);
+    renderAdminUsers();
     await waitFor(() => expect(screen.getByText('page_title')).toBeInTheDocument());
+  });
+
+  it('renders the shared SettingsPageHeader with a working back button', async () => {
+    vi.mocked(userService.listUsers).mockResolvedValue([]);
+    renderAdminUsers();
+    await waitFor(() => expect(screen.getByText('page_title')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'back' })).toBeInTheDocument();
   });
 
   it('renders user rows after load', async () => {
     vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
-    render(<AdminUsers />);
+    renderAdminUsers();
     await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
     expect(screen.getByText('alice@hotel.com')).toBeInTheDocument();
     expect(screen.getByText('RECEPTIONIST')).toBeInTheDocument();
@@ -73,14 +85,14 @@ describe('AdminUsers', () => {
 
   it('shows active/inactive status for each user', async () => {
     vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE, USER_INACTIVE]);
-    render(<AdminUsers />);
+    renderAdminUsers();
     await waitFor(() => expect(screen.getByText('status_active')).toBeInTheDocument());
     expect(screen.getByText('status_inactive')).toBeInTheDocument();
   });
 
   it('opens create user modal on button click', async () => {
     vi.mocked(userService.listUsers).mockResolvedValue([]);
-    render(<AdminUsers />);
+    renderAdminUsers();
     // Wait for loading to fully complete (no_users appears after setLoading(false))
     // This ensures the listUsers promise is flushed before we proceed.
     await waitFor(() => screen.getByText('no_users'));
@@ -92,7 +104,7 @@ describe('AdminUsers', () => {
 
   it('closes create user modal on cancel', async () => {
     vi.mocked(userService.listUsers).mockResolvedValue([]);
-    render(<AdminUsers />);
+    renderAdminUsers();
     await waitFor(() => screen.getByText('btn_new_user'));
     fireEvent.click(screen.getByText('btn_new_user'));
     fireEvent.click(screen.getByText('btn_cancel'));
@@ -102,7 +114,7 @@ describe('AdminUsers', () => {
   it('calls deactivateUser when active user toggle clicked', async () => {
     vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
     vi.mocked(userService.deactivateUser).mockResolvedValue({ ...USER_ACTIVE, active: false } as never);
-    render(<AdminUsers />);
+    renderAdminUsers();
     await waitFor(() => screen.getByText('alice'));
     fireEvent.click(screen.getByText('btn_deactivate'));
     await waitFor(() => expect(userService.deactivateUser).toHaveBeenCalledWith('u1'));
@@ -111,7 +123,7 @@ describe('AdminUsers', () => {
   it('calls activateUser when inactive user toggle clicked', async () => {
     vi.mocked(userService.listUsers).mockResolvedValue([USER_INACTIVE]);
     vi.mocked(userService.activateUser).mockResolvedValue({ ...USER_INACTIVE, active: true } as never);
-    render(<AdminUsers />);
+    renderAdminUsers();
     await waitFor(() => screen.getByText('bob'));
     fireEvent.click(screen.getByText('btn_activate'));
     await waitFor(() => expect(userService.activateUser).toHaveBeenCalledWith('u2'));
@@ -120,33 +132,33 @@ describe('AdminUsers', () => {
   it('shows mustChangePassword warning for flagged users', async () => {
     const userWithFlag = { ...USER_ACTIVE, mustChangePassword: true };
     vi.mocked(userService.listUsers).mockResolvedValue([userWithFlag]);
-    render(<AdminUsers />);
+    renderAdminUsers();
     await waitFor(() => expect(screen.getByText('must_change_pw')).toBeInTheDocument());
   });
 
   it('passes axe accessibility check', async () => {
     vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
-    const { container } = render(<AdminUsers />);
+    const { container } = renderAdminUsers();
     await waitFor(() => screen.getByText('alice'));
     expect(await axe(container)).toHaveNoViolations();
   }, 30000);
 
   it('shows an error toast when listUsers fails', async () => {
     vi.mocked(userService.listUsers).mockRejectedValue(new Error('boom'));
-    render(<AdminUsers />);
+    renderAdminUsers();
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_load_failed', 'error'));
   });
 
   it('shows the no_users message when the list is empty', async () => {
     vi.mocked(userService.listUsers).mockResolvedValue([]);
-    render(<AdminUsers />);
+    renderAdminUsers();
     await waitFor(() => expect(screen.getByText('no_users')).toBeInTheDocument());
   });
 
   it('shows an error toast when activate/deactivate fails', async () => {
     vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
     vi.mocked(userService.deactivateUser).mockRejectedValue(new Error('fail'));
-    render(<AdminUsers />);
+    renderAdminUsers();
     await waitFor(() => screen.getByText('alice'));
     fireEvent.click(screen.getByText('btn_deactivate'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_toggle_failed', 'error'));
@@ -157,7 +169,7 @@ describe('AdminUsers', () => {
     vi.mocked(userService.deactivateUser).mockRejectedValue(
       mockAxiosErrorWithDetail('CANNOT_DEACTIVATE_LAST_ADMIN', 409),
     );
-    render(<AdminUsers />);
+    renderAdminUsers();
     await waitFor(() => screen.getByText('alice'));
     fireEvent.click(screen.getByText('btn_deactivate'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('CANNOT_DEACTIVATE_LAST_ADMIN', 'error'));
@@ -166,7 +178,7 @@ describe('AdminUsers', () => {
   describe('CreateUserModal', () => {
     it('shows a validation error when required fields are missing', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([]);
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('btn_new_user'));
       fireEvent.click(screen.getByText('btn_new_user'));
 
@@ -179,7 +191,7 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([]);
       const created = { ...USER_ACTIVE, id: 'u3', username: 'carol' };
       vi.mocked(userService.createUser).mockResolvedValue(created as never);
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('btn_new_user'));
       fireEvent.click(screen.getByText('btn_new_user'));
 
@@ -199,7 +211,7 @@ describe('AdminUsers', () => {
     it('shows an error when createUser fails', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([]);
       vi.mocked(userService.createUser).mockRejectedValue(new Error('fail'));
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('btn_new_user'));
       fireEvent.click(screen.getByText('btn_new_user'));
 
@@ -216,7 +228,7 @@ describe('AdminUsers', () => {
       vi.mocked(userService.createUser).mockRejectedValue(
         mockAxiosErrorWithDetail('USERNAME_ALREADY_EXISTS', 409),
       );
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('btn_new_user'));
       fireEvent.click(screen.getByText('btn_new_user'));
 
@@ -230,7 +242,7 @@ describe('AdminUsers', () => {
 
     it('toggles password visibility in the create user form', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([]);
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('btn_new_user'));
       fireEvent.click(screen.getByText('btn_new_user'));
 
@@ -246,7 +258,7 @@ describe('AdminUsers', () => {
 
     it('closes on Escape key', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([]);
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('btn_new_user'));
       fireEvent.click(screen.getByText('btn_new_user'));
       fireEvent.keyDown(document, { key: 'Escape' });
@@ -257,7 +269,7 @@ describe('AdminUsers', () => {
   describe('ResetPasswordModal', () => {
     it('opens via the reset-password button', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
       fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
       expect(screen.getByText('modal_reset_title')).toBeInTheDocument();
@@ -265,7 +277,7 @@ describe('AdminUsers', () => {
 
     it('toggles password visibility independently for new and confirm fields', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
       fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
 
@@ -285,7 +297,7 @@ describe('AdminUsers', () => {
 
     it('shows an error when the password is too short', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
       fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
 
@@ -298,7 +310,7 @@ describe('AdminUsers', () => {
 
     it('shows an error when the password is long but too weak', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
       fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
 
@@ -310,7 +322,7 @@ describe('AdminUsers', () => {
 
     it('shows an error when passwords do not match', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
       fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
 
@@ -325,7 +337,7 @@ describe('AdminUsers', () => {
     it('resets the password successfully and shows a success toast', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       vi.mocked(userService.resetUserPassword).mockResolvedValue(undefined);
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
       fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
 
@@ -342,7 +354,7 @@ describe('AdminUsers', () => {
     it('shows an error when resetUserPassword fails', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       vi.mocked(userService.resetUserPassword).mockRejectedValue(new Error('fail'));
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
       fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
 
@@ -359,7 +371,7 @@ describe('AdminUsers', () => {
       vi.mocked(userService.resetUserPassword).mockRejectedValue(
         mockAxiosErrorWithDetail('USER_NOT_FOUND', 404),
       );
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
       fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
 
@@ -373,7 +385,7 @@ describe('AdminUsers', () => {
 
     it('closes via cancel and Escape', async () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
-      render(<AdminUsers />);
+      renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
       fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
       fireEvent.click(screen.getByText('btn_cancel'));

@@ -231,7 +231,7 @@ class StayServiceGroupCheckoutTest {
                 .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(hotelSettingsService.getOrCreate(hotelId))
                 .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null, null, null, null, null));
+                        true, true, null, null, null, null, null, null, null, "Europe/Rome", 4));
         when(billingClient.getInvoiceForEmail(invoiceId))
                 .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, OPEN_STATUS,
                         BigDecimal.ZERO, CURRENCY_EUR, List.of()));
@@ -282,7 +282,7 @@ class StayServiceGroupCheckoutTest {
                 .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         when(hotelSettingsService.getOrCreate(hotelId))
                 .thenReturn(new HotelSettingsResponse(hotelId, false, HOTEL_NAME_TEST, null, null, null, null, null, false,
-                        true, true, null, null, null, null, null, null, null));
+                        true, true, null, null, null, null, null, null, null, "Europe/Rome", 4));
         when(billingClient.getInvoiceForEmail(invoiceId))
                 .thenReturn(new InvoiceForEmailResponse(invoiceId, reservationId, INVOICE_NUMBER_TEST, OPEN_STATUS,
                         BigDecimal.ZERO, CURRENCY_EUR, List.of()));

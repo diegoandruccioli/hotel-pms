@@ -7,6 +7,7 @@ import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GroupChargeRequest;
 import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
+import com.hotelpms.billing.dto.StayInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.InvoiceSummaryResponse;
@@ -137,6 +138,21 @@ public interface InvoiceService {
      * @return response containing whether invoices exist and the most recent date
      */
     GuestInvoiceCheckResponse getLastInvoiceDateForGuest(@NonNull UUID guestId, @NonNull UUID hotelId);
+
+    /**
+     * Returns the most recent invoice date relevant to a stay within a hotel —
+     * either the stay's own individual folio, or (if its charges were later
+     * transferred to a reservation group's MASTER folio, Punto 4) whichever
+     * invoice actually carries them.
+     * Used internally by the frontdesk-service GDPR legal-hold guard (E22) to
+     * verify whether the Codice Civile art. 2220 ten-year fiscal retention
+     * obligation has expired before anonymising a {@code StayGuest} record.
+     *
+     * @param stayId  the stay UUID; must not be {@code null}
+     * @param hotelId the hotel UUID; must not be {@code null}
+     * @return response containing whether a relevant invoice exists and its most recent date
+     */
+    StayInvoiceCheckResponse getLastInvoiceDateForStay(@NonNull UUID stayId, @NonNull UUID hotelId);
 
     /**
      * Returns all invoice summaries for a guest within a hotel, ordered by issue

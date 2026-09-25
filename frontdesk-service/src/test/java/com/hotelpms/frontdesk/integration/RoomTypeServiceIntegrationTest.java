@@ -7,6 +7,7 @@ import com.hotelpms.frontdesk.rooms.dto.RoomTypeRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomTypeResponse;
 import com.hotelpms.frontdesk.rooms.service.RoomTypeService;
 import com.hotelpms.frontdesk.stays.security.AlloggiatiCredentialEncryptor;
+import com.hotelpms.frontdesk.stays.security.StayGuestDocumentEncryptor;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -87,6 +88,9 @@ class RoomTypeServiceIntegrationTest {
 
     @MockitoBean
     private AlloggiatiCredentialEncryptor alloggiatiCredentialEncryptor;
+
+    @MockitoBean
+    private StayGuestDocumentEncryptor stayGuestDocumentEncryptor;
 
     @Autowired
     private RoomTypeService roomTypeService;

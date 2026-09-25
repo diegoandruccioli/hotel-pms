@@ -8,6 +8,10 @@ l'intero settore Horeca (hotel + ristorazione). Ogni fatto tecnico qui sotto è
 verificato sul codice sorgente al 2026-09-05, non dichiarato a intuito — vedi
 `backup/DECISIONS.md` ADR-006 per la decisione presa nel frattempo (nessuna
 integrazione nel pilota, solo un banner di avviso nell'interfaccia).
+**Ri-verificato il 2026-09-24** (checklist go-live, punto 4): tutti e 5 i
+fatti tecnici sotto sono stati riletti contro il codice attuale — nessuna
+modifica dal controllo precedente, il documento resta valido parola per
+parola.
 
 **Stato attuale**: nessuna integrazione con corrispettivi telematici o con un
 registratore telematico. Il pilota resta in affiancamento al gestionale fiscale

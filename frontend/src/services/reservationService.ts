@@ -14,6 +14,9 @@ export const reservationService = {
   searchReservations: async (params: {
     query?: string;
     upcomingOnly?: boolean;
+    dateFrom?: string;
+    dateTo?: string;
+    status?: string;
     page?: number;
     size?: number;
     sort?: string;
@@ -24,6 +27,9 @@ export const reservationService = {
     });
     if (params.query?.trim()) searchParams.set('query', params.query.trim());
     if (params.upcomingOnly) searchParams.set('upcomingOnly', 'true');
+    if (params.dateFrom) searchParams.set('dateFrom', params.dateFrom);
+    if (params.dateTo) searchParams.set('dateTo', params.dateTo);
+    if (params.status) searchParams.set('status', params.status);
     if (params.sort) searchParams.set('sort', params.sort);
     const response = await api.get<SpringPage<ReservationResponse>>(
       `${BASE_PATH}/search?${searchParams.toString()}`,

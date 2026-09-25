@@ -12,6 +12,17 @@ CVE-2026-22732
 # Project is now on Spring Cloud 2025.0.0 — suppression retained pending
 # confirmation from next Trivy run. Remove after next clean scan.
 CVE-2026-22739
+# ── tomcat-embed-core CRITICAL — fix version not yet published ─────────────
+# Trivy's DB marks these "fixed" (advisory names 11.0.25/10.1.58/9.0.121), but
+# none of those versions exist on Maven Central as of 2026-09-11 (verified:
+# GET .../tomcat-embed-core/10.1.58/... -> 404; Gradle dependency resolution
+# fails against it — see root build.gradle.kts's tomcat.version comment).
+# Blocks the CI CRITICAL gate on every one of the 8 Boot services otherwise.
+# Remove as soon as 10.1.58 (or newer 10.1.x) is actually published and the
+# root build.gradle.kts pin is bumped to match.
+CVE-2026-65182
+CVE-2026-65905
+CVE-2026-68525
 # ── Go stdlib CVEs (gosu + Grafana binaries) ────────────────────────────────
 # These CVEs are in Go standard library code compiled into gosu and Grafana
 # binaries. They are NOT present in our Java Spring Boot service images.
@@ -68,13 +79,38 @@ CVE-2026-39823
 #   gosu: does not decode MIME headers.
 #   Grafana: accepted upstream pending release with Go ≥ 1.26.4.
 CVE-2026-42504
+# ── gosu Go stdlib CVEs, batch 2 (found 2026-09-10 after docker/postgres/Dockerfile
+#   gained its own `apk upgrade`, which made hotel-pms/postgres:ci actually get
+#   scanned instead of the bare upstream postgres:15-alpine tag — see ci.yml's
+#   trivy job). All 16 are in usr/local/bin/gosu's bundled Go 1.24.6 stdlib.
+#   gosu's entire job is: parse UID/GID args, setuid/setgid, execve the real
+#   command — no network I/O, no TLS, no HTTP, no HTML/XML rendering, no cert
+#   chain building. None of these code paths are reachable from that.
+CVE-2025-68121
+CVE-2025-61726
+CVE-2025-61729
+CVE-2026-25679
+CVE-2026-27145
+CVE-2026-32280
+CVE-2026-32281
+CVE-2026-32283
+CVE-2026-33818
+CVE-2026-39821
+CVE-2026-39822
+CVE-2026-56853
+CVE-2026-56858
+CVE-2026-56859
+CVE-2026-56860
+CVE-2026-56862
 # ── postgres:15-alpine / redis:alpine — native library CVEs ─────────────────
 # These are CVEs in Alpine OS packages bundled with the official upstream
-# images, not in our application code. We do not pin a digest, so the next
-# `docker pull` of the same tag picks up the patched package once the
-# upstream image maintainers rebuild — no Dockerfile change needed on our
-# side. Documented here in the meantime per the same accepted-risk approach
-# used for the Go stdlib CVEs above.
+# images, not in our application code. Both docker/postgres/Dockerfile and
+# docker/redis/Dockerfile now run `apk update && apk upgrade --no-cache` on
+# top of the base tag, which resolves any CVE with a patched Alpine package
+# already published (confirmed: redis:8.8.2-alpine scans at 0 vulnerabilities
+# post-upgrade). The two entries below are reachability-based exceptions —
+# libraries present but not exercised by any code path we use — not "wait for
+# upstream to rebuild the tag".
 #
 # CVE-2026-6732 — libxml2: type confusion / crash when validating a crafted
 #   document against an XML Schema Definition (XSD) with an internal entity

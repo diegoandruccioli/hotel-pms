@@ -7,7 +7,7 @@
 
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
-      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n</pattern>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%replace(%X{correlationId:-}){'[\r\n]','_'}] %logger{36} - %replace(%msg){'[\r\n]','_'}%n</pattern>
       <charset>UTF-8</charset>
     </encoder>
   </appender>
@@ -22,7 +22,7 @@
           <pattern>service=${appName},level=%level</pattern>
         </label>
         <message>
-          <pattern>[%level] [%thread] %logger{36} | %msg%n%ex</pattern>
+          <pattern>[%level] [%thread] %logger{36} | %replace(%msg){'[\r\n]','_'}%n%ex</pattern>
         </message>
         <sortByTime>true</sortByTime>
       </format>

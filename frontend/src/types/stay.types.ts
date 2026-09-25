@@ -225,6 +225,11 @@ export interface HotelSettingsRequest {
   comune?: string;
   /** Provincia — 2-letter province code, e.g. "RM". */
   provincia?: string;
+  /** IANA timezone the hotel operates in, e.g. "Europe/Rome". Undefined = leave unchanged. */
+  timezone?: string;
+  /** Hour of the day (0-12, hotel-local) before which the housekeeping worksheet's
+   * business date still resolves to yesterday. Undefined = leave unchanged. */
+  housekeepingDayCutoffHour?: number;
 }
 
 export interface HotelSettingsResponse {
@@ -245,6 +250,11 @@ export interface HotelSettingsResponse {
   cap?: string | null;
   comune?: string | null;
   provincia?: string | null;
+  /** IANA timezone the hotel operates in, e.g. "Europe/Rome". */
+  timezone: string;
+  /** Hour of the day (0-12, hotel-local) before which the housekeeping worksheet's
+   * business date still resolves to yesterday. */
+  housekeepingDayCutoffHour: number;
 }
 
 /** E18: request to record a new hotel classification/category entry (append-only). */

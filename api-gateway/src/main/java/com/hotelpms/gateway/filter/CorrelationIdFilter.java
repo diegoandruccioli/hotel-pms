@@ -11,13 +11,17 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Gateway global filter that propagates a correlation ID across the entire request chain.
  *
- * <p>If the incoming request carries an {@code X-Correlation-ID} header, its value is
- * forwarded unchanged to downstream services. If the header is absent, a new UUID is
- * generated and injected. The correlation ID is also added to the response so that
+ * <p>If the incoming request carries an {@code X-Correlation-ID} header matching
+ * {@link #VALID_CORRELATION_ID}, its value is forwarded to downstream services. Otherwise
+ * (absent, blank, or not matching the allowlist — e.g. containing CR/LF) a new UUID is
+ * generated and injected instead, since this value flows unsanitized into every
+ * downstream service's MDC and plain-text log encoder (CWE-117 log injection) and is
+ * echoed back on the response. The correlation ID is also added to the response so that
  * callers (e.g. the frontend) can include it in support tickets.
  *
  * <p>This filter runs before {@link AuthenticationFilter} (order
@@ -31,6 +35,8 @@ public class CorrelationIdFilter implements GlobalFilter, Ordered {
 
     /** Header name used throughout the platform for distributed tracing correlation. */
     public static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
+
+    private static final Pattern VALID_CORRELATION_ID = Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
 
     @Override
     public Mono<Void> filter(final ServerWebExchange exchange, final GatewayFilterChain chain) {
@@ -57,7 +63,7 @@ public class CorrelationIdFilter implements GlobalFilter, Ordered {
 
     private static String resolveCorrelationId(final ServerHttpRequest request) {
         final String existing = request.getHeaders().getFirst(CORRELATION_ID_HEADER);
-        if (existing != null && !existing.isBlank()) {
+        if (existing != null && VALID_CORRELATION_ID.matcher(existing).matches()) {
             return existing;
         }
         return UUID.randomUUID().toString();

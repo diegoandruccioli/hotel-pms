@@ -43,7 +43,7 @@ We follow responsible disclosure: once a fix is available, we will publish a Git
 
 ### Out of scope
 
-- Vulnerabilities in third-party Docker base images already tracked in `report-secure-coding.tex` (e.g. Grafana 11.5.0 Alpine CVEs — documented accepted risk)
+- Vulnerabilities in third-party Docker base images already tracked in `report-secure-coding.tex` (e.g. Grafana 13.1.5 bundled Go plugin CVEs — documented accepted risk)
 - Denial-of-service attacks requiring sustained traffic above configured rate limits
 - Social engineering
 - Physical security
@@ -57,7 +57,7 @@ Notable accepted residual risks:
 | ID | Description | Mitigation |
 |---|---|---|
 | CVE-2026-42577 | Netty epoll DoS — fix requires Netty 4.2.x, incompatible with current Spring Boot 3.5.x BOM | Network-layer isolation; JDK NIO transport active |
-| Grafana CVEs | Grafana 11.5.0 Alpine layer (OpenSSL, musl, zlib) | Internal-only tool, isolated Docker network, no guest PII |
+| Grafana CVEs | Grafana 13.1.5 bundled Go datasource plugins (zipkin, elasticsearch), fixable only upstream | Internal-only tool, isolated Docker network, no guest PII |
 
 ## Security contacts
 

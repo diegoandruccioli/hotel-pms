@@ -99,3 +99,35 @@ export function mockOwnerSummary(page: Page, overrides: Partial<MockOwnerSummary
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }),
   );
 }
+
+/** Empty `SpringPage<T>` shape — used as the default body for both search
+ * mocks below, since most specs only care that the Dashboard's front-desk
+ * work-list panel renders its empty state, not specific rows. */
+function emptySpringPage(size: number): Record<string, unknown> {
+  return {
+    content: [], totalElements: 0, totalPages: 0, number: 0, size,
+    numberOfElements: 0, first: true, last: true, empty: true,
+  };
+}
+
+/** Backs `ArrivalsDeparturesPanel`'s arrivals list
+ * (`reservationService.searchReservations`). Matched by path only — the
+ * component always appends `dateFrom`/`dateTo`/`status`/`sort` query params
+ * that would make an exact-match pattern brittle. */
+export function mockTodayArrivals(page: Page, content: unknown[] = []): Promise<void> {
+  const body = { ...emptySpringPage(8), content, totalElements: content.length, empty: content.length === 0 };
+  return page.route('**/api/v1/reservations/search**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }),
+  );
+}
+
+/** Backs `ArrivalsDeparturesPanel`'s due-out list (`stayService.searchStays`,
+ * same `/api/v1/stays` base path as check-in/checkout and the two
+ * alloggiati/city-tax summary endpoints — matched on the literal `?` so this
+ * doesn't also swallow those, which have no query string of their own). */
+export function mockDueOutStays(page: Page, content: unknown[] = []): Promise<void> {
+  const body = { ...emptySpringPage(50), content, totalElements: content.length, empty: content.length === 0 };
+  return page.route(/\/api\/v1\/stays\?/, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }),
+  );
+}

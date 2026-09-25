@@ -14,7 +14,11 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../services/billingReportService', () => ({
-  billingReportService: { getOwnerFinancialReport: vi.fn(), exportToCsv: vi.fn() },
+  billingReportService: {
+    getOwnerFinancialReport: vi.fn(),
+    getOwnerFinancialSummary: vi.fn(),
+    exportToCsv: vi.fn(),
+  },
 }));
 
 vi.mock('../services/kpiReportService', () => ({
@@ -37,6 +41,13 @@ describe('OwnerDashboard', () => {
     vi.mocked(kpiReportService.getKpiReport).mockResolvedValue({
       periods: [], totals: { periodStart: '', totalRoomRevenue: 0, occupiedRoomNights: 0,
         availableRoomNights: 0, adr: 0, revpar: 0, occupancyRate: 0 },
+    });
+    // Previous-period comparison call the report load now makes alongside
+    // getOwnerFinancialReport — default to an empty baseline so DeltaBadge
+    // has nothing to compare against (previous === 0) and stays absent
+    // unless a test explicitly overrides this to assert on it.
+    vi.mocked(billingReportService.getOwnerFinancialSummary).mockResolvedValue({
+      startDate: '', endDate: '', totalRevenue: 0, totalInvoices: 0, paidInvoices: 0, pendingRevenue: 0,
     });
   });
 
@@ -120,6 +131,21 @@ describe('OwnerDashboard', () => {
     expect(billingReportService.exportToCsv).toHaveBeenCalledWith(
       expect.any(String), expect.any(String),
     );
+  });
+
+  it('shows a delta badge comparing revenue against the previous period', async () => {
+    mockUseAuthStore.mockReturnValue({ user: { role: 'OWNER' } });
+    vi.mocked(billingReportService.getOwnerFinancialReport).mockResolvedValueOnce(REPORT);
+    vi.mocked(billingReportService.getOwnerFinancialSummary).mockResolvedValueOnce({
+      startDate: '2026-05-01', endDate: '2026-05-30', totalRevenue: 1000, totalInvoices: 4, paidInvoices: 2, pendingRevenue: 0,
+    });
+    renderWithQuery(<OwnerDashboard />);
+
+    fireEvent.click(screen.getByText('generate_report'));
+
+    await waitFor(() => expect(screen.getByText('INV-1')).toBeInTheDocument());
+    // One badge each for revenue, total invoices, and paid invoices.
+    expect(screen.getAllByText('delta_vs_previous_period')).toHaveLength(3);
   });
 
   it('shows the no_invoices_period message when the report has zero invoices', async () => {

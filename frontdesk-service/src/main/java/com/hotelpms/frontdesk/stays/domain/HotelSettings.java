@@ -42,6 +42,9 @@ public class HotelSettings {
     private static final int LEN_COMUNE = 100;
     private static final int LEN_COMUNE_CODICE = 9;
     private static final int LEN_CITY_TAX_APPLICABILITY = 20;
+    private static final int LEN_TIMEZONE = 64;
+    private static final String DEFAULT_TIMEZONE = "Europe/Rome";
+    private static final short DEFAULT_HOUSEKEEPING_DAY_CUTOFF_HOUR = 4;
 
     /** The hotel this settings row belongs to (primary key). */
     @Id
@@ -169,6 +172,25 @@ public class HotelSettings {
      */
     @Column(name = "email_greeting_text", length = LEN_EMAIL_GREETING)
     private String emailGreetingText;
+
+    /**
+     * IANA timezone this hotel operates in (e.g. {@code "Europe/Rome"}). Used by
+     * {@link com.hotelpms.frontdesk.housekeeping.service.BusinessDateResolver} to resolve
+     * "today" from the hotel's local clock rather than the JVM default zone.
+     */
+    @Column(name = "timezone", nullable = false, length = LEN_TIMEZONE)
+    @Builder.Default
+    private String timezone = DEFAULT_TIMEZONE;
+
+    /**
+     * Hour of the day (0-12, hotel-local time) before which the housekeeping
+     * business date is still considered "yesterday" — e.g. with the default
+     * value {@code 4}, a housekeeping worksheet requested at 02:00 resolves to
+     * yesterday's date, matching what the night shift is still working on.
+     */
+    @Column(name = "housekeeping_day_cutoff_hour", nullable = false)
+    @Builder.Default
+    private short housekeepingDayCutoffHour = DEFAULT_HOUSEKEEPING_DAY_CUTOFF_HOUR;
 
     /** The timestamp when the record was created. */
     @CreatedDate

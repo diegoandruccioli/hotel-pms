@@ -1,7 +1,9 @@
 package com.hotelpms.guest.model;
 
 import com.hotelpms.guest.model.enums.DocumentType;
+import com.hotelpms.guest.security.DocumentNumberConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
@@ -43,6 +45,9 @@ import java.util.UUID;
 @Builder
 public class IdentityDocument {
 
+    /** Encrypted ciphertext (IV + tag + encoding overhead) needs far more room than the plaintext. */
+    private static final int ENCRYPTED_DOCUMENT_NUMBER_LENGTH = 512;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -55,7 +60,12 @@ public class IdentityDocument {
     @Column(nullable = false)
     private DocumentType documentType;
 
-    @Column(nullable = false, length = 100)
+    /**
+     * Encrypted at rest (E23, GDPR Art. 32) via {@link DocumentNumberConverter} —
+     * this field always holds the decrypted plaintext in memory, never ciphertext.
+     */
+    @Convert(converter = DocumentNumberConverter.class)
+    @Column(nullable = false, length = ENCRYPTED_DOCUMENT_NUMBER_LENGTH)
     private String documentNumber;
 
     @Column(nullable = false)

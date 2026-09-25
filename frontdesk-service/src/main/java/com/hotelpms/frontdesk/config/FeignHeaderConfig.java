@@ -15,11 +15,11 @@ import java.util.Optional;
  * accept them (T-GW-07 / T-GST-05). See {@link InternalFeignAuthInterceptor}
  * for the shared signing logic.
  *
- * <p>The scheduled night-audit job also originates a call to billing-service
- * (the cash-closing summary) outside an HTTP request context, so — same
- * pattern as guest-service's GDPR retention job — the fallback sources the
- * auth context from {@link NightAuditJobContext} when no inbound request is
- * bound to the current thread.
+ * <p>Scheduled jobs (night audit, GDPR retention) also originate calls to
+ * billing-service outside an HTTP request context, so — same pattern as
+ * guest-service's GDPR retention job — the fallback sources the auth context
+ * from {@link BatchJobContext} when no inbound request is bound to the
+ * current thread.
  */
 @Configuration
 public class FeignHeaderConfig {
@@ -37,7 +37,7 @@ public class FeignHeaderConfig {
 
     /**
      * Registers the shared {@link InternalFeignAuthInterceptor} with a
-     * fallback that sources the auth context from {@link NightAuditJobContext}
+     * fallback that sources the auth context from {@link BatchJobContext}
      * when no inbound request context is bound to the current thread.
      *
      * @return the configured interceptor
@@ -48,7 +48,7 @@ public class FeignHeaderConfig {
     }
 
     private static Optional<FeignAuthContext> resolveBatchJobFallback() {
-        final NightAuditJobContext ctx = NightAuditJobContext.get();
+        final BatchJobContext ctx = BatchJobContext.get();
         return ctx == null
                 ? Optional.empty()
                 : Optional.of(new FeignAuthContext(ctx.getUser(), ctx.getRole(), ctx.getHotelId()));

@@ -9,6 +9,11 @@ on:
   pull_request:
     branches:
       - main
+  # Third-party images (grafana/grafana) get no new alert until someone pushes —
+  # refresh weekly so a Security-tab alert auto-closes once upstream patches it,
+  # instead of staying open indefinitely between unrelated pushes.
+  schedule:
+    - cron: "0 5 * * 1"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -17,6 +22,7 @@ jobs:
   # ── Job 1: Backend ──────────────────────────────────────────────────────────
   backend:
     name: "Backend — Build · PMD · Checkstyle · JUnit"
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -68,6 +74,7 @@ jobs:
   # ── Job 2: Frontend ─────────────────────────────────────────────────────────
   frontend:
     name: "Frontend — ESLint · TypeScript · Vitest"
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -104,13 +111,15 @@ jobs:
         run: npm run test:coverage
 
   # ── Job 3: Container Image Scan ──────────────────────────────────────────────
-  # Scans all 10 custom Docker images for OS/library CVEs (CRITICAL + HIGH).
-  # Uses a matrix strategy to scan each image in parallel.
-  # Uploads SARIF results to GitHub Security tab for centralised tracking.
-  # Also runs a misconfig scan on each Dockerfile (warn-only).
+  # Scans all 11 custom Docker images (9 application services/frontend + our
+  # hardened postgres/redis) for OS/library CVEs. Uses a matrix strategy to scan
+  # each image in parallel. Uploads SARIF results to GitHub Security tab for
+  # centralised tracking. Also runs a misconfig scan on each Dockerfile (warn-only).
+  # A CRITICAL finding with a published fix fails the build; HIGH is report-only.
   # ─────────────────────────────────────────────────────────────────────────────
   trivy:
     name: "Trivy — ${{ matrix.service }}"
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     needs: [backend]
     permissions:
@@ -157,6 +166,19 @@ jobs:
             dockerfile: frontend/Dockerfile
             image: hotel-pms/frontend
             context: ./frontend
+          # postgres/redis build our own hardened image (apk upgrade on top of the
+          # upstream tag — docker/postgres, docker/redis), not the naked upstream
+          # tag, so this scan reflects what actually runs, not what Docker Hub
+          # ships. Moved here (out of trivy-thirdparty) precisely because these two
+          # are no longer "third-party, no fix on our side" — the Dockerfile is ours.
+          - service: postgres
+            dockerfile: docker/postgres/Dockerfile
+            image: hotel-pms/postgres
+            context: docker/postgres
+          - service: redis
+            dockerfile: docker/redis/Dockerfile
+            image: hotel-pms/redis
+            context: docker/redis
 
     steps:
       - name: Checkout repository
@@ -190,10 +212,7 @@ jobs:
         with:
           image-ref: "${{ matrix.image }}:ci"
           format: "table"
-          exit-code: "0"
-          severity: "CRITICAL,HIGH"
-          ignore-unfixed: true
-          timeout: "10m0s"
+          trivy-config: "trivy.yaml"
 
       - name: Trivy SARIF scan — ${{ matrix.service }}
         if: always()
@@ -202,9 +221,7 @@ jobs:
           image-ref: "${{ matrix.image }}:ci"
           format: "sarif"
           output: "trivy-${{ matrix.service }}.sarif"
-          severity: "CRITICAL,HIGH"
-          ignore-unfixed: true
-          timeout: "10m0s"
+          trivy-config: "trivy.yaml"
 
       - name: Upload SARIF to GitHub Security
         if: always()
@@ -212,6 +229,22 @@ jobs:
         with:
           sarif_file: "trivy-${{ matrix.service }}.sarif"
           category: "trivy-${{ matrix.service }}"
+
+      # Blocking gate, deliberately narrower than trivy.yaml's CRITICAL+HIGH: these
+      # are OUR images, so a CRITICAL with a published fix should fail the build.
+      # HIGH stays report-only (still visible via the SARIF upload above) — the
+      # volume of HIGH findings across 10 images would otherwise make every bump
+      # a red build. trivy-thirdparty (upstream images we don't control) stays
+      # warn-only entirely.
+      - name: Trivy vulnerability gate (CRITICAL, fixed only) — ${{ matrix.service }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: "${{ matrix.image }}:ci"
+          format: "table"
+          exit-code: "1"
+          severity: "CRITICAL"
+          ignore-unfixed: true
+          timeout: "10m0s"
 
       - name: Trivy misconfig scan — ${{ matrix.service }}
         if: always()
@@ -224,28 +257,36 @@ jobs:
           severity: "CRITICAL,HIGH"
 
   # ── Job 4: Third-party Image Scan ──────────────────────────────────────────
-  # Warn-only scan of critical third-party images used in docker-compose.yml.
-  # Non-blocking: we don't control upstream release cycles, but we want
-  # visibility into CVEs in our infrastructure dependencies.
+  # Warn-only scan of third-party images we don't build ourselves. postgres and
+  # redis moved to the `trivy` job above once they got their own Dockerfile
+  # (docker/postgres, docker/redis) — grafana is the only image left with no
+  # Dockerfile of ours to patch, purely an upstream pull.
+  #
+  # The tag is read from docker-compose.yml at scan time instead of being
+  # duplicated here: a hardcoded copy is exactly what let this job scan
+  # grafana/grafana:13.1.1 for weeks after docker-compose.yml had already moved
+  # on, orphaning ~25 alerts under a stale category (DEP-CVE-07).
   # ─────────────────────────────────────────────────────────────────────────────
   trivy-thirdparty:
-    name: "Trivy 3rd-party — ${{ matrix.image }}"
+    name: "Trivy 3rd-party — grafana"
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
 
-    strategy:
-      fail-fast: false
-      matrix:
-        image:
-          - postgres:15-alpine
-          - redis:8.8.1-alpine
-          - grafana/grafana:13.1.1
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Resolve grafana image tag from docker-compose.yml
+        id: resolve
+        run: |
+          IMAGE=$(grep -oP '(?<=image: )grafana/grafana:\S+' docker-compose.yml | head -1)
+          if [ -z "$IMAGE" ]; then
+            echo "::error::Could not find a grafana/grafana image line in docker-compose.yml"
+            exit 1
+          fi
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Cache Trivy DB
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
@@ -254,37 +295,34 @@ jobs:
           key: trivy-db-${{ github.run_id }}
           restore-keys: trivy-db-
 
-      - name: Trivy scan — ${{ matrix.image }}
+      - name: Trivy scan — ${{ steps.resolve.outputs.image }}
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
-          image-ref: "${{ matrix.image }}"
+          image-ref: "${{ steps.resolve.outputs.image }}"
           format: "table"
-          exit-code: "0"
-          severity: "CRITICAL,HIGH"
-          ignore-unfixed: true
-          timeout: "10m0s"
+          trivy-config: "trivy.yaml"
 
-      - name: Trivy SARIF scan — ${{ matrix.image }}
+      - name: Trivy SARIF scan — ${{ steps.resolve.outputs.image }}
         if: always()
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
-          image-ref: "${{ matrix.image }}"
+          image-ref: "${{ steps.resolve.outputs.image }}"
           format: "sarif"
-          output: "trivy-thirdparty-${{ strategy.job-index }}.sarif"
-          severity: "CRITICAL,HIGH"
-          ignore-unfixed: true
-          timeout: "10m0s"
+          output: "trivy-thirdparty-2.sarif"
+          trivy-config: "trivy.yaml"
 
       - name: Upload SARIF to GitHub Security
         if: always()
         uses: github/codeql-action/upload-sarif@24c7eb380a2dc368f2d129e4c65e51d172983a1e # v4
         with:
-          sarif_file: "trivy-thirdparty-${{ strategy.job-index }}.sarif"
-          # Stable per-slot category (not the versioned image tag): a tag-based
-          # category orphans its alerts every time the pinned version bumps,
-          # since the old category is never scanned again and GitHub can't
-          # auto-close alerts under it.
-          category: "trivy-thirdparty-${{ strategy.job-index }}"
+          sarif_file: "trivy-thirdparty-2.sarif"
+          # Category kept as the literal "trivy-thirdparty-2" (grafana's slot index
+          # in the old 3-item matrix: postgres=0, redis=1, grafana=2) rather than
+          # renamed to something readable — a rename here would orphan every
+          # existing grafana alert exactly the way a tag-based category would (see
+          # the original rationale this replaces). Stable across tag bumps AND
+          # across this matrix -> single-job refactor.
+          category: "trivy-thirdparty-2"
 
   # ── Job 5: E2E ──────────────────────────────────────────────────────────────
   # Runs only after backend, frontend, and trivy pass.
@@ -297,6 +335,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   e2e:
     name: "E2E — Docker Stack + Playwright"
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     needs: [backend, frontend, trivy]
     timeout-minutes: 75

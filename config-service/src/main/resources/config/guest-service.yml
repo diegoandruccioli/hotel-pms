@@ -56,3 +56,10 @@ guest:
     # @Scheduled annotation; externalized here for the same reason as
     # frontdesk.night-audit.cron — movable without a redeploy.
     cron: "0 0 2 * * *"
+  documents:
+    # Encrypts identity_documents.document_number at rest (E23, GDPR Art. 32)
+    # via DocumentNumberConverter, AES-256-GCM — same pattern as frontdesk-
+    # service's alloggiati.credentials.encryption-key/-salt.
+    # encryption-salt MUST be hex-encoded (e.g. `openssl rand -hex 16`).
+    encryption-key: ${GUEST_DOCUMENTS_ENCRYPTION_KEY}
+    encryption-salt: ${GUEST_DOCUMENTS_ENCRYPTION_SALT}

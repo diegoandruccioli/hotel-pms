@@ -27,6 +27,8 @@ const SETTINGS: HotelSettingsResponse = {
   alloggiatiCredentialsConfigured: false,
   sendReservationConfirmedEmail: false,
   sendCheckoutEmail: false,
+  timezone: 'Europe/Rome',
+  housekeepingDayCutoffHour: 4,
 };
 
 const ALLOGGIATI_SWITCH = /alloggiati_auto_send_label/;

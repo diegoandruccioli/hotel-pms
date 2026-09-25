@@ -33,6 +33,15 @@ Lavoro reale da maggio 2026 ad oggi, non ancora raggruppato in una release numer
   testando lo stack reale fuori dall'ordine scriptato, il più grave: il fallback del
   circuit breaker su `billingClient.addCharge` assorbiva in silenzio anche i rifiuti
   legittimi (409), non solo i guasti di rete
+- **Foglio pulizie scaricabile** (Housekeeping) — PDF room-by-room per una data
+  qualsiasi, anche la sera prima del turno; righe raggruppate per
+  partenza/occupata/arrivo/da-pulire/manutenzione, senza alcun campo ospite
+  (minimizzazione dati). Nuova data operativa per hotel (`timezone` +
+  `housekeepingDayCutoffHour`, default `Europe/Rome`/4) così il foglio non
+  cambia data a mezzanotte del calendario ma all'ora di taglio configurata —
+  deliberatamente isolato, non un refactor `Clock`-wide del resto del backend.
+  Badge PROVVISORIO/DEFINITIVO legato al completamento del night audit del
+  giorno precedente
 
 ### Changed
 
@@ -56,6 +65,11 @@ Lavoro reale da maggio 2026 ad oggi, non ancora raggruppato in una release numer
   deploy live, non dai test unitari)
 - Export batch FatturaPA: una singola fattura con dati incompleti bloccava l'intero
   export del periodo invece di essere isolata e segnalata nell'indice
+- Foglio pulizie: una `LEFT JOIN FETCH` sui guest materializzava l'entità `StayGuest`
+  per ogni soggiorno, facendo scattare il decryptor su `document_number` anche per
+  righe legacy pre-cifratura non hex-decodificabili — un solo soggiorno con dati
+  sporchi in tutto l'hotel buttava giù il foglio con 500 per ogni data (trovato
+  testando dal vivo su browser, non dai test unitari)
 
 ---
 

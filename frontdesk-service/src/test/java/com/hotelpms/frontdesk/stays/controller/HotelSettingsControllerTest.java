@@ -77,7 +77,7 @@ class HotelSettingsControllerTest {
 
         settingsResponse = new HotelSettingsResponse(
                 hotelId, false, HOTEL_NAME, HOTEL_ADDRESS, null, null, null, null, false,
-                true, true, null, null, null, null, null, null, null);
+                true, true, null, null, null, null, null, null, null, "Europe/Rome", 4);
     }
 
     @AfterEach
@@ -98,10 +98,10 @@ class HotelSettingsControllerTest {
     void shouldUpdateSettingsReturn200() throws Exception {
         final HotelSettingsRequest request = new HotelSettingsRequest(
                 true, HOTEL_NAME, HOTEL_ADDRESS, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
         final HotelSettingsResponse updated = new HotelSettingsResponse(
                 hotelId, true, HOTEL_NAME, HOTEL_ADDRESS, null, null, null, null, false,
-                true, true, null, null, null, null, null, null, null);
+                true, true, null, null, null, null, null, null, null, "Europe/Rome", 4);
         when(hotelSettingsService.update(eq(hotelId), any(HotelSettingsRequest.class)))
                 .thenReturn(updated);
 
@@ -120,7 +120,7 @@ class HotelSettingsControllerTest {
         // via direct API. Mirrors cap's own @Pattern guard on this same DTO.
         final HotelSettingsRequest request = new HotelSettingsRequest(
                 null, null, null, "NOT-A-VAT-NUMBER!!", null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
 
         mockMvc.perform(put(BASE_URL)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -132,7 +132,7 @@ class HotelSettingsControllerTest {
     void shouldAccept11DigitVatNumber() throws Exception {
         final HotelSettingsRequest request = new HotelSettingsRequest(
                 null, null, null, "01234567890", null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
         when(hotelSettingsService.update(eq(hotelId), any(HotelSettingsRequest.class)))
                 .thenReturn(settingsResponse);
 
@@ -146,7 +146,7 @@ class HotelSettingsControllerTest {
     void shouldUpdateSettingsReturn200WithAutoSendFalse() throws Exception {
         final HotelSettingsRequest request = new HotelSettingsRequest(
                 false, HOTEL_NAME, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
         when(hotelSettingsService.update(eq(hotelId), any(HotelSettingsRequest.class)))
                 .thenReturn(settingsResponse);
 

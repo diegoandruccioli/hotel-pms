@@ -37,6 +37,23 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Read by docker/postgres/initdb/02-create-tenant-roles.sql and
+      # 03-create-monitoring-role.sql via psql's \getenv — those scripts run
+      # only once, on a genuinely empty $PGDATA (docker-entrypoint-initdb.d
+      # semantics). Without these here, a fresh volume never gets the
+      # per-service roles created and every service crash-loops on Flyway/
+      # Hikari "password authentication failed". Same variables already
+      # passed to every application service below (e.g. SPRING_DATASOURCE_
+      # PASSWORD) — this just also wires them to the one container that
+      # needs them to bootstrap those roles in the first place. See
+      # docs/OPERATIONS_RUNBOOK.md for the one-time manual replay needed on
+      # a volume that already existed before this was added.
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      GUEST_DB_PASSWORD: ${GUEST_DB_PASSWORD}
+      FRONTDESK_DB_PASSWORD: ${FRONTDESK_DB_PASSWORD}
+      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD}
+      FB_DB_PASSWORD: ${FB_DB_PASSWORD}
+      POSTGRES_EXPORTER_PASSWORD: ${POSTGRES_EXPORTER_PASSWORD}
       # Continuous WAL archiving + scheduled full/incremental backups via
       # pgBackRest — replaces the old db-backup sidecar (pg_dumpall on a
       # fixed 24h cadence). RPO is now measured in minutes
@@ -102,7 +119,7 @@ services:
   # nonce store (T-GW-08, all 5 InternalAuthFilter validators)
   # ----------------------------------------------------------
   redis:
-    image: redis:8.8.1-alpine
+    build: ./docker/redis
     container_name: hotel_redis
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD}
@@ -161,7 +178,7 @@ services:
   # Grafana - Dashboard SIEM (GAP-4: visualizzazione audit log)
   # ----------------------------------------------------------
   grafana:
-    image: grafana/grafana:13.1.1
+    image: grafana/grafana:13.1.5
     container_name: hotel_grafana
     restart: unless-stopped
     profiles: ["observability"]
@@ -228,13 +245,25 @@ services:
     profiles: ["observability"]
     ports:
       - "9093:9093"
+    # entrypoint.sh renders alertmanager.yml.template (tracked, no secrets)
+    # into alertmanager_data (the named volume, never the host filesystem)
+    # by substituting SMTP_*/ALERT_EMAIL_* from .env via sed -- the image
+    # has no envsubst. Invoked via "/bin/sh <path>" rather than executing
+    # the file directly so the host's executable bit (unreliable on a
+    # Windows bind mount) never matters. See docker/alertmanager/entrypoint.sh.
+    entrypoint: ["/bin/sh", "/etc/alertmanager/entrypoint.sh"]
+    environment:
+      - SMTP_HOST=${SMTP_HOST:-mailpit}
+      - SMTP_PORT=${SMTP_PORT:-1025}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_STARTTLS=${SMTP_STARTTLS:-false}
+      - ALERT_EMAIL_FROM=${ALERT_EMAIL_FROM:-alerts@hotelpms.local}
+      - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-ops@hotelpms.local}
     volumes:
-      - ./docker/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - ./docker/alertmanager/alertmanager.yml.template:/etc/alertmanager/alertmanager.yml.template:ro
+      - ./docker/alertmanager/entrypoint.sh:/etc/alertmanager/entrypoint.sh:ro
       - alertmanager_data:/alertmanager
-    command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
-      - "--storage.path=/alertmanager"
-      - "--log.level=info"
     networks:
       - observability-network
     deploy:
@@ -291,7 +320,15 @@ services:
     restart: unless-stopped
     profiles: ["observability"]
     volumes:
-      - /:/host:ro,rslave
+      # Plain :ro, no propagation flag — `rslave` fails identically on
+      # Docker Desktop's internal VM and on WSL2/Ubuntu ("path / is mounted
+      # on / but it is not a shared or slave mount", neither marks / as a
+      # shared/slave mount by default). Filesystems already mounted at
+      # container start (i.e. everything, on this single-PC deployment) are
+      # still visible for DiskSpaceLow (alert_rules.yml) — only propagation
+      # of filesystems mounted on the host *after* the container starts is
+      # lost, not relevant here.
+      - /:/host:ro
       - pgbackrest_metrics:/var/lib/node_exporter/textfile_collector:ro
     command:
       - "--path.rootfs=/host"
@@ -521,6 +558,8 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${GUEST_DB_PASSWORD}
       - APPLICATION_CONFIG_FRONTDESK_SERVICE_URL=http://frontdesk-service:8081
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - GUEST_DOCUMENTS_ENCRYPTION_KEY=${GUEST_DOCUMENTS_ENCRYPTION_KEY:-ci_placeholder_encryption_key}
+      - GUEST_DOCUMENTS_ENCRYPTION_SALT=${GUEST_DOCUMENTS_ENCRYPTION_SALT:-deadbeefdeadbeefdeadbeefdeadbeef}
       - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
@@ -583,6 +622,9 @@ services:
       # Encrypts per-hotel Alloggiati credentials at rest (P8) — salt MUST be hex.
       - ALLOGGIATI_CREDENTIALS_ENCRYPTION_KEY=${ALLOGGIATI_CREDENTIALS_ENCRYPTION_KEY:-ci_placeholder_encryption_key}
       - ALLOGGIATI_CREDENTIALS_ENCRYPTION_SALT=${ALLOGGIATI_CREDENTIALS_ENCRYPTION_SALT:-deadbeefdeadbeefdeadbeefdeadbeef}
+      # Encrypts stay_guests.document_number at rest (E23) — separate key from above.
+      - FRONTDESK_DOCUMENTS_ENCRYPTION_KEY=${FRONTDESK_DOCUMENTS_ENCRYPTION_KEY:-ci_placeholder_encryption_key}
+      - FRONTDESK_DOCUMENTS_ENCRYPTION_SALT=${FRONTDESK_DOCUMENTS_ENCRYPTION_SALT:-deadbeefdeadbeefdeadbeefdeadbeef}
       - JAVA_TOOL_OPTIONS=-Xmx384m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
@@ -633,6 +675,8 @@ services:
       - SPRING_DATASOURCE_USERNAME=billing_service_app
       - SPRING_DATASOURCE_PASSWORD=${BILLING_DB_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      # ADR-006: "PILOT/" prefix on generated invoice numbers while true.
+      - BILLING_PILOT_MODE=${BILLING_PILOT_MODE:-false}
       # MaxMetaspaceSize raised from 128m (BUG-0b stopgap, docs/LIVE_E2E_AUDIT_2026-07.md):
       # PDF generation was crashing the process with a Metaspace OOM. The root causes
       # (GuestClient discovery failure + per-render font re-read/re-subset) are fixed

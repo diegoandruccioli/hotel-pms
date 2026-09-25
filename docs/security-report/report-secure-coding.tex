@@ -2083,6 +2083,53 @@ di sviluppo.
 \paragraph{Riferimento} Commit: \commitref{1c24f72}{fix(security): T-AUTH-15 --- resolve clientIp instead of collapsing lockout keys on null}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Log Injection sulla chiave di lockout corrotta \threat{T-AUTH-16}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato triagando gli alert CodeQL \texttt{java/log-injection} (CWE-117)
+segnalati da GitHub sul branch. A differenza di \texttt{AuthServiceImpl}
+(già sanitizzato tramite \texttt{sanitizeForLog} sin da T-AUTH-14/T-AUTH-05
+--- i suoi tre alert erano falsi positivi, vedi nota SAST più sotto),
+\texttt{LoginAttemptServiceImpl.getLockedUntil} loggava \texttt{lockKey}
+(costruita da \texttt{username}/\texttt{clientIp} grezzi tramite
+\texttt{normalize()}) e il valore Redis corrotto \texttt{raw} senza alcuno
+strip di CR/LF, sul ramo che gestisce un valore di lock illeggibile
+(\texttt{NumberFormatException} su \texttt{Long.parseLong}, introdotto dal
+fix T-AUTH-15). Un \texttt{username} o \texttt{clientIp} contenente
+\texttt{\textbackslash r\textbackslash n} poteva iniettare righe di audit
+log false nell'output console/Loki --- ad esempio una falsa riga
+\texttt{LOGIN\_SUCCESS} per un altro utente. Classificato OWASP A09.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- LoginAttemptServiceImpl.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: lockKey/raw non sanitizzati -- username/clientIp grezzi
+// possono contenere CR/LF e falsificare righe di log successive
+log.warn("[AUTH] LOCKOUT_KEY_CORRUPTED | key={} | value={}", lockKey, raw);
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Aggiunto un \texttt{sanitizeForLog} locale alla classe, stesso pattern già
+in uso in \texttt{AuthServiceImpl} (\texttt{null} $\to$ \texttt{"unknown"},
+altrimenti strip di \texttt{[\textbackslash r\textbackslash n]}), applicato
+a entrambi gli argomenti del log.
+
+\begin{securebox}[title={Codice Sicuro --- LoginAttemptServiceImpl.java (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: entrambi gli argomenti passano da sanitizeForLog prima del log
+log.warn("[AUTH] LOCKOUT_KEY_CORRUPTED | key={} | value={}",
+        sanitizeForLog(lockKey), sanitizeForLog(raw));
+
+private static String sanitizeForLog(final String value) {
+    return value == null ? UNKNOWN : value.replaceAll("[\r\n]", "_");
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Riferimento} Commit: \commitref{3b62006}{fix(security): harden CWE-117 log injection across auth-service and gateway}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Audit Log e Security Monitoring \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
 % ─────────────────────────────────────────────────────────────────────────────
 
@@ -4907,6 +4954,77 @@ replay dello stesso nonce rifiutato.
 \paragraph{Riferimento} Commit: \commitref{a2620fc}{feat(secure-coding-hardening): SSE realtime room-status sync (T-GW-11, T-GW-12)}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Log Injection via Header X-Correlation-ID Non Validato \threat{T-GW-13}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante il triage degli alert CodeQL \texttt{java/log-injection} sul
+branch: \texttt{CorrelationIdFilter.resolveCorrelationId} accettava l'header
+\texttt{X-Correlation-ID} così come inviato dal client, senza alcuna
+validazione né limite di lunghezza, quando presente e non vuoto. Il valore
+veniva poi (1) propagato inalterato a ogni servizio downstream come header
+HTTP, (2) riflesso sulla risposta al client, e (3) inserito nell'MDC SLF4J
+da \texttt{InternalAuthFilter} (\texttt{MDC.put("correlationId", ...)},
+condiviso da sei servizi) --- da cui ogni pattern Logback plain-text lo
+rendeva letteralmente via \texttt{\%X\{correlationId:-\}}. Un header
+contenente \texttt{\textbackslash r\textbackslash n} era quindi log
+forging (CWE-117) iniettabile da \emph{qualunque} richiesta pubblica
+attraverso il gateway, senza credenziali né bypass di alcun controllo ---
+un vettore più ampio dei tre alert CodeQL su \texttt{AuthServiceImpl}
+(entrambi falsi positivi, vedi nota SAST), perché non richiedeva neanche
+un flusso di autenticazione per essere raggiunto. Non era coperto da alcun
+threat ID esistente né da alcun alert automatico: CodeQL non analizza il
+modulo \texttt{api-gateway} (WebFlux) con la stessa profondità dei servizi
+servlet, e Trivy fa solo CVE scanning, non taint analysis del codice
+applicativo. Classificato OWASP A09.
+
+\begin{insecurebox}[title={Codice Vulnerabile --- CorrelationIdFilter.java (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: l'header client e' accettato verbatim, nessun limite di
+// lunghezza o di alfabeto -- puo' contenere CR/LF
+private static String resolveCorrelationId(final ServerHttpRequest request) {
+    final String existing = request.getHeaders().getFirst(CORRELATION_ID_HEADER);
+    if (existing != null && !existing.isBlank()) {
+        return existing;
+    }
+    return UUID.randomUUID().toString();
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Allowlist esplicita sul formato atteso di un correlation ID
+(\texttt{\^{}[A-Za-z0-9\_-]\{1,64\}\$}); un header assente, vuoto, troppo
+lungo o non conforme (incluso qualunque valore con CR/LF) genera un UUID
+nuovo, esattamente come già avveniva per l'header assente --- nessun
+cambio di comportamento per il traffico legittimo.
+
+\begin{securebox}[title={Codice Sicuro --- CorrelationIdFilter.java (fix)}]
+\begin{lstlisting}[style=java]
+private static final Pattern VALID_CORRELATION_ID =
+        Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
+
+// SICURO: solo un valore che rispetta l'allowlist viene propagato;
+// qualunque altro caso (assente, vuoto, CRLF, troppo lungo) genera un UUID
+private static String resolveCorrelationId(final ServerHttpRequest request) {
+    final String existing = request.getHeaders().getFirst(CORRELATION_ID_HEADER);
+    if (existing != null && VALID_CORRELATION_ID.matcher(existing).matches()) {
+        return existing;
+    }
+    return UUID.randomUUID().toString();
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test}
+Nuovo \texttt{CorrelationIdFilterTest}, quattro casi: header valido
+preservato invariato; header contenente CR/LF sostituito da un UUID; header
+oltre 64 caratteri sostituito da un UUID; header assente genera un UUID
+(comportamento pre-esistente, verificato come non-regressione).
+
+\paragraph{Riferimento} Commit: \commitref{3b62006}{fix(security): harden CWE-117 log injection across auth-service and gateway}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Gestione Segreti}
 % ─────────────────────────────────────────────────────────────────────────────
 
@@ -5084,6 +5202,103 @@ internal:
 \paragraph{Riferimento} Commit: \commitref{6dc6ea4}{fix(security): T-CFG-02 --- rimuovi fallback JWT\_SECRET hardcoded da api-gateway JwtUtil}
 
 % ─────────────────────────────────────────────────────────────────────────────
+\subsection{Account ADMIN fixture con password nota spedito su ogni installazione \threat{T-AUTH-17}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante un audit di pilot-readiness (valutazione se il sistema
+fosse pronto per il primo hotel pilota reale, non un pentest dedicato).
+\texttt{V7\_\_seed\_second\_hotel\_admin\_for\_e2e\_tests.sql} era una
+migration Flyway \emph{permanente}: girava incondizionatamente su
+qualunque installazione che eseguisse le migration del servizio, incluso
+un hotel reale in produzione, non solo l'ambiente di test in cui era
+pensata per vivere. Creava un account \texttt{e2e-live-other-hotel-admin},
+ruolo \texttt{ADMIN}, password nota (\texttt{"password"}, stesso hash
+bcrypt del seed admin di default), \texttt{must\_change\_password=FALSE},
+su un secondo tenant fittizio --- pensata solo come fixture per la suite
+E2E live locale (\texttt{frontend/e2e-live/idor-cross-tenant-live.spec.ts}),
+ma senza alcun gate di profilo/ambiente. Chiunque leggesse il codice
+sorgente pubblico del repository otteneva le credenziali complete di un
+account ADMIN funzionante su qualunque installazione reale. Classificato
+OWASP A05 --- Security Misconfiguration (un default/credenziale nota
+spedita per errore, non un bypass di un controllo di accesso esistente).
+
+\begin{insecurebox}[title={V7\_\_seed\_second\_hotel\_admin\_for\_e2e\_tests.sql --- migration permanente (baseline)}]
+\begin{lstlisting}[style=sql]
+-- INSICURO: nessun gate di profilo/ambiente -- questa riga viene inserita
+-- su OGNI installazione che applica le migration Flyway di auth-service
+INSERT INTO user_account (
+    id, username, password_hash, email, role, hotel_id,
+    active, must_change_password, created_at, updated_at
+) VALUES (
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'e2e-live-other-hotel-admin',
+    '{bcrypt}$2a$10$8aXe/PIDoC/tOecWVAMxsu57InT1n4F4Uq2ObRGB4W8DhGowDrbMi',
+    'e2e-live-other-hotel-admin@hotel-pms.local',
+    'ADMIN', '99999999-9999-9999-9999-999999999999',
+    TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+) ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Flyway tratta le migration come immutabili una volta applicate (checksum
+sul contenuto del file), quindi \texttt{V7} non è stata modificata --- è
+stata annullata. Una nuova migration \texttt{V9} rimuove retroattivamente
+la riga (\texttt{DELETE FROM user\_account WHERE username = ...}),
+idempotente sui volumi dove \texttt{V7} non è mai girata. Il seed è ora
+on-demand, mai parte del path Flyway: un nuovo \texttt{ApplicationRunner}
+(\texttt{E2eFixtureSeeder}) annotato \texttt{@ConditionalOnProperty} lo
+esegue solo se \texttt{auth.seed-e2e-fixtures=true}, valore risolto da
+\texttt{AUTH\_SEED\_E2E\_FIXTURES}, mai settata né in
+\texttt{docker-compose.yml} né in \texttt{docker-compose.prod.yml}. Un
+developer che vuole eseguire la suite E2E live locale la attiva
+esplicitamente sul proprio stack --- non è più un comportamento di
+default su nessuna installazione.
+
+\begin{securebox}[title={E2eFixtureSeeder.java --- seed opt-in, gated da env var (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: questo bean non esiste nemmeno se auth.seed-e2e-fixtures
+// non e' esplicitamente true -- default false ovunque, mai settato
+// in docker-compose.yml/docker-compose.prod.yml
+@Component
+@ConditionalOnProperty(prefix = "auth", name = "seed-e2e-fixtures", havingValue = "true")
+public class E2eFixtureSeeder implements ApplicationRunner {
+
+    @Override
+    @Transactional
+    public void run(final ApplicationArguments args) {
+        log.warn("[AUTH] E2E_FIXTURE_SEED_ENABLED -- ... "
+                + "Never enable this on an installation with real hotel data.");
+        if (userRepository.existsByUsername(FIXTURE_USERNAME)) {
+            return;
+        }
+        userRepository.save(UserAccount.builder()
+                .username(FIXTURE_USERNAME)
+                .passwordHash(passwordEncoder.encode(FIXTURE_PASSWORD))
+                .hotelId(FIXTURE_HOTEL_ID)
+                .role(Role.ADMIN)
+                .active(true)
+                .mustChangePassword(false)
+                .build());
+    }
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Verifica dal vivo}
+Non solo unit test: riavviato \texttt{auth-service} contro un volume
+Postgres di sviluppo esistente che aveva già applicato \texttt{V7} (la riga
+fixture era presente e attiva). Dopo il deploy della nuova immagine,
+\texttt{V9} è girata e la riga è stata rimossa; il seed admin reale
+(\texttt{must\_change\_password=true}) è risultato intatto. Verificato
+anche che il commento di \texttt{V7} stesso documentasse in chiaro la
+password nota --- ulteriore motivo per non modificarla ma limitarsi ad
+annullarne l'effetto.
+
+\paragraph{Riferimento} Commit: \commitref{5e7651a2}{fix(security): remove e2e fixture ADMIN account from production migration path}
+
+% ─────────────────────────────────────────────────────────────────────────────
 \subsection{Regressione della guardia legale GDPR TULPS/fiscale \threat{T-GST-06}}
 % ─────────────────────────────────────────────────────────────────────────────
 
@@ -5182,6 +5397,339 @@ storico → \texttt{DELETE} → \texttt{204} invariato (nessuna regressione sul
 percorso felice).
 
 \paragraph{Riferimento} Commit: \commitref{4db09fc}{fix(security): T-GST-06 --- GDPR legal-hold guard fail-open regression (Feign path, final under CGLIB, fallback semantics)}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Retention GDPR mancante su StayGuest \threat{T-STAY-08}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato da \texttt{docs/COMPLIANCE\_AUDIT\_2026-08.md} \S3, gap gemello di
+\threat{T-GST-05}: il job notturno di anonimizzazione GDPR
+(\texttt{GuestRetentionJobServiceImpl}, guest-service) copre solo l'entità
+\texttt{Guest}. \texttt{StayGuest} (frontdesk-service) conserva però una
+copia indipendente della PII Alloggiati --- nome, data di nascita,
+cittadinanza, numero documento --- per ogni soggiorno storico, popolata al
+check-in e mai più toccata dopo. Anonimizzare \texttt{Guest} non anonimizza
+\texttt{StayGuest}: un profilo ospite formalmente cancellato lasciava
+intatta, a tempo indeterminato, la stessa PII duplicata sotto ogni suo
+soggiorno passato. Classificato OWASP A04 --- Insecure Design, stessa
+categoria di \threat{T-GST-05}: manca un intero meccanismo di protezione,
+non un bug in uno esistente.
+
+\paragraph{Mitigazione applicata}
+Nuovo \texttt{StayGuestRetentionJobServiceImpl}, eseguito ogni notte alle
+02:30, che replica la stessa doppia garanzia legale già validata per
+\texttt{Guest}: il vincolo TULPS (5 anni) è verificato localmente da
+\texttt{StayGuest.departureDate}, senza chiamata inter-servizio; il vincolo
+FISCALE (10 anni) richiede invece un nuovo endpoint in billing-service,
+\texttt{GET /api/v1/invoices/stay/\{stayId\}/last-date}, perché lo stesso
+soggiorno può avere le sue spese trasferite al master folio di un gruppo
+(Punto 4) --- il nuovo endpoint verifica sia il folio individuale dello stay
+sia un eventuale master folio con un addebito instradato da quello stay
+(\texttt{InvoiceCharge.routedFromStayId}), così il vincolo fiscale segue
+sempre il documento che porta davvero l'importo, non necessariamente il
+folio originale dello stay.
+
+\begin{securebox}[title={StayGuestRetentionJobServiceImpl.java --- doppio vincolo legale (main)}]
+\begin{lstlisting}[style=java]
+// SICURO: TULPS locale, FISCALE via billing-service, fail-closed su indeterminazione
+final LocalDate tulpsExpiry = latestDeparture.plusYears(TULPS_MIN_YEARS);
+if (!LocalDate.now().isAfter(tulpsExpiry)) {
+    return false; // vincolo TULPS ancora attivo
+}
+final StayInvoiceDateResponse invoiceInfo = billingClient.getLastInvoiceDateForStay(stayId);
+if (invoiceInfo.hasInvoices()) {
+    if (invoiceInfo.lastInvoiceDate() == null) {
+        return false; // indeterminato (fallback circuit breaker) -- blocca, non libera
+    }
+    final LocalDate fiscalExpiry = invoiceInfo.lastInvoiceDate().plusYears(FISCAL_MIN_YEARS);
+    if (!LocalDate.now().isAfter(fiscalExpiry)) {
+        return false; // vincolo FISCALE ancora attivo
+    }
+}
+return true;
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Dettaglio non ovvio}
+A differenza di \texttt{Guest}, le colonne PII di \texttt{StayGuest}
+(\texttt{gender}, \texttt{dateOfBirth}, \texttt{placeOfBirth},
+\texttt{citizenship}) sono \texttt{NOT NULL} --- vincolo del tracciato
+Alloggiati. L'anonimizzazione non può quindi impostarle a \texttt{null} come
+fa \texttt{GuestRetentionJobServiceImpl} sui campi equivalenti (nullable su
+\texttt{Guest}): sovrascritte invece con sentinel fissi non identificativi
+(\texttt{"ERASED"}, \texttt{LocalDate.EPOCH}), stesso principio già usato
+per \texttt{firstName}/\texttt{lastName} nel job \texttt{Guest}
+(\texttt{"GDPR"}/\texttt{"ERASED\_<id>"}).
+
+\paragraph{Test}
+5 nuovi test in \texttt{StayGuestRetentionJobServiceImplTest}: entrambi i
+vincoli scaduti (anonimizza), TULPS attivo (skip), FISCALE attivo (skip),
+stato fiscale indeterminato dal circuit breaker (skip, non libera), ospite
+ancora in casa senza \texttt{departureDate} (skip).
+
+\paragraph{Riferimento} Commit: \commitref{fe189c76}{feat(security): E22 -- nightly GDPR retention job for StayGuest}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Cifratura a riposo del numero documento \threat{GAP-28}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato da \texttt{docs/COMPLIANCE\_AUDIT\_2026-08.md} \S3: il numero di
+documento d'identità dell'ospite era l'unico campo PII senza protezione a
+riposo in tutto il sistema, salvato in chiaro sia in
+\texttt{guest-service.IdentityDocument.documentNumber} sia in
+\texttt{frontdesk-service.StayGuest.documentNumber} (stesso dato,
+duplicato indipendentemente nei due servizi). Le credenziali Alloggiati Web
+per-hotel avevano già questo trattamento (P8,
+\texttt{AlloggiatiCredentialEncryptor}); il numero di documento no,
+nonostante sia dato identificativo sensibile ai sensi dell'Art. 32 GDPR.
+Classificato OWASP A02 --- Cryptographic Failures.
+
+\begin{insecurebox}[title={IdentityDocument.java --- campo in chiaro (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO: nessuna protezione a riposo su un identificativo sensibile
+@Column(nullable = false, length = 100)
+private String documentNumber;
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Due coppie encryptor + \texttt{AttributeConverter} JPA indipendenti, una
+per servizio con chiave/salt proprie (mai condivise: una chiave compromessa
+in un servizio non espone i dati dell'altro) --- stessa scelta di libreria
+già validata per P8, \texttt{Encryptors.delux} (AES-256-GCM, Spring
+Security Crypto). Il converter è transparente: l'entità Java vede sempre il
+testo in chiaro, la cifratura/decifratura avviene solo nel round-trip
+JPA/Hibernate, nessun altro livello applicativo tocca il ciphertext.
+\texttt{@Convert(autoApply = false)} applicato esplicitamente solo al
+campo interessato, non a ogni colonna \texttt{String} dell'entità.
+
+\begin{securebox}[title={IdentityDocument.java --- cifratura trasparente via converter (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: cifrato at-rest, l'entita' vede sempre il plaintext in memoria
+@Convert(converter = DocumentNumberConverter.class)
+@Column(nullable = false, length = 512)
+private String documentNumber;
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Migrazione schema, non dati}
+Nessuna riscrittura di righe esistenti: confermato con l'utente che solo
+dati di test/pilota esistono ad oggi, non un hotel reale in produzione ---
+il lavoro resta puramente di schema. Entrambe le colonne allargate a
+\texttt{VARCHAR(512)} (ciphertext + IV + tag pesa molto più del numero
+documento in chiaro che sostituisce): migrazione \texttt{V10} in
+guest-service, \texttt{V26} in frontdesk-service. Rimosso anche
+\texttt{idx\_id\_docs\_document\_number} su \texttt{identity\_documents} ---
+già codice morto (le query che lo sfruttavano erano state rimosse
+nell'audit di isolamento tenant, Punto 7 item 2, senza più alcun chiamante)
+e ora doppiamente inutile: un indice di uguaglianza su una colonna cifrata
+non deterministica (IV casuale ad ogni scrittura) non può più trovare
+corrispondenze comunque.
+
+\paragraph{Test}
+Nuovi \texttt{DocumentNumberEncryptorTest}/\texttt{StayGuestDocumentEncryptorTest}
+(round-trip cifra/decifra, IV casuale --- due cifrature dello stesso
+plaintext producono ciphertext diverso, gestione \texttt{null}/blank) e
+\texttt{DocumentNumberConverterTest}/\texttt{StayGuestDocumentNumberConverterTest}
+(delega corretta all'encryptor, senza esercitare crypto reale). Due
+suite \texttt{@SpringBootTest} preesistenti in frontdesk-service
+(\texttt{RoomTypeServiceIntegrationTest}, \texttt{SoftDeleteVersionCheckIntegrationTest})
+necessitavano un nuovo \texttt{@MockitoBean} per
+\texttt{StayGuestDocumentEncryptor} --- stesso pattern già in uso lì per
+\texttt{AlloggiatiCredentialEncryptor} --- per evitare di richiedere le
+chiavi di cifratura reali all'avvio del contesto di test.
+
+\paragraph{Riferimento} Commit: \commitref{f20c5904}{fix(security): E23 -- encrypt documentNumber at rest (GDPR Art. 32)}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Startup check fail-closed sulle chiavi di cifratura PII \threat{GAP-29}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Complementare a \threat{GAP-28}: le due coppie chiave/salt introdotte da
+quel fix (\texttt{guest.documents.encryption-key/-salt} in guest-service;
+\texttt{frontdesk.documents.encryption-key/-salt} e
+\texttt{alloggiati.credentials.encryption-key/-salt} in frontdesk-service)
+non avevano alcun equivalente di \texttt{HmacSecretStartupCheck}
+(api-gateway, già esistente per \texttt{internal.hmac.secret}). Se le
+variabili d'ambiente reali non sono impostate, \texttt{docker-compose.yml}
+ricade sullo stesso placeholder letterale ovunque
+(\texttt{ci\_placeholder\_encryption\_key} /
+\texttt{deadbeefdeadbeefdeadbeefdeadbeef}), committato in chiaro in questo
+stesso repository. Trovato durante lo stesso audit di pilot-readiness di
+\threat{T-AUTH-17}: verificato che il file \texttt{.env} reale di questa
+installazione non conteneva nessuna delle sei variabili --- lo stack
+girava cifrando numeri di documento d'identità e credenziali Alloggiati
+con una chiave pubblica. Classificato OWASP A02 --- Cryptographic
+Failures (una chiave nota equivale, ai fini pratici, a nessuna cifratura).
+
+\begin{insecurebox}[title={docker-compose.yml --- fallback a placeholder pubblico (baseline)}]
+\begin{lstlisting}[style=yaml]
+# INSICURO: se la env var reale non e' nell'.env, il servizio parte
+# comunque, cifrando con una chiave pubblicamente nota nel repository
+- GUEST_DOCUMENTS_ENCRYPTION_KEY=${GUEST_DOCUMENTS_ENCRYPTION_KEY:-ci_placeholder_encryption_key}
+- GUEST_DOCUMENTS_ENCRYPTION_SALT=${GUEST_DOCUMENTS_ENCRYPTION_SALT:-deadbeefdeadbeefdeadbeefdeadbeef}
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Nuovo \texttt{EncryptionKeyStartupCheck} in entrambi i servizi, stesso
+pattern di \texttt{HmacSecretStartupCheck}: un \texttt{@EventListener} su
+\texttt{ApplicationReadyEvent} che blocca il boot
+(\texttt{IllegalStateException}) se una coppia chiave/salt è placeholder
+noto, vuota, o sotto 16 caratteri --- ma solo quando il profilo Spring
+attivo indica un deployment reale (\texttt{SPRING\_PROFILES\_ACTIVE=
+<nome-servizio>}, come impostato da \texttt{docker-compose.yml} per ogni
+servizio). Degrada a semplice WARN quando il profilo è vuoto o contiene
+\texttt{dev}/\texttt{test} --- condizione che copre sia i test Gradle a
+contesto pieno sia un avvio locale ad-hoc senza Docker, senza richiedere
+una chiave reale in quei casi.
+
+\begin{securebox}[title={EncryptionKeyStartupCheck.java (guest-service) --- fail-closed in produzione (fix)}]
+\begin{lstlisting}[style=java]
+// SICURO: in un deployment reale (profilo = nome servizio, mai vuoto/dev/test)
+// il boot si interrompe se la chiave e' un placeholder noto o troppo corta
+@EventListener(ApplicationReadyEvent.class)
+public void validateEncryptionKey() {
+    final boolean insecure = KNOWN_INSECURE_KEYS.contains(encryptionKey.trim())
+            || KNOWN_INSECURE_SALTS.contains(encryptionSalt.trim())
+            || encryptionKey.length() < MIN_KEY_LENGTH;
+    if (!insecure) {
+        return;
+    }
+    final boolean isDevOrTest = activeProfile.isBlank()
+            || activeProfile.contains("dev") || activeProfile.contains("test");
+    if (!isDevOrTest) {
+        throw new IllegalStateException(
+                "guest.documents.encryption-key/-salt is insecure. "
+                        + "Set strong values before starting in production.");
+    }
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Verifica dal vivo}
+Generate sei chiavi/salt reali (\texttt{openssl rand -base64 32} /
+\texttt{openssl rand -hex 16}) e aggiunte al \texttt{.env} locale (non
+committato --- \texttt{.gitignore}). Riavviati guest-service e
+frontdesk-service contro il volume esistente: i log mostrano
+\texttt{ENCRYPTION\_KEY\_OK} / \texttt{ENCRYPTION\_KEYS\_OK}. Verificato
+anche che le due suite \texttt{@SpringBootTest} preesistenti che avevano
+richiesto un \texttt{@MockitoBean} per evitare le chiavi reali
+(\texttt{RoomTypeServiceIntegrationTest},
+\texttt{SoftDeleteVersionCheckIntegrationTest}, si veda \threat{GAP-28})
+continuano a passare: girano a profilo vuoto, trattato come segnale
+dev/test dal nuovo check.
+
+\paragraph{Riferimento} Commit: \commitref{991436f5}{fix(security): fail-closed startup check for PII encryption keys}
+
+\paragraph{Follow-up --- generazione delle chiavi nel bootstrap segreti}
+Il solo fail-closed lasciava un'installazione fresca senza un modo ovvio
+per generare le 6 chiavi, oltre a leggere \texttt{.env.example} a mano.
+\texttt{setup-hmac-secret.ps1}/\texttt{.sh} --- il bootstrap segreti
+idempotente già eseguito da ogni installazione per
+\texttt{INTERNAL\_HMAC\_SECRET}/\texttt{JWT\_SECRET}/le 7 password
+DB/Redis --- sono stati estesi con lo stesso pattern per le 3 coppie
+chiave/salt (chiave: segreto casuale in base64, equivalente a
+\texttt{openssl rand -base64 32}; salt: byte casuali in hex, equivalente
+a \texttt{openssl rand -hex 16} --- \texttt{Encryptors.delux} richiede il
+salt in hex, a differenza della chiave). Verificato in una directory
+scratch isolata, non sull'installazione tracciata di questa macchina:
+entrambi gli script generano le 6 variabili con il formato corretto e
+sono idempotenti a una seconda esecuzione.
+
+\paragraph{Riferimento} Commit: \commitref{8b9727bf}{fix(security): generate the 6 PII encryption keys in the secrets bootstrap}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Segreti SMTP scrivibili solo in un file tracciato in git \threat{GAP-30}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante la pianificazione del punto 2 della checklist go-live
+(configurazione di un relay SMTP reale per gli alert operativi), prima
+di scrivere qualunque credenziale. \texttt{docker/alertmanager/alertmanager.yml}
+era tracciato in git --- a differenza di \texttt{.env} --- con un commento
+che invitava esplicitamente a scriverci \texttt{smarthost}/\texttt{from}/
+\texttt{to}/\texttt{auth\_username}/\texttt{auth\_password} reali
+\emph{"BEFORE GO-LIVE"}: Alertmanager non supporta l'espansione
+\texttt{\$\{VAR\}}, quindi l'unico modo suggerito dal commento stesso era
+il valore letterale nel file. Configurare un relay reale avrebbe
+committato le credenziali SMTP nella storia del repository. Classificato
+OWASP A02 --- Cryptographic Failures, stesso trattamento già dato a
+\threat{T-CFG-02} per lo stesso tipo di problema (segreto scrivibile solo
+in chiaro in un file di configurazione).
+
+\begin{insecurebox}[title={docker/alertmanager/alertmanager.yml --- commento che invita al leak (baseline)}]
+\begin{lstlisting}[style=yaml]
+# INSICURO: nessuna espansione ${VAR} in questa versione di Alertmanager --
+# l'unico modo per configurare un relay reale è scrivere il valore qui,
+# in un file TRACCIATO IN GIT (a differenza di .env)
+# ... BEFORE GO-LIVE, replace smarthost/from/to/auth_username/auth_password
+# with the hotel's real SMTP relay ...
+  - name: 'email-ops'
+    email_configs:
+      - smarthost: 'mailpit:1025'
+        from: 'alerts@hotelpms.local'
+        to: 'ops@hotelpms.local'
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Il file tracciato è stato rinominato \texttt{alertmanager.yml.template}:
+resta in git ma con placeholder letterali (\texttt{\$\{SMTP\_HOST\}} ecc.),
+mai un valore reale. Un nuovo \texttt{docker/alertmanager/entrypoint.sh}
+(tracciato, nessun segreto) sostituisce quei placeholder via \texttt{sed}
+--- verificato che l'immagine \texttt{prom/alertmanager:v0.27.0} ha
+\texttt{sed} ma non \texttt{envsubst} --- scrivendo il risultato in
+\texttt{/alertmanager/alertmanager.generated.yml}, dentro il volume Docker
+\emph{named} (\texttt{alertmanager\_data}), mai sul filesystem host, mai
+raggiungibile da git. Le variabili lette sono le stesse già usate da
+\texttt{notification-service} (\texttt{SMTP\_HOST/PORT/USERNAME/PASSWORD/
+STARTTLS} --- stesso relay, nessuna duplicazione) più due nuove dedicate
+agli alert (\texttt{ALERT\_EMAIL\_FROM}/\texttt{ALERT\_EMAIL\_TO}, identità
+mittente/destinatario separata da quella guest-facing). Ogni valore passa
+per una funzione di escaping (\texttt{\textbackslash}, \texttt{|}, \texttt{\&}) prima della
+sostituzione, per evitare che un carattere speciale in una password reale
+corrompa il comando \texttt{sed} o la YAML risultante.
+
+\begin{securebox}[title={docker/alertmanager/entrypoint.sh --- escaping e sostituzione (fix)}]
+\begin{lstlisting}[style=bash]
+# SICURO: ogni valore passa per l'escaping prima di finire nel comando sed,
+# e il file finale non tocca mai il filesystem host o git
+escape_for_sed() {
+    printf '%s' "$1" | sed -e 's/[\\|&]/\\&/g'
+}
+sed \
+    -e "s|\${SMTP_HOST}|${SMTP_HOST_ESC}|g" \
+    -e "s|\${SMTP_PASSWORD}|${SMTP_PASSWORD_ESC}|g" \
+    -e "s|\${ALERT_EMAIL_TO}|${ALERT_EMAIL_TO_ESC}|g" \
+    "$TEMPLATE_FILE" > "$OUTPUT_FILE"
+
+exec /bin/alertmanager "--config.file=${OUTPUT_FILE}" "--storage.path=/alertmanager"
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Compatibilità e non-regressione}
+Ogni variabile ha un default identico al valore hardcoded precedente
+(\texttt{mailpit:1025}, nessuna auth, nessun TLS, \texttt{alerts@hotelpms.local}
+--- \texttt{ops@hotelpms.local}) --- un'installazione senza alcuna
+configurazione aggiuntiva in \texttt{.env} continua a comportarsi
+esattamente come prima. Nessuna regressione per gli ambienti dev/CI
+esistenti.
+
+\paragraph{Verifica dal vivo}
+Container ricreato con la configurazione di default: log identico al
+comportamento pre-fix, Alertmanager carica correttamente
+\texttt{alertmanager.generated.yml}. Ripetuto con credenziali fittizie
+contenenti tutti e tre i caratteri da escapare
+(\texttt{test\&user|name} / \texttt{p@ss|with\&special\textbackslash chars}):
+il file generato risulta YAML valida, Alertmanager lo carica senza errori
+(\texttt{"Completed loading of configuration file"}), verificato leggendo
+il contenuto generato direttamente dentro il container.
+
+\paragraph{Riferimento} Commit: \commitref{ae9121d7}{fix(security): render alertmanager SMTP secrets at runtime, never in git}
 
 % ─────────────────────────────────────────────────────────────────────────────
 % ═════════════════════════════════════════════════════════════════════════════
@@ -6001,6 +6549,181 @@ Checkstyle/PMD pre-esistenti confermato invariato per diff contro una baseline
 \texttt{git stash} --- il refactor non introduce nuovo debito, chiude solo il gap.
 
 \paragraph{Riferimento} Commit: \commitref{2f550eff}{refactor(security): close ArchUnit tenant-isolation blind spots, extract shared TenantContext helper}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Risposta 403 ambigua tra rotazione password forzata e diniego RBAC \threat{GAP-25}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante un collaudo live in browser (Claude in Chrome, 2026-09-06) sul flusso
+RBAC di \texttt{AuthenticationFilter} (api-gateway): un account \texttt{RECEPTIONIST}
+appena creato risultava bloccato con \texttt{403} su endpoint di uso quotidiano
+(\texttt{day-sheet}, \texttt{rooms}, \texttt{events/stream}), inizialmente scambiato per
+un bug di autorizzazione. Un'indagine mirata sul codice sorgente (nessuna
+\texttt{@PreAuthorize} presente su nessuno dei tre endpoint, confermato da test
+esistenti) ha escluso un problema RBAC vero e proprio: la causa reale era che
+l'account di test aveva \texttt{mustChangePassword=true} e non aveva mai completato il
+cambio password richiesto prima di navigare altrove --- il gateway blocca
+correttamente ogni richiesta finché la password non viene cambiata (difesa già corretta,
+si veda il commento storico su \texttt{MUST\_CHANGE\_PASSWORD\_ALLOWED\_PATHS}).
+
+Il problema reale, più piccolo ma genuino: \texttt{onError} scriveva un \texttt{403}
+\textbf{senza alcun corpo} sia per il branch \texttt{mustChangePassword} (rotazione
+password forzata, stato di autenticazione legittimo) sia per il branch RBAC
+(\texttt{ACCESS\_DENIED}, diniego di ruolo) --- rendendo i due casi indistinguibili per
+qualunque client e per chi analizza log/incidenti, e mascherando uno stato benigno da un
+diniego di autorizzazione. Classificato \textbf{OWASP A09 --- Security Logging \&
+Monitoring Failures}: non un bypass di enforcement (chi viene bloccato era già corretto
+in entrambi i rami), ma un deficit di osservabilità che ha reso più lento diagnosticare
+l'accaduto.
+
+\begin{insecurebox}[title={AuthenticationFilter.java --- 403 senza corpo, due cause indistinguibili (baseline)}]
+\begin{lstlisting}[style=java]
+private Mono<Void> onError(final ServerWebExchange exchange, final String err,
+        final HttpStatus httpStatus) {
+    final ServerHttpResponse response = exchange.getResponse();
+    response.setStatusCode(httpStatus);
+    return response.setComplete(); // "err" mai scritto da nessuna parte
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={AuthenticationFilter.java --- corpo JSON con il motivo (main)}]
+\begin{lstlisting}[style=java]
+private Mono<Void> onError(final ServerWebExchange exchange, final String err,
+        final HttpStatus httpStatus) {
+    final ServerHttpResponse response = exchange.getResponse();
+    response.setStatusCode(httpStatus);
+    response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+    final byte[] body = ("{\"error\":\"" + err + "\"}").getBytes(StandardCharsets.UTF_8);
+    return response.writeWith(Mono.just(response.bufferFactory().wrap(body)));
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Mitigazione applicata}
+\texttt{onError} scrive ora un corpo JSON minimo con il motivo esatto del rifiuto
+(\texttt{\{"error":"PASSWORD\_CHANGE\_REQUIRED"\}} contro
+\texttt{\{"error":"ACCESS\_DENIED"\}}), riusando lo stesso pattern già in uso in
+\texttt{InternalEventsAuthFilter.reject()} nello stesso package. Test estesi in
+\texttt{AuthenticationFilterTest} per asserire il corpo esatto sui tre casi (RBAC
+denied, mustChangePassword su endpoint di business, mustChangePassword anche per un
+ADMIN) oltre al solo status code già coperto in precedenza.
+
+\paragraph{Riferimento} Commit: \commitref{a33ed7ff}{fix(gateway): distinguish PASSWORD\_CHANGE\_REQUIRED from ACCESS\_DENIED in 403 body}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Allargamento deliberato RBAC: night audit e banner Dashboard aperti a RECEPTIONIST \threat{GAP-26}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Un'analisi di mercato UX commissionata dall'utente (confronto con Mews, Cloudbeds,
+Oracle OPERA Cloud, Ericsoft Suite 5°) ha rilevato che tre endpoint erano
+\texttt{ADMIN}/\texttt{OWNER}-only per default architetturale mai rivalutato, non per
+una reale esigenza di riservatezza: \texttt{NightAuditController} (esecuzione e storico,
+comprensivo del riepilogo cassa) e i due summary che pilotano i banner della Dashboard
+(\texttt{StayController.getAlloggiatiFailureSummary},
+\texttt{getCityTaxUnassessedSummary}). Nella prassi alberghiera reale la chiusura
+giornaliera la esegue il turno di notte --- personale di reception, non la proprietà ---
+e i due banner segnalano condizioni (schedine Alloggiati non inviate, tassa di soggiorno
+non valutata) su cui deve intervenire chi lavora al front desk, non l'owner.
+
+Non è un fix di una vulnerabilità: è un allargamento deliberato del perimetro di
+autorizzazione, deciso dall'utente con piena consapevolezza del trade-off. Prima di
+applicarlo è stato esplicitamente segnalato che l'endpoint di night audit include il
+riepilogo cassa (incassi per metodo di pagamento) e che i due endpoint erano protetti da
+test di sicurezza dedicati che bloccavano \texttt{RECEPTIONIST} proprio su quel dato
+finanziario --- non un dettaglio da retrofit inosservato. L'utente ha confermato la
+scelta due volte, anche dopo questa scoperta: chi esegue il night audit riconcilia
+comunque il cassetto contanti, è prassi ordinaria del ruolo, non un'eccezione.
+
+\begin{securebox}[title={NightAuditController.java --- costante di ruolo dedicata (main)}]
+\begin{lstlisting}[style=java]
+// Prima: private static final String ROLE_ADMIN_OR_OWNER =
+//                "hasAnyRole('ADMIN', 'OWNER')";
+private static final String ROLE_ADMIN_OWNER_OR_RECEPTIONIST =
+        "hasAnyRole('ADMIN', 'OWNER', 'RECEPTIONIST')";
+
+@PostMapping
+@PreAuthorize(ROLE_ADMIN_OWNER_OR_RECEPTIONIST)
+public ResponseEntity<NightAuditRunResponse> runNightAudit(...) { ... }
+
+@GetMapping
+@PreAuthorize(ROLE_ADMIN_OWNER_OR_RECEPTIONIST)
+public ResponseEntity<Page<NightAuditRunResponse>> getHistory(...) { ... }
+\end{lstlisting}
+\end{securebox}
+
+In \texttt{StayController} l'allargamento è scoped a una \emph{nuova} costante distinta
+dalla \texttt{ROLE\_ADMIN\_OR\_OWNER} esistente, applicata solo ai due endpoint summary:
+gli altri cinque endpoint \texttt{ADMIN}/\texttt{OWNER}-only dello stesso controller
+(invio/download Alloggiati, backfill tassa di soggiorno) restano invariati --- un
+allargamento mirato, non una modifica della costante condivisa che li avrebbe aperti
+tutti per effetto collaterale.
+
+\paragraph{Mitigazione applicata}
+Nuova costante \texttt{hasAnyRole('ADMIN','OWNER','RECEPTIONIST')} sui tre endpoint
+sopra. Test di sicurezza aggiornati in entrambe le classi
+(\texttt{NightAuditControllerSecurityTest}, \texttt{StayControllerSecurityTest}): le
+asserzioni \texttt{403 per RECEPTIONIST} sono diventate \texttt{200}/\texttt{201} per
+RECEPTIONIST, con un ruolo \texttt{GUEST} aggiunto come nuovo caso negativo che verifica
+che l'enforcement resti comunque presente. Lato frontend, la rotta \texttt{/night-audit}
+è stata spostata su un \texttt{ProtectedRoute} proprio con un allowlist
+\texttt{NIGHT\_AUDIT\_ROLES} dedicato, separato dal resto delle rotte owner-only in
+\texttt{App.tsx}; la voce di navigazione è uscita dal gruppo owner-only in
+\texttt{MainLayout.tsx}/\texttt{CommandPalette.tsx}; i due fetch dei banner Dashboard non
+sono più condizionati al ruolo owner/admin.
+
+\paragraph{Riferimento} Commit: \commitref{bcf03b8e}{fix(frontdesk,frontend): open night audit and dashboard-alert summaries to RECEPTIONIST}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\subsection{Hardening strutturale dell'encoder di log contro CWE-117 \threat{GAP-27}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Complementare a \threat{T-AUTH-16} e \threat{T-GW-13}: entrambi quei fix
+sanitizzano il valore \emph{alla sorgente} (il call site di logging, o
+l'header in ingresso al gateway), ma il pattern Logback che rende
+effettivamente la riga di log resta plain-text --- \texttt{\%msg} e
+\texttt{\%X\{correlationId:-\}} scritti letteralmente, senza alcuna
+protezione strutturale. Un futuro call site che dimentichi di chiamare
+\texttt{sanitizeForLog} (i quattro sanitizzatori del progetto sono copie
+indipendenti, non un'unica utility condivisa --- nessun modulo è dipendenza
+di tutti e otto i servizi, \texttt{api-gateway} è WebFlux e non dipende da
+\texttt{common-web-lib}) riaprirebbe silenziosamente lo stesso CWE-117 senza
+che né CodeQL né una revisione manuale se ne accorgano necessariamente.
+
+\begin{insecurebox}[title={logback-spring.xml --- pattern plain-text (baseline)}]
+\begin{lstlisting}[style=xml]
+<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%X{correlationId:-}] %logger{36} - %msg%n</pattern>
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+\texttt{\%msg} e \texttt{\%X\{correlationId:-\}} avvolti nel conversion word
+\texttt{\%replace(...)\{'[\textbackslash r\textbackslash n]','\_'\}}, che
+sostituisce ogni CR/LF con \texttt{\_} indipendentemente da cosa produce il
+valore a monte --- CRLF diventa strutturalmente impossibile nell'output,
+non solo scoraggiato per convenzione. Applicato in
+\texttt{auth-service}/\texttt{billing-service}/\texttt{notification-service}
+(\texttt{logback-spring.xml}, sia l'encoder console sia il blocco
+\texttt{<message>} dell'appender Loki) e nell'\texttt{application.yml}
+condiviso servito da \texttt{config-service} via Spring Cloud Config
+(\texttt{logging.pattern.console}), che copre i servizi privi di un proprio
+\texttt{logback-spring.xml} (\texttt{api-gateway}, \texttt{guest-service},
+\texttt{frontdesk-service}, \texttt{fb-service}). \texttt{config-service}
+non importa la configurazione che serve agli altri, quindi replica la
+stessa property nel proprio \texttt{application.yml} locale. Gli stack
+trace (\texttt{\%ex}) restano fuori dal wrapping --- devono restare
+multi-riga.
+
+\begin{securebox}[title={logback-spring.xml --- pattern con encoder rafforzato (fix)}]
+\begin{lstlisting}[style=xml]
+<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level [%replace(%X{correlationId:-}){'[\r\n]','_'}] %logger{36} - %replace(%msg){'[\r\n]','_'}%n</pattern>
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Riferimento} Commit: \commitref{3b62006}{fix(security): harden CWE-117 log injection across auth-service and gateway}
 
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
@@ -6967,6 +7690,28 @@ soppressione \texttt{codeql[java/log-injection]} aggiunti ad ogni chiamata
 (documentazione inline, non solo dismissal silenzioso); alert chiusi su GitHub
 con motivazione.
 
+\paragraph{Correzione (2026-09-10): i commenti \texttt{codeql[...]} non sopprimono nulla}
+Durante il triage degli alert \texttt{\#588}/\texttt{\#589}/\texttt{\#590}
+(stesso falso positivo di cui sopra, questa volta su
+\texttt{AuthServiceImpl.java}) è emerso che il repository gira in CodeQL
+\emph{default setup} (nessun workflow \texttt{codeql-analysis.yml} committato
+--- confermato via \texttt{gh api .../code-scanning/analyses}, che mostra
+\texttt{CodeQL} come tool ma nessuna analisi triggerata da un job del
+repository, e da \texttt{docs/ROADMAP.md} P13, che documenta l'aggiornamento
+della query suite a \texttt{extended} fatto via API proprio perché non esiste
+un file di configurazione in-repo). In default setup i commenti di
+soppressione inline \texttt{codeql[...]} \textbf{non hanno alcun effetto}
+sullo stato dell'alert --- funzionano solo con \emph{advanced setup} (un
+workflow CodeQL committato nel repository). I tre alert su
+\texttt{AuthServiceImpl.java} sono quindi rimasti aperti contro ogni commit
+successivo nonostante il commento, esattamente come già documentato per il
+falso positivo CSRF di \threat{GAP-9} (che infatti richiese anche lì un
+dismissal manuale, non il solo commento). Corretto: i tre alert dismissati
+manualmente su GitHub (\texttt{false positive}, stessa motivazione tecnica),
+e i commenti inline in \texttt{AuthServiceImpl.java} riformulati per non
+affermare più un meccanismo di soppressione che non esiste sotto questa
+configurazione.
+
 \paragraph{CVE scanning con Trivy (DEP-CVE-01/02/04)}
 Pipeline CI esegue Trivy su ogni immagine Docker.
 CVE risolte: \texttt{CVE-2026-33870/33871} (Netty request smuggling + HTTP/2 DoS),
@@ -6987,6 +7732,72 @@ Risolte con upgrade mirati senza breaking change (OWASP~A06:2025):
 \end{itemize}
 Tutti i 344 test rimasti verdi; build e lint zero warning.
 Commit: \commitref{b1be3e8}{fix(deps): resolve 7 Dependabot CVEs --- react-router 7.17.0, esbuild 0.28.1}
+
+\paragraph{Centralizzazione pin Tomcat/Netty e bump immagini container (DEP-CVE-08)}
+Triage dei 34 alert code-scanning aperti su GitHub il 2026-09-10 (4 CodeQL,
+30 Trivy). \texttt{tomcat.version}/\texttt{netty.version} erano duplicati
+identici in 8 \texttt{build.gradle.kts} --- esattamente la duplicazione che
+aveva lasciato Tomcat fermo a \texttt{10.1.55} ovunque (3 alert CRITICAL).
+Centralizzati nel blocco \texttt{subprojects\{\}} del \texttt{build.gradle.kts}
+di root, stesso pattern già in uso per l'override \texttt{httpcore5}. Netty
+bumpato a \texttt{4.1.137.Final} (\texttt{CVE-2026-75595}, CRITICAL),
+verificato risolvere correttamente via
+\texttt{./gradlew :auth-service:dependencies}. Tomcat \textbf{non} bumpato a
+\texttt{10.1.58}: la advisory lo cita come fixed version ma quella versione
+non è pubblicata su Maven Central (\texttt{GET .../10.1.58/... -> 404},
+risoluzione Gradle fallisce) --- lasciato alla versione più alta
+realmente esistente, con nota di ricontrollo alla prossima release Apache.
+
+\texttt{docker/postgres/Dockerfile} e il nuovo
+\texttt{docker/redis/Dockerfile} eseguono
+\texttt{apk update \&\& apk upgrade --no-cache} sopra il tag base: il solo
+bump di tag non aggiorna i pacchetti Alpine già cristallizzati nell'immagine
+upstream al momento della sua build (verificato: \texttt{redis:8.8.2-alpine}
+da solo restava su \texttt{libcrypto3}/\texttt{libssl3} \texttt{3.5.7-r0}).
+Con l'\texttt{apk upgrade}, un rescan Trivy locale di entrambe le immagini
+costruite torna a 0 vulnerabilità CRITICAL/HIGH. Redis
+\texttt{8.8.1-alpine}~→~\texttt{8.8.2-alpine}; Grafana
+\texttt{13.1.1}~→~\texttt{13.1.5} (azzera i 2 CRITICAL
+\texttt{golang.org/x/crypto}; gli HIGH residui sono nei plugin datasource Go
+precompilati, fixabili solo upstream); \texttt{frontend/Dockerfile}:
+\texttt{nginxinc/nginx-unprivileged:alpine} --- l'unico tag completamente
+flottante del repository --- pinnato a \texttt{1.31.5-alpine}.
+\texttt{.trivyignore} esteso con 16 nuove CVE Go-stdlib nel binario
+\texttt{gosu} bundlato in postgres, emerse solo ora che la CI scansiona
+l'immagine costruita da noi invece del tag upstream nudo (stessa
+argomentazione di raggiungibilità già in uso nel file: \texttt{gosu} fa solo
+\texttt{setuid}+\texttt{execve}, nessun path di rete/TLS/parsing).
+
+Di conseguenza, \texttt{.github/workflows/ci.yml}: nuovo gate bloccante
+(\texttt{exit-code: 1}, severità CRITICAL) sul job \texttt{trivy} per le 11
+immagini che costruiamo noi --- postgres/redis spostate lì dal job
+\texttt{trivy-thirdparty}, avendo ora un proprio Dockerfile hardenato;
+\texttt{trivy-thirdparty} (solo Grafana rimasto) legge il tag da
+\texttt{docker-compose.yml} a runtime invece di duplicarlo a mano --- quel
+duplicato hardcoded è la causa esatta del drift di \texttt{DEP-CVE-07}; nuovo
+schedule settimanale (lunedì 05:00 UTC) così gli alert di terze parti si
+aggiornano anche senza push; \texttt{trivy-config: trivy.yaml} finalmente
+referenziato da entrambi i job (il file esisteva dalla baseline ma nessuno
+step lo usava, quindi era configurazione morta). 17 alert Trivy rimasti
+orfani dalla migrazione di categoria (postgres/redis) dismissati manualmente
+su GitHub con motivazione, dopo verifica via rescan locale che fossero
+effettivamente risolti.
+Commit: \commitref{c050521}{fix(security): centralize tomcat/netty version overrides, bump netty to 4.1.137.Final},
+\commitref{2eba1cc}{fix(security): patch OS packages in postgres/redis images, bump redis/grafana, pin nginx},
+\commitref{81b3f2f}{fix(ci): gate CRITICAL on our images, scan postgres/redis as built, kill matrix drift}
+
+\paragraph{Bump vitest --- alert Dependabot residui (DEP-CVE-09)}
+4 alert Dependabot sul frontend, tutti su devDependency (nessun impatto sul
+bundle di produzione): \texttt{@vitest/mocker} (path traversal,
+GHSA-82fw-gwwq-j7x9) risolto con bump diretto di \texttt{vitest} e
+\texttt{@vitest/coverage-v8} a \texttt{\^{}4.1.11} --- già dentro il range
+semver dichiarato in \texttt{package.json}, \texttt{npm audit fix} da solo
+non attraversava il bump per una divergenza nella risoluzione delle
+dipendenze peer. \texttt{baseline-browser-mapping}, \texttt{browserslist},
+\texttt{@humanfs/node} risolti transitivamente dallo stesso
+\texttt{npm audit fix}. Verificato: lint pulito, build verde, 1154/1154 test
+Vitest verdi.
+Commit: \commitref{209354e}{fix(deps): bump vitest to 4.1.11, closing @vitest/mocker path-traversal advisory}
 
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Appendice B --- Utilizzo dell'IA e Revisione Critica}
