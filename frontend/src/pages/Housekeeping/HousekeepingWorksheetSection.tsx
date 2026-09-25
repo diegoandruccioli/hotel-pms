@@ -43,9 +43,9 @@ export const HousekeepingWorksheetSection = memo(() => {
     setUserPickedDate(e.target.value);
   }, []);
 
-  const handleDownload = useCallback(() => {
+  const handleDownload = useCallback(async () => {
     if (date) {
-      housekeepingService.downloadWorksheetPdf(date);
+      await housekeepingService.downloadWorksheetPdf(date);
     }
   }, [date]);
 
