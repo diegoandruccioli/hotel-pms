@@ -19,6 +19,13 @@ test.describe('Blocco 3 — Housekeeping', () => {
 
     const badges = page.locator('.grid.grid-cols-3.gap-4 > button');
     await expect(badges).toHaveCount(3);
+    // The badges render 0 until the rooms query resolves — read the baseline only once the
+    // room cards are on screen, otherwise "before" is the loading placeholder, not the count.
+    await expect(page.locator('.lg\\:grid-cols-4 > div').first()).toBeVisible();
+    // The badges come from their own query and can still read 0 with the cards on screen —
+    // wait until they carry real counts before taking the baseline.
+    await expect.poll(() => badges.evaluateAll((els) =>
+      els.reduce((sum, el) => sum + Number(el.querySelector('p')?.textContent?.trim() ?? 0), 0))).toBeGreaterThan(0);
     const cleanBadge = badges.nth(0); // ALL_STATUSES = ['CLEAN', 'DIRTY', 'MAINTENANCE']
     const before = Number((await cleanBadge.locator('p').first().textContent())?.trim());
     expect(Number.isFinite(before)).toBe(true);
@@ -50,6 +57,11 @@ test.describe('Blocco 3 — Housekeeping', () => {
 
     const badges = page.locator('.grid.grid-cols-3.gap-4 > button');
     await expect(badges).toHaveCount(3);
+    await expect(page.locator('.lg\\:grid-cols-4 > div').first()).toBeVisible();
+    // The badges come from their own query and can still read 0 with the cards on screen —
+    // wait until they carry real counts before taking the baseline.
+    await expect.poll(() => badges.evaluateAll((els) =>
+      els.reduce((sum, el) => sum + Number(el.querySelector('p')?.textContent?.trim() ?? 0), 0))).toBeGreaterThan(0);
     const dirtyBadge = badges.nth(1);
     const before = Number((await dirtyBadge.locator('p').first().textContent())?.trim());
     expect(Number.isFinite(before)).toBe(true);

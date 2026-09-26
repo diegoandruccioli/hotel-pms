@@ -238,18 +238,22 @@ test.describe('QA 2026-08-24 — imposta di soggiorno (city tax) vs comune confi
     expect(body).toContain('CITY_TAX_COMUNE_NOT_CONFIGURED');
   });
 
-  test('(c) malformed: overlapping validity period for the same category is rejected (409), not silently duplicated', async ({ request }) => {
+  test('(c) malformed: a validFrom not after the open rate start is rejected (400), not silently duplicated', async ({ request }) => {
     const headers = await csrfHeader(request);
     const category = `QAOVR${Date.now() % 100000}`;
     const first = await request.post('/api/v1/stays/city-tax-rates', {
       headers, data: { category, amountPerNight: 3, validFrom: '2021-01-01' },
     });
     expect(first.status(), await first.text()).toBe(201);
+    // A LATER validFrom now auto-closes the open rate (201); only a validFrom that is not
+    // after the open rate's own is rejected.
     const overlapping = await request.post('/api/v1/stays/city-tax-rates', {
-      headers, data: { category, amountPerNight: 5, validFrom: '2021-06-01' },
+      headers, data: { category, amountPerNight: 5, validFrom: '2020-06-01' },
     });
+    const overlappingBody = await overlapping.text();
     logCustom('fiscal_matrix_result', { flow: 'city_tax', state: 'overlapping_rate', status: overlapping.status() });
-    expect(overlapping.status()).toBe(409);
+    expect(overlapping.status(), overlappingBody).toBe(400);
+    expect(overlappingBody).toContain('CITY_TAX_RATE_VALID_FROM_NOT_AFTER_CURRENT');
   });
 
   test('(d) a check-in on a hotel with no city-tax rate configured for the current category proceeds without charging city tax (documented no-op, not a crash)', async () => {

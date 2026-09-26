@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { APIRequestContext } from '@playwright/test';
@@ -114,7 +114,16 @@ export async function ensureFixtureIds(request: APIRequestContext): Promise<Fixt
   // try/catch on the read itself, not existsSync-then-readFileSync: same
   // TOCTOU concern as snapshotHotelSettings above (CodeQL js/file-system-race).
   try {
-    return JSON.parse(readFileSync(FIXTURE_IDS_FILE, 'utf-8'));
+    const cached = JSON.parse(readFileSync(FIXTURE_IDS_FILE, 'utf-8')) as FixtureIds;
+    // The cache outlives the round that wrote it: a reservation/quotation from an earlier
+    // round may have been soft-deleted since (or its guest anonymised), and reusing its
+    // ids turns every parametric-route check into a 404. Reuse only if both still resolve.
+    const [reservation, quotation] = await Promise.all([
+      request.get(`/api/v1/reservations/${cached.reservationId}`),
+      request.get(`/api/v1/quotations/${cached.quotationId}`),
+    ]);
+    if (reservation.ok() && quotation.ok()) return cached;
+    unlinkSync(FIXTURE_IDS_FILE);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
   }
