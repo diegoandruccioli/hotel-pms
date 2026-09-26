@@ -3,6 +3,7 @@ package com.hotelpms.frontdesk.reservations.service.impl;
 import com.hotelpms.internalauth.security.TenantContext;
 
 import com.hotelpms.commonweb.csv.CsvWriter;
+import com.hotelpms.commonweb.paging.StablePaging;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
@@ -98,13 +99,6 @@ public class ReservationServiceImpl implements ReservationService {
      * page at a time instead of loading the whole matching set before writing.
      */
     private static final int EXPORT_PAGE_SIZE = 500;
-    /**
-     * Secondary sort keys appended to every paginated reservation query: many reservations share the
-     * same check-in date, and without a unique final key Postgres does not guarantee a stable order
-     * across LIMIT/OFFSET pages, so a row can be skipped or repeated between pages.
-     */
-    private static final List<Sort.Order> STABLE_TIE_BREAK =
-            List.of(Sort.Order.desc("createdAt"), Sort.Order.asc("id"));
     private static final String UNKNOWN_GUEST = "Unknown Guest";
     private static final LocalDate EARLIEST_FILTER_DATE = LocalDate.of(1900, 1, 1);
     private static final LocalDate LATEST_FILTER_DATE = LocalDate.of(2100, 12, 31);
@@ -161,7 +155,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional(readOnly = true)
     public Page<ReservationResponse> getAllReservations(final Pageable pageable) {
-        final Pageable safePageable = withStableOrder(pageable == null ? Pageable.unpaged() : pageable);
+        final Pageable safePageable = StablePaging.withCreatedAtTieBreak(pageable);
         final UUID hotelId = TenantContext.resolveHotelId();
         final Page<Reservation> reservationPage = reservationRepository.findAllByHotelId(hotelId, safePageable);
 
@@ -194,7 +188,7 @@ public class ReservationServiceImpl implements ReservationService {
             final LocalDate dateFrom, final LocalDate dateTo, final ReservationStatus status,
             final Pageable pageable) {
         final UUID hotelId = TenantContext.resolveHotelId();
-        final Pageable safePageable = withStableOrder(pageable == null ? Pageable.unpaged() : pageable);
+        final Pageable safePageable = StablePaging.withCreatedAtTieBreak(pageable);
         final Page<Reservation> results =
                 fetchReservationsPage(hotelId, query, upcomingOnly, dateFrom, dateTo, status, safePageable);
 
@@ -214,24 +208,6 @@ public class ReservationServiceImpl implements ReservationService {
         return results.map(reservation -> enrichWithGuestName(
                 reservationMapper.toResponse(reservation),
                 guestNameMap.getOrDefault(reservation.getGuestId(), UNKNOWN_GUEST)));
-    }
-
-    /**
-     * Appends the {@link #STABLE_TIE_BREAK} keys (skipping any the caller already sorts on) so the
-     * page order is total and deterministic whatever sort the client asked for.
-     *
-     * @param pageable the requested page; returned unchanged when unpaged
-     * @return a pageable whose sort ends with {@code createdAt desc, id asc}
-     */
-    private static Pageable withStableOrder(final Pageable pageable) {
-        if (pageable.isUnpaged()) {
-            return pageable;
-        }
-        final Sort requested = pageable.getSort();
-        final Sort tieBreak = Sort.by(STABLE_TIE_BREAK.stream()
-                .filter(order -> requested.getOrderFor(order.getProperty()) == null)
-                .toList());
-        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), requested.and(tieBreak));
     }
 
     /**
@@ -283,7 +259,7 @@ public class ReservationServiceImpl implements ReservationService {
             int pageNumber = 0;
             Page<Reservation> page;
             do {
-                final Pageable pageable = withStableOrder(PageRequest.of(
+                final Pageable pageable = StablePaging.withCreatedAtTieBreak(PageRequest.of(
                         pageNumber, EXPORT_PAGE_SIZE, Sort.by("checkInDate").descending()));
                 page = fetchReservationsPage(hotelId, query, upcomingOnly, dateFrom, dateTo, status, pageable);
 
