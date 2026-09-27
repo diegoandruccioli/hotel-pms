@@ -3,6 +3,7 @@ package com.hotelpms.guest.service.impl;
 import com.hotelpms.internalauth.security.TenantContext;
 
 import com.hotelpms.commonweb.csv.CsvWriter;
+import com.hotelpms.commonweb.paging.StablePaging;
 import com.hotelpms.guest.client.AlloggiatiComuniClient;
 import com.hotelpms.guest.client.BillingServiceClient;
 import com.hotelpms.guest.client.ReservationClient;
@@ -339,8 +340,8 @@ public class GuestServiceImpl implements GuestService {
             int pageNumber = 0;
             Page<Guest> page;
             do {
-                final Pageable pageable = PageRequest.of(
-                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("lastName").ascending());
+                final Pageable pageable = StablePaging.withCreatedAtTieBreak(PageRequest.of(
+                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("lastName").ascending()));
                 page = safeQuery.isEmpty()
                         ? guestRepository.findAllByHotelId(hotelId, pageable)
                         : guestRepository.searchByKeywordAndHotelId(safeQuery, hotelId, pageable);

@@ -7,6 +7,7 @@ import com.hotelpms.guest.client.StayServiceClient;
 import com.hotelpms.guest.client.dto.AlloggiatiComuneClientResponse;
 import com.hotelpms.guest.client.dto.GuestInvoiceClientResponse;
 import com.hotelpms.guest.client.dto.GuestLastStayClientResponse;
+import com.hotelpms.commonweb.paging.StablePaging;
 import com.hotelpms.guest.dto.request.GuestRequest;
 import com.hotelpms.guest.dto.request.IdentityDocumentRequestDTO;
 import com.hotelpms.guest.dto.response.GuestResponse;
@@ -512,7 +513,8 @@ class GuestServiceImplTest {
 
     @Test
     void shouldExportAllGuestsAsCsvWhenQueryIsBlank() throws IOException {
-        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_LAST_NAME).ascending());
+        final Pageable pageable = StablePaging.withCreatedAtTieBreak(
+                PageRequest.of(0, 500, Sort.by(SORT_FIELD_LAST_NAME).ascending()));
         final Page<Guest> guestPage = new PageImpl<>(List.of(Objects.requireNonNull(guest)), pageable, 1L);
         when(guestRepository.findAllByHotelId(hotelId, pageable)).thenReturn(guestPage);
 
@@ -528,7 +530,8 @@ class GuestServiceImplTest {
 
     @Test
     void shouldExportMatchingGuestsAsCsvWhenQueryIsGiven() throws IOException {
-        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_LAST_NAME).ascending());
+        final Pageable pageable = StablePaging.withCreatedAtTieBreak(
+                PageRequest.of(0, 500, Sort.by(SORT_FIELD_LAST_NAME).ascending()));
         final Page<Guest> guestPage = new PageImpl<>(List.of(Objects.requireNonNull(guest)), pageable, 1L);
         when(guestRepository.searchByKeywordAndHotelId("mario", hotelId, pageable)).thenReturn(guestPage);
 
@@ -548,7 +551,8 @@ class GuestServiceImplTest {
                 .lastName("Nome")
                 .active(true)
                 .build();
-        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_LAST_NAME).ascending());
+        final Pageable pageable = StablePaging.withCreatedAtTieBreak(
+                PageRequest.of(0, 500, Sort.by(SORT_FIELD_LAST_NAME).ascending()));
         final Page<Guest> guestPage = new PageImpl<>(List.of(bareGuest), pageable, 1L);
         when(guestRepository.findAllByHotelId(hotelId, pageable)).thenReturn(guestPage);
 

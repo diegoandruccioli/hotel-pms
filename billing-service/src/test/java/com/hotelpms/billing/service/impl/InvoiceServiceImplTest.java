@@ -1,5 +1,6 @@
 package com.hotelpms.billing.service.impl;
 
+import com.hotelpms.commonweb.paging.StablePaging;
 import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.client.dto.GuestSearchPageResponse;
@@ -39,6 +40,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -828,8 +830,8 @@ class InvoiceServiceImplTest {
                 invoice.setStatus(InvoiceStatus.ISSUED);
                 invoice.setDocumentType(DocumentType.FATTURA);
                 invoice.setTotalAmount(BigDecimal.TEN);
-                final PageRequest pageable = PageRequest.of(
-                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending());
+                final Pageable pageable = StablePaging.withCreatedAtTieBreak(PageRequest.of(
+                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending()));
 
                 when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(InvoiceStatus.ISSUED), eq(null), eq(null),
                                 eq(null), eq(List.of()), eq(pageable)))
@@ -854,8 +856,8 @@ class InvoiceServiceImplTest {
         @DisplayName("exportInvoicesCsv skips guest batch resolution when there are no matching invoices")
         void exportInvoicesCsvSkipsGuestBatchResolutionWhenEmpty() throws IOException {
                 // Arrange
-                final PageRequest pageable = PageRequest.of(
-                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending());
+                final Pageable pageable = StablePaging.withCreatedAtTieBreak(PageRequest.of(
+                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending()));
                 when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
                                 eq(null), eq(List.of()), eq(pageable)))
                                 .thenReturn(new PageImpl<>(List.of()));
@@ -874,8 +876,8 @@ class InvoiceServiceImplTest {
         void exportInvoicesCsvResolvesGuestIdsFromQuery() throws IOException {
                 // Arrange
                 final UUID otherGuestId = UUID.randomUUID();
-                final PageRequest pageable = PageRequest.of(
-                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending());
+                final Pageable pageable = StablePaging.withCreatedAtTieBreak(PageRequest.of(
+                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending()));
                 when(guestClient.searchGuests(QUERY_MARIO, GUEST_SEARCH_CAP))
                                 .thenReturn(new GuestSearchPageResponse(List.of(
                                                 new GuestResponse(otherGuestId, GUEST_FIRST_NAME_MARIO, "Bianchi",

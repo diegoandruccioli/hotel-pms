@@ -3,6 +3,7 @@ package com.hotelpms.billing.service.impl;
 import com.hotelpms.internalauth.security.TenantContext;
 
 import com.hotelpms.commonweb.csv.CsvWriter;
+import com.hotelpms.commonweb.paging.StablePaging;
 import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.domain.ChargeType;
@@ -357,8 +358,8 @@ public class InvoiceServiceImpl implements InvoiceService {
             int pageNumber = 0;
             Page<Invoice> page;
             do {
-                final Pageable pageable = PageRequest.of(
-                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("issueDate").descending());
+                final Pageable pageable = StablePaging.withCreatedAtTieBreak(PageRequest.of(
+                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("issueDate").descending()));
                 page = invoiceRepository.searchInvoicesByHotelId(
                         hotelId, status, fromInclusive, toExclusive, trimmedQuery, guestIds, pageable);
 
