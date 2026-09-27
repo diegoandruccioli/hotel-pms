@@ -51,12 +51,13 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
     boolean existsByUsername(String username);
 
     /**
-     * Returns all active users belonging to the given hotel.
+     * Returns all active users belonging to the given hotel, ordered by
+     * {@code username} (unique) for a stable admin-page listing.
      *
      * @param hotelId the hotel UUID
      * @return list of active user accounts for the hotel
      */
-    List<UserAccount> findAllByHotelId(UUID hotelId);
+    List<UserAccount> findAllByHotelIdOrderByUsernameAsc(UUID hotelId);
 
     /**
      * Finds an active user by id scoped to a hotel (prevents cross-tenant access).
