@@ -70,13 +70,15 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      * Finds all stays for a reservation, scoped to the given hotel (multi-tenancy).
      * Used by the public {@code getStaysByReservationId} endpoint so a
      * cross-hotel reservationId cannot be used to enumerate another hotel's
-     * stays (T-STAY-04, IDOR).
+     * stays (T-STAY-04, IDOR). Ordered by {@code id} — the caller pages this
+     * list in memory (there is no natural date to page by here) and needs a
+     * total order for that slicing to be deterministic across calls.
      *
      * @param reservationId the reservation ID
      * @param hotelId       the hotel UUID (tenant isolation)
-     * @return list of stays for that reservation within that hotel
+     * @return list of stays for that reservation within that hotel, ordered by id
      */
-    List<Stay> findAllByReservationIdAndHotelId(UUID reservationId, UUID hotelId);
+    List<Stay> findAllByReservationIdAndHotelIdOrderById(UUID reservationId, UUID hotelId);
 
     /**
      * Finds all stays for a hotel where actual check-in time falls within the given

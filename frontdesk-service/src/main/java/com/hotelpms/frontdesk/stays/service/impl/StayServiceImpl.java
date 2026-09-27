@@ -282,7 +282,7 @@ public class StayServiceImpl implements StayService {
             @NonNull final UUID reservationId, @NonNull final UUID hotelId, final Pageable pageable) {
         log.debug("Fetching stays for reservationId: {}", reservationId);
         final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
-        final List<Stay> stays = stayRepository.findAllByReservationIdAndHotelId(reservationId, hotelId);
+        final List<Stay> stays = stayRepository.findAllByReservationIdAndHotelIdOrderById(reservationId, hotelId);
         final List<StayResponse> content = stays.stream()
                 .map(stayMapper::toDto)
                 .toList();

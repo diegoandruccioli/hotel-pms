@@ -1091,7 +1091,7 @@ class ReservationServiceImplTest {
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
-        when(stayRepository.findAllByReservationIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(List.of());
+        when(stayRepository.findAllByReservationIdAndHotelIdOrderById(reservationId, HOTEL_ID)).thenReturn(List.of());
         when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
         when(guestClient.getGuestById(GUEST_ID)).thenReturn(mockGuestResponse);
         when(reservationMapper.toResponse(entity)).thenReturn(noShowResponse);
@@ -1120,7 +1120,7 @@ class ReservationServiceImplTest {
         entity.setStatus(ReservationStatus.CONFIRMED);
         entity.setCheckInDate(LocalDate.now().minusDays(1));
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
-        when(stayRepository.findAllByReservationIdAndHotelId(reservationId, HOTEL_ID))
+        when(stayRepository.findAllByReservationIdAndHotelIdOrderById(reservationId, HOTEL_ID))
                 .thenReturn(List.of(mock(com.hotelpms.frontdesk.stays.domain.Stay.class)));
 
         assertThrows(ConflictException.class,

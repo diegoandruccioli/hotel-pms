@@ -531,7 +531,7 @@ class StayServiceImplTest {
         final StayResponse expectedResponse = Objects.requireNonNull(validResponse);
         final Pageable pageable = PageRequest.of(0, 20);
 
-        when(stayRepository.findAllByReservationIdAndHotelId(reservation, hotelId))
+        when(stayRepository.findAllByReservationIdAndHotelIdOrderById(reservation, hotelId))
                 .thenReturn(List.of(stay));
         when(stayMapper.toDto(stay)).thenReturn(expectedResponse);
 
@@ -541,7 +541,7 @@ class StayServiceImplTest {
         // Assert
         assertEquals(1, response.getTotalElements());
         assertEquals(expectedResponse, response.getContent().get(0));
-        verify(stayRepository, times(1)).findAllByReservationIdAndHotelId(reservation, hotelId);
+        verify(stayRepository, times(1)).findAllByReservationIdAndHotelIdOrderById(reservation, hotelId);
     }
 
     @Test
@@ -558,7 +558,7 @@ class StayServiceImplTest {
         final StayResponse responseC = mock(StayResponse.class);
         final Pageable secondPage = PageRequest.of(1, 2);
 
-        when(stayRepository.findAllByReservationIdAndHotelId(reservation, hotelId))
+        when(stayRepository.findAllByReservationIdAndHotelIdOrderById(reservation, hotelId))
                 .thenReturn(List.of(stayA, stayB, stayC));
         when(stayMapper.toDto(stayA)).thenReturn(responseA);
         when(stayMapper.toDto(stayB)).thenReturn(responseB);

@@ -767,7 +767,7 @@ public class ReservationServiceImpl implements ReservationService {
             throw new ConflictException("RESERVATION_NO_SHOW_BEFORE_CHECKIN_DATE");
         }
         final boolean hasStay = !stayRepository
-                .findAllByReservationIdAndHotelId(reservation.getId(), hotelId).isEmpty();
+                .findAllByReservationIdAndHotelIdOrderById(reservation.getId(), hotelId).isEmpty();
         if (hasStay) {
             throw new ConflictException("RESERVATION_NO_SHOW_HAS_STAY");
         }
