@@ -231,7 +231,7 @@ class ReservationGroupServiceImplTest {
 
         when(groupRepository.findByIdAndHotelId(groupId, hotelId))
                 .thenReturn(java.util.Optional.of(group(GroupStatus.CONFIRMED)));
-        when(reservationRepository.findAllByGroupIdAndHotelId(groupId, hotelId))
+        when(reservationRepository.findAllByGroupIdAndHotelIdOrderByCreatedAtAscIdAsc(groupId, hotelId))
                 .thenReturn(List.of(memberReservation));
         when(guestClient.getGuestsBatch(ArgumentMatchers.any())).thenReturn(List.of(
                 new GuestResponse(memberReservation.getGuestId(), "Jane", "Doe", "jane@test.com"),
@@ -258,7 +258,7 @@ class ReservationGroupServiceImplTest {
         final ReservationGroup existingGroup = group(GroupStatus.CONFIRMED);
 
         when(groupRepository.findByIdAndHotelId(groupId, hotelId)).thenReturn(java.util.Optional.of(existingGroup));
-        when(reservationRepository.findAllByGroupIdAndHotelId(groupId, hotelId)).thenReturn(List.of(
+        when(reservationRepository.findAllByGroupIdAndHotelIdOrderByCreatedAtAscIdAsc(groupId, hotelId)).thenReturn(List.of(
                 member(confirmedReservationId, ReservationStatus.CONFIRMED),
                 member(cancelledReservationId, ReservationStatus.CANCELLED)));
         when(groupRepository.save(ArgumentMatchers.any(ReservationGroup.class)))
@@ -295,7 +295,7 @@ class ReservationGroupServiceImplTest {
 
         when(groupRepository.findByIdAndHotelId(groupId, hotelId))
                 .thenReturn(java.util.Optional.of(group(GroupStatus.CONFIRMED)));
-        when(reservationRepository.findAllByGroupIdAndHotelId(groupId, hotelId))
+        when(reservationRepository.findAllByGroupIdAndHotelIdOrderByCreatedAtAscIdAsc(groupId, hotelId))
                 .thenReturn(List.of(checkedInMember));
         when(stayRepository.findAllByReservationId(reservationId)).thenReturn(List.of(checkedInStay));
         when(groupRepository.save(ArgumentMatchers.any(ReservationGroup.class)))
@@ -318,7 +318,7 @@ class ReservationGroupServiceImplTest {
 
         when(groupRepository.findByIdAndHotelId(groupId, hotelId))
                 .thenReturn(java.util.Optional.of(group(GroupStatus.CONFIRMED)));
-        when(reservationRepository.findAllByGroupIdAndHotelId(groupId, hotelId))
+        when(reservationRepository.findAllByGroupIdAndHotelIdOrderByCreatedAtAscIdAsc(groupId, hotelId))
                 .thenReturn(List.of(checkedInMember));
         when(stayRepository.findAllByReservationId(reservationId)).thenReturn(List.of(checkedInStay));
         org.mockito.Mockito.doThrow(new BillingNotPaidException("BILLING_NOT_PAID"))
@@ -339,7 +339,7 @@ class ReservationGroupServiceImplTest {
 
         when(groupRepository.findByIdAndHotelId(groupId, hotelId))
                 .thenReturn(java.util.Optional.of(group(GroupStatus.CONFIRMED)));
-        when(reservationRepository.findAllByGroupIdAndHotelId(groupId, hotelId))
+        when(reservationRepository.findAllByGroupIdAndHotelIdOrderByCreatedAtAscIdAsc(groupId, hotelId))
                 .thenReturn(List.of(notCheckedIn));
         when(stayRepository.findAllByReservationId(reservationId)).thenReturn(List.of());
 

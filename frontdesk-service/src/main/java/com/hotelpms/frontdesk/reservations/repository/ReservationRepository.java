@@ -291,13 +291,14 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
 
     /**
      * Returns every rooming-list member reservation of a group, scoped to a hotel
-     * (IDOR-safe). Used to render/act on a group's rooming list.
+     * (IDOR-safe). Used to render/act on a group's rooming list. Ordered by
+     * {@code createdAt} then {@code id} for a stable, deterministic row order.
      *
      * @param groupId the reservation group UUID
      * @param hotelId the hotel UUID
      * @return the group's member reservations
      */
-    List<Reservation> findAllByGroupIdAndHotelId(UUID groupId, UUID hotelId);
+    List<Reservation> findAllByGroupIdAndHotelIdOrderByCreatedAtAscIdAsc(UUID groupId, UUID hotelId);
 
     /**
      * Counts reservations checking out on a given date with one of the given

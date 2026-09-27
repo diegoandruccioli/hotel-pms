@@ -320,7 +320,8 @@ public class StayServiceImpl implements StayService {
                 guest.firstName(), guest.lastName(), guestId);
 
         return stayRepository
-                .findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(guestId, hotelId, StayStatus.CHECKED_OUT)
+                .findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDescIdDesc(
+                        guestId, hotelId, StayStatus.CHECKED_OUT.name())
                 .map(stayMapper::toDto);
     }
 
@@ -399,7 +400,7 @@ public class StayServiceImpl implements StayService {
     @Override
     @Transactional(readOnly = true)
     public AlloggiatiFailureSummaryResponse getAlloggiatiFailureSummary(@NonNull final UUID hotelId) {
-        final List<Stay> failed = stayRepository.findByHotelIdAndAlloggiatiSendFailedTrue(hotelId);
+        final List<Stay> failed = stayRepository.findByHotelIdAndAlloggiatiSendFailedTrueOrderByCreatedAtAscIdAsc(hotelId);
         final Optional<Stay> mostRecent = failed.stream()
                 .max(Comparator.comparing((@NonNull Stay s) -> s.getActualCheckInTime()));
         return new AlloggiatiFailureSummaryResponse(
@@ -426,7 +427,7 @@ public class StayServiceImpl implements StayService {
     public GuestLastStayResponse getLastStayDateForGuest(
             @NonNull final UUID guestId, @NonNull final UUID hotelId) {
         final Optional<Stay> latest = stayRepository
-                .findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(guestId, hotelId);
+                .findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDescIdDesc(guestId, hotelId);
         if (latest.isEmpty() || latest.get().getActualCheckInTime() == null) {
             return new GuestLastStayResponse(false, null);
         }

@@ -1020,7 +1020,7 @@ class InvoiceServiceImplTest {
                                 .id(UUID.randomUUID())
                                 .issueDate(LocalDateTime.of(SEARCH_YEAR, SEARCH_MONTH, DAY_FIVE, 0, 0))
                                 .build();
-                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
+                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDescIdDesc(stayId, hotelId))
                                 .thenReturn(Optional.of(ownFolio));
                 when(invoiceRepository.findByRoutedFromStayIdAndHotelId(stayId, hotelId))
                                 .thenReturn(List.of());
@@ -1042,7 +1042,7 @@ class InvoiceServiceImplTest {
                                 .folioType(FolioType.MASTER)
                                 .issueDate(LocalDateTime.of(SEARCH_YEAR, SEARCH_MONTH, DAY_ONE, 0, 0))
                                 .build();
-                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
+                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDescIdDesc(stayId, hotelId))
                                 .thenReturn(Optional.empty());
                 when(invoiceRepository.findByRoutedFromStayIdAndHotelId(stayId, hotelId))
                                 .thenReturn(List.of(masterFolio));
@@ -1058,7 +1058,7 @@ class InvoiceServiceImplTest {
         @DisplayName("getLastInvoiceDateForStay reports no invoices when neither lookup matches")
         void lastInvoiceDateForStayReturnsFalseWhenNoInvoiceExists() {
                 final UUID stayId = UUID.randomUUID();
-                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
+                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDescIdDesc(stayId, hotelId))
                                 .thenReturn(Optional.empty());
                 when(invoiceRepository.findByRoutedFromStayIdAndHotelId(stayId, hotelId))
                                 .thenReturn(List.of());

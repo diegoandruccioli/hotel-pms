@@ -26,10 +26,11 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, UUID> {
     Optional<RoomType> findByIdAndHotelId(UUID id, UUID hotelId);
 
     /**
-     * Returns all active room types belonging to a specific hotel (multi-tenancy).
+     * Returns all active room types belonging to a specific hotel (multi-tenancy),
+     * ordered by {@code name} then {@code id} for a total, stable order.
      *
      * @param hotelId the hotel UUID
      * @return list of room types scoped to the hotel
      */
-    List<RoomType> findAllByHotelId(UUID hotelId);
+    List<RoomType> findAllByHotelIdOrderByNameAscIdAsc(UUID hotelId);
 }

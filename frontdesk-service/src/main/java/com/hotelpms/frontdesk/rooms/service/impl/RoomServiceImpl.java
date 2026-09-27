@@ -325,7 +325,7 @@ public class RoomServiceImpl implements RoomService {
     @Transactional(readOnly = true)
     public List<RoomResponse> findCleanRooms(final UUID hotelId) {
         Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
-        return roomRepository.findAllByActiveTrueAndHotelIdAndStatus(hotelId, RoomStatus.CLEAN).stream()
+        return roomRepository.findAllByActiveTrueAndHotelIdAndStatusOrderByRoomNumberAsc(hotelId, RoomStatus.CLEAN).stream()
                 .map(roomMapper::toResponse)
                 .toList();
     }

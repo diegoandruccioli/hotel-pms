@@ -1652,7 +1652,7 @@ class StayServiceImplTest {
                 .alloggiatiFailureReason(PS_PORTAL_DOWN)
                 .build();
 
-        when(stayRepository.findByHotelIdAndAlloggiatiSendFailedTrue(summaryHotelId))
+        when(stayRepository.findByHotelIdAndAlloggiatiSendFailedTrueOrderByCreatedAtAscIdAsc(summaryHotelId))
                 .thenReturn(List.of(olderFailure, newerFailure));
 
         final var summary = stayService.getAlloggiatiFailureSummary(summaryHotelId);
@@ -1665,7 +1665,7 @@ class StayServiceImplTest {
     @Test
     void shouldReturnZeroFailuresWhenNoneExist() {
         final UUID noFailuresHotelId = Objects.requireNonNull(hotelId);
-        when(stayRepository.findByHotelIdAndAlloggiatiSendFailedTrue(noFailuresHotelId))
+        when(stayRepository.findByHotelIdAndAlloggiatiSendFailedTrueOrderByCreatedAtAscIdAsc(noFailuresHotelId))
                 .thenReturn(List.of());
 
         final var summary = stayService.getAlloggiatiFailureSummary(noFailuresHotelId);
@@ -1780,16 +1780,16 @@ class StayServiceImplTest {
 
         when(guestClient.getGuestById(guestId))
                 .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
-        when(stayRepository.findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
-                guestId, hotelId, StayStatus.CHECKED_OUT))
+        when(stayRepository.findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDescIdDesc(
+                guestId, hotelId, StayStatus.CHECKED_OUT.name()))
                 .thenReturn(Optional.of(checkedOutStay));
         when(stayMapper.toDto(checkedOutStay)).thenReturn(Objects.requireNonNull(validResponse));
 
         final Optional<StayResponse> result = stayService.getLastCompletedStayForGuest(guestId, hotelId);
 
         assertTrue(result.isPresent());
-        verify(stayRepository).findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
-                guestId, hotelId, StayStatus.CHECKED_OUT);
+        verify(stayRepository).findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDescIdDesc(
+                guestId, hotelId, StayStatus.CHECKED_OUT.name());
     }
 
     @Test
@@ -1801,7 +1801,7 @@ class StayServiceImplTest {
 
         assertFalse(result.isPresent());
         verify(stayRepository, never())
-                .findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
+                .findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDescIdDesc(
                         ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
     }
 

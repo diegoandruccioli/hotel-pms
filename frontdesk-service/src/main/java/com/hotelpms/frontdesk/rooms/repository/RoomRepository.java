@@ -86,9 +86,13 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
      *
      * @param hotelId the hotel UUID extracted from the authenticated user's JWT
      * @param status  the housekeeping status to filter by
-     * @return active rooms for that hotel and status
+     * @return active rooms for that hotel and status, ordered by
+     *         {@code roomNumber} (unique, so the order is total — a lexical
+     *         string sort, e.g. "20" before "3", not a numeric one) — both
+     *         current callers list rooms for hotel staff, where a stable
+     *         order matters more than the exact sort key
      */
-    List<Room> findAllByActiveTrueAndHotelIdAndStatus(UUID hotelId, RoomStatus status);
+    List<Room> findAllByActiveTrueAndHotelIdAndStatusOrderByRoomNumberAsc(UUID hotelId, RoomStatus status);
 
     /**
      * Returns a page of active rooms scoped to the given hotel, filtered by
