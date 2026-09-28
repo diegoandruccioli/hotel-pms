@@ -16,6 +16,7 @@ import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GroupChargeRequest;
+import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.MasterFolioRequest;
@@ -58,6 +59,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -176,6 +178,90 @@ class InvoiceServiceImplTest {
                 final Exception exception = assertThrows(NotFoundException.class,
                                 () -> invoiceService.getInvoice(Objects.requireNonNull(invoiceId)));
                 assertEquals("INVOICE_NOT_FOUND", exception.getMessage());
+        }
+
+        // ---------------------------------------------------------------
+        // getLatestInvoiceByReservation
+        // ---------------------------------------------------------------
+
+        @Test
+        @DisplayName("getLatestInvoiceByReservation returns the mapped invoice when one exists")
+        void shouldGetLatestInvoiceByReservation() {
+                final UUID invoiceId = UUID.randomUUID();
+                final Invoice invoice = new Invoice();
+                invoice.setId(invoiceId);
+                final InvoiceResponse expectedResponse = new InvoiceResponse(invoiceId, hotelId, INV_123, null,
+                                BigDecimal.TEN, InvoiceStatus.ISSUED, reservationId, guestId, null,
+                                null, null, List.of(), List.of());
+                when(invoiceRepository.findFirstByReservationIdAndHotelIdOrderByIssueDateDescIdDesc(
+                                reservationId, hotelId)).thenReturn(Optional.of(invoice));
+                when(invoiceMapper.toResponse(invoice)).thenReturn(expectedResponse);
+
+                final InvoiceResponse result = invoiceService.getLatestInvoiceByReservation(reservationId);
+
+                assertEquals(expectedResponse, result);
+                verify(invoiceRepository).findFirstByReservationIdAndHotelIdOrderByIssueDateDescIdDesc(
+                                reservationId, hotelId);
+        }
+
+        @Test
+        @DisplayName("getLatestInvoiceByReservation throws NotFoundException when the reservation has no invoice")
+        void shouldThrowWhenReservationHasNoInvoice() {
+                when(invoiceRepository.findFirstByReservationIdAndHotelIdOrderByIssueDateDescIdDesc(
+                                reservationId, hotelId)).thenReturn(Optional.empty());
+
+                final Exception exception = assertThrows(NotFoundException.class,
+                                () -> invoiceService.getLatestInvoiceByReservation(reservationId));
+                assertEquals("INVOICE_NOT_FOUND", exception.getMessage());
+        }
+
+        // ---------------------------------------------------------------
+        // getLastInvoiceDateForGuest (T-GST-05 GDPR legal-hold guard)
+        // ---------------------------------------------------------------
+
+        @Test
+        @DisplayName("getLastInvoiceDateForGuest reports the most recent issue date when an invoice exists")
+        void shouldGetLastInvoiceDateForGuest() {
+                final Invoice invoice = new Invoice();
+                invoice.setId(UUID.randomUUID());
+                invoice.setIssueDate(LocalDateTime.of(SEARCH_YEAR, SEARCH_MONTH, DAY_ONE, 0, 0));
+                when(invoiceRepository.findTopByGuestIdAndHotelIdOrderByIssueDateDescIdDesc(guestId, hotelId))
+                                .thenReturn(Optional.of(invoice));
+
+                final GuestInvoiceCheckResponse result = invoiceService.getLastInvoiceDateForGuest(guestId, hotelId);
+
+                assertTrue(result.hasInvoices());
+                assertEquals(LocalDate.of(SEARCH_YEAR, SEARCH_MONTH, DAY_ONE), result.lastInvoiceDate());
+        }
+
+        @Test
+        @DisplayName("getLastInvoiceDateForGuest reports no invoices when the returned invoice has no issue date")
+        void shouldReportNoInvoicesWhenTheLatestInvoiceHasNoIssueDate() {
+                // Defensive branch (InvoiceServiceImpl): unreachable in production today
+                // (issue_date is NOT NULL in the schema), but pins the intent — a row with
+                // issueDate == null must not be reported as a real invoice date to the GDPR
+                // legal-hold guard — in case that constraint is ever relaxed.
+                final Invoice invoice = new Invoice();
+                invoice.setId(UUID.randomUUID());
+                when(invoiceRepository.findTopByGuestIdAndHotelIdOrderByIssueDateDescIdDesc(guestId, hotelId))
+                                .thenReturn(Optional.of(invoice));
+
+                final GuestInvoiceCheckResponse result = invoiceService.getLastInvoiceDateForGuest(guestId, hotelId);
+
+                assertFalse(result.hasInvoices());
+                assertNull(result.lastInvoiceDate());
+        }
+
+        @Test
+        @DisplayName("getLastInvoiceDateForGuest reports no invoices when the guest has none")
+        void shouldReportNoInvoicesForGuestWithNoInvoice() {
+                when(invoiceRepository.findTopByGuestIdAndHotelIdOrderByIssueDateDescIdDesc(guestId, hotelId))
+                                .thenReturn(Optional.empty());
+
+                final GuestInvoiceCheckResponse result = invoiceService.getLastInvoiceDateForGuest(guestId, hotelId);
+
+                assertFalse(result.hasInvoices());
+                assertNull(result.lastInvoiceDate());
         }
 
         // ---------------------------------------------------------------

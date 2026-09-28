@@ -35,6 +35,7 @@ import com.hotelpms.frontdesk.rooms.service.RoomService;
 import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.domain.StayGuest;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
+import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
@@ -1803,6 +1804,51 @@ class StayServiceImplTest {
         verify(stayRepository, never())
                 .findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDescIdDesc(
                         ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+    }
+
+    @Test
+    void lastStayDateForGuestReportsTheMostRecentCheckInDateWhenAStayExists() {
+        // Regression test for T-GST-05: the GDPR legal-hold guard's date must reflect
+        // a real check-in, never fall through to "no stays" while one actually exists.
+        final Stay stay = Objects.requireNonNull(savedStay);
+        when(stayRepository.findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDescIdDesc(guestId, hotelId))
+                .thenReturn(Optional.of(stay));
+
+        final GuestLastStayResponse result = stayService.getLastStayDateForGuest(guestId, hotelId);
+
+        assertTrue(result.hasStays());
+        assertEquals(stay.getActualCheckInTime().toLocalDate(), result.lastStayDate());
+    }
+
+    @Test
+    void lastStayDateForGuestReportsNoStaysWhenTheGuestHasNone() {
+        when(stayRepository.findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDescIdDesc(guestId, hotelId))
+                .thenReturn(Optional.empty());
+
+        final GuestLastStayResponse result = stayService.getLastStayDateForGuest(guestId, hotelId);
+
+        assertFalse(result.hasStays());
+        assertNull(result.lastStayDate());
+    }
+
+    @Test
+    void lastStayDateForGuestReportsNoStaysWhenTheReturnedStayHasNoCheckInTime() {
+        // Defensive branch (StayServiceImpl): a row with actualCheckInTime == null must not
+        // be reported as a real stay date to the GDPR legal-hold guard.
+        final Stay noCheckInStay = Stay.builder()
+                .id(UUID.randomUUID())
+                .guestId(guestId)
+                .hotelId(hotelId)
+                .status(StayStatus.EXPECTED)
+                .actualCheckInTime(null)
+                .build();
+        when(stayRepository.findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDescIdDesc(guestId, hotelId))
+                .thenReturn(Optional.of(noCheckInStay));
+
+        final GuestLastStayResponse result = stayService.getLastStayDateForGuest(guestId, hotelId);
+
+        assertFalse(result.hasStays());
+        assertNull(result.lastStayDate());
     }
 
     // -----------------------------------------------------------------
