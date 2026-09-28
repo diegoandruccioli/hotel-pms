@@ -39,25 +39,13 @@ test.describe('Blocco 5 (D3) — City tax settings', () => {
     guard.checkpoint('negative amountPerNight blocked client-side');
   });
 
-  test('DEFECT 🟢: help text claims re-registering a category "auto-closes" the current rate, but it actually 409s', async ({ page }) => {
-    // CityTaxRatesSection.tsx's section description says "Registrare una
-    // nuova tariffa per la stessa categoria chiude automaticamente quella
-    // corrente" (settings.json city_tax_rates_section_desc) — but the
-    // backend has no such supersede logic for open-ended ranges: a second
-    // rate for the same category, with no validTo on the first, is a
-    // genuine overlap and correctly 409s (excl_city_tax_rates_no_overlap),
-    // surfaced via the translated city_tax_err_overlap toast — not silently
-    // superseded as the on-screen copy claims. The error handling itself is
-    // correct (translated, not a raw 409); only the descriptive text is
-    // inaccurate. Minor/cosmetic — filed as 🟢, not blocking.
-    const guard = new ConsoleGuard(page, {
-      role: 'admin',
-      locale: 'it',
-      extraAllow: [
-        { pattern: /409.*city-tax-rates/, reason: 'expected: same-category re-registration correctly rejected as overlap', scope: 'http_error' },
-        { pattern: /409 \(Conflict\)/, reason: 'expected: same-category re-registration correctly rejected as overlap', scope: 'console' },
-      ],
-    });
+  test('re-registering a category auto-closes the current rate, as the help text says', async ({ page }) => {
+    // Round 2026-08-25 filed this as a 🟢 defect: CityTaxRatesSection.tsx's description says
+    // "Registrare una nuova tariffa per la stessa categoria chiude automaticamente quella
+    // corrente", yet the backend 409'd. Fixed since (3214867, "auto-close reale della
+    // tariffa"): a later validFrom now closes the open rate, so the copy is accurate and this
+    // test pins the fixed behaviour instead of the old overlap rejection.
+    const guard = new ConsoleGuard(page, { role: 'admin', locale: 'it' });
     await page.goto('/settings/city-tax');
     await page.getByRole('heading', { name: /imposta di soggiorno|tourist tax/i }).waitFor();
 
@@ -75,7 +63,8 @@ test.describe('Blocco 5 (D3) — City tax settings', () => {
     guard.checkpoint('first rate created and listed');
 
     await addRate('2026-02-01');
-    await expect(page.getByText(/esiste già una regola attiva|an active rule already exists/i)).toBeVisible({ timeout: 5000 });
-    guard.checkpoint('second same-category rate correctly rejected as overlap, translated message shown (contradicts the "auto-closes" help text)');
+    await expect(page.getByRole('cell', { name: category })).toHaveCount(2, { timeout: 5000 });
+    await expect(page.getByText(/esiste già una regola attiva|an active rule already exists/i)).toHaveCount(0);
+    guard.checkpoint('second same-category rate accepted, first one auto-closed');
   });
 });

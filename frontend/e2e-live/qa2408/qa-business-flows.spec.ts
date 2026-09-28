@@ -133,8 +133,12 @@ test.describe('QA 2026-08-24 — imposta di soggiorno is charged at check-in onc
     const rateResponse = await request.post('/api/v1/stays/city-tax-rates', {
       headers, data: { category, amountPerNight: 3.5, validFrom: today },
     });
-    if (rateResponse.status() !== 201 && rateResponse.status() !== 409) {
-      throw new Error(`Unexpected status creating city-tax rate: ${rateResponse.status()} ${await rateResponse.text()}`);
+    // A same-day re-run finds the open rate this test created earlier today: the backend
+    // rejects a validFrom that is not after the open rate's (400), which here means "already there".
+    const rateBody = rateResponse.status() === 400 ? await rateResponse.text() : '';
+    const rateAlreadyOpenToday = rateBody.includes('CITY_TAX_RATE_VALID_FROM_NOT_AFTER_CURRENT');
+    if (rateResponse.status() !== 201 && rateResponse.status() !== 409 && !rateAlreadyOpenToday) {
+      throw new Error(`Unexpected status creating city-tax rate: ${rateResponse.status()} ${rateBody || await rateResponse.text()}`);
     }
 
     const room = await createCleanRoom(request, headers);

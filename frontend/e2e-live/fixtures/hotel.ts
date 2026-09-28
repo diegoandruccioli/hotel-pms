@@ -15,9 +15,14 @@ export const SEED_HOTEL_ID = '00000000-0000-0000-0000-000000000001';
 // the real forced-first-login change-password flow to this final password —
 // exercising that flow for real, not just documenting it. Local Docker dev
 // stack only; not a production credential.
+//
+// 2026-09-25: the admin password was rotated again after a QA session; set
+// E2E_ADMIN_PASSWORD to the current one instead of committing it here. The
+// literal below is only the old, public fallback and no longer works on a
+// stack whose admin password has been changed.
 export const SEED_ADMIN = {
     username: 'admin',
-    password: 'QaAdmin2026!!RotatedOK',
+    password: process.env.E2E_ADMIN_PASSWORD ?? 'QaAdmin2026!!RotatedOK',
 };
 
 // A second, independent tenant for cross-tenant IDOR/RBAC checks

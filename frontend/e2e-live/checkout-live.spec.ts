@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { csrfHeader, createCleanRoom, createGuest, createWalkInStay } from './fixtures/api';
+import { csrfHeader, createCleanRoom, createGuest, createWalkInStay, ensureHotelFiscalProfile } from './fixtures/api';
 
 // Checkout + FatturaPA against the real backend (Fase 7 / item 20). Exercises
 // the full billing lifecycle a mocked spec cannot: checkout is gated on the
@@ -15,6 +15,7 @@ test.describe('Checkout + invoice PDF + FatturaPA XML against the real backend',
 
     test.beforeAll(async ({ request }) => {
         const headers = await csrfHeader(request);
+        await ensureHotelFiscalProfile(request, headers);
         const room = await createCleanRoom(request, headers);
         // fiscalDetails: true — FatturaPAServiceImpl.generateXml requires the
         // guest's structured address (cap/comune/provincia) to be present

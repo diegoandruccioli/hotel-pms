@@ -47,11 +47,15 @@ test.describe('Reservation no-show against the real backend', () => {
         await page.goto('/reservations');
         await page.getByRole('searchbox').fill(guestEmail);
 
-        const noShowButton = page.getByRole('button', { name: new RegExp(reservationId) });
+        // The row also carries a Delete button whose aria-label ends with the same
+        // id, so anchor on the no-show label (IT default, EN fallback).
+        const noShowButton = page.getByRole('button', {
+            name: new RegExp(`(Segna no-show|Mark no-show) ${reservationId}`),
+        });
         await expect(noShowButton).toBeVisible({ timeout: 10000 });
         await noShowButton.click();
 
-        await page.getByRole('button', { name: 'confirm', exact: true }).click();
+        await page.getByRole('button', { name: /^(confirm|conferma)$/i }).click();
 
         // Verify against the real backend, not just the UI toast: the exact
         // thing the ALLOWED_TRANSITIONS + verifyNoShowAllowed guards protect.
