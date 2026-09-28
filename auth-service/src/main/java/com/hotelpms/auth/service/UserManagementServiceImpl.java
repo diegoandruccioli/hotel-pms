@@ -36,7 +36,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Override
     @Transactional(readOnly = true)
     public List<UserResponse> listUsers(final UUID hotelId) {
-        return userRepository.findAllByHotelId(hotelId)
+        return userRepository.findAllByHotelIdOrderByUsernameAsc(hotelId)
                 .stream()
                 .map(this::toResponse)
                 .toList();

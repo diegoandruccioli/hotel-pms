@@ -84,7 +84,7 @@ class UserManagementServiceImplTest {
 
     @Test
     void listUsersShouldReturnMappedResponse() {
-        when(userRepository.findAllByHotelId(HOTEL_ID)).thenReturn(List.of(activeUser));
+        when(userRepository.findAllByHotelIdOrderByUsernameAsc(HOTEL_ID)).thenReturn(List.of(activeUser));
 
         final List<UserResponse> result = userManagementService.listUsers(HOTEL_ID);
 
@@ -92,12 +92,12 @@ class UserManagementServiceImplTest {
         assertEquals(USERNAME, result.get(0).username());
         assertEquals(EMAIL, result.get(0).email());
         assertTrue(result.get(0).mustChangePassword());
-        verify(userRepository).findAllByHotelId(HOTEL_ID);
+        verify(userRepository).findAllByHotelIdOrderByUsernameAsc(HOTEL_ID);
     }
 
     @Test
     void listUsersShouldReturnEmptyListWhenNoUsers() {
-        when(userRepository.findAllByHotelId(HOTEL_ID)).thenReturn(List.of());
+        when(userRepository.findAllByHotelIdOrderByUsernameAsc(HOTEL_ID)).thenReturn(List.of());
 
         final List<UserResponse> result = userManagementService.listUsers(HOTEL_ID);
 
