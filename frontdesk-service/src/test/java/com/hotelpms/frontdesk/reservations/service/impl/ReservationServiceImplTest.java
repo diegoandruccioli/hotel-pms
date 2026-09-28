@@ -29,6 +29,7 @@ import com.hotelpms.frontdesk.rooms.service.RoomService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -96,6 +97,9 @@ class ReservationServiceImplTest {
     private static final BigDecimal PRICE_200 = BigDecimal.valueOf(200);
     private static final BigDecimal PRICE_240 = BigDecimal.valueOf(240);
     private static final String SORT_FIELD_CHECK_IN_DATE = "checkInDate";
+    private static final String SORT_FIELD_CREATED_AT = "createdAt";
+    private static final String SORT_FIELD_ID = "id";
+    private static final int TEST_PAGE_SIZE = 20;
     private static final String QUERY_MARIO = "mario";
     private static final int GUEST_SEARCH_CAP = 200;
 
@@ -424,9 +428,97 @@ class ReservationServiceImplTest {
         assertThrows(NotFoundException.class, () -> reservationService.getReservationById(reservationId));
     }
 
+    /**
+     * Mirrors the service's tie-break so stubs match the pageable the repository actually receives.
+     *
+     * @param pageable the pageable handed to the service
+     * @return the same page with {@code createdAt desc, id asc} appended to its sort
+     */
+    private static Pageable stable(final Pageable pageable) {
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                pageable.getSort().and(Sort.by(Sort.Order.desc(SORT_FIELD_CREATED_AT), Sort.Order.asc(SORT_FIELD_ID))));
+    }
+
+    // ---------------------------------------------------------------
+    // Stable pagination order (tie-break on createdAt desc, id asc)
+    // ---------------------------------------------------------------
+
+    private Pageable capturedSearchPageable() {
+        final ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(reservationRepository).searchReservationsByHotelId(any(), any(), any(), captor.capture());
+        return captor.getValue();
+    }
+
+    @Test
+    void testSearchAppendsTieBreakToDefaultCheckInDateSort() {
+        when(reservationRepository.searchReservationsByHotelId(any(), any(), any(), any()))
+                .thenReturn(Page.empty());
+
+        reservationService.searchReservations(null, false, null, null, null,
+                PageRequest.of(0, TEST_PAGE_SIZE, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending()));
+
+        assertEquals(
+                Sort.by(Sort.Order.desc(SORT_FIELD_CHECK_IN_DATE), Sort.Order.desc(SORT_FIELD_CREATED_AT),
+                        Sort.Order.asc(SORT_FIELD_ID)),
+                capturedSearchPageable().getSort());
+    }
+
+    @Test
+    void testSearchKeepsClientSortAheadOfTieBreak() {
+        when(reservationRepository.searchReservationsByHotelId(any(), any(), any(), any()))
+                .thenReturn(Page.empty());
+
+        reservationService.searchReservations(null, false, null, null, null,
+                PageRequest.of(2, TEST_PAGE_SIZE, Sort.by("status").ascending()));
+
+        final Pageable seen = capturedSearchPageable();
+        assertEquals(
+                Sort.by(Sort.Order.asc("status"), Sort.Order.desc(SORT_FIELD_CREATED_AT), Sort.Order.asc(SORT_FIELD_ID)),
+                seen.getSort());
+        assertEquals(2, seen.getPageNumber());
+        assertEquals(TEST_PAGE_SIZE, seen.getPageSize());
+    }
+
+    @Test
+    void testSearchDoesNotDuplicateTieBreakKeyAlreadyInSort() {
+        when(reservationRepository.searchReservationsByHotelId(any(), any(), any(), any()))
+                .thenReturn(Page.empty());
+
+        reservationService.searchReservations(null, false, null, null, null,
+                PageRequest.of(0, TEST_PAGE_SIZE, Sort.by(SORT_FIELD_CREATED_AT).ascending()));
+
+        assertEquals(
+                Sort.by(Sort.Order.asc(SORT_FIELD_CREATED_AT), Sort.Order.asc(SORT_FIELD_ID)),
+                capturedSearchPageable().getSort());
+    }
+
+    @Test
+    void testSearchLeavesUnpagedRequestUntouched() {
+        when(reservationRepository.searchReservationsByHotelId(any(), any(), any(), any()))
+                .thenReturn(Page.empty());
+
+        reservationService.searchReservations(null, false, null, null, null, Pageable.unpaged());
+
+        assertTrue(capturedSearchPageable().isUnpaged());
+    }
+
+    @Test
+    void testGetAllReservationsAppendsTieBreak() {
+        when(reservationRepository.findAllByHotelId(any(), any())).thenReturn(Page.empty());
+
+        reservationService.getAllReservations(PageRequest.of(0, TEST_PAGE_SIZE, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending()));
+
+        final ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(reservationRepository).findAllByHotelId(any(), captor.capture());
+        assertEquals(
+                Sort.by(Sort.Order.desc(SORT_FIELD_CHECK_IN_DATE), Sort.Order.desc(SORT_FIELD_CREATED_AT),
+                        Sort.Order.asc(SORT_FIELD_ID)),
+                captor.getValue().getSort());
+    }
+
     @Test
     void testGetAllReservationsSuccess() {
-        final Pageable pageable = PageRequest.of(0, 20);
+        final Pageable pageable = stable(PageRequest.of(0, 20));
         final Page<Reservation> reservationPage = new PageImpl<>(List.of(entity), pageable, 1L);
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
@@ -443,7 +535,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testGetAllReservationsEmpty() {
-        final Pageable pageable = PageRequest.of(0, 20);
+        final Pageable pageable = stable(PageRequest.of(0, 20));
         final Page<Reservation> emptyPage = Page.empty(pageable);
 
         when(reservationRepository.findAllByHotelId(HOTEL_ID, pageable)).thenReturn(emptyPage);
@@ -460,7 +552,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testSearchReservationsWithNoQuerySkipsGuestResolution() {
-        final Pageable pageable = PageRequest.of(0, 20);
+        final Pageable pageable = stable(PageRequest.of(0, 20));
         final Page<Reservation> reservationPage = new PageImpl<>(List.of(entity), pageable, 1L);
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
@@ -479,7 +571,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testSearchReservationsWithBlankQueryIsTreatedAsNoQuery() {
-        final Pageable pageable = PageRequest.of(0, 20);
+        final Pageable pageable = stable(PageRequest.of(0, 20));
         when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
                 .thenReturn(Page.empty(pageable));
 
@@ -490,7 +582,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testSearchReservationsWithQueryResolvesGuestIds() {
-        final Pageable pageable = PageRequest.of(0, 20);
+        final Pageable pageable = stable(PageRequest.of(0, 20));
         final UUID otherGuestId = Objects.requireNonNull(UUID.randomUUID());
         final GuestResponse matched =
                 new GuestResponse(otherGuestId, "Mario", "Rossi", "mario@test.com");
@@ -509,7 +601,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testSearchReservationsUpcomingOnlyAppliesTodayAsLowerBound() {
-        final Pageable pageable = PageRequest.of(0, 20);
+        final Pageable pageable = stable(PageRequest.of(0, 20));
         when(reservationRepository.searchUpcomingReservationsByHotelId(
                 eq(HOTEL_ID), eq(LocalDate.now()), eq(null), eq(List.of()), eq(pageable)))
                 .thenReturn(Page.empty(pageable));
@@ -522,7 +614,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testSearchReservationsWithDateRangeUsesFilterQuery() {
-        final Pageable pageable = PageRequest.of(0, 20);
+        final Pageable pageable = stable(PageRequest.of(0, 20));
         final LocalDate dateFrom = LocalDate.of(2026, 8, 1);
         final LocalDate dateTo = LocalDate.of(2026, 8, 31);
         when(reservationRepository.filterReservationsByHotelId(
@@ -537,7 +629,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testSearchReservationsWithStatusFilterUsesFilterQueryWithSingleStatus() {
-        final Pageable pageable = PageRequest.of(0, 20);
+        final Pageable pageable = stable(PageRequest.of(0, 20));
         when(reservationRepository.filterReservationsByHotelId(
                 eq(HOTEL_ID), any(), any(), eq(Set.of(ReservationStatus.CHECKED_IN)),
                 eq(null), eq(List.of()), eq(pageable)))
@@ -552,7 +644,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testSearchReservationsDateRangeTakesPrecedenceOverUpcomingOnly() {
-        final Pageable pageable = PageRequest.of(0, 20);
+        final Pageable pageable = stable(PageRequest.of(0, 20));
         final LocalDate dateFrom = LocalDate.of(2026, 8, 1);
         when(reservationRepository.filterReservationsByHotelId(
                 eq(HOTEL_ID), eq(dateFrom), any(), any(), eq(null), eq(List.of()), eq(pageable)))
@@ -566,7 +658,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testSearchReservationsEmptyResultSkipsGuestBatchResolution() {
-        final Pageable pageable = PageRequest.of(0, 20);
+        final Pageable pageable = stable(PageRequest.of(0, 20));
         when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
                 .thenReturn(Page.empty(pageable));
 
@@ -1265,7 +1357,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testExportReservationsCsvWritesHeaderAndHotelScopedRowsWithResolvedGuestName() throws IOException {
-        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending());
+        final Pageable pageable = stable(PageRequest.of(0, 500, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending()));
         final Page<Reservation> reservationPage = new PageImpl<>(List.of(entity), pageable, 1L);
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
@@ -1285,7 +1377,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testExportReservationsCsvSkipsGuestBatchResolutionWhenNoRows() throws IOException {
-        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending());
+        final Pageable pageable = stable(PageRequest.of(0, 500, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending()));
         when(reservationRepository.searchReservationsByHotelId(HOTEL_ID, null, List.of(), pageable))
                 .thenReturn(Page.empty(pageable));
 
@@ -1298,7 +1390,7 @@ class ReservationServiceImplTest {
 
     @Test
     void testExportReservationsCsvAppliesStatusFilterViaFilterQuery() throws IOException {
-        final Pageable pageable = PageRequest.of(0, 500, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending());
+        final Pageable pageable = stable(PageRequest.of(0, 500, Sort.by(SORT_FIELD_CHECK_IN_DATE).descending()));
         when(reservationRepository.filterReservationsByHotelId(
                 eq(HOTEL_ID), any(), any(), eq(Set.of(ReservationStatus.CHECKED_IN)),
                 eq(null), eq(List.of()), eq(pageable)))
