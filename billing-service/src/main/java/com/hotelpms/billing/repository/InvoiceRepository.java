@@ -53,13 +53,15 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     /**
      * Finds the most recent invoice for a reservation scoped to a hotel
-     * (used during check-out validation).
+     * (used during check-out validation). Ordered by {@code id} after
+     * {@code issueDate} so two invoices issued in the same instant still
+     * resolve to the same "most recent" one on every call.
      *
      * @param reservationId the reservation UUID
      * @param hotelId       the hotel UUID from the authenticated request
      * @return the latest invoice if it belongs to the given hotel
      */
-    Optional<Invoice> findFirstByReservationIdAndHotelIdOrderByIssueDateDesc(UUID reservationId, UUID hotelId);
+    Optional<Invoice> findFirstByReservationIdAndHotelIdOrderByIssueDateDescIdDesc(UUID reservationId, UUID hotelId);
 
     /**
      * Finds all invoices for a hotel whose issue date falls within the given window
@@ -124,7 +126,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     /**
      * Finds the most recent invoice for a guest within a hotel, ordered by
-     * issue date descending.
+     * issue date descending, {@code id} descending as a tie-break so a genuine
+     * tie on issue date still resolves the same way on every call.
      * Used by the guest-service GDPR legal-hold guard (T-GST-05) to verify
      * whether the Codice Civile art. 2220 ten-year fiscal retention obligation
      * has expired before anonymising a guest profile.
@@ -133,19 +136,23 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
      * @param hotelId the hotel UUID (tenant isolation)
      * @return the most recent invoice if present
      */
-    Optional<Invoice> findTopByGuestIdAndHotelIdOrderByIssueDateDesc(UUID guestId, UUID hotelId);
+    Optional<Invoice> findTopByGuestIdAndHotelIdOrderByIssueDateDescIdDesc(UUID guestId, UUID hotelId);
 
     /**
      * Finds the most recent invoice carrying at least one charge routed from a
      * given stay's individual folio to a group MASTER folio (Punto 4, {@code
      * routedFromStayId} on {@link com.hotelpms.billing.domain.InvoiceCharge}).
      *
-     * <p>Used by {@link #findTopByStayIdAndHotelIdOrderByIssueDateDesc}'s caller
-     * (the frontdesk-service GDPR legal-hold guard for {@code StayGuest}) as a
-     * second lookup: a stay's own individual invoice can close at zero once its
-     * ROOM_NIGHT/CITY_TAX charges move to the group's master folio at check-out,
-     * so the fiscal retention clock must also consider whichever invoice
-     * actually carries the money, not just the stay's own folio.
+     * <p>Used by {@link #findTopByStayIdAndHotelIdOrderByIssueDateDescIdDesc}'s
+     * caller (the frontdesk-service GDPR legal-hold guard for {@code StayGuest})
+     * as a second lookup: a stay's own individual invoice can close at zero once
+     * its ROOM_NIGHT/CITY_TAX charges move to the group's master folio at
+     * check-out, so the fiscal retention clock must also consider whichever
+     * invoice actually carries the money, not just the stay's own folio.
+     *
+     * <p>Returns the whole list rather than the single most recent one — the
+     * caller reduces it with {@code max()} in Java, so an unstable order here
+     * changes nothing about the result.
      *
      * @param stayId  the stay UUID (frontdesk-service) the charge was transferred from
      * @param hotelId the hotel UUID (tenant isolation)
@@ -159,13 +166,15 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     /**
      * Finds the most recent invoice for a stay's own individual folio within a
-     * hotel, ordered by issue date descending.
+     * hotel, ordered by issue date descending, {@code id} descending as a
+     * tie-break so a genuine tie on issue date still resolves the same way on
+     * every call.
      *
      * @param stayId  the stay UUID
      * @param hotelId the hotel UUID (tenant isolation)
      * @return the most recent invoice if present
      */
-    Optional<Invoice> findTopByStayIdAndHotelIdOrderByIssueDateDesc(UUID stayId, UUID hotelId);
+    Optional<Invoice> findTopByStayIdAndHotelIdOrderByIssueDateDescIdDesc(UUID stayId, UUID hotelId);
 
     /**
      * Finds all invoices for a guest within a hotel, ordered by issue date descending.

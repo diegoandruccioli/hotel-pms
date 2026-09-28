@@ -32,7 +32,7 @@ public class MenuItemServiceImpl implements MenuItemService {
     @Transactional(readOnly = true)
     public List<MenuItemResponse> getAll(final UUID hotelId) {
         log.debug("Fetching active menu items for hotel={}", hotelId);
-        return menuItemRepository.findAllByHotelId(hotelId).stream()
+        return menuItemRepository.findAllByHotelIdOrderByCategoryAscNameAscIdAsc(hotelId).stream()
                 .map(this::toResponse)
                 .toList();
     }

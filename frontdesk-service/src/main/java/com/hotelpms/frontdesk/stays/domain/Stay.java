@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 
 /**
  * Entity class representing a Stay in the hotel.
@@ -247,6 +248,7 @@ public class Stay {
      * The list of guests staying in this room.
      */
     @OneToMany(mappedBy = "stay", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("createdAt ASC, id ASC")
     @Builder.Default
     private List<StayGuest> guests = new ArrayList<>();
 

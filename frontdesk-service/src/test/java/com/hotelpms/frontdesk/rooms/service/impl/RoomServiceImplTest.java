@@ -521,7 +521,7 @@ class RoomServiceImplTest {
 
     @Test
     void testFindCleanRoomsSuccess() {
-        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatus(hotelId, RoomStatus.CLEAN))
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatusOrderByRoomNumberAsc(hotelId, RoomStatus.CLEAN))
                 .thenReturn(List.of(room));
         when(roomMapper.toResponse(Objects.requireNonNull(room))).thenReturn(response);
 
@@ -533,7 +533,7 @@ class RoomServiceImplTest {
 
     @Test
     void testFindCleanRoomsEmpty() {
-        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatus(hotelId, RoomStatus.CLEAN))
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatusOrderByRoomNumberAsc(hotelId, RoomStatus.CLEAN))
                 .thenReturn(List.of());
 
         final List<RoomResponse> result = roomService.findCleanRooms(hotelId);

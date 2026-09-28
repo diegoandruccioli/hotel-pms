@@ -85,11 +85,14 @@ class HousekeepingWorksheetServiceImplTest {
                 true, true, null, null, null, null, null, null, null, "Europe/Rome", 4));
         lenient().when(reservationRepository.findByHotelIdAndCheckInDateAndStatusIn(eq(HOTEL_ID), eq(DATE), any()))
                 .thenReturn(List.of());
-        lenient().when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of());
+        lenient().when(stayRepository.findByHotelIdAndStatusOrderByCreatedAtAscIdAsc(HOTEL_ID, StayStatus.CHECKED_IN))
+                .thenReturn(List.of());
         lenient().when(stayRepository.countGuestsByStayForHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN))
                 .thenReturn(List.of());
-        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatus(HOTEL_ID, RoomStatus.DIRTY)).thenReturn(List.of());
-        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatus(HOTEL_ID, RoomStatus.MAINTENANCE)).thenReturn(List.of());
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatusOrderByRoomNumberAsc(HOTEL_ID, RoomStatus.DIRTY))
+                .thenReturn(List.of());
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatusOrderByRoomNumberAsc(HOTEL_ID, RoomStatus.MAINTENANCE))
+                .thenReturn(List.of());
     }
 
     @Test
@@ -97,7 +100,8 @@ class HousekeepingWorksheetServiceImplTest {
         final Room room = room("101", RoomStatus.OCCUPIED);
         final Stay stay = stay(room, DATE);
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        when(stayRepository.findByHotelIdAndStatusOrderByCreatedAtAscIdAsc(HOTEL_ID, StayStatus.CHECKED_IN))
+                .thenReturn(List.of(stay));
         stubPax(stay, 2);
 
         final HousekeepingWorksheetResponse worksheet = housekeepingWorksheetService.getWorksheet(HOTEL_ID, DATE);
@@ -117,7 +121,8 @@ class HousekeepingWorksheetServiceImplTest {
         final Room room = room("102", RoomStatus.OCCUPIED);
         final Stay stay = stay(room, DATE.minusDays(2));
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        when(stayRepository.findByHotelIdAndStatusOrderByCreatedAtAscIdAsc(HOTEL_ID, StayStatus.CHECKED_IN))
+                .thenReturn(List.of(stay));
         stubPax(stay, 1);
 
         final HousekeepingWorksheetResponse worksheet = housekeepingWorksheetService.getWorksheet(HOTEL_ID, DATE);
@@ -131,7 +136,8 @@ class HousekeepingWorksheetServiceImplTest {
         final Room room = room("103", RoomStatus.OCCUPIED);
         final Stay stay = stay(room, DATE.plusDays(3));
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        when(stayRepository.findByHotelIdAndStatusOrderByCreatedAtAscIdAsc(HOTEL_ID, StayStatus.CHECKED_IN))
+                .thenReturn(List.of(stay));
         stubPax(stay, 1);
 
         final HousekeepingWorksheetResponse worksheet = housekeepingWorksheetService.getWorksheet(HOTEL_ID, DATE);
@@ -147,7 +153,8 @@ class HousekeepingWorksheetServiceImplTest {
         final Room room = room("104", RoomStatus.OCCUPIED);
         final Stay stay = stay(room, null);
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        when(stayRepository.findByHotelIdAndStatusOrderByCreatedAtAscIdAsc(HOTEL_ID, StayStatus.CHECKED_IN))
+                .thenReturn(List.of(stay));
         stubPax(stay, 1);
 
         final HousekeepingWorksheetResponse worksheet = housekeepingWorksheetService.getWorksheet(HOTEL_ID, DATE);
@@ -166,7 +173,8 @@ class HousekeepingWorksheetServiceImplTest {
         final Room room = room("104b", RoomStatus.OCCUPIED);
         final Stay stay = stay(room, DATE);
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        when(stayRepository.findByHotelIdAndStatusOrderByCreatedAtAscIdAsc(HOTEL_ID, StayStatus.CHECKED_IN))
+                .thenReturn(List.of(stay));
         // Deliberately no countGuestsByStayForHotelIdAndStatus stub override — stays empty.
 
         final HousekeepingWorksheetResponse worksheet = housekeepingWorksheetService.getWorksheet(HOTEL_ID, DATE);
@@ -180,7 +188,8 @@ class HousekeepingWorksheetServiceImplTest {
         final Room room = room("105", RoomStatus.OCCUPIED);
         final Stay stay = stay(room, DATE);
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        when(stayRepository.findByHotelIdAndStatusOrderByCreatedAtAscIdAsc(HOTEL_ID, StayStatus.CHECKED_IN))
+                .thenReturn(List.of(stay));
         stubPax(stay, 1);
         when(reservationRepository.findByHotelIdAndCheckInDateAndStatusIn(
                 eq(HOTEL_ID), eq(DATE), any())).thenReturn(List.of(reservation(room, 2)));
@@ -212,7 +221,7 @@ class HousekeepingWorksheetServiceImplTest {
     void vacantDirtyRoomIsListedWithZeroPax() {
         final Room dirtyRoom = room("107", RoomStatus.DIRTY);
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(dirtyRoom));
-        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatus(HOTEL_ID, RoomStatus.DIRTY))
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatusOrderByRoomNumberAsc(HOTEL_ID, RoomStatus.DIRTY))
                 .thenReturn(List.of(dirtyRoom));
 
         final HousekeepingWorksheetResponse worksheet = housekeepingWorksheetService.getWorksheet(HOTEL_ID, DATE);
@@ -231,9 +240,10 @@ class HousekeepingWorksheetServiceImplTest {
         final Room room = room("108", RoomStatus.OCCUPIED);
         final Stay stay = stay(room, DATE);
         when(roomRepository.findAllByActiveTrueAndHotelId(HOTEL_ID)).thenReturn(List.of(room));
-        when(stayRepository.findByHotelIdAndStatus(HOTEL_ID, StayStatus.CHECKED_IN)).thenReturn(List.of(stay));
+        when(stayRepository.findByHotelIdAndStatusOrderByCreatedAtAscIdAsc(HOTEL_ID, StayStatus.CHECKED_IN))
+                .thenReturn(List.of(stay));
         stubPax(stay, 1);
-        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatus(HOTEL_ID, RoomStatus.MAINTENANCE))
+        when(roomRepository.findAllByActiveTrueAndHotelIdAndStatusOrderByRoomNumberAsc(HOTEL_ID, RoomStatus.MAINTENANCE))
                 .thenReturn(List.of(room));
 
         final HousekeepingWorksheetResponse worksheet = housekeepingWorksheetService.getWorksheet(HOTEL_ID, DATE);

@@ -93,7 +93,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     @Cacheable(value = CACHE_NAME, key = "#hotelId")
     public List<RoomTypeResponse> getAllRoomTypes(final UUID hotelId) {
         Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
-        return roomTypeRepository.findAllByHotelId(hotelId).stream()
+        return roomTypeRepository.findAllByHotelIdOrderByNameAscIdAsc(hotelId).stream()
                 .filter((@NonNull RoomType rt) -> rt.isActive())
                 .map(roomTypeMapper::toResponse)
                 .toList();

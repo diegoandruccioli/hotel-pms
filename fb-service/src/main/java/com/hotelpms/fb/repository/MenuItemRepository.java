@@ -15,12 +15,13 @@ import java.util.UUID;
 public interface MenuItemRepository extends JpaRepository<MenuItem, UUID> {
 
     /**
-     * Returns all active menu items for the given hotel.
+     * Returns all active menu items for the given hotel, grouped by category
+     * then name, {@code id} as a final tie-break for a total order.
      *
      * @param hotelId the hotel scope
      * @return list of active menu items
      */
-    List<MenuItem> findAllByHotelId(UUID hotelId);
+    List<MenuItem> findAllByHotelIdOrderByCategoryAscNameAscIdAsc(UUID hotelId);
 
     /**
      * Finds a menu item by ID and hotel scope.
