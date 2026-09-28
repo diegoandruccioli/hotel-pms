@@ -141,7 +141,7 @@ public class ReservationGroupServiceImpl implements ReservationGroupService {
             throw new ConflictException("GROUP_STALE_VERSION");
         }
 
-        final List<Reservation> members = reservationRepository.findAllByGroupIdAndHotelId(id, hotelId);
+        final List<Reservation> members = reservationRepository.findAllByGroupIdAndHotelIdOrderByCreatedAtAscIdAsc(id, hotelId);
         for (final Reservation member : members) {
             if (!TERMINAL_STATUSES.contains(member.getStatus())) {
                 reservationService.updateStatusAndGuestsForHotel(
@@ -170,7 +170,7 @@ public class ReservationGroupServiceImpl implements ReservationGroupService {
     public List<GroupCheckoutOutcome> checkoutGroup(final UUID id) {
         final UUID hotelId = TenantContext.resolveHotelId();
         final ReservationGroup group = findGroupOrThrow(id, hotelId);
-        final List<Reservation> members = reservationRepository.findAllByGroupIdAndHotelId(id, hotelId);
+        final List<Reservation> members = reservationRepository.findAllByGroupIdAndHotelIdOrderByCreatedAtAscIdAsc(id, hotelId);
 
         final List<GroupCheckoutOutcome> outcomes = new ArrayList<>();
         boolean allCheckedOut = !members.isEmpty();
@@ -204,7 +204,7 @@ public class ReservationGroupServiceImpl implements ReservationGroupService {
 
     private ReservationGroupResponse enrich(final ReservationGroup group) {
         final List<Reservation> memberReservations =
-                reservationRepository.findAllByGroupIdAndHotelId(group.getId(), group.getHotelId());
+                reservationRepository.findAllByGroupIdAndHotelIdOrderByCreatedAtAscIdAsc(group.getId(), group.getHotelId());
 
         final List<UUID> guestIds = new ArrayList<>(memberReservations.stream()
                 .map(Reservation::getGuestId)

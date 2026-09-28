@@ -3,6 +3,7 @@ package com.hotelpms.frontdesk.reservations.service.impl;
 import com.hotelpms.internalauth.security.TenantContext;
 
 import com.hotelpms.commonweb.csv.CsvWriter;
+import com.hotelpms.commonweb.paging.StablePaging;
 import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
@@ -154,7 +155,7 @@ public class ReservationServiceImpl implements ReservationService {
     @Override
     @Transactional(readOnly = true)
     public Page<ReservationResponse> getAllReservations(final Pageable pageable) {
-        final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
+        final Pageable safePageable = StablePaging.withCreatedAtTieBreak(pageable);
         final UUID hotelId = TenantContext.resolveHotelId();
         final Page<Reservation> reservationPage = reservationRepository.findAllByHotelId(hotelId, safePageable);
 
@@ -187,7 +188,7 @@ public class ReservationServiceImpl implements ReservationService {
             final LocalDate dateFrom, final LocalDate dateTo, final ReservationStatus status,
             final Pageable pageable) {
         final UUID hotelId = TenantContext.resolveHotelId();
-        final Pageable safePageable = pageable == null ? Pageable.unpaged() : pageable;
+        final Pageable safePageable = StablePaging.withCreatedAtTieBreak(pageable);
         final Page<Reservation> results =
                 fetchReservationsPage(hotelId, query, upcomingOnly, dateFrom, dateTo, status, safePageable);
 
@@ -258,8 +259,8 @@ public class ReservationServiceImpl implements ReservationService {
             int pageNumber = 0;
             Page<Reservation> page;
             do {
-                final Pageable pageable = PageRequest.of(
-                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("checkInDate").descending());
+                final Pageable pageable = StablePaging.withCreatedAtTieBreak(PageRequest.of(
+                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("checkInDate").descending()));
                 page = fetchReservationsPage(hotelId, query, upcomingOnly, dateFrom, dateTo, status, pageable);
 
                 final List<UUID> guestIds = page.getContent().stream()
@@ -766,7 +767,7 @@ public class ReservationServiceImpl implements ReservationService {
             throw new ConflictException("RESERVATION_NO_SHOW_BEFORE_CHECKIN_DATE");
         }
         final boolean hasStay = !stayRepository
-                .findAllByReservationIdAndHotelId(reservation.getId(), hotelId).isEmpty();
+                .findAllByReservationIdAndHotelIdOrderById(reservation.getId(), hotelId).isEmpty();
         if (hasStay) {
             throw new ConflictException("RESERVATION_NO_SHOW_HAS_STAY");
         }

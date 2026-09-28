@@ -116,7 +116,8 @@ class RoomTypeServiceImplTest {
 
     @Test
     void testGetAllRoomTypesSuccess() {
-        when(roomTypeRepository.findAllByHotelId(Objects.requireNonNull(hotelId))).thenReturn(List.of(roomType));
+        when(roomTypeRepository.findAllByHotelIdOrderByNameAscIdAsc(Objects.requireNonNull(hotelId)))
+                .thenReturn(List.of(roomType));
         when(roomTypeMapper.toResponse(Objects.requireNonNull(roomType))).thenReturn(response);
 
         final List<RoomTypeResponse> result = roomTypeService.getAllRoomTypes(hotelId);

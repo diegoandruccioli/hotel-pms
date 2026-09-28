@@ -35,6 +35,7 @@ import com.hotelpms.frontdesk.rooms.service.RoomService;
 import com.hotelpms.frontdesk.stays.domain.Stay;
 import com.hotelpms.frontdesk.stays.domain.StayGuest;
 import com.hotelpms.frontdesk.stays.domain.StayStatus;
+import com.hotelpms.frontdesk.stays.dto.GuestLastStayResponse;
 import com.hotelpms.frontdesk.stays.dto.HotelSettingsResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
@@ -531,7 +532,7 @@ class StayServiceImplTest {
         final StayResponse expectedResponse = Objects.requireNonNull(validResponse);
         final Pageable pageable = PageRequest.of(0, 20);
 
-        when(stayRepository.findAllByReservationIdAndHotelId(reservation, hotelId))
+        when(stayRepository.findAllByReservationIdAndHotelIdOrderById(reservation, hotelId))
                 .thenReturn(List.of(stay));
         when(stayMapper.toDto(stay)).thenReturn(expectedResponse);
 
@@ -541,7 +542,7 @@ class StayServiceImplTest {
         // Assert
         assertEquals(1, response.getTotalElements());
         assertEquals(expectedResponse, response.getContent().get(0));
-        verify(stayRepository, times(1)).findAllByReservationIdAndHotelId(reservation, hotelId);
+        verify(stayRepository, times(1)).findAllByReservationIdAndHotelIdOrderById(reservation, hotelId);
     }
 
     @Test
@@ -558,7 +559,7 @@ class StayServiceImplTest {
         final StayResponse responseC = mock(StayResponse.class);
         final Pageable secondPage = PageRequest.of(1, 2);
 
-        when(stayRepository.findAllByReservationIdAndHotelId(reservation, hotelId))
+        when(stayRepository.findAllByReservationIdAndHotelIdOrderById(reservation, hotelId))
                 .thenReturn(List.of(stayA, stayB, stayC));
         when(stayMapper.toDto(stayA)).thenReturn(responseA);
         when(stayMapper.toDto(stayB)).thenReturn(responseB);
@@ -1652,7 +1653,7 @@ class StayServiceImplTest {
                 .alloggiatiFailureReason(PS_PORTAL_DOWN)
                 .build();
 
-        when(stayRepository.findByHotelIdAndAlloggiatiSendFailedTrue(summaryHotelId))
+        when(stayRepository.findByHotelIdAndAlloggiatiSendFailedTrueOrderByCreatedAtAscIdAsc(summaryHotelId))
                 .thenReturn(List.of(olderFailure, newerFailure));
 
         final var summary = stayService.getAlloggiatiFailureSummary(summaryHotelId);
@@ -1665,7 +1666,7 @@ class StayServiceImplTest {
     @Test
     void shouldReturnZeroFailuresWhenNoneExist() {
         final UUID noFailuresHotelId = Objects.requireNonNull(hotelId);
-        when(stayRepository.findByHotelIdAndAlloggiatiSendFailedTrue(noFailuresHotelId))
+        when(stayRepository.findByHotelIdAndAlloggiatiSendFailedTrueOrderByCreatedAtAscIdAsc(noFailuresHotelId))
                 .thenReturn(List.of());
 
         final var summary = stayService.getAlloggiatiFailureSummary(noFailuresHotelId);
@@ -1780,16 +1781,16 @@ class StayServiceImplTest {
 
         when(guestClient.getGuestById(guestId))
                 .thenReturn(new GuestResponse(guestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
-        when(stayRepository.findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
-                guestId, hotelId, StayStatus.CHECKED_OUT))
+        when(stayRepository.findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDescIdDesc(
+                guestId, hotelId, StayStatus.CHECKED_OUT.name()))
                 .thenReturn(Optional.of(checkedOutStay));
         when(stayMapper.toDto(checkedOutStay)).thenReturn(Objects.requireNonNull(validResponse));
 
         final Optional<StayResponse> result = stayService.getLastCompletedStayForGuest(guestId, hotelId);
 
         assertTrue(result.isPresent());
-        verify(stayRepository).findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
-                guestId, hotelId, StayStatus.CHECKED_OUT);
+        verify(stayRepository).findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDescIdDesc(
+                guestId, hotelId, StayStatus.CHECKED_OUT.name());
     }
 
     @Test
@@ -1801,8 +1802,53 @@ class StayServiceImplTest {
 
         assertFalse(result.isPresent());
         verify(stayRepository, never())
-                .findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
+                .findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDescIdDesc(
                         ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+    }
+
+    @Test
+    void lastStayDateForGuestReportsTheMostRecentCheckInDateWhenAStayExists() {
+        // Regression test for T-GST-05: the GDPR legal-hold guard's date must reflect
+        // a real check-in, never fall through to "no stays" while one actually exists.
+        final Stay stay = Objects.requireNonNull(savedStay);
+        when(stayRepository.findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDescIdDesc(guestId, hotelId))
+                .thenReturn(Optional.of(stay));
+
+        final GuestLastStayResponse result = stayService.getLastStayDateForGuest(guestId, hotelId);
+
+        assertTrue(result.hasStays());
+        assertEquals(stay.getActualCheckInTime().toLocalDate(), result.lastStayDate());
+    }
+
+    @Test
+    void lastStayDateForGuestReportsNoStaysWhenTheGuestHasNone() {
+        when(stayRepository.findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDescIdDesc(guestId, hotelId))
+                .thenReturn(Optional.empty());
+
+        final GuestLastStayResponse result = stayService.getLastStayDateForGuest(guestId, hotelId);
+
+        assertFalse(result.hasStays());
+        assertNull(result.lastStayDate());
+    }
+
+    @Test
+    void lastStayDateForGuestReportsNoStaysWhenTheReturnedStayHasNoCheckInTime() {
+        // Defensive branch (StayServiceImpl): a row with actualCheckInTime == null must not
+        // be reported as a real stay date to the GDPR legal-hold guard.
+        final Stay noCheckInStay = Stay.builder()
+                .id(UUID.randomUUID())
+                .guestId(guestId)
+                .hotelId(hotelId)
+                .status(StayStatus.EXPECTED)
+                .actualCheckInTime(null)
+                .build();
+        when(stayRepository.findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDescIdDesc(guestId, hotelId))
+                .thenReturn(Optional.of(noCheckInStay));
+
+        final GuestLastStayResponse result = stayService.getLastStayDateForGuest(guestId, hotelId);
+
+        assertFalse(result.hasStays());
+        assertNull(result.lastStayDate());
     }
 
     // -----------------------------------------------------------------

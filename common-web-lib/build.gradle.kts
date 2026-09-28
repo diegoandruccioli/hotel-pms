@@ -58,6 +58,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core")
     testImplementation("jakarta.servlet:jakarta.servlet-api")
+    testImplementation("org.springframework:spring-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

@@ -139,7 +139,7 @@ public class HousekeepingWorksheetServiceImpl implements HousekeepingWorksheetSe
             final UUID hotelId, final LocalDate date, final Map<UUID, Room> roomsById,
             final Map<UUID, Long> paxByStayId, final Set<UUID> arrivingRoomIds,
             final Map<UUID, HousekeepingRow> rowsByRoomId, final List<HousekeepingRow> stayoverRows) {
-        for (final Stay stay : stayRepository.findByHotelIdAndStatus(hotelId, StayStatus.CHECKED_IN)) {
+        for (final Stay stay : stayRepository.findByHotelIdAndStatusOrderByCreatedAtAscIdAsc(hotelId, StayStatus.CHECKED_IN)) {
             final Room room = roomsById.get(stay.getRoomId());
             if (room == null) {
                 // Defensive: the room was deactivated after the stay was created.
@@ -188,7 +188,7 @@ public class HousekeepingWorksheetServiceImpl implements HousekeepingWorksheetSe
     private List<HousekeepingRow> buildRoomStatusRows(
             final UUID hotelId, final RoomStatus status, final HousekeepingTaskType taskType,
             final Set<UUID> alreadyCoveredRoomIds) {
-        return roomRepository.findAllByActiveTrueAndHotelIdAndStatus(hotelId, status).stream()
+        return roomRepository.findAllByActiveTrueAndHotelIdAndStatusOrderByRoomNumberAsc(hotelId, status).stream()
                 // Defensive de-dup: by construction a DEPARTURE/STAYOVER room can't also be
                 // DIRTY/MAINTENANCE (housekeeping status is 1:1 with a checked-in stay), but
                 // this guards against the invariant ever being violated by a data anomaly.

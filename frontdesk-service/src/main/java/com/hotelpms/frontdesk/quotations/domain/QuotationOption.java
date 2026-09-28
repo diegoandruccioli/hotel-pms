@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -69,6 +70,7 @@ public class QuotationOption {
     private BigDecimal totalPrice;
 
     @OneToMany(mappedBy = "quotationOption", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("createdAt ASC, id ASC")
     @Builder.Default
     @SQLRestriction("active = true")
     private List<QuotationLineItem> lineItems = new ArrayList<>();

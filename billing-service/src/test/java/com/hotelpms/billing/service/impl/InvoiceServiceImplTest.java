@@ -1,5 +1,6 @@
 package com.hotelpms.billing.service.impl;
 
+import com.hotelpms.commonweb.paging.StablePaging;
 import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.client.dto.GuestSearchPageResponse;
@@ -15,6 +16,7 @@ import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.dto.ChargeRequest;
 import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.GroupChargeRequest;
+import com.hotelpms.billing.dto.GuestInvoiceCheckResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.MasterFolioRequest;
@@ -39,6 +41,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -56,6 +59,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -174,6 +178,90 @@ class InvoiceServiceImplTest {
                 final Exception exception = assertThrows(NotFoundException.class,
                                 () -> invoiceService.getInvoice(Objects.requireNonNull(invoiceId)));
                 assertEquals("INVOICE_NOT_FOUND", exception.getMessage());
+        }
+
+        // ---------------------------------------------------------------
+        // getLatestInvoiceByReservation
+        // ---------------------------------------------------------------
+
+        @Test
+        @DisplayName("getLatestInvoiceByReservation returns the mapped invoice when one exists")
+        void shouldGetLatestInvoiceByReservation() {
+                final UUID invoiceId = UUID.randomUUID();
+                final Invoice invoice = new Invoice();
+                invoice.setId(invoiceId);
+                final InvoiceResponse expectedResponse = new InvoiceResponse(invoiceId, hotelId, INV_123, null,
+                                BigDecimal.TEN, InvoiceStatus.ISSUED, reservationId, guestId, null,
+                                null, null, List.of(), List.of());
+                when(invoiceRepository.findFirstByReservationIdAndHotelIdOrderByIssueDateDescIdDesc(
+                                reservationId, hotelId)).thenReturn(Optional.of(invoice));
+                when(invoiceMapper.toResponse(invoice)).thenReturn(expectedResponse);
+
+                final InvoiceResponse result = invoiceService.getLatestInvoiceByReservation(reservationId);
+
+                assertEquals(expectedResponse, result);
+                verify(invoiceRepository).findFirstByReservationIdAndHotelIdOrderByIssueDateDescIdDesc(
+                                reservationId, hotelId);
+        }
+
+        @Test
+        @DisplayName("getLatestInvoiceByReservation throws NotFoundException when the reservation has no invoice")
+        void shouldThrowWhenReservationHasNoInvoice() {
+                when(invoiceRepository.findFirstByReservationIdAndHotelIdOrderByIssueDateDescIdDesc(
+                                reservationId, hotelId)).thenReturn(Optional.empty());
+
+                final Exception exception = assertThrows(NotFoundException.class,
+                                () -> invoiceService.getLatestInvoiceByReservation(reservationId));
+                assertEquals("INVOICE_NOT_FOUND", exception.getMessage());
+        }
+
+        // ---------------------------------------------------------------
+        // getLastInvoiceDateForGuest (T-GST-05 GDPR legal-hold guard)
+        // ---------------------------------------------------------------
+
+        @Test
+        @DisplayName("getLastInvoiceDateForGuest reports the most recent issue date when an invoice exists")
+        void shouldGetLastInvoiceDateForGuest() {
+                final Invoice invoice = new Invoice();
+                invoice.setId(UUID.randomUUID());
+                invoice.setIssueDate(LocalDateTime.of(SEARCH_YEAR, SEARCH_MONTH, DAY_ONE, 0, 0));
+                when(invoiceRepository.findTopByGuestIdAndHotelIdOrderByIssueDateDescIdDesc(guestId, hotelId))
+                                .thenReturn(Optional.of(invoice));
+
+                final GuestInvoiceCheckResponse result = invoiceService.getLastInvoiceDateForGuest(guestId, hotelId);
+
+                assertTrue(result.hasInvoices());
+                assertEquals(LocalDate.of(SEARCH_YEAR, SEARCH_MONTH, DAY_ONE), result.lastInvoiceDate());
+        }
+
+        @Test
+        @DisplayName("getLastInvoiceDateForGuest reports no invoices when the returned invoice has no issue date")
+        void shouldReportNoInvoicesWhenTheLatestInvoiceHasNoIssueDate() {
+                // Defensive branch (InvoiceServiceImpl): unreachable in production today
+                // (issue_date is NOT NULL in the schema), but pins the intent — a row with
+                // issueDate == null must not be reported as a real invoice date to the GDPR
+                // legal-hold guard — in case that constraint is ever relaxed.
+                final Invoice invoice = new Invoice();
+                invoice.setId(UUID.randomUUID());
+                when(invoiceRepository.findTopByGuestIdAndHotelIdOrderByIssueDateDescIdDesc(guestId, hotelId))
+                                .thenReturn(Optional.of(invoice));
+
+                final GuestInvoiceCheckResponse result = invoiceService.getLastInvoiceDateForGuest(guestId, hotelId);
+
+                assertFalse(result.hasInvoices());
+                assertNull(result.lastInvoiceDate());
+        }
+
+        @Test
+        @DisplayName("getLastInvoiceDateForGuest reports no invoices when the guest has none")
+        void shouldReportNoInvoicesForGuestWithNoInvoice() {
+                when(invoiceRepository.findTopByGuestIdAndHotelIdOrderByIssueDateDescIdDesc(guestId, hotelId))
+                                .thenReturn(Optional.empty());
+
+                final GuestInvoiceCheckResponse result = invoiceService.getLastInvoiceDateForGuest(guestId, hotelId);
+
+                assertFalse(result.hasInvoices());
+                assertNull(result.lastInvoiceDate());
         }
 
         // ---------------------------------------------------------------
@@ -828,8 +916,8 @@ class InvoiceServiceImplTest {
                 invoice.setStatus(InvoiceStatus.ISSUED);
                 invoice.setDocumentType(DocumentType.FATTURA);
                 invoice.setTotalAmount(BigDecimal.TEN);
-                final PageRequest pageable = PageRequest.of(
-                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending());
+                final Pageable pageable = StablePaging.withCreatedAtTieBreak(PageRequest.of(
+                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending()));
 
                 when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(InvoiceStatus.ISSUED), eq(null), eq(null),
                                 eq(null), eq(List.of()), eq(pageable)))
@@ -854,8 +942,8 @@ class InvoiceServiceImplTest {
         @DisplayName("exportInvoicesCsv skips guest batch resolution when there are no matching invoices")
         void exportInvoicesCsvSkipsGuestBatchResolutionWhenEmpty() throws IOException {
                 // Arrange
-                final PageRequest pageable = PageRequest.of(
-                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending());
+                final Pageable pageable = StablePaging.withCreatedAtTieBreak(PageRequest.of(
+                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending()));
                 when(invoiceRepository.searchInvoicesByHotelId(eq(hotelId), eq(null), eq(null), eq(null),
                                 eq(null), eq(List.of()), eq(pageable)))
                                 .thenReturn(new PageImpl<>(List.of()));
@@ -874,8 +962,8 @@ class InvoiceServiceImplTest {
         void exportInvoicesCsvResolvesGuestIdsFromQuery() throws IOException {
                 // Arrange
                 final UUID otherGuestId = UUID.randomUUID();
-                final PageRequest pageable = PageRequest.of(
-                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending());
+                final Pageable pageable = StablePaging.withCreatedAtTieBreak(PageRequest.of(
+                                PAGE_ZERO, EXPORT_PAGE_SIZE, Sort.by(SORT_FIELD_ISSUE_DATE).descending()));
                 when(guestClient.searchGuests(QUERY_MARIO, GUEST_SEARCH_CAP))
                                 .thenReturn(new GuestSearchPageResponse(List.of(
                                                 new GuestResponse(otherGuestId, GUEST_FIRST_NAME_MARIO, "Bianchi",
@@ -1018,7 +1106,7 @@ class InvoiceServiceImplTest {
                                 .id(UUID.randomUUID())
                                 .issueDate(LocalDateTime.of(SEARCH_YEAR, SEARCH_MONTH, DAY_FIVE, 0, 0))
                                 .build();
-                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
+                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDescIdDesc(stayId, hotelId))
                                 .thenReturn(Optional.of(ownFolio));
                 when(invoiceRepository.findByRoutedFromStayIdAndHotelId(stayId, hotelId))
                                 .thenReturn(List.of());
@@ -1040,7 +1128,7 @@ class InvoiceServiceImplTest {
                                 .folioType(FolioType.MASTER)
                                 .issueDate(LocalDateTime.of(SEARCH_YEAR, SEARCH_MONTH, DAY_ONE, 0, 0))
                                 .build();
-                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
+                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDescIdDesc(stayId, hotelId))
                                 .thenReturn(Optional.empty());
                 when(invoiceRepository.findByRoutedFromStayIdAndHotelId(stayId, hotelId))
                                 .thenReturn(List.of(masterFolio));
@@ -1056,7 +1144,7 @@ class InvoiceServiceImplTest {
         @DisplayName("getLastInvoiceDateForStay reports no invoices when neither lookup matches")
         void lastInvoiceDateForStayReturnsFalseWhenNoInvoiceExists() {
                 final UUID stayId = UUID.randomUUID();
-                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId))
+                when(invoiceRepository.findTopByStayIdAndHotelIdOrderByIssueDateDescIdDesc(stayId, hotelId))
                                 .thenReturn(Optional.empty());
                 when(invoiceRepository.findByRoutedFromStayIdAndHotelId(stayId, hotelId))
                                 .thenReturn(List.of());

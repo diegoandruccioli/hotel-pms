@@ -3,6 +3,7 @@ package com.hotelpms.billing.service.impl;
 import com.hotelpms.internalauth.security.TenantContext;
 
 import com.hotelpms.commonweb.csv.CsvWriter;
+import com.hotelpms.commonweb.paging.StablePaging;
 import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.client.dto.GuestResponse;
 import com.hotelpms.billing.domain.ChargeType;
@@ -294,7 +295,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         log.info("Fetching latest invoice for reservation {}", reservationId);
         final UUID hotelId = TenantContext.resolveHotelId();
         final Invoice invoice = invoiceRepository
-                .findFirstByReservationIdAndHotelIdOrderByIssueDateDesc(reservationId, hotelId)
+                .findFirstByReservationIdAndHotelIdOrderByIssueDateDescIdDesc(reservationId, hotelId)
                 .orElseThrow(() -> new NotFoundException(INVOICE_NOT_FOUND));
         return invoiceMapper.toResponse(invoice);
     }
@@ -357,8 +358,8 @@ public class InvoiceServiceImpl implements InvoiceService {
             int pageNumber = 0;
             Page<Invoice> page;
             do {
-                final Pageable pageable = PageRequest.of(
-                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("issueDate").descending());
+                final Pageable pageable = StablePaging.withCreatedAtTieBreak(PageRequest.of(
+                        pageNumber, EXPORT_PAGE_SIZE, Sort.by("issueDate").descending()));
                 page = invoiceRepository.searchInvoicesByHotelId(
                         hotelId, status, fromInclusive, toExclusive, trimmedQuery, guestIds, pageable);
 
@@ -534,7 +535,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     public GuestInvoiceCheckResponse getLastInvoiceDateForGuest(
             @NonNull final UUID guestId, @NonNull final UUID hotelId) {
         final Optional<Invoice> latest = invoiceRepository
-                .findTopByGuestIdAndHotelIdOrderByIssueDateDesc(guestId, hotelId);
+                .findTopByGuestIdAndHotelIdOrderByIssueDateDescIdDesc(guestId, hotelId);
         if (latest.isEmpty() || latest.get().getIssueDate() == null) {
             return new GuestInvoiceCheckResponse(false, null);
         }
@@ -548,7 +549,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     public StayInvoiceCheckResponse getLastInvoiceDateForStay(
             @NonNull final UUID stayId, @NonNull final UUID hotelId) {
         final Optional<LocalDate> ownFolioDate = invoiceRepository
-                .findTopByStayIdAndHotelIdOrderByIssueDateDesc(stayId, hotelId)
+                .findTopByStayIdAndHotelIdOrderByIssueDateDescIdDesc(stayId, hotelId)
                 .map(Invoice::getIssueDate)
                 .filter(Objects::nonNull)
                 .map(LocalDateTime::toLocalDate);

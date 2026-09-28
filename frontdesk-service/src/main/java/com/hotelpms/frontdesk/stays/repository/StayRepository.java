@@ -23,6 +23,9 @@ import java.util.UUID;
 @Repository
 public interface StayRepository extends JpaRepository<Stay, UUID> {
 
+    /** Query-parameter name for the tenant hotelId, reused across several native/JPQL queries below. */
+    String HOTEL_ID_PARAM = "hotelId";
+
     /**
      * Finds all stays by reservation ID.
      *
@@ -70,13 +73,15 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      * Finds all stays for a reservation, scoped to the given hotel (multi-tenancy).
      * Used by the public {@code getStaysByReservationId} endpoint so a
      * cross-hotel reservationId cannot be used to enumerate another hotel's
-     * stays (T-STAY-04, IDOR).
+     * stays (T-STAY-04, IDOR). Ordered by {@code id} — the caller pages this
+     * list in memory (there is no natural date to page by here) and needs a
+     * total order for that slicing to be deterministic across calls.
      *
      * @param reservationId the reservation ID
      * @param hotelId       the hotel UUID (tenant isolation)
-     * @return list of stays for that reservation within that hotel
+     * @return list of stays for that reservation within that hotel, ordered by id
      */
-    List<Stay> findAllByReservationIdAndHotelId(UUID reservationId, UUID hotelId);
+    List<Stay> findAllByReservationIdAndHotelIdOrderById(UUID reservationId, UUID hotelId);
 
     /**
      * Finds all stays for a hotel where actual check-in time falls within the given
@@ -97,35 +102,59 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      * Drives the Dashboard alert banner and the per-stay FAILED badge state.
      *
      * @param hotelId the hotel UUID (tenant isolation)
-     * @return list of stays whose most recent submission attempt failed
+     * @return list of stays whose most recent submission attempt failed, in a
+     *         stable, deterministic order (oldest first) — no retry job reads
+     *         this order today, but the Dashboard alert banner listing them
+     *         still benefits from not reshuffling between page loads
      */
-    List<Stay> findByHotelIdAndAlloggiatiSendFailedTrue(UUID hotelId);
+    List<Stay> findByHotelIdAndAlloggiatiSendFailedTrueOrderByCreatedAtAscIdAsc(UUID hotelId);
 
     /**
      * Finds the most recent stay for a guest within a hotel with the given status,
-     * ordered by actual check-in time descending (T-STAY-06, tenant isolation).
-     * Used to pre-fill the check-in form for returning guests, after the
-     * caller has verified that the guest profile is still active in guest-service.
+     * ordered by actual check-in time descending, {@code id} descending as a
+     * tie-break (T-STAY-06, tenant isolation). Used to pre-fill the check-in form
+     * for returning guests, after the caller has verified that the guest profile
+     * is still active in guest-service.
+     *
+     * <p>{@code actual_check_in_time} is nullable in the schema (a defensive column
+     * constraint, not something the check-in flow itself ever leaves unset — see
+     * {@code StayServiceImpl.checkIn}), but a derived-query {@code OrderBy} sorts
+     * DESC with nulls first on Postgres, which would let one legacy/imported row
+     * with no check-in time outrank every real one. A native query with an
+     * explicit {@code NULLS LAST} avoids that; JPQL has no {@code NULLS LAST}
+     * clause to fall back on instead.
      *
      * @param guestId the guest UUID
      * @param hotelId the hotel UUID (tenant isolation)
      * @param status  the stay status to filter by
      * @return an Optional containing the most recent matching stay within that hotel
      */
-    Optional<Stay> findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDesc(
-            UUID guestId, UUID hotelId, StayStatus status);
+    @Query(value = "SELECT * FROM stays WHERE guest_id = :guestId AND hotel_id = :hotelId AND status = :status "
+            + "ORDER BY actual_check_in_time DESC NULLS LAST, id DESC LIMIT 1", nativeQuery = true)
+    Optional<Stay> findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDescIdDesc(
+            @Param("guestId") UUID guestId, @Param(HOTEL_ID_PARAM) UUID hotelId, @Param("status") String status);
 
     /**
-     * Finds the most recent stay for a guest within a hotel, regardless of status.
+     * Finds the most recent stay for a guest within a hotel, regardless of status,
+     * ordered by actual check-in time descending, {@code id} descending as a
+     * tie-break so a genuine tie still resolves the same way on every call.
      * Used by the guest-service GDPR legal-hold guard (T-GST-05) to verify whether
      * the TULPS five-year retention obligation has expired before anonymising a guest profile.
+     *
+     * <p>Same {@code NULLS LAST} concern as {@link
+     * #findTopByGuestIdAndHotelIdAndStatusOrderByActualCheckInTimeDescIdDesc} — here it
+     * matters even more: a null-check-in row outranking a real one would let the GDPR
+     * clock start over from nothing and understate how long a guest's data has actually
+     * been held.
      *
      * @param guestId the guest UUID
      * @param hotelId the hotel UUID (tenant isolation)
      * @return the most recent stay if present
      */
-    Optional<Stay> findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDesc(
-            @NonNull UUID guestId, @NonNull UUID hotelId);
+    @Query(value = "SELECT * FROM stays WHERE guest_id = :guestId AND hotel_id = :hotelId "
+            + "ORDER BY actual_check_in_time DESC NULLS LAST, id DESC LIMIT 1", nativeQuery = true)
+    Optional<Stay> findTopByGuestIdAndHotelIdOrderByActualCheckInTimeDescIdDesc(
+            @Param("guestId") @NonNull UUID guestId, @Param(HOTEL_ID_PARAM) @NonNull UUID hotelId);
 
     /**
      * Finds all stays for a guest within a hotel, ordered by check-in descending.
@@ -193,7 +222,7 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      * @return the total number of guests across matching stays
      */
     @Query("SELECT COUNT(g) FROM Stay s JOIN s.guests g WHERE s.hotelId = :hotelId AND s.status = :status")
-    long countGuestsInHouseByHotelId(@Param("hotelId") UUID hotelId, @Param("status") StayStatus status);
+    long countGuestsInHouseByHotelId(@Param(HOTEL_ID_PARAM) UUID hotelId, @Param("status") StayStatus status);
 
     /**
      * Finds every stay with the given status for a hotel — plain, no fetch
@@ -209,9 +238,10 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      *
      * @param hotelId the hotel UUID
      * @param status  the stay status to filter by (e.g. CHECKED_IN)
-     * @return matching stays
+     * @return matching stays, ordered by {@code createdAt} then {@code id} —
+     *         a total, deterministic order, not a meaningful business one
      */
-    List<Stay> findByHotelIdAndStatus(UUID hotelId, StayStatus status);
+    List<Stay> findByHotelIdAndStatusOrderByCreatedAtAscIdAsc(UUID hotelId, StayStatus status);
 
     /**
      * Counts guests per stay, for stays with the given status in a hotel —
@@ -228,7 +258,8 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      */
     @Query("SELECT s.id AS stayId, COUNT(g) AS guestCount FROM Stay s JOIN s.guests g "
             + "WHERE s.hotelId = :hotelId AND s.status = :status GROUP BY s.id")
-    List<StayGuestCount> countGuestsByStayForHotelIdAndStatus(@Param("hotelId") UUID hotelId, @Param("status") StayStatus status);
+    List<StayGuestCount> countGuestsByStayForHotelIdAndStatus(
+            @Param(HOTEL_ID_PARAM) UUID hotelId, @Param("status") StayStatus status);
 
     /**
      * Sums occupied room-nights per time bucket for a hotel, for the KPI
@@ -285,6 +316,6 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
             + "ORDER BY periodStart",
             nativeQuery = true)
     List<StayOccupancyPeriod> sumOccupiedRoomNightsByHotelIdGroupedByPeriod(
-            @Param("hotelId") UUID hotelId, @Param("start") LocalDateTime start,
+            @Param(HOTEL_ID_PARAM) UUID hotelId, @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end, @Param("granularity") String granularity);
 }

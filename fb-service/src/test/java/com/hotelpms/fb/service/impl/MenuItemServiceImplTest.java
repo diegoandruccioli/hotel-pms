@@ -64,7 +64,8 @@ class MenuItemServiceImplTest {
                 .id(UUID.randomUUID()).hotelId(HOTEL_ID).name("Cappuccino")
                 .price(new BigDecimal(PRICE_300)).category(CATEGORY_BAR).available(true).active(true).build();
 
-        when(menuItemRepository.findAllByHotelId(HOTEL_ID)).thenReturn(List.of(espresso, cappuccino));
+        when(menuItemRepository.findAllByHotelIdOrderByCategoryAscNameAscIdAsc(HOTEL_ID))
+                .thenReturn(List.of(espresso, cappuccino));
 
         final List<MenuItemResponse> result = menuItemService.getAll(HOTEL_ID);
 
@@ -76,7 +77,7 @@ class MenuItemServiceImplTest {
 
     @Test
     void shouldReturnEmptyListOnGetAllWhenNoItems() {
-        when(menuItemRepository.findAllByHotelId(HOTEL_ID)).thenReturn(List.of());
+        when(menuItemRepository.findAllByHotelIdOrderByCategoryAscNameAscIdAsc(HOTEL_ID)).thenReturn(List.of());
 
         assertTrue(menuItemService.getAll(HOTEL_ID).isEmpty());
     }
