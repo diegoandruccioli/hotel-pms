@@ -19,9 +19,8 @@ import {
   validateAlloggiatiGuests,
 } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
-import { getErrorMessage } from '../../utils';
+import { getErrorMessage, todayIsoDate } from '../../utils';
 
-const todayIso = new Date().toISOString().split('T')[0];
 const GUEST_SEARCH_DEBOUNCE_MS = 300;
 
 // -----------------------------------------------------------------------
@@ -291,7 +290,7 @@ export function WalkInCheckInForm() {
           required
           type="date"
           value={expectedCheckOutDate}
-          min={todayIso}
+          min={todayIsoDate()}
           onChange={handleCheckoutChange}
         />
 
