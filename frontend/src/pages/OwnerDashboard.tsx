@@ -11,7 +11,7 @@ import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage, cn } from '../utils';
+import { getErrorMessage, cn, invoiceStatusTone } from '../utils';
 import { KpiTrendSection } from './OwnerDashboard/KpiTrendSection';
 
 /** Same-length period immediately preceding `[start, end]` (both inclusive),
@@ -57,15 +57,6 @@ const DeltaBadge = ({ current, previous }: DeltaBadgeProps) => {
   );
 };
 
-const getStatusTone = (status: InvoiceResponse['status']) => {
-  switch (status) {
-    case 'PAID': return 'success' as const;
-    case 'ISSUED': return 'warning' as const;
-    case 'CANCELLED': return 'error' as const;
-    default: return 'neutral' as const;
-  }
-};
-
 const getFirstDayOfMonth = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -92,7 +83,7 @@ const InvoiceRow = memo(({
     <M3TableCell className="text-on-surface-variant">{formatDate(inv.issueDate)}</M3TableCell>
     <M3TableCell className="font-medium">{formatCurrency(inv.totalAmount)}</M3TableCell>
     <M3TableCell>
-      <M3StatusChip label={formatStatus(inv.status)} tone={getStatusTone(inv.status)} />
+      <M3StatusChip label={formatStatus(inv.status)} tone={invoiceStatusTone[inv.status]} />
     </M3TableCell>
   </M3TableRow>
 ));

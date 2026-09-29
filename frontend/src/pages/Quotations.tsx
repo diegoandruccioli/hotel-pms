@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { quotationService } from '../services';
-import type { QuotationResponse, QuotationStatus } from '../types';
+import type { QuotationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
@@ -10,17 +10,9 @@ import { M3TableActionLink } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3Dialog } from '../components/m3';
 import { useToastStore } from '../store';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, quotationStatusTone } from '../utils';
 
 const PAGE_SIZE = 20;
-
-const STATUS_TONE: Record<QuotationStatus, 'success' | 'warning' | 'error' | 'neutral' | 'info'> = {
-  DRAFT: 'neutral',
-  SENT: 'info',
-  ACCEPTED: 'success',
-  DECLINED: 'error',
-  EXPIRED: 'warning',
-};
 
 const formatTotal = (quotation: QuotationResponse, t: (key: string, opts?: Record<string, unknown>) => string): string => {
   if (quotation.options.length <= 1) {
@@ -70,7 +62,7 @@ const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, 
       <M3TableCell className="text-on-surface-variant">{quotation.validUntil}</M3TableCell>
       <M3TableCell>
         <div className="flex flex-col items-start gap-1">
-          <M3StatusChip label={t(`status_${quotation.status.toLowerCase()}`)} tone={STATUS_TONE[quotation.status]} />
+          <M3StatusChip label={t(`status_${quotation.status.toLowerCase()}`)} tone={quotationStatusTone[quotation.status]} />
           {quotation.sendFailed && (
             <M3StatusChip label={t('send_failed_badge')} tone="error" />
           )}

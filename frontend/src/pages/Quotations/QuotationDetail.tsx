@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { quotationService } from '../../services';
-import type { QuotationResponse, QuotationOptionResponse, QuotationStatus } from '../../types';
+import type { QuotationResponse, QuotationOptionResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
@@ -11,15 +11,7 @@ import { M3StatusChip } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { QuotationPdfPreviewDialog } from './QuotationPdfPreviewDialog';
 import { useToastStore } from '../../store';
-import { getErrorMessage, cn } from '../../utils';
-
-const STATUS_TONE: Record<QuotationStatus, 'success' | 'warning' | 'error' | 'neutral' | 'info'> = {
-  DRAFT: 'neutral',
-  SENT: 'info',
-  ACCEPTED: 'success',
-  DECLINED: 'error',
-  EXPIRED: 'warning',
-};
+import { getErrorMessage, cn, quotationStatusTone } from '../../utils';
 
 const OptionCard = ({ option, isAccepted, isConvertChoice, selectable, onChoose }: {
   option: QuotationOptionResponse;
@@ -257,7 +249,7 @@ export const QuotationDetail = () => {
         <div className="flex-1">
           <h1 className="text-2xl font-display font-bold text-on-surface flex items-center gap-3">
             {quotation.guestFullName}
-            <M3StatusChip label={t(`status_${quotation.status.toLowerCase()}`)} tone={STATUS_TONE[quotation.status]} />
+            <M3StatusChip label={t(`status_${quotation.status.toLowerCase()}`)} tone={quotationStatusTone[quotation.status]} />
           </h1>
         </div>
       </div>

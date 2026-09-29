@@ -10,7 +10,7 @@ import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3Pagination } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, groupStatusTone } from '../utils';
 import { useReservationGroups } from '../hooks/queries';
 
 const PAGE_SIZE = 20;
@@ -34,15 +34,6 @@ const GroupNameCell = memo(({ group, onView }: GroupNameCellProps) => {
 });
 
 GroupNameCell.displayName = 'GroupNameCell';
-
-const getStatusTone = (status: ReservationGroupResponse['status']) => {
-  switch (status) {
-    case 'CHECKED_OUT': return 'success' as const;
-    case 'CHECKED_IN': return 'warning' as const;
-    case 'CANCELLED': return 'error' as const;
-    default: return 'neutral' as const;
-  }
-};
 
 export const ReservationGroups = () => {
   const { t } = useTranslation('common');
@@ -103,7 +94,7 @@ export const ReservationGroups = () => {
       id: 'status',
       header: t('status'),
       cell: ({ row }) => (
-        <M3StatusChip label={getStatusLabel(row.original.status)} tone={getStatusTone(row.original.status)} />
+        <M3StatusChip label={getStatusLabel(row.original.status)} tone={groupStatusTone[row.original.status]} />
       ),
     },
   ], [t, handleViewGroup, getStatusLabel]);

@@ -6,20 +6,14 @@ import { M3Dialog } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { AddChargeModal } from './AddChargeModal';
-import { getErrorMessage } from '../../utils';
-import type { BillingDocumentType as DocumentType, InvoiceResponse, InvoiceStatus, PaymentMethod, ChargeType, SdiStatus } from '../../types';
+import { getErrorMessage, invoiceStatusTone, sdiStatusTone } from '../../utils';
+import type { BillingDocumentType as DocumentType, InvoiceResponse, PaymentMethod, ChargeType } from '../../types';
 
 interface Props {
   invoice: InvoiceResponse;
   onClose: () => void;
   onUpdated?: (updated: InvoiceResponse) => void;
 }
-
-const statusTone = (s: InvoiceStatus) => {
-  if (s === 'PAID') return 'success' as const;
-  if (s === 'CANCELLED') return 'error' as const;
-  return 'warning' as const;
-};
 
 const methodIcon: Record<PaymentMethod, string> = {
   CASH: 'payments',
@@ -34,13 +28,6 @@ const chargeTypeIcon: Record<ChargeType, string> = {
   ROOM_NIGHT: 'bed',
   EXTRA: 'add_circle',
   CITY_TAX: 'account_balance',
-};
-
-const sdiStatusTone = (s: SdiStatus) => {
-  if (s === 'ACCEPTED') return 'success' as const;
-  if (s === 'REJECTED') return 'error' as const;
-  if (s === 'SENT') return 'warning' as const;
-  return 'neutral' as const;
 };
 
 interface ChargeRowProps {
@@ -246,7 +233,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
               </span>
               <M3StatusChip
                 label={t(`sdi_status_${invoice.sdiStatus.toLowerCase()}`, { ns: 'billing' })}
-                tone={sdiStatusTone(invoice.sdiStatus)}
+                tone={sdiStatusTone[invoice.sdiStatus]}
               />
             </div>
             <button
@@ -281,7 +268,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
             <dd className="mt-0.5">
               <M3StatusChip
                 label={t(`invoice_status_${invoice.status}`, { ns: 'common', defaultValue: invoice.status })}
-                tone={statusTone(invoice.status)}
+                tone={invoiceStatusTone[invoice.status]}
               />
             </dd>
           </div>
