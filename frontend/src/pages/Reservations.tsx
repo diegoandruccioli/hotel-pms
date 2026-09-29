@@ -17,7 +17,7 @@ import type { TFunction } from 'i18next';
 import type { RoomResponse } from '../types';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
-import { getErrorMessage, cn } from '../utils';
+import { getErrorMessage, cn, todayIsoDate } from '../utils';
 import { reservationService } from '../services';
 import {
   useReservationsSearch,
@@ -52,7 +52,6 @@ interface ReservationsNavState {
 
 // checkInDate is an ISO 'YYYY-MM-DD' string (see ReservationResponse) — safe
 // to compare lexicographically against another ISO date of the same shape.
-const todayIsoDate = (): string => new Date().toISOString().slice(0, 10);
 
 const getStatusTone = (status: string) => {
   switch (status.toUpperCase()) {

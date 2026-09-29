@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
 import { useToastStore } from '../store';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, todayIsoDate, addDaysIso } from '../utils';
 import {
   useNightAuditHistory, useRunNightAudit, useReservationsSearch, useStaysSearch,
 } from '../hooks/queries';
@@ -36,7 +36,6 @@ const getStatusLabel = (status: NightAuditRunResponse['status'], t: TFunction) =
 const cashTotal = (run: NightAuditRunResponse): number =>
   run.cashByMethod.reduce((sum, line) => sum + line.total, 0);
 
-const todayIsoDate = (): string => new Date().toISOString().slice(0, 10);
 
 interface ViewDetailCellProps {
   run: NightAuditRunResponse;
@@ -117,11 +116,7 @@ export const NightAudit = () => {
   const addToast = useToastStore((s) => s.addToast);
 
   const [page, setPage] = useState(0);
-  const [runDate, setRunDate] = useState(() => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    return yesterday.toISOString().slice(0, 10);
-  });
+  const [runDate, setRunDate] = useState(() => addDaysIso(todayIsoDate(), -1));
   const [confirmingRun, setConfirmingRun] = useState(false);
   const [detailRun, setDetailRun] = useState<NightAuditRunResponse | null>(null);
 

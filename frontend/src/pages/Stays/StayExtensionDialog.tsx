@@ -6,7 +6,7 @@ import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { useToastStore } from '../../store';
 import { stayService } from '../../services';
-import { getErrorMessage } from '../../utils';
+import { getErrorMessage, addDaysIso } from '../../utils';
 import type { StayResponse } from '../../types';
 
 interface StayExtensionDialogProps {
@@ -15,18 +15,6 @@ interface StayExtensionDialogProps {
   onClose: () => void;
   onExtended: (updated: StayResponse) => void;
 }
-
-/**
- * Defaults the date picker to one night past the current check-out. Uses UTC
- * getters/setters throughout — an ISO date-only string parses as UTC midnight,
- * so mixing in local-timezone methods (getDate/setDate) would shift the result
- * by a day in any timezone west of UTC.
- */
-const dayAfter = (isoDate: string): string => {
-  const d = new Date(isoDate);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-};
 
 /**
  * "I'm staying another night" at the desk (Parte 3) — extends expectedCheckOutDate
@@ -43,7 +31,7 @@ export const StayExtensionDialog = memo(({ stay, onClose, onExtended }: StayExte
 
   useEffect(() => {
     setError(null);
-    setNewCheckOutDate(stay?.expectedCheckOutDate ? dayAfter(stay.expectedCheckOutDate) : '');
+    setNewCheckOutDate(stay?.expectedCheckOutDate ? addDaysIso(stay.expectedCheckOutDate, 1) : '');
   }, [stay]);
 
   const handleDateChange = useCallback(

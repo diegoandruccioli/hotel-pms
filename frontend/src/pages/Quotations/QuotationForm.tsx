@@ -13,7 +13,7 @@ import { quotationService } from '../../services';
 import type { GuestResponseDTO } from '../../types';
 import type { RoomResponse } from '../../types';
 import type { ReservationResponse } from '../../types';
-import { cn } from '../../utils';
+import { cn, todayIsoDate, addDaysIso } from '../../utils';
 import type { QuotationOptionRequest, QuotationRequest } from '../../types';
 import { RoomSelection } from '../Reservations/RoomSelection';
 import { getErrorMessage } from '../../utils';
@@ -86,12 +86,6 @@ const OptionTab = memo(({ option, index, isActive, canRemove, total, onSelect, o
 });
 OptionTab.displayName = 'OptionTab';
 
-const todayPlusDays = (days: number): string => {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-};
-
 export const QuotationForm = () => {
   const { t } = useTranslation(['quotations', 'guests', 'common']);
   const navigate = useNavigate();
@@ -120,7 +114,7 @@ export const QuotationForm = () => {
   const [expectedGuests, setExpectedGuests] = useState<number | string>(1);
   const [options, setOptions] = useState<OptionDraft[]>([{ label: defaultOptionLabel(0), selectedRoomIds: [] }]);
   const [activeOptionIndex, setActiveOptionIndex] = useState(0);
-  const [validUntil, setValidUntil] = useState(() => todayPlusDays(DEFAULT_VALID_DAYS));
+  const [validUntil, setValidUntil] = useState(() => addDaysIso(todayIsoDate(), DEFAULT_VALID_DAYS));
 
   const quotationSchema = useMemo(() => z.object({
     checkInDate: z.string().min(1, t('common:msg_valid_dates')),

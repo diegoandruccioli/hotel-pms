@@ -90,6 +90,22 @@ describe('NightAudit', () => {
     expect(screen.getByText('progress_activity')).toBeInTheDocument();
   });
 
+  it('defaults the business date to yesterday in local time, even just after midnight', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 7, 20, 0, 30));
+    try {
+      vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([]) as never);
+      render(<NightAudit />);
+
+      const input = screen.getByLabelText('night_audit_business_date');
+      expect(input).toHaveValue('2026-08-19');
+      expect(input).toHaveAttribute('max', '2026-08-20');
+      await waitFor(() => expect(screen.getByText('night_audit_no_runs_found')).toBeInTheDocument());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('should render history rows on success', async () => {
     vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([COMPLETED_RUN]) as never);
     render(<NightAudit />);

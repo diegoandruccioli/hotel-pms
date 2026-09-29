@@ -9,7 +9,7 @@ import { M3LoadingState } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { useToastStore } from '../../store';
 import { stayService } from '../../services';
-import { getErrorMessage } from '../../utils';
+import { getErrorMessage, todayIsoDate } from '../../utils';
 import { queryKeys } from '../../lib';
 import type {
   AlloggiatiStato,
@@ -318,7 +318,7 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
 
   const handleStartDeparture = useCallback((guestId: string) => {
     setDepartureTargetId(guestId);
-    setDepartureDate(new Date().toISOString().slice(0, 10));
+    setDepartureDate(todayIsoDate());
   }, []);
 
   const handleCancelDeparture = useCallback(() => setDepartureTargetId(null), []);
