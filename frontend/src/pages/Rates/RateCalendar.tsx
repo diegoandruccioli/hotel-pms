@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from 'date-fns';
-import { it, enUS } from 'date-fns/locale';
 import { rateSeasonService } from '../../services';
 import type { RateCalendarResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
@@ -10,7 +9,7 @@ import { M3Card } from '../../components/m3';
 import { RateCalendarCell } from './RateCalendarCell';
 import { RateBulkApplyDialog } from './RateBulkApplyDialog';
 import { useAuthStore } from '../../store';
-import { getErrorMessage, cn, resolveDesignToken } from '../../utils';
+import { getErrorMessage, cn, resolveDesignToken, dateFnsLocale } from '../../utils';
 
 const SIDEBAR_WIDTH = 192;
 const CELL_WIDTH = 100;
@@ -51,7 +50,7 @@ LegendEntry.displayName = 'LegendEntry';
 
 export const RateCalendar = () => {
   const { t, i18n } = useTranslation(['common']);
-  const locale = i18n.language.startsWith('it') ? it : enUS;
+  const locale = dateFnsLocale(i18n.language);
   const role = useAuthStore((s) => s.user?.role);
   const canApplyPrice = role === 'ADMIN' || role === 'OWNER';
 

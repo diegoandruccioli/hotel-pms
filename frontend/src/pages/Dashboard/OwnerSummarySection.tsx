@@ -1,14 +1,10 @@
+import { todayIsoDate } from '../../utils';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Card } from '../../components/m3';
 import { useKpiReport } from '../../hooks/queries';
-
-const todayIsoDate = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
 
 interface MiniStat {
   key: string;

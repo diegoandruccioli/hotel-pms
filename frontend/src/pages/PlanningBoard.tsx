@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect, memo, useCallback } from 'react';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, differenceInCalendarDays, addMonths } from 'date-fns';
-import { it, enUS } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
 import { M3Card } from '../components/m3';
 import type { RoomResponse } from '../types';
 import type { ReservationResponse } from '../types';
-import { cn } from '../utils';
+import { cn, dateFnsLocale } from '../utils';
 
 interface PlanningBoardProps {
   rooms: RoomResponse[];
@@ -183,7 +182,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
   onReservationMove,
 }) => {
   const { t, i18n } = useTranslation('common');
-  const locale = i18n.language.startsWith('it') ? it : enUS;
+  const locale = dateFnsLocale(i18n.language);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { monthStart, monthEnd, nextMonthStart, days } = useMemo(() => {

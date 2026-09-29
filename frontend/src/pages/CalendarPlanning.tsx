@@ -12,7 +12,7 @@ import { M3Card } from '../components/m3';
 import PlanningBoard from '@/pages/PlanningBoard';
 import { inventoryService } from '../services';
 import type { RoomResponse } from '../types';
-import { getErrorMessage, cn, resolveDesignToken } from '../utils';
+import { getErrorMessage, cn, resolveDesignToken, dateFnsLocale } from '../utils';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
@@ -202,7 +202,7 @@ export const CalendarPlanning = () => {
   }, []);
 
   const currentYear = format(currentDate, 'yyyy');
-  const monthName = format(currentDate, 'MMMM', { locale: i18n.language.startsWith('it') ? it : enUS });
+  const monthName = format(currentDate, 'MMMM', { locale: dateFnsLocale(i18n.language) });
   const monthValue = format(currentDate, 'yyyy-MM');
 
   return (

@@ -6,16 +6,11 @@ import { M3Card } from '../../components/m3';
 import { M3EmptyState } from '../../components/m3';
 import { M3TableActionLink } from '../../components/m3';
 import { useToastStore } from '../../store';
-import { getErrorMessage } from '../../utils';
+import { getErrorMessage, todayIsoDate } from '../../utils';
 import { useReservationsSearch, useStaysSearch, useCheckOutStay } from '../../hooks/queries';
 import type { ReservationResponse, StayResponse } from '../../types';
 
 const WIDGET_ROW_LIMIT = 8;
-
-const todayIsoDate = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
 
 const CHECK_IN_ELIGIBLE_STATUS = 'CONFIRMED';
 
