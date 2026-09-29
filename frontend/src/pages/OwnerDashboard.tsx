@@ -11,7 +11,7 @@ import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage, cn, invoiceStatusTone } from '../utils';
+import { getErrorMessage, cn, invoiceStatusTone, todayIsoDate, toIsoDate } from '../utils';
 import { KpiTrendSection } from './OwnerDashboard/KpiTrendSection';
 
 /** Same-length period immediately preceding `[start, end]` (both inclusive),
@@ -28,8 +28,7 @@ const getPreviousPeriod = (startDate: string, endDate: string): { prevStart: str
   prevEndDate.setDate(prevEndDate.getDate() - 1);
   const prevStartDate = new Date(prevEndDate);
   prevStartDate.setDate(prevStartDate.getDate() - (lengthDays - 1));
-  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  return { prevStart: fmt(prevStartDate), prevEnd: fmt(prevEndDate) };
+  return { prevStart: toIsoDate(prevStartDate), prevEnd: toIsoDate(prevEndDate) };
 };
 
 /** Percentage change from `previous` to `current`, or `null` when there's no
@@ -62,11 +61,6 @@ const getFirstDayOfMonth = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 };
 
-const getTodayString = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
-
 const InvoiceRow = memo(({
   inv,
   formatDate,
@@ -95,7 +89,7 @@ export const OwnerDashboard = memo(() => {
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
   const [startDate, setStartDate] = useState(getFirstDayOfMonth());
-  const [endDate, setEndDate] = useState(getTodayString());
+  const [endDate, setEndDate] = useState(todayIsoDate());
   const [report, setReport] = useState<OwnerFinancialReportDto | null>(null);
   const [previousSummary, setPreviousSummary] = useState<OwnerFinancialSummaryDto | null>(null);
   const [loading, setLoading] = useState(false);
