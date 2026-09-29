@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo, useMemo } from 'react';
+import { useState, useCallback, memo, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
@@ -13,12 +13,12 @@ import { PaymentModal } from './Billing/PaymentModal';
 import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useTranslation } from 'react-i18next';
 import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries';
+import { useDebounce } from '../hooks';
 import { getErrorMessage, cn, invoiceStatusTone } from '../utils';
 import { billingService } from '../services';
 import { useAuthStore, useToastStore } from '../store';
 
 const PAGE_SIZE = 20;
-const SEARCH_DEBOUNCE_MS = 300;
 const DEFAULT_SORT_FIELD = 'issueDate';
 const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'desc';
 
@@ -106,7 +106,7 @@ export const Billing = memo(() => {
   const [detailTarget, setDetailTarget]   = useState<InvoiceResponse | null>(null);
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDebounce(searchQuery);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
@@ -123,11 +123,6 @@ export const Billing = memo(() => {
     }
   }, [statusFilter, searchQuery, dateFrom, dateTo, addToast, t]);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
-
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [searchQuery]);
 
   // Any filter change invalidates the current page — always restart from page 0.
   // Adjusted during render (React's documented pattern for this — see

@@ -26,6 +26,7 @@ import {
   useRetryConfirmationEmail,
   useUpdateReservationStatus,
 } from '../hooks/queries';
+import { useDebounce } from '../hooks';
 
 const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 // Mirrors ReservationServiceImpl.ALLOWED_TRANSITIONS's NO_SHOW edges — a
@@ -35,7 +36,6 @@ const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 // can't express).
 const NO_SHOW_ELIGIBLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 const PAGE_SIZE = 20;
-const SEARCH_DEBOUNCE_MS = 300;
 const EMPTY_RESERVATIONS: ReservationResponse[] = [];
 const EMPTY_ROOMS: RoomResponse[] = [];
 
@@ -221,7 +221,7 @@ export const Reservations = () => {
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
   const [reservationToMarkNoShow, setReservationToMarkNoShow] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDebounce(searchQuery);
   const [sortField, setSortField] = useState<SortField>(() => navState?.sortField ?? DEFAULT_SORT_FIELD);
   const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? DEFAULT_SORT_DIR);
   const [upcomingOnly, setUpcomingOnly] = useState(() => navState?.upcomingOnly ?? false);
@@ -233,11 +233,6 @@ export const Reservations = () => {
       addToast(getErrorMessage(err, t('csv_export_failed')), 'error');
     }
   }, [searchQuery, upcomingOnly, addToast, t]);
-
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [searchQuery]);
 
   // Any filter/sort change invalidates the current page — always restart from page 0.
   useEffect(() => {
