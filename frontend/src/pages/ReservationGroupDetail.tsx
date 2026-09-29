@@ -9,20 +9,11 @@ import { M3Dialog } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, groupStatusTone } from '../utils';
 import { useToastStore } from '../store';
 import {
   useReservationGroup, useCancelReservationGroup, useCheckoutReservationGroup,
 } from '../hooks/queries';
-
-const getStatusTone = (status: string) => {
-  switch (status) {
-    case 'CHECKED_OUT': return 'success' as const;
-    case 'CHECKED_IN': return 'warning' as const;
-    case 'CANCELLED': return 'error' as const;
-    default: return 'neutral' as const;
-  }
-};
 
 export const ReservationGroupDetail = () => {
   const { t, i18n } = useTranslation('common');
@@ -122,7 +113,7 @@ export const ReservationGroupDetail = () => {
             {group.name}
             <M3StatusChip
               label={t(`group_status_${group.status.toLowerCase()}`)}
-              tone={getStatusTone(group.status)}
+              tone={groupStatusTone[group.status]}
             />
           </h1>
         </div>
