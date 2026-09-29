@@ -14,7 +14,7 @@ import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useTranslation } from 'react-i18next';
 import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries';
 import { useDebounce } from '../hooks';
-import { getErrorMessage, cn } from '../utils';
+import { getErrorMessage, cn, invoiceStatusTone } from '../utils';
 import { billingService } from '../services';
 import { useAuthStore, useToastStore } from '../store';
 
@@ -32,15 +32,6 @@ const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'desc';
  * with a commercialista.
  */
 const PILOT_MODE = import.meta.env.VITE_PILOT_MODE !== 'false';
-
-const getStatusTone = (status: InvoiceStatus) => {
-  switch (status) {
-    case 'ISSUED': return 'warning' as const;
-    case 'PAID':   return 'success' as const;
-    case 'CANCELLED': return 'error' as const;
-    default: return 'neutral' as const;
-  }
-};
 
 const VIEW_BTN_CLASS = cn(
   'text-primary hover:text-primary/80 font-medium text-sm mr-4',
@@ -276,7 +267,7 @@ export const Billing = memo(() => {
       cell: ({ row }) => (
         <M3StatusChip
           label={t(`invoice_status_${row.original.invoice.status}`, row.original.invoice.status)}
-          tone={getStatusTone(row.original.invoice.status)}
+          tone={invoiceStatusTone[row.original.invoice.status]}
         />
       ),
     },

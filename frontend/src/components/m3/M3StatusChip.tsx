@@ -1,16 +1,15 @@
 import { cn } from '../../utils';
+import type { StatusTone } from '../../utils';
 import { MaterialIcon } from '../MaterialIcon';
-
-type ChipTone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
 interface M3StatusChipProps {
   label: string;
-  tone?: ChipTone;
+  tone?: StatusTone;
   icon?: string;
   className?: string;
 }
 
-const toneClasses: Record<ChipTone, string> = {
+const toneClasses: Record<StatusTone, string> = {
   success: 'bg-tertiary-container text-on-tertiary-container',
   warning: 'bg-secondary-container text-on-secondary-container',
   error: 'bg-error-container text-on-error-container',
