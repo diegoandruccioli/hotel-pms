@@ -17,6 +17,7 @@ import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 import { useGuestsSearch, useDeleteGuest } from '../hooks/queries';
+import { useDebounce } from '../hooks';
 import { queryKeys } from '../lib';
 import { getErrorMessage } from '../utils';
 import { guestService } from '../services';
@@ -94,7 +95,7 @@ export const Guests = memo(() => {
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') ?? '';
   const [searchQuery, setSearchQuery] = useState(initialSearch);
-  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
+  const debouncedSearch = useDebounce(searchQuery);
 
   const handleExportCsv = useCallback(async () => {
     try {
@@ -106,11 +107,6 @@ export const Guests = memo(() => {
 
   const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
-
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(searchQuery), 300);
-    return () => clearTimeout(id);
-  }, [searchQuery]);
 
   // A new search query invalidates the current page — always restart from page 0.
   useEffect(() => {
