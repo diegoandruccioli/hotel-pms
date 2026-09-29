@@ -6,9 +6,11 @@ on:
     branches:
       - main
       - feature/secure-coding-hardening
+      - feature/ui-redesign
   pull_request:
     branches:
       - main
+      - feature/ui-redesign
   # Third-party images (grafana/grafana) get no new alert until someone pushes —
   # refresh weekly so a Security-tab alert auto-closes once upstream patches it,
   # instead of staying open indefinitely between unrelated pushes.
