@@ -50,7 +50,7 @@ const DeltaBadge = ({ current, previous }: DeltaBadgeProps) => {
   if (delta === null) return null;
   const isPositive = delta >= 0;
   return (
-    <p className={cn('text-xs font-body font-medium flex items-center gap-0.5', isPositive ? 'text-success' : 'text-error')}>
+    <p className={cn('text-xs font-body font-medium flex items-center gap-0.5', isPositive ? 'text-tertiary' : 'text-error')}>
       <MaterialIcon name={isPositive ? 'trending_up' : 'trending_down'} size={14} />
       {t('delta_vs_previous_period', { percent: Math.round(Math.abs(delta)) })}
     </p>

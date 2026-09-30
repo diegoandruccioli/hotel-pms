@@ -325,7 +325,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
                         </p>
                       </div>
                     </div>
-                    <span className="font-medium text-success shrink-0 ml-4">
+                    <span className="font-medium text-tertiary shrink-0 ml-4">
                       {formatCurrency(p.amount)}
                     </span>
                   </li>

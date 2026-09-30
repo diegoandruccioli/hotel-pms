@@ -217,7 +217,7 @@ export const NightAudit = () => {
             {formatCurrency(cashTotal(row.original))}
             {row.original.cashSummaryDegraded && (
               <span title={t('night_audit_cash_degraded')}>
-                <MaterialIcon name="warning" size={16} className="text-warning" />
+                <MaterialIcon name="warning" size={16} className="text-secondary" />
               </span>
             )}
           </span>
@@ -353,7 +353,7 @@ export const NightAudit = () => {
                 <p className="font-medium">
                   {t('night_audit_cash_total')}
                   {detailRun.cashSummaryDegraded && (
-                    <span className="ml-2 text-warning text-xs">{t('night_audit_cash_degraded')}</span>
+                    <span className="ml-2 text-secondary text-xs">{t('night_audit_cash_degraded')}</span>
                   )}
                 </p>
                 {detailRun.cashByMethod.length === 0 ? (
