@@ -1,3 +1,4 @@
+import { useFormatters } from '../../hooks';
 import { useState, useEffect, useCallback, useMemo, memo, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -177,16 +178,19 @@ const EMPTY_RATE_FORM = {
 };
 type RateFormState = typeof EMPTY_RATE_FORM;
 
-const RateRow = memo(({ rate }: { rate: CityTaxRateResponse }) => (
+const RateRow = memo(({ rate }: { rate: CityTaxRateResponse }) => {
+  const { formatCurrency } = useFormatters();
+  return (
   <M3TableRow>
     <M3TableCell className="font-medium">{rate.category}</M3TableCell>
-    <M3TableCell>€ {rate.amountPerNight.toFixed(2)}</M3TableCell>
+    <M3TableCell>{formatCurrency(rate.amountPerNight)}</M3TableCell>
     <M3TableCell>{rate.maxTaxableNights ?? '-'}</M3TableCell>
     <M3TableCell>{rate.exemptUnderAge ?? '-'}</M3TableCell>
     <M3TableCell>{rate.validFrom}</M3TableCell>
     <M3TableCell>{rate.validTo ?? '-'}</M3TableCell>
   </M3TableRow>
-));
+  );
+});
 RateRow.displayName = 'RateRow';
 
 const CityTaxRatesSection = () => {
@@ -466,10 +470,12 @@ const CityTaxApplicabilitySection = () => {
 const BackfillRow = memo(({ line, t }: {
   line: CityTaxBackfillResponse['lines'][number];
   t: (key: string) => string;
-}) => (
+}) => {
+  const { formatCurrency } = useFormatters();
+  return (
   <M3TableRow>
     <M3TableCell>{line.checkInDate}</M3TableCell>
-    <M3TableCell>€ {line.amount.toFixed(2)}</M3TableCell>
+    <M3TableCell>{formatCurrency(line.amount)}</M3TableCell>
     <M3TableCell>
       {line.charged
         ? t('city_tax_backfill_status_charged')
@@ -478,11 +484,13 @@ const BackfillRow = memo(({ line, t }: {
           : t('city_tax_backfill_status_pending')}
     </M3TableCell>
   </M3TableRow>
-));
+  );
+});
 BackfillRow.displayName = 'BackfillRow';
 
 const CityTaxBackfillSection = () => {
   const { t } = useTranslation(['settings', 'common']);
+  const { formatCurrency } = useFormatters();
   const addToast = useToastStore((s) => s.addToast);
 
   const [result, setResult] = useState<CityTaxBackfillResponse | null>(null);
@@ -549,7 +557,7 @@ const CityTaxBackfillSection = () => {
         ) : (
           <>
             <p className="text-sm font-medium text-on-surface">
-              {t('city_tax_backfill_total', { total: result.totalAmount.toFixed(2) })}
+              {t('city_tax_backfill_total', { total: formatCurrency(result.totalAmount) })}
             </p>
             <M3Table headers={tableHeaders}>
               {result.lines.map((line) => (

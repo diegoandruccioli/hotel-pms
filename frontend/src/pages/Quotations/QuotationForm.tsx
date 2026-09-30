@@ -1,3 +1,4 @@
+import { useFormatters } from '../../hooks';
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -56,6 +57,7 @@ const OptionTab = memo(({ option, index, isActive, canRemove, total, onSelect, o
   onSelect: (index: number) => void;
   onRemove: (index: number) => void;
 }) => {
+  const { formatCurrency } = useFormatters();
   const handleSelect = useCallback(() => onSelect(index), [onSelect, index]);
   const handleRemove = useCallback(() => onRemove(index), [onRemove, index]);
   return (
@@ -69,7 +71,7 @@ const OptionTab = memo(({ option, index, isActive, canRemove, total, onSelect, o
           isActive ? 'text-on-primary-container' : 'text-on-surface-variant'
         )}
       >
-        {option.label || defaultOptionLabel(index)} · € {total.toFixed(2)}
+        {option.label || defaultOptionLabel(index)} · {formatCurrency(total)}
       </button>
       {canRemove && (
         <button
@@ -87,6 +89,7 @@ const OptionTab = memo(({ option, index, isActive, canRemove, total, onSelect, o
 OptionTab.displayName = 'OptionTab';
 
 export const QuotationForm = () => {
+  const { formatCurrency } = useFormatters();
   const { t } = useTranslation(['quotations', 'guests', 'common']);
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -499,7 +502,7 @@ export const QuotationForm = () => {
         />
         {activeOption.selectedRoomIds.length > 0 && (
           <p className="text-sm font-medium text-on-surface">
-            {t('quotation_total', { amount: `€ ${optionTotal(activeOption).toFixed(2)}` })}
+            {t('quotation_total', { amount: formatCurrency(optionTotal(activeOption)) })}
           </p>
         )}
       </M3Card>

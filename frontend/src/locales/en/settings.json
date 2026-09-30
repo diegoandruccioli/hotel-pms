@@ -96,7 +96,7 @@
   "city_tax_backfill_skip_still_unconfigured": "Still unconfigured for this date",
   "city_tax_backfill_skip_charge_failed": "Charge failed",
   "city_tax_backfill_none_found": "No unassessed stays found.",
-  "city_tax_backfill_total": "Total: € {{total}}",
+  "city_tax_backfill_total": "Total: {{total}}",
   "city_tax_backfill_success": "Charged {{count}} stays.",
   "city_tax_backfill_err_preview": "Check failed. Please try again.",
   "city_tax_backfill_err_confirm": "Charge failed. Please try again.",

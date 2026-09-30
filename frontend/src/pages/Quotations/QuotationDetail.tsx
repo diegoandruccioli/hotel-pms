@@ -1,3 +1,4 @@
+import { useFormatters } from '../../hooks';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +21,7 @@ const OptionCard = ({ option, isAccepted, isConvertChoice, selectable, onChoose 
   selectable: boolean;
   onChoose?: (optionId: string) => void;
 }) => {
+  const { formatCurrency } = useFormatters();
   const { t } = useTranslation(['quotations', 'common']);
   const handleChoose = useCallback(() => onChoose?.(option.id), [onChoose, option.id]);
 
@@ -47,11 +49,11 @@ const OptionCard = ({ option, isAccepted, isConvertChoice, selectable, onChoose 
           <M3TableRow key={li.id}>
             <M3TableCell className="py-1.5 first:pl-0 last:pr-0 text-on-surface">{li.roomNumber}</M3TableCell>
             <M3TableCell className="py-1.5 first:pl-0 last:pr-0 text-on-surface-variant">{li.roomTypeName}</M3TableCell>
-            <M3TableCell className="py-1.5 first:pl-0 last:pr-0 text-right text-on-surface-variant">€ {li.price.toFixed(2)}</M3TableCell>
+            <M3TableCell className="py-1.5 first:pl-0 last:pr-0 text-right text-on-surface-variant">{formatCurrency(li.price)}</M3TableCell>
           </M3TableRow>
         ))}
       </M3Table>
-      <p className="text-right font-medium text-on-surface">€ {option.totalPrice.toFixed(2)}</p>
+      <p className="text-right font-medium text-on-surface">{formatCurrency(option.totalPrice)}</p>
       {selectable && (
         <M3Button type="button" variant={isConvertChoice ? 'filled' : 'outlined'} onClick={handleChoose} className="w-full">
           {isConvertChoice ? t('common:selected') : t('action_choose_option')}
@@ -62,6 +64,7 @@ const OptionCard = ({ option, isAccepted, isConvertChoice, selectable, onChoose 
 };
 
 export const QuotationDetail = () => {
+  const { formatCurrency } = useFormatters();
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation(['quotations', 'common']);
   const navigate = useNavigate();
@@ -301,14 +304,14 @@ export const QuotationDetail = () => {
               <M3TableRow key={li.id}>
                 <M3TableCell className="font-medium">{li.roomNumber}</M3TableCell>
                 <M3TableCell className="text-on-surface-variant">{li.roomTypeName}</M3TableCell>
-                <M3TableCell className="text-on-surface-variant">€ {li.price.toFixed(2)}</M3TableCell>
+                <M3TableCell className="text-on-surface-variant">{formatCurrency(li.price)}</M3TableCell>
               </M3TableRow>
             ))}
           </M3Table>
         ) : null}
 
         <p className="text-right text-lg font-medium text-on-surface">
-          {t('quotation_total', { amount: `€ ${quotation.totalPrice.toFixed(2)}` })}
+          {t('quotation_total', { amount: formatCurrency(quotation.totalPrice) })}
         </p>
       </M3Card>
 

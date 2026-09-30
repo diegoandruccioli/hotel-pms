@@ -97,7 +97,7 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     renderPage();
     await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
-    expect(screen.getByText('€ 200.00')).toBeInTheDocument();
+    expect(screen.getByText('€200.00')).toBeInTheDocument();
   });
 
   it('renders empty state when no quotations', async () => {
@@ -213,7 +213,7 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([equalOptionsQuotation]) as never);
     renderPage();
     await waitFor(() => expect(screen.getByText('Anna Neri')).toBeInTheDocument());
-    expect(screen.getByText('€ 90.00')).toBeInTheDocument();
+    expect(screen.getByText('€90.00')).toBeInTheDocument();
     expect(screen.queryByText('price_range')).not.toBeInTheDocument();
   });
 

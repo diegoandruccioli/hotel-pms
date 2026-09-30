@@ -67,7 +67,7 @@ describe('SettingsCityTax', () => {
   it('shows a rate row after data loads', async () => {
     vi.mocked(stayService.getCityTaxRates).mockResolvedValue([RATE]);
     renderPage();
-    await waitFor(() => expect(screen.getByText('€ 2.50')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('€2.50')).toBeInTheDocument());
   });
 
   it('submits a new category entry and reloads the history', async () => {
