@@ -97,7 +97,7 @@ StatusFilterChip.displayName = 'StatusFilterChip';
 const EMPTY_RESULTS: InvoiceSearchResult[] = [];
 
 export const Billing = memo(() => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
   const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
@@ -207,15 +207,7 @@ export const Billing = memo(() => {
     setDetailTarget(updated);
   }, [patchInvoiceInCache]);
 
-  const { formatCurrency } = useFormatters();
-
-  const formatDate = useCallback(
-    (dateStr?: string) => {
-      if (!dateStr) return '—';
-      return new Date(dateStr).toLocaleDateString(i18n.language);
-    },
-    [i18n.language],
-  );
+  const { formatCurrency, formatDate } = useFormatters();
 
   const tView            = t('view');
   const tRegisterPayment = t('register_payment');

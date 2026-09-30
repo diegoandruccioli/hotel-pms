@@ -1,5 +1,5 @@
 import { useFormatters } from '../../hooks';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3';
 import { M3Button } from '../../components/m3';
@@ -23,17 +23,9 @@ const getStatusTone = (status: OrderStatus | string) => {
 };
 
 export const OrderDetailModal = memo(({ order, onClose }: Props) => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
 
-  const { formatCurrency } = useFormatters();
-
-  const formatDate = useCallback(
-    (dateStr?: string) => {
-      if (!dateStr) return '-';
-      return new Date(dateStr).toLocaleString(i18n.language);
-    },
-    [i18n.language],
-  );
+  const { formatCurrency, formatDate } = useFormatters();
 
   const itemHeaders = useMemo(() => [
     t('item_name'),

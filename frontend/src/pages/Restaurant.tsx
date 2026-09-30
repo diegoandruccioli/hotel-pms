@@ -120,7 +120,7 @@ const OrderActionsCell = ({ order, confirmingId, onConfirm, onView, t }: OrderAc
 };
 
 export const Restaurant = memo(() => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
   const { t: tMenu } = useTranslation('restaurant');
   const role = useAuthStore((s) => s.user?.role);
   const { addToast } = useToastStore();
@@ -225,12 +225,7 @@ export const Restaurant = memo(() => {
   const handleViewOrder = useCallback((order: RestaurantOrderResponse) => setSelectedOrder(order), []);
   const handleCloseDetail = useCallback(() => setSelectedOrder(null), []);
 
-  const { formatCurrency } = useFormatters();
-
-  const formatDate = useCallback((dateStr?: string) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleString(i18n.language);
-  }, [i18n.language]);
+  const { formatCurrency, formatDate } = useFormatters();
 
   const getOrderRowId = useCallback((o: RestaurantOrderResponse) => o.id, []);
 

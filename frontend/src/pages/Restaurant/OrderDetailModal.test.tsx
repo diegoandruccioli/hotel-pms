@@ -76,7 +76,7 @@ describe('OrderDetailModal', () => {
 
   it('shows a dash when the order date is missing', () => {
     render(<OrderDetailModal order={{ ...ORDER, orderDate: undefined } as unknown as typeof ORDER} onClose={onClose} />);
-    expect(screen.getByText('-')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
   });
 
   it.each([

@@ -29,3 +29,11 @@ export const formatCurrency = (amount: number | null | undefined, language: stri
   amount == null
     ? EMPTY_PLACEHOLDER
     : new Intl.NumberFormat(language, { style: 'currency', currency: 'EUR' }).format(amount);
+
+/** Locale date (no time); missing values render as the placeholder. */
+export const formatDate = (value: string | null | undefined, language: string): string =>
+  value ? new Date(value).toLocaleDateString(language) : EMPTY_PLACEHOLDER;
+
+/** Locale date and time; missing values render as the placeholder. */
+export const formatDateTime = (value: string | null | undefined, language: string): string =>
+  value ? new Date(value).toLocaleString(language) : EMPTY_PLACEHOLDER;
