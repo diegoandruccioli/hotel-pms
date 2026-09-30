@@ -1,3 +1,4 @@
+import { useFormatters } from '../../hooks';
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +21,7 @@ const RoomTypeRow = memo(({ rt, onEdit, onManageSeasons, t }: {
   onManageSeasons: (rt: RoomTypeResponse) => void;
   t: (k: string) => string;
 }) => {
+  const { formatCurrency } = useFormatters();
   const handleEdit = useCallback(() => {
     onEdit(rt);
   }, [onEdit, rt]);
@@ -32,7 +34,7 @@ const RoomTypeRow = memo(({ rt, onEdit, onManageSeasons, t }: {
     <M3TableRow key={rt.id}>
       <M3TableCell className="font-medium">{rt.name}</M3TableCell>
       <M3TableCell className="text-on-surface-variant font-medium">{rt.maxOccupancy}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant font-medium">€ {rt.basePrice.toFixed(2)}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant font-medium">{formatCurrency(rt.basePrice)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant max-w-xs truncate" title={rt.description}>{rt.description || '-'}</M3TableCell>
       <M3TableCell className="text-right">
         <M3TableActionLink onClick={handleManageSeasons} className="lg:mr-4">

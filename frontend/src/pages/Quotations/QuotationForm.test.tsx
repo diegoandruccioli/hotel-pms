@@ -214,7 +214,7 @@ describe('QuotationForm', () => {
     await waitFor(() => expect(inventoryService.getAvailableRooms).toHaveBeenCalledWith('2026-09-01', '2026-09-03'));
 
     fireEvent.click(screen.getByText('Toggle Room r1'));
-    await waitFor(() => expect(screen.getByText('quotation_total:€ 200.00')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('quotation_total:€200.00')).toBeInTheDocument());
   });
 
   it('resets resolved prices when getAvailableRooms rejects', async () => {
@@ -227,7 +227,7 @@ describe('QuotationForm', () => {
     await waitFor(() => expect(inventoryService.getAvailableRooms).toHaveBeenCalled());
 
     fireEvent.click(screen.getByText('Toggle Room r1'));
-    await waitFor(() => expect(screen.getByText('quotation_total:€ 0.00')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('quotation_total:€0.00')).toBeInTheDocument());
   });
 
   it('shows an error banner when the initial data fails to load', async () => {
@@ -385,7 +385,7 @@ describe('QuotationForm', () => {
     fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-09-04' } });
     fireEvent.click(screen.getByText('Toggle Room r1'));
 
-    await waitFor(() => expect(screen.getByText('quotation_total:€ 300.00')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('quotation_total:€300.00')).toBeInTheDocument());
   });
 
   it('passes axe accessibility check', async () => {

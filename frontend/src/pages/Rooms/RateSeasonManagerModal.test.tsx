@@ -59,7 +59,7 @@ describe('RateSeasonManagerModal', () => {
     vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
-    expect(screen.getByText('€ 150.00')).toBeInTheDocument();
+    expect(screen.getByText('€150.00')).toBeInTheDocument();
   });
 
   it('add_rate_season opens the form', async () => {

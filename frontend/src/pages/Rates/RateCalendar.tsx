@@ -1,3 +1,4 @@
+import { useFormatters } from '../../hooks';
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from 'date-fns';
@@ -51,6 +52,7 @@ LegendEntry.displayName = 'LegendEntry';
 export const RateCalendar = () => {
   const { t, i18n } = useTranslation(['common']);
   const locale = dateFnsLocale(i18n.language);
+  const { formatCurrency } = useFormatters();
   const role = useAuthStore((s) => s.user?.role);
   const canApplyPrice = role === 'ADMIN' || role === 'OWNER';
 
@@ -298,7 +300,7 @@ export const RateCalendar = () => {
                       className="border-b border-outline-variant flex flex-col justify-center px-4 bg-surface-container-low"
                     >
                       <span className="font-display font-bold text-on-surface truncate">{row.roomTypeName}</span>
-                      <span className="text-xs text-on-surface-variant">€ {row.basePrice.toFixed(2)}</span>
+                      <span className="text-xs text-on-surface-variant">{formatCurrency(row.basePrice)}</span>
                     </div>
                   ))}
                 </div>
@@ -317,7 +319,7 @@ export const RateCalendar = () => {
                             && dayIndex >= bounds.dayMin && dayIndex <= bounds.dayMax}
                           isToday={isSameDay(new Date(day.date), new Date())}
                           seasonColor={day.rateSeasonId ? seasonColors.get(day.rateSeasonId) : undefined}
-                          ariaLabel={`${row.roomTypeName}, ${format(new Date(day.date), 'd MMMM', { locale })}, € ${day.price.toFixed(2)}${day.seasonName ? ` — ${day.seasonName}` : ''}`}
+                          ariaLabel={`${row.roomTypeName}, ${format(new Date(day.date), 'd MMMM', { locale })}, ${formatCurrency(day.price)}${day.seasonName ? ` — ${day.seasonName}` : ''}`}
                           onPointerDown={canApplyPrice ? handlePointerDown : noop}
                           onPointerEnter={canApplyPrice ? handlePointerEnter : noop}
                           onKeyboardSelect={canApplyPrice ? handleKeyboardSelect : noop}

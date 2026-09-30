@@ -65,7 +65,7 @@ describe('RateCalendar', () => {
     vi.mocked(rateSeasonService.getRateCalendar).mockResolvedValue(CALENDAR);
     render(<RateCalendar />);
     await waitFor(() => expect(screen.getByText('Double')).toBeInTheDocument());
-    expect(screen.getByText('€ 90.00')).toBeInTheDocument();
+    expect(screen.getByText('€90.00')).toBeInTheDocument();
   });
 
   it('shows the apply-price button for ADMIN', async () => {

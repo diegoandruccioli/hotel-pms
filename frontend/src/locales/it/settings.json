@@ -96,7 +96,7 @@
   "city_tax_backfill_skip_still_unconfigured": "Ancora non configurato per questa data",
   "city_tax_backfill_skip_charge_failed": "Addebito non riuscito",
   "city_tax_backfill_none_found": "Nessun soggiorno scoperto trovato.",
-  "city_tax_backfill_total": "Totale: € {{total}}",
+  "city_tax_backfill_total": "Totale: {{total}}",
   "city_tax_backfill_success": "Addebitati {{count}} soggiorni.",
   "city_tax_backfill_err_preview": "Verifica non riuscita. Riprova.",
   "city_tax_backfill_err_confirm": "Addebito non riuscito. Riprova.",
