@@ -1,3 +1,4 @@
+import { useFormatters } from '../hooks';
 import { useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { GroupCheckoutOutcome, GroupMemberResponse } from '../types';
@@ -16,7 +17,7 @@ import {
 } from '../hooks/queries';
 
 export const ReservationGroupDetail = () => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const addToast = useToastStore((s) => s.addToast);
@@ -30,11 +31,7 @@ export const ReservationGroupDetail = () => {
   const checkoutGroup = useCheckoutReservationGroup();
   const error = queryError ? getErrorMessage(queryError, t('group_load_failed')) : null;
 
-  const formatCurrency = useCallback((amount: number | null) =>
-    amount === null
-      ? '—'
-      : new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(amount),
-  [i18n.language]);
+  const { formatCurrency } = useFormatters();
 
   const getMemberStatusLabel = useCallback(
     (status: string) => t(`status_${status.toLowerCase()}`, status),

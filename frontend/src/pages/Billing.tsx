@@ -13,7 +13,7 @@ import { PaymentModal } from './Billing/PaymentModal';
 import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useTranslation } from 'react-i18next';
 import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries';
-import { useDebounce } from '../hooks';
+import { useDebounce, useFormatters } from '../hooks';
 import { getErrorMessage, cn, invoiceStatusTone } from '../utils';
 import { billingService } from '../services';
 import { useAuthStore, useToastStore } from '../store';
@@ -207,11 +207,7 @@ export const Billing = memo(() => {
     setDetailTarget(updated);
   }, [patchInvoiceInCache]);
 
-  const formatCurrency = useCallback(
-    (amount: number) =>
-      new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(amount),
-    [i18n.language],
-  );
+  const { formatCurrency } = useFormatters();
 
   const formatDate = useCallback(
     (dateStr?: string) => {

@@ -1,3 +1,4 @@
+import { useFormatters } from '../../hooks';
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3';
@@ -22,7 +23,7 @@ const PRESETS = ['MINIBAR', 'LAUNDRY', 'PARKING', 'LATE_CHECKOUT', 'OTHER'] as c
 type Preset = (typeof PRESETS)[number];
 
 export const AddChargeModal = memo(({ invoice, stayId, onClose, onAdded }: Props) => {
-  const { t, i18n } = useTranslation(['billing', 'common']);
+  const { t } = useTranslation(['billing', 'common']);
   const addToast = useToastStore((s) => s.addToast);
 
   const [preset, setPreset] = useState<Preset>('MINIBAR');
@@ -32,14 +33,7 @@ export const AddChargeModal = memo(({ invoice, stayId, onClose, onAdded }: Props
   const [amountError, setAmountError] = useState('');
   const [descriptionError, setDescriptionError] = useState('');
 
-  const formatCurrency = useCallback(
-    (val: number) =>
-      new Intl.NumberFormat(i18n.language, {
-        style: 'currency',
-        currency: 'EUR',
-      }).format(val),
-    [i18n.language],
-  );
+  const { formatCurrency } = useFormatters();
 
   const handlePresetChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => setPreset(e.target.value as Preset),

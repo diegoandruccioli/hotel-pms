@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { it as itLocale, enUS } from 'date-fns/locale';
-import { addDaysIso, dateFnsLocale, todayIsoDate, toIsoDate } from './format';
+import { addDaysIso, dateFnsLocale, EMPTY_PLACEHOLDER, formatCurrency, todayIsoDate, toIsoDate } from './format';
 
 describe('toIsoDate', () => {
   it('formats the local calendar date with zero padding', () => {
@@ -42,5 +42,24 @@ describe('dateFnsLocale', () => {
   it('falls back to English', () => {
     expect(dateFnsLocale('en')).toBe(enUS);
     expect(dateFnsLocale('fr')).toBe(enUS);
+  });
+});
+
+describe('formatCurrency', () => {
+  const nbsp = (value: string) => value.replace(/\u00A0/g, ' ');
+
+  it('formats euros in English and Italian', () => {
+    expect(formatCurrency(1234.5, 'en')).toBe('€1,234.50');
+    expect(nbsp(formatCurrency(12345.5, 'it'))).toBe('12.345,50 €');
+  });
+
+  it('formats zero and negative amounts', () => {
+    expect(formatCurrency(0, 'en')).toBe('€0.00');
+    expect(formatCurrency(-5, 'en')).toBe('-€5.00');
+  });
+
+  it('renders the placeholder for null and undefined', () => {
+    expect(formatCurrency(null, 'en')).toBe(EMPTY_PLACEHOLDER);
+    expect(formatCurrency(undefined, 'it')).toBe(EMPTY_PLACEHOLDER);
   });
 });

@@ -1,3 +1,4 @@
+import { useFormatters } from '../../hooks';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3';
@@ -24,11 +25,7 @@ const getStatusTone = (status: OrderStatus | string) => {
 export const OrderDetailModal = memo(({ order, onClose }: Props) => {
   const { t, i18n } = useTranslation('common');
 
-  const formatCurrency = useCallback(
-    (val: number) =>
-      new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(val),
-    [i18n.language],
-  );
+  const { formatCurrency } = useFormatters();
 
   const formatDate = useCallback(
     (dateStr?: string) => {

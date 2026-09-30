@@ -1,3 +1,4 @@
+import { useFormatters } from '../hooks';
 import { useState, useCallback, memo, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { MenuItemResponse, RestaurantOrderResponse, OrderStatus } from '../types';
@@ -224,9 +225,7 @@ export const Restaurant = memo(() => {
   const handleViewOrder = useCallback((order: RestaurantOrderResponse) => setSelectedOrder(order), []);
   const handleCloseDetail = useCallback(() => setSelectedOrder(null), []);
 
-  const formatCurrency = useCallback((amount: number) => {
-    return new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(amount);
-  }, [i18n.language]);
+  const { formatCurrency } = useFormatters();
 
   const formatDate = useCallback((dateStr?: string) => {
     if (!dateStr) return '-';

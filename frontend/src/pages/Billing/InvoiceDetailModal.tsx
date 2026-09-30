@@ -1,3 +1,4 @@
+import { useFormatters } from '../../hooks';
 import { useCallback, memo, useState } from 'react';
 import { billingService } from '../../services';
 import { useToastStore } from '../../store';
@@ -179,14 +180,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
     [handleRemoveChargeAsync],
   );
 
-  const formatCurrency = useCallback(
-    (val: number) =>
-      new Intl.NumberFormat(i18n.language, {
-        style: 'currency',
-        currency: 'EUR',
-      }).format(val),
-    [i18n.language],
-  );
+  const { formatCurrency } = useFormatters();
 
   const formatDateTime = useCallback(
     (dateStr?: string) => {

@@ -1,3 +1,4 @@
+import { useFormatters } from '../../hooks';
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3';
@@ -24,7 +25,7 @@ const PAYMENT_METHODS: PaymentMethod[] = [
 ];
 
 export const PaymentModal = memo(({ invoice, onClose, onPaid }: Props) => {
-  const { t, i18n } = useTranslation(['billing', 'common']);
+  const { t } = useTranslation(['billing', 'common']);
   const addToast = useToastStore((s) => s.addToast);
 
   const [amount, setAmount] = useState(String(invoice.totalAmount));
@@ -33,14 +34,7 @@ export const PaymentModal = memo(({ invoice, onClose, onPaid }: Props) => {
   const [loading, setLoading] = useState(false);
   const [amountError, setAmountError] = useState('');
 
-  const formatCurrency = useCallback(
-    (val: number) =>
-      new Intl.NumberFormat(i18n.language, {
-        style: 'currency',
-        currency: 'EUR',
-      }).format(val),
-    [i18n.language],
-  );
+  const { formatCurrency } = useFormatters();
 
   const handleAmountChange = useCallback((val: string) => {
     setAmount(val);
