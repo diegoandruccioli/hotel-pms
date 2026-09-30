@@ -7,6 +7,7 @@ import { MaterialIcon } from './components/MaterialIcon';
 import { useAuthStore } from './store';
 import { authService } from './services';
 import { useTranslation } from 'react-i18next';
+import { OWNER_ADMIN_ROLES, NIGHT_AUDIT_ROLES } from './config/navigation';
 
 const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
@@ -40,12 +41,6 @@ const SettingsAppearance = lazy(() => import('./pages/Settings/SettingsAppearanc
 const SettingsSystem = lazy(() => import('./pages/Settings/SettingsSystem').then((m) => ({ default: m.SettingsSystem })));
 const SettingsCityTax = lazy(() => import('./pages/Settings/SettingsCityTax').then((m) => ({ default: m.SettingsCityTax })));
 const SettingsPrivacy = lazy(() => import('./pages/Settings/SettingsPrivacy').then((m) => ({ default: m.SettingsPrivacy })));
-
-const OWNER_ADMIN_ROLES = ['OWNER', 'ADMIN'] as const;
-/** Night audit is night-shift front-desk work in practice, not ownership —
- * open to RECEPTIONIST too, unlike the rest of the owner-only routes below
- * (GAP-26 in THREAT_MODEL.md; backend @PreAuthorize widened to match). */
-const NIGHT_AUDIT_ROLES = ['OWNER', 'ADMIN', 'RECEPTIONIST'] as const;
 
 function App() {
   const { t } = useTranslation('common');

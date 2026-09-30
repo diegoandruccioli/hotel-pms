@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, memo } from 'react';
+import { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store';
 import { authService } from '../services';
@@ -12,29 +12,8 @@ import { useEscapeKey } from '../hooks';
 import { useServerEvents } from '../hooks';
 import * as FocusTrapModule from 'focus-trap-react';
 import { cn } from '../utils';
+import { getSidebarEntries, type NavEntry } from '../config/navigation';
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
-
-const navigation = [
-  { nameKey: 'dashboard', href: '/', icon: 'dashboard' },
-  { nameKey: 'guests', href: '/guests', icon: 'group' },
-  { nameKey: 'reservations', href: '/reservations', icon: 'event' },
-  { nameKey: 'reservation_groups', href: '/reservations/groups', icon: 'groups' },
-  { nameKey: 'quotations', href: '/quotations', icon: 'request_quote' },
-  { nameKey: 'calendar', href: '/calendar', icon: 'date_range' },
-  { nameKey: 'stays', href: '/stays', icon: 'hotel' },
-  { nameKey: 'housekeeping', href: '/housekeeping', icon: 'cleaning_services' },
-  { nameKey: 'night_audit', href: '/night-audit', icon: 'fact_check' },
-  { nameKey: 'billing', href: '/billing', icon: 'receipt_long' },
-  { nameKey: 'restaurant', href: '/restaurant', icon: 'restaurant' },
-  { nameKey: 'rooms', href: '/rooms', icon: 'meeting_room' },
-  { nameKey: 'rates', href: '/rates', icon: 'payments' },
-];
-
-// Night audit moved into `navigation` above (GAP-26, THREAT_MODEL.md) — it's
-// night-shift front-desk work, open to RECEPTIONIST, not ownership-only.
-const ownerNavigation = [
-  { nameKey: 'owner_dashboard', href: '/owner-dashboard', icon: 'bar_chart' },
-];
 
 // BUG-7 (docs/LIVE_E2E_AUDIT_2026-07.md): the sidebar had no focus-visible
 // ring at all, unlike the skip-link — same recipe as M3Button/M3TableActionLink
@@ -67,12 +46,12 @@ const RailNavItem = memo(({
   label,
   end,
 }: {
-  item: { nameKey: string; href: string; icon: string };
+  item: NavEntry;
   label: string;
   end?: boolean;
 }) => (
   <NavLink
-    to={item.href}
+    to={item.path}
     end={end}
     className={getRailNavItemClasses}
   >
@@ -106,13 +85,13 @@ const DrawerNavItem = memo(({
   end,
   onClose,
 }: {
-  item: { nameKey: string; href: string; icon: string };
+  item: NavEntry;
   label: string;
   end?: boolean;
   onClose: () => void;
 }) => (
   <NavLink
-    to={item.href}
+    to={item.path}
     end={end}
     onClick={onClose}
     className={getDrawerNavItemClasses}
@@ -175,7 +154,9 @@ export const MainLayout = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const isOwnerOrAdmin = user?.role === 'OWNER' || user?.role === 'ADMIN';
+  const sidebarEntries = useMemo(() => getSidebarEntries(user?.role), [user?.role]);
+  const mainEntries    = useMemo(() => sidebarEntries.filter((e) => !e.separated), [sidebarEntries]);
+  const adminEntries   = useMemo(() => sidebarEntries.filter((e) => e.separated), [sidebarEntries]);
   const username       = user?.username ?? t('guest');
   const roleLabel      = user?.role ? t(`role_${user.role.toLowerCase()}`) : t('role_guest');
 
@@ -209,24 +190,24 @@ export const MainLayout = () => {
               </div>
 
               <div className="flex-1 pt-2 pb-4 space-y-0.5">
-                {navigation.map((item) => (
+                {mainEntries.map((item) => (
                   <DrawerNavItem
-                    key={item.nameKey}
+                    key={item.id}
                     item={item}
-                    label={t(`nav_${item.nameKey}`)}
-                    end={item.href === '/'}
+                    label={t(item.labelKey)}
+                    end={item.path === '/'}
                     onClose={closeDrawer}
                   />
                 ))}
 
-                {isOwnerOrAdmin && (
+                {adminEntries.length > 0 && (
                   <>
                     <div className="my-2 mx-4 border-t border-outline-variant" />
-                    {ownerNavigation.map((item) => (
+                    {adminEntries.map((item) => (
                       <DrawerNavItem
-                        key={item.nameKey}
+                        key={item.id}
                         item={item}
-                        label={t(`nav_${item.nameKey}`)}
+                        label={t(item.labelKey)}
                         onClose={closeDrawer}
                       />
                     ))}
@@ -245,23 +226,23 @@ export const MainLayout = () => {
         </div>
 
         <nav className="flex flex-col items-center gap-0.5 flex-1 w-full">
-          {navigation.map((item) => (
+          {mainEntries.map((item) => (
             <RailNavItem
-              key={item.nameKey}
+              key={item.id}
               item={item}
-              label={t(`nav_${item.nameKey}`)}
-              end={item.href === '/'}
+              label={t(item.labelKey)}
+              end={item.path === '/'}
             />
           ))}
 
-          {isOwnerOrAdmin && (
+          {adminEntries.length > 0 && (
             <>
               <div className="w-8 my-1.5 border-t border-outline-variant" />
-              {ownerNavigation.map((item) => (
+              {adminEntries.map((item) => (
                 <RailNavItem
-                  key={item.nameKey}
+                  key={item.id}
                   item={item}
-                  label={t(`nav_${item.nameKey}`)}
+                  label={t(item.labelKey)}
                 />
               ))}
             </>
