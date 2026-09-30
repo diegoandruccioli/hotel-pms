@@ -50,6 +50,20 @@ describe('RouteAnnouncer', () => {
     });
   });
 
+  it('announces night audit instead of falling back to the dashboard', async () => {
+    renderAt('/night-audit');
+    await waitFor(() => {
+      expect(screen.getByText('nav_night_audit')).toBeInTheDocument();
+    });
+  });
+
+  it('announces reservation groups, not the parent reservations section', async () => {
+    renderAt('/reservations/groups');
+    await waitFor(() => {
+      expect(screen.getByText('nav_reservation_groups')).toBeInTheDocument();
+    });
+  });
+
   it('falls back to the dashboard label for an unmapped path', async () => {
     renderAt('/some-unknown-path');
     await waitFor(() => {

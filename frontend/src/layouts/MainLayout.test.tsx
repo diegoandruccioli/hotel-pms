@@ -87,6 +87,12 @@ describe('MainLayout', () => {
     expect(screen.getAllByText('nav_night_audit').length).toBeGreaterThan(0);
   });
 
+  it('hides the night-audit nav item from a GUEST (route is closed to that role)', () => {
+    mockAuthStore({ sub: '3', username: 'carol', role: 'GUEST' });
+    renderLayout();
+    expect(screen.queryByText('nav_night_audit')).not.toBeInTheDocument();
+  });
+
   it('opens the mobile drawer from the hamburger button', () => {
     mockAuthStore(RECEPTIONIST);
     renderLayout();

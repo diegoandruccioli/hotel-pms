@@ -5,53 +5,11 @@ import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
 import { useAuthStore } from '../store';
 import { useCommandPaletteGuests, useCommandPaletteReservations } from '../hooks/queries';
-import type { Role } from '../types';
+import { getPaletteEntries, type NavEntry } from '../config/navigation';
 import type { GuestResponseDTO } from '../types';
 import type { ReservationResponse } from '../types';
 
-const OWNER_ADMIN_ROLES = ['OWNER', 'ADMIN'] as const;
-/** Night audit is night-shift front-desk work, open to RECEPTIONIST too —
- * see GAP-26 in THREAT_MODEL.md. */
-const NIGHT_AUDIT_ROLES = ['OWNER', 'ADMIN', 'RECEPTIONIST'] as const;
 const SEARCH_DEBOUNCE_MS = 300;
-
-interface NavItem {
-  id: string;
-  href: string;
-  icon: string;
-  labelKey: string;
-  ns: 'common' | 'settings';
-  allowedRoles?: readonly Role[];
-}
-
-/** Every static, directly-navigable route in the app (same set App.tsx
- * routes and MainLayout's sidebar + Settings hub cover), collected in one
- * place so the palette doesn't drift from either as routes change. */
-const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', href: '/', icon: 'dashboard', labelKey: 'nav_dashboard', ns: 'common' },
-  { id: 'guests', href: '/guests', icon: 'group', labelKey: 'nav_guests', ns: 'common' },
-  { id: 'reservations', href: '/reservations', icon: 'event', labelKey: 'nav_reservations', ns: 'common' },
-  { id: 'reservation-groups', href: '/reservations/groups', icon: 'groups', labelKey: 'nav_reservation_groups', ns: 'common' },
-  { id: 'quotations', href: '/quotations', icon: 'request_quote', labelKey: 'nav_quotations', ns: 'common' },
-  { id: 'calendar', href: '/calendar', icon: 'date_range', labelKey: 'nav_calendar', ns: 'common' },
-  { id: 'stays', href: '/stays', icon: 'hotel', labelKey: 'nav_stays', ns: 'common' },
-  { id: 'housekeeping', href: '/housekeeping', icon: 'cleaning_services', labelKey: 'nav_housekeeping', ns: 'common' },
-  { id: 'billing', href: '/billing', icon: 'receipt_long', labelKey: 'nav_billing', ns: 'common' },
-  { id: 'restaurant', href: '/restaurant', icon: 'restaurant', labelKey: 'nav_restaurant', ns: 'common' },
-  { id: 'rooms', href: '/rooms', icon: 'meeting_room', labelKey: 'nav_rooms', ns: 'common' },
-  { id: 'rates', href: '/rates', icon: 'payments', labelKey: 'nav_rates', ns: 'common' },
-  { id: 'owner-dashboard', href: '/owner-dashboard', icon: 'bar_chart', labelKey: 'nav_owner_dashboard', ns: 'common', allowedRoles: OWNER_ADMIN_ROLES },
-  { id: 'night-audit', href: '/night-audit', icon: 'fact_check', labelKey: 'nav_night_audit', ns: 'common', allowedRoles: NIGHT_AUDIT_ROLES },
-  { id: 'settings', href: '/settings', icon: 'settings', labelKey: 'settings', ns: 'settings' },
-  { id: 'settings-profile', href: '/settings/profile', icon: 'person', labelKey: 'my_profile', ns: 'settings' },
-  { id: 'settings-password', href: '/settings/password', icon: 'lock', labelKey: 'change_password', ns: 'settings' },
-  { id: 'settings-accessibility', href: '/settings/accessibility', icon: 'accessibility_new', labelKey: 'settings_section_accessibility', ns: 'settings' },
-  { id: 'settings-appearance', href: '/settings/appearance', icon: 'palette', labelKey: 'settings_appearance_language_title', ns: 'settings' },
-  { id: 'settings-system', href: '/settings/system', icon: 'admin_panel_settings', labelKey: 'settings_section_system', ns: 'settings', allowedRoles: OWNER_ADMIN_ROLES },
-  { id: 'hotel-profile', href: '/profile/hotel', icon: 'apartment', labelKey: 'settings_section_hotel_profile', ns: 'settings', allowedRoles: OWNER_ADMIN_ROLES },
-  { id: 'admin-users', href: '/admin/users', icon: 'manage_accounts', labelKey: 'settings_section_admin_users', ns: 'settings', allowedRoles: OWNER_ADMIN_ROLES },
-  { id: 'settings-city-tax', href: '/settings/city-tax', icon: 'account_balance', labelKey: 'settings_section_city_tax', ns: 'settings', allowedRoles: OWNER_ADMIN_ROLES },
-];
 
 const ITEM_CLASS =
   'flex items-center gap-3 px-4 py-3 rounded-shape-sm text-sm font-body text-on-surface cursor-pointer aria-selected:bg-primary-container aria-selected:text-on-primary-container';
@@ -91,10 +49,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   const { data: guestResults } = useCommandPaletteGuests(debouncedSearch);
   const { data: reservationResults } = useCommandPaletteReservations(debouncedSearch);
 
-  const visibleNavItems = useMemo(
-    () => NAV_ITEMS.filter((item) => !item.allowedRoles || (role && item.allowedRoles.includes(role))),
-    [role],
-  );
+  const visibleNavItems = useMemo(() => getPaletteEntries(role), [role]);
 
   const goTo = useCallback((href: string, state?: Record<string, unknown>) => {
     navigate(href, state ? { state } : undefined);
@@ -183,13 +138,13 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
 };
 
 const NavCommandItem = ({ item, onSelect, tCommon, tSettings }: {
-  item: NavItem;
+  item: NavEntry;
   onSelect: (href: string) => void;
   tCommon: (key: string) => string;
   tSettings: (key: string) => string;
 }) => {
   const label = item.ns === 'common' ? tCommon(item.labelKey) : tSettings(item.labelKey);
-  const handleSelect = useCallback(() => onSelect(item.href), [onSelect, item.href]);
+  const handleSelect = useCallback(() => onSelect(item.path), [onSelect, item.path]);
   const keywords = useMemo(() => [label], [label]);
   return (
     <Command.Item value={`nav-${item.id}-${label}`} onSelect={handleSelect} className={ITEM_CLASS} keywords={keywords}>

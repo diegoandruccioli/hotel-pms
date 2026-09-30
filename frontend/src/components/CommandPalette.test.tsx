@@ -114,6 +114,17 @@ describe('CommandPalette', () => {
     expect(screen.getByText('nav_night_audit')).toBeInTheDocument();
   });
 
+  it('lists the privacy settings entry for an ADMIN only', () => {
+    mockAuthStore(ADMIN);
+    const { unmount } = renderWithQuery(<CommandPalette open onClose={vi.fn()} />);
+    expect(screen.getByText('settings_section_privacy')).toBeInTheDocument();
+    unmount();
+
+    mockAuthStore(RECEPTIONIST);
+    renderWithQuery(<CommandPalette open onClose={vi.fn()} />);
+    expect(screen.queryByText('settings_section_privacy')).not.toBeInTheDocument();
+  });
+
   it('navigates when a nav item is selected', () => {
     const onClose = vi.fn();
     renderWithQuery(<CommandPalette open onClose={onClose} />);
