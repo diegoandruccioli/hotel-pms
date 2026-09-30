@@ -86,7 +86,7 @@ const InvoiceRow = memo(({
 InvoiceRow.displayName = 'InvoiceRow';
 
 export const OwnerDashboard = memo(() => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
   const [startDate, setStartDate] = useState(getFirstDayOfMonth());
@@ -96,12 +96,7 @@ export const OwnerDashboard = memo(() => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { formatCurrency } = useFormatters();
-
-  const formatDate = useCallback((dateStr?: string) => {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString(i18n.language);
-  }, [i18n.language]);
+  const { formatCurrency, formatDate } = useFormatters();
 
   const formatStatus = useCallback((status: InvoiceResponse['status']) =>
     t(`invoice_status_${status}`),

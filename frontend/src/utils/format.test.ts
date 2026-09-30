@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { it as itLocale, enUS } from 'date-fns/locale';
-import { addDaysIso, dateFnsLocale, EMPTY_PLACEHOLDER, formatCurrency, todayIsoDate, toIsoDate } from './format';
+import { addDaysIso, dateFnsLocale, EMPTY_PLACEHOLDER, formatCurrency, formatDate, formatDateTime, todayIsoDate, toIsoDate } from './format';
 
 describe('toIsoDate', () => {
   it('formats the local calendar date with zero padding', () => {
@@ -61,5 +61,22 @@ describe('formatCurrency', () => {
   it('renders the placeholder for null and undefined', () => {
     expect(formatCurrency(null, 'en')).toBe(EMPTY_PLACEHOLDER);
     expect(formatCurrency(undefined, 'it')).toBe(EMPTY_PLACEHOLDER);
+  });
+});
+
+describe('formatDate / formatDateTime', () => {
+  it('formats a date without time', () => {
+    expect(formatDate('2026-08-20T10:30:00', 'en')).toBe('8/20/2026');
+    expect(formatDate('2026-08-20T10:30:00', 'it')).toBe('20/08/2026');
+  });
+
+  it('formats date and time', () => {
+    expect(formatDateTime('2026-08-20T10:30:00', 'en')).toBe(new Date('2026-08-20T10:30:00').toLocaleString('en'));
+    expect(formatDateTime('2026-08-20T10:30:00', 'en')).toContain('10:30');
+  });
+
+  it.each([undefined, null, ''])('renders the placeholder for %s', (value) => {
+    expect(formatDate(value, 'en')).toBe(EMPTY_PLACEHOLDER);
+    expect(formatDateTime(value, 'en')).toBe(EMPTY_PLACEHOLDER);
   });
 });

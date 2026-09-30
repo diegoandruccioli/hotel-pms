@@ -29,7 +29,7 @@ import {
   useRetryInvoiceCreation,
   useRetryCheckoutEmail,
 } from '../hooks/queries';
-import { useDebounce } from '../hooks';
+import { useDebounce, useFormatters } from '../hooks';
 
 type StaySortField = 'actualCheckInTime' | 'expectedCheckOutDate' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -188,7 +188,7 @@ interface StaysNavState {
 const EMPTY_STAYS: StayResponse[] = [];
 
 export const Stays = memo(() => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
   const navigate = useNavigate();
   const location = useLocation();
   const navState = location.state as StaysNavState | null;
@@ -305,10 +305,7 @@ export const Stays = memo(() => {
     [t],
   );
   
-  const formatDate = useCallback((dateStr?: string) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleString(i18n.language);
-  }, [i18n.language]);
+  const { formatDate } = useFormatters();
 
   const getStayRowId = useCallback((s: StayResponse) => s.id, []);
 

@@ -84,7 +84,7 @@ const ChargeRow = memo(({ charge, removable, removing, formatCurrency, onRemove 
 ChargeRow.displayName = 'ChargeRow';
 
 export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) => {
-  const { t, i18n } = useTranslation(['billing', 'common']);
+  const { t } = useTranslation(['billing', 'common']);
   const addToast = useToastStore((s) => s.addToast);
   const [switchingType, setSwitchingType] = useState(false);
   const [validatingXml, setValidatingXml] = useState(false);
@@ -180,15 +180,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
     [handleRemoveChargeAsync],
   );
 
-  const { formatCurrency } = useFormatters();
-
-  const formatDateTime = useCallback(
-    (dateStr?: string) => {
-      if (!dateStr) return '—';
-      return new Date(dateStr).toLocaleString(i18n.language);
-    },
-    [i18n.language],
-  );
+  const { formatCurrency, formatDateTime } = useFormatters();
 
   const totalPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
 
