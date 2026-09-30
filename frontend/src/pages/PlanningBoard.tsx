@@ -300,7 +300,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-display font-bold text-on-surface">{room.roomNumber}</span>
-                    <div className={cn('w-2 h-2 rounded-full', room.status === 'CLEAN' ? 'bg-success' : room.status === 'DIRTY' ? 'bg-error' : 'bg-warning')} />
+                    <div className={cn('w-2 h-2 rounded-full', room.status === 'CLEAN' ? 'bg-tertiary' : room.status === 'DIRTY' ? 'bg-error' : 'bg-secondary')} />
                   </div>
                   <span className="text-xs text-on-surface-variant line-clamp-1">{room.roomType.name}</span>
                 </div>

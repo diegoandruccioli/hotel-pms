@@ -278,7 +278,7 @@ export const Billing = memo(() => {
   return (
     <div className="space-y-6">
       {PILOT_MODE && (
-        <div role="status" className="flex items-start gap-3 rounded-2xl bg-warning-container text-on-warning-container px-4 py-3 text-sm font-medium">
+        <div role="status" className="flex items-start gap-3 rounded-2xl bg-secondary-container text-on-secondary-container px-4 py-3 text-sm font-medium">
           <MaterialIcon name="warning" size={18} className="mt-0.5 shrink-0" />
           {t('pilot_mode_fiscal_banner')}
         </div>

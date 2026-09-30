@@ -82,7 +82,7 @@ const RoomsCell = ({ reservation, rooms }: { reservation: ReservationResponse; r
 const GuestsCountCell = ({ reservation }: { reservation: ReservationResponse }) => (
   <div className={cn(
     'font-medium flex items-center gap-1.5',
-    (reservation.actualGuests || 0) < reservation.expectedGuests ? 'text-warning' :
+    (reservation.actualGuests || 0) < reservation.expectedGuests ? 'text-secondary' :
     (reservation.actualGuests || 0) > reservation.expectedGuests ? 'text-error' :
     'text-on-surface'
   )}>

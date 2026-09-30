@@ -222,7 +222,7 @@ export const ReservationGroupDetail = () => {
                     <MaterialIcon
                       name={outcome.success ? 'check_circle' : 'error'}
                       size={16}
-                      className={outcome.success ? 'text-success' : 'text-error'}
+                      className={outcome.success ? 'text-tertiary' : 'text-error'}
                     />
                     <span>{outcome.success ? t('checkout_room_success') : (outcome.errorCode ?? t('checkout_room_failed'))}</span>
                   </li>
