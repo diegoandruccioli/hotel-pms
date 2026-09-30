@@ -1,3 +1,4 @@
+import { useFormatters } from '../hooks';
 import { useState, useCallback, useMemo, memo } from 'react';
 import { billingReportService } from '../services';
 import { useAuthStore } from '../store';
@@ -95,9 +96,7 @@ export const OwnerDashboard = memo(() => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const formatCurrency = useCallback((amount: number) =>
-    new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(amount),
-  [i18n.language]);
+  const { formatCurrency } = useFormatters();
 
   const formatDate = useCallback((dateStr?: string) => {
     if (!dateStr) return '—';

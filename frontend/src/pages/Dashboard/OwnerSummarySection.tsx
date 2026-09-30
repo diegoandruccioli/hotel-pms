@@ -1,3 +1,4 @@
+import { useFormatters } from '../../hooks';
 import { todayIsoDate } from '../../utils';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -24,8 +25,7 @@ export const OwnerSummarySection = () => {
   const today = useMemo(() => todayIsoDate(), []);
   const { data: kpiReport, isLoading } = useKpiReport(today, today, 'DAY', true);
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(amount);
+  const { formatCurrency } = useFormatters();
   const formatPercent = (fraction: number) =>
     new Intl.NumberFormat(i18n.language, { style: 'percent', maximumFractionDigits: 0 }).format(fraction);
 

@@ -1,3 +1,4 @@
+import { useFormatters } from '../../hooks';
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3';
@@ -77,7 +78,7 @@ const MenuItemRow = memo(
 MenuItemRow.displayName = 'MenuItemRow';
 
 export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
   const addToast = useToastStore((s) => s.addToast);
 
   const [stayId, setStayId] = useState('');
@@ -105,11 +106,7 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
       .finally(() => setStaysLoading(false));
   }, []);
 
-  const formatCurrency = useCallback(
-    (val: number) =>
-      new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(val),
-    [i18n.language],
-  );
+  const { formatCurrency } = useFormatters();
 
   const handleStayIdChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setStayId(e.target.value);

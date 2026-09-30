@@ -1,3 +1,4 @@
+import { useFormatters } from '../hooks';
 import { useEffect, useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store';
@@ -39,7 +40,8 @@ interface StatCardConfig {
 }
 
 export const Dashboard = () => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
+  const { formatCurrency } = useFormatters();
   const user = useAuthStore((state) => state.user);
   const isOwnerOrAdmin = user?.role === 'OWNER' || user?.role === 'ADMIN';
 
@@ -102,13 +104,12 @@ export const Dashboard = () => {
     if (!isOwnerOrAdmin || !ownerSummary) return null;
     return {
       nameKey: 'stat_pending_revenue',
-      stat: new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' })
-        .format(ownerSummary.pendingRevenue),
+      stat: formatCurrency(ownerSummary.pendingRevenue),
       icon: 'receipt_long',
       containerClass: 'bg-error-container text-on-error-container',
       href: '/billing',
     };
-  }, [isOwnerOrAdmin, ownerSummary, i18n.language]);
+  }, [isOwnerOrAdmin, ownerSummary, formatCurrency]);
 
   const allStats = useMemo<StatCardConfig[]>(
     () => (ownerStat ? [...universalStats, ownerStat] : universalStats),

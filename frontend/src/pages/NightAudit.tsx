@@ -1,3 +1,4 @@
+import { useFormatters } from '../hooks';
 import { useState, useCallback, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { NightAuditRunResponse } from '../types';
@@ -112,7 +113,7 @@ const NightAuditPreCheck = ({ businessDate }: { businessDate: string }) => {
 };
 
 export const NightAudit = () => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
   const addToast = useToastStore((s) => s.addToast);
 
   const [page, setPage] = useState(0);
@@ -125,9 +126,7 @@ export const NightAudit = () => {
   const totalPages = historyPage?.totalPages ?? 1;
   const error = queryError ? getErrorMessage(queryError, t('night_audit_load_failed')) : null;
 
-  const formatCurrency = useCallback((amount: number) =>
-    new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(amount),
-  [i18n.language]);
+  const { formatCurrency } = useFormatters();
 
   const runMutation = useRunNightAudit();
 

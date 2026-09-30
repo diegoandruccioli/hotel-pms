@@ -1,3 +1,4 @@
+import { useFormatters } from '../hooks';
 import { useState, useCallback, memo, useMemo } from 'react';
 import { useToastStore } from '../store';
 import type { RoomResponse, RoomStatus } from '../types';
@@ -58,13 +59,10 @@ const RoomCard = memo(({
   onToggleSelected: (id: string) => void;
   onStatusChange: (id: string, status: RoomStatus) => Promise<void>;
 }) => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
   const [updating, setUpdating] = useState<RoomStatus | null>(null);
 
-  const formatCurrency = useCallback((amount: number | null | undefined) => {
-    if (amount == null) return '—';
-    return new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(amount);
-  }, [i18n.language]);
+  const { formatCurrency } = useFormatters();
 
   const handleStatusButton = useCallback(async (newStatus: RoomStatus) => {
     if (newStatus === room.status) return;
