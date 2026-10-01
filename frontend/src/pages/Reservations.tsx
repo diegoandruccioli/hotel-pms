@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { ReservationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3TableActionLink } from '../components/m3';
@@ -445,53 +446,51 @@ export const Reservations = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="event" className="mr-2 text-primary" />
-            {t('nav_reservations')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('reservations_subtitle')}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <M3TextField
-            label={t('search_placeholder')}
-            hideLabel
-            leadingIcon="search"
-            type="search"
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="w-full sm:w-56"
-          />
-          <button
-            type="button"
-            aria-pressed={upcomingOnly}
-            onClick={toggleUpcomingOnly}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
-              upcomingOnly
-                ? 'bg-primary text-on-primary border-primary'
-                : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
-            )}
-          >
-            {t('reservations_upcoming_filter')}
-          </button>
-          <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
-            {t('export_csv')}
-          </M3Button>
-          <M3Button
-            data-testid="view-groups-btn"
-            icon="groups"
-            variant="outlined"
-            onClick={handleViewGroups}
-          >
-            {t('nav_reservation_groups')}
-          </M3Button>
-          <M3Button data-testid="new-reservation-btn" icon="add" onClick={handleNewReservation}>
-            {t('new_reservation')}
-          </M3Button>
-        </div>
-      </div>
+      <PageHeader
+        icon="event"
+        title={t('nav_reservations')}
+        subtitle={t('reservations_subtitle')}
+        actions={
+          <>
+            <M3TextField
+              label={t('search_placeholder')}
+              hideLabel
+              leadingIcon="search"
+              type="search"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="w-full sm:w-56"
+            />
+            <button
+              type="button"
+              aria-pressed={upcomingOnly}
+              onClick={toggleUpcomingOnly}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
+                upcomingOnly
+                  ? 'bg-primary text-on-primary border-primary'
+                  : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
+              )}
+            >
+              {t('reservations_upcoming_filter')}
+            </button>
+            <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
+              {t('export_csv')}
+            </M3Button>
+            <M3Button
+              data-testid="view-groups-btn"
+              icon="groups"
+              variant="outlined"
+              onClick={handleViewGroups}
+            >
+              {t('nav_reservation_groups')}
+            </M3Button>
+            <M3Button data-testid="new-reservation-btn" icon="add" onClick={handleNewReservation}>
+              {t('new_reservation')}
+            </M3Button>
+          </>
+        }
+      />
 
       {loading ? (
         <M3LoadingState label={t('loading')} />

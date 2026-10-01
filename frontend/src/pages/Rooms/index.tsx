@@ -1,6 +1,7 @@
 import { useState, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { PageHeader } from '../../components/PageHeader';
 import { RoomList } from './RoomList';
 import { RoomTypeList } from './RoomTypeList';
 import { cn } from '../../utils';
@@ -16,15 +17,7 @@ export const Rooms = memo(() => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="meeting_room" className="mr-2 text-primary" />
-            {t('rooms_title')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('rooms_subtitle')}</p>
-        </div>
-      </div>
+      <PageHeader icon="meeting_room" title={t('rooms_title')} subtitle={t('rooms_subtitle')} />
 
       {/* Segmented Button / Tabs */}
       <div className="flex p-1 space-x-1 bg-surface-container-highest rounded-shape-md w-max border border-outline-variant/30">

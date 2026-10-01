@@ -3,6 +3,7 @@ import { useState, useCallback, memo, useMemo } from 'react';
 import { useToastStore } from '../store';
 import type { RoomResponse, RoomStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3Checkbox } from '../components/m3';
@@ -194,18 +195,16 @@ export const Housekeeping = memo(() => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center gap-2">
-            <MaterialIcon name="cleaning_services" className="text-primary" />
-            {t('nav_housekeeping')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('housekeeping_subtitle')}</p>
-        </div>
-        <M3Button variant="outlined" icon="refresh" onClick={handleRetry}>
-          {t('refresh')}
-        </M3Button>
-      </div>
+      <PageHeader
+        icon="cleaning_services"
+        title={t('nav_housekeeping')}
+        subtitle={t('housekeeping_subtitle')}
+        actions={
+          <M3Button variant="outlined" icon="refresh" onClick={handleRetry}>
+            {t('refresh')}
+          </M3Button>
+        }
+      />
 
       <HousekeepingWorksheetSection />
 

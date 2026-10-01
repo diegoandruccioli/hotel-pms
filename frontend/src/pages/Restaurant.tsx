@@ -3,6 +3,7 @@ import { useState, useCallback, memo, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { MenuItemResponse, RestaurantOrderResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
@@ -315,18 +316,14 @@ export const Restaurant = memo(() => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="restaurant" className="mr-2 text-primary" />
-            {t('nav_restaurant')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('restaurant_subtitle')}</p>
-        </div>
-        <div className="flex items-center gap-3">
+      <PageHeader
+        icon="restaurant"
+        title={t('nav_restaurant')}
+        subtitle={t('restaurant_subtitle')}
+        actions={
           <M3Button icon="add" onClick={handleOpenOrderModal}>{t('new_order')}</M3Button>
-        </div>
-      </div>
+        }
+      />
 
       {loading ? (
         <M3LoadingState label={t('loading')} />

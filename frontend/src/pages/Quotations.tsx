@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { quotationService } from '../services';
 import type { QuotationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
 import { M3TableActionLink } from '../components/m3';
@@ -221,16 +222,14 @@ export const Quotations = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="request_quote" className="mr-2 text-primary" />
-            {t('title')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('subtitle')}</p>
-        </div>
-        <M3Button icon="add" onClick={handleNew}>{t('new_quotation')}</M3Button>
-      </div>
+      <PageHeader
+        icon="request_quote"
+        title={t('title')}
+        subtitle={t('subtitle')}
+        actions={
+          <M3Button icon="add" onClick={handleNew}>{t('new_quotation')}</M3Button>
+        }
+      />
 
       {loading ? (
         <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">

@@ -6,6 +6,7 @@ import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 import type { StayResponse, StayStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
@@ -401,23 +402,21 @@ export const Stays = memo(() => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="hotel" className="mr-2 text-primary" />
-            {t('nav_stays')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('stays_subtitle')}</p>
-        </div>
-        <div className="flex gap-2">
-          <M3Button icon="add" onClick={handleNewCheckIn}>
-            {t('new_checkin', 'New Check-in')}
-          </M3Button>
-          <M3Button icon="person_add" variant="outlined" onClick={handleWalkIn}>
-            {t('walkin_title', 'Walk-in')}
-          </M3Button>
-        </div>
-      </div>
+      <PageHeader
+        icon="hotel"
+        title={t('nav_stays')}
+        subtitle={t('stays_subtitle')}
+        actions={
+          <>
+            <M3Button icon="add" onClick={handleNewCheckIn}>
+              {t('new_checkin', 'New Check-in')}
+            </M3Button>
+            <M3Button icon="person_add" variant="outlined" onClick={handleWalkIn}>
+              {t('walkin_title', 'Walk-in')}
+            </M3Button>
+          </>
+        }
+      />
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <M3TextField

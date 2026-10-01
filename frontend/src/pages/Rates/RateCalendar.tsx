@@ -5,6 +5,7 @@ import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMont
 import { rateSeasonService } from '../../services';
 import type { RateCalendarResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
 import { RateCalendarCell } from './RateCalendarCell';
@@ -191,18 +192,16 @@ export const RateCalendar = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="payments" className="mr-2 text-primary" />
-            {t('nav_rates')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('rate_calendar_subtitle')}</p>
-        </div>
-        {canApplyPrice && (
-          <M3Button icon="add" onClick={openDialog}>{t('btn_apply_price')}</M3Button>
-        )}
-      </div>
+      <PageHeader
+        icon="payments"
+        title={t('nav_rates')}
+        subtitle={t('rate_calendar_subtitle')}
+        actions={
+          canApplyPrice && (
+            <M3Button icon="add" onClick={openDialog}>{t('btn_apply_price')}</M3Button>
+          )
+        }
+      />
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
