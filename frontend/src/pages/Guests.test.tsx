@@ -21,7 +21,7 @@ vi.mock('../services/guestService', () => ({
   guestService: {
     searchGuestsPaged: vi.fn(),
     deleteGuest: vi.fn(),
-    exportGuestData: vi.fn(),
+    downloadGuestDataExport: vi.fn(),
     exportGuestsCsv: vi.fn(),
   },
 }));
@@ -339,17 +339,13 @@ describe('Guests', () => {
     fireEvent.click(screen.getByRole('button', { name: /export_guest_data John Doe/ }));
 
     expect(screen.getByText('export_guest_data_confirm_body')).toBeInTheDocument();
-    expect(guestService.exportGuestData).not.toHaveBeenCalled();
+    expect(guestService.downloadGuestDataExport).not.toHaveBeenCalled();
   });
 
-  it('should download the export as JSON on confirm', async () => {
+  it('should trigger the export download on confirm and close the dialog', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
-    vi.mocked(guestService.exportGuestData).mockResolvedValueOnce({ guestId: 'guest-1' } as never);
-    const createObjectURL = vi.fn(() => 'blob:mock');
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.mocked(guestService.downloadGuestDataExport).mockResolvedValueOnce(undefined);
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
@@ -357,21 +353,15 @@ describe('Guests', () => {
     fireEvent.click(screen.getByRole('button', { name: 'export_guest_data_confirm_action' }));
 
     await waitFor(() => {
-      expect(guestService.exportGuestData).toHaveBeenCalledWith('guest-1');
-      expect(createObjectURL).toHaveBeenCalled();
-      expect(clickSpy).toHaveBeenCalled();
-      expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
+      expect(guestService.downloadGuestDataExport).toHaveBeenCalledWith('guest-1');
       expect(screen.queryByText('export_guest_data_confirm_body')).not.toBeInTheDocument();
     });
-
-    clickSpy.mockRestore();
-    vi.unstubAllGlobals();
   });
 
   it('should show an error toast when the export fails', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
-    vi.mocked(guestService.exportGuestData).mockRejectedValueOnce(new Error('network'));
+    vi.mocked(guestService.downloadGuestDataExport).mockRejectedValueOnce(new Error('network'));
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());

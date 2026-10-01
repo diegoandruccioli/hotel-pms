@@ -68,17 +68,6 @@ const ActionsCell = ({ guest, onEdit, onDelete, onExport, t }: ActionsCellProps)
   );
 };
 
-/** Triggers a client-side download of a JSON blob — same pattern as billingReportService's CSV export. */
-function downloadJson(data: unknown, filename: string): void {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 export const Guests = memo(() => {
   const { t } = useTranslation('common');
   const addToast = useToastStore((s) => s.addToast);
@@ -204,8 +193,7 @@ export const Guests = memo(() => {
     if (!guestToExport) return;
     setExporting(true);
     try {
-      const data = await guestService.exportGuestData(guestToExport.id);
-      downloadJson(data, `guest-export-${guestToExport.id}.json`);
+      await guestService.downloadGuestDataExport(guestToExport.id);
       setGuestToExport(null);
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('export_guest_data_failed')), 'error');

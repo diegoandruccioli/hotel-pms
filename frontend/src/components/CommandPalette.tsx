@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Command } from 'cmdk';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
 import { useAuthStore } from '../store';
+import { useDebounce } from '../hooks';
 import { useCommandPaletteGuests, useCommandPaletteReservations } from '../hooks/queries';
 import { getPaletteEntries, type NavEntry } from '../config/navigation';
 import type { GuestResponseDTO } from '../types';
@@ -27,22 +28,20 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   const role = useAuthStore((s) => s.user?.role);
 
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debounced = useDebounce(search, SEARCH_DEBOUNCE_MS);
+  // An empty input (cleared, or reset on close) turns the search off at once
+  // instead of keeping the last term alive for the debounce window.
+  const debouncedSearch = search === '' ? '' : debounced;
 
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [search]);
-
-  // Reset on close so the next open starts from a blank slate instead of
-  // whatever was last typed. Adjusted during render (not an effect) per
-  // the codebase's established prevProp-comparison idiom.
+  // Reset on close so the next open starts with an empty input instead of
+  // whatever was last typed (the debounced term catches up within the debounce
+  // window). Adjusted during render (not an effect) per the codebase's
+  // established prevProp-comparison idiom.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
     if (!open) {
       setSearch('');
-      setDebouncedSearch('');
     }
   }
 
