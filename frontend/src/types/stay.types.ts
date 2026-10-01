@@ -1,4 +1,4 @@
-export type StayStatus = 'EXPECTED' | 'CHECKED_IN' | 'CHECKED_OUT';
+export type StayStatus = 'EXPECTED' | 'CHECKED_IN' | 'CHECKED_OUT' | 'CANCELLED';
 
 export interface AvailableRoom {
   id: string;

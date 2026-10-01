@@ -73,6 +73,19 @@ describe('RoomList', () => {
     await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
   });
 
+  it.each([
+    ['CLEAN', 'bg-tertiary-container'],
+    ['DIRTY', 'bg-secondary-container'],
+    ['MAINTENANCE', 'bg-error-container'],
+    ['OCCUPIED', 'bg-primary-container'],
+  ] as const)('colours a %s room chip with %s', async (status, expectedClass) => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue({ ...roomPage, content: [{ ...ROOM, status }] } as never);
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
+    renderPage();
+    const chip = await screen.findByText(`room_status_${status.toLowerCase()}`);
+    expect(chip.closest('span')?.className).toContain(expectedClass);
+  });
+
   it('renders empty state when no rooms', async () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValue(emptyPage as never);
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);

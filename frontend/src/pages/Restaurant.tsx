@@ -1,7 +1,7 @@
 import { useFormatters } from '../hooks';
 import { useState, useCallback, memo, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import type { MenuItemResponse, RestaurantOrderResponse, OrderStatus } from '../types';
+import type { MenuItemResponse, RestaurantOrderResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, orderStatusTone } from '../utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOrders, useMenuItems, useConfirmOrder, useDeleteMenuItem } from '../hooks/queries';
 import { queryKeys } from '../lib';
@@ -70,19 +70,6 @@ function compareMenuItems(a: MenuItemResponse, b: MenuItemResponse, field: strin
     default: return a.name.localeCompare(b.name);
   }
 }
-
-const getStatusTone = (status: OrderStatus | string) => {
-  switch (status) {
-    case 'PENDING': return 'warning' as const;
-    case 'PREPARING': return 'info' as const;
-    case 'PREPARED': return 'info' as const;
-    case 'READY': return 'success' as const;
-    case 'DELIVERED': return 'neutral' as const;
-    case 'CANCELLED': return 'error' as const;
-    case 'BILLED_TO_ROOM': return 'info' as const;
-    default: return 'neutral' as const;
-  }
-};
 
 interface OrderActionsCellProps {
   order: RestaurantOrderResponse;
@@ -261,7 +248,7 @@ export const Restaurant = memo(() => {
       cell: ({ row }) => (
         <M3StatusChip
           label={t(`order_status_${row.original.status}`, row.original.status.replace(/_/g, ' '))}
-          tone={getStatusTone(row.original.status)}
+          tone={orderStatusTone[row.original.status]}
         />
       ),
     },

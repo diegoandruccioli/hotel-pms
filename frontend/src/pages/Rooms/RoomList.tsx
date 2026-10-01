@@ -12,21 +12,12 @@ import { M3ErrorState } from '../../components/m3';
 import { M3TableEmptyRow } from '../../components/m3';
 import { useRoomsList, useRoomTypes } from '../../hooks/queries';
 import { queryKeys } from '../../lib';
-import { getErrorMessage, cn } from '../../utils';
+import { getErrorMessage, cn, roomStatusTone } from '../../utils';
 import { RoomFormModal } from './RoomFormModal';
 
 interface RoomListNavState {
   availableToday?: boolean;
 }
-
-const getStatusTone = (status: string) => {
-  switch (status) {
-    case 'CLEAN': return 'success' as const;
-    case 'DIRTY': return 'warning' as const;
-    case 'MAINTENANCE': return 'error' as const;
-    default: return 'neutral' as const;
-  }
-};
 
 const RoomRow = memo(({ room, onEdit, t }: {
   room: RoomResponse;
@@ -42,7 +33,7 @@ const RoomRow = memo(({ room, onEdit, t }: {
       <M3TableCell className="font-bold">{room.roomNumber}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{room.roomType.name}</M3TableCell>
       <M3TableCell>
-        <M3StatusChip label={t(`room_status_${room.status.toLowerCase()}`)} tone={getStatusTone(room.status)} />
+        <M3StatusChip label={t(`room_status_${room.status.toLowerCase()}`)} tone={roomStatusTone[room.status]} />
       </M3TableCell>
       <M3TableCell className="text-right">
         <M3TableActionLink onClick={handleEdit} className="lg:mr-4">

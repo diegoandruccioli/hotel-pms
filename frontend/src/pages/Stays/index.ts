@@ -11,4 +11,3 @@ export * from './StayRoomChangeDialog';
 export * from './StayStatusChip';
 export * from './WalkInCheckInForm';
 export * from './stayGuestFieldHelpers';
-export * from './stayStatusTone';

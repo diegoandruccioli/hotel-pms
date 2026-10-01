@@ -11,7 +11,7 @@ import { guestService } from '../../services';
 import { stayService } from '../../services';
 import type { GuestResponseDTO } from '../../types';
 import type { RoomResponse } from '../../types';
-import type { ReservationRequest, ReservationResponse } from '../../types';
+import type { ReservationRequest, ReservationResponse, ReservationStatus } from '../../types';
 import { GuestSearchAndCreate } from './GuestSearchAndCreate';
 import { RoomSelection } from './RoomSelection';
 import { useTranslation } from 'react-i18next';
@@ -42,7 +42,7 @@ export const ReservationForm = () => {
   const [checkOutDate, setCheckOutDate] = useState('');
   const [expectedGuests, setExpectedGuests] = useState<number | string>(1);
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
-  const [status, setStatus] = useState<string>('CONFIRMED');
+  const [status, setStatus] = useState<ReservationStatus>('CONFIRMED');
   // Optimistic-lock version last read from the server; echoed back on update so a
   // stale save (someone else changed this reservation while this tab sat open) is
   // rejected with a conflict instead of silently overwriting their change.

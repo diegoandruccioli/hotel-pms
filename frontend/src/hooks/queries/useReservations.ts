@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { reservationService } from '../../services';
 import { inventoryService } from '../../services';
-import type { ReservationResponse } from '../../types';
+import type { ReservationResponse, ReservationStatus } from '../../types';
 import type { SpringPage } from '../../types';
 import { queryKeys } from '../../lib';
 
@@ -45,7 +45,7 @@ export function useDeleteReservation() {
 
 interface UpdateReservationStatusVariables {
   id: string;
-  status: string;
+  status: ReservationStatus;
   version: number;
 }
 

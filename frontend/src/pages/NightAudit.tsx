@@ -15,21 +15,13 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Link } from 'react-router-dom';
 import { useToastStore } from '../store';
-import { getErrorMessage, todayIsoDate, addDaysIso } from '../utils';
+import { getErrorMessage, todayIsoDate, addDaysIso, nightAuditStatusTone } from '../utils';
 import {
   useNightAuditHistory, useRunNightAudit, useReservationsSearch, useStaysSearch,
 } from '../hooks/queries';
 
 const PAGE_SIZE = 20;
 const PRE_CHECK_STAYS_SAMPLE_SIZE = 100;
-
-const getStatusTone = (status: NightAuditRunResponse['status']) => {
-  switch (status) {
-    case 'COMPLETED': return 'success' as const;
-    case 'FAILED': return 'error' as const;
-    default: return 'neutral' as const;
-  }
-};
 
 const getStatusLabel = (status: NightAuditRunResponse['status'], t: TFunction) =>
   t(`night_audit_status_${status.toLowerCase()}`);
@@ -190,7 +182,7 @@ export const NightAudit = () => {
       id: 'status',
       header: t('status'),
       cell: ({ row }) => (
-        <M3StatusChip label={getStatusLabel(row.original.status, t)} tone={getStatusTone(row.original.status)} />
+        <M3StatusChip label={getStatusLabel(row.original.status, t)} tone={nightAuditStatusTone[row.original.status]} />
       ),
     },
     {
@@ -326,7 +318,7 @@ export const NightAudit = () => {
           <div className="space-y-3 text-sm font-body text-on-surface">
             <div className="flex justify-between">
               <span className="text-on-surface-variant">{t('status')}</span>
-              <M3StatusChip label={getStatusLabel(detailRun.status, t)} tone={getStatusTone(detailRun.status)} />
+              <M3StatusChip label={getStatusLabel(detailRun.status, t)} tone={nightAuditStatusTone[detailRun.status]} />
             </div>
             {detailRun.status === 'FAILED' && detailRun.failureReason && (
               <p className="text-error">{detailRun.failureReason}</p>
