@@ -44,7 +44,7 @@
   },
   "overrides": {
     "esbuild": "^0.28.1",
-    "undici": "^7.29.0",
+    "undici": "^7.30.0",
     "js-yaml": "^5.2.3"
   },
   "devDependencies": {
