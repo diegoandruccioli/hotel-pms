@@ -12,7 +12,7 @@ import { M3Card } from '../components/m3';
 import PlanningBoard from '@/pages/PlanningBoard';
 import { inventoryService } from '../services';
 import type { RoomResponse } from '../types';
-import { getErrorMessage, cn, resolveDesignToken, dateFnsLocale, reservationStatusTone } from '../utils';
+import { getErrorMessage, cn, resolveDesignToken, dateFnsLocale, reservationStatusTone, toneSolidTokens } from '../utils';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
@@ -38,28 +38,13 @@ const mapToEvent = (reservation: ReservationResponse): ReservationEvent => ({
 
 // `tone` alone drives the rendered swatch (M3StatusChip resolves it to the
 // matching M3 token) -- derived from the shared reservation map so the legend
-// can't drift from the list; see EVENT_STATUS_TOKENS below for the (different)
-// mapping the calendar's solid event blocks use, which needs actual resolved
-// color values, not a tone.
+// can't drift from the list; the solid event blocks below use toneSolidTokens,
+// since react-big-calendar needs actual resolved color values, not a tone.
 const LEGEND_STATUSES = ['CONFIRMED', 'PENDING', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'] as const;
 const statusLegend = LEGEND_STATUSES.map((status) => ({
   labelKey: `status_${status.toLowerCase()}`,
   tone: reservationStatusTone[status],
 }));
-
-// react-big-calendar renders events as solid-fill blocks via inline style, so
-// this can't use Tailwind classes like M3StatusChip's tones do -- same tone
-// semantics (success->tertiary, warning->secondary, error->error, info->primary,
-// neutral->outline), but the *base* token (not the pale "-container" variant
-// M3StatusChip's tag-shaped chips use) since a solid block needs real contrast
-// against its own on-* text color, not a subdued tag background.
-const EVENT_STATUS_TOKENS: Record<string, { bg: string; text: string }> = {
-  CONFIRMED: { bg: '--md-primary', text: '--md-on-primary' },
-  PENDING: { bg: '--md-secondary', text: '--md-on-secondary' },
-  CHECKED_IN: { bg: '--md-tertiary', text: '--md-on-tertiary' },
-  CHECKED_OUT: { bg: '--md-outline', text: '--md-on-surface' },
-  CANCELLED: { bg: '--md-error', text: '--md-on-error' },
-};
 
 const CALENDAR_VIEWS: View[] = ['month'];
 const CALENDAR_STYLE = { height: 600 };
@@ -189,13 +174,15 @@ export const CalendarPlanning = () => {
 
   const eventPropGetter = useCallback((event: ReservationEvent) => {
     const status = event.resource.status;
-    const tokens = EVENT_STATUS_TOKENS[status] ?? EVENT_STATUS_TOKENS.CONFIRMED;
+    // A status the map doesn't know (backend ahead of the frontend) renders neutral.
+    const tokens = toneSolidTokens[reservationStatusTone[status] ?? 'neutral'];
     // Resolved live (not memoized) so a theme change (light/dark, high-contrast)
     // is reflected on the next render instead of freezing whatever was current
     // when this callback happened to be created.
     const bg = resolveDesignToken(tokens.bg);
     const text = resolveDesignToken(tokens.text);
-    return { style: { backgroundColor: bg, borderColor: bg, color: text, borderRadius: '8px' } };
+    const border = resolveDesignToken(tokens.border);
+    return { style: { backgroundColor: bg, borderColor: border, color: text, borderRadius: '8px' } };
   }, []);
 
   const currentYear = format(currentDate, 'yyyy');

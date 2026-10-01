@@ -122,6 +122,49 @@ describe('PlanningBoard', () => {
     expect(screen.getByText('303')).toBeInTheDocument();
   });
 
+  it.each([
+    ['CLEAN', 'bg-tertiary'],
+    ['DIRTY', 'bg-secondary'],
+    ['MAINTENANCE', 'bg-error'],
+    ['OCCUPIED', 'bg-primary'],
+    ['UNKNOWN_STATUS' as never, 'bg-outline'],
+  ] as const)('colours the %s room dot with %s (canonical room tones)', (status, expectedClass) => {
+    render(
+      <PlanningBoard
+        rooms={[{ ...ROOMS[0], id: 'rx', roomNumber: '404', status }]}
+        reservations={EMPTY_RESERVATIONS}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.getByText('404').nextElementSibling?.className).toContain(expectedClass);
+  });
+
+  it.each([
+    ['CONFIRMED', 'bg-primary text-on-primary'],
+    ['PENDING', 'bg-secondary text-on-secondary'],
+    ['PARTIALLY_CHECKED_IN', 'bg-secondary text-on-secondary'],
+    ['CHECKED_IN', 'bg-tertiary text-on-tertiary'],
+    ['CANCELLED', 'bg-error text-on-error'],
+    ['NO_SHOW', 'bg-error text-on-error'],
+    ['CHECKED_OUT', 'bg-surface-container-highest text-on-surface'],
+    ['UNKNOWN_STATUS' as never, 'bg-surface-container-highest text-on-surface'],
+  ] as const)('colours a %s reservation bar with "%s"', (status, expectedClasses) => {
+    const reservation = {
+      ...RESERVATION, id: `bar-${status}`, guestFullName: 'Bar Guest', status,
+      lineItems: [{ id: 'li-bar', roomId: 'r1', price: 50, active: true, createdAt: '', updatedAt: '' }],
+    };
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={[reservation]}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.getByTitle(`Bar Guest (${status})`).className).toContain(expectedClasses);
+  });
+
   it('does not render a reservation bar entirely outside the visible month', () => {
     const outsideReservation: ReservationResponse = {
       ...RESERVATION, id: 'res-outside',

@@ -194,8 +194,10 @@ describe('CalendarPlanning', () => {
       ['PENDING', '--md-secondary'],
       ['CANCELLED', '--md-error'],
       ['CHECKED_IN', '--md-tertiary'],
-      ['CHECKED_OUT', '--md-outline'],
-      ['UNKNOWN_STATUS', '--md-primary'],
+      ['PARTIALLY_CHECKED_IN', '--md-secondary'],
+      ['NO_SHOW', '--md-error'],
+      ['CHECKED_OUT', '--md-surface-container-highest'],
+      ['UNKNOWN_STATUS', '--md-surface-container-highest'],
     ])('maps status %s to design token %s', async (status, expectedColor) => {
       vi.mocked(reservationService.getAllReservations).mockResolvedValue([reservation(status)] as never);
       render(<CalendarPlanning />);
@@ -207,6 +209,20 @@ describe('CalendarPlanning', () => {
       const result = getter({ resource: { status } });
 
       expect(result.style.backgroundColor).toBe(expectedColor);
+    });
+
+    it('renders a checked-out block as a tonal bar: readable text and an outline border', async () => {
+      vi.mocked(reservationService.getAllReservations).mockResolvedValue([reservation('CHECKED_OUT')] as never);
+      render(<CalendarPlanning />);
+      await waitFor(() => screen.getByText('view_month'));
+      fireEvent.click(screen.getByText('view_month'));
+      await waitFor(() => screen.getByTestId('rbc-calendar'));
+
+      const getter = lastCalendarProps.current.eventPropGetter as (e: { resource: { status: string } }) => { style: { color: string; borderColor: string } };
+      const { style } = getter({ resource: { status: 'CHECKED_OUT' } });
+
+      expect(style.color).toBe('--md-on-surface');
+      expect(style.borderColor).toBe('--md-outline');
     });
   });
 

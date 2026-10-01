@@ -1,4 +1,4 @@
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
@@ -222,6 +222,16 @@ describe('Dashboard Component', () => {
     await waitFor(() => expect(screen.getByTestId('room-status-summary')).toBeInTheDocument());
     expect(screen.getByText('10')).toBeInTheDocument(); // CLEAN
     expect(screen.getByText('2')).toBeInTheDocument();  // DIRTY
+  });
+
+  it('colours the room tiles with the canonical room tones (dirty = warning, maintenance = error)', async () => {
+    renderDashboard();
+    const summary = await screen.findByTestId('room-status-summary');
+    const tileOf = (count: string) => within(summary).getByText(count).parentElement;
+    expect(tileOf('10')?.className).toContain('border-tertiary/50'); // CLEAN
+    expect(tileOf('2')?.className).toContain('border-secondary/50'); // DIRTY
+    expect(tileOf('1')?.className).toContain('border-error/50'); // MAINTENANCE
+    expect(tileOf('12')?.className).toContain('border-primary/50'); // OCCUPIED
   });
 
   it('shows Alloggiati failure banner for ADMIN when failures exist', async () => {

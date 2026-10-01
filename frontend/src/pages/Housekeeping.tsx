@@ -10,7 +10,7 @@ import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3EmptyState } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage, cn } from '../utils';
+import { getErrorMessage, cn, roomStatusTone, toneCardClasses, toneOutlineButtonClasses } from '../utils';
 import { useRoomsList, useUpdateRoomStatus, useBulkUpdateRoomStatus } from '../hooks/queries';
 import { useDaySheet } from '../hooks/queries';
 import { HousekeepingWorksheetSection } from './Housekeeping/HousekeepingWorksheetSection';
@@ -20,29 +20,6 @@ const STATUS_KEYS: Record<RoomStatus, string> = {
   DIRTY: 'room_status_dirty',
   MAINTENANCE: 'room_status_maintenance',
   OCCUPIED: 'room_status_occupied',
-};
-
-type StatusTone = 'success' | 'error' | 'warning' | 'info' | 'neutral';
-
-const STATUS_CARD_STYLES: Record<RoomStatus, string> = {
-  CLEAN: 'bg-tertiary-container/30 border-tertiary',
-  DIRTY: 'bg-error-container/30 border-error',
-  MAINTENANCE: 'bg-secondary-container/30 border-secondary',
-  OCCUPIED: 'bg-primary-container/30 border-primary',
-};
-
-const STATUS_TONES: Record<RoomStatus, StatusTone> = {
-  CLEAN: 'success',
-  DIRTY: 'error',
-  MAINTENANCE: 'warning',
-  OCCUPIED: 'info',
-};
-
-const STATUS_BUTTON_STYLES: Record<RoomStatus, string> = {
-  CLEAN: 'border-tertiary text-tertiary hover:bg-tertiary-container',
-  DIRTY: 'border-error text-error hover:bg-error-container',
-  MAINTENANCE: 'border-secondary text-secondary hover:bg-secondary-container',
-  OCCUPIED: 'border-outline text-on-surface-variant hover:bg-surface-container',
 };
 
 const ALL_STATUSES: RoomStatus[] = ['CLEAN', 'DIRTY', 'MAINTENANCE'];
@@ -79,7 +56,7 @@ const RoomCard = memo(({
   }, [onToggleSelected, room.id]);
 
   return (
-    <div className={cn('rounded-shape-md border-2 p-4 flex flex-col gap-3 shadow-elevation-1 transition-all', STATUS_CARD_STYLES[room.status])}>
+    <div className={cn('rounded-shape-md border-2 p-4 flex flex-col gap-3 shadow-elevation-1 transition-all', toneCardClasses[roomStatusTone[room.status]])}>
       {/* flex-wrap: the checkbox + room-number block + status chip can outgrow a
           4-up grid column for the longer status labels (e.g. "Maintenance").
           Without wrapping, the flex-1 min-w-0 heading block was the only shrinkable
@@ -98,7 +75,7 @@ const RoomCard = memo(({
           <h3 className="text-lg font-display font-bold text-on-surface truncate">{t('room_number', { number: room.roomNumber })}</h3>
           <p className="text-xs font-body font-medium uppercase tracking-wide text-on-surface-variant truncate">{room.roomType?.name}</p>
         </div>
-        <M3StatusChip label={t(STATUS_KEYS[room.status])} tone={STATUS_TONES[room.status]} />
+        <M3StatusChip label={t(STATUS_KEYS[room.status])} tone={roomStatusTone[room.status]} />
       </div>
 
       <p className="text-sm font-body text-on-surface-variant">{formatCurrency(room.roomType?.basePrice)} / {t('night')}</p>
@@ -136,7 +113,7 @@ const StatusButton = memo(({ newStatus, updating, onClick, t }: {
       disabled={updating !== null}
       className={cn(
         'flex-1 flex items-center justify-center min-h-10 text-xs font-medium font-body border rounded-shape-sm px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-        STATUS_BUTTON_STYLES[newStatus]
+        toneOutlineButtonClasses[roomStatusTone[newStatus]]
       )}
     >
       {updating === newStatus ? (
@@ -323,7 +300,7 @@ const BulkStatusButton = memo(({ status, disabled, onClick, t }: {
       data-testid={`bulk-status-${status}`}
       className={cn(
         'flex items-center justify-center min-h-10 text-xs font-medium font-body border rounded-shape-sm px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-        STATUS_BUTTON_STYLES[status]
+        toneOutlineButtonClasses[roomStatusTone[status]]
       )}
     >
       {t(STATUS_KEYS[status])}
@@ -348,7 +325,7 @@ const FilterBadge = memo(({ status, active, count, onClick, t }: {
       className={cn(
         'rounded-shape-md border-2 px-4 py-3 text-center transition-all shadow-elevation-1',
         active
-          ? STATUS_CARD_STYLES[status]
+          ? toneCardClasses[roomStatusTone[status]]
           : 'bg-surface border-outline-variant text-on-surface-variant hover:border-outline'
       )}
     >
