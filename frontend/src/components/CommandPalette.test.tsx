@@ -199,6 +199,17 @@ describe('CommandPalette', () => {
     expect(screen.getByRole('combobox')).toHaveValue('');
   });
 
+  it('drops the search results immediately when the input is cleared, without waiting for the debounce', async () => {
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValue(page([GUEST]) as never);
+    renderWithQuery(<CommandPalette open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'John' } });
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument(), { timeout: 2000 });
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } });
+
+    expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+  });
+
   it('has no accessibility violations while open', async () => {
     const { container } = renderWithQuery(<CommandPalette open onClose={vi.fn()} />);
     const results = await axe(container);

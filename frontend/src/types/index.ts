@@ -26,9 +26,6 @@ export type {
   IdentityDocumentResponseDTO,
   GuestRequestDTO,
   GuestResponseDTO,
-  GuestExportStaySummary,
-  GuestExportInvoiceSummary,
-  GuestDataExportResponse,
   GuestPrivacySettingsResponse,
   GuestPrivacySettingsRequest,
 } from './guest.types';
