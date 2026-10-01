@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { z } from 'zod';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
@@ -274,20 +275,7 @@ export const ReservationForm = () => {
 
   return (
     <form onSubmit={handleSubmitReservation} noValidate className="space-y-6 max-w-4xl mx-auto pb-10">
-      <div className="flex items-center gap-4 border-b border-outline-variant pb-4">
-        <button
-          type="button"
-          onClick={handleBackToReservations}
-          className="p-2 rounded-full hover:bg-surface-variant transition-colors text-on-surface-variant"
-          aria-label={t('back', 'Back')}
-        >
-          <MaterialIcon name="arrow_back" />
-        </button>
-        <div>
-          <h1 className="text-2xl font-display font-bold text-on-surface">{titles.title}</h1>
-          <p className="text-sm text-on-surface-variant mt-1">{titles.subtitle}</p>
-        </div>
-      </div>
+      <PageHeader title={titles.title} subtitle={titles.subtitle} onBack={handleBackToReservations} bordered />
 
       {error && (
         <div className="p-4 bg-error-container text-on-error-container rounded-shape-sm flex items-start gap-3">

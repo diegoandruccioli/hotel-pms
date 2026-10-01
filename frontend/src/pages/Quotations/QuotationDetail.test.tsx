@@ -214,7 +214,7 @@ describe('QuotationDetail', () => {
     renderDetail();
     await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByLabelText('common:back'));
+    fireEvent.click(screen.getByLabelText('back'));
     expect(mockNavigate).toHaveBeenCalledWith('/quotations');
   });
 

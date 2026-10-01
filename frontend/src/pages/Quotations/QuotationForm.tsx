@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
@@ -357,21 +358,7 @@ export const QuotationForm = () => {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-6 max-w-4xl mx-auto pb-10">
-      <div className="flex items-center gap-4 border-b border-outline-variant pb-4">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="p-2 rounded-full hover:bg-surface-variant transition-colors text-on-surface-variant"
-          aria-label={t('common:back')}
-        >
-          <MaterialIcon name="arrow_back" />
-        </button>
-        <div>
-          <h1 className="text-2xl font-display font-bold text-on-surface">
-            {isEditMode ? t('edit_quotation') : t('new_quotation')}
-          </h1>
-        </div>
-      </div>
+      <PageHeader title={isEditMode ? t('edit_quotation') : t('new_quotation')} onBack={handleBack} bordered />
 
       {error && (
         <div className="p-4 bg-error-container text-on-error-container rounded-shape-sm flex items-start gap-3">

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { stayService } from '../../services';
 import { guestService } from '../../services';
@@ -227,10 +228,7 @@ export const CheckInForm = memo(() => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <M3Button variant="text" icon="arrow_back" onClick={handleBack}>{t('back')}</M3Button>
-        <h1 className="text-2xl font-display font-bold text-on-surface">{t('checkin_title')}</h1>
-      </div>
+      <PageHeader title={t('checkin_title')} onBack={handleBack} />
 
       {prefillFields.length > 0 && (
         <div className="bg-secondary-container text-on-secondary-container p-4 rounded-shape-sm flex items-start gap-3">
