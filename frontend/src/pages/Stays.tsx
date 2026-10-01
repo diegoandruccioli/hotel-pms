@@ -17,12 +17,11 @@ import { useTranslation } from 'react-i18next';
 import { StayStatusChip } from './Stays/StayStatusChip';
 import { M3StatusChip } from '../components/m3';
 import { M3TableActionLink } from '../components/m3';
-import { getStatusTone } from './Stays/stayStatusTone';
 import { AlloggiatiReportSection } from './Stays/AlloggiatiReportSection';
 import { StayGuestManagerDialog } from './Stays/StayGuestManagerDialog';
 import { StayExtensionDialog } from './Stays/StayExtensionDialog';
 import { StayRoomChangeDialog } from './Stays/StayRoomChangeDialog';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, stayStatusTone } from '../utils';
 import {
   useStaysList,
   useCheckOutStay,
@@ -363,7 +362,7 @@ export const Stays = memo(() => {
       cell: ({ row }) => (
         <M3StatusChip
           label={t(`status_${row.original.status.toLowerCase()}`, row.original.status.replace('_', ' '))}
-          tone={getStatusTone(row.original.status)}
+          tone={stayStatusTone[row.original.status]}
         />
       ),
     },

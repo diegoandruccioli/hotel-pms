@@ -4,6 +4,16 @@
  * time — a client-supplied price was never validated against anything and was
  * silently ignored downstream.
  */
+/** Mirrors the backend `ReservationStatus` enum. */
+export type ReservationStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'PARTIALLY_CHECKED_IN'
+  | 'CHECKED_IN'
+  | 'CHECKED_OUT'
+  | 'CANCELLED'
+  | 'NO_SHOW';
+
 export interface ReservationLineItemRequest {
   roomId: string;
 }
@@ -21,7 +31,7 @@ export interface ReservationRequest {
   guestId: string; // UUID
   checkInDate: string; // YYYY-MM-DD
   checkOutDate: string; // YYYY-MM-DD
-  status: string;
+  status: ReservationStatus;
   expectedGuests: number;
   lineItems: ReservationLineItemRequest[];
   /**
@@ -39,7 +49,7 @@ export interface ReservationResponse {
   guestFullName?: string;
   checkInDate: string;
   checkOutDate: string;
-  status: string;
+  status: ReservationStatus;
   expectedGuests: number;
   actualGuests?: number;
   lineItems: ReservationLineItemResponse[];

@@ -89,6 +89,13 @@ describe('OrderDetailModal', () => {
     expect(screen.getByText(expectedLabel)).toBeInTheDocument();
   });
 
+  it('colours a cancelled order with the error tone and a prepared one with info', () => {
+    const { rerender } = render(<OrderDetailModal order={{ ...ORDER, status: 'CANCELLED' }} onClose={onClose} />);
+    expect(screen.getByText('CANCELLED').closest('span')?.className).toContain('bg-error-container');
+    rerender(<OrderDetailModal order={{ ...ORDER, status: 'PREPARED' }} onClose={onClose} />);
+    expect(screen.getByText('PREPARED').closest('span')?.className).toContain('bg-primary-container');
+  });
+
   it('should have no accessibility violations', async () => {
     const { container } = render(<OrderDetailModal order={ORDER} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());

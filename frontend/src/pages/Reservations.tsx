@@ -17,7 +17,7 @@ import type { TFunction } from 'i18next';
 import type { RoomResponse } from '../types';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
-import { getErrorMessage, cn, todayIsoDate } from '../utils';
+import { getErrorMessage, cn, todayIsoDate, reservationStatusTone } from '../utils';
 import { reservationService } from '../services';
 import {
   useReservationsSearch,
@@ -52,18 +52,6 @@ interface ReservationsNavState {
 
 // checkInDate is an ISO 'YYYY-MM-DD' string (see ReservationResponse) — safe
 // to compare lexicographically against another ISO date of the same shape.
-
-const getStatusTone = (status: string) => {
-  switch (status.toUpperCase()) {
-    case 'CONFIRMED': return 'success' as const;
-    case 'CHECKED_IN': return 'success' as const;
-    case 'PARTIALLY_CHECKED_IN': return 'warning' as const;
-    case 'PENDING': return 'warning' as const;
-    case 'CANCELLED': return 'error' as const;
-    case 'NO_SHOW': return 'error' as const;
-    default: return 'neutral' as const;
-  }
-};
 
 const getStatusLabel = (status: string, t: TFunction) =>
   t(`status_${status.toLowerCase()}`, status);
@@ -105,7 +93,7 @@ const StatusCell = ({ reservation, onRetryConfirmationEmail, retryingEmail, t }:
 
   return (
     <div className="flex flex-col items-start gap-1">
-      <M3StatusChip label={getStatusLabel(reservation.status, t)} tone={getStatusTone(reservation.status)} />
+      <M3StatusChip label={getStatusLabel(reservation.status, t)} tone={reservationStatusTone[reservation.status]} />
       {reservation.confirmationEmailFailed && (
         <span
           className="inline-flex items-center gap-1"

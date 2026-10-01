@@ -12,7 +12,7 @@ import { M3Card } from '../components/m3';
 import PlanningBoard from '@/pages/PlanningBoard';
 import { inventoryService } from '../services';
 import type { RoomResponse } from '../types';
-import { getErrorMessage, cn, resolveDesignToken, dateFnsLocale } from '../utils';
+import { getErrorMessage, cn, resolveDesignToken, dateFnsLocale, reservationStatusTone } from '../utils';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
@@ -36,19 +36,16 @@ const mapToEvent = (reservation: ReservationResponse): ReservationEvent => ({
 
 
 
-type StatusTone = 'info' | 'warning' | 'success' | 'neutral' | 'error';
-
 // `tone` alone drives the rendered swatch (M3StatusChip resolves it to the
-// matching M3 token) -- there is deliberately no `color` field here anymore;
-// see EVENT_STATUS_TOKENS below for the (different) mapping the calendar's
-// solid event blocks use, which needs actual resolved color values, not a tone.
-const statusLegend: { labelKey: string; tone: StatusTone }[] = [
-  { labelKey: 'status_confirmed', tone: 'info' },
-  { labelKey: 'status_pending', tone: 'warning' },
-  { labelKey: 'status_checked_in', tone: 'success' },
-  { labelKey: 'status_checked_out', tone: 'neutral' },
-  { labelKey: 'status_cancelled', tone: 'error' },
-];
+// matching M3 token) -- derived from the shared reservation map so the legend
+// can't drift from the list; see EVENT_STATUS_TOKENS below for the (different)
+// mapping the calendar's solid event blocks use, which needs actual resolved
+// color values, not a tone.
+const LEGEND_STATUSES = ['CONFIRMED', 'PENDING', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'] as const;
+const statusLegend = LEGEND_STATUSES.map((status) => ({
+  labelKey: `status_${status.toLowerCase()}`,
+  tone: reservationStatusTone[status],
+}));
 
 // react-big-calendar renders events as solid-fill blocks via inline style, so
 // this can't use Tailwind classes like M3StatusChip's tones do -- same tone
