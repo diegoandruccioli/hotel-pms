@@ -2,6 +2,7 @@ import { useState, useCallback, memo, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
@@ -283,24 +284,23 @@ export const Billing = memo(() => {
           {t('pilot_mode_fiscal_banner')}
         </div>
       )}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="receipt_long" className="mr-2 text-primary" />
-            {t('nav_billing')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('billing_subtitle')}</p>
-        </div>
-        <M3TextField
-          label={t('invoice_search_placeholder')}
-          hideLabel
-          leadingIcon="search"
-          type="search"
-          value={searchQuery}
-          onChange={handleSearchChange}
-          className="w-full sm:w-72"
-        />
-      </div>
+      <PageHeader
+        icon="receipt_long"
+        title={t('nav_billing')}
+        subtitle={t('billing_subtitle')}
+        actionsClassName="w-full sm:w-auto"
+        actions={
+          <M3TextField
+            label={t('invoice_search_placeholder')}
+            hideLabel
+            leadingIcon="search"
+            type="search"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="w-full sm:w-72"
+          />
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex flex-wrap gap-2" role="group" aria-label={t('filter_status')}>

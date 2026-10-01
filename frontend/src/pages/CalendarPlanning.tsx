@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useToastStore } from '../store';
 import type { ReservationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3StatusChip } from '../components/m3';
 import { M3Card } from '../components/m3';
 import PlanningBoard from '@/pages/PlanningBoard';
@@ -194,13 +195,7 @@ export const CalendarPlanning = () => {
       {/* Header */}
       <div className="grid grid-cols-1 lg:grid-cols-3 items-center gap-6">
         {/* Title Group */}
-        <div className="flex flex-col">
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center gap-2">
-            <MaterialIcon name="date_range" className="text-primary" />
-            {t('nav_calendar')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('calendar_subtitle')}</p>
-        </div>
+        <PageHeader icon="date_range" title={t('nav_calendar')} subtitle={t('calendar_subtitle')} />
 
         {/* Central Navigator */}
         <div className="flex items-center justify-center gap-2 bg-surface-container-low px-4 py-2 rounded-shape-full shadow-elevation-1">

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { GuestResponseDTO } from '../types';
-import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3Dialog } from '../components/m3';
@@ -251,34 +251,32 @@ export const Guests = memo(() => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="group" className="mr-2 text-primary" />
-            {t('nav_guests')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('guests_subtitle')}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <M3TextField
-            label={t('search_placeholder')}
-            hideLabel
-            leadingIcon="search"
-            type="search"
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="w-full sm:w-56"
-          />
-          {isAdminOrOwner && (
-            <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
-              {t('export_csv')}
+      <PageHeader
+        icon="group"
+        title={t('nav_guests')}
+        subtitle={t('guests_subtitle')}
+        actions={
+          <>
+            <M3TextField
+              label={t('search_placeholder')}
+              hideLabel
+              leadingIcon="search"
+              type="search"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="w-full sm:w-56"
+            />
+            {isAdminOrOwner && (
+              <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
+                {t('export_csv')}
+              </M3Button>
+            )}
+            <M3Button icon="add" onClick={handleOpenAddModal}>
+              {t('add_guest')}
             </M3Button>
-          )}
-          <M3Button icon="add" onClick={handleOpenAddModal}>
-            {t('add_guest')}
-          </M3Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {loading ? (
         <M3LoadingState label={t('loading')} />

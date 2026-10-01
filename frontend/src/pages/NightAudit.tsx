@@ -3,6 +3,7 @@ import { useState, useCallback, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { NightAuditRunResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
@@ -230,27 +231,25 @@ export const NightAudit = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="fact_check" className="mr-2 text-primary" />
-            {t('nav_night_audit')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('night_audit_subtitle')}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <M3TextField
-            label={t('night_audit_business_date')}
-            type="date"
-            value={runDate}
-            onChange={handleRunDateChange}
-            max={todayIsoDate()}
-          />
-          <M3Button icon="play_arrow" onClick={handleRunRequest} loading={runMutation.isPending}>
-            {t('night_audit_run_action')}
-          </M3Button>
-        </div>
-      </div>
+      <PageHeader
+        icon="fact_check"
+        title={t('nav_night_audit')}
+        subtitle={t('night_audit_subtitle')}
+        actions={
+          <>
+            <M3TextField
+              label={t('night_audit_business_date')}
+              type="date"
+              value={runDate}
+              onChange={handleRunDateChange}
+              max={todayIsoDate()}
+            />
+            <M3Button icon="play_arrow" onClick={handleRunRequest} loading={runMutation.isPending}>
+              {t('night_audit_run_action')}
+            </M3Button>
+          </>
+        }
+      />
 
       <NightAuditPreCheck businessDate={runDate} />
 

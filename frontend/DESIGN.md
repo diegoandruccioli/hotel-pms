@@ -252,6 +252,11 @@ readable is *consistency*, not *sparseness*. Concretely:
   Toggling theme should never change *which* components render or *how* they're
   laid out — only the token values underneath. If a component looks meaningfully
   different in dark mode beyond color, that's a bug, not a feature.
+- **Every page title goes through `PageHeader`** — never a hand-written `<h1>`. It
+  renders the page's single `h1` with optional `icon`, `subtitle`, `actions`,
+  `onBack` (round back button), `titleAdornment` (e.g. a status chip inside the
+  `h1`), `bordered` (form/detail divider), and `id`/`titleTestId` for
+  `aria-labelledby` and test hooks.
 
 ---
 

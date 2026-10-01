@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { ReservationGroupResponse } from '../types';
-import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
@@ -101,28 +101,26 @@ export const ReservationGroups = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="groups" className="mr-2 text-primary" />
-            {t('nav_reservation_groups')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('reservation_groups_subtitle')}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <M3Button
-            data-testid="view-reservations-btn"
-            icon="event"
-            variant="outlined"
-            onClick={handleViewReservations}
-          >
-            {t('nav_reservations')}
-          </M3Button>
-          <M3Button icon="add" onClick={handleNewGroup}>
-            {t('new_group')}
-          </M3Button>
-        </div>
-      </div>
+      <PageHeader
+        icon="groups"
+        title={t('nav_reservation_groups')}
+        subtitle={t('reservation_groups_subtitle')}
+        actions={
+          <>
+            <M3Button
+              data-testid="view-reservations-btn"
+              icon="event"
+              variant="outlined"
+              onClick={handleViewReservations}
+            >
+              {t('nav_reservations')}
+            </M3Button>
+            <M3Button icon="add" onClick={handleNewGroup}>
+              {t('new_group')}
+            </M3Button>
+          </>
+        }
+      />
 
       {isLoading ? (
         <M3LoadingState label={t('loading')} />
