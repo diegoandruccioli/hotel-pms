@@ -8,19 +8,12 @@ import { M3Card } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { stayService } from '../services';
-import { getErrorMessage, cn } from '../utils';
+import { getErrorMessage, cn, roomStatusTone, toneTileClasses } from '../utils';
 import { useDaySheet, useOwnerFinancialSummary } from '../hooks/queries';
 import type { RoomStatus } from '../types';
 import type { AlloggiatiFailureSummaryResponse, CityTaxUnassessedSummaryResponse } from '../types';
 import { ArrivalsDeparturesPanel } from './Dashboard/ArrivalsDeparturesPanel';
 import { OwnerSummarySection } from './Dashboard/OwnerSummarySection';
-
-const ROOM_STATUS_COLORS: Record<RoomStatus, string> = {
-  CLEAN:       'bg-tertiary-container/60 text-on-tertiary-container border-tertiary/50',
-  DIRTY:       'bg-error-container/60 text-on-error-container border-error/50',
-  MAINTENANCE: 'bg-secondary-container/60 text-on-secondary-container border-secondary/50',
-  OCCUPIED:    'bg-primary-container/60 text-on-primary-container border-primary/50',
-};
 
 const ALL_ROOM_STATUSES: RoomStatus[] = ['CLEAN', 'DIRTY', 'MAINTENANCE', 'OCCUPIED'];
 
@@ -246,7 +239,7 @@ export const Dashboard = () => {
                 {ALL_ROOM_STATUSES.map((status) => (
                   <div
                     key={status}
-                    className={cn('rounded-shape-sm border p-3 text-center', ROOM_STATUS_COLORS[status])}
+                    className={cn('rounded-shape-sm border p-3 text-center', toneTileClasses[roomStatusTone[status]])}
                   >
                     <div className="text-xl font-display font-bold">
                       {daySheet.roomStatusCounts[status] ?? 0}

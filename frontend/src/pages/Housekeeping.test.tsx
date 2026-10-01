@@ -217,6 +217,31 @@ describe('Housekeeping', () => {
     await waitFor(() => expect(inventoryService.getAllRooms).toHaveBeenCalledWith(0, 100, undefined));
   });
 
+  it('styles room cards with the canonical room tones (dirty = warning, maintenance = error)', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
+      content: [
+        { id: '1', roomNumber: '101', type: 'Standard', status: 'DIRTY', pricePerNight: 100 },
+        { id: '2', roomNumber: '201', type: 'Standard', status: 'MAINTENANCE', pricePerNight: 100 },
+      ],
+      totalElements: 2,
+    } as never);
+    const { container } = render(<Housekeeping />);
+    await waitFor(() => expect(container.querySelector('div.border-2.border-secondary')).toBeInTheDocument());
+    expect(container.querySelector('div.border-2.border-error')).toBeInTheDocument();
+  });
+
+  it('styles the status-change buttons with the canonical room tones (dirty = warning, maintenance = error)', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
+      content: [{ id: '1', roomNumber: '101', type: 'Standard', status: 'CLEAN', pricePerNight: 100 }],
+      totalElements: 1,
+    } as never);
+    render(<Housekeeping />);
+    const dirty = await screen.findByRole('button', { name: '→ room_status_dirty' });
+    const maintenance = screen.getByRole('button', { name: '→ room_status_maintenance' });
+    expect(dirty.className).toContain('border-secondary');
+    expect(maintenance.className).toContain('border-error');
+  });
+
   it('shows status-count badges sourced from the day-sheet aggregate', async () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
       content: [{ id: '1', roomNumber: '101', type: 'Standard', status: 'CLEAN', pricePerNight: 100 }],
