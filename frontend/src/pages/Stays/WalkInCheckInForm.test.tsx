@@ -86,6 +86,12 @@ describe('WalkInCheckInForm', () => {
     expect(screen.getByLabelText(/walkin_label_checkout_date/i)).toBeInTheDocument();
   });
 
+  it('renders the title as h1 and no <main> of its own (the layout owns the landmark)', async () => {
+    const { container } = renderComponent();
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'walkin_title' })).toHaveAttribute('id', 'walkin-title'));
+    expect(container.querySelector('main')).toBeNull();
+  });
+
   it('shows Alloggiati guest section on initial render', async () => {
     renderComponent();
     await waitFor(() => expect(screen.getByText('guest_number')).toBeInTheDocument());

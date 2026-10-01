@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { quotationService } from '../../services';
 import type { QuotationResponse, QuotationOptionResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
@@ -240,22 +241,14 @@ export const QuotationDetail = () => {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10">
-      <div className="flex items-center gap-4 border-b border-outline-variant pb-4">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="p-2 rounded-full hover:bg-surface-variant transition-colors text-on-surface-variant"
-          aria-label={t('common:back')}
-        >
-          <MaterialIcon name="arrow_back" />
-        </button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-display font-bold text-on-surface flex items-center gap-3">
-            {quotation.guestFullName}
-            <M3StatusChip label={t(`status_${quotation.status.toLowerCase()}`)} tone={quotationStatusTone[quotation.status]} />
-          </h1>
-        </div>
-      </div>
+      <PageHeader
+        title={quotation.guestFullName}
+        titleAdornment={
+          <M3StatusChip label={t(`status_${quotation.status.toLowerCase()}`)} tone={quotationStatusTone[quotation.status]} />
+        }
+        onBack={handleBack}
+        bordered
+      />
 
       {quotation.sendFailed && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container">

@@ -3,6 +3,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { GroupCheckoutOutcome, GroupMemberResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3Card } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
@@ -95,38 +96,31 @@ export const ReservationGroupDetail = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <button
-            type="button"
-            className="text-sm text-primary hover:underline flex items-center gap-1 mb-1"
-            onClick={handleBackToList}
-          >
-            <MaterialIcon name="arrow_back" size={16} />
-            {t('nav_reservation_groups')}
-          </button>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center gap-2">
-            <MaterialIcon name="groups" className="text-primary" />
-            {group.name}
-            <M3StatusChip
-              label={t(`group_status_${group.status.toLowerCase()}`)}
-              tone={groupStatusTone[group.status]}
-            />
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {canCheckout && (
-            <M3Button variant="tonal" icon="logout" onClick={handleCheckoutRequest}>
-              {t('checkout_group')}
-            </M3Button>
-          )}
-          {canCancel && (
-            <M3Button variant="outlined" icon="cancel" onClick={handleCancelRequest}>
-              {t('cancel_group')}
-            </M3Button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        icon="groups"
+        title={group.name}
+        titleAdornment={
+          <M3StatusChip
+            label={t(`group_status_${group.status.toLowerCase()}`)}
+            tone={groupStatusTone[group.status]}
+          />
+        }
+        onBack={handleBackToList}
+        actions={
+          <>
+            {canCheckout && (
+              <M3Button variant="tonal" icon="logout" onClick={handleCheckoutRequest}>
+                {t('checkout_group')}
+              </M3Button>
+            )}
+            {canCancel && (
+              <M3Button variant="outlined" icon="cancel" onClick={handleCancelRequest}>
+                {t('cancel_group')}
+              </M3Button>
+            )}
+          </>
+        }
+      />
 
       <M3Card className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
         <div>

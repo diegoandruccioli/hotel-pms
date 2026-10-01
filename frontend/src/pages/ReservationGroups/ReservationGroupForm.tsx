@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MaterialIcon } from '../../components/MaterialIcon';
+import { PageHeader } from '../../components/PageHeader';
 import { M3Button, M3Card, M3TextField, M3Textarea, M3Checkbox } from '../../components/m3';
 import { GuestSearchAndCreate } from '../Reservations/GuestSearchAndCreate';
 import { RoomingListRow, type RoomingListRowState } from './RoomingListRow';
@@ -134,12 +134,7 @@ export const ReservationGroupForm = () => {
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center gap-2">
-        <MaterialIcon name="groups" className="text-primary" />
-        <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface">
-          {t('new_group')}
-        </h1>
-      </div>
+      <PageHeader icon="groups" title={t('new_group')} />
 
       {error && (
         <div className="p-3 rounded-shape-sm bg-error-container text-on-error-container text-sm" role="alert">

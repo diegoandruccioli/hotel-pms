@@ -10,6 +10,7 @@ import type {
 import type { GuestResponseDTO } from '../../types';
 import { useToastStore } from '../../store';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { PageHeader } from '../../components/PageHeader';
 import { M3TextField } from '../../components/m3';
 import { M3Select } from '../../components/m3';
 import { GuestFieldSection } from './GuestFieldSection';
@@ -217,11 +218,8 @@ export function WalkInCheckInForm() {
   const guestListLabel = useMemo(() => t('walkin_label_guest'), [t]);
 
   return (
-    <main className="max-w-2xl mx-auto p-6" aria-labelledby="walkin-title">
-      <h1 id="walkin-title" className="text-2xl font-semibold text-on-surface mb-1">
-        {t('walkin_title')}
-      </h1>
-      <p className="text-sm text-on-surface-variant mb-6">{t('walkin_subtitle')}</p>
+    <div className="max-w-2xl mx-auto p-6">
+      <PageHeader id="walkin-title" title={t('walkin_title')} subtitle={t('walkin_subtitle')} className="mb-6" />
 
       {cityTaxWarning && cityTaxWarning !== 'NOT_APPLICABLE' && (
         <div
@@ -330,6 +328,6 @@ export function WalkInCheckInForm() {
           </button>
         </div>
       </form>
-    </main>
+    </div>
   );
 }
