@@ -6,6 +6,7 @@ import { useToastStore } from '../store';
 import type { OwnerFinancialReportDto, OwnerFinancialSummaryDto } from '../types';
 import type { InvoiceResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3Card } from '../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
@@ -158,20 +159,18 @@ export const OwnerDashboard = memo(() => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="bar_chart" className="mr-2 text-primary" />
-            {t('owner_dashboard')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('owner_dashboard_subtitle')}</p>
-        </div>
-        {report && (
-          <M3Button variant="tonal" icon="download" id="export-csv-btn" onClick={handleExport}>
-            {t('export_csv')}
-          </M3Button>
-        )}
-      </div>
+      <PageHeader
+        icon="bar_chart"
+        title={t('owner_dashboard')}
+        subtitle={t('owner_dashboard_subtitle')}
+        actions={
+          report && (
+            <M3Button variant="tonal" icon="download" id="export-csv-btn" onClick={handleExport}>
+              {t('export_csv')}
+            </M3Button>
+          )
+        }
+      />
 
       <M3Card variant="outlined" className="p-4">
         <div className="flex flex-col sm:flex-row items-end gap-4">

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Card } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
@@ -115,12 +116,11 @@ export const Dashboard = () => {
 
   return (
     <div data-testid="dashboard-page">
-      <h1 data-testid="dashboard-heading" className="text-2xl font-display font-semibold text-on-surface">
-        {t('welcome_back', { name: user?.username })} 👋
-      </h1>
-      <p className="mt-1 text-sm font-body text-on-surface-variant">
-        {t('dashboard_subtitle')}
-      </p>
+      <PageHeader
+        title={`${t('welcome_back', { name: user?.username })} 👋`}
+        subtitle={t('dashboard_subtitle')}
+        titleTestId="dashboard-heading"
+      />
 
       {alloggiatiFailures && alloggiatiFailures.failedCount > 0 && (
         <div
