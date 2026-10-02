@@ -257,6 +257,9 @@ readable is *consistency*, not *sparseness*. Concretely:
   `onBack` (round back button), `titleAdornment` (e.g. a status chip inside the
   `h1`), `bordered` (form/detail divider), and `id`/`titleTestId` for
   `aria-labelledby` and test hooks.
+- **Confirmations go through `M3ConfirmDialog`** — a message plus Cancel/Confirm, with
+  `loading` while the action runs. A confirmation that needs more (a result list, a
+  second step) uses `M3Dialog` directly.
 
 ---
 

@@ -8,7 +8,7 @@ import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3TableActionLink } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
-import { M3Dialog } from '../components/m3';
+import { M3ConfirmDialog } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3Pagination } from '../components/m3';
@@ -525,40 +525,24 @@ export const Reservations = () => {
         />
       )}
       {reservationToDelete && (
-        <M3Dialog
-          open
+        <M3ConfirmDialog
           title={t('delete_reservation')}
           titleId="confirm-delete-reservation-dialog"
-          onClose={handleDeleteDialogClose}
-        >
-          <p className="text-sm font-body text-on-surface">{t('delete_reservation_confirm')}</p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={handleDeleteDialogClose} disabled={deleting}>
-              {t('cancel')}
-            </M3Button>
-            <M3Button type="button" onClick={handleDeleteConfirm} loading={deleting}>
-              {t('confirm')}
-            </M3Button>
-          </div>
-        </M3Dialog>
+          message={t('delete_reservation_confirm')}
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleDeleteDialogClose}
+          loading={deleting}
+        />
       )}
       {reservationToMarkNoShow && (
-        <M3Dialog
-          open
+        <M3ConfirmDialog
           title={t('mark_no_show')}
           titleId="confirm-mark-no-show-dialog"
-          onClose={handleMarkNoShowDialogClose}
-        >
-          <p className="text-sm font-body text-on-surface">{t('mark_no_show_confirm')}</p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={handleMarkNoShowDialogClose} disabled={markingNoShow}>
-              {t('cancel')}
-            </M3Button>
-            <M3Button type="button" onClick={handleMarkNoShowConfirm} loading={markingNoShow}>
-              {t('confirm')}
-            </M3Button>
-          </div>
-        </M3Dialog>
+          message={t('mark_no_show_confirm')}
+          onConfirm={handleMarkNoShowConfirm}
+          onCancel={handleMarkNoShowDialogClose}
+          loading={markingNoShow}
+        />
       )}
     </div>
   );

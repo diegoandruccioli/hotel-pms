@@ -12,7 +12,7 @@ import { M3Button } from '../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
 import { M3TableActionLink } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
-import { M3Dialog } from '../components/m3';
+import { M3ConfirmDialog } from '../components/m3';
 import { useToastStore } from '../store';
 import { getErrorMessage, quotationStatusTone } from '../utils';
 
@@ -279,23 +279,25 @@ export const Quotations = () => {
       )}
 
       {declineTarget && (
-        <M3Dialog open title={t('action_decline')} titleId="confirm-decline-quotation-dialog" onClose={handleDeclineClose}>
-          <p className="text-sm font-body text-on-surface">{t('confirm_decline')}</p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={handleDeclineClose} disabled={busy}>{t('common:cancel')}</M3Button>
-            <M3Button type="button" onClick={handleDeclineConfirm} loading={busy}>{t('common:confirm')}</M3Button>
-          </div>
-        </M3Dialog>
+        <M3ConfirmDialog
+          title={t('action_decline')}
+          titleId="confirm-decline-quotation-dialog"
+          message={t('confirm_decline')}
+          onConfirm={handleDeclineConfirm}
+          onCancel={handleDeclineClose}
+          loading={busy}
+        />
       )}
 
       {deleteTarget && (
-        <M3Dialog open title={t('action_delete')} titleId="confirm-delete-quotation-dialog" onClose={handleDeleteClose}>
-          <p className="text-sm font-body text-on-surface">{t('confirm_delete')}</p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={handleDeleteClose} disabled={busy}>{t('common:cancel')}</M3Button>
-            <M3Button type="button" onClick={handleDeleteConfirm} loading={busy}>{t('common:confirm')}</M3Button>
-          </div>
-        </M3Dialog>
+        <M3ConfirmDialog
+          title={t('action_delete')}
+          titleId="confirm-delete-quotation-dialog"
+          message={t('confirm_delete')}
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleDeleteClose}
+          loading={busy}
+        />
       )}
     </div>
   );
