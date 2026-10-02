@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
@@ -247,7 +247,7 @@ describe('QuotationDetail', () => {
 
     fireEvent.click(screen.getByText('action_decline'));
     expect(screen.getByText('confirm_decline')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:cancel'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByText('cancel'));
 
     expect(screen.queryByText('confirm_decline')).not.toBeInTheDocument();
     expect(quotationService.declineQuotation).not.toHaveBeenCalled();
@@ -260,7 +260,7 @@ describe('QuotationDetail', () => {
 
     fireEvent.click(screen.getByText('action_delete'));
     expect(screen.getByText('confirm_delete')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:cancel'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByText('cancel'));
 
     expect(screen.queryByText('confirm_delete')).not.toBeInTheDocument();
     expect(quotationService.deleteQuotation).not.toHaveBeenCalled();
@@ -276,7 +276,7 @@ describe('QuotationDetail', () => {
 
     fireEvent.click(screen.getByText('action_decline'));
     await waitFor(() => expect(screen.getByText('confirm_decline')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
 
     await waitFor(() => expect(quotationService.declineQuotation).toHaveBeenCalledWith('q1'));
   });
@@ -292,7 +292,7 @@ describe('QuotationDetail', () => {
     await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('action_decline'));
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
 
     await waitFor(() => expect(quotationService.declineQuotation).toHaveBeenCalledWith('q1'));
   });
@@ -305,7 +305,7 @@ describe('QuotationDetail', () => {
 
     fireEvent.click(screen.getByText('action_delete'));
     await waitFor(() => expect(screen.getByText('confirm_delete')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/quotations'));
   });
@@ -318,7 +318,7 @@ describe('QuotationDetail', () => {
 
     fireEvent.click(screen.getByText('action_delete'));
     await waitFor(() => expect(screen.getByText('confirm_delete')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
 
     await waitFor(() => expect(quotationService.deleteQuotation).toHaveBeenCalledWith('q1'));
     expect(mockNavigate).not.toHaveBeenCalledWith('/quotations');

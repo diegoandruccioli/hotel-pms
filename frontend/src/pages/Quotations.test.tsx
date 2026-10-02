@@ -175,7 +175,7 @@ describe('Quotations', () => {
     await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_decline'));
     expect(screen.getByText('confirm_decline')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(quotationService.declineQuotation).toHaveBeenCalledWith('q1'));
     expect(mockAddToast).toHaveBeenCalledWith('toast_declined', 'success');
   });
@@ -186,7 +186,7 @@ describe('Quotations', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_decline'));
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_declined', 'error'));
   });
 
@@ -196,7 +196,7 @@ describe('Quotations', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_delete'));
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_deleted', 'error'));
   });
 
@@ -243,7 +243,7 @@ describe('Quotations', () => {
     await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_decline'));
     expect(screen.getByText('confirm_decline')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:cancel'));
+    fireEvent.click(screen.getByText('cancel'));
     expect(screen.queryByText('confirm_decline')).not.toBeInTheDocument();
     expect(quotationService.declineQuotation).not.toHaveBeenCalled();
   });
@@ -254,7 +254,7 @@ describe('Quotations', () => {
     await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_delete'));
     expect(screen.getByText('confirm_delete')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:cancel'));
+    fireEvent.click(screen.getByText('cancel'));
     expect(screen.queryByText('confirm_delete')).not.toBeInTheDocument();
     expect(quotationService.deleteQuotation).not.toHaveBeenCalled();
   });
@@ -266,7 +266,7 @@ describe('Quotations', () => {
     await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_delete'));
     expect(screen.getByText('confirm_delete')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(quotationService.deleteQuotation).toHaveBeenCalledWith('q1'));
   });
 

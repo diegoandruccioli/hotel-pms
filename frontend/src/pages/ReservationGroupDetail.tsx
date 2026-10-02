@@ -8,6 +8,7 @@ import { M3Button } from '../components/m3';
 import { M3Card } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3Dialog } from '../components/m3';
+import { M3ConfirmDialog } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { useTranslation } from 'react-i18next';
@@ -193,17 +194,14 @@ export const ReservationGroupDetail = () => {
       </M3Card>
 
       {confirmingCancel && (
-        <M3Dialog open title={t('cancel_group')} titleId="confirm-cancel-group-dialog" onClose={handleCancelDialogClose}>
-          <p className="text-sm font-body text-on-surface">{t('cancel_group_confirm')}</p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={handleCancelDialogClose} disabled={cancelGroup.isPending}>
-              {t('cancel')}
-            </M3Button>
-            <M3Button type="button" onClick={handleCancelConfirm} loading={cancelGroup.isPending}>
-              {t('confirm')}
-            </M3Button>
-          </div>
-        </M3Dialog>
+        <M3ConfirmDialog
+          title={t('cancel_group')}
+          titleId="confirm-cancel-group-dialog"
+          message={t('cancel_group_confirm')}
+          onConfirm={handleCancelConfirm}
+          onCancel={handleCancelDialogClose}
+          loading={cancelGroup.isPending}
+        />
       )}
 
       {confirmingCheckout && (

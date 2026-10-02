@@ -1,6 +1,7 @@
 export * from './M3Button';
 export * from './M3Card';
 export * from './M3Checkbox';
+export * from './M3ConfirmDialog';
 export * from './M3DataTable';
 export * from './M3Dialog';
 export * from './M3EmptyState';

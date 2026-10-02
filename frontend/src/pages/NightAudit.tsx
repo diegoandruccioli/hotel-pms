@@ -9,6 +9,7 @@ import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3Dialog } from '../components/m3';
+import { M3ConfirmDialog } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3Pagination } from '../components/m3';
@@ -285,24 +286,14 @@ export const NightAudit = () => {
       )}
 
       {confirmingRun && (
-        <M3Dialog
-          open
+        <M3ConfirmDialog
           title={t('night_audit_run_action')}
           titleId="confirm-night-audit-run-dialog"
-          onClose={handleRunDialogClose}
-        >
-          <p className="text-sm font-body text-on-surface">
-            {t('night_audit_run_confirm', { date: runDate })}
-          </p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={handleRunDialogClose} disabled={runMutation.isPending}>
-              {t('cancel')}
-            </M3Button>
-            <M3Button type="button" onClick={handleRunConfirm} loading={runMutation.isPending}>
-              {t('confirm')}
-            </M3Button>
-          </div>
-        </M3Dialog>
+          message={t('night_audit_run_confirm', { date: runDate })}
+          onConfirm={handleRunConfirm}
+          onCancel={handleRunDialogClose}
+          loading={runMutation.isPending}
+        />
       )}
 
       {detailRun && (

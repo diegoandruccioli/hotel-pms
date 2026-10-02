@@ -11,6 +11,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
+import { M3ConfirmDialog } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { QuotationPdfPreviewDialog } from './QuotationPdfPreviewDialog';
@@ -369,23 +370,25 @@ export const QuotationDetail = () => {
       )}
 
       {declineConfirmOpen && (
-        <M3Dialog open title={t('action_decline')} titleId="confirm-decline-quotation-detail-dialog" onClose={closeDeclineConfirm}>
-          <p className="text-sm font-body text-on-surface">{t('confirm_decline')}</p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={closeDeclineConfirm} disabled={busy}>{t('common:cancel')}</M3Button>
-            <M3Button type="button" onClick={handleDeclineConfirmed} loading={busy}>{t('common:confirm')}</M3Button>
-          </div>
-        </M3Dialog>
+        <M3ConfirmDialog
+          title={t('action_decline')}
+          titleId="confirm-decline-quotation-detail-dialog"
+          message={t('confirm_decline')}
+          onConfirm={handleDeclineConfirmed}
+          onCancel={closeDeclineConfirm}
+          loading={busy}
+        />
       )}
 
       {deleteConfirmOpen && (
-        <M3Dialog open title={t('action_delete')} titleId="confirm-delete-quotation-detail-dialog" onClose={closeDeleteConfirm}>
-          <p className="text-sm font-body text-on-surface">{t('confirm_delete')}</p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={closeDeleteConfirm} disabled={busy}>{t('common:cancel')}</M3Button>
-            <M3Button type="button" onClick={handleDeleteConfirmed} loading={busy}>{t('common:confirm')}</M3Button>
-          </div>
-        </M3Dialog>
+        <M3ConfirmDialog
+          title={t('action_delete')}
+          titleId="confirm-delete-quotation-detail-dialog"
+          message={t('confirm_delete')}
+          onConfirm={handleDeleteConfirmed}
+          onCancel={closeDeleteConfirm}
+          loading={busy}
+        />
       )}
     </div>
   );

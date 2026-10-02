@@ -6,7 +6,7 @@ import type { GuestResponseDTO } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
-import { M3Dialog } from '../components/m3';
+import { M3ConfirmDialog } from '../components/m3';
 import { M3TableActionLink } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
@@ -320,41 +320,27 @@ export const Guests = memo(() => {
       )}
 
       {guestToDelete && (
-        <M3Dialog
-          open
+        <M3ConfirmDialog
           title={t('delete')}
           titleId="confirm-delete-guest-dialog"
-          onClose={handleDeleteCancel}
-        >
-          <p className="text-sm font-body text-on-surface">{t('delete_guest_confirm')}</p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={handleDeleteCancel} disabled={deleting}>
-              {t('cancel')}
-            </M3Button>
-            <M3Button type="button" onClick={handleDeleteConfirm} loading={deleting}>
-              {t('delete')}
-            </M3Button>
-          </div>
-        </M3Dialog>
+          message={t('delete_guest_confirm')}
+          confirmLabel={t('delete')}
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleDeleteCancel}
+          loading={deleting}
+        />
       )}
 
       {guestToExport && (
-        <M3Dialog
-          open
+        <M3ConfirmDialog
           title={t('export_guest_data_confirm_title')}
           titleId="confirm-export-guest-dialog"
-          onClose={handleExportCancel}
-        >
-          <p className="text-sm font-body text-on-surface">{t('export_guest_data_confirm_body')}</p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={handleExportCancel} disabled={exporting}>
-              {t('cancel')}
-            </M3Button>
-            <M3Button type="button" onClick={handleExportConfirm} loading={exporting}>
-              {t('export_guest_data_confirm_action')}
-            </M3Button>
-          </div>
-        </M3Dialog>
+          message={t('export_guest_data_confirm_body')}
+          confirmLabel={t('export_guest_data_confirm_action')}
+          onConfirm={handleExportConfirm}
+          onCancel={handleExportCancel}
+          loading={exporting}
+        />
       )}
     </div>
   );
