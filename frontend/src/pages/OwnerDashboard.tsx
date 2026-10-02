@@ -9,6 +9,7 @@ import { MaterialIcon } from '../components/MaterialIcon';
 import { Alert } from '../components/Alert';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
+import { M3TableEmptyRow } from '../components/m3';
 import { M3Card } from '../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
@@ -254,7 +255,7 @@ export const OwnerDashboard = memo(() => {
 
           <M3Table headers={tableHeaders}>
             {report.invoices.length === 0 ? (
-              <tr><td colSpan={4} className="py-8 text-center text-sm font-body text-on-surface-variant">{t('no_invoices_period')}</td></tr>
+              <M3TableEmptyRow colSpan={tableHeaders.length} message={t('no_invoices_period')} />
             ) : (
               report.invoices.map((inv) => (
                 <InvoiceRow

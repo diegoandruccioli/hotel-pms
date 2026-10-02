@@ -2,6 +2,7 @@ import { useFormatters } from '../../hooks';
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3';
+import { M3EmptyState } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3Select } from '../../components/m3';
 import { M3LoadingState } from '../../components/m3';
@@ -215,9 +216,7 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
           {loadingMenu ? (
             <M3LoadingState label={t('loading')} plain className="h-auto py-6" />
           ) : menuItems.length === 0 ? (
-            <p className="text-sm font-body text-on-surface-variant text-center py-4">
-              {t('no_menu_available')}
-            </p>
+            <M3EmptyState icon="restaurant_menu" title={t('no_menu_available')} className="py-6" />
           ) : (
             <ul aria-labelledby="menu-items-label" className="space-y-2">
               {menuItems.map((item) => (

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { quotationService } from '../services';
 import type { QuotationResponse } from '../types';
 import { M3LoadingState } from '../components/m3';
+import { M3TableEmptyRow } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
@@ -244,11 +245,7 @@ export const Quotations = () => {
       ) : (
         <M3Table headers={tableHeaders}>
           {quotations.length === 0 ? (
-            <tr>
-              <td colSpan={7} className="py-8 text-center text-sm font-body text-on-surface-variant">
-                {t('no_quotations_found')}
-              </td>
-            </tr>
+            <M3TableEmptyRow colSpan={tableHeaders.length} message={t('no_quotations_found')} />
           ) : (
             quotations.map((quotation) => (
               <QuotationRow

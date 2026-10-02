@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { rateSeasonService } from '../../services';
 import type { RateSeasonRequest, RateSeasonResponse, RoomTypeResponse } from '../../types';
 import { M3LoadingState } from '../../components/m3';
+import { M3EmptyState } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
@@ -207,7 +208,7 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
           {loading ? (
             <M3LoadingState label={t('common:loading')} plain className="h-32" />
           ) : seasons.length === 0 ? (
-            <p className="text-sm font-body text-on-surface-variant py-4">{t('no_rate_seasons')}</p>
+            <M3EmptyState icon="date_range" title={t('no_rate_seasons')} className="py-6" />
           ) : deletingSeason ? (
             <div className="flex flex-col gap-3 items-center py-4">
               <span className="text-sm font-medium font-body text-error">
