@@ -8,6 +8,7 @@ import { useToastStore } from '../store';
 import type { ReservationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { M3LoadingState } from '../components/m3';
+import { M3ErrorState } from '../components/m3';
 import { PageHeader } from '../components/PageHeader';
 import { M3StatusChip } from '../components/m3';
 import { M3Card } from '../components/m3';
@@ -275,16 +276,12 @@ export const CalendarPlanning = () => {
       {loading ? (
         <M3LoadingState label={t('common:loading')} className="h-96" />
       ) : error ? (
-        <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium font-body">{t('error_loading_reservations')}</h3>
-            <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button type="button" onClick={loadData} className="mt-2 text-sm font-medium underline hover:no-underline">
-              {t('try_again')}
-            </button>
-          </div>
-        </div>
+        <M3ErrorState
+          title={t('error_loading_reservations')}
+          message={error}
+          retryLabel={t('try_again')}
+          onRetry={loadData}
+        />
       ) : view === 'planning' ? (
         <PlanningBoard
           rooms={rooms}

@@ -4,9 +4,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { quotationService } from '../../services';
 import type { QuotationResponse, QuotationOptionResponse } from '../../types';
-import { MaterialIcon } from '../../components/MaterialIcon';
 import { Alert } from '../../components/Alert';
 import { M3LoadingState } from '../../components/m3';
+import { M3ErrorState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
@@ -221,16 +221,12 @@ export const QuotationDetail = () => {
 
   if (error || !quotation) {
     return (
-      <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-        <MaterialIcon name="error" size={20} className="shrink-0" />
-        <div>
-          <h3 className="text-sm font-medium font-body">{t('error_loading_quotation')}</h3>
-          <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-          <button type="button" onClick={loadQuotation} className="mt-2 text-sm font-medium underline hover:no-underline">
-            {t('common:try_again')}
-          </button>
-        </div>
-      </div>
+      <M3ErrorState
+        title={t('error_loading_quotation')}
+        message={error ?? ''}
+        retryLabel={t('common:try_again')}
+        onRetry={loadQuotation}
+      />
     );
   }
 
