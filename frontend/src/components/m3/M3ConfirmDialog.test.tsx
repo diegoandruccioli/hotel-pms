@@ -1,5 +1,5 @@
 import { createElement, Fragment } from 'react';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
@@ -14,7 +14,7 @@ vi.mock('focus-trap-react', () => ({
   default: ({ children }: { children: ReactNode }) => createElement(Fragment, null, children),
 }));
 
-const renderDialog = (props: Partial<React.ComponentProps<typeof M3ConfirmDialog>> = {}) => {
+const renderDialog = (props: Partial<ComponentProps<typeof M3ConfirmDialog>> = {}) => {
   const onConfirm = vi.fn();
   const onCancel = vi.fn();
   render(
