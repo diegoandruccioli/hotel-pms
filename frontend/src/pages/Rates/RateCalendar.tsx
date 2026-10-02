@@ -5,6 +5,7 @@ import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMont
 import { rateSeasonService } from '../../services';
 import type { RateCalendarResponse } from '../../types';
 import { M3LoadingState } from '../../components/m3';
+import { M3EmptyState } from '../../components/m3';
 import { M3ErrorState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
@@ -246,8 +247,8 @@ export const RateCalendar = () => {
           onRetry={loadCalendar}
         />
       ) : roomTypeOptions.length === 0 ? (
-        <M3Card variant="outlined" className="p-8 text-center text-sm font-body text-on-surface-variant">
-          {t('no_room_types_for_calendar')}
+        <M3Card variant="outlined">
+          <M3EmptyState icon="payments" title={t('no_room_types_for_calendar')} />
         </M3Card>
       ) : (
         <M3Card variant="outlined" className="overflow-hidden">

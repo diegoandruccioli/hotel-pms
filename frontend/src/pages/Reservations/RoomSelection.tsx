@@ -1,6 +1,7 @@
 import { useCallback, useMemo, memo } from 'react';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3TextField } from '../../components/m3';
+import { M3EmptyState } from '../../components/m3';
 import { useTranslation } from 'react-i18next';
 import type { RoomResponse } from '../../types';
 import type { ReservationResponse } from '../../types';
@@ -164,7 +165,7 @@ export const RoomSelection = memo(({
       <div className="pt-4">
         <h3 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider mb-3">{t('select_rooms')}</h3>
         {availableRooms.length === 0 ? (
-          <p className="text-sm text-on-surface-variant">{t('no_rooms_available')}</p>
+          <M3EmptyState icon="meeting_room" title={t('no_rooms_available')} className="py-6" />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {availableRooms.map(room => (
