@@ -6,6 +6,7 @@ import { useToastStore } from '../store';
 import type { OwnerFinancialReportDto, OwnerFinancialSummaryDto } from '../types';
 import type { InvoiceResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { Alert } from '../components/Alert';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3Card } from '../components/m3';
@@ -201,10 +202,7 @@ export const OwnerDashboard = memo(() => {
       </M3Card>
 
       {error && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="shrink-0" />
-          <p className="text-sm font-body">{error}</p>
-        </div>
+        <Alert tone="error">{error}</Alert>
       )}
 
       <KpiTrendSection

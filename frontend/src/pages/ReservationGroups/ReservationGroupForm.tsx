@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Alert } from '../../components/Alert';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button, M3Card, M3TextField, M3Textarea, M3Checkbox } from '../../components/m3';
 import { GuestSearchAndCreate } from '../Reservations/GuestSearchAndCreate';
@@ -137,9 +138,7 @@ export const ReservationGroupForm = () => {
       <PageHeader icon="groups" title={t('new_group')} />
 
       {error && (
-        <div className="p-3 rounded-shape-sm bg-error-container text-on-error-container text-sm" role="alert">
-          {error}
-        </div>
+        <Alert tone="error">{error}</Alert>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">

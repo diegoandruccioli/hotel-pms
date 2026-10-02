@@ -3,6 +3,7 @@ import { useState, useCallback, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { NightAuditRunResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { Alert } from '../components/Alert';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
@@ -83,25 +84,22 @@ const NightAuditPreCheck = ({ businessDate }: { businessDate: string }) => {
   if (pendingArrivalsCount === 0 && pendingDeparturesCount === 0) return null;
 
   return (
-    <div
-      role="status"
-      className="flex flex-col gap-2 px-4 py-3 rounded-shape-sm bg-secondary-container text-on-secondary-container text-sm font-body"
-    >
-      {pendingArrivalsCount > 0 && (
-        <div className="flex items-center gap-2">
-          <MaterialIcon name="info" size={18} className="shrink-0" />
-          <span>{t('night_audit_precheck_pending_arrivals', { count: pendingArrivalsCount })}</span>
-          <Link to="/reservations" className="underline hover:no-underline font-medium">{t('view_all')}</Link>
-        </div>
-      )}
-      {pendingDeparturesCount > 0 && (
-        <div className="flex items-center gap-2">
-          <MaterialIcon name="info" size={18} className="shrink-0" />
-          <span>{t('night_audit_precheck_pending_departures', { count: pendingDeparturesCount })}</span>
-          <Link to="/stays" className="underline hover:no-underline font-medium">{t('view_all')}</Link>
-        </div>
-      )}
-    </div>
+    <Alert tone="warning" icon="info">
+      <div className="flex flex-col gap-2">
+        {pendingArrivalsCount > 0 && (
+          <div className="flex items-center gap-2">
+            <span>{t('night_audit_precheck_pending_arrivals', { count: pendingArrivalsCount })}</span>
+            <Link to="/reservations" className="underline hover:no-underline font-medium">{t('view_all')}</Link>
+          </div>
+        )}
+        {pendingDeparturesCount > 0 && (
+          <div className="flex items-center gap-2">
+            <span>{t('night_audit_precheck_pending_departures', { count: pendingDeparturesCount })}</span>
+            <Link to="/stays" className="underline hover:no-underline font-medium">{t('view_all')}</Link>
+          </div>
+        )}
+      </div>
+    </Alert>
   );
 };
 

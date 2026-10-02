@@ -9,7 +9,7 @@ import type {
 } from '../../types';
 import type { GuestResponseDTO } from '../../types';
 import { useToastStore } from '../../store';
-import { MaterialIcon } from '../../components/MaterialIcon';
+import { Alert } from '../../components/Alert';
 import { PageHeader } from '../../components/PageHeader';
 import { M3TextField } from '../../components/m3';
 import { M3Select } from '../../components/m3';
@@ -222,16 +222,9 @@ export function WalkInCheckInForm() {
       <PageHeader id="walkin-title" title={t('walkin_title')} subtitle={t('walkin_subtitle')} className="mb-6" />
 
       {cityTaxWarning && cityTaxWarning !== 'NOT_APPLICABLE' && (
-        <div
-          role="status"
-          className="mb-6 bg-secondary-container text-on-secondary-container p-4 rounded-shape-sm flex items-start gap-3"
-        >
-          <MaterialIcon name="info" className="mt-0.5 shrink-0" />
-          <div>
-            <p className="font-body text-sm font-medium">{t('city_tax_preflight_title')}</p>
-            <p className="font-body text-sm">{t(`city_tax_preflight_reason_${cityTaxWarning.toLowerCase()}`)}</p>
-          </div>
-        </div>
+        <Alert tone="warning" icon="info" title={t('city_tax_preflight_title')} className="mb-6">
+          {t(`city_tax_preflight_reason_${cityTaxWarning.toLowerCase()}`)}
+        </Alert>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>

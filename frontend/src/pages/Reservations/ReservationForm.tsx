@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { z } from 'zod';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { Alert } from '../../components/Alert';
 import { M3LoadingState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
@@ -277,27 +278,21 @@ export const ReservationForm = () => {
       <PageHeader title={titles.title} subtitle={titles.subtitle} onBack={handleBackToReservations} bordered />
 
       {error && (
-        <div className="p-4 bg-error-container text-on-error-container rounded-shape-sm flex items-start gap-3">
-          <MaterialIcon name="error" />
-          <p className="text-sm font-body mt-0.5">{error}</p>
-        </div>
+        <Alert tone="error">{error}</Alert>
       )}
 
       {checkedInStayId && (
-        <div className="p-4 bg-tertiary-container text-on-tertiary-container rounded-shape-sm flex items-start gap-3">
-          <MaterialIcon name="info" />
-          <div className="text-sm font-body mt-0.5 flex-1">
-            <p>{t('reservation_already_checked_in_banner')}</p>
-            <M3Button
-              type="button"
-              variant="text"
-              className="mt-1 px-0"
-              onClick={handleGoToStay}
-            >
-              {t('reservation_go_to_stay')}
-            </M3Button>
-          </div>
-        </div>
+        <Alert tone="info">
+          <p>{t('reservation_already_checked_in_banner')}</p>
+          <M3Button
+            type="button"
+            variant="text"
+            className="mt-1 px-0"
+            onClick={handleGoToStay}
+          >
+            {t('reservation_go_to_stay')}
+          </M3Button>
+        </Alert>
       )}
 
       {/* STEP 1: GUEST SELECTION OR CREATION */}

@@ -2,7 +2,7 @@ import { useState, useCallback, memo, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MaterialIcon } from '../../components/MaterialIcon';
+import { Alert } from '../../components/Alert';
 import { M3LoadingState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
@@ -232,34 +232,21 @@ export const CheckInForm = memo(() => {
       <PageHeader title={t('checkin_title')} onBack={handleBack} />
 
       {prefillFields.length > 0 && (
-        <div className="bg-secondary-container text-on-secondary-container p-4 rounded-shape-sm flex items-start gap-3">
-          <MaterialIcon name="auto_fix_high" className="mt-0.5 shrink-0" />
-          <p className="font-body text-sm">
-            {prefillSource === 'stay'
-              ? t('prefill_banner_stay', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })
-              : t('prefill_banner_profile', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })}
-          </p>
-        </div>
+        <Alert tone="warning" icon="auto_fix_high">
+          {prefillSource === 'stay'
+            ? t('prefill_banner_stay', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })
+            : t('prefill_banner_profile', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })}
+        </Alert>
       )}
 
       {cityTaxWarning && cityTaxWarning !== 'NOT_APPLICABLE' && (
-        <div
-          role="status"
-          className="bg-secondary-container text-on-secondary-container p-4 rounded-shape-sm flex items-start gap-3"
-        >
-          <MaterialIcon name="info" className="mt-0.5 shrink-0" />
-          <div>
-            <p className="font-body text-sm font-medium">{t('city_tax_preflight_title')}</p>
-            <p className="font-body text-sm">{t(`city_tax_preflight_reason_${cityTaxWarning.toLowerCase()}`)}</p>
-          </div>
-        </div>
+        <Alert tone="warning" icon="info" title={t('city_tax_preflight_title')}>
+          {t(`city_tax_preflight_reason_${cityTaxWarning.toLowerCase()}`)}
+        </Alert>
       )}
 
       {error && (
-        <div className="bg-error-container text-on-error-container p-4 rounded-shape-sm flex items-start gap-3">
-          <MaterialIcon name="error" className="mt-0.5 shrink-0" />
-          <p className="font-body text-sm">{error}</p>
-        </div>
+        <Alert tone="error">{error}</Alert>
       )}
 
       {contextLoading ? (

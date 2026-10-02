@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { Alert } from '../components/Alert';
 import { PageHeader } from '../components/PageHeader';
 import { M3Card } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
@@ -123,45 +124,41 @@ export const Dashboard = () => {
       />
 
       {alloggiatiFailures && alloggiatiFailures.failedCount > 0 && (
-        <div
-          role="alert"
-          className="mt-4 flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container"
+        <Alert
+          tone="error"
+          icon="warning"
+          title={t('alloggiati_failure_banner_title')}
+          className="mt-4"
+          action={
+            <Link
+              to="/stays"
+              className="inline-flex items-center min-h-10 text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
+            >
+              {t('view_all')}
+            </Link>
+          }
         >
-          <MaterialIcon name="warning" size={20} className="shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-body font-medium">{t('alloggiati_failure_banner_title')}</p>
-            <p className="text-sm font-body">
-              {t('alloggiati_failure_banner_desc', { count: alloggiatiFailures.failedCount })}
-            </p>
-          </div>
-          <Link
-            to="/stays"
-            className="inline-flex items-center min-h-10 text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
-          >
-            {t('view_all')}
-          </Link>
-        </div>
+          {t('alloggiati_failure_banner_desc', { count: alloggiatiFailures.failedCount })}
+        </Alert>
       )}
 
       {cityTaxUnassessed && cityTaxUnassessed.unassessedCount > 0 && (
-        <div
-          role="alert"
-          className="mt-4 flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container"
+        <Alert
+          tone="error"
+          icon="warning"
+          title={t('city_tax_unassessed_banner_title')}
+          className="mt-4"
+          action={
+            <Link
+              to="/settings/city-tax"
+              className="inline-flex items-center min-h-10 text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
+            >
+              {t('city_tax_unassessed_banner_action')}
+            </Link>
+          }
         >
-          <MaterialIcon name="warning" size={20} className="shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-body font-medium">{t('city_tax_unassessed_banner_title')}</p>
-            <p className="text-sm font-body">
-              {t('city_tax_unassessed_banner_desc', { count: cityTaxUnassessed.unassessedCount })}
-            </p>
-          </div>
-          <Link
-            to="/settings/city-tax"
-            className="inline-flex items-center min-h-10 text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
-          >
-            {t('city_tax_unassessed_banner_action')}
-          </Link>
-        </div>
+          {t('city_tax_unassessed_banner_desc', { count: cityTaxUnassessed.unassessedCount })}
+        </Alert>
       )}
 
       {isLoading ? (

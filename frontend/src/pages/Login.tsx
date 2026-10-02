@@ -5,7 +5,7 @@ import { authService } from '../services';
 import { useTranslation } from 'react-i18next';
 import { M3TextField } from '../components/m3';
 import { M3Button } from '../components/m3';
-import { MaterialIcon } from '../components/MaterialIcon';
+import { Alert } from '../components/Alert';
 
 export const Login = memo(() => {
   const { t } = useTranslation('auth');
@@ -54,10 +54,7 @@ export const Login = memo(() => {
   return (
     <form data-testid="login-form" className="space-y-5" onSubmit={handleSubmit}>
       {error && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} />
-          <p className="text-sm font-body">{error}</p>
-        </div>
+        <Alert tone="error">{error}</Alert>
       )}
 
       <M3TextField

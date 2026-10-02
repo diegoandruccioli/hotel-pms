@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { quotationService } from '../../services';
 import type { QuotationResponse, QuotationOptionResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { Alert } from '../../components/Alert';
 import { M3LoadingState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
@@ -250,10 +251,7 @@ export const QuotationDetail = () => {
       />
 
       {quotation.sendFailed && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="shrink-0" />
-          <p className="text-sm font-body">{t('send_failed_banner')}</p>
-        </div>
+        <Alert tone="error">{t('send_failed_banner')}</Alert>
       )}
 
       <M3Card className="p-6 space-y-4">
