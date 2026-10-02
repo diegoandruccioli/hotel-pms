@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3Select } from '../../components/m3';
+import { M3LoadingState } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { fbService } from '../../services';
 import { stayService } from '../../services';
@@ -212,14 +213,7 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
           </p>
 
           {loadingMenu ? (
-            <div className="flex justify-center py-6" aria-label={t('loading')}>
-              <MaterialIcon
-                name="progress_activity"
-                size={24}
-                className="text-primary animate-spin"
-                aria-hidden="true"
-              />
-            </div>
+            <M3LoadingState label={t('loading')} plain className="h-auto py-6" />
           ) : menuItems.length === 0 ? (
             <p className="text-sm font-body text-on-surface-variant text-center py-4">
               {t('no_menu_available')}

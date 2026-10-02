@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { rateSeasonService } from '../../services';
 import type { RateSeasonRequest, RateSeasonResponse, RoomTypeResponse } from '../../types';
-import { MaterialIcon } from '../../components/MaterialIcon';
+import { M3LoadingState } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
@@ -205,9 +205,7 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
           </div>
 
           {loading ? (
-            <div className="flex justify-center items-center h-32">
-              <MaterialIcon name="progress_activity" size={28} className="text-primary animate-spin" />
-            </div>
+            <M3LoadingState label={t('common:loading')} plain className="h-32" />
           ) : seasons.length === 0 ? (
             <p className="text-sm font-body text-on-surface-variant py-4">{t('no_rate_seasons')}</p>
           ) : deletingSeason ? (

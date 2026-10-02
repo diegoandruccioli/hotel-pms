@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { M3LoadingState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
@@ -350,9 +351,7 @@ export const QuotationForm = () => {
 
   if (fetching) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-      </div>
+      <M3LoadingState label={t('common:loading')} plain />
     );
   }
 

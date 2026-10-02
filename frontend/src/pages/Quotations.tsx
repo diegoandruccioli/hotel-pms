@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { quotationService } from '../services';
 import type { QuotationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { M3LoadingState } from '../components/m3';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
@@ -232,9 +233,7 @@ export const Quotations = () => {
       />
 
       {loading ? (
-        <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('common:loading')} />
       ) : error ? (
         <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
           <MaterialIcon name="error" size={20} className="shrink-0" />

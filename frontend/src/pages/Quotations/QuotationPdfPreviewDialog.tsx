@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { quotationService } from '../../services';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { M3LoadingState } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
 import { getErrorMessage } from '../../utils';
@@ -65,9 +66,7 @@ export const QuotationPdfPreviewDialog = memo(({ quotationId, onClose }: Props) 
     >
       <div className="h-[70vh] flex flex-col">
         {loading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-          </div>
+          <M3LoadingState label={t('common:loading')} plain className="flex-1 h-auto" />
         ) : error ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6">
             <MaterialIcon name="error" size={32} className="text-error" />
