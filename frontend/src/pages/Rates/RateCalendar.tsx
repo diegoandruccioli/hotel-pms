@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from 'date-fns';
 import { rateSeasonService } from '../../services';
 import type { RateCalendarResponse } from '../../types';
-import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3LoadingState } from '../../components/m3';
+import { M3ErrorState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
@@ -239,16 +239,12 @@ export const RateCalendar = () => {
       {loading ? (
         <M3LoadingState label={t('loading')} />
       ) : error ? (
-        <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium font-body">{t('error_loading_rate_calendar')}</h3>
-            <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button type="button" onClick={loadCalendar} className="mt-2 text-sm font-medium underline hover:no-underline">
-              {t('try_again')}
-            </button>
-          </div>
-        </div>
+        <M3ErrorState
+          title={t('error_loading_rate_calendar')}
+          message={error}
+          retryLabel={t('try_again')}
+          onRetry={loadCalendar}
+        />
       ) : roomTypeOptions.length === 0 ? (
         <M3Card variant="outlined" className="p-8 text-center text-sm font-body text-on-surface-variant">
           {t('no_room_types_for_calendar')}
