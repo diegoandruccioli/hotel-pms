@@ -7799,6 +7799,24 @@ dipendenze peer. \texttt{baseline-browser-mapping}, \texttt{browserslist},
 Vitest verdi.
 Commit: \commitref{209354e}{fix(deps): bump vitest to 4.1.11, closing @vitest/mocker path-traversal advisory}
 
+\paragraph{Bump Grafana e override frontend --- alert residui (DEP-CVE-10, DEP-CVE-11)}
+8 alert Trivy HIGH sull'immagine \texttt{grafana/grafana:13.1.5}
+(CVE-2026-84304 e CVE-2026-84445 su grpc, CVE-2026-43871 su thrift,
+CVE-2026-14456 su OpenSSL) risolti con il bump a \texttt{13.1.7}: il job CI
+\texttt{trivy-thirdparty} legge il tag da \texttt{docker-compose.yml}, quindi
+non serve alcuna modifica al workflow. Il rescan locale conferma l'assenza
+delle quattro CVE; due HIGH nuove sul modulo \texttt{grafana/tempo}
+vendorizzato (CVE-2026-21728, CVE-2026-28377) riguardano il server Tempo, che
+non eseguiamo, e sono soppresse in \texttt{.trivyignore} con motivazione.
+L'alert CodeQL \#618 (\texttt{java/log-injection}) è stato dismissato come
+falso positivo: \texttt{sanitizeForLog()} rimuove CR/LF su entrambi gli
+argomenti. 7 alert Dependabot su devDependency (\texttt{undici},
+\texttt{js-yaml}) risolti alzando gli \texttt{overrides} di
+\texttt{package.json}, rimasti fermi alle versioni vulnerabili. Verificato:
+lint pulito, build verde, 1193/1193 test Vitest verdi.
+Commit: \commitref{7ff622c}{fix(security): bump grafana to 13.1.7 for grpc/thrift/openssl CVEs},
+\commitref{587d637}{fix(security): raise undici/js-yaml overrides to patched versions}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Appendice B --- Utilizzo dell'IA e Revisione Critica}
 \label{app:ia}
