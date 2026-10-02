@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { RoomResponse } from '../../types';
+import { Alert } from '../../components/Alert';
 import { M3Button } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
@@ -133,9 +134,9 @@ export const RoomList = memo(() => {
       </div>
 
       {roomTypes.length === 0 && !loading && !error && (
-        <div className="p-4 bg-tertiary-container text-on-tertiary-container rounded-shape-md mb-4 text-sm font-body">
+        <Alert tone="info" className="mb-4">
           {t('error_loading_room_types')} ({t('add_room_type')} prima)
-        </div>
+        </Alert>
       )}
 
       {loading ? (

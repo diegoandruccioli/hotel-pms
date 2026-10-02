@@ -7,7 +7,7 @@ import { authService } from '../../services';
 import { M3Card } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
-import { MaterialIcon } from '../../components/MaterialIcon';
+import { Alert } from '../../components/Alert';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
 import { PasswordRequirementsChecklist } from '../../components/PasswordRequirementsChecklist';
 import { isPasswordValid } from '../../utils';
@@ -91,21 +91,14 @@ export const SettingsPassword = () => {
       <SettingsPageHeader icon="lock" title={t('section_change_password')} onBack={handleBack} />
 
       {mustChangePassword && (
-        <div role="alert" className="flex items-start gap-3 rounded-2xl bg-secondary-container text-on-secondary-container px-4 py-3 text-sm font-medium">
-          <MaterialIcon name="warning" size={18} className="mt-0.5 shrink-0" />
+        <Alert tone="warning" role="alert" className="font-medium">
           {t('must_change_password_banner', 'You must change your password before continuing.')}
-        </div>
+        </Alert>
       )}
 
       <M3Card className="p-6">
         {error && (
-          <div
-            role="alert"
-            className="mb-4 p-4 bg-error-container text-on-error-container rounded-shape-sm flex items-start gap-3"
-          >
-            <MaterialIcon name="error" />
-            <p className="text-sm font-body mt-0.5">{error}</p>
-          </div>
+          <Alert tone="error" className="mb-4">{error}</Alert>
         )}
 
         <form onSubmit={handleChangePassword} className="space-y-4" noValidate>

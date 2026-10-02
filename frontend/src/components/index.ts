@@ -9,6 +9,7 @@
 // (`./components/Toast`, `./components/UserMenu`, ...); this file exists
 // only for consistency with every other src/ folder's barrel-export rule,
 // not because it's safe to consume.
+export * from './Alert';
 export * from './CommandPalette';
 export * from './ErrorBoundary';
 export * from './MaterialIcon';

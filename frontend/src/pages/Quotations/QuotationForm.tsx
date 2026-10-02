@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { Alert } from '../../components/Alert';
 import { M3LoadingState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
@@ -360,10 +361,7 @@ export const QuotationForm = () => {
       <PageHeader title={isEditMode ? t('edit_quotation') : t('new_quotation')} onBack={handleBack} bordered />
 
       {error && (
-        <div className="p-4 bg-error-container text-on-error-container rounded-shape-sm flex items-start gap-3">
-          <MaterialIcon name="error" />
-          <p className="text-sm font-body mt-0.5">{error}</p>
-        </div>
+        <Alert tone="error">{error}</Alert>
       )}
 
       <M3Card className="p-6 space-y-4">
