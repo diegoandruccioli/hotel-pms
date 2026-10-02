@@ -5,6 +5,7 @@ import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMont
 import { rateSeasonService } from '../../services';
 import type { RateCalendarResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { M3LoadingState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
@@ -236,9 +237,7 @@ export const RateCalendar = () => {
       )}
 
       {loading ? (
-        <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('loading')} />
       ) : error ? (
         <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
           <MaterialIcon name="error" size={20} className="shrink-0" />

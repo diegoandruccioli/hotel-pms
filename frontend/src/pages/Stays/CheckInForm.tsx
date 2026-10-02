@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { M3LoadingState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { stayService } from '../../services';
@@ -262,9 +263,7 @@ export const CheckInForm = memo(() => {
       )}
 
       {contextLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('common:loading')} plain className="h-auto py-12" />
       ) : (
       <form onSubmit={handleSubmit} noValidate className="space-y-6">
         {guests.map((guest, index) => (

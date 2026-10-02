@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useToastStore } from '../store';
 import type { ReservationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { M3LoadingState } from '../components/m3';
 import { PageHeader } from '../components/PageHeader';
 import { M3StatusChip } from '../components/m3';
 import { M3Card } from '../components/m3';
@@ -272,9 +273,7 @@ export const CalendarPlanning = () => {
 
       {/* Calendar body */}
       {loading ? (
-        <div className="flex justify-center items-center h-96 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('common:loading')} className="h-96" />
       ) : error ? (
         <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
           <MaterialIcon name="error" size={20} className="shrink-0" />

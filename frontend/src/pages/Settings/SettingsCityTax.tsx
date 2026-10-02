@@ -11,7 +11,7 @@ import type {
   HotelCategoryHistoryRequest,
   HotelCategoryHistoryResponse,
 } from '../../types';
-import { MaterialIcon } from '../../components/MaterialIcon';
+import { M3LoadingState } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
 import { M3Select } from '../../components/m3';
@@ -155,9 +155,7 @@ const HotelCategorySection = () => {
       </form>
 
       {loading ? (
-        <div className="flex justify-center items-center h-24">
-          <MaterialIcon name="progress_activity" size={28} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('common:loading')} plain className="h-24" />
       ) : history.length === 0 ? (
         <p className="text-sm font-body text-on-surface-variant py-4">{t('city_tax_no_category_history')}</p>
       ) : (
@@ -368,9 +366,7 @@ const CityTaxRatesSection = () => {
       </form>
 
       {loading ? (
-        <div className="flex justify-center items-center h-24">
-          <MaterialIcon name="progress_activity" size={28} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('common:loading')} plain className="h-24" />
       ) : rates.length === 0 ? (
         <p className="text-sm font-body text-on-surface-variant py-4">{t('city_tax_no_rates')}</p>
       ) : (
@@ -442,9 +438,7 @@ const CityTaxApplicabilitySection = () => {
       </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-16">
-          <MaterialIcon name="progress_activity" size={28} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('common:loading')} plain className="h-16" />
       ) : (
         <M3Select
           label={t('city_tax_applicability_label')}

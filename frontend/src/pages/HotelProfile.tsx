@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { stayService } from '../services';
 import type { HotelSettingsResponse, HotelSettingsRequest } from '../types';
-import { MaterialIcon } from '../components/MaterialIcon';
+import { M3LoadingState } from '../components/m3';
 import { M3Button } from '../components/m3';
 import { M3Card } from '../components/m3';
 import { M3TextField } from '../components/m3';
@@ -150,9 +150,7 @@ export function HotelProfile() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-24">
-        <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-      </div>
+      <M3LoadingState label={t('common:loading')} plain className="h-auto py-24" />
     );
   }
 
