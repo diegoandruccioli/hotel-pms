@@ -130,6 +130,15 @@ CVE-2026-45447
 #   Protected by HTTP Basic Auth (T-CFG-03). No external exposure.
 #   Affected: spring-cloud-config-server 5.x. Fix pending Spring Cloud 2025.x patch.
 CVE-2026-41002
+# ── Grafana (usr/share/grafana/bin/grafana) ──────────────────────────────────
+# CVE-2026-21728, CVE-2026-28377 — grafana/tempo Go module, vendored into the
+#   grafana binary for its Tempo datasource client. Both advisories concern the
+#   Tempo *server* (DoS via large queries, S3 key leak via status endpoint);
+#   we run no Tempo server and the Tempo datasource is not provisioned. Fix only
+#   ships upstream (grafana 13.2.3 is not clean either: other bundled plugins).
+#   Re-check on the next grafana patch bump.
+CVE-2026-21728
+CVE-2026-28377
 # Format: one CVE-ID per line, with a comment explaining the
 # justification — mirrors the approach used in
 # config/dependency-check/suppressions.xml for OWASP DC.

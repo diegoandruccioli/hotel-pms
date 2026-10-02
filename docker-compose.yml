@@ -178,7 +178,7 @@ services:
   # Grafana - Dashboard SIEM (GAP-4: visualizzazione audit log)
   # ----------------------------------------------------------
   grafana:
-    image: grafana/grafana:13.1.5
+    image: grafana/grafana:13.1.7
     container_name: hotel_grafana
     restart: unless-stopped
     profiles: ["observability"]
