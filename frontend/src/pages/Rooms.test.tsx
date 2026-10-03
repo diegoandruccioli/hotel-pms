@@ -44,34 +44,26 @@ describe('Rooms', () => {
     });
   });
 
-  it('renders both tab buttons', () => {
+  it('renders both tabs as radios in a labelled group', () => {
     render(<Rooms />);
-    // Use getAllByText because sub-components share translation keys
-    expect(screen.getAllByText('tab_rooms').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('tab_room_types').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('radiogroup', { name: 'rooms_tabs_label' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'tab_rooms' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'tab_room_types' })).toBeInTheDocument();
   });
 
-  it('Rooms tab is active by default (has bg-primary class)', () => {
+  it('Rooms tab is active by default', () => {
     render(<Rooms />);
-    const activeBtn = screen
-      .getAllByText('tab_rooms')
-      .find((el) => el.closest('button')?.className.includes('bg-primary'));
-    expect(activeBtn).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'tab_rooms' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'tab_room_types' })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('Room Types tab becomes active after click', async () => {
     render(<Rooms />);
-    const typeBtn = screen
-      .getAllByText('tab_room_types')
-      .find((el) => el.closest('button') !== null);
-    expect(typeBtn).toBeTruthy();
-    fireEvent.click(typeBtn!.closest('button')!);
+    fireEvent.click(screen.getByRole('radio', { name: 'tab_room_types' }));
     await waitFor(() => {
-      const nowActive = screen
-        .getAllByText('tab_room_types')
-        .find((el) => el.closest('button')?.className.includes('bg-primary'));
-      expect(nowActive).toBeTruthy();
+      expect(screen.getByRole('radio', { name: 'tab_room_types' })).toHaveAttribute('aria-checked', 'true');
     });
+    expect(screen.getByRole('radio', { name: 'tab_rooms' })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('shows rooms subtitle text', async () => {

@@ -218,6 +218,7 @@
   "rooms_subtitle": "Gestisci le camere fisiche e le tipologie di stanza.",
   "tab_rooms": "Camere Fisiche",
   "tab_room_types": "Tipologie",
+  "rooms_tabs_label": "Sezione inventario",
   "add_room": "Nuova Camera",
   "add_room_type": "Nuova Tipologia",
   "room_type": "Tipologia",

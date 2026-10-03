@@ -6,7 +6,7 @@ import { cn } from '../../utils';
 export interface M3SegmentOption<T extends string> {
   value: T;
   labelKey: string;
-  icon: string;
+  icon?: string;
 }
 
 /**
@@ -18,15 +18,17 @@ const SegmentedButton = memo(function SegmentedButton<T extends string>({
   isActive,
   isFirst,
   isLast,
+  ns,
   onChange,
 }: {
   opt: M3SegmentOption<T>;
   isActive: boolean;
   isFirst: boolean;
   isLast: boolean;
+  ns: string;
   onChange: (v: T) => void;
 }) {
-  const { t } = useTranslation('settings');
+  const { t } = useTranslation(ns);
   const handleClick = useCallback(() => onChange(opt.value), [onChange, opt.value]);
 
   return (
@@ -50,7 +52,13 @@ const SegmentedButton = memo(function SegmentedButton<T extends string>({
       )}
       aria-label={t(opt.labelKey)}
     >
-      {isActive && <MaterialIcon name="check" size={16} className="shrink-0" />}
+      {isActive ? (
+        <MaterialIcon name="check" size={16} className="shrink-0" />
+      ) : (
+        opt.icon && (
+          <MaterialIcon name={opt.icon} size={16} className="hidden shrink-0 sm:inline-block" />
+        )
+      )}
       <span className="truncate">{t(opt.labelKey)}</span>
     </button>
   );
@@ -59,29 +67,36 @@ const SegmentedButton = memo(function SegmentedButton<T extends string>({
   isActive: boolean;
   isFirst: boolean;
   isLast: boolean;
+  ns: string;
   onChange: (v: T) => void;
 }) => ReactElement;
 
 /**
  * M3 Segmented-button row (mutual exclusion).
- * Each option shows a check icon when selected.
+ * The selected option shows a check icon; the others show their own icon, if any
+ * (from the `sm` breakpoint up, so narrow screens keep room for the labels).
+ * Labels are translated from `ns` (default "settings").
  */
 export function M3SegmentedRow<T extends string>({
   options,
   value,
   onChange,
   ariaLabel,
+  ns = 'settings',
+  className,
 }: {
   options: M3SegmentOption<T>[];
   value: T;
   onChange: (v: T) => void;
   ariaLabel: string;
+  ns?: string;
+  className?: string;
 }) {
   return (
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className="flex rounded-shape-full border border-outline overflow-hidden"
+      className={cn('flex rounded-shape-full border border-outline overflow-hidden', className)}
     >
       {options.map((opt, idx) => (
         <SegmentedButton
@@ -90,6 +105,7 @@ export function M3SegmentedRow<T extends string>({
           isActive={opt.value === value}
           isFirst={idx === 0}
           isLast={idx === options.length - 1}
+          ns={ns}
           onChange={onChange}
         />
       ))}
