@@ -67,8 +67,6 @@
   /* Glass */
   --md-glass-bg: rgba(255, 255, 255, 0.72);
   --md-glass-border: rgba(255, 255, 255, 0.3);
-  --md-glass-bg-elevated: rgba(255, 255, 255, 0.82);
-  --md-glass-border-elevated: rgba(255, 255, 255, 0.4);
 
   /* Scrollbar */
   --md-scrollbar-thumb: #C3C7CF;
@@ -135,8 +133,6 @@
   /* Glass — dark */
   --md-glass-bg: rgba(30, 32, 35, 0.75);
   --md-glass-border: rgba(255, 255, 255, 0.08);
-  --md-glass-bg-elevated: rgba(40, 42, 45, 0.82);
-  --md-glass-border-elevated: rgba(255, 255, 255, 0.12);
 
   /* Scrollbar — dark */
   --md-scrollbar-thumb: #43474E;
@@ -192,8 +188,6 @@
 
   --md-glass-bg: rgba(255, 255, 255, 0.95);
   --md-glass-border: rgba(0, 0, 0, 0.5);
-  --md-glass-bg-elevated: rgba(255, 255, 255, 0.98);
-  --md-glass-border-elevated: rgba(0, 0, 0, 0.6);
 }
 
 .dark[data-contrast="high"] {
@@ -239,8 +233,6 @@
 
   --md-glass-bg: rgba(0, 0, 0, 0.95);
   --md-glass-border: rgba(255, 255, 255, 0.5);
-  --md-glass-bg-elevated: rgba(10, 12, 15, 0.98);
-  --md-glass-border-elevated: rgba(255, 255, 255, 0.6);
 }
 
 /* ── Typography Scale ───────────────────────────────── */

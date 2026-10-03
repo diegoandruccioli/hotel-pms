@@ -101,10 +101,19 @@ themes use a much stronger `outline-variant`), not a UI-component boundary; the 
 also reads through its fill and shadow. Text on both surfaces is checked at ≥7:1 in all four
 themes by `src/styles/contrast.test.ts`.
 
-**Glass surfaces — deprecated** — `.glass-surface` / `.glass-surface-elevated`
+**Glass surfaces — deprecated** — `.glass-surface`
 (`--md-glass-*` tokens) and `M3Card variant="glass"` remain only until the redesign
-migrates their last consumers (nav rail, top bar, dashboard cards) and removes them.
+migrates their last consumers (the dashboard cards) and removes them.
 Don't use them for new surfaces; use the solid pair above.
+
+**App shell navigation** — from `lg` (1024px) a fixed 264px sidebar (`w-66`,
+`surface-container-lowest`, `outline-variant` right border); below it the same
+`SidebarNav` opens in the hamburger drawer. Entries come from `config/navigation.ts`
+(`getSidebarSections`): the dashboard first, then Front office / Operations / Revenue /
+Administration, each under a `role="group"` heading (`text-xs`, uppercase,
+`on-surface-variant`). Full labels at `text-sm` — no `text-2xs` in the nav. The top bar
+is a solid `surface-container-lowest` with an `outline-variant` bottom border. A compact
+rail mode is planned (V02b); until then 768–1023px uses the drawer.
 
 **Motion** — a global rule in `m3-base.css` applies a 150ms
 `cubic-bezier(0.2,0,0,1)` transition to `color`/`background-color`/`border-color`/
