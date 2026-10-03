@@ -11,6 +11,7 @@ import type { GuestResponseDTO } from '../../types';
 import { useToastStore } from '../../store';
 import { Alert } from '../../components/Alert';
 import { PageHeader } from '../../components/PageHeader';
+import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { M3Select } from '../../components/m3';
 import { GuestFieldSection } from './GuestFieldSection';
@@ -299,26 +300,20 @@ export function WalkInCheckInForm() {
               onChange={handleGuestChange}
             />
           ))}
-          <button
-            type="button"
-            onClick={addGuest}
-            className="rounded-full border border-outline px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary"
-          >
+          <M3Button type="button" variant="outlined" onClick={addGuest}>
             {t('btn_add_guest')}
-          </button>
+          </M3Button>
         </div>
 
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
 
         <div className="flex gap-3 pt-2">
-          <button type="button" onClick={handleNavigateBack}
-            className="flex-1 rounded-full border border-outline px-6 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary">
+          <M3Button type="button" variant="outlined" onClick={handleNavigateBack} className="flex-1">
             {t('cancel')}
-          </button>
-          <button type="submit" disabled={loading || rooms.length === 0}
-            className="flex-1 rounded-full bg-primary px-6 py-2 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50 focus:outline-hidden focus:ring-2 focus:ring-primary">
+          </M3Button>
+          <M3Button type="submit" loading={loading} disabled={rooms.length === 0} className="flex-1">
             {loading ? t('btn_processing') : t('walkin_btn_checkin')}
-          </button>
+          </M3Button>
         </div>
       </form>
     </div>

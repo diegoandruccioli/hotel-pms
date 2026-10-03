@@ -3,6 +3,7 @@ import { useCallback, memo, useState } from 'react';
 import { billingService } from '../../services';
 import { useToastStore } from '../../store';
 import { useTranslation } from 'react-i18next';
+import { M3Button } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
@@ -342,14 +343,9 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
 
       {/* PDF download action */}
       <div className="flex justify-end pt-2 border-t border-outline-variant mt-4">
-        <button
-          type="button"
-          onClick={handleDownloadPdf}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-medium hover:opacity-90 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-h-10"
-        >
-          <MaterialIcon name="download" size={18} />
+        <M3Button type="button" icon="download" onClick={handleDownloadPdf}>
           {t('download_pdf', { ns: 'billing' })}
-        </button>
+        </M3Button>
       </div>
 
       {addingCharge && invoice.stayId && (
