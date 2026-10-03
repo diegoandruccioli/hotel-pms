@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
 import { renderWithQuery as render } from '../test-utils';
 import { Rooms } from './Rooms';
@@ -64,6 +65,15 @@ describe('Rooms', () => {
       expect(screen.getByRole('radio', { name: 'tab_room_types' })).toHaveAttribute('aria-checked', 'true');
     });
     expect(screen.getByRole('radio', { name: 'tab_rooms' })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('switches tab with the arrow keys', async () => {
+    const user = userEvent.setup();
+    render(<Rooms />);
+    screen.getByRole('radio', { name: 'tab_rooms' }).focus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('radio', { name: 'tab_room_types' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'tab_room_types' })).toHaveFocus();
   });
 
   it('shows rooms subtitle text', async () => {

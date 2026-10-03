@@ -264,8 +264,10 @@ readable is *consistency*, not *sparseness*. Concretely:
   `onClick` for a standalone toggle, or `value` + `onValueSelect` for a row of chips sharing one
   handler (the `react-perf` lint rule forbids inline arrow functions as props).
 - **Mutually exclusive switchers go through `M3SegmentedRow`** — view switchers, theme,
-  language. It renders a `radiogroup` (no arrow-key roving yet); pass `ns` when the labels live outside `settings`, and optional
-  `icon`s (shown on unselected options; the selected one shows a check).
+  language. It renders a `radiogroup` with one Tab stop (the selected option) and arrow-key,
+  Home and End navigation that moves focus and selection together; pass `ns` when the labels
+  live outside `settings`, and optional `icon`s (shown on unselected options; the selected one
+  shows a check).
 - **Initials circles go through `M3Avatar`** — `size="md"` (40px) or `"lg"` (64px); falls
   back to `?` without a name. Wrap it in a `<button>` when it must be interactive
   (see `UserMenu`).

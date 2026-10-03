@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
 import { M3SegmentedRow, type M3SegmentOption } from './M3SegmentedRow';
 
@@ -27,6 +29,16 @@ const PLAIN_OPTIONS: M3SegmentOption<Choice>[] = [
   { value: 'a', labelKey: 'opt_a' },
   { value: 'b', labelKey: 'opt_b' },
 ];
+
+const Controlled = ({ initial = 'a' as Choice }: { initial?: Choice }) => {
+  const [value, setValue] = useState<Choice>(initial);
+  return (
+    <>
+      <M3SegmentedRow options={OPTIONS} value={value} onChange={setValue} ariaLabel="choices" />
+      <button type="button">after</button>
+    </>
+  );
+};
 
 describe('M3SegmentedRow', () => {
   it('renders all options as radio buttons', () => {
@@ -74,6 +86,124 @@ describe('M3SegmentedRow', () => {
   it('merges a custom className on the radiogroup', () => {
     render(<M3SegmentedRow options={OPTIONS} value="a" onChange={vi.fn()} ariaLabel="choices" className="w-max" />);
     expect(screen.getByRole('radiogroup', { name: 'choices' }).className).toContain('w-max');
+  });
+
+  describe('keyboard navigation', () => {
+    const radio = (name: string) => screen.getByRole('radio', { name });
+
+    it('makes only the selected option a tab stop', () => {
+      render(<M3SegmentedRow options={OPTIONS} value="b" onChange={vi.fn()} ariaLabel="choices" />);
+      expect(radio('opt_a')).toHaveAttribute('tabindex', '-1');
+      expect(radio('opt_b')).toHaveAttribute('tabindex', '0');
+      expect(radio('opt_c')).toHaveAttribute('tabindex', '-1');
+    });
+
+    it('keeps the first option reachable when the value matches no option', () => {
+      render(<M3SegmentedRow options={OPTIONS} value={'x' as Choice} onChange={vi.fn()} ariaLabel="choices" />);
+      expect(radio('opt_a')).toHaveAttribute('tabindex', '0');
+      expect(radio('opt_b')).toHaveAttribute('tabindex', '-1');
+    });
+
+    it('enters on the selected option and leaves the group with the next Tab', async () => {
+      const user = userEvent.setup();
+      render(<Controlled initial="b" />);
+      await user.tab();
+      expect(radio('opt_b')).toHaveFocus();
+      await user.tab();
+      expect(screen.getByRole('button', { name: 'after' })).toHaveFocus();
+    });
+
+    it('moves focus and selection with ArrowRight and ArrowDown', async () => {
+      const user = userEvent.setup();
+      render(<Controlled />);
+      await user.tab();
+      await user.keyboard('{ArrowRight}');
+      expect(radio('opt_b')).toHaveFocus();
+      expect(radio('opt_b')).toHaveAttribute('aria-checked', 'true');
+      await user.keyboard('{ArrowDown}');
+      expect(radio('opt_c')).toHaveFocus();
+      expect(radio('opt_c')).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('moves focus and selection with ArrowLeft and ArrowUp', async () => {
+      const user = userEvent.setup();
+      render(<Controlled initial="c" />);
+      await user.tab();
+      await user.keyboard('{ArrowLeft}');
+      expect(radio('opt_b')).toHaveFocus();
+      await user.keyboard('{ArrowUp}');
+      expect(radio('opt_a')).toHaveFocus();
+      expect(radio('opt_a')).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('wraps around at both ends', async () => {
+      const user = userEvent.setup();
+      render(<Controlled initial="c" />);
+      await user.tab();
+      await user.keyboard('{ArrowRight}');
+      expect(radio('opt_a')).toHaveFocus();
+      await user.keyboard('{ArrowLeft}');
+      expect(radio('opt_c')).toHaveFocus();
+    });
+
+    it('jumps to the first and last option with Home and End', async () => {
+      const user = userEvent.setup();
+      render(<Controlled initial="b" />);
+      await user.tab();
+      await user.keyboard('{End}');
+      expect(radio('opt_c')).toHaveFocus();
+      expect(radio('opt_c')).toHaveAttribute('aria-checked', 'true');
+      await user.keyboard('{Home}');
+      expect(radio('opt_a')).toHaveFocus();
+      expect(radio('opt_a')).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('reports the new value through onChange', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(<M3SegmentedRow options={OPTIONS} value="a" onChange={onChange} ariaLabel="choices" />);
+      await user.tab();
+      await user.keyboard('{ArrowRight}');
+      expect(onChange).toHaveBeenCalledWith('b');
+    });
+
+    it('suppresses the default action of handled keys', () => {
+      render(<M3SegmentedRow options={OPTIONS} value="a" onChange={vi.fn()} ariaLabel="choices" />);
+      const first = screen.getByRole('radio', { name: 'opt_a' });
+      expect(fireEvent.keyDown(first, { key: 'ArrowDown' })).toBe(false);
+      expect(fireEvent.keyDown(first, { key: 'x' })).toBe(true);
+    });
+
+    it('leaves browser shortcuts such as Alt+ArrowLeft alone', () => {
+      const onChange = vi.fn();
+      render(<M3SegmentedRow options={OPTIONS} value="b" onChange={onChange} ariaLabel="choices" />);
+      const second = screen.getByRole('radio', { name: 'opt_b' });
+      expect(fireEvent.keyDown(second, { key: 'ArrowLeft', altKey: true })).toBe(true);
+      expect(fireEvent.keyDown(second, { key: 'ArrowLeft', metaKey: true })).toBe(true);
+      expect(fireEvent.keyDown(second, { key: 'Home', ctrlKey: true })).toBe(true);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('keeps stepping from the focused radio when the parent does not update the value', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(<M3SegmentedRow options={OPTIONS} value="a" onChange={onChange} ariaLabel="choices" />);
+      await user.tab();
+      await user.keyboard('{ArrowRight}{ArrowRight}');
+      expect(onChange).toHaveBeenNthCalledWith(1, 'b');
+      expect(onChange).toHaveBeenNthCalledWith(2, 'c');
+      expect(radio('opt_c')).toHaveFocus();
+    });
+
+    it('ignores other keys', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      render(<M3SegmentedRow options={OPTIONS} value="a" onChange={onChange} ariaLabel="choices" />);
+      await user.tab();
+      await user.keyboard('x');
+      expect(onChange).not.toHaveBeenCalled();
+      expect(radio('opt_a')).toHaveFocus();
+    });
   });
 
   it('should have no accessibility violations', async () => {
