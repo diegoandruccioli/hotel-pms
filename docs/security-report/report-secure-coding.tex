@@ -7817,6 +7817,17 @@ lint pulito, build verde, 1193/1193 test Vitest verdi.
 Commit: \commitref{7ff622c}{fix(security): bump grafana to 13.1.7 for grpc/thrift/openssl CVEs},
 \commitref{587d637}{fix(security): raise undici/js-yaml overrides to patched versions}
 
+\paragraph{Advisory npm emersi dopo il triage (DEP-CVE-12)}
+\texttt{npm audit} ha segnalato advisory pubblicati dopo il triage e non
+ancora presenti tra gli alert Dependabot: \texttt{axios} (12 GHSA, HIGH, nel
+bundle di produzione), \texttt{moment}, \texttt{brace-expansion} e la catena
+\texttt{braces}/\texttt{micromatch}/\texttt{fast-glob} raggiunta da
+\texttt{knip} (devDependency). \texttt{npm audit fix} senza \texttt{--force}
+ha aggiornato solo il lockfile, perché i range di \texttt{package.json} già
+consentivano le versioni corrette. Esito: 0 vulnerabilità; lint pulito, build
+verde, 1193/1193 test Vitest verdi.
+Commit: \commitref{88d28e3d}{fix(security): npm audit fix for axios, moment, brace-expansion, micromatch chain}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Appendice B --- Utilizzo dell'IA e Revisione Critica}
 \label{app:ia}
