@@ -28,23 +28,25 @@ interface ActionsCellProps {
   t: TFunction;
 }
 
+const ACTION_BTN_CLASS = 'h-auto min-h-10 px-3 py-1 text-xs';
+
 const ActionsCell = ({ user, onToggle, onResetPassword, currentUsername, t }: ActionsCellProps) => {
   const handleToggle = useCallback(() => onToggle(user), [onToggle, user]);
   const handleReset = useCallback(() => onResetPassword(user), [onResetPassword, user]);
 
   return (
     <div className="flex items-center gap-2">
-      <button type="button" onClick={handleToggle}
-        className="inline-flex items-center justify-center min-h-10 text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary"
+      <M3Button type="button" variant="outlined" onClick={handleToggle}
+        className={ACTION_BTN_CLASS}
         aria-label={user.active ? t('btn_deactivate') : t('btn_activate')}>
         {user.active ? t('btn_deactivate') : t('btn_activate')}
-      </button>
+      </M3Button>
       {user.username !== currentUsername && (
-        <button type="button" onClick={handleReset}
-          className="inline-flex items-center justify-center min-h-10 text-xs rounded-full border border-outline px-3 py-1 hover:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary"
+        <M3Button type="button" variant="outlined" onClick={handleReset}
+          className={ACTION_BTN_CLASS}
           aria-label={`${t('btn_reset_password')} ${user.username}`}>
           {t('btn_reset_password')}
-        </button>
+        </M3Button>
       )}
     </div>
   );
