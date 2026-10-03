@@ -218,6 +218,7 @@
   "rooms_subtitle": "Manage physical rooms and room categories.",
   "tab_rooms": "Physical Rooms",
   "tab_room_types": "Room Categories",
+  "rooms_tabs_label": "Inventory section",
   "add_room": "Add Room",
   "add_room_type": "Add Category",
   "room_type": "Room Type",

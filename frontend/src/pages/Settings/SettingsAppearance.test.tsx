@@ -12,8 +12,10 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
+const i18nState = vi.hoisted(() => ({ language: 'it' }));
+
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'it' } }),
+  useTranslation: () => ({ t: (key: string) => key, i18n: i18nState }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
@@ -27,6 +29,7 @@ const renderPage = () => render(<MemoryRouter><SettingsAppearance /></MemoryRout
 describe('SettingsAppearance', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    i18nState.language = 'it';
     vi.mocked(useThemeStore).mockReturnValue({ theme: 'system', setTheme } as never);
     vi.mocked(useSettingsStore).mockReturnValue({ setLanguage } as never);
   });
@@ -53,6 +56,20 @@ describe('SettingsAppearance', () => {
     expect(screen.getByRole('radio', { name: /lang_italian/ })).toHaveAttribute('aria-checked', 'true');
     fireEvent.click(screen.getByRole('radio', { name: /lang_english/ }));
     expect(setLanguage).toHaveBeenCalledWith('en');
+  });
+
+  it('marks English as checked for an English locale such as en-GB', () => {
+    i18nState.language = 'en-GB';
+    renderPage();
+    expect(screen.getByRole('radio', { name: /lang_english/ })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /lang_italian/ })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('marks English as checked for an unsupported locale, since i18n falls back to English', () => {
+    i18nState.language = 'de-DE';
+    renderPage();
+    expect(screen.getByRole('radio', { name: /lang_english/ })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /lang_italian/ })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('should have no accessibility violations', async () => {
