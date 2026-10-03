@@ -286,6 +286,7 @@
   "update_reservation": "Aggiorna Prenotazione",
   "confirm_reservation": "Conferma Prenotazione",
   "back": "Indietro",
+  "breadcrumb_label": "Percorso di navigazione",
   "select_rooms": "Seleziona Camere",
   "room_occupied": "Occupata",
   "label_checkin_date": "Data di Check-in",

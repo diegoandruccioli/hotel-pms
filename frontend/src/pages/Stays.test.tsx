@@ -168,7 +168,7 @@ describe('Stays', () => {
     render(<Stays />);
 
     await waitFor(() => {
-      expect(screen.getByText('nav_stays')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'nav_stays' })).toBeInTheDocument();
     });
   });
 

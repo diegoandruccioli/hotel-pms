@@ -104,10 +104,19 @@ describe('QuotationDetail', () => {
     vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
     renderDetail();
 
-    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Mario Rossi/ })).toBeInTheDocument());
     expect(screen.getByText('status_draft')).toBeInTheDocument();
     expect(screen.getByText('101')).toBeInTheDocument();
     expect(screen.getByText('Standard')).toBeInTheDocument();
+  });
+
+  it('ends the breadcrumb with the guest name under the quotations list', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail();
+
+    const nav = await screen.findByRole('navigation', { name: 'breadcrumb_label' });
+    expect(within(nav).getByRole('link', { name: 'nav_quotations' })).toHaveAttribute('href', '/quotations');
+    expect(within(nav).getByText('Mario Rossi')).toHaveAttribute('aria-current', 'page');
   });
 
   it('shows an error state with retry on load failure', async () => {
@@ -117,7 +126,7 @@ describe('QuotationDetail', () => {
 
     await waitFor(() => expect(screen.getAllByText('error_loading_quotation').length).toBeGreaterThan(0));
     fireEvent.click(screen.getByText('common:try_again'));
-    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Mario Rossi/ })).toBeInTheDocument());
   });
 
   it('shows the send-failed banner when sendFailed is true', async () => {
@@ -133,7 +142,7 @@ describe('QuotationDetail', () => {
       { ...DRAFT_QUOTATION, status: 'ACCEPTED' } as never,
     );
     renderDetail();
-    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Mario Rossi/ })).toBeInTheDocument());
     expect(screen.queryByText('common:edit')).not.toBeInTheDocument();
   });
 
@@ -212,7 +221,7 @@ describe('QuotationDetail', () => {
   it('back arrow navigates to the quotations list', async () => {
     vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
     renderDetail();
-    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Mario Rossi/ })).toBeInTheDocument());
 
     fireEvent.click(screen.getByLabelText('back'));
     expect(mockNavigate).toHaveBeenCalledWith('/quotations');
@@ -356,7 +365,7 @@ describe('QuotationDetail', () => {
   it('passes axe accessibility check', async () => {
     vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
     const { container } = renderDetail();
-    await waitFor(() => screen.getByText('Mario Rossi'));
+    await waitFor(() => screen.getByRole('heading', { level: 1, name: /Mario Rossi/ }));
     expect(await axe(container)).toHaveNoViolations();
   });
 });

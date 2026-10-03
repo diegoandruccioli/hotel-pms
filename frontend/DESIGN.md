@@ -292,6 +292,20 @@ readable is *consistency*, not *sparseness*. Concretely:
   `onBack` (round back button), `titleAdornment` (e.g. a status chip inside the
   `h1`), `bordered` (form/detail divider), and `id`/`titleTestId` for
   `aria-labelledby` and test hooks.
+- **Breadcrumbs come from the route, not from the page.** `PageHeader` renders a
+  `Breadcrumbs` trail above the `h1`, derived from `config/navigation.ts`
+  (`resolveCrumbs`): sidebar group (a heading, no link), parent entry, current page.
+  Nested pages (forms, details, check-in) are listed in `NESTED_ROUTES`; settings
+  sub-pages carry `parent: 'settings'`. A new route needs an entry or a nested route
+  there, or it shows no trail. Pass `crumbLabel` when the page name is data (a group,
+  a guest), `crumbs` to override the trail and `crumbs={[]}` to hide it. A trail of
+  fewer than two crumbs is not rendered (dashboard, `/settings`). The current page is
+  `aria-current="page"`, the separators are `aria-hidden`, links keep the 40px target
+  and the standard focus ring; below `sm` the group heading is dropped. Colours are
+  `on-surface-variant` (links, separators) and `on-surface` (current page) on
+  `surface-container-low`/`-lowest`, covered at ≥7:1 in all four themes by
+  `src/styles/contrast.test.ts`. The leaf label repeats the `h1`: tests that look the
+  title up must use `getByRole('heading', { level: 1 })`, not `getByText`.
 - **Confirmations go through `M3ConfirmDialog`** — a message plus Cancel/Confirm, with
   `loading` while the action runs. A confirmation that needs more (a result list, a
   second step) uses `M3Dialog` directly.

@@ -4,20 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
 import { M3Tooltip } from './m3/M3Tooltip';
 import { cn } from '../utils';
-import type { NavGroup, SidebarSection } from '../config/navigation';
+import { NAV_GROUP_LABEL_KEYS, type SidebarSection } from '../config/navigation';
 
 // BUG-7 (docs/LIVE_E2E_AUDIT_2026-07.md): the sidebar had no focus-visible
 // ring at all, unlike the skip-link — same recipe as M3Button/M3TableActionLink
 // so focus indicators are consistent across the whole app.
 const NAV_ITEM_FOCUS_RING =
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2';
-
-const GROUP_LABEL_KEYS: Record<NavGroup, string> = {
-  'front-office': 'nav_group_front_office',
-  operations: 'nav_group_operations',
-  revenue: 'nav_group_revenue',
-  admin: 'nav_group_admin',
-};
 
 const getNavItemClasses = (collapsed: boolean) => ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -71,7 +64,7 @@ export const SidebarNav = memo(({ sections, onNavigate, ariaLabel, collapsed = f
                     : 'px-4 pb-1 text-xs font-semibold font-body uppercase tracking-wide text-on-surface-variant'
                 }
               >
-                {t(GROUP_LABEL_KEYS[group])}
+                {t(NAV_GROUP_LABEL_KEYS[group])}
               </span>
             )}
             {entries.map((item) => {

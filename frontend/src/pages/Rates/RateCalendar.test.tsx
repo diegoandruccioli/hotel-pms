@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { RateCalendar } from './RateCalendar';
 import { rateSeasonService } from '../../services';
@@ -9,6 +9,12 @@ import { rateSeasonService } from '../../services';
 // call would re-trigger the fetch on every render, racing the mocked service.
 const mockT = (key: string, opts?: Record<string, unknown>) =>
   (opts?.count !== undefined ? `${key}:${opts.count}` : key);
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
+
+// PageHeader derives its breadcrumbs from the router location.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: mockT, i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },

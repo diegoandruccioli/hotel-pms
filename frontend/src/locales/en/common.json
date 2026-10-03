@@ -286,6 +286,7 @@
   "update_reservation": "Update Reservation",
   "confirm_reservation": "Confirm Reservation",
   "back": "Back",
+  "breadcrumb_label": "Breadcrumb",
   "select_rooms": "Select Rooms",
   "room_occupied": "Occupied",
   "label_checkin_date": "Check-in Date",

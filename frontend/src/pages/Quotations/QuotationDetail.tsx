@@ -240,6 +240,7 @@ export const QuotationDetail = () => {
     <div className="space-y-6 max-w-4xl mx-auto pb-10">
       <PageHeader
         title={quotation.guestFullName}
+        crumbLabel={quotation.guestFullName}
         titleAdornment={
           <M3StatusChip label={t(`status_${quotation.status.toLowerCase()}`)} tone={quotationStatusTone[quotation.status]} />
         }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { renderWithQuery as render } from '../test-utils';
 import { ReservationGroupDetail } from './ReservationGroupDetail';
@@ -74,9 +74,18 @@ describe('ReservationGroupDetail', () => {
     vi.mocked(reservationGroupService.getGroup).mockResolvedValueOnce(GROUP as never);
     renderDetail();
 
-    await waitFor(() => expect(screen.getByText('Acme Corp Offsite')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Acme Corp Offsite/ })).toBeInTheDocument());
     expect(screen.getByText('Jane Doe')).toBeInTheDocument();
     expect(screen.getByText('Mario Rossi')).toBeInTheDocument();
+  });
+
+  it('ends the breadcrumb with the group name under the groups list', async () => {
+    vi.mocked(reservationGroupService.getGroup).mockResolvedValueOnce(GROUP as never);
+    renderDetail();
+
+    const nav = await screen.findByRole('navigation', { name: 'breadcrumb_label' });
+    expect(within(nav).getByRole('link', { name: /nav_reservation_groups/ })).toHaveAttribute('href', '/reservations/groups');
+    expect(within(nav).getByText('Acme Corp Offsite')).toHaveAttribute('aria-current', 'page');
   });
 
   it('should show error state on load failure', async () => {
@@ -91,7 +100,7 @@ describe('ReservationGroupDetail', () => {
     vi.mocked(reservationGroupService.cancelGroup).mockResolvedValueOnce({ ...GROUP, status: 'CANCELLED' } as never);
     renderDetail();
 
-    await waitFor(() => expect(screen.getByText('Acme Corp Offsite')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Acme Corp Offsite/ })).toBeInTheDocument());
     fireEvent.click(screen.getByText('cancel_group'));
     fireEvent.click(screen.getByText('confirm'));
 
@@ -105,7 +114,7 @@ describe('ReservationGroupDetail', () => {
     vi.mocked(reservationGroupService.cancelGroup).mockRejectedValueOnce(new Error('Network error'));
     renderDetail();
 
-    await waitFor(() => expect(screen.getByText('Acme Corp Offsite')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Acme Corp Offsite/ })).toBeInTheDocument());
     fireEvent.click(screen.getByText('cancel_group'));
     fireEvent.click(screen.getByText('confirm'));
 
@@ -121,7 +130,7 @@ describe('ReservationGroupDetail', () => {
     vi.mocked(reservationGroupService.getGroup).mockResolvedValue(checkedInGroup as never);
     renderDetail();
 
-    await waitFor(() => expect(screen.getByText('Acme Corp Offsite')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Acme Corp Offsite/ })).toBeInTheDocument());
     fireEvent.click(screen.getByText('checkout_group'));
     await waitFor(() => expect(screen.getByText('checkout_group_confirm')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
@@ -138,7 +147,7 @@ describe('ReservationGroupDetail', () => {
     ] as never);
     renderDetail();
 
-    await waitFor(() => expect(screen.getByText('Acme Corp Offsite')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Acme Corp Offsite/ })).toBeInTheDocument());
     fireEvent.click(screen.getByText('checkout_group'));
     fireEvent.click(screen.getByText('confirm'));
 
@@ -151,7 +160,7 @@ describe('ReservationGroupDetail', () => {
     vi.mocked(reservationGroupService.checkoutGroup).mockRejectedValueOnce(new Error('Network error'));
     renderDetail();
 
-    await waitFor(() => expect(screen.getByText('Acme Corp Offsite')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Acme Corp Offsite/ })).toBeInTheDocument());
     fireEvent.click(screen.getByText('checkout_group'));
     fireEvent.click(screen.getByText('confirm'));
 
@@ -177,7 +186,7 @@ describe('ReservationGroupDetail', () => {
     ] as never);
     renderDetail();
 
-    await waitFor(() => expect(screen.getByText('Acme Corp Offsite')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Acme Corp Offsite/ })).toBeInTheDocument());
     fireEvent.click(screen.getByText('checkout_group'));
     fireEvent.click(screen.getByText('confirm'));
 

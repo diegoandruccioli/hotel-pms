@@ -7,6 +7,7 @@ import { Guests } from './Guests';
 const mockUseSearchParams = vi.hoisted(() => vi.fn(() => [new URLSearchParams()] as [URLSearchParams]));
 vi.mock('react-router-dom', () => ({
   useSearchParams: mockUseSearchParams,
+  useLocation: () => ({ pathname: '/guests' }),
 }));
 import { guestService } from '../services';
 import { useAuthStore } from '../store';
@@ -124,7 +125,7 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => {
-      expect(screen.getByText('nav_guests')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'nav_guests' })).toBeInTheDocument();
     });
   });
 
