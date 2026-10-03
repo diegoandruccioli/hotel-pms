@@ -33,6 +33,14 @@ describe('M3Card', () => {
     expect(el.className).toContain('glass-surface');
   });
 
+  it('should apply solid variant classes', () => {
+    render(<M3Card variant="solid">Solid</M3Card>);
+    const el = screen.getByText('Solid');
+    expect(el.className).toContain('bg-surface-container-lowest');
+    expect(el.className).toContain('border-outline-variant');
+    expect(el.className).toContain('rounded-shape-lg');
+  });
+
   it('should pass additional className', () => {
     render(<M3Card className="p-4">Styled</M3Card>);
     const el = screen.getByText('Styled');
