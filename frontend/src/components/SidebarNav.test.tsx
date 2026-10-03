@@ -86,6 +86,38 @@ describe('SidebarNav', () => {
     expect(onNavigate).toHaveBeenCalledOnce();
   });
 
+  it('does not set a title when expanded', () => {
+    renderNav();
+    expect(screen.getByRole('link', { name: /nav_guests/ })).not.toHaveAttribute('title');
+  });
+
+  describe('collapsed', () => {
+    const renderCollapsed = () =>
+      render(
+        <MemoryRouter initialEntries={GUESTS_ENTRY}>
+          <SidebarNav sections={SECTIONS} collapsed />
+        </MemoryRouter>,
+      );
+
+    it('keeps accessible names while showing icons only', () => {
+      renderCollapsed();
+      const link = screen.getByRole('link', { name: 'common:nav_guests' });
+      expect(link).toHaveAttribute('title', 'common:nav_guests');
+      expect(within(link).getByText('common:nav_guests')).toHaveClass('sr-only');
+    });
+
+    it('hides the group headings visually but keeps the labelled groups', () => {
+      renderCollapsed();
+      expect(screen.getByText('nav_group_front_office')).toHaveClass('sr-only');
+      expect(screen.getByRole('group', { name: 'nav_group_front_office' })).toBeInTheDocument();
+    });
+
+    it('should have no accessibility violations', async () => {
+      const { container } = renderCollapsed();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
   it('should have no accessibility violations', async () => {
     const { container } = renderNav();
     expect(await axe(container)).toHaveNoViolations();

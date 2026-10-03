@@ -18,9 +18,12 @@ const GROUP_LABEL_KEYS: Record<NavGroup, string> = {
   admin: 'nav_group_admin',
 };
 
-const getNavItemClasses = ({ isActive }: { isActive: boolean }) =>
+const getNavItemClasses = (collapsed: boolean) => ({ isActive }: { isActive: boolean }) =>
   cn(
-    'flex items-center gap-3 px-4 py-2.5 rounded-shape-full text-sm font-medium font-body transition-colors',
+    'flex items-center text-sm font-medium font-body transition-colors',
+    collapsed
+      ? 'justify-center w-10 h-10 mx-auto rounded-shape-lg'
+      : 'gap-3 px-4 py-2.5 rounded-shape-full',
     NAV_ITEM_FOCUS_RING,
     isActive
       ? 'bg-primary-container text-on-primary-container'
@@ -33,16 +36,19 @@ interface SidebarNavProps {
   onNavigate?: () => void;
   /** Landmark name; the drawer overrides it so both copies stay distinguishable. */
   ariaLabel?: string;
+  /** Icon-only rail: labels and group headings stay in the DOM as screen-reader text. */
+  collapsed?: boolean;
 }
 
 /** Grouped main navigation, shared by the desktop sidebar and the mobile drawer. */
-export const SidebarNav = memo(({ sections, onNavigate, ariaLabel }: SidebarNavProps) => {
+export const SidebarNav = memo(({ sections, onNavigate, ariaLabel, collapsed = false }: SidebarNavProps) => {
   const { t } = useTranslation('common');
   // Per-instance: the desktop sidebar and the drawer render side by side.
   const uid = useId();
+  const itemClasses = getNavItemClasses(collapsed);
 
   return (
-    <nav aria-label={ariaLabel ?? t('nav_main')} className="flex flex-col gap-4 px-3 pb-4">
+    <nav aria-label={ariaLabel ?? t('nav_main')} className={cn('flex flex-col pb-4', collapsed ? 'gap-2 px-2' : 'gap-4 px-3')}>
       {sections.map(({ group, entries }) => {
         const headingId = group ? `${uid}-${group}` : undefined;
         return (
@@ -50,12 +56,19 @@ export const SidebarNav = memo(({ sections, onNavigate, ariaLabel }: SidebarNavP
             key={group ?? 'ungrouped'}
             role={group ? 'group' : undefined}
             aria-labelledby={headingId}
-            className="flex flex-col gap-0.5"
+            className={cn(
+              'flex flex-col gap-0.5',
+              collapsed && group && 'pt-2 border-t border-outline-variant'
+            )}
           >
             {group && (
               <span
                 id={headingId}
-                className="px-4 pb-1 text-xs font-semibold font-body uppercase tracking-wide text-on-surface-variant"
+                className={
+                  collapsed
+                    ? 'sr-only'
+                    : 'px-4 pb-1 text-xs font-semibold font-body uppercase tracking-wide text-on-surface-variant'
+                }
               >
                 {t(GROUP_LABEL_KEYS[group])}
               </span>
@@ -66,12 +79,17 @@ export const SidebarNav = memo(({ sections, onNavigate, ariaLabel }: SidebarNavP
                 to={item.path}
                 end={item.path === '/'}
                 onClick={onNavigate}
-                className={getNavItemClasses}
+                title={collapsed ? t(item.labelKey, { ns: item.ns }) : undefined}
+                className={itemClasses}
               >
                 {({ isActive }) => (
                   <>
                     <MaterialIcon name={item.icon} filled={isActive} size={24} />
-                    {t(item.labelKey, { ns: item.ns })}
+                    {collapsed ? (
+                      <span className="sr-only">{t(item.labelKey, { ns: item.ns })}</span>
+                    ) : (
+                      t(item.labelKey, { ns: item.ns })
+                    )}
                   </>
                 )}
               </NavLink>
