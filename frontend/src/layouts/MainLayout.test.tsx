@@ -7,8 +7,9 @@ import { useAuthStore, useSettingsStore } from '../store';
 import { renderWithQuery } from '../test-utils';
 import type { UserPayload } from '../types';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
+vi.mock('react-i18next', () => {
+  // One stable `t`, like the real hook: RouteAnnouncer re-focuses <main> whenever `t` changes.
+  const value = {
     t: (key: string, opts?: Record<string, unknown>) => {
       if (opts && typeof opts === 'object') {
         return Object.entries(opts).reduce(
@@ -18,9 +19,12 @@ vi.mock('react-i18next', () => ({
       }
       return key;
     },
-  }),
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
-}));
+  };
+  return {
+    useTranslation: () => value,
+    initReactI18next: { type: '3rdParty', init: vi.fn() },
+  };
+});
 
 vi.mock('focus-trap-react', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -142,6 +146,19 @@ describe('MainLayout', () => {
     expect(aside).toHaveClass('w-66');
     expect(content).toHaveClass('lg:ml-66');
     expect(localStorage.getItem('hotel-pms-sidebar-collapsed')).toBe('false');
+  });
+
+  it('keeps keyboard focus on the sidebar toggle when it flips the sidebar', () => {
+    mockAuthStore(ADMIN);
+    renderLayout();
+    const toggle = screen.getByRole('button', { name: 'sidebar_collapse' });
+    toggle.focus();
+
+    fireEvent.click(toggle);
+
+    const after = screen.getByRole('button', { name: 'sidebar_expand' });
+    expect(after).toBe(toggle);
+    expect(after).toHaveFocus();
   });
 
   it('keeps the mobile drawer expanded while the desktop sidebar is compact', () => {

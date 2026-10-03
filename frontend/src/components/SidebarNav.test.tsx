@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { SidebarNav } from './SidebarNav';
@@ -86,9 +87,11 @@ describe('SidebarNav', () => {
     expect(onNavigate).toHaveBeenCalledOnce();
   });
 
-  it('does not set a title when expanded', () => {
+  it('shows no tooltip when expanded', async () => {
+    const user = userEvent.setup();
     renderNav();
-    expect(screen.getByRole('link', { name: /nav_guests/ })).not.toHaveAttribute('title');
+    await user.tab();
+    expect(screen.queryByTestId('m3-tooltip')).not.toBeInTheDocument();
   });
 
   describe('collapsed', () => {
@@ -102,8 +105,17 @@ describe('SidebarNav', () => {
     it('keeps accessible names while showing icons only', () => {
       renderCollapsed();
       const link = screen.getByRole('link', { name: 'common:nav_guests' });
-      expect(link).toHaveAttribute('title', 'common:nav_guests');
+      expect(link).not.toHaveAttribute('title');
       expect(within(link).getByText('common:nav_guests')).toHaveClass('sr-only');
+    });
+
+    it('shows the visible name of a link on keyboard focus', async () => {
+      const user = userEvent.setup();
+      renderCollapsed();
+      await user.tab();
+      expect(screen.getByTestId('m3-tooltip')).toHaveTextContent('nav_dashboard');
+      await user.tab();
+      expect(screen.getByTestId('m3-tooltip')).toHaveTextContent('common:nav_guests');
     });
 
     it('hides the group headings visually but keeps the labelled groups', () => {

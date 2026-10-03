@@ -41,4 +41,16 @@ test.describe('Sidebar', () => {
     await expect(page.getByTestId('dashboard-heading')).toBeVisible({ timeout: 10000 });
     await expect(page.getByRole('button', { name: /expand sidebar|espandi menu/i })).toBeVisible();
   });
+
+  test('shows the visible name of a compact-rail link on keyboard focus and hides it on Escape', async ({ page }) => {
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await page.goto('/');
+    await expect(page.getByTestId('dashboard-heading')).toBeVisible({ timeout: 10000 });
+
+    await page.locator('#app-sidebar').getByRole('link', { name: /^guests$|^ospiti$/i }).focus();
+    await expect(page.getByTestId('m3-tooltip')).toHaveText(/guests|ospiti/i);
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('m3-tooltip')).toHaveCount(0);
+  });
 });

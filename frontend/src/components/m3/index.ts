@@ -18,4 +18,5 @@ export * from './M3Table';
 export * from './M3TableActionLink';
 export * from './M3TextField';
 export * from './M3Textarea';
+export * from './M3Tooltip';
 export * from './PasswordVisibilityToggle';
