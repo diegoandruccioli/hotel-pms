@@ -1,4 +1,4 @@
-import { useCallback, memo, type ReactElement } from 'react';
+import { useCallback, useRef, memo, type KeyboardEvent, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../MaterialIcon';
 import { cn } from '../../utils';
@@ -16,17 +16,21 @@ export interface M3SegmentOption<T extends string> {
 const SegmentedButton = memo(function SegmentedButton<T extends string>({
   opt,
   isActive,
+  isTabStop,
   isFirst,
   isLast,
   ns,
   onChange,
+  onKeyDown,
 }: {
   opt: M3SegmentOption<T>;
   isActive: boolean;
+  isTabStop: boolean;
   isFirst: boolean;
   isLast: boolean;
   ns: string;
   onChange: (v: T) => void;
+  onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => void;
 }) {
   const { t } = useTranslation(ns);
   const handleClick = useCallback(() => onChange(opt.value), [onChange, opt.value]);
@@ -36,7 +40,9 @@ const SegmentedButton = memo(function SegmentedButton<T extends string>({
       type="button"
       role="radio"
       aria-checked={isActive}
+      tabIndex={isTabStop ? 0 : -1}
       onClick={handleClick}
+      onKeyDown={onKeyDown}
       className={cn(
         'relative flex items-center justify-center gap-1.5',
         'flex-1 h-10 px-3 text-sm font-medium font-body',
@@ -65,10 +71,12 @@ const SegmentedButton = memo(function SegmentedButton<T extends string>({
 }) as <T extends string>(props: {
   opt: M3SegmentOption<T>;
   isActive: boolean;
+  isTabStop: boolean;
   isFirst: boolean;
   isLast: boolean;
   ns: string;
   onChange: (v: T) => void;
+  onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => void;
 }) => ReactElement;
 
 /**
@@ -76,6 +84,9 @@ const SegmentedButton = memo(function SegmentedButton<T extends string>({
  * The selected option shows a check icon; the others show their own icon, if any
  * (from the `sm` breakpoint up, so narrow screens keep room for the labels).
  * Labels are translated from `ns` (default "settings").
+ * Keyboard (WAI-ARIA radiogroup): one Tab stop on the selected option; arrow keys move
+ * focus and selection with wrap-around, Home/End jump to the first/last option.
+ * Arrow directions are not mirrored for RTL (the app has no RTL locale).
  */
 export function M3SegmentedRow<T extends string>({
   options,
@@ -92,8 +103,47 @@ export function M3SegmentedRow<T extends string>({
   ns?: string;
   className?: string;
 }) {
+  const groupRef = useRef<HTMLDivElement>(null);
+  const activeIndex = options.findIndex((opt) => opt.value === value);
+  const tabStopIndex = Math.max(0, activeIndex);
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLButtonElement>) => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const last = options.length - 1;
+      const radios = Array.from<HTMLElement>(
+        groupRef.current?.querySelectorAll('[role="radio"]') ?? []
+      );
+      const current = radios.indexOf(e.currentTarget);
+      let next: number;
+      switch (e.key) {
+        case 'ArrowRight':
+        case 'ArrowDown':
+          next = current === last ? 0 : current + 1;
+          break;
+        case 'ArrowLeft':
+        case 'ArrowUp':
+          next = current === 0 ? last : current - 1;
+          break;
+        case 'Home':
+          next = 0;
+          break;
+        case 'End':
+          next = last;
+          break;
+        default:
+          return;
+      }
+      e.preventDefault();
+      onChange(options[next].value);
+      radios[next]?.focus();
+    },
+    [options, onChange]
+  );
+
   return (
     <div
+      ref={groupRef}
       role="radiogroup"
       aria-label={ariaLabel}
       className={cn('flex rounded-shape-full border border-outline overflow-hidden', className)}
@@ -103,10 +153,12 @@ export function M3SegmentedRow<T extends string>({
           key={opt.value}
           opt={opt}
           isActive={opt.value === value}
+          isTabStop={idx === tabStopIndex}
           isFirst={idx === 0}
           isLast={idx === options.length - 1}
           ns={ns}
           onChange={onChange}
+          onKeyDown={handleKeyDown}
         />
       ))}
     </div>
