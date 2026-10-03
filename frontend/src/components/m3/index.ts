@@ -1,3 +1,4 @@
+export * from './M3Avatar';
 export * from './M3Button';
 export * from './M3Card';
 export * from './M3Checkbox';
@@ -6,6 +7,7 @@ export * from './M3DataTable';
 export * from './M3Dialog';
 export * from './M3EmptyState';
 export * from './M3ErrorState';
+export * from './M3FilterChip';
 export * from './M3LoadingState';
 export * from './M3Pagination';
 export * from './M3SegmentedRow';

@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store';
-import { M3Card } from '../../components/m3';
+import { M3Avatar, M3Card } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { SettingsPageHeader } from '../../components/SettingsPageHeader';
 
@@ -14,7 +14,6 @@ export const SettingsProfile = () => {
   const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const roleLabel = user?.role ? t(`role_${user.role.toLowerCase()}`) : '';
-  const userInitial = user?.username?.charAt(0).toUpperCase() ?? '?';
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-10">
@@ -26,12 +25,7 @@ export const SettingsProfile = () => {
           <h2 className="text-lg font-medium text-on-surface">{t('section_account_info')}</h2>
         </div>
         <div className="flex items-center gap-4">
-          <div
-            className="flex items-center justify-center w-16 h-16 rounded-shape-full bg-primary text-on-primary text-2xl font-display font-bold"
-            aria-hidden="true"
-          >
-            {userInitial}
-          </div>
+          <M3Avatar name={user?.username} size="lg" aria-hidden="true" />
           <div>
             <p className="text-base font-semibold text-on-surface">{user?.username}</p>
             <p className="text-sm text-on-surface-variant capitalize">{roleLabel}</p>

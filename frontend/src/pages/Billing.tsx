@@ -8,6 +8,7 @@ import { M3DataTable } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
+import { M3FilterChip } from '../components/m3';
 import { M3Pagination } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { PaymentModal } from './Billing/PaymentModal';
@@ -69,31 +70,6 @@ const ActionsCell = ({ invoice, onView, onPay, tView, tRegisterPayment }: Action
     </div>
   );
 };
-
-const StatusFilterChip = memo(({ value, active, label, onClick }: {
-  value: InvoiceStatus | 'ALL';
-  active: boolean;
-  label: string;
-  onClick: (v: InvoiceStatus | 'ALL') => void;
-}) => {
-  const handleClick = useCallback(() => onClick(value), [onClick, value]);
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={handleClick}
-      className={cn(
-        'px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
-        active
-          ? 'bg-primary text-on-primary border-primary'
-          : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
-      )}
-    >
-      {label}
-    </button>
-  );
-});
-StatusFilterChip.displayName = 'StatusFilterChip';
 
 const EMPTY_RESULTS: InvoiceSearchResult[] = [];
 
@@ -190,10 +166,6 @@ export const Billing = memo(() => {
   const handleRetry = useCallback(() => { refetch(); }, [refetch]);
 
   const patchInvoiceInCache = usePatchInvoiceInCache();
-
-  const handleStatusFilterClick = useCallback((s: InvoiceStatus | 'ALL') => {
-    setStatusFilter(s);
-  }, []);
 
   const handlePaid = useCallback((updated: InvoiceResponse) => {
     patchInvoiceInCache(updated);
@@ -302,12 +274,12 @@ export const Billing = memo(() => {
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex flex-wrap gap-2" role="group" aria-label={t('filter_status')}>
           {(['ALL', 'ISSUED', 'PAID', 'CANCELLED'] as const).map((s) => (
-            <StatusFilterChip
+            <M3FilterChip
               key={s}
               value={s}
-              active={statusFilter === s}
+              selected={statusFilter === s}
               label={s === 'ALL' ? t('filter_all') : t(`invoice_status_${s}`, s)}
-              onClick={handleStatusFilterClick}
+              onValueSelect={setStatusFilter}
             />
           ))}
         </div>

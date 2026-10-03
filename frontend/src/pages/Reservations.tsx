@@ -11,6 +11,7 @@ import { M3StatusChip } from '../components/m3';
 import { M3ConfirmDialog } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
+import { M3FilterChip } from '../components/m3';
 import { M3Pagination } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
@@ -461,19 +462,11 @@ export const Reservations = () => {
               onChange={handleSearchChange}
               className="w-full sm:w-56"
             />
-            <button
-              type="button"
-              aria-pressed={upcomingOnly}
+            <M3FilterChip
+              selected={upcomingOnly}
               onClick={toggleUpcomingOnly}
-              className={cn(
-                'px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
-                upcomingOnly
-                  ? 'bg-primary text-on-primary border-primary'
-                  : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
-              )}
-            >
-              {t('reservations_upcoming_filter')}
-            </button>
+              label={t('reservations_upcoming_filter')}
+            />
             <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
               {t('export_csv')}
             </M3Button>

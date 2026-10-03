@@ -9,6 +9,7 @@ import { M3TableEmptyRow } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
+import { M3Pagination } from '../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
 import { M3TableActionLink } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
@@ -141,6 +142,10 @@ export const Quotations = () => {
   const handleNew = useCallback(() => navigate('/quotations/new'), [navigate]);
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
   const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
+  const pageOfLabel = useCallback(
+    (current: number, total: number) => t('common:page_x_of_y', { current, total }),
+    [t],
+  );
 
   const handleSend = useCallback(async (id: string) => {
     setSendingId(id);
@@ -264,18 +269,17 @@ export const Quotations = () => {
         </M3Table>
       )}
 
-      {!loading && !error && totalPages > 1 && (
-        <nav aria-label={t('common:pagination')} className="flex items-center justify-center gap-3">
-          <M3Button variant="outlined" icon="chevron_left" disabled={page === 0} onClick={handlePrevPage} aria-label={t('common:prev_page')}>
-            {t('common:prev_page')}
-          </M3Button>
-          <span className="text-sm font-body text-on-surface-variant">
-            {t('common:page_x_of_y', { current: page + 1, total: totalPages })}
-          </span>
-          <M3Button variant="outlined" icon="chevron_right" disabled={page >= totalPages - 1} onClick={handleNextPage} aria-label={t('common:next_page')}>
-            {t('common:next_page')}
-          </M3Button>
-        </nav>
+      {!loading && !error && (
+        <M3Pagination
+          page={page}
+          totalPages={totalPages}
+          onPrev={handlePrevPage}
+          onNext={handleNextPage}
+          pageLabel={t('common:pagination')}
+          prevLabel={t('common:prev_page')}
+          nextLabel={t('common:next_page')}
+          pageOfLabel={pageOfLabel}
+        />
       )}
 
       {declineTarget && (
