@@ -15,7 +15,7 @@ import { M3Pagination } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
 
-import { StayStatusChip } from './Stays/StayStatusChip';
+import { M3FilterChip } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3TableActionLink } from '../components/m3';
 import { AlloggiatiReportSection } from './Stays/AlloggiatiReportSection';
@@ -204,10 +204,6 @@ export const Stays = memo(() => {
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-  }, []);
-
-  const handleStatusFilterClick = useCallback((s: StayStatus | 'ALL') => {
-    setStatusFilter(s);
   }, []);
 
   const sorting = useMemo<SortingState>(
@@ -430,12 +426,12 @@ export const Stays = memo(() => {
         />
         <div className="flex flex-wrap gap-2" role="group" aria-label={t('filter_status')}>
           {(['ALL', 'EXPECTED', 'CHECKED_IN', 'CHECKED_OUT'] as const).map((s) => (
-            <StayStatusChip
+            <M3FilterChip
               key={s}
               value={s}
-              active={statusFilter === s}
+              selected={statusFilter === s}
               label={s === 'ALL' ? t('filter_all') : s === 'EXPECTED' ? t('status_expected') : s === 'CHECKED_IN' ? t('status_checked_in') : t('status_checked_out')}
-              onClick={handleStatusFilterClick}
+              onValueSelect={setStatusFilter}
             />
           ))}
         </div>

@@ -6,6 +6,7 @@ import type { RoomResponse } from '../../types';
 import { Alert } from '../../components/Alert';
 import { M3Button } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
+import { M3FilterChip } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
 import { M3TableActionLink } from '../../components/m3';
 import { M3LoadingState } from '../../components/m3';
@@ -13,7 +14,7 @@ import { M3ErrorState } from '../../components/m3';
 import { M3TableEmptyRow } from '../../components/m3';
 import { useRoomsList, useRoomTypes } from '../../hooks/queries';
 import { queryKeys } from '../../lib';
-import { getErrorMessage, cn, roomStatusTone } from '../../utils';
+import { getErrorMessage, roomStatusTone } from '../../utils';
 import { RoomFormModal } from './RoomFormModal';
 
 interface RoomListNavState {
@@ -114,19 +115,11 @@ export const RoomList = memo(() => {
       <div className="flex flex-wrap justify-between items-center gap-3">
         <h2 className="text-xl font-display font-medium text-on-surface">{t('tab_rooms')}</h2>
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            aria-pressed={availableOnly}
+          <M3FilterChip
+            selected={availableOnly}
             onClick={toggleAvailableOnly}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
-              availableOnly
-                ? 'bg-primary text-on-primary border-primary'
-                : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
-            )}
-          >
-            {t('rooms_available_today_filter')}
-          </button>
+            label={t('rooms_available_today_filter')}
+          />
           <M3Button icon="add" onClick={openAddModal} disabled={roomTypes.length === 0}>
             {t('add_room')}
           </M3Button>

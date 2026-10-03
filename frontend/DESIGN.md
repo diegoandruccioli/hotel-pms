@@ -260,6 +260,12 @@ readable is *consistency*, not *sparseness*. Concretely:
 - **Confirmations go through `M3ConfirmDialog`** — a message plus Cancel/Confirm, with
   `loading` while the action runs. A confirmation that needs more (a result list, a
   second step) uses `M3Dialog` directly.
+- **Filter pills go through `M3FilterChip`** — a pill toggle with `aria-pressed`. Use
+  `onClick` for a standalone toggle, or `value` + `onValueSelect` for a row of chips sharing one
+  handler (the `react-perf` lint rule forbids inline arrow functions as props).
+- **Initials circles go through `M3Avatar`** — `size="md"` (40px) or `"lg"` (64px); falls
+  back to `?` without a name. Wrap it in a `<button>` when it must be interactive
+  (see `UserMenu`).
 
 ---
 
