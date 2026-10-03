@@ -115,9 +115,9 @@ Administration, each under a `role="group"` heading (`text-xs`, uppercase,
 is a solid `surface-container-lowest` with an `outline-variant` bottom border.
 
 The sidebar has a compact mode (80px, `w-20`): icons only, each link keeping its accessible
-name as `sr-only` text plus a `title` tooltip (mouse only — known gap: no visible name
-on keyboard focus until a dedicated, non-clipped tooltip component exists), group
-headings `sr-only` with a divider between groups. It is toggled by the button pinned
+name as `sr-only` text plus an `M3Tooltip` (visible name on hover and keyboard focus),
+group headings `sr-only` with a divider between groups. Touch has no tooltip (a tap
+follows the link): the always-visible toggle expands the sidebar to show the names. It is toggled by the button pinned
 (`sticky`) at the foot of the sidebar, whose label names the action, and stored in `settingsStore`
 (`sidebarCollapsed`, key `hotel-pms-sidebar-collapsed`). With no stored choice it starts
 compact below 1280px and expanded from 1280px; that default is evaluated once at load, so
@@ -254,6 +254,15 @@ folder with 2+ files satisfies the barrel-export rule uniformly — without the
 is correct-but-useless noise that trains you to stop reading the report. Add a
 new folder to the list only after confirming (like these) that it truly can't
 have a safe consumer — not just because knip complained once.
+
+**Tooltips (`M3Tooltip`)** — visible label for a control that shows only an icon,
+shown to its right on hover (300ms) and keyboard focus. Portal + `position: fixed`, so a
+scrolling or clipping ancestor (the sidebar) can't cut it off. It is visual only
+(`aria-hidden`): the control must already have its own accessible name, and it is not
+a place for information that exists nowhere else. Meets WCAG 1.4.13 (dismissible with
+Escape, hoverable, hides on scroll/resize). Don't also set a native `title`. No touch
+behaviour: a tap activates the control. `inverse-surface` on `inverse-on-surface` is
+checked at ≥7:1 in all four themes by `src/styles/contrast.test.ts`.
 
 ---
 

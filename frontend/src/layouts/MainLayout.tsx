@@ -12,6 +12,7 @@ import { useEscapeKey } from '../hooks';
 import { useServerEvents } from '../hooks';
 import * as FocusTrapModule from 'focus-trap-react';
 import { SidebarNav } from '../components/SidebarNav';
+import { M3Tooltip } from '../components/m3/M3Tooltip';
 import { getSidebarSections } from '../config/navigation';
 import { cn } from '../utils';
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
@@ -134,15 +135,16 @@ export const MainLayout = () => {
         </div>
         <SidebarNav sections={sidebarSections} collapsed={sidebarCollapsed} />
         <div className={cn('sticky bottom-0 mt-auto flex pb-4 pt-2 bg-surface-container-lowest', sidebarCollapsed ? 'justify-center' : 'px-5')}>
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            aria-label={sidebarCollapsed ? t('sidebar_expand') : t('sidebar_collapse')}
-            title={sidebarCollapsed ? t('sidebar_expand') : t('sidebar_collapse')}
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          >
-            <MaterialIcon name={sidebarCollapsed ? 'chevron_right' : 'chevron_left'} size={24} />
-          </button>
+          <M3Tooltip label={t('sidebar_expand')} disabled={!sidebarCollapsed}>
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label={sidebarCollapsed ? t('sidebar_expand') : t('sidebar_collapse')}
+              className="flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            >
+              <MaterialIcon name={sidebarCollapsed ? 'chevron_right' : 'chevron_left'} size={24} />
+            </button>
+          </M3Tooltip>
         </div>
       </aside>
 

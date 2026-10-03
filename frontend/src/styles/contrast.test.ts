@@ -55,6 +55,13 @@ describe('active navigation item contrast (WCAG AAA, 7:1)', () => {
   });
 });
 
+describe('tooltip contrast (WCAG AAA, 7:1)', () => {
+  it.each(Object.keys(themes))('%s: inverse-on-surface vs inverse-surface', (theme) => {
+    const tokens = themes[theme];
+    expect(ratio(tokens['inverse-on-surface'], tokens['inverse-surface'])).toBeGreaterThanOrEqual(7);
+  });
+});
+
 describe('page and solid-card surface contrast (WCAG AAA, 7:1)', () => {
   const cases = Object.keys(themes).flatMap((theme) =>
     surfaces.flatMap((surface) => texts.map((text) => [theme, surface, text] as const)),

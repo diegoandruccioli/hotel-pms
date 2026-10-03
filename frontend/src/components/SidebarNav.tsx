@@ -2,6 +2,7 @@ import { memo, useId } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
+import { M3Tooltip } from './m3/M3Tooltip';
 import { cn } from '../utils';
 import type { NavGroup, SidebarSection } from '../config/navigation';
 
@@ -73,27 +74,26 @@ export const SidebarNav = memo(({ sections, onNavigate, ariaLabel, collapsed = f
                 {t(GROUP_LABEL_KEYS[group])}
               </span>
             )}
-            {entries.map((item) => (
-              <NavLink
-                key={item.id}
-                to={item.path}
-                end={item.path === '/'}
-                onClick={onNavigate}
-                title={collapsed ? t(item.labelKey, { ns: item.ns }) : undefined}
-                className={itemClasses}
-              >
-                {({ isActive }) => (
-                  <>
-                    <MaterialIcon name={item.icon} filled={isActive} size={24} />
-                    {collapsed ? (
-                      <span className="sr-only">{t(item.labelKey, { ns: item.ns })}</span>
-                    ) : (
-                      t(item.labelKey, { ns: item.ns })
+            {entries.map((item) => {
+              const label = t(item.labelKey, { ns: item.ns });
+              return (
+                <M3Tooltip key={item.id} label={label} disabled={!collapsed} className="mx-auto w-fit">
+                  <NavLink
+                    to={item.path}
+                    end={item.path === '/'}
+                    onClick={onNavigate}
+                    className={itemClasses}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <MaterialIcon name={item.icon} filled={isActive} size={24} />
+                        {collapsed ? <span className="sr-only">{label}</span> : label}
+                      </>
                     )}
-                  </>
-                )}
-              </NavLink>
-            ))}
+                  </NavLink>
+                </M3Tooltip>
+              );
+            })}
           </div>
         );
       })}
