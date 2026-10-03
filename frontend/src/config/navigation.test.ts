@@ -3,7 +3,7 @@ import {
   NAV_ENTRIES,
   OWNER_ADMIN_ROLES,
   NIGHT_AUDIT_ROLES,
-  getSidebarEntries,
+  getSidebarSections,
   getPaletteEntries,
   resolveAnnouncement,
 } from './navigation';
@@ -42,30 +42,39 @@ describe('role constants', () => {
   });
 });
 
-describe('getSidebarEntries', () => {
-  it('only lists common-namespace entries (the sidebar translates with `common`)', () => {
-    expect(getSidebarEntries('ADMIN').every((e) => e.ns === 'common')).toBe(true);
-  });
+const sectionIds = (role: Parameters<typeof getSidebarSections>[0]) =>
+  getSidebarSections(role).map((s) => [s.group, s.entries.map((e) => e.id)] as const);
 
-  it('gives a RECEPTIONIST 13 entries in sidebar order, night audit included', () => {
-    const ids = getSidebarEntries('RECEPTIONIST').map((e) => e.id);
-    expect(ids).toEqual([
-      'dashboard', 'guests', 'reservations', 'reservation-groups', 'quotations', 'calendar', 'stays',
-      'housekeeping', 'night-audit', 'billing', 'restaurant', 'rooms', 'rates',
+describe('getSidebarSections', () => {
+  it('gives a RECEPTIONIST the dashboard, then three groups in sidebar order, night audit included', () => {
+    expect(sectionIds('RECEPTIONIST')).toEqual([
+      [null, ['dashboard']],
+      ['front-office', ['guests', 'reservations', 'reservation-groups', 'quotations', 'calendar', 'stays']],
+      ['operations', ['housekeeping', 'night-audit', 'restaurant']],
+      ['revenue', ['billing', 'rooms', 'rates']],
     ]);
   });
 
-  it.each(['ADMIN', 'OWNER'] as const)('appends owner-dashboard for %s', (role) => {
-    const entries = getSidebarEntries(role);
-    expect(entries).toHaveLength(14);
-    expect(entries.at(-1)?.id).toBe('owner-dashboard');
+  it.each(['ADMIN', 'OWNER'] as const)('adds owner-dashboard to revenue and an admin group for %s', (role) => {
+    const sections = getSidebarSections(role);
+    expect(sections.map((s) => s.group)).toEqual([null, 'front-office', 'operations', 'revenue', 'admin']);
+    expect(sections.find((s) => s.group === 'revenue')?.entries.at(-1)?.id).toBe('owner-dashboard');
+    expect(sections.find((s) => s.group === 'admin')?.entries.map((e) => e.id)).toEqual(['hotel-profile', 'admin-users']);
   });
 
-  it('hides night audit and owner-dashboard from GUEST and from no role', () => {
+  it('hides night audit, owner-dashboard and the admin group from GUEST and from no role', () => {
     for (const role of ['GUEST', undefined] as const) {
-      const ids = getSidebarEntries(role).map((e) => e.id);
+      const sections = getSidebarSections(role);
+      const ids = sections.flatMap((s) => s.entries.map((e) => e.id));
       expect(ids).not.toContain('night-audit');
       expect(ids).not.toContain('owner-dashboard');
+      expect(sections.map((s) => s.group)).not.toContain('admin');
+    }
+  });
+
+  it('never returns an empty section', () => {
+    for (const role of ['OWNER', 'ADMIN', 'RECEPTIONIST', 'GUEST', undefined] as const) {
+      expect(getSidebarSections(role).every((s) => s.entries.length > 0)).toBe(true);
     }
   });
 });

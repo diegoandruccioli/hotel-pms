@@ -48,6 +48,13 @@ const ratio = (a: string, b: string): number => {
 const surfaces = ['surface-container-low', 'surface-container-lowest'];
 const texts = ['on-surface', 'on-surface-variant', 'primary', 'secondary', 'tertiary', 'error'];
 
+describe('active navigation item contrast (WCAG AAA, 7:1)', () => {
+  it.each(Object.keys(themes))('%s: on-primary-container vs primary-container', (theme) => {
+    const tokens = themes[theme];
+    expect(ratio(tokens['on-primary-container'], tokens['primary-container'])).toBeGreaterThanOrEqual(7);
+  });
+});
+
 describe('page and solid-card surface contrast (WCAG AAA, 7:1)', () => {
   const cases = Object.keys(themes).flatMap((theme) =>
     surfaces.flatMap((surface) => texts.map((text) => [theme, surface, text] as const)),
