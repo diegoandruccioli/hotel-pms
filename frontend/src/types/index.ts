@@ -23,7 +23,6 @@ export type {
 export * from './daySheet.types';
 export * from './fb.types';
 export type {
-  IdentityDocumentResponseDTO,
   GuestRequestDTO,
   GuestResponseDTO,
   GuestPrivacySettingsResponse,
