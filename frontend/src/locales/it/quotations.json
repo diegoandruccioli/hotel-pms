@@ -45,6 +45,7 @@
   "err_select_room": "Seleziona almeno una camera",
   "quotation_total": "Totale preventivo: {{amount}}",
   "edit_quotation": "Modifica preventivo",
+  "quotation_details": "Dettaglio preventivo",
   "toast_updated": "Preventivo aggiornato",
   "toast_duplicated": "Preventivo duplicato",
   "error_loading_quotation": "Errore caricamento preventivo",

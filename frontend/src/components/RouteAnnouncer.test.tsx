@@ -43,10 +43,24 @@ describe('RouteAnnouncer', () => {
     });
   });
 
-  it('resolves a sub-route to its section label (e.g. a reservation form)', async () => {
+  it('announces a nested route by its own title (e.g. a reservation form)', async () => {
     renderAt('/reservations/new');
     await waitFor(() => {
-      expect(screen.getByText('nav_reservations')).toBeInTheDocument();
+      expect(screen.getByText('new_reservation')).toBeInTheDocument();
+    });
+  });
+
+  it('titles a dynamic detail route with its static label, not the page data', async () => {
+    renderAt('/quotations/q1');
+    await waitFor(() => {
+      expect(document.title).toContain('quotation_details');
+    });
+  });
+
+  it('falls back to the section label for an unmapped sub-route', async () => {
+    renderAt('/reservations/groups/g1/unmapped');
+    await waitFor(() => {
+      expect(screen.getByText('nav_reservation_groups')).toBeInTheDocument();
     });
   });
 

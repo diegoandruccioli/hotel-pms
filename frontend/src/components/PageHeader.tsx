@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../utils';
+import { useBreadcrumbs } from '../hooks/useBreadcrumbs';
+import { Breadcrumbs, type Crumb } from './Breadcrumbs';
 import { MaterialIcon } from './MaterialIcon';
 
 interface PageHeaderProps {
@@ -8,6 +10,10 @@ interface PageHeaderProps {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
+  /** Overrides the trail derived from the route; `[]` hides it. */
+  crumbs?: readonly Crumb[];
+  /** Label for the last crumb when the page name is data (a group, a quotation). */
+  crumbLabel?: string;
   /** Renders the round back button before the title. */
   onBack?: () => void;
   /** Rendered inside the `h1`, after the title (e.g. a status chip). */
@@ -21,13 +27,17 @@ interface PageHeaderProps {
   actionsClassName?: string;
 }
 
-/** Single page-title block: `h1` + optional icon, subtitle, back button and
- * actions. Every page renders its title through this component. */
+/** Single page-title block: breadcrumbs (derived from the route) + `h1` +
+ * optional icon, subtitle, back button and actions. Every page renders its
+ * title through this component. Needs a Router above it (the trail reads the
+ * location). */
 export const PageHeader = ({
   icon,
   title,
   subtitle,
   actions,
+  crumbs,
+  crumbLabel,
   onBack,
   titleAdornment,
   id,
@@ -37,6 +47,7 @@ export const PageHeader = ({
   actionsClassName,
 }: PageHeaderProps) => {
   const { t } = useTranslation('common');
+  const derivedCrumbs = useBreadcrumbs(crumbLabel);
 
   return (
     <div
@@ -57,7 +68,8 @@ export const PageHeader = ({
             <MaterialIcon name="arrow_back" />
           </button>
         )}
-        <div>
+        <div className="min-w-0">
+          <Breadcrumbs crumbs={crumbs ?? derivedCrumbs} />
           <h1
             id={id}
             data-testid={titleTestId}

@@ -182,7 +182,7 @@ describe('ReservationForm', () => {
     );
     
     await waitFor(() => {
-      expect(screen.getByText('new_reservation')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'new_reservation' })).toBeInTheDocument();
       expect(screen.getByTestId('room-mock')).toBeInTheDocument();
     });
   });
@@ -203,7 +203,7 @@ describe('ReservationForm', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('reservation_details')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'reservation_details' })).toBeInTheDocument();
       expect(screen.getByText(/Mario Rossi/i)).toBeInTheDocument();
       expect(screen.getAllByText(/Read Only/i).length).toBeGreaterThan(0);
     });
@@ -227,7 +227,7 @@ describe('ReservationForm', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('edit_reservation')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'edit_reservation' })).toBeInTheDocument();
       expect(screen.getByText(/Luigi Verdi/i)).toBeInTheDocument();
     });
 
@@ -280,7 +280,7 @@ describe('ReservationForm', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('edit_reservation')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'edit_reservation' })).toBeInTheDocument();
     });
     expect(screen.queryByText('reservation_already_checked_in_banner')).not.toBeInTheDocument();
     expect(screen.queryByText('Read Only')).not.toBeInTheDocument();
@@ -294,7 +294,7 @@ describe('ReservationForm', () => {
         </Routes>
       </MemoryRouter>
     );
-    await waitFor(() => expect(screen.getByText('new_reservation')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'new_reservation' })).toBeInTheDocument());
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
@@ -315,14 +315,14 @@ describe('ReservationForm', () => {
   describe('validation chain', () => {
     it('shows msg_select_guest when no guest is selected', async () => {
       renderNew();
-      await waitFor(() => screen.getByText('new_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
       submitForm();
       expect(await screen.findByText('msg_select_guest')).toBeInTheDocument();
     });
 
     it('shows msg_select_room when a guest is selected but no room', async () => {
       renderNew();
-      await waitFor(() => screen.getByText('new_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
       fireEvent.click(screen.getByText('Select Guest'));
       submitForm();
       expect(await screen.findByText('msg_select_room')).toBeInTheDocument();
@@ -330,7 +330,7 @@ describe('ReservationForm', () => {
 
     it('shows msg_valid_dates when guest and room are set but dates are missing', async () => {
       renderNew();
-      await waitFor(() => screen.getByText('new_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
       fireEvent.click(screen.getByText('Select Guest'));
       fireEvent.click(screen.getByText('Toggle Room r1'));
       submitForm();
@@ -339,7 +339,7 @@ describe('ReservationForm', () => {
 
     it('shows msg_valid_dates when checkout date is not after checkin date', async () => {
       renderNew();
-      await waitFor(() => screen.getByText('new_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
       fireEvent.click(screen.getByText('Select Guest'));
       fireEvent.click(screen.getByText('Toggle Room r1'));
       fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-04-05' } });
@@ -351,7 +351,7 @@ describe('ReservationForm', () => {
 
     it('clears the selected guest via onClearGuest', async () => {
       renderNew();
-      await waitFor(() => screen.getByText('new_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
       fireEvent.click(screen.getByText('Select Guest'));
       expect(await screen.findByText('Mario Rossi')).toBeInTheDocument();
       fireEvent.click(screen.getByText('Clear Guest'));
@@ -367,7 +367,7 @@ describe('ReservationForm', () => {
         }),
       ]);
       renderNew();
-      await waitFor(() => screen.getByText('new_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
       fireEvent.click(screen.getByText('Select Guest'));
       fireEvent.click(screen.getByText('Toggle Room r1'));
       fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-03-22' } });
@@ -387,7 +387,7 @@ describe('ReservationForm', () => {
       ]);
       vi.mocked(reservationService.createReservation).mockResolvedValue(mockReservation());
       renderNew();
-      await waitFor(() => screen.getByText('new_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
       fireEvent.click(screen.getByText('Select Guest'));
       fireEvent.click(screen.getByText('Toggle Room r1'));
       fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-03-22' } });
@@ -401,7 +401,7 @@ describe('ReservationForm', () => {
     it('creates a reservation and navigates back on success', async () => {
       vi.mocked(reservationService.createReservation).mockResolvedValue(mockReservation());
       renderNew();
-      await waitFor(() => screen.getByText('new_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
       fireEvent.click(screen.getByText('Select Guest'));
       fireEvent.click(screen.getByText('Toggle Room r1'));
       fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-04-01' } });
@@ -424,7 +424,7 @@ describe('ReservationForm', () => {
           <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
         </MemoryRouter>
       );
-      await waitFor(() => screen.getByText('edit_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'edit_reservation' }));
       fireEvent.click(screen.getByText('Toggle Room r1'));
       fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
       fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
@@ -446,7 +446,7 @@ describe('ReservationForm', () => {
           <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
         </MemoryRouter>
       );
-      await waitFor(() => screen.getByText('edit_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'edit_reservation' }));
       fireEvent.click(screen.getByText('Toggle Room r1'));
       fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
       fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
@@ -471,7 +471,7 @@ describe('ReservationForm', () => {
           <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
         </MemoryRouter>
       );
-      await waitFor(() => screen.getByText('edit_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'edit_reservation' }));
       fireEvent.click(screen.getByText('Toggle Room r1'));
       fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
       fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
@@ -495,7 +495,7 @@ describe('ReservationForm', () => {
           <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
         </MemoryRouter>
       );
-      await waitFor(() => screen.getByText('edit_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'edit_reservation' }));
       fireEvent.click(screen.getByText('Toggle Room r1'));
       fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
       fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
@@ -522,7 +522,7 @@ describe('ReservationForm', () => {
           <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
         </MemoryRouter>
       );
-      await waitFor(() => screen.getByText('edit_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'edit_reservation' }));
       fireEvent.click(screen.getByText('Toggle Room r1'));
       fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
       fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
@@ -539,7 +539,7 @@ describe('ReservationForm', () => {
         response: { data: { errorCode: 'GUEST_NOT_FOUND' } },
       });
       renderNew();
-      await waitFor(() => screen.getByText('new_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
       fireEvent.click(screen.getByText('Select Guest'));
       fireEvent.click(screen.getByText('Toggle Room r1'));
       fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-04-01' } });
@@ -552,7 +552,7 @@ describe('ReservationForm', () => {
     it('shows a generic failure message on a non-specific creation error', async () => {
       vi.mocked(reservationService.createReservation).mockRejectedValue({ response: { data: {} } });
       renderNew();
-      await waitFor(() => screen.getByText('new_reservation'));
+      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
       fireEvent.click(screen.getByText('Select Guest'));
       fireEvent.click(screen.getByText('Toggle Room r1'));
       fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-04-01' } });
@@ -587,7 +587,7 @@ describe('ReservationForm', () => {
 
   it('navigates back to the list when the back button is clicked', async () => {
     renderNew();
-    await waitFor(() => screen.getByText('new_reservation'));
+    await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
     fireEvent.click(screen.getByLabelText('back'));
     expect(mockNavigate).toHaveBeenCalledWith('/reservations');
   });

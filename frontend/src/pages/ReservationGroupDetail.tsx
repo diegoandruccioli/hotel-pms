@@ -100,6 +100,7 @@ export const ReservationGroupDetail = () => {
       <PageHeader
         icon="groups"
         title={group.name}
+        crumbLabel={group.name}
         titleAdornment={
           <M3StatusChip
             label={t(`group_status_${group.status.toLowerCase()}`)}

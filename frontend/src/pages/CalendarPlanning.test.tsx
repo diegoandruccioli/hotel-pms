@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { CalendarPlanning } from './CalendarPlanning';
 
@@ -10,6 +10,12 @@ const lastCalendarProps: { current: Record<string, unknown> } = { current: {} };
 const lastPlanningBoardProps: { current: Record<string, unknown> } = { current: {} };
 
 // Default view is 'planning' → PlanningBoard renders; month view → Calendar renders
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
+
+// PageHeader derives its breadcrumbs from the router location.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
+
 vi.mock('react-big-calendar', () => ({
   Calendar: (props: Record<string, unknown>) => {
     lastCalendarProps.current = props;

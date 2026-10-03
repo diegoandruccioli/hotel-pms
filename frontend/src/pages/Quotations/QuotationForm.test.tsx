@@ -91,7 +91,7 @@ describe('QuotationForm', () => {
   it('renders heading and room mock after data loads', async () => {
     renderForm();
     await waitFor(() => {
-      expect(screen.getByText('new_quotation')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'new_quotation' })).toBeInTheDocument();
       expect(screen.getByTestId('room-mock')).toBeInTheDocument();
     });
   });
@@ -430,7 +430,7 @@ describe('QuotationForm', () => {
     it('shows the edit title and pre-fills the selected room from the existing quotation', async () => {
       renderEditForm();
       await waitFor(() => {
-        expect(screen.getByText('edit_quotation')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { level: 1, name: 'edit_quotation' })).toBeInTheDocument();
         expect(screen.getByText('Selected: r1')).toBeInTheDocument();
       });
     });

@@ -173,6 +173,14 @@ test.describe('Reservations', () => {
     await expect(page).toHaveURL(/\/reservations\/new/);
   });
 
+  test('new reservation form shows a breadcrumb back to the list', async ({ page }) => {
+    await page.goto('/reservations/new');
+    const crumbs = page.getByRole('navigation', { name: /breadcrumb|percorso di navigazione/i });
+    await expect(crumbs.getByText(/new reservation|nuova prenotazione/i)).toHaveAttribute('aria-current', 'page');
+    await crumbs.getByRole('link', { name: /reservations|prenotazioni/i }).click();
+    await expect(page).toHaveURL(/\/reservations$/);
+  });
+
   test('search filters by guest name', async ({ page }) => {
     await page.goto('/reservations');
     await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });

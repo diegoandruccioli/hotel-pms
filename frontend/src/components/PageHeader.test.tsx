@@ -1,12 +1,71 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, type RenderOptions } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement, ReactNode } from 'react';
 import { axe } from 'vitest-axe';
 import { PageHeader } from './PageHeader';
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+  useTranslation: () => ({
+    t: (key: string, opts?: { ns?: string }) => (opts?.ns ? `${opts.ns}:${key}` : key),
+    i18n: { language: 'en' },
+  }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
+
+const routerAt = (path: string) => {
+  const entries = [path];
+  return ({ children }: { children: ReactNode }) => (
+    <MemoryRouter initialEntries={entries}>{children}</MemoryRouter>
+  );
+};
+
+const EXPLICIT_CRUMBS = [{ label: 'A', to: '/a' }, { label: 'B' }];
+const NO_CRUMBS: never[] = [];
+
+/** PageHeader reads the location to derive its breadcrumbs; default is the dashboard (no trail). */
+const render = (ui: ReactElement, path = '/', options?: RenderOptions) =>
+  rtlRender(ui, { wrapper: routerAt(path), ...options });
+
+describe('PageHeader breadcrumbs', () => {
+  it('derives the trail from the current route', () => {
+    render(<PageHeader title="New" />, '/reservations/new');
+    const nav = screen.getByRole('navigation', { name: 'breadcrumb_label' });
+    expect(nav).toHaveTextContent('common:nav_reservations');
+    expect(screen.getByRole('link', { name: 'common:nav_reservations' })).toHaveAttribute('href', '/reservations');
+  });
+
+  it('renders the trail before the title', () => {
+    render(<PageHeader title="New" />, '/reservations/new');
+    const nav = screen.getByRole('navigation', { name: 'breadcrumb_label' });
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(nav.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('uses crumbLabel for the last crumb', () => {
+    render(<PageHeader title="Sala Rossi" crumbLabel="Sala Rossi" />, '/reservations/groups/g1');
+    expect(screen.getByText('Sala Rossi', { selector: '[aria-current="page"]' })).toBeInTheDocument();
+  });
+
+  it('prefers explicit crumbs over the derived trail', () => {
+    render(
+      <PageHeader title="X" crumbs={EXPLICIT_CRUMBS} />,
+      '/reservations/new',
+    );
+    expect(screen.getByRole('link', { name: 'A' })).toBeInTheDocument();
+    expect(screen.queryByText('common:nav_reservations')).not.toBeInTheDocument();
+  });
+
+  it('crumbs={[]} hides the trail', () => {
+    render(<PageHeader title="X" crumbs={NO_CRUMBS} />, '/reservations/new');
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+  });
+
+  it('shows no trail on the dashboard', () => {
+    render(<PageHeader title="Dashboard" />, '/');
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+  });
+});
 
 describe('PageHeader', () => {
   it('renders the title as an h1', () => {

@@ -4,9 +4,14 @@ import { axe } from 'vitest-axe';
 import { OwnerDashboard } from './OwnerDashboard';
 import { billingReportService } from '../services';
 import { kpiReportService } from '../services';
-import { renderWithQuery } from '../test-utils';
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
+import { renderWithQuery as renderWithQueryOnly } from '../test-utils';
 import type { OwnerFinancialReportDto } from '../types';
 import { mockAxiosErrorWithDetail } from '../test-utils';
+
+// PageHeader derives its breadcrumbs from the router location.
+const renderWithQuery = (ui: ReactElement) => renderWithQueryOnly(<MemoryRouter>{ui}</MemoryRouter>);
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),

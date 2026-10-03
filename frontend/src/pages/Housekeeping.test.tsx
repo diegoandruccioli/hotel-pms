@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../test-utils';
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
+import { renderWithQuery } from '../test-utils';
 import { Housekeeping } from './Housekeeping';
 import { inventoryService } from '../services';
 import { dashboardService } from '../services';
@@ -12,6 +14,9 @@ const stableT = (key: string, options?: { count?: number; status?: string }) => 
   if (options?.count !== undefined) return `${key} ${options.count}`;
   return key;
 };
+// PageHeader derives its breadcrumbs from the router location.
+const render = (ui: ReactElement) => renderWithQuery(<MemoryRouter>{ui}</MemoryRouter>);
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: stableT, i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },

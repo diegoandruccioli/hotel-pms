@@ -2,11 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../test-utils';
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
+import { renderWithQuery } from '../test-utils';
 import { Billing } from './Billing';
 import { billingService } from '../services';
 import { useAuthStore } from '../store';
 import type { InvoiceResponse, InvoiceSearchResult } from '../types';
+
+// PageHeader derives its breadcrumbs from the router location.
+const render = (ui: ReactElement) => renderWithQuery(<MemoryRouter>{ui}</MemoryRouter>);
 
 vi.mock('react-i18next', () => {
   const t = vi.fn((key: string) => key);
