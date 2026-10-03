@@ -112,8 +112,17 @@ Don't use them for new surfaces; use the solid pair above.
 (`getSidebarSections`): the dashboard first, then Front office / Operations / Revenue /
 Administration, each under a `role="group"` heading (`text-xs`, uppercase,
 `on-surface-variant`). Full labels at `text-sm` — no `text-2xs` in the nav. The top bar
-is a solid `surface-container-lowest` with an `outline-variant` bottom border. A compact
-rail mode is planned (V02b); until then 768–1023px uses the drawer.
+is a solid `surface-container-lowest` with an `outline-variant` bottom border.
+
+The sidebar has a compact mode (80px, `w-20`): icons only, each link keeping its accessible
+name as `sr-only` text plus a `title` tooltip (mouse only — known gap: no visible name
+on keyboard focus until a dedicated, non-clipped tooltip component exists), group
+headings `sr-only` with a divider between groups. It is toggled by the button pinned
+(`sticky`) at the foot of the sidebar, whose label names the action, and stored in `settingsStore`
+(`sidebarCollapsed`, key `hotel-pms-sidebar-collapsed`). With no stored choice it starts
+compact below 1280px and expanded from 1280px; that default is evaluated once at load, so
+resizing never flips it. The mobile drawer is always expanded. Below `lg` the drawer
+replaces the sidebar altogether.
 
 **Motion** — a global rule in `m3-base.css` applies a 150ms
 `cubic-bezier(0.2,0,0,1)` transition to `color`/`background-color`/`border-color`/

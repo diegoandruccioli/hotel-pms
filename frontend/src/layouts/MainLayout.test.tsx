@@ -3,7 +3,7 @@ import { screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { MainLayout } from './MainLayout';
-import { useAuthStore } from '../store';
+import { useAuthStore, useSettingsStore } from '../store';
 import { renderWithQuery } from '../test-utils';
 import type { UserPayload } from '../types';
 
@@ -51,6 +51,8 @@ const renderLayout = () =>
 describe('MainLayout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    useSettingsStore.setState({ sidebarCollapsed: false });
   });
 
   it('renders the skip-link, sidebar nav, and the routed page content', () => {
@@ -118,6 +120,44 @@ describe('MainLayout', () => {
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('nav_group_front_office')).toBeInTheDocument();
     expect(within(dialog).getByText('nav_group_admin')).toBeInTheDocument();
+  });
+
+  it('toggles the sidebar between expanded and compact and remembers the choice', () => {
+    mockAuthStore(ADMIN);
+    const { container } = renderLayout();
+    const aside = container.querySelector('#app-sidebar');
+    const toggle = screen.getByRole('button', { name: 'sidebar_collapse' });
+    const content = container.querySelector('#app-sidebar + div');
+    expect(aside).toHaveClass('w-66');
+    expect(content).toHaveClass('lg:ml-66');
+
+    fireEvent.click(toggle);
+
+    expect(aside).toHaveClass('w-20');
+    expect(content).toHaveClass('lg:ml-20');
+    expect(localStorage.getItem('hotel-pms-sidebar-collapsed')).toBe('true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'sidebar_expand' }));
+
+    expect(aside).toHaveClass('w-66');
+    expect(content).toHaveClass('lg:ml-66');
+    expect(localStorage.getItem('hotel-pms-sidebar-collapsed')).toBe('false');
+  });
+
+  it('keeps the mobile drawer expanded while the desktop sidebar is compact', () => {
+    useSettingsStore.setState({ sidebarCollapsed: true });
+    mockAuthStore(ADMIN);
+    renderLayout();
+    fireEvent.click(screen.getByLabelText('nav_menu'));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('nav_group_front_office')).not.toHaveClass('sr-only');
+  });
+
+  it('has no accessibility violations with the compact sidebar', async () => {
+    useSettingsStore.setState({ sidebarCollapsed: true });
+    mockAuthStore(ADMIN);
+    const { container } = renderLayout();
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('closes the drawer when the viewport grows past the lg breakpoint (its focus trap would hold a hidden dialog)', () => {

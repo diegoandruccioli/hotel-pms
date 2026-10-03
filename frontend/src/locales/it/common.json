@@ -210,6 +210,8 @@
   "delta_vs_previous_period": "{{percent}}% rispetto al periodo precedente",
   "no_invoices_period": "Nessuna fattura in questo periodo.",
   "nav_menu": "Menu",
+  "sidebar_collapse": "Comprimi menu",
+  "sidebar_expand": "Espandi menu",
   "nav_drawer": "Navigazione mobile",
   "nav_main": "Navigazione principale",
   "nav_group_front_office": "Front office",

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store';
+import { useAuthStore, useSettingsStore } from '../store';
 import { authService } from '../services';
 import { ToastContainer } from '../components/Toast';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +13,7 @@ import { useServerEvents } from '../hooks';
 import * as FocusTrapModule from 'focus-trap-react';
 import { SidebarNav } from '../components/SidebarNav';
 import { getSidebarSections } from '../config/navigation';
+import { cn } from '../utils';
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
 
 /* ── Main Layout Component ──────────────────────────── */
@@ -22,6 +23,9 @@ export const MainLayout = () => {
   const { t: tCommand } = useTranslation('command');
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+
+  const sidebarCollapsed = useSettingsStore((s) => s.sidebarCollapsed);
+  const toggleSidebar    = useSettingsStore((s) => s.toggleSidebar);
 
   const [drawerOpen, setDrawerOpen]     = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -113,18 +117,37 @@ export const MainLayout = () => {
       )}
 
       {/* ── Desktop Sidebar ─────────────────────────── */}
-      <aside className="hidden lg:flex flex-col fixed left-0 top-0 h-full w-66 bg-surface-container-lowest border-r border-outline-variant overflow-y-auto scrollbar-gutter-stable z-20">
-        <div className="flex items-center gap-3 px-6 pt-5 pb-4">
+      <aside
+        id="app-sidebar"
+        className={cn(
+          'hidden lg:flex flex-col fixed left-0 top-0 h-full bg-surface-container-lowest border-r border-outline-variant overflow-y-auto scrollbar-gutter-stable z-20',
+          sidebarCollapsed ? 'w-20' : 'w-66'
+        )}
+      >
+        <div className={cn('flex items-center gap-3 pt-5 pb-4', sidebarCollapsed ? 'justify-center' : 'px-6')}>
           <div className="flex items-center justify-center w-10 h-10 bg-primary-container rounded-shape-lg">
             <MaterialIcon name="apartment" size={24} className="text-on-primary-container" />
           </div>
-          <span className="text-lg font-display font-bold text-on-surface">Hotel PMS</span>
+          {!sidebarCollapsed && (
+            <span className="text-lg font-display font-bold text-on-surface">Hotel PMS</span>
+          )}
         </div>
-        <SidebarNav sections={sidebarSections} />
+        <SidebarNav sections={sidebarSections} collapsed={sidebarCollapsed} />
+        <div className={cn('sticky bottom-0 mt-auto flex pb-4 pt-2 bg-surface-container-lowest', sidebarCollapsed ? 'justify-center' : 'px-5')}>
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={sidebarCollapsed ? t('sidebar_expand') : t('sidebar_collapse')}
+            title={sidebarCollapsed ? t('sidebar_expand') : t('sidebar_collapse')}
+            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            <MaterialIcon name={sidebarCollapsed ? 'chevron_right' : 'chevron_left'} size={24} />
+          </button>
+        </div>
       </aside>
 
       {/* ── Main content area ───────────────────────── */}
-      <div className="flex flex-col flex-1 w-0 overflow-hidden lg:ml-66">
+      <div className={cn('flex flex-col flex-1 w-0 overflow-hidden', sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-66')}>
         {/* Top Bar */}
         <header className="relative z-10 shrink-0 flex items-center h-16 bg-surface-container-lowest border-b border-outline-variant px-4">
           {/* Mobile hamburger */}
