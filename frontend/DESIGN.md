@@ -83,7 +83,7 @@ subscription for unless it's an actual reported problem.
 | `rounded-shape-xl` | 28px |
 | `rounded-shape-full` | 9999px |
 
-Pick from this scale — don't write an arbitrary `rounded-[Npx]`. Cards use `shape-md`,
+Pick from this scale — don't write an arbitrary `rounded-[Npx]`. Legacy card variants use `shape-md` (`solid` uses `shape-lg`),
 chips/buttons typically `shape-sm`/`shape-full`; match the existing `m3/` components
 for the component type you're building.
 
@@ -92,11 +92,19 @@ defined in `m3-base.css` for both light and dark (dark uses higher shadow alpha:
 0.30/0.50 vs light's 0.15/0.30, since a dark surface needs stronger shadows to read).
 Don't write a bespoke `box-shadow`.
 
-**Glass surfaces** — two purpose-built utility classes exist for translucent
-panels: `.glass-surface` (16px blur) and `.glass-surface-elevated` (24px blur),
-backed by `--md-glass-bg`/`--md-glass-border` tokens (light/dark variants). Use these
-instead of inventing a new `backdrop-blur` + `bg-white/70` combination — they're
-already tuned per-theme.
+**Solid surfaces (default for new UI)** — the page background is
+`surface-container-low` (`body` in `m3-base.css`, `MainLayout`, `AuthLayout`); cards on
+it are `<M3Card variant="solid">` (`surface-container-lowest`, 1px `outline-variant`
+border, `shape-lg`, `elevation-1`). Same token pair in all four themes. The card border
+is a decorative container edge (~1.7–2:1 in the standard themes; the high-contrast
+themes use a much stronger `outline-variant`), not a UI-component boundary; the card
+also reads through its fill and shadow. Text on both surfaces is checked at ≥7:1 in all four
+themes by `src/styles/contrast.test.ts`.
+
+**Glass surfaces — deprecated** — `.glass-surface` / `.glass-surface-elevated`
+(`--md-glass-*` tokens) and `M3Card variant="glass"` remain only until the redesign
+migrates their last consumers (nav rail, top bar, dashboard cards) and removes them.
+Don't use them for new surfaces; use the solid pair above.
 
 **Motion** — a global rule in `m3-base.css` applies a 150ms
 `cubic-bezier(0.2,0,0,1)` transition to `color`/`background-color`/`border-color`/

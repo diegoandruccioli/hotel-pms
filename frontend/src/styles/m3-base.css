@@ -283,7 +283,7 @@ html {
   body {
     font-family: "Inter", system-ui, sans-serif;
     color: var(--md-on-surface);
-    background-color: var(--md-surface);
+    background-color: var(--md-surface-container-low);
   }
 }
 
