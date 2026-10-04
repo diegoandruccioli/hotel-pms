@@ -6,6 +6,7 @@ import { MaterialIcon } from '../components/MaterialIcon';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3Card } from '../components/m3';
+import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3Dialog } from '../components/m3';
 import { M3ConfirmDialog } from '../components/m3';
@@ -33,7 +34,11 @@ export const ReservationGroupDetail = () => {
   const checkoutGroup = useCheckoutReservationGroup();
   const error = queryError ? getErrorMessage(queryError, t('group_load_failed')) : null;
 
-  const { formatCurrency } = useFormatters();
+  const { formatCurrency, formatDate } = useFormatters();
+  const memberHeaders = useMemo(
+    () => [t('guest'), t('label_expected_guests'), t('status'), t('billed_to_master_folio'), t('amount')],
+    [t],
+  );
 
   const getMemberStatusLabel = useCallback(
     (status: string) => t(`status_${status.toLowerCase()}`, status),
@@ -124,7 +129,7 @@ export const ReservationGroupDetail = () => {
         }
       />
 
-      <M3Card className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+      <M3Card variant="solid" className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
         <div>
           <p className="text-on-surface-variant">{t('company_name')}</p>
           <p className="font-medium">{group.companyName ?? '—'}</p>
@@ -135,7 +140,7 @@ export const ReservationGroupDetail = () => {
         </div>
         <div>
           <p className="text-on-surface-variant">{t('label_checkin_date')} / {t('label_checkout_date')}</p>
-          <p className="font-medium">{group.checkInDate} — {group.checkOutDate}</p>
+          <p className="font-medium">{formatDate(group.checkInDate)} — {formatDate(group.checkOutDate)}</p>
         </div>
         <div>
           <p className="text-on-surface-variant">{t('group_rate_per_night')}</p>
@@ -155,44 +160,31 @@ export const ReservationGroupDetail = () => {
         )}
       </M3Card>
 
-      <M3Card className="p-6 space-y-4">
-        <h2 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider">
+      <section aria-labelledby="rooming-list-title" className="space-y-3">
+        <h2 id="rooming-list-title" className="text-sm font-medium text-on-surface-variant uppercase tracking-wider">
           {t('rooming_list')}
         </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-on-surface-variant border-b border-outline-variant">
-                <th className="py-2 pr-4">{t('guest')}</th>
-                <th className="py-2 pr-4">{t('label_expected_guests')}</th>
-                <th className="py-2 pr-4">{t('status')}</th>
-                <th className="py-2 pr-4">{t('billed_to_master_folio')}</th>
-                <th className="py-2 pr-4">{t('amount')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {group.members.map((member: GroupMemberResponse) => (
-                <tr key={member.reservationId} className="border-b border-outline-variant last:border-0">
-                  <td className="py-2 pr-4 font-medium">{member.guestFullName}</td>
-                  <td className="py-2 pr-4">{member.expectedGuests}</td>
-                  <td className="py-2 pr-4">
-                    <M3StatusChip
-                      label={getMemberStatusLabel(member.status)}
-                      tone={member.status === 'CANCELLED' || member.status === 'NO_SHOW' ? 'error' : 'neutral'}
-                    />
-                  </td>
-                  <td className="py-2 pr-4">
-                    {member.billedToMasterFolio
-                      ? <MaterialIcon name="check" size={16} className="text-primary" />
-                      : '—'}
-                  </td>
-                  <td className="py-2 pr-4">{formatCurrency(member.price)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </M3Card>
+        <M3Table headers={memberHeaders}>
+          {group.members.map((member: GroupMemberResponse) => (
+            <M3TableRow key={member.reservationId}>
+              <M3TableCell className="font-medium">{member.guestFullName}</M3TableCell>
+              <M3TableCell>{member.expectedGuests}</M3TableCell>
+              <M3TableCell>
+                <M3StatusChip
+                  label={getMemberStatusLabel(member.status)}
+                  tone={member.status === 'CANCELLED' || member.status === 'NO_SHOW' ? 'error' : 'neutral'}
+                />
+              </M3TableCell>
+              <M3TableCell>
+                {member.billedToMasterFolio
+                  ? <MaterialIcon name="check" size={16} className="text-primary" />
+                  : '—'}
+              </M3TableCell>
+              <M3TableCell>{formatCurrency(member.price)}</M3TableCell>
+            </M3TableRow>
+          ))}
+        </M3Table>
+      </section>
 
       {confirmingCancel && (
         <M3ConfirmDialog

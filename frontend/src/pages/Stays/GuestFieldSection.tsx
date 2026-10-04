@@ -87,7 +87,7 @@ export const GuestFieldSection = memo(({
   }, [index, onChange]);
 
   return (
-    <M3Card className="p-6">
+    <M3Card variant="solid" className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-display font-medium text-on-surface flex items-center gap-2">
           <MaterialIcon name="person" className="text-primary" />
