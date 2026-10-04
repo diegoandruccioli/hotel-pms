@@ -1,8 +1,8 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Card } from '../../components/m3';
+import { M3Card, M3SegmentedRow } from '../../components/m3';
+import type { M3SegmentOption } from '../../components/m3';
 import { M3EmptyState } from '../../components/m3';
 import { M3TableActionLink } from '../../components/m3';
 import { useToastStore } from '../../store';
@@ -14,43 +14,14 @@ const WIDGET_ROW_LIMIT = 8;
 
 const CHECK_IN_ELIGIBLE_STATUS = 'CONFIRMED';
 
-interface PanelShellProps {
-  icon: string;
-  title: string;
-  viewAllHref: string;
-  viewAllLabel: string;
-  isLoading: boolean;
-  isEmpty: boolean;
-  emptyIcon: string;
-  emptyTitle: string;
-  children: React.ReactNode;
-}
+type PanelTab = 'arrivals' | 'departures';
 
-const PanelShell = ({
-  icon, title, viewAllHref, viewAllLabel, isLoading, isEmpty, emptyIcon, emptyTitle, children,
-}: PanelShellProps) => (
-  <M3Card variant="outlined" className="p-5">
-    <div className="flex items-center justify-between mb-4">
-      <div className="flex items-center gap-2">
-        <MaterialIcon name={icon} size={20} className="text-primary" />
-        <h2 className="text-sm font-display font-semibold text-on-surface">{title}</h2>
-      </div>
-      <Link
-        to={viewAllHref}
-        className="inline-flex items-center min-h-10 text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
-      >
-        {viewAllLabel}
-      </Link>
-    </div>
-    {isLoading ? (
-      <div className="py-8 text-center text-sm font-body text-on-surface-variant">…</div>
-    ) : isEmpty ? (
-      <M3EmptyState icon={emptyIcon} title={emptyTitle} />
-    ) : (
-      <ul className="divide-y divide-outline-variant">{children}</ul>
-    )}
-  </M3Card>
-);
+const TAB_OPTIONS: M3SegmentOption<PanelTab>[] = [
+  { value: 'arrivals', labelKey: 'dashboard_tab_arrivals', icon: 'login' },
+  { value: 'departures', labelKey: 'dashboard_tab_departures', icon: 'logout' },
+];
+
+const VIEW_ALL_HREF: Record<PanelTab, string> = { arrivals: '/reservations', departures: '/stays' };
 
 const ArrivalRow = ({ reservation }: { reservation: ReservationResponse }) => {
   const { t } = useTranslation('common');
@@ -119,14 +90,15 @@ const DepartureRow = ({ stay }: { stay: StayResponse }) => {
 };
 
 /**
- * Front-desk "work list" widget — arrivals and due-outs for today, with
- * inline check-in/check-out actions, per the front-desk-dashboard convention
- * (Cloudbeds "Today", Mews front-desk timeline): actionable rows, not just
- * counters. Complements, doesn't replace, the KPI cards above it.
+ * Front-desk "work list" widget: arrivals and due-outs for today in one card,
+ * switched by a segmented row, with inline check-in/check-out actions per the
+ * front-desk-dashboard convention (Cloudbeds "Today", Mews front-desk timeline):
+ * actionable rows, not just counters. Complements the KPI cards above it.
  */
 export const ArrivalsDeparturesPanel = () => {
   const { t } = useTranslation('common');
   const today = useMemo(() => todayIsoDate(), []);
+  const [tab, setTab] = useState<PanelTab>('arrivals');
 
   const { data: arrivalsPage, isLoading: arrivalsLoading } = useReservationsSearch({
     query: '',
@@ -153,34 +125,46 @@ export const ArrivalsDeparturesPanel = () => {
   }, [dueOutPage, today]);
 
   const arrivals = arrivalsPage?.content ?? [];
+  const isArrivals = tab === 'arrivals';
+  const isLoading = isArrivals ? arrivalsLoading : dueOutLoading;
+  const isEmpty = isArrivals ? arrivals.length === 0 : dueOutStays.length === 0;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-      <PanelShell
-        icon="login"
-        title={t('dashboard_arrivals_today')}
-        viewAllHref="/reservations"
-        viewAllLabel={t('view_all')}
-        isLoading={arrivalsLoading}
-        isEmpty={arrivals.length === 0}
-        emptyIcon="event_available"
-        emptyTitle={t('dashboard_no_arrivals_today')}
-      >
-        {arrivals.map((r) => <ArrivalRow key={r.id} reservation={r} />)}
-      </PanelShell>
-
-      <PanelShell
-        icon="logout"
-        title={t('dashboard_departures_today')}
-        viewAllHref="/stays"
-        viewAllLabel={t('view_all')}
-        isLoading={dueOutLoading}
-        isEmpty={dueOutStays.length === 0}
-        emptyIcon="event_busy"
-        emptyTitle={t('dashboard_no_departures_today')}
-      >
-        {dueOutStays.map((s) => <DepartureRow key={s.id} stay={s} />)}
-      </PanelShell>
-    </div>
+    <M3Card variant="solid" className="p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h2 className="text-sm font-display font-semibold text-on-surface">{t('dashboard_arrivals_departures_title')}</h2>
+        <div className="flex items-center gap-3">
+          <M3SegmentedRow<PanelTab>
+            options={TAB_OPTIONS}
+            value={tab}
+            onChange={setTab}
+            ariaLabel={t('dashboard_arrivals_departures_switch')}
+            ns="common"
+            className="w-56"
+          />
+          <Link
+            to={VIEW_ALL_HREF[tab]}
+            aria-label={t(isArrivals ? 'dashboard_view_all_arrivals' : 'dashboard_view_all_departures')}
+            className="inline-flex items-center min-h-10 text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm whitespace-nowrap"
+          >
+            {t('view_all')}
+          </Link>
+        </div>
+      </div>
+      {isLoading ? (
+        <div className="py-8 text-center text-sm font-body text-on-surface-variant">…</div>
+      ) : isEmpty ? (
+        <M3EmptyState
+          icon={isArrivals ? 'event_available' : 'event_busy'}
+          title={t(isArrivals ? 'dashboard_no_arrivals_today' : 'dashboard_no_departures_today')}
+        />
+      ) : (
+        <ul className="divide-y divide-outline-variant">
+          {isArrivals
+            ? arrivals.map((r) => <ArrivalRow key={r.id} reservation={r} />)
+            : dueOutStays.map((st) => <DepartureRow key={st.id} stay={st} />)}
+        </ul>
+      )}
+    </M3Card>
   );
 };

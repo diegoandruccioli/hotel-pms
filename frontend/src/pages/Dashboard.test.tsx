@@ -93,6 +93,8 @@ const LocationProbe = () => {
   return <div data-testid="location" data-state={JSON.stringify(state)}>{pathname}</div>;
 };
 
+const openDeparturesTab = async () => fireEvent.click(await screen.findByRole('radio', { name: 'dashboard_tab_departures' }));
+
 const renderDashboard = () =>
   renderWithQuery(<MemoryRouter><Dashboard /></MemoryRouter>);
 
@@ -173,6 +175,7 @@ describe('Dashboard Component', () => {
     renderDashboard();
     await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
     expect(screen.getByTestId('dashboard-check-in-res-1')).toBeInTheDocument();
+    await openDeparturesTab();
     expect(screen.getByText('dashboard_no_departures_today')).toBeInTheDocument();
   });
 
@@ -197,6 +200,7 @@ describe('Dashboard Component', () => {
     } as never);
     vi.mocked(stayService.checkOut).mockResolvedValue({} as never);
     renderDashboard();
+    await openDeparturesTab();
 
     await waitFor(() => expect(screen.getByTestId('dashboard-check-out-stay-1')).toBeInTheDocument());
     expect(screen.getByText('101')).toBeInTheDocument();
@@ -211,6 +215,7 @@ describe('Dashboard Component', () => {
     } as never);
     vi.mocked(stayService.checkOut).mockRejectedValue(new Error('boom'));
     renderDashboard();
+    await openDeparturesTab();
 
     await waitFor(() => expect(screen.getByTestId('dashboard-check-out-stay-2')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('dashboard-check-out-stay-2'));
@@ -246,14 +251,25 @@ describe('Dashboard Component', () => {
     expect(screen.getByText('2')).toBeInTheDocument();  // DIRTY
   });
 
-  it('colours the room tiles with the canonical room tones (dirty = warning, maintenance = error)', async () => {
+  it('lists every room status with its count and canonical tone dot', async () => {
     renderDashboard();
-    const summary = await screen.findByTestId('room-status-summary');
-    const tileOf = (count: string) => within(summary).getByText(count).parentElement;
-    expect(tileOf('10')?.className).toContain('border-tertiary/50'); // CLEAN
-    expect(tileOf('2')?.className).toContain('border-secondary/50'); // DIRTY
-    expect(tileOf('1')?.className).toContain('border-error/50'); // MAINTENANCE
-    expect(tileOf('12')?.className).toContain('border-primary/50'); // OCCUPIED
+    const legend = await screen.findByTestId('room-status-summary');
+    const rowOf = (label: string) => within(legend).getByText(label).closest('li');
+    expect(rowOf('room_status_clean')).toHaveTextContent('10');
+    expect(rowOf('room_status_dirty')).toHaveTextContent('2');
+    expect(rowOf('room_status_maintenance')).toHaveTextContent('1');
+    expect(rowOf('room_status_occupied')).toHaveTextContent('12');
+    expect(rowOf('room_status_clean')?.querySelector('span')?.className).toContain('bg-tertiary');
+    expect(rowOf('room_status_dirty')?.querySelector('span')?.className).toContain('bg-secondary');
+    expect(rowOf('room_status_maintenance')?.querySelector('span')?.className).toContain('bg-error');
+    expect(rowOf('room_status_occupied')?.querySelector('span')?.className).toContain('bg-primary');
+  });
+
+  it('offers the to-do list with links built from the day-sheet', async () => {
+    renderDashboard();
+    expect(await screen.findByText('dashboard_tasks_title')).toBeInTheDocument();
+    expect(screen.getByText('dashboard_task_dirty_rooms').closest('a')).toHaveAttribute('href', '/housekeeping');
+    expect(screen.getByText('dashboard_task_night_audit').closest('a')).toHaveAttribute('href', '/night-audit');
   });
 
   it('shows Alloggiati failure banner for ADMIN when failures exist', async () => {

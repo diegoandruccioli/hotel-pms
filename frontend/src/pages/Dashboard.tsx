@@ -3,24 +3,22 @@ import { useEffect, useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store';
 import { useTranslation } from 'react-i18next';
-import { MaterialIcon } from '../components/MaterialIcon';
 import { Alert } from '../components/Alert';
 import { PageHeader } from '../components/PageHeader';
-import { M3Button, M3Card, M3StatCard } from '../components/m3';
+import { M3Button, M3StatCard } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { stayService } from '../services';
-import { getErrorMessage, cn, roomStatusTone, toneTileClasses, todayIsoDate } from '../utils';
+import { getErrorMessage, todayIsoDate } from '../utils';
 import type { StatusTone } from '../utils';
 import { useDaySheet, useDaySheetTrend, useOwnerFinancialSummary } from '../hooks/queries';
-import type { RoomStatus } from '../types';
 import type { AlloggiatiFailureSummaryResponse, CityTaxUnassessedSummaryResponse } from '../types';
 import { ArrivalsDeparturesPanel } from './Dashboard/ArrivalsDeparturesPanel';
 import { OwnerSummarySection } from './Dashboard/OwnerSummarySection';
+import { RoomStatusCard } from './Dashboard/RoomStatusCard';
+import { TodayTasksCard } from './Dashboard/TodayTasksCard';
 import { kpiTrend } from './Dashboard/kpiTrend';
 import type { TrendField } from './Dashboard/kpiTrend';
-
-const ALL_ROOM_STATUSES: RoomStatus[] = ['CLEAN', 'DIRTY', 'MAINTENANCE', 'OCCUPIED'];
 
 /** Owner financial summary covers the hotel's full operating history — same
  * range the pre-day-sheet Dashboard used for pending revenue — but now backed
@@ -232,51 +230,22 @@ export const Dashboard = () => {
             ))}
           </div>
 
-          {/* Actionable front-desk work list — arrivals/departures for today,
-              per the front-desk-dashboard convention (Cloudbeds "Today",
-              Mews front-desk timeline): rows with inline actions, not just
-              the counters above. Visible to every role. */}
-          <ArrivalsDeparturesPanel />
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            {/* Actionable front-desk work list, visible to every role. */}
+            <div className="lg:col-span-2">
+              <ArrivalsDeparturesPanel />
+            </div>
+            {daySheet && (
+              <div className="space-y-5">
+                <RoomStatusCard counts={daySheet.roomStatusCounts} />
+                <TodayTasksCard daySheet={daySheet} role={user?.role} />
+              </div>
+            )}
+          </div>
 
-          {/* Owner/admin-only "today at a glance" — occupancy/ADR/RevPAR,
+          {/* Owner/admin-only "today at a glance": occupancy/ADR/RevPAR,
               linking into the full comparative report at /owner-dashboard. */}
           {isOwnerOrAdmin && <OwnerSummarySection />}
-
-          {/* Room status overview — counts only; the day-sheet endpoint doesn't
-              carry the full per-room list, see Housekeeping for that. */}
-          {daySheet && (
-            <M3Card variant="outlined" className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <MaterialIcon name="grid_view" size={20} className="text-primary" />
-                  <h2 className="text-sm font-display font-semibold text-on-surface">
-                    {t('room_overview_title')}
-                  </h2>
-                </div>
-                <Link
-                  to="/housekeeping"
-                  className="inline-flex items-center min-h-10 text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
-                >
-                  {t('view_all')}
-                </Link>
-              </div>
-              <div data-testid="room-status-summary" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {ALL_ROOM_STATUSES.map((status) => (
-                  <div
-                    key={status}
-                    className={cn('rounded-shape-sm border p-3 text-center', toneTileClasses[roomStatusTone[status]])}
-                  >
-                    <div className="text-xl font-display font-bold">
-                      {daySheet.roomStatusCounts[status] ?? 0}
-                    </div>
-                    <div className="text-xs font-body font-medium uppercase tracking-wide">
-                      {t(`room_status_${status.toLowerCase()}`)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </M3Card>
-          )}
         </div>
       )}
     </div>

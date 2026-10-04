@@ -6,7 +6,6 @@ import {
   toneOutlineButtonClasses,
   toneSolidClasses,
   toneSolidTokens,
-  toneTileClasses,
 } from './toneStyles';
 import type { StatusTone } from './domainStatus';
 
@@ -22,7 +21,6 @@ describe('toneStyles', () => {
   it.each([
     ['chip', toneChipClasses],
     ['card', toneCardClasses],
-    ['tile', toneTileClasses],
     ['outline button', toneOutlineButtonClasses],
     ['solid', toneSolidClasses],
     ['dot', toneDotClasses],
@@ -36,7 +34,6 @@ describe('toneStyles', () => {
       const role = ROLE_OF[tone];
       expect(toneChipClasses[tone]).toContain(`${role}-container`);
       expect(toneCardClasses[tone]).toContain(`border-${role}`);
-      expect(toneTileClasses[tone]).toContain(`border-${role}/50`);
       expect(toneOutlineButtonClasses[tone]).toContain(`border-${role}`);
       expect(toneSolidClasses[tone]).toBe(`bg-${role} text-on-${role}`);
       expect(toneDotClasses[tone]).toBe(`bg-${role}`);
