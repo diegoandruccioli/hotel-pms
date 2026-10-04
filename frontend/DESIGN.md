@@ -102,8 +102,8 @@ also reads through its fill and shadow. Text on both surfaces is checked at ≥7
 themes by `src/styles/contrast.test.ts`.
 
 **Glass surfaces — deprecated** — `.glass-surface`
-(`--md-glass-*` tokens) and `M3Card variant="glass"` remain only until the redesign
-migrates their last consumers (the dashboard cards) and removes them.
+(`--md-glass-*` tokens) and `M3Card variant="glass"` have no consumers left and are
+removed in the final cleanup (C01).
 Don't use them for new surfaces; use the solid pair above.
 
 **App shell navigation** — from `lg` (1024px) a fixed 264px sidebar (`w-66`,

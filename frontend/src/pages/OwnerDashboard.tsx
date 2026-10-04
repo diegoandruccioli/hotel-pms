@@ -15,8 +15,9 @@ import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage, cn, invoiceStatusTone, todayIsoDate, toIsoDate } from '../utils';
+import { getErrorMessage, invoiceStatusTone, todayIsoDate, toIsoDate } from '../utils';
 import { KpiTrendSection } from './OwnerDashboard/KpiTrendSection';
+import { OwnerKpiCards } from './OwnerDashboard/OwnerKpiCards';
 
 /** Same-length period immediately preceding `[start, end]` (both inclusive),
  * e.g. 2026-09-01..2026-09-07 (7 days) -> 2026-08-25..2026-08-31 — used to
@@ -33,31 +34,6 @@ const getPreviousPeriod = (startDate: string, endDate: string): { prevStart: str
   const prevStartDate = new Date(prevEndDate);
   prevStartDate.setDate(prevStartDate.getDate() - (lengthDays - 1));
   return { prevStart: toIsoDate(prevStartDate), prevEnd: toIsoDate(prevEndDate) };
-};
-
-/** Percentage change from `previous` to `current`, or `null` when there's no
- * previous-period baseline to compare against (avoids a nonsensical +∞%). */
-const percentChange = (current: number, previous: number): number | null => {
-  if (previous === 0) return current === 0 ? 0 : null;
-  return ((current - previous) / previous) * 100;
-};
-
-interface DeltaBadgeProps {
-  current: number;
-  previous: number;
-}
-
-const DeltaBadge = ({ current, previous }: DeltaBadgeProps) => {
-  const { t } = useTranslation('common');
-  const delta = percentChange(current, previous);
-  if (delta === null) return null;
-  const isPositive = delta >= 0;
-  return (
-    <p className={cn('text-xs font-body font-medium flex items-center gap-0.5', isPositive ? 'text-tertiary' : 'text-error')}>
-      <MaterialIcon name={isPositive ? 'trending_up' : 'trending_down'} size={14} />
-      {t('delta_vs_previous_period', { percent: Math.round(Math.abs(delta)) })}
-    </p>
-  );
 };
 
 const getFirstDayOfMonth = () => {
@@ -215,43 +191,7 @@ export const OwnerDashboard = memo(() => {
 
       {report && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <M3Card variant="glass" className="p-5 flex items-center gap-4">
-              <div className="flex items-center justify-center w-12 h-12 rounded-shape-lg bg-primary-container">
-                <MaterialIcon name="trending_up" size={24} className="text-on-primary-container" />
-              </div>
-              <div>
-                <p className="text-sm font-body text-on-surface-variant">{t('total_revenue')}</p>
-                <p className="text-2xl font-display font-bold text-on-surface">{formatCurrency(report.totalRevenue)}</p>
-                {previousSummary && <DeltaBadge current={report.totalRevenue} previous={previousSummary.totalRevenue} />}
-              </div>
-            </M3Card>
-            <M3Card variant="glass" className="p-5 flex items-center gap-4">
-              <div className="flex items-center justify-center w-12 h-12 rounded-shape-lg bg-secondary-container">
-                <MaterialIcon name="description" size={24} className="text-on-secondary-container" />
-              </div>
-              <div>
-                <p className="text-sm font-body text-on-surface-variant">{t('total_invoices')}</p>
-                <p className="text-2xl font-display font-bold text-on-surface">{report.totalInvoices}</p>
-                {previousSummary && <DeltaBadge current={report.totalInvoices} previous={previousSummary.totalInvoices} />}
-              </div>
-            </M3Card>
-            <M3Card variant="glass" className="p-5 flex items-center gap-4">
-              <div className="flex items-center justify-center w-12 h-12 rounded-shape-lg bg-tertiary-container">
-                <MaterialIcon name="verified" size={24} className="text-on-tertiary-container" />
-              </div>
-              <div>
-                <p className="text-sm font-body text-on-surface-variant">{t('paid_invoices')}</p>
-                <p className="text-2xl font-display font-bold text-on-surface">{report.paidInvoices}</p>
-                <p className="text-xs font-body text-on-surface-variant">
-                  {report.totalInvoices > 0
-                    ? `${Math.round((report.paidInvoices / report.totalInvoices) * 100)}% ${t('collection_rate')}`
-                    : t('no_invoices')}
-                </p>
-                {previousSummary && <DeltaBadge current={report.paidInvoices} previous={previousSummary.paidInvoices} />}
-              </div>
-            </M3Card>
-          </div>
+          <OwnerKpiCards report={report} previousSummary={previousSummary} formatCurrency={formatCurrency} />
 
           <M3Table headers={tableHeaders}>
             {report.invoices.length === 0 ? (

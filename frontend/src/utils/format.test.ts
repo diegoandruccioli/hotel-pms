@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { it as itLocale, enUS } from 'date-fns/locale';
-import { addDaysIso, dateFnsLocale, EMPTY_PLACEHOLDER, formatCurrency, formatDate, formatDateTime, todayIsoDate, toIsoDate } from './format';
+import { addDaysIso, dateFnsLocale, EMPTY_PLACEHOLDER, formatCurrency, formatDate, formatDateTime, formatSigned, todayIsoDate, toIsoDate } from './format';
 
 describe('toIsoDate', () => {
   it('formats the local calendar date with zero padding', () => {
@@ -78,5 +78,11 @@ describe('formatDate / formatDateTime', () => {
   it.each([undefined, null, ''])('renders the placeholder for %s', (value) => {
     expect(formatDate(value, 'en')).toBe(EMPTY_PLACEHOLDER);
     expect(formatDateTime(value, 'en')).toBe(EMPTY_PLACEHOLDER);
+  });
+});
+
+describe('formatSigned', () => {
+  it.each([[3, '+3'], [-2, '−2'], [0, '0']])('formats %s as %s', (value, expected) => {
+    expect(formatSigned(value)).toBe(expected);
   });
 });
