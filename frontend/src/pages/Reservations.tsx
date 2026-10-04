@@ -1,25 +1,20 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import type { ReservationResponse } from '../types';
-import { MaterialIcon } from '../components/MaterialIcon';
+import type { ReservationResponse, RoomResponse } from '../types';
 import { PageHeader } from '../components/PageHeader';
+import { ListToolbar } from '../components/ListToolbar';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
-import { M3TableActionLink } from '../components/m3';
-import { M3StatusChip } from '../components/m3';
 import { M3ConfirmDialog } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3FilterChip } from '../components/m3';
 import { M3Pagination } from '../components/m3';
-import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
-import type { RoomResponse } from '../types';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
-import { getErrorMessage, cn, todayIsoDate, reservationStatusTone } from '../utils';
+import { EMPTY_PLACEHOLDER, getErrorMessage, nightsBetween, todayIsoDate } from '../utils';
 import { reservationService } from '../services';
 import {
   useReservationsSearch,
@@ -28,15 +23,17 @@ import {
   useRetryConfirmationEmail,
   useUpdateReservationStatus,
 } from '../hooks/queries';
-import { useDebounce } from '../hooks';
+import { useDebounce, useFormatters, useListRangeSummary } from '../hooks';
+import {
+  ActionsCell,
+  GuestNameCell,
+  GuestsCountCell,
+  RoomsCell,
+  StatusCell,
+} from './Reservations/ReservationRowCells';
+import { RESERVATION_PRESETS, reservationFilterParams } from './Reservations/reservationFilters';
+import type { ReservationPreset } from './Reservations/reservationFilters';
 
-const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
-// Mirrors ReservationServiceImpl.ALLOWED_TRANSITIONS's NO_SHOW edges — a
-// client-side pre-filter so the action isn't offered for a request that
-// would always 409 server-side; the backend re-validates authoritatively
-// (including the check-in-date-passed / no-existing-stay guards this list
-// can't express).
-const NO_SHOW_ELIGIBLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 const PAGE_SIZE = 20;
 const EMPTY_RESERVATIONS: ReservationResponse[] = [];
 const EMPTY_ROOMS: RoomResponse[] = [];
@@ -52,149 +49,18 @@ interface ReservationsNavState {
   sortDir?: SortDir;
 }
 
-// checkInDate is an ISO 'YYYY-MM-DD' string (see ReservationResponse) — safe
-// to compare lexicographically against another ISO date of the same shape.
-
-const getStatusLabel = (status: string, t: TFunction) =>
-  t(`status_${status.toLowerCase()}`, status);
-
-const RoomsCell = ({ reservation, rooms }: { reservation: ReservationResponse; rooms: RoomResponse[] }) => {
-  const roomNumbers = useMemo(() => (
-    reservation.lineItems?.filter(li => li.active !== false).map(li => {
-      const room = rooms.find(r => r.id === li.roomId);
-      return room?.roomNumber;
-    }).filter(Boolean).sort().join(', ') || '-'
-  ), [reservation.lineItems, rooms]);
-
-  return <span className="text-on-surface-variant font-medium">{roomNumbers}</span>;
+const PRESET_LABEL_KEYS: Record<ReservationPreset, string> = {
+  all: 'reservations_filter_all',
+  upcoming: 'reservations_upcoming_filter',
+  pending: 'reservations_filter_pending',
+  arrivalsToday: 'reservations_filter_arrivals_today',
+  inHouse: 'reservations_filter_in_house',
+  cancelled: 'reservations_filter_cancelled',
 };
 
-const GuestsCountCell = ({ reservation }: { reservation: ReservationResponse }) => (
-  <div className={cn(
-    'font-medium flex items-center gap-1.5',
-    (reservation.actualGuests || 0) < reservation.expectedGuests ? 'text-secondary' :
-    (reservation.actualGuests || 0) > reservation.expectedGuests ? 'text-error' :
-    'text-on-surface'
-  )}>
-    <MaterialIcon name="group" size={18} />
-    <span>{reservation.actualGuests || 0} / {reservation.expectedGuests}</span>
-  </div>
-);
-
-interface StatusCellProps {
-  reservation: ReservationResponse;
-  onRetryConfirmationEmail: (id: string) => void;
-  retryingEmail: string | null;
-  t: TFunction;
-}
-
-const StatusCell = ({ reservation, onRetryConfirmationEmail, retryingEmail, t }: StatusCellProps) => {
-  const handleRetry = useCallback(() => {
-    onRetryConfirmationEmail(reservation.id);
-  }, [onRetryConfirmationEmail, reservation.id]);
-
-  return (
-    <div className="flex flex-col items-start gap-1">
-      <M3StatusChip label={getStatusLabel(reservation.status, t)} tone={reservationStatusTone[reservation.status]} />
-      {reservation.confirmationEmailFailed && (
-        <span
-          className="inline-flex items-center gap-1"
-          title={reservation.confirmationEmailFailureReason ?? undefined}
-        >
-          <M3StatusChip label={t('confirmation_email_failed')} tone="error" />
-          <button
-            type="button"
-            onClick={handleRetry}
-            disabled={retryingEmail === reservation.id}
-            aria-label={t('retry_confirmation_email')}
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/12 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
-          >
-            <MaterialIcon name={retryingEmail === reservation.id ? 'progress_activity' : 'refresh'} size={16} />
-          </button>
-        </span>
-      )}
-    </div>
-  );
-};
-
-interface ActionsCellProps {
-  reservation: ReservationResponse;
-  onCheckIn: (reservationId: string, roomId: string, expectedGuests: number, guestId: string) => void;
-  onView: (reservationId: string) => void;
-  onEdit: (reservationId: string) => void;
-  onDelete?: (id: string) => void;
-  onMarkNoShow?: (id: string) => void;
-  t: TFunction;
-}
-
-const isNoShowEligible = (reservation: ReservationResponse): boolean =>
-  NO_SHOW_ELIGIBLE_STATUSES.has(reservation.status) && reservation.checkInDate <= todayIsoDate();
-
-const ActionsCell = ({ reservation, onCheckIn, onView, onEdit, onDelete, onMarkNoShow, t }: ActionsCellProps) => {
-  const handleCheckInClick = useCallback(() => {
-    onCheckIn(
-      reservation.id,
-      reservation.lineItems?.[0]?.roomId || '',
-      reservation.expectedGuests,
-      reservation.guestId,
-    );
-  }, [onCheckIn, reservation]);
-
-  const handleViewClick = useCallback(() => {
-    onView(reservation.id);
-  }, [onView, reservation.id]);
-
-  const handleEditClick = useCallback(() => {
-    onEdit(reservation.id);
-  }, [onEdit, reservation.id]);
-
-  const handleDeleteClick = useCallback(() => {
-    onDelete?.(reservation.id);
-  }, [onDelete, reservation.id]);
-
-  const handleMarkNoShowClick = useCallback(() => {
-    onMarkNoShow?.(reservation.id);
-  }, [onMarkNoShow, reservation.id]);
-
-  return (
-    <div className="text-right">
-      {reservation.status === 'CONFIRMED' && (
-        <M3TableActionLink
-          className="mr-4"
-          data-testid={`check-in-btn-${reservation.id}`}
-          onClick={handleCheckInClick}
-        >
-          {t('check_in')}
-        </M3TableActionLink>
-      )}
-      <M3TableActionLink className="mr-4" onClick={handleViewClick}>
-        {t('view')}
-      </M3TableActionLink>
-      <M3TableActionLink onClick={handleEditClick}>
-        {t('edit')}
-      </M3TableActionLink>
-      {onMarkNoShow && isNoShowEligible(reservation) && (
-        <M3TableActionLink
-          tone="error"
-          className="ml-4"
-          aria-label={`${t('mark_no_show')} ${reservation.id}`}
-          onClick={handleMarkNoShowClick}
-        >
-          {t('mark_no_show')}
-        </M3TableActionLink>
-      )}
-      {onDelete && DELETABLE_STATUSES.has(reservation.status) && (
-        <M3TableActionLink
-          tone="error"
-          className="ml-4"
-          aria-label={`${t('delete_reservation')} ${reservation.id}`}
-          onClick={handleDeleteClick}
-        >
-          {t('delete_reservation')}
-        </M3TableActionLink>
-      )}
-    </div>
-  );
+const EMPTY_MESSAGE_KEYS: Partial<Record<ReservationPreset, string>> = {
+  all: 'no_reservations_found',
+  upcoming: 'no_upcoming_reservations_found',
 };
 
 export const Reservations = () => {
@@ -205,6 +71,7 @@ export const Reservations = () => {
   const addToast = useToastStore((s) => s.addToast);
   const role = useAuthStore((s) => s.user?.role);
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
+  const { formatDate } = useFormatters();
 
   const [page, setPage] = useState(0);
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
@@ -213,27 +80,28 @@ export const Reservations = () => {
   const debouncedSearch = useDebounce(searchQuery);
   const [sortField, setSortField] = useState<SortField>(() => navState?.sortField ?? DEFAULT_SORT_FIELD);
   const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? DEFAULT_SORT_DIR);
-  const [upcomingOnly, setUpcomingOnly] = useState(() => navState?.upcomingOnly ?? false);
+  const [preset, setPreset] = useState<ReservationPreset>(() => (navState?.upcomingOnly ? 'upcoming' : 'all'));
+  const handlePresetSelect = useCallback((next: ReservationPreset) => {
+    setPage(0);
+    setPreset(next);
+  }, []);
+  const filterParams = useMemo(() => reservationFilterParams(preset, todayIsoDate()), [preset]);
 
   const handleExportCsv = useCallback(async () => {
     try {
-      await reservationService.exportReservationsCsv({ query: searchQuery, upcomingOnly });
+      await reservationService.exportReservationsCsv({ query: searchQuery, upcomingOnly: false, ...filterParams });
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('csv_export_failed')), 'error');
     }
-  }, [searchQuery, upcomingOnly, addToast, t]);
+  }, [searchQuery, filterParams, addToast, t]);
 
   // Any filter/sort change invalidates the current page — always restart from page 0.
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, sortField, sortDir, upcomingOnly]);
+  }, [debouncedSearch, sortField, sortDir, preset]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-  }, []);
-
-  const toggleUpcomingOnly = useCallback(() => {
-    setUpcomingOnly((prev) => !prev);
   }, []);
 
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
@@ -261,11 +129,12 @@ export const Reservations = () => {
 
   const searchParams = useMemo(() => ({
     query: debouncedSearch,
-    upcomingOnly,
+    upcomingOnly: false,
     page,
     size: PAGE_SIZE,
     sort: `${sortField},${sortDir}`,
-  }), [debouncedSearch, upcomingOnly, page, sortField, sortDir]);
+    ...filterParams,
+  }), [debouncedSearch, page, sortField, sortDir, filterParams]);
 
   const {
     data: reservationsPage,
@@ -276,10 +145,13 @@ export const Reservations = () => {
   const { data: roomsData, isLoading: roomsLoading, error: roomsErrorRaw, refetch: refetchRooms } = useRoomsLookup();
   const reservations = reservationsPage?.content ?? EMPTY_RESERVATIONS;
   const totalPages = reservationsPage?.totalPages ?? 1;
+  const totalElements = reservationsPage?.totalElements ?? 0;
   const rooms = roomsData ?? EMPTY_ROOMS;
   const loading = reservationsLoading || roomsLoading;
   const queryError = reservationsError ?? roomsErrorRaw;
   const error = queryError ? getErrorMessage(queryError, t('failed_load_reservations')) : null;
+
+  const summary = useListRangeSummary(page, PAGE_SIZE, reservations.length, totalElements);
 
   const handleRetry = useCallback(() => {
     refetchReservations();
@@ -381,25 +253,34 @@ export const Reservations = () => {
       setReservationToMarkNoShow(null);
     }
   }, [reservationToMarkNoShow, reservations, addToast, t, updateReservationStatusMutation]);
-
   const columns = useMemo<ColumnDef<ReservationResponse>[]>(() => [
     {
       id: 'guestFullName',
       header: t('guest_name'),
       enableSorting: false,
-      cell: ({ row }) => <span className="font-medium">{row.original.guestFullName}</span>,
+      cell: ({ row }) => <GuestNameCell name={row.original.guestFullName} />,
     },
     {
       id: 'checkInDate',
       accessorKey: 'checkInDate',
       header: t('check_in'),
-      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.checkInDate}</span>,
+      cell: ({ row }) => <span className="text-on-surface-variant">{formatDate(row.original.checkInDate)}</span>,
     },
     {
       id: 'checkOutDate',
       accessorKey: 'checkOutDate',
       header: t('check_out'),
-      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.checkOutDate}</span>,
+      cell: ({ row }) => <span className="text-on-surface-variant">{formatDate(row.original.checkOutDate)}</span>,
+    },
+    {
+      id: 'nights',
+      header: t('nights'),
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span data-testid={`nights-${row.original.id}`} className="text-on-surface-variant tabular-nums">
+          {nightsBetween(row.original.checkInDate, row.original.checkOutDate) ?? EMPTY_PLACEHOLDER}
+        </span>
+      ),
     },
     {
       id: 'rooms',
@@ -442,8 +323,10 @@ export const Reservations = () => {
         />
       ),
     },
-  ], [t, rooms, handleRetryConfirmationEmail, retryingEmail, handleCheckIn, handleView, handleEdit,
+  ], [t, formatDate, rooms, handleRetryConfirmationEmail, retryingEmail, handleCheckIn, handleView, handleEdit,
       isAdminOrOwner, handleDeleteRequest, handleMarkNoShowRequest]);
+
+  const emptyMessage = EMPTY_MESSAGE_KEYS[preset] ? t(EMPTY_MESSAGE_KEYS[preset]) : t('no_reservations_match_filter');
 
   return (
     <div className="space-y-6">
@@ -453,23 +336,6 @@ export const Reservations = () => {
         subtitle={t('reservations_subtitle')}
         actions={
           <>
-            <M3TextField
-              label={t('search_placeholder')}
-              hideLabel
-              leadingIcon="search"
-              type="search"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="w-full sm:w-56"
-            />
-            <M3FilterChip
-              selected={upcomingOnly}
-              onClick={toggleUpcomingOnly}
-              label={t('reservations_upcoming_filter')}
-            />
-            <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
-              {t('export_csv')}
-            </M3Button>
             <M3Button
               data-testid="view-groups-btn"
               icon="groups"
@@ -484,6 +350,28 @@ export const Reservations = () => {
           </>
         }
       />
+
+      <ListToolbar
+        searchLabel={t('search_placeholder')}
+        filtersLabel={t('reservations_filters_label')}
+        searchValue={searchQuery}
+        onSearchChange={handleSearchChange}
+        trailing={
+          <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
+            {t('export_csv')}
+          </M3Button>
+        }
+      >
+        {RESERVATION_PRESETS.map((value) => (
+          <M3FilterChip
+            key={value}
+            value={value}
+            selected={preset === value}
+            onValueSelect={handlePresetSelect}
+            label={t(PRESET_LABEL_KEYS[value])}
+          />
+        ))}
+      </ListToolbar>
 
       {loading ? (
         <M3LoadingState label={t('loading')} />
@@ -501,7 +389,7 @@ export const Reservations = () => {
           getRowId={getReservationRowId}
           sorting={sorting}
           onSortingChange={handleSortingChange}
-          emptyMessage={upcomingOnly ? t('no_upcoming_reservations_found') : t('no_reservations_found')}
+          emptyMessage={emptyMessage}
         />
       )}
 
@@ -515,6 +403,7 @@ export const Reservations = () => {
           prevLabel={t('prev_page')}
           nextLabel={t('next_page')}
           pageOfLabel={pageOfLabel}
+          summary={summary}
         />
       )}
       {reservationToDelete && (
