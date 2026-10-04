@@ -457,6 +457,7 @@
   "dashboard_owner_summary_title": "Today at a glance",
 
   "search_placeholder": "Search",
+  "list_range_summary": "{{from}}–{{to}} of {{total}}",
   "filter_all": "All",
   "filter_status": "Filter by status",
   "sort_by": "Sort by",

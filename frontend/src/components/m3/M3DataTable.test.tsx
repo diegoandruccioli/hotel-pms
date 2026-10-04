@@ -26,6 +26,13 @@ function manyRows(count: number): TestRow[] {
 }
 
 describe('M3DataTable', () => {
+  it('uses the solid container (lowest surface, outline-variant border)', () => {
+    const { container } = render(
+      <M3DataTable data={ROWS} columns={COLUMNS} sorting={[]} onSortingChange={vi.fn()} emptyMessage="No rows" />,
+    );
+    expect(container.firstChild).toHaveClass('bg-surface-container-lowest', 'border', 'border-outline-variant', 'rounded-shape-lg');
+  });
+
   it('renders headers and row data', () => {
     render(
       <M3DataTable

@@ -19,6 +19,13 @@ describe('M3TextField', () => {
     expect(screen.getByText('person')).toBeInTheDocument();
   });
 
+  it('shows the placeholder (not the floating label) when hideLabel is set', () => {
+    render(<M3TextField label="Search guests" hideLabel name="search" />);
+    const input = screen.getByLabelText('Search guests');
+    expect(input).toHaveClass('placeholder:text-on-surface-variant');
+    expect(input).not.toHaveClass('placeholder-transparent');
+  });
+
   it('visually hides the label but keeps it programmatically associated when hideLabel is set', () => {
     render(<M3TextField label="Search guests" hideLabel name="search" />);
     const label = screen.getByText('Search guests');

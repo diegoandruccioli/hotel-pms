@@ -70,9 +70,10 @@ export const M3TextField = ({
           id={id}
           type={isPasswordField && showPassword ? 'text' : type}
           className={cn(
-            'peer w-full bg-transparent px-4 pt-5 pb-1.5 text-sm font-body text-on-surface placeholder-transparent',
+            'peer w-full bg-transparent px-4 text-sm font-body text-on-surface',
+            hideLabel ? 'py-3 placeholder:text-on-surface-variant' : 'pt-5 pb-1.5 placeholder-transparent',
             'focus:outline-hidden',
-            leadingIcon && 'pl-2'
+            leadingIcon && (hideLabel ? 'pl-3' : 'pl-2')
           )}
           placeholder={label}
           onFocus={handleFocus}

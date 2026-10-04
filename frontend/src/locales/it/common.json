@@ -457,6 +457,7 @@
   "dashboard_owner_summary_title": "In sintesi oggi",
 
   "search_placeholder": "Cerca",
+  "list_range_summary": "{{from}}–{{to}} di {{total}}",
   "filter_all": "Tutti",
   "filter_status": "Filtra per stato",
   "sort_by": "Ordina per",

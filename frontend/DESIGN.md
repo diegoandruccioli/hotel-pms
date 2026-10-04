@@ -101,6 +101,12 @@ themes use a much stronger `outline-variant`), not a UI-component boundary; the 
 also reads through its fill and shadow. Text on both surfaces is checked at ≥7:1 in all four
 themes by `src/styles/contrast.test.ts`.
 
+**List pages** — `PageHeader` (title, breadcrumb, primary actions) → `ListToolbar`
+(search, `M3FilterChip` row, secondary actions such as export) → `M3DataTable` / `M3Table`
+→ `M3Pagination` with a `summary` ("1–20 of 214"). The table container uses the same
+solid pair as `M3Card variant="solid"` (`surface-container-lowest`, 1px `outline-variant`
+border, `shape-lg`, `elevation-1`); the header row is `surface-container-highest`.
+
 **Glass surfaces — deprecated** — `.glass-surface`
 (`--md-glass-*` tokens) and `M3Card variant="glass"` have no consumers left and are
 removed in the final cleanup (C01).
