@@ -224,7 +224,14 @@ describe('Dashboard Component', () => {
 
   it('shows the owner summary section (occupancy/ADR/RevPAR) for ADMIN', async () => {
     renderDashboard();
-    await waitFor(() => expect(screen.getByText('dashboard_owner_summary_title')).toBeInTheDocument());
+    const section = await screen.findByRole('region', { name: 'dashboard_owner_summary_title' });
+    expect(within(section).getByText('75%')).toBeInTheDocument();
+    expect(within(section).getByText('€120.00')).toBeInTheDocument();
+    expect(within(section).getByText('€90.00')).toBeInTheDocument();
+    // The cards are plain tiles; the one link is the section's own, named by context.
+    expect(within(section).getAllByRole('link')).toHaveLength(1);
+    expect(within(section).getByRole('link', { name: 'dashboard_view_all_owner_report' }))
+      .toHaveAttribute('href', '/owner-dashboard');
   });
 
   it('hides the owner summary section for RECEPTIONIST', async () => {

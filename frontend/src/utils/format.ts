@@ -30,6 +30,10 @@ export const formatCurrency = (amount: number | null | undefined, language: stri
     ? EMPTY_PLACEHOLDER
     : new Intl.NumberFormat(language, { style: 'currency', currency: 'EUR' }).format(amount);
 
+/** Signed whole number as text ("+3", "−2", "0"): trend icons are decorative, so the sign must be in the words. */
+export const formatSigned = (value: number): string =>
+  `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value)}`;
+
 /** Locale date (no time); missing values render as the placeholder. */
 export const formatDate = (value: string | null | undefined, language: string): string =>
   value ? new Date(value).toLocaleDateString(language) : EMPTY_PLACEHOLDER;

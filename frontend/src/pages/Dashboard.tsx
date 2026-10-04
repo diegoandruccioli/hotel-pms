@@ -9,7 +9,7 @@ import { M3Button, M3StatCard } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { stayService } from '../services';
-import { getErrorMessage, todayIsoDate } from '../utils';
+import { formatSigned, getErrorMessage, todayIsoDate } from '../utils';
 import type { StatusTone } from '../utils';
 import { useDaySheet, useDaySheetTrend, useOwnerFinancialSummary } from '../hooks/queries';
 import type { AlloggiatiFailureSummaryResponse, CityTaxUnassessedSummaryResponse } from '../types';
@@ -38,10 +38,6 @@ interface StatCardConfig {
   /** Day-sheet field and live value feeding the sparkline and the delta; absent = no trend. */
   trend?: { field: TrendField; today: number };
 }
-
-/** Signed difference as text: the delta icon is decorative, so the sign must be in the words. */
-const formatSigned = (value: number): string =>
-  `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value)}`;
 
 export const Dashboard = () => {
   const { t } = useTranslation('common');
