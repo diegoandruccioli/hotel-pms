@@ -1,4 +1,4 @@
-import { useFormatters } from '../hooks';
+import { useFormatters, useListRangeSummary } from '../hooks';
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -48,7 +48,7 @@ interface QuotationRowProps {
 }
 
 const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, onDownload, sendingId, t }: QuotationRowProps) => {
-  const { formatCurrency } = useFormatters();
+  const { formatCurrency, formatDate } = useFormatters();
   const handleSend = useCallback(() => onSend(quotation.id), [onSend, quotation.id]);
   const handleConvert = useCallback(() => onConvert(quotation.id), [onConvert, quotation.id]);
   const handleDecline = useCallback(() => onDecline(quotation.id), [onDecline, quotation.id]);
@@ -66,10 +66,10 @@ const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, 
           {quotation.guestFullName}
         </Link>
       </M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{quotation.checkInDate}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{quotation.checkOutDate}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant">{formatDate(quotation.checkInDate)}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant">{formatDate(quotation.checkOutDate)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant font-medium">{formatTotal(quotation, t, formatCurrency)}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{quotation.validUntil}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant">{formatDate(quotation.validUntil)}</M3TableCell>
       <M3TableCell>
         <div className="flex flex-col items-start gap-1">
           <M3StatusChip label={t(`status_${quotation.status.toLowerCase()}`)} tone={quotationStatusTone[quotation.status]} />
@@ -114,6 +114,7 @@ export const Quotations = () => {
   const [quotations, setQuotations] = useState<QuotationResponse[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
@@ -128,6 +129,7 @@ export const Quotations = () => {
       const data = await quotationService.getAllQuotations(page, PAGE_SIZE);
       setQuotations(data.content);
       setTotalPages(data.totalPages);
+      setTotalElements(data.totalElements);
     } catch (err: unknown) {
       setError(getErrorMessage(err, t('error_loading_quotations')));
     } finally {
@@ -138,6 +140,8 @@ export const Quotations = () => {
   useEffect(() => {
     loadQuotations();
   }, [loadQuotations]);
+
+  const summary = useListRangeSummary(page, PAGE_SIZE, quotations.length, totalElements);
 
   const handleNew = useCallback(() => navigate('/quotations/new'), [navigate]);
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
@@ -279,6 +283,7 @@ export const Quotations = () => {
           prevLabel={t('common:prev_page')}
           nextLabel={t('common:next_page')}
           pageOfLabel={pageOfLabel}
+          summary={summary}
         />
       )}
 
