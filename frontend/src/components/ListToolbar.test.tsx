@@ -1,0 +1,40 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { axe } from 'vitest-axe';
+import { ListToolbar } from './ListToolbar';
+
+const renderToolbar = (props: Partial<React.ComponentProps<typeof ListToolbar>> = {}) => {
+  const onSearchChange = vi.fn();
+  render(
+    <ListToolbar searchLabel="Search" searchValue="" onSearchChange={onSearchChange} {...props} />,
+  );
+  return { onSearchChange };
+};
+
+describe('ListToolbar', () => {
+  it('renders a named search field and reports typing', () => {
+    const { onSearchChange } = renderToolbar();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search' }), { target: { value: 'rossi' } });
+    expect(onSearchChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders chips and trailing actions when given', () => {
+    renderToolbar({ children: <button type="button">Chip</button>, trailing: <button type="button">Export</button> });
+    expect(screen.getByRole('button', { name: 'Chip' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
+  });
+
+  it('renders only the search field without chips or actions', () => {
+    renderToolbar();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(
+      <ListToolbar searchLabel="Search" searchValue="" onSearchChange={vi.fn()} trailing={<button type="button">Export</button>}>
+        <button type="button">Chip</button>
+      </ListToolbar>,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+});

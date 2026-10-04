@@ -5,6 +5,15 @@ import { axe } from 'vitest-axe';
 import { M3Table, M3TableRow, M3TableCell } from './M3Table';
 
 describe('M3Table', () => {
+  it('uses the solid container (lowest surface, outline-variant border)', () => {
+    const { container } = render(
+      <M3Table headers={['Name']}>
+        <M3TableRow><M3TableCell>John</M3TableCell></M3TableRow>
+      </M3Table>
+    );
+    expect(container.firstChild).toHaveClass('bg-surface-container-lowest', 'border', 'border-outline-variant', 'rounded-shape-lg');
+  });
+
   it('should render headers', () => {
     render(
       <M3Table headers={['Name', 'Status', 'Actions']}>
