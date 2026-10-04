@@ -191,4 +191,16 @@ test.describe('Reservations', () => {
     await expect(page.getByText('Anna Bianchi')).toBeVisible({ timeout: 2000 });
     await expect(page.getByText('Mario Rossi')).not.toBeVisible();
   });
+
+  test('the "to confirm" chip asks the server for PENDING reservations only', async ({ page }) => {
+    await page.goto('/reservations');
+    await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
+
+    const request = page.waitForRequest((req) => req.url().includes('/reservations/search') && req.url().includes('status=PENDING'));
+    const chip = page.getByRole('button', { name: /to confirm|da confermare/i });
+    await chip.click();
+    await request;
+
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+  });
 });
