@@ -56,6 +56,7 @@ export const queryKeys = {
   },
   dashboard: {
     daySheet: (date: string) => ['dashboard', 'day-sheet', date] as const,
+    daySheetTrend: (date: string, days: number) => ['dashboard', 'day-sheet-trend', date, days] as const,
   },
   commandPalette: {
     guests: (query: string) => ['command-palette', 'guests', query] as const,
