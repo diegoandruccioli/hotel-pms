@@ -122,4 +122,11 @@ class DaySheetTrendControllerTest {
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(daySheetTrendService);
     }
+
+    @Test
+    void returns400WhenDateIsMalformed() throws Exception {
+        mockMvc.perform(get(URL).param(PARAM_DATE, "04-10-2026"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(daySheetTrendService);
+    }
 }
