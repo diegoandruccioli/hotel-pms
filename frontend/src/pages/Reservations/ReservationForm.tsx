@@ -296,7 +296,7 @@ export const ReservationForm = () => {
       )}
 
       {/* STEP 1: GUEST SELECTION OR CREATION */}
-      <M3Card className="p-6 space-y-4">
+      <M3Card variant="solid" className="p-6 space-y-4">
         <div className="flex items-center gap-2 mb-4">
           <MaterialIcon name="person" className="text-primary" />
           <h2 className="text-lg font-medium text-on-surface">{t('step_primary_guest')}</h2>
@@ -310,7 +310,7 @@ export const ReservationForm = () => {
       </M3Card>
 
       {/* STEP 2: DATES & ROOMS */}
-      <M3Card className="p-6 space-y-4">
+      <M3Card variant="solid" className="p-6 space-y-4">
         <div className="flex items-center gap-2 mb-4">
           <MaterialIcon name="event_seat" className="text-primary" />
           <h2 className="text-lg font-medium text-on-surface">{t('step_reservation_details')}</h2>
