@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockAuthMe, mockDaySheet, mockOwnerSummary, mockTodayArrivals, mockDueOutStays } from './fixtures/mockApi';
+import { mockAuthMe, mockDaySheet, mockDaySheetTrend, mockOwnerSummary, mockTodayArrivals, mockDueOutStays } from './fixtures/mockApi';
 
 async function mockDashboardApis(page: import('@playwright/test').Page): Promise<void> {
   await mockAuthMe(page);
@@ -70,13 +70,34 @@ test.describe('Dashboard', () => {
     await expect(page.getByText(/pending revenue|ricavi in sospeso/i)).toBeVisible();
   });
 
-  test('stat cards link to correct pages', async ({ page }) => {
+  test('each stat card is one link to its page', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByTestId('stats-grid')).toBeVisible({ timeout: 10000 });
-    // 4 universal stats + owner pending-revenue stat + room-overview section
-    // link + the arrivals/departures work-list panel's own 2 "View all"
-    // links, all "View all".
-    const viewAllLinks = page.getByRole('link', { name: /view all|vedi tutto/i });
-    await expect(viewAllLinks).toHaveCount(8);
+    const grid = page.getByTestId('stats-grid');
+    await expect(grid).toBeVisible({ timeout: 10000 });
+    // 4 universal stats + owner pending-revenue stat, each the whole card as one link.
+    await expect(grid.getByRole('link')).toHaveCount(5);
+    await expect(grid.getByRole('link', { name: /guests in house|ospiti in struttura/i })).toHaveAttribute('href', '/stays');
+    await expect(grid.getByRole('link', { name: /pending revenue|fatturato in attesa/i })).toHaveAttribute('href', '/billing');
+    // Left: room-overview link + the work-list panel's own 2 "View all" links.
+    await expect(page.getByRole('link', { name: /view all|vedi tutto/i })).toHaveCount(3);
+  });
+
+  test('shows the delta against yesterday when a snapshot exists', async ({ page }) => {
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    const yesterday = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+    await mockDaySheet(page, { guestsInHouse: 5 });
+    await mockDaySheetTrend(page, [
+      { date: yesterday, arrivals: 1, departures: 0, guestsInHouse: 2, availableRooms: 1 },
+    ]);
+    await page.goto('/');
+    const grid = page.getByTestId('stats-grid');
+    await expect(grid.getByText(/\+3.*(vs yesterday|rispetto a ieri)/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test('header offers new reservation and walk-in', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: /new reservation|nuova prenotazione/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: /walk-in/i })).toBeVisible();
   });
 });

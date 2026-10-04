@@ -63,11 +63,35 @@ export const DEFAULT_MOCK_DAY_SHEET: MockDaySheet = {
   roomStatusCounts: { CLEAN: 1, DIRTY: 1, MAINTENANCE: 0, OCCUPIED: 1 },
 };
 
-export function mockDaySheet(page: Page, overrides: Partial<MockDaySheet> = {}): Promise<void> {
-  const body = { ...DEFAULT_MOCK_DAY_SHEET, ...overrides };
-  return page.route('**/api/v1/frontdesk/day-sheet**', (route) =>
+/** One night-audit snapshot — mirrors `DaySheetTrendPoint`. */
+export interface MockDaySheetTrendPoint {
+  date: string;
+  arrivals: number;
+  departures: number;
+  guestsInHouse: number;
+  availableRooms: number;
+}
+
+/** Matches by pathname: a `day-sheet**` glob would also swallow `/day-sheet/trend`
+ * and answer it with the day-sheet body. */
+const isDaySheetPath = (url: URL): boolean => url.pathname.endsWith('/api/v1/frontdesk/day-sheet');
+const isDaySheetTrendPath = (url: URL): boolean => url.pathname.endsWith('/api/v1/frontdesk/day-sheet/trend');
+
+/** Snapshots default to none, so KPI cards render without delta or sparkline. Call
+ * after `mockDaySheet` (which registers the empty default) to override them. */
+export function mockDaySheetTrend(page: Page, points: MockDaySheetTrendPoint[] = []): Promise<void> {
+  const body = { from: todayLocalDateString(), to: todayLocalDateString(), points };
+  return page.route(isDaySheetTrendPath, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }),
   );
+}
+
+export async function mockDaySheet(page: Page, overrides: Partial<MockDaySheet> = {}): Promise<void> {
+  const body = { ...DEFAULT_MOCK_DAY_SHEET, ...overrides };
+  await page.route(isDaySheetPath, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }),
+  );
+  await mockDaySheetTrend(page);
 }
 
 /** Mirrors `OwnerFinancialSummaryDto` — see
