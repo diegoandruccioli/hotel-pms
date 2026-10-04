@@ -12,6 +12,7 @@ import { M3Pagination } from '../components/m3';
 import { useTranslation } from 'react-i18next';
 import { getErrorMessage, groupStatusTone } from '../utils';
 import { useReservationGroups } from '../hooks/queries';
+import { useFormatters, useListRangeSummary } from '../hooks';
 
 const PAGE_SIZE = 20;
 
@@ -43,6 +44,8 @@ export const ReservationGroups = () => {
   const { data: groupsPage, isLoading, error: queryError, refetch } = useReservationGroups(page, PAGE_SIZE);
   const groups = groupsPage?.content ?? [];
   const totalPages = groupsPage?.totalPages ?? 1;
+  const summary = useListRangeSummary(page, PAGE_SIZE, groups.length, groupsPage?.totalElements ?? 0);
+  const { formatDate } = useFormatters();
   const error = queryError ? getErrorMessage(queryError, t('groups_load_failed')) : null;
 
   const handleNewGroup = useCallback(() => navigate('/reservations/groups/new'), [navigate]);
@@ -78,12 +81,12 @@ export const ReservationGroups = () => {
     {
       id: 'checkInDate',
       header: t('label_checkin_date'),
-      cell: ({ row }) => <span>{row.original.checkInDate}</span>,
+      cell: ({ row }) => <span>{formatDate(row.original.checkInDate)}</span>,
     },
     {
       id: 'checkOutDate',
       header: t('label_checkout_date'),
-      cell: ({ row }) => <span>{row.original.checkOutDate}</span>,
+      cell: ({ row }) => <span>{formatDate(row.original.checkOutDate)}</span>,
     },
     {
       id: 'rooms',
@@ -97,7 +100,7 @@ export const ReservationGroups = () => {
         <M3StatusChip label={getStatusLabel(row.original.status)} tone={groupStatusTone[row.original.status]} />
       ),
     },
-  ], [t, handleViewGroup, getStatusLabel]);
+  ], [t, handleViewGroup, getStatusLabel, formatDate]);
 
   return (
     <div className="space-y-6">
@@ -152,6 +155,7 @@ export const ReservationGroups = () => {
           prevLabel={t('prev_page')}
           nextLabel={t('next_page')}
           pageOfLabel={pageOfLabel}
+          summary={summary}
         />
       )}
     </div>

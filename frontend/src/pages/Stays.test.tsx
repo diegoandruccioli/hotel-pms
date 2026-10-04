@@ -285,7 +285,7 @@ describe('Stays', () => {
       totalElements: 1, totalPages: 1, number: 0, size: 20, numberOfElements: 1, first: true, last: true, empty: false,
     } as never);
     render(<Stays />);
-    await waitFor(() => expect(screen.getByText('2026-07-01')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('7/1/2026')).toBeInTheDocument());
   });
 
   it('extends a CHECKED_IN stay via the extension dialog', async () => {
@@ -302,7 +302,7 @@ describe('Stays', () => {
     } as never);
 
     render(<Stays />);
-    await waitFor(() => expect(screen.getByText('2026-07-01')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('7/1/2026')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'action_extend_stay' }));
     await waitFor(() => expect(screen.getByText('stay_extension_title')).toBeInTheDocument());
@@ -354,5 +354,43 @@ describe('Stays', () => {
 
     await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
     expect(screen.queryByText('202')).not.toBeInTheDocument(); // filtered out: EXPECTED != CHECKED_IN
+  });
+
+  describe('toolbar and range', () => {
+    const TWO_STAYS = {
+      content: [
+        { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'John Doe', status: 'CHECKED_IN' },
+        { id: 's2', roomId: 'r2', roomNumber: '202', guestId: 'g2', guestDisplayName: 'Jane Smith', status: 'EXPECTED' },
+      ],
+      totalElements: 2, totalPages: 1, number: 0, size: 20, numberOfElements: 2, first: true, last: true, empty: false,
+    };
+
+    it('groups the status chips under the filter label', async () => {
+      vi.mocked(stayService.getAllStays).mockResolvedValue(TWO_STAYS as never);
+      render(<Stays />);
+      await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
+
+      const group = screen.getByRole('group', { name: 'filter_status' });
+      expect(within(group).getAllByRole('button')).toHaveLength(4);
+    });
+
+    it('shows the server-wide range, and hides it while a client-side filter narrows the page', async () => {
+      vi.mocked(stayService.getAllStays).mockResolvedValue(TWO_STAYS as never);
+      render(<Stays />);
+      await waitFor(() => expect(screen.getByText('list_range_summary')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: 'status_expected' }));
+
+      await waitFor(() => expect(screen.queryByText('list_range_summary')).not.toBeInTheDocument());
+    });
+
+    it('has no range summary for an empty list', async () => {
+      vi.mocked(stayService.getAllStays).mockResolvedValue({
+        content: [], totalElements: 0, totalPages: 0, number: 0, size: 20, numberOfElements: 0, first: true, last: true, empty: true,
+      } as never);
+      render(<Stays />);
+      await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
+      expect(screen.queryByText('list_range_summary')).not.toBeInTheDocument();
+    });
   });
 });

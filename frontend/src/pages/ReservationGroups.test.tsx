@@ -13,7 +13,10 @@ import { ReservationGroups } from './ReservationGroups';
 import { reservationGroupService } from '../services';
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string, opts?: Record<string, unknown>) => (opts ? `${key} ${JSON.stringify(opts)}` : key) }),
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => (opts ? `${key} ${JSON.stringify(opts)}` : key),
+    i18n: { language: 'en' },
+  }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
@@ -127,5 +130,15 @@ describe('ReservationGroups', () => {
     await waitFor(() => {
       expect(reservationGroupService.getAllGroups).toHaveBeenLastCalledWith(0, 20);
     });
+  });
+
+  it('shows locale-formatted dates and the result range', async () => {
+    vi.mocked(reservationGroupService.getAllGroups).mockResolvedValueOnce(page([GROUP]) as never);
+    render(<MemoryRouter><ReservationGroups /></MemoryRouter>);
+
+    await waitFor(() => expect(screen.getByText('Acme Corp Offsite')).toBeInTheDocument());
+    expect(screen.getByText('10/1/2026')).toBeInTheDocument();
+    expect(screen.getByText('10/3/2026')).toBeInTheDocument();
+    expect(screen.getByText(/^list_range_summary/)).toBeInTheDocument();
   });
 });

@@ -292,4 +292,14 @@ describe('Quotations', () => {
     await waitFor(() => screen.getByText('Mario Rossi'));
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  it('shows locale-formatted dates and the result range', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+    expect(screen.getByText('9/1/2026')).toBeInTheDocument();
+    expect(screen.getByText('9/3/2026')).toBeInTheDocument();
+    expect(screen.getByText('8/20/2026')).toBeInTheDocument();
+    expect(screen.getByText('list_range_summary')).toBeInTheDocument();
+  });
 });
