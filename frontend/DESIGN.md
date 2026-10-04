@@ -264,6 +264,16 @@ Escape, hoverable, hides on scroll/resize). Don't also set a native `title`. No 
 behaviour: a tap activates the control. `inverse-surface` on `inverse-on-surface` is
 checked at ≥7:1 in all four themes by `src/styles/contrast.test.ts`.
 
+**Stat cards (`M3StatCard`)** — KPI tile on `M3Card variant="solid"`: optional tone icon
+tile (`toneChipClasses`), label, figure (`font-display text-2xl tabular-nums`), optional
+delta and inline sparkline. Presentational: the caller translates, formats and computes the
+delta. The delta carries its sign in the icon and the text, never in the colour alone. The
+sparkline is an inline SVG, decorative (`aria-hidden`), drawn only with ≥2 points; pass
+`trendLabel` for the text alternative (`sr-only`). With `to` the **whole card is one link**
+named by its content — no "view all" footer, and nothing else focusable inside the card (if a
+card ever needs an action, use a stretched link, never a nested `Link`). Uses only existing
+tokens, so the contrast pairs are already covered by `src/styles/contrast.test.ts`.
+
 ---
 
 ## Dashboard / layout composition rules
