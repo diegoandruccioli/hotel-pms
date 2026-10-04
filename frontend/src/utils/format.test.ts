@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { it as itLocale, enUS } from 'date-fns/locale';
-import { addDaysIso, dateFnsLocale, EMPTY_PLACEHOLDER, formatCurrency, formatDate, formatDateTime, formatSigned, todayIsoDate, toIsoDate } from './format';
+import { addDaysIso, dateFnsLocale, EMPTY_PLACEHOLDER, formatCurrency, formatDate, formatDateTime, formatSigned, nightsBetween, todayIsoDate, toIsoDate } from './format';
 
 describe('toIsoDate', () => {
   it('formats the local calendar date with zero padding', () => {
@@ -65,6 +65,16 @@ describe('formatCurrency', () => {
 });
 
 describe('formatDate / formatDateTime', () => {
+  it('keeps a date-only value on its own day in a timezone west of UTC', () => {
+    const previous = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    try {
+      expect(formatDate('2026-04-01', 'en')).toBe('4/1/2026');
+    } finally {
+      if (previous === undefined) delete process.env.TZ; else process.env.TZ = previous;
+    }
+  });
+
   it('formats a date without time', () => {
     expect(formatDate('2026-08-20T10:30:00', 'en')).toBe('8/20/2026');
     expect(formatDate('2026-08-20T10:30:00', 'it')).toBe('20/08/2026');
@@ -85,4 +95,18 @@ describe('formatSigned', () => {
   it.each([[3, '+3'], [-2, '−2'], [0, '0']])('formats %s as %s', (value, expected) => {
     expect(formatSigned(value)).toBe(expected);
   });
+});
+
+describe('nightsBetween', () => {
+  it('counts calendar nights, also across a DST change', () => {
+    expect(nightsBetween('2026-04-01', '2026-04-03')).toBe(2);
+    expect(nightsBetween('2026-03-28', '2026-03-30')).toBe(2);
+  });
+
+  it.each([[undefined, '2026-04-03'], ['2026-04-01', null], ['', ''], ['bad', '2026-04-03']])(
+    'returns null for %s / %s',
+    (checkIn, checkOut) => {
+      expect(nightsBetween(checkIn as string | undefined, checkOut as string | null)).toBeNull();
+    },
+  );
 });

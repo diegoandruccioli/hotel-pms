@@ -4,20 +4,20 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { GuestResponseDTO } from '../types';
 import { PageHeader } from '../components/PageHeader';
-import { M3Button } from '../components/m3';
+import { ListToolbar } from '../components/ListToolbar';
+import { M3Avatar, M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3ConfirmDialog } from '../components/m3';
 import { M3TableActionLink } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3Pagination } from '../components/m3';
-import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 import { useGuestsSearch, useDeleteGuest } from '../hooks/queries';
-import { useDebounce } from '../hooks';
+import { useDebounce, useListRangeSummary } from '../hooks';
 import { queryKeys } from '../lib';
 import { getErrorMessage } from '../utils';
 import { guestService } from '../services';
@@ -131,6 +131,7 @@ export const Guests = memo(() => {
   } = useGuestsSearch(debouncedSearch, page, PAGE_SIZE, `${sortField},${sortDir}`);
   const guests = data?.content ?? [];
   const totalPages = data?.totalPages ?? 1;
+  const summary = useListRangeSummary(page, PAGE_SIZE, guests.length, data?.totalElements ?? 0);
   const error = queryError ? getErrorMessage(queryError, t('error_unexpected_fallback')) : null;
 
   const deleteGuestMutation = useDeleteGuest();
@@ -210,14 +211,14 @@ export const Guests = memo(() => {
       accessorKey: 'lastName',
       header: t('name'),
       cell: ({ row }) => (
-        <span className="font-medium">{row.original.firstName} {row.original.lastName}</span>
+        <div className="flex items-center gap-3">
+          <M3Avatar name={row.original.firstName || row.original.lastName} size="md" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="font-medium">{row.original.firstName} {row.original.lastName}</p>
+            {row.original.email && <p className="text-xs text-on-surface-variant">{row.original.email}</p>}
+          </div>
+        </div>
       ),
-    },
-    {
-      id: 'email',
-      accessorKey: 'email',
-      header: t('email'),
-      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.email}</span>,
     },
     {
       id: 'phone',
@@ -256,26 +257,21 @@ export const Guests = memo(() => {
         title={t('nav_guests')}
         subtitle={t('guests_subtitle')}
         actions={
-          <>
-            <M3TextField
-              label={t('search_placeholder')}
-              hideLabel
-              leadingIcon="search"
-              type="search"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="w-full sm:w-56"
-            />
-            {isAdminOrOwner && (
-              <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
-                {t('export_csv')}
-              </M3Button>
-            )}
-            <M3Button icon="add" onClick={handleOpenAddModal}>
-              {t('add_guest')}
-            </M3Button>
-          </>
+          <M3Button icon="add" onClick={handleOpenAddModal}>
+            {t('add_guest')}
+          </M3Button>
         }
+      />
+
+      <ListToolbar
+        searchLabel={t('search_placeholder')}
+        searchValue={searchQuery}
+        onSearchChange={handleSearchChange}
+        trailing={isAdminOrOwner && (
+          <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
+            {t('export_csv')}
+          </M3Button>
+        )}
       />
 
       {loading ? (
@@ -308,6 +304,7 @@ export const Guests = memo(() => {
           prevLabel={t('prev_page')}
           nextLabel={t('next_page')}
           pageOfLabel={pageOfLabel}
+          summary={summary}
         />
       )}
 

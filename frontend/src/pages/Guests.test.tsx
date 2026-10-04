@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { renderWithQuery as render } from '../test-utils';
 import { Guests } from './Guests';
@@ -382,5 +382,44 @@ describe('Guests', () => {
     await waitFor(() => expect(screen.getByText('no_guests_found')).toBeInTheDocument());
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+
+  describe('list presentation', () => {
+    it('shows the avatar initial and the email under the name', async () => {
+      vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+      render(<Guests />);
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      expect(screen.getByText('J')).toBeInTheDocument();
+      const nameCell = screen.getByText('John Doe').closest('div') as HTMLElement;
+      expect(within(nameCell).getByText('john@test.com')).toBeInTheDocument();
+    });
+
+    it('keeps phone and city columns and drops the separate email column', async () => {
+      vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+      render(<Guests />);
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      expect(screen.getByRole('columnheader', { name: 'phone' })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'city' })).toBeInTheDocument();
+      expect(screen.queryByRole('columnheader', { name: 'email' })).not.toBeInTheDocument();
+    });
+
+    it('shows the result range, also with a single page', async () => {
+      vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST, JANE]) as never);
+      render(<Guests />);
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+      expect(screen.getByText('list_range_summary')).toBeInTheDocument();
+    });
+
+    it('puts the search in the toolbar and still searches as you type', async () => {
+      vi.mocked(guestService.searchGuestsPaged).mockResolvedValue(page([GUEST]) as never);
+      render(<Guests />);
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'doe' } });
+
+      await waitFor(() => expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('doe', 0, 20, 'lastName,asc'));
+    });
   });
 });

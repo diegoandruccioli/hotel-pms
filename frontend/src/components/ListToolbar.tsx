@@ -7,6 +7,8 @@ interface ListToolbarProps {
   searchLabel: string;
   searchValue: string;
   onSearchChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  /** Names the chip row for assistive tech (rendered as a group). */
+  filtersLabel?: string;
   /** Filter chips, next to the search field. */
   children?: ReactNode;
   /** Right-aligned actions (e.g. export). */
@@ -14,13 +16,13 @@ interface ListToolbarProps {
   className?: string;
 }
 
-/** @public Unused until S01a-2 wires it into Reservations and Guests; drop the tag then.
- * Row under a list page's `PageHeader`: search, filter chips and secondary actions.
+/** Row under a list page's `PageHeader`: search, filter chips and secondary actions.
  * Wraps on narrow screens, with the search field taking the full width. */
 export const ListToolbar = ({
   searchLabel,
   searchValue,
   onSearchChange,
+  filtersLabel,
   children,
   trailing,
   className,
@@ -35,7 +37,11 @@ export const ListToolbar = ({
       onChange={onSearchChange}
       className="w-full sm:w-72"
     />
-    {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+    {children && (
+      <div role={filtersLabel ? 'group' : undefined} aria-label={filtersLabel} className="flex flex-wrap items-center gap-2">
+        {children}
+      </div>
+    )}
     {trailing && <div className="flex flex-wrap items-center gap-2 sm:ml-auto">{trailing}</div>}
   </div>
 );

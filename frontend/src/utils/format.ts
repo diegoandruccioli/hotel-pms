@@ -34,10 +34,22 @@ export const formatCurrency = (amount: number | null | undefined, language: stri
 export const formatSigned = (value: number): string =>
   `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value)}`;
 
-/** Locale date (no time); missing values render as the placeholder. */
-export const formatDate = (value: string | null | undefined, language: string): string =>
-  value ? new Date(value).toLocaleDateString(language) : EMPTY_PLACEHOLDER;
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Locale date (no time); missing values render as the placeholder. A bare `yyyy-MM-dd` is a calendar date, read in local time so it never shows the previous day west of UTC. */
+export const formatDate = (value: string | null | undefined, language: string): string => {
+  if (!value) return EMPTY_PLACEHOLDER;
+  const date = DATE_ONLY.test(value) ? new Date(`${value}T00:00:00`) : new Date(value);
+  return date.toLocaleDateString(language);
+};
 
 /** Locale date and time; missing values render as the placeholder. */
 export const formatDateTime = (value: string | null | undefined, language: string): string =>
   value ? new Date(value).toLocaleString(language) : EMPTY_PLACEHOLDER;
+
+/** Whole nights between two `yyyy-MM-dd` dates (calendar arithmetic, immune to DST); `null` when either is missing or invalid. */
+export const nightsBetween = (checkIn: string | null | undefined, checkOut: string | null | undefined): number | null => {
+  if (!checkIn || !checkOut) return null;
+  const nights = (Date.parse(`${checkOut}T00:00:00Z`) - Date.parse(`${checkIn}T00:00:00Z`)) / MS_PER_DAY;
+  return Number.isFinite(nights) ? nights : null;
+};

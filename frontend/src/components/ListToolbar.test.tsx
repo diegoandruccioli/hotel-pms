@@ -24,6 +24,11 @@ describe('ListToolbar', () => {
     expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
   });
 
+  it('names the chip row as a group when given a label', () => {
+    renderToolbar({ filtersLabel: 'Filters', children: <button type="button">Chip</button> });
+    expect(screen.getByRole('group', { name: 'Filters' })).toContainElement(screen.getByRole('button', { name: 'Chip' }));
+  });
+
   it('renders only the search field without chips or actions', () => {
     renderToolbar();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
