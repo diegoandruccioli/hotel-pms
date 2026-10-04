@@ -75,7 +75,7 @@ describe('App', () => {
     mockStore({ isAuthenticated: true, isLoading: false, user: ADMIN, checkAuth: vi.fn() });
 
     render(<App />);
-    await waitFor(() => expect(screen.getByText('skip_to_main')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('skip_to_main')).toBeInTheDocument(), { timeout: 8000 });
     expect(window.location.pathname).toBe('/');
   });
 

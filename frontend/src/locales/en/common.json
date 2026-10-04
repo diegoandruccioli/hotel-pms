@@ -432,6 +432,9 @@
   "dashboard_departures_today": "Today's Departures",
   "dashboard_no_arrivals_today": "No arrivals expected today",
   "dashboard_no_departures_today": "No departures due today",
+  "dashboard_action_walk_in": "Walk-in",
+  "dashboard_delta_vs_yesterday": "{{value}} vs yesterday",
+  "dashboard_trend_label": "Last {{count}} days: {{values}}",
   "dashboard_owner_summary_title": "Today at a glance",
 
   "search_placeholder": "Search",
