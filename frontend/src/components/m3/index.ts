@@ -12,6 +12,7 @@ export * from './M3LoadingState';
 export * from './M3Pagination';
 export * from './M3SegmentedRow';
 export * from './M3Select';
+export * from './M3StatCard';
 export * from './M3StatusChip';
 export * from './M3Switch';
 export * from './M3Table';
