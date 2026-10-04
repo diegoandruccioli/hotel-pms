@@ -23,15 +23,6 @@ export const toneCardClasses: Record<StatusTone, string> = {
   neutral: 'bg-surface-container-highest/30 border-outline',
 };
 
-/** Read-only summary tile (Dashboard room counts). */
-export const toneTileClasses: Record<StatusTone, string> = {
-  success: 'bg-tertiary-container/60 text-on-tertiary-container border-tertiary/50',
-  warning: 'bg-secondary-container/60 text-on-secondary-container border-secondary/50',
-  error: 'bg-error-container/60 text-on-error-container border-error/50',
-  info: 'bg-primary-container/60 text-on-primary-container border-primary/50',
-  neutral: 'bg-surface-container-highest/60 text-on-surface border-outline/50',
-};
-
 /** Outlined action button that sets a status (Housekeeping). */
 export const toneOutlineButtonClasses: Record<StatusTone, string> = {
   success: 'border-tertiary text-tertiary hover:bg-tertiary-container',

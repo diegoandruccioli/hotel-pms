@@ -32,8 +32,8 @@ test.describe('Dashboard', () => {
     await page.goto('/');
     await expect(page.getByTestId('stats-grid')).toBeVisible({ timeout: 10000 });
     // All stat card labels should be present (verify by translation keys rendered as text).
-    // Scoped to stats-grid: "Today's Arrivals" now also titles the front-desk
-    // work-list panel below it, which would make an unscoped match ambiguous.
+    // Scoped to stats-grid: the work-list panel below also mentions arrivals,
+    // which would make an unscoped match ambiguous.
     const statsGrid = page.getByTestId('stats-grid');
     await expect(statsGrid.getByText(/guests in house|ospiti in struttura/i)).toBeVisible({ timeout: 10000 });
     await expect(statsGrid.getByText(/today.*(arrivals|check.in)|arrivi/i)).toBeVisible();
@@ -78,8 +78,8 @@ test.describe('Dashboard', () => {
     await expect(grid.getByRole('link')).toHaveCount(5);
     await expect(grid.getByRole('link', { name: /guests in house|ospiti in struttura/i })).toHaveAttribute('href', '/stays');
     await expect(grid.getByRole('link', { name: /pending revenue|fatturato in attesa/i })).toHaveAttribute('href', '/billing');
-    // Left: room-overview link + the work-list panel's own 2 "View all" links.
-    await expect(page.getByRole('link', { name: /view all|vedi tutto/i })).toHaveCount(3);
+    // Left: the work-list panel's single "View all" (it follows the tab) + the room-overview one.
+    await expect(page.getByRole('link', { name: /view all|vedi tutto/i })).toHaveCount(2);
   });
 
   test('shows the delta against yesterday when a snapshot exists', async ({ page }) => {
@@ -93,6 +93,28 @@ test.describe('Dashboard', () => {
     await page.goto('/');
     const grid = page.getByTestId('stats-grid');
     await expect(grid.getByText(/\+3.*(vs yesterday|rispetto a ieri)/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test('arrivals/departures panel switches tab and its "View all" target', async ({ page }) => {
+    await page.goto('/');
+    const panelLink = page.getByRole('link', { name: /view all|vedi tutto/i }).first();
+    await expect(panelLink).toHaveAttribute('href', '/reservations', { timeout: 10000 });
+    await page.getByRole('radio', { name: /departures|partenze/i }).click();
+    await expect(panelLink).toHaveAttribute('href', '/stays');
+    await expect(page.getByText(/no departures due today|nessuna partenza prevista oggi/i)).toBeVisible();
+  });
+
+  test('to-do card links dirty rooms to housekeeping and offers night audit', async ({ page }) => {
+    await mockDaySheet(page, { roomStatusCounts: { CLEAN: 1, DIRTY: 3, MAINTENANCE: 0, OCCUPIED: 1 } });
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: /3 rooms to clean|3 camere da pulire/i })).toHaveAttribute('href', '/housekeeping', { timeout: 10000 });
+    await expect(page.getByTestId('today-tasks').getByRole('link', { name: /night audit/i })).toBeVisible();
+  });
+
+  test('to-do card uses the singular form for one dirty room', async ({ page }) => {
+    await mockDaySheet(page, { roomStatusCounts: { CLEAN: 1, DIRTY: 1, MAINTENANCE: 0, OCCUPIED: 1 } });
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: /1 room to clean|1 camera da pulire/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('header offers new reservation and walk-in', async ({ page }) => {
