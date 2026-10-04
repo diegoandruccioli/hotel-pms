@@ -31,7 +31,10 @@ export const M3Pagination = ({
   pageOfLabel,
   summary,
 }: M3PaginationProps) => {
-  if (totalPages <= 1 && !summary) return null;
+  if (totalPages <= 1) {
+    // Nothing to navigate: a plain line, not an (empty) navigation landmark.
+    return summary ? <p className="text-sm font-body text-on-surface-variant">{summary}</p> : null;
+  }
 
   return (
     <nav
@@ -39,31 +42,29 @@ export const M3Pagination = ({
       className={cn('flex flex-wrap items-center gap-3', summary ? 'justify-between' : 'justify-center')}
     >
       {summary && <span className="text-sm font-body text-on-surface-variant">{summary}</span>}
-      {totalPages > 1 && (
-        <div className="flex items-center gap-3">
-          <M3Button
-            variant="outlined"
-            icon="chevron_left"
-            disabled={page === 0}
-            onClick={onPrev}
-            aria-label={prevLabel}
-          >
-            {prevLabel}
-          </M3Button>
-          <span className="text-sm font-body text-on-surface-variant">
-            {pageOfLabel(page + 1, totalPages)}
-          </span>
-          <M3Button
-            variant="outlined"
-            icon="chevron_right"
-            disabled={page >= totalPages - 1}
-            onClick={onNext}
-            aria-label={nextLabel}
-          >
+      <div className="flex items-center gap-3">
+        <M3Button
+          variant="outlined"
+          icon="chevron_left"
+          disabled={page === 0}
+          onClick={onPrev}
+          aria-label={prevLabel}
+        >
+          {prevLabel}
+        </M3Button>
+        <span className="text-sm font-body text-on-surface-variant">
+          {pageOfLabel(page + 1, totalPages)}
+        </span>
+        <M3Button
+          variant="outlined"
+          icon="chevron_right"
+          disabled={page >= totalPages - 1}
+          onClick={onNext}
+          aria-label={nextLabel}
+        >
             {nextLabel}
           </M3Button>
-        </div>
-      )}
+      </div>
     </nav>
   );
 };

@@ -3,7 +3,7 @@ import { M3TextField } from './m3';
 import { cn } from '../utils';
 
 interface ListToolbarProps {
-  /** Accessible name of the search field (visually hidden; the icon and placeholder carry it for sighted users). */
+  /** Accessible name of the search field (also shown as the placeholder). */
   searchLabel: string;
   searchValue: string;
   onSearchChange: (e: ChangeEvent<HTMLInputElement>) => void;

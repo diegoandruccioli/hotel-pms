@@ -83,6 +83,7 @@ describe('M3Pagination', () => {
     render(<M3Pagination {...baseProps} page={0} totalPages={1} summary="1–5 of 5" />);
     expect(screen.getByText('1–5 of 5')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
   });
 
   it('shows the summary alongside the page controls', () => {
