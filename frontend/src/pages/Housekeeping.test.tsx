@@ -10,7 +10,10 @@ import { dashboardService } from '../services';
 import { housekeepingService } from '../services';
 import { mockAxiosErrorWithDetail } from '../test-utils';
 
-const stableT = (key: string, options?: { count?: number; status?: string }) => {
+const stableT = (key: string, options?: { count?: number; status?: string; dirty?: number; clean?: number; maintenance?: number; occupied?: number }) => {
+  if (key === 'housekeeping_status_summary') {
+    return `${key}:${options?.dirty}/${options?.clean}/${options?.maintenance}/${options?.occupied}`;
+  }
   if (options?.count !== undefined) return `${key} ${options.count}`;
   return key;
 };
@@ -204,7 +207,7 @@ describe('Housekeeping', () => {
     expect(inventoryService.updateRoomStatus).not.toHaveBeenCalled();
   });
 
-  it('applies a status-filtered server request when a filter badge is toggled', async () => {
+  it('filters by status through exclusive chips and "all" clears the filter', async () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValue({
       content: [{ id: '2', roomNumber: '102', type: 'Standard', status: 'DIRTY', pricePerNight: 100 }],
       totalElements: 1,
@@ -212,17 +215,37 @@ describe('Housekeeping', () => {
     render(<Housekeeping />);
     await waitFor(() => expect(inventoryService.getAllRooms).toHaveBeenCalledWith(0, 100, undefined));
 
-    const dirtyButtons = screen.getAllByRole('button', { name: /room_status_dirty/i });
-    const filterBadge = dirtyButtons.find((b) => !b.textContent?.startsWith('→'))!;
+    const all = screen.getByRole('button', { name: 'filter_all' });
+    const dirtyChip = await screen.findByRole('button', { name: 'room_status_dirty (1)' });
+    expect(all).toHaveAttribute('aria-pressed', 'true');
+    expect(dirtyChip).toHaveAttribute('aria-pressed', 'false');
 
-    fireEvent.click(filterBadge);
+    fireEvent.click(dirtyChip);
     await waitFor(() => expect(inventoryService.getAllRooms).toHaveBeenCalledWith(0, 100, 'DIRTY'));
+    expect(dirtyChip).toHaveAttribute('aria-pressed', 'true');
+    expect(all).toHaveAttribute('aria-pressed', 'false');
 
-    fireEvent.click(filterBadge);
-    await waitFor(() => expect(inventoryService.getAllRooms).toHaveBeenCalledWith(0, 100, undefined));
+    fireEvent.click(all);
+    await waitFor(() => expect(inventoryService.getAllRooms).toHaveBeenLastCalledWith(0, 100, undefined));
+    expect(all).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('styles room cards with the canonical room tones (dirty = warning, maintenance = error)', async () => {
+  it('clears the room selection when the filter changes', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue({
+      content: [{ id: '1', roomNumber: '101', type: 'Standard', status: 'CLEAN', pricePerNight: 100 }],
+      totalElements: 1,
+    } as never);
+    render(<Housekeeping />);
+    await waitFor(() => expect(screen.getByText('room_number')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText('select_all_visible'));
+    await waitFor(() => expect(screen.getByText(/n_rooms_selected 1/)).toBeInTheDocument());
+
+    fireEvent.click(await screen.findByRole('button', { name: 'room_status_dirty (1)' }));
+    await waitFor(() => expect(screen.queryByText(/n_rooms_selected/)).not.toBeInTheDocument());
+  });
+
+  it('marks each room card with its canonical tone (dirty = warning, maintenance = error)', async () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
       content: [
         { id: '1', roomNumber: '101', type: 'Standard', status: 'DIRTY', pricePerNight: 100 },
@@ -230,9 +253,10 @@ describe('Housekeeping', () => {
       ],
       totalElements: 2,
     } as never);
-    const { container } = render(<Housekeeping />);
-    await waitFor(() => expect(container.querySelector('div.border-2.border-secondary')).toBeInTheDocument());
-    expect(container.querySelector('div.border-2.border-error')).toBeInTheDocument();
+    render(<Housekeeping />);
+    const bars = await screen.findAllByTestId('room-card-tone');
+    expect(bars[0]).toHaveClass('bg-secondary');
+    expect(bars[1]).toHaveClass('bg-error');
   });
 
   it('styles the status-change buttons with the canonical room tones (dirty = warning, maintenance = error)', async () => {
@@ -247,15 +271,31 @@ describe('Housekeeping', () => {
     expect(maintenance.className).toContain('border-error');
   });
 
-  it('shows status-count badges sourced from the day-sheet aggregate', async () => {
+  it('shows status counts in the filter chips, sourced from the day-sheet aggregate', async () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
       content: [{ id: '1', roomNumber: '101', type: 'Standard', status: 'CLEAN', pricePerNight: 100 }],
       totalElements: 1,
     } as never);
     render(<Housekeeping />);
-    await waitFor(() => expect(screen.getByText('3')).toBeInTheDocument()); // CLEAN count
-    expect(screen.getByText('1')).toBeInTheDocument(); // DIRTY count
-    expect(screen.getByText('0')).toBeInTheDocument(); // MAINTENANCE count
+    expect(await screen.findByRole('button', { name: 'room_status_clean (3)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'room_status_dirty (1)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'room_status_maintenance (0)' })).toBeInTheDocument();
+  });
+
+  it('summarises the day-sheet counts in the subtitle', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue({ content: [], totalElements: 0 } as never);
+    render(<Housekeeping />);
+    // MOCK_DAY_SHEET: CLEAN 3, DIRTY 1, MAINTENANCE 0, OCCUPIED 2 — order is dirty/clean/maintenance/occupied.
+    expect(await screen.findByText('housekeeping_status_summary:1/3/0/2')).toBeInTheDocument();
+    expect(screen.queryByText('housekeeping_subtitle')).not.toBeInTheDocument();
+  });
+
+  it('keeps the static subtitle and count-less chips when the day-sheet is unavailable', async () => {
+    vi.mocked(dashboardService.getDaySheet).mockRejectedValue(new Error('down'));
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue({ content: [], totalElements: 0 } as never);
+    render(<Housekeeping />);
+    expect(await screen.findByText('housekeeping_subtitle')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'room_status_dirty' })).toBeInTheDocument();
   });
 
   it('retries loading rooms when the try_again button is clicked after a failure', async () => {

@@ -156,6 +156,8 @@
   "rooms_updated": "{{count}} rooms updated to {{status}}",
   "failed_bulk_update_rooms": "Failed to update the selected rooms. Please try again.",
   "housekeeping_subtitle": "Monitor and update room cleanliness status for the cleaning crew.",
+  "housekeeping_status_summary": "{{dirty}} to clean · {{clean}} clean · {{maintenance}} out of service · {{occupied}} occupied",
+  "housekeeping_filter_label": "Filter rooms by status",
   "refresh": "Refresh",
   "error_loading_rooms": "Error loading rooms",
   "no_rooms_found": "No rooms found.",
