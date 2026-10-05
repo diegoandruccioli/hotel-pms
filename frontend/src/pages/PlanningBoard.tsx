@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { M3Card } from '../components/m3';
 import type { RoomResponse } from '../types';
 import type { ReservationResponse } from '../types';
+import { CELL_STYLE, CELL_WIDTH, ROW_STYLE, SIDEBAR_STYLE, SIDEBAR_WIDTH } from './planningGrid';
 import { cn, dateFnsLocale, reservationStatusTone, roomStatusTone, toneDotClasses, toneSolidClasses } from '../utils';
 
 interface PlanningBoardProps {
@@ -13,14 +14,6 @@ interface PlanningBoardProps {
   onNavigate: (date: Date) => void;
   onReservationMove?: (reservationId: string, oldRoomId: string, newRoomId: string) => void;
 }
-
-const CELL_WIDTH = 100;
-const SIDEBAR_WIDTH = 192;
-const ROW_HEIGHT = 64;
-
-const ROW_STYLE = { height: ROW_HEIGHT };
-const SIDEBAR_STYLE = { width: SIDEBAR_WIDTH };
-const CELL_STYLE = { width: CELL_WIDTH };
 
 const ReservationBar = memo(({ 
   reservation, 
@@ -237,7 +230,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
   }, [onReservationMove]);
 
   return (
-    <M3Card variant="outlined" className="overflow-hidden flex flex-col flex-1 min-h-0 border-outline-variant">
+    <M3Card variant="solid" className="overflow-hidden flex flex-col flex-1 min-h-0">
       <div 
         className="flex-1 overflow-auto relative" 
         ref={scrollContainerRef}

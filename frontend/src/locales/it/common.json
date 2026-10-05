@@ -178,6 +178,7 @@
   "calendar_subtitle": "Trascina le prenotazioni tra le camere nel Planning Board. Modifica le date dal form prenotazione.",
   "view_planning": "Tabellone Planning",
   "view_month": "Vista a Mese",
+  "calendar_view_label": "Vista del calendario",
   "status_confirmed": "Confermata",
   "status_pending": "In Attesa",
   "status_checked_in": "Check-in",
