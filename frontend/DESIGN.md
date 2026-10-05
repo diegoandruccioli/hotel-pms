@@ -333,6 +333,14 @@ readable is *consistency*, not *sparseness*. Concretely:
   Home and End navigation that moves focus and selection together; pass `ns` when the labels
   live outside `settings`, and optional `icon`s (shown on unselected options; the selected one
   shows a check).
+- **Settings sections live under `SettingsLayout`** (`/settings/*`, nested routes): the page `h1`
+  ("Settings") and a side navigation built from `getSettingsEntries(role)` (`config/navigation.ts`,
+  the `settings-*` entries filtered by role, in nav order) next to the routed section; below `lg` the
+  nav becomes a scrolling row. The current section is `aria-current="page"`. A section renders its
+  own title with `SettingsSectionTitle` (an `h2`), never `PageHeader`/`SettingsPageHeader` and no back
+  button, on `M3Card variant="solid"`. Adding a section = a `settings-*` entry in `NAV_ENTRIES` plus its
+  id in `SETTINGS_NAV_ORDER` and a child `Route` in `App.tsx`. Admin pages outside the area (hotel
+  profile, users) keep `SettingsPageHeader`.
 - **Initials circles go through `M3Avatar`** — `size="md"` (40px) or `"lg"` (64px); falls
   back to `?` without a name. Wrap it in a `<button>` when it must be interactive
   (see `UserMenu`).

@@ -9,7 +9,7 @@ import { useAuthStore } from '../../store';
 import { cn } from '../../utils';
 
 const linkClass = ({ isActive }: { isActive: boolean }) => cn(
-  'flex shrink-0 items-center gap-3 rounded-shape-full px-4 py-2.5 text-sm font-medium font-body transition-colors',
+  'flex shrink-0 items-center gap-3 whitespace-nowrap rounded-shape-full px-4 py-2.5 text-sm font-medium font-body transition-colors',
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
   isActive
     ? 'bg-primary-container text-on-primary-container'
