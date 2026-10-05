@@ -94,6 +94,22 @@ describe('Rooms', () => {
     expect(screen.queryByText('rooms_subtitle')).not.toBeInTheDocument();
   });
 
+  it('does not state a room count when the list fills a whole page (it may be truncated)', async () => {
+    const { inventoryService } = await import('../services/inventoryService');
+    const type = { id: 't1', name: 'Single', maxOccupancy: 1, basePrice: 50 };
+    const full = Array.from({ length: 100 }, (_, i) => ({
+      id: 'r' + i, roomNumber: String(100 + i), status: 'CLEAN', roomType: type,
+    }));
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
+      content: full, totalElements: 150, totalPages: 2, number: 0, size: 100,
+    } as never);
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValueOnce([type] as never);
+    render(<Rooms />);
+    await screen.findByText('100');
+    expect(screen.getByText('rooms_subtitle')).toBeInTheDocument();
+    expect(screen.queryByText('rooms_count_summary')).not.toBeInTheDocument();
+  });
+
   it('has no critical accessibility violations', async () => {
     const { container } = render(<Rooms />);
     await waitFor(() => screen.getByText('rooms_title'));

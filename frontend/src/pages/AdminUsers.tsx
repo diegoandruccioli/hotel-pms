@@ -14,7 +14,6 @@ import { M3LoadingState } from '../components/m3';
 import { M3EmptyState } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { SettingsPageHeader } from '../components/SettingsPageHeader';
-import { useFormatters } from '../hooks';
 import { useToastStore } from '../store';
 import { useAuthStore } from '../store';
 import { getErrorMessage, userRoleTone } from '../utils';
@@ -86,7 +85,6 @@ function compareUsers(a: UserResponse, b: UserResponse, field: string): number {
     case 'email': return a.email.localeCompare(b.email);
     case 'role': return a.role.localeCompare(b.role);
     case 'active': return Number(a.active) - Number(b.active);
-    case 'createdAt': return a.createdAt.localeCompare(b.createdAt);
     default: return a.username.localeCompare(b.username);
   }
 }
@@ -104,7 +102,6 @@ export function AdminUsers() {
   const [deactivateTarget, setDeactivateTarget] = useState<UserResponse | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<UserFilter>('ALL');
-  const { formatDate } = useFormatters();
   const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
 
@@ -239,29 +236,18 @@ export function AdminUsers() {
       accessorKey: 'active',
       header: t('col_status'),
       cell: ({ row }) => (
-        <M3StatusChip
-          label={row.original.active ? t('status_active') : t('status_inactive')}
-          tone={row.original.active ? 'success' : 'error'}
-        />
-      ),
-    },
-    {
-      id: 'createdAt',
-      accessorKey: 'createdAt',
-      header: t('col_created'),
-      cell: ({ row }) => <span className="text-on-surface-variant">{formatDate(row.original.createdAt)}</span>,
-    },
-    {
-      id: 'mustChangePassword',
-      header: t('col_must_change_password'),
-      enableSorting: false,
-      cell: ({ row }) => (
-        row.original.mustChangePassword ? (
-          <span className="text-xs flex items-center gap-1 text-on-surface-variant">
-            <MaterialIcon name="warning" size={14} />
-            {t('must_change_pw')}
-          </span>
-        ) : null
+        <div className="flex flex-col items-start gap-1">
+          <M3StatusChip
+            label={row.original.active ? t('status_active') : t('status_inactive')}
+            tone={row.original.active ? 'success' : 'error'}
+          />
+          {row.original.mustChangePassword && (
+            <span className="flex items-center gap-1 text-xs text-on-surface-variant">
+              <MaterialIcon name="warning" size={14} />
+              {t('must_change_pw')}
+            </span>
+          )}
+        </div>
       ),
     },
     {
@@ -278,7 +264,7 @@ export function AdminUsers() {
         />
       ),
     },
-  ], [t, formatDate, handleToggle, openReset, currentUser?.username]);
+  ], [t, handleToggle, openReset, currentUser?.username]);
 
   return (
     <div className="space-y-6">
@@ -299,7 +285,7 @@ export function AdminUsers() {
       ) : users.length === 0 ? (
         <M3EmptyState icon="manage_accounts" title={t('no_users')} className="bg-surface rounded-shape-md shadow-elevation-1" />
       ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="space-y-4">
             <ListToolbar
               searchLabel={t('users_search_label')}

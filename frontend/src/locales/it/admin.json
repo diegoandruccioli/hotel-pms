@@ -74,8 +74,7 @@
   "err_password_too_weak": "La password deve avere 2 maiuscole, 2 cifre, 2 caratteri speciali",
   "err_reset_failed": "Reset password non riuscito",
   "toast_reset_success": "Password resettata. L'utente dovrà cambiarla al prossimo accesso.",
-  "col_created": "Creato il",
-  "users_search_label": "Cerca utenti per nome utente o email",
+  "users_search_label": "Cerca utenti",
   "users_search_hint": "Nome utente o email",
   "users_filters_label": "Filtra gli utenti",
   "users_filter_admin": "Admin",
@@ -89,5 +88,11 @@
   "users_role_admin_desc": "Accesso completo, inclusi utenti e impostazioni dell'hotel.",
   "users_role_owner_desc": "Report e dati finanziari, più utenti e impostazioni dell'hotel.",
   "users_role_receptionist_desc": "Lavoro di front office: ospiti, prenotazioni, soggiorni, pulizie e fatturazione.",
-  "users_deactivate_confirm": "{{username}} non potrà più accedere. Potrai riattivare l'account in seguito."
+  "users_deactivate_confirm": "{{username}} non potrà più accedere. Potrai riattivare l'account in seguito.",
+  "hotel_preview_title": "Intestazione documenti",
+  "hotel_preview_hint": "Come appare l'hotel in cima ai documenti fiscali.",
+  "hotel_city_tax_title": "Imposta di soggiorno",
+  "hotel_city_tax_hint": "Tariffe, categorie e ospiti a cui si applica si gestiscono a parte.",
+  "hotel_city_tax_link": "Gestisci imposta di soggiorno",
+  "hotel_logo_preview_alt": "Anteprima del logo dell'hotel"
 }
