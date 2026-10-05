@@ -368,4 +368,12 @@ describe('QuotationDetail', () => {
     await waitFor(() => screen.getByRole('heading', { level: 1, name: /Mario Rossi/ }));
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  it('shows the stay dates and validity in the locale format', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('9/1/2026')).toBeInTheDocument());
+    expect(screen.getByText('9/3/2026')).toBeInTheDocument();
+    expect(screen.getByText('8/25/2026')).toBeInTheDocument();
+  });
 });

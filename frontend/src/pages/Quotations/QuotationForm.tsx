@@ -364,7 +364,7 @@ export const QuotationForm = () => {
         <Alert tone="error">{error}</Alert>
       )}
 
-      <M3Card className="p-6 space-y-4">
+      <M3Card variant="solid" className="p-6 space-y-4">
         <div className="flex items-center gap-2 mb-2">
           <MaterialIcon name="person" className="text-primary" />
           <h2 className="text-lg font-medium text-on-surface">{t('step_recipient')}</h2>
@@ -428,7 +428,7 @@ export const QuotationForm = () => {
         )}
       </M3Card>
 
-      <M3Card className="p-6 space-y-4">
+      <M3Card variant="solid" className="p-6 space-y-4">
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
             <MaterialIcon name="event_seat" className="text-primary" />
