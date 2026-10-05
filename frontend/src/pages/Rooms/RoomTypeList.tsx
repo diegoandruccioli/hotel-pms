@@ -99,8 +99,7 @@ export const RoomTypeList = memo(() => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-display font-medium text-on-surface">{t('tab_room_types')}</h2>
+      <div className="flex justify-end">
         <M3Button icon="add" onClick={openAddModal}>{t('add_room_type')}</M3Button>
       </div>
 

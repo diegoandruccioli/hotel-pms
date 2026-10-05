@@ -83,6 +83,17 @@ describe('Rooms', () => {
     });
   });
 
+  it('summarises the counts in the subtitle once rooms and room types are loaded', async () => {
+    const { inventoryService } = await import('../services/inventoryService');
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
+      content: [{ id: 'r1', roomNumber: '101', status: 'CLEAN', roomType: { id: 't1', name: 'Single' } }, { id: 'r2', roomNumber: '102', status: 'CLEAN', roomType: { id: 't1', name: 'Single' } }], totalElements: 2, totalPages: 1, number: 0, size: 100,
+    } as never);
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValueOnce([{ id: 't1', name: 'Single', maxOccupancy: 1, basePrice: 50 }] as never);
+    render(<Rooms />);
+    expect(await screen.findByText('rooms_count_summary')).toBeInTheDocument();
+    expect(screen.queryByText('rooms_subtitle')).not.toBeInTheDocument();
+  });
+
   it('has no critical accessibility violations', async () => {
     const { container } = render(<Rooms />);
     await waitFor(() => screen.getByText('rooms_title'));

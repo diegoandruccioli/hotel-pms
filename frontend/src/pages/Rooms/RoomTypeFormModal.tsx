@@ -68,10 +68,10 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
     try {
       if (roomType) {
         await inventoryService.updateRoomType(roomType.id, submitData);
-        addToast(t('room_updated', { status: t('save') }), 'success');
+        addToast(t('room_type_saved'), 'success');
       } else {
         await inventoryService.createRoomType(submitData);
-        addToast(t('saving'), 'success'); // generic success
+        addToast(t('room_type_created'), 'success');
       }
       onSaved();
     } catch (err: unknown) {

@@ -59,11 +59,60 @@ const renderPage = (state?: Record<string, unknown>) => {
 describe('RoomList', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('renders table heading', async () => {
+  it('has no section heading of its own (the page tabs already name the list)', async () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValue(emptyPage as never);
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     renderPage();
-    await waitFor(() => expect(screen.getByText('tab_rooms')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('no_rooms_found')).toBeInTheDocument());
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+  });
+
+  describe('search and room type filter', () => {
+    const SUITE = { ...ROOM_TYPE, id: 'rt2', name: 'Suite', maxOccupancy: 4, basePrice: 120 };
+    const rooms = [
+      ROOM,
+      { ...ROOM, id: 'r2', roomNumber: '102' },
+      { ...ROOM, id: 'r3', roomNumber: '201', roomType: SUITE },
+    ];
+
+    const renderWithRooms = async () => {
+      vi.mocked(inventoryService.getAllRooms).mockResolvedValue({ ...roomPage, content: rooms } as never);
+      vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE, SUITE]);
+      renderPage();
+      await screen.findByText('201');
+    };
+
+    it('filters rows by room number as you type', async () => {
+      await renderWithRooms();
+      fireEvent.change(screen.getByRole('searchbox', { name: 'rooms_search_label' }), { target: { value: '10' } });
+      expect(screen.getByText('101')).toBeInTheDocument();
+      expect(screen.getByText('102')).toBeInTheDocument();
+      expect(screen.queryByText('201')).not.toBeInTheDocument();
+    });
+
+    it('filters rows by room type with one chip at a time and "all" restores the list', async () => {
+      await renderWithRooms();
+      fireEvent.click(screen.getByRole('button', { name: 'Suite' }));
+      expect(screen.getByRole('button', { name: 'Suite' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText('201')).toBeInTheDocument();
+      expect(screen.queryByText('101')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'filter_all' }));
+      expect(screen.getByText('101')).toBeInTheDocument();
+      expect(screen.getByText('201')).toBeInTheDocument();
+    });
+
+    it('combines search and type, and says so when nothing matches', async () => {
+      await renderWithRooms();
+      fireEvent.click(screen.getByRole('button', { name: 'Suite' }));
+      fireEvent.change(screen.getByRole('searchbox', { name: 'rooms_search_label' }), { target: { value: '10' } });
+      expect(screen.getByText('no_rooms_match_filters')).toBeInTheDocument();
+    });
+
+    it('keeps the add-room action in the toolbar', async () => {
+      await renderWithRooms();
+      expect(screen.getByRole('button', { name: 'add_room' })).toBeInTheDocument();
+    });
   });
 
   it('renders room row after data loads', async () => {
@@ -115,7 +164,7 @@ describe('RoomList', () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([]);
     renderPage();
     await waitFor(() =>
-      expect(screen.getByText('error_loading_room_types (add_room_type prima)')).toBeInTheDocument()
+      expect(screen.getByText('error_loading_room_types (rooms_add_room_type_first)')).toBeInTheDocument()
     );
   });
 

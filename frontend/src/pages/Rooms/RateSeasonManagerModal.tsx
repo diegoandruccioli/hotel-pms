@@ -26,15 +26,15 @@ const SeasonRow = memo(({ season, onEdit, onDelete, t }: {
   onDelete: (season: RateSeasonResponse) => void;
   t: (k: string) => string;
 }) => {
-  const { formatCurrency } = useFormatters();
+  const { formatCurrency, formatDate } = useFormatters();
   const handleEdit = useCallback(() => onEdit(season), [onEdit, season]);
   const handleDelete = useCallback(() => onDelete(season), [onDelete, season]);
 
   return (
     <M3TableRow>
       <M3TableCell className="font-medium">{season.name || '-'}</M3TableCell>
-      <M3TableCell>{season.startDate}</M3TableCell>
-      <M3TableCell>{season.endDate}</M3TableCell>
+      <M3TableCell>{formatDate(season.startDate)}</M3TableCell>
+      <M3TableCell>{formatDate(season.endDate)}</M3TableCell>
       <M3TableCell>{formatCurrency(season.nightlyPrice)}</M3TableCell>
       <M3TableCell className="text-right space-x-2">
         <M3TableActionLink onClick={handleEdit}>
@@ -137,14 +137,14 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
       } else {
         await rateSeasonService.createSeason(roomType.id, formData);
       }
-      addToast(t('save'), 'success');
+      addToast(t('rate_season_saved'), 'success');
       setMode('list');
       await loadSeasons();
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { detail?: string } } };
       const errorMsg = e.response?.status === 409
         ? t('err_rate_season_overlap')
-        : e.response?.data?.detail || t('toast_delete_error');
+        : e.response?.data?.detail || t('rate_season_save_failed');
       addToast(errorMsg, 'error');
     } finally {
       setSaving(false);
