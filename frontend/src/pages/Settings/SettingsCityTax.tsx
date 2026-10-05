@@ -1,6 +1,5 @@
 import { useFormatters } from '../../hooks';
 import { useState, useEffect, useCallback, useMemo, memo, type ChangeEvent, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { stayService } from '../../services';
@@ -17,7 +16,7 @@ import { M3Card } from '../../components/m3';
 import { M3Select } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
-import { SettingsPageHeader } from '../../components/SettingsPageHeader';
+import { SettingsSectionTitle } from '../../components/SettingsSectionTitle';
 import { useToastStore } from '../../store';
 import { getErrorMessage } from '../../utils';
 
@@ -116,7 +115,7 @@ const HotelCategorySection = () => {
   const currentCategory = history.find((h) => h.validTo === null);
 
   return (
-    <M3Card className="p-6 space-y-4">
+    <M3Card variant="solid" className="p-6 space-y-4">
       <div>
         <h2 className="text-sm font-semibold text-on-surface">{t('city_tax_category_section_title')}</h2>
         <p className="text-xs text-on-surface-variant mt-0.5">{t('city_tax_category_section_desc')}</p>
@@ -285,7 +284,7 @@ const CityTaxRatesSection = () => {
   ], [t]);
 
   return (
-    <M3Card className="p-6 space-y-4">
+    <M3Card variant="solid" className="p-6 space-y-4">
       <div>
         <h2 className="text-sm font-semibold text-on-surface">{t('city_tax_rates_section_title')}</h2>
         <p className="text-xs text-on-surface-variant mt-0.5">{t('city_tax_rates_section_desc')}</p>
@@ -431,7 +430,7 @@ const CityTaxApplicabilitySection = () => {
   }, [applicability, addToast, t]);
 
   return (
-    <M3Card className="p-6 space-y-4">
+    <M3Card variant="solid" className="p-6 space-y-4">
       <div>
         <h2 className="text-sm font-semibold text-on-surface">{t('city_tax_applicability_section_title')}</h2>
         <p className="text-xs text-on-surface-variant mt-0.5">{t('city_tax_applicability_section_desc')}</p>
@@ -528,7 +527,7 @@ const CityTaxBackfillSection = () => {
   const canConfirm = !!result && !confirmed && result.lines.some((l) => !l.charged && !l.skipReason);
 
   return (
-    <M3Card className="p-6 space-y-4">
+    <M3Card variant="solid" className="p-6 space-y-4">
       <div>
         <h2 className="text-sm font-semibold text-on-surface">{t('city_tax_backfill_section_title')}</h2>
         <p className="text-xs text-on-surface-variant mt-0.5">{t('city_tax_backfill_section_desc')}</p>
@@ -571,17 +570,10 @@ const CityTaxBackfillSection = () => {
 
 export const SettingsCityTax = () => {
   const { t } = useTranslation('settings');
-  const navigate = useNavigate();
-  const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto pb-10">
-      <SettingsPageHeader
-        icon="account_balance"
-        title={t('settings_section_city_tax')}
-        subtitle={t('city_tax_page_subtitle')}
-        onBack={handleBack}
-      />
+    <div className="space-y-6">
+      <SettingsSectionTitle title={t('settings_section_city_tax')} subtitle={t('city_tax_page_subtitle')} />
       <CityTaxApplicabilitySection />
       <HotelCategorySection />
       <CityTaxRatesSection />

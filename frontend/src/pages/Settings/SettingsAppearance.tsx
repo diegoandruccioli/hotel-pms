@@ -1,11 +1,10 @@
 import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useThemeStore } from '../../store';
 import { useSettingsStore } from '../../store';
 import { M3Card } from '../../components/m3';
 import { M3SegmentedRow, type M3SegmentOption } from '../../components/m3';
-import { SettingsPageHeader } from '../../components/SettingsPageHeader';
+import { SettingsSectionTitle } from '../../components/SettingsSectionTitle';
 
 type ThemeValue = 'light' | 'dark' | 'system';
 
@@ -24,21 +23,19 @@ const LANGUAGE_OPTIONS: M3SegmentOption<LanguageValue>[] = [
 
 export const SettingsAppearance = () => {
   const { t, i18n } = useTranslation('settings');
-  const navigate = useNavigate();
   const { theme, setTheme } = useThemeStore();
   const { setLanguage } = useSettingsStore();
 
-  const handleBack = useCallback(() => navigate(-1), [navigate]);
   const handleThemeChange = useCallback((v: ThemeValue) => setTheme(v), [setTheme]);
   const handleLanguageChange = useCallback((lang: LanguageValue) => setLanguage(lang), [setLanguage]);
   // i18n falls back to English for any locale other than Italian.
   const language: LanguageValue = i18n.language.startsWith('it') ? 'it' : 'en';
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto pb-10">
-      <SettingsPageHeader icon="palette" title={t('settings_appearance_language_title')} onBack={handleBack} />
+    <div className="space-y-6">
+      <SettingsSectionTitle title={t('settings_appearance_language_title')} />
 
-      <M3Card className="p-6 space-y-6">
+      <M3Card variant="solid" className="p-6 space-y-6">
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-widest text-on-surface-variant mb-3">
             {t('settings_section_appearance')}

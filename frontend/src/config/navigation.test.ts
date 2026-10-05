@@ -5,6 +5,7 @@ import {
   NIGHT_AUDIT_ROLES,
   getSidebarSections,
   getPaletteEntries,
+  getSettingsEntries,
   NESTED_ROUTES,
   NAV_GROUP_LABEL_KEYS,
   matchRoute,
@@ -252,5 +253,30 @@ describe('resolveCrumbs', () => {
       { labelKey: 'nav_group_admin', ns: 'common' },
       { labelKey: 'settings_section_admin_users', ns: 'settings', path: '/admin/users' },
     ]);
+  });
+});
+
+describe('getSettingsEntries', () => {
+  it('gives front-desk staff only the personal sections', () => {
+    expect(getSettingsEntries('RECEPTIONIST').map((e) => e.id)).toEqual([
+      'settings-profile', 'settings-password', 'settings-appearance', 'settings-accessibility',
+    ]);
+  });
+
+  it.each(['ADMIN', 'OWNER'] as const)('adds tourist tax, system and privacy for %s, in nav order', (role) => {
+    expect(getSettingsEntries(role).map((e) => e.id)).toEqual([
+      'settings-profile', 'settings-password', 'settings-appearance', 'settings-accessibility',
+      'settings-city-tax', 'settings-system', 'settings-privacy',
+    ]);
+  });
+
+  it('leaves out the admin pages that live elsewhere (hotel profile, users)', () => {
+    const ids = getSettingsEntries('ADMIN').map((e) => e.id);
+    expect(ids).not.toContain('hotel-profile');
+    expect(ids).not.toContain('admin-users');
+  });
+
+  it('returns nothing sensitive without a role', () => {
+    expect(getSettingsEntries(undefined).map((e) => e.id)).not.toContain('settings-system');
   });
 });

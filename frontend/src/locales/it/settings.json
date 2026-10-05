@@ -31,11 +31,9 @@
   "lang_english": "Inglese",
   "user_menu_label": "Menu utente di {{name}}",
   "log_out": "Esci",
-
   "settings_section_system": "Sistema",
   "alloggiati_auto_send_label": "Invio automatico alloggiati",
   "alloggiati_auto_send_desc": "Invia automaticamente il report alloggiati al portale della Polizia di Stato ad ogni check-in",
-
   "settings_section_email_notifications": "Notifiche email",
   "email_reservation_confirmed_label": "Email conferma prenotazione",
   "email_reservation_confirmed_desc": "Invia un'email all'ospite quando viene creata una prenotazione",
@@ -46,7 +44,6 @@
   "email_greeting_label": "Testo di saluto/firma",
   "email_greeting_desc": "Aggiunto in fondo a ogni email inviata agli ospiti (es. \"Vi aspettiamo, il team di Hotel Bella Vista\")",
   "email_greeting_placeholder": "Es. Vi aspettiamo, il team di Hotel Bella Vista",
-
   "settings_section_city_tax": "Imposta di Soggiorno",
   "settings_hub_city_tax_desc": "Categoria della struttura e tariffe dell'imposta di soggiorno",
   "city_tax_page_subtitle": "Gestisci la categoria della struttura e le tariffe dell'imposta di soggiorno comunale (art. 4 D.Lgs. 23/2011)",
@@ -74,7 +71,6 @@
   "city_tax_err_loading_category": "Errore caricamento storico categoria",
   "city_tax_err_loading_rates": "Errore caricamento tariffe",
   "city_tax_err_invalid_age": "L'età deve essere compresa tra 0 e 120",
-
   "city_tax_applicability_section_title": "Applicabilità dell'imposta",
   "city_tax_applicability_section_desc": "Dichiara se il comune della struttura applica l'imposta di soggiorno. Dichiarare \"Non applicabile\" disattiva gli avvisi di mancata configurazione; se non sei sicuro, lascia \"Da dichiarare\".",
   "city_tax_applicability_label": "Applicabilità",
@@ -82,7 +78,6 @@
   "city_tax_applicability_applicable": "Applicabile",
   "city_tax_applicability_not_applicable": "Non applicabile (il comune non la prevede)",
   "city_tax_err_loading_applicability": "Errore caricamento applicabilità imposta",
-
   "city_tax_backfill_section_title": "Recupero soggiorni non tassati",
   "city_tax_backfill_section_desc": "Verifica i soggiorni per cui l'imposta di soggiorno non è mai stata calcolata per una configurazione mancante, e recupera l'importo dovuto sulle fatture ancora aperte. Le fatture già chiuse non vengono mai toccate: vanno gestite con nota di variazione.",
   "city_tax_backfill_action_preview": "Verifica soggiorni scoperti",
@@ -100,7 +95,6 @@
   "city_tax_backfill_success": "Addebitati {{count}} soggiorni.",
   "city_tax_backfill_err_preview": "Verifica non riuscita. Riprova.",
   "city_tax_backfill_err_confirm": "Addebito non riuscito. Riprova.",
-
   "settings_section_privacy": "Privacy",
   "settings_hub_privacy_desc": "Export dati ospite (GDPR) e impostazioni di conservazione",
   "privacy_page_subtitle": "Gestisci l'export dei dati degli ospiti e il periodo di conservazione (GDPR)",
@@ -113,5 +107,6 @@
   "privacy_fiscal_min_label": "Minimo di legge fiscale (fatture)",
   "privacy_years_value": "{{count}} anni",
   "privacy_err_loading": "Errore caricamento impostazioni privacy",
-  "privacy_err_save": "Salvataggio fallito. Riprova."
+  "privacy_err_save": "Salvataggio fallito. Riprova.",
+  "settings_nav_label": "Sezioni delle impostazioni"
 }

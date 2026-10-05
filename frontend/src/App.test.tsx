@@ -79,6 +79,26 @@ describe('App', () => {
     expect(window.location.pathname).toBe('/');
   });
 
+  it('opens the settings area on the profile section', async () => {
+    vi.mocked(authService.fetchMe).mockResolvedValue(ADMIN);
+    mockStore({ isAuthenticated: true, isLoading: false, user: ADMIN, checkAuth: vi.fn() });
+    window.history.pushState({}, '', '/settings');
+
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/settings/profile'), { timeout: 8000 });
+    expect(await screen.findByRole('navigation', { name: 'settings_nav_label' }, { timeout: 8000 })).toBeInTheDocument();
+  });
+
+  it('keeps the admin-only settings sections away from front-desk staff', async () => {
+    const receptionist: UserPayload = { sub: '2', username: 'desk', role: 'RECEPTIONIST' };
+    vi.mocked(authService.fetchMe).mockResolvedValue(receptionist);
+    mockStore({ isAuthenticated: true, isLoading: false, user: receptionist, checkAuth: vi.fn() });
+    window.history.pushState({}, '', '/settings/system');
+
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/'), { timeout: 8000 });
+  });
+
   it('loading state has no accessibility violations', async () => {
     vi.mocked(authService.fetchMe).mockReturnValue(new Promise(() => { /* never resolves */ }));
     mockStore({ isAuthenticated: false, isLoading: true, user: null, checkAuth: vi.fn() });

@@ -33,7 +33,7 @@ const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard').then((m) => (
 const NightAudit = lazy(() => import('./pages/NightAudit').then((m) => ({ default: m.NightAudit })));
 const Rooms = lazy(() => import('./pages/Rooms').then((m) => ({ default: m.Rooms })));
 const RateCalendar = lazy(() => import('./pages/Rates/RateCalendar').then((m) => ({ default: m.RateCalendar })));
-const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
+const SettingsLayout = lazy(() => import('./pages/Settings/SettingsLayout').then((m) => ({ default: m.SettingsLayout })));
 const SettingsProfile = lazy(() => import('./pages/Settings/SettingsProfile').then((m) => ({ default: m.SettingsProfile })));
 const SettingsPassword = lazy(() => import('./pages/Settings/SettingsPassword').then((m) => ({ default: m.SettingsPassword })));
 const SettingsAccessibility = lazy(() => import('./pages/Settings/SettingsAccessibility').then((m) => ({ default: m.SettingsAccessibility })));
@@ -110,11 +110,18 @@ function App() {
               <Route path="/housekeeping" element={<Housekeeping />} />
               <Route path="/rooms" element={<Rooms />} />
               <Route path="/rates" element={<RateCalendar />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/settings/profile" element={<SettingsProfile />} />
-              <Route path="/settings/password" element={<SettingsPassword />} />
-              <Route path="/settings/accessibility" element={<SettingsAccessibility />} />
-              <Route path="/settings/appearance" element={<SettingsAppearance />} />
+              <Route path="/settings" element={<SettingsLayout />}>
+                <Route index element={<Navigate to="profile" replace />} />
+                <Route path="profile" element={<SettingsProfile />} />
+                <Route path="password" element={<SettingsPassword />} />
+                <Route path="accessibility" element={<SettingsAccessibility />} />
+                <Route path="appearance" element={<SettingsAppearance />} />
+                <Route element={<ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />}>
+                  <Route path="system" element={<SettingsSystem />} />
+                  <Route path="city-tax" element={<SettingsCityTax />} />
+                  <Route path="privacy" element={<SettingsPrivacy />} />
+                </Route>
+              </Route>
               <Route element={<ProtectedRoute allowedRoles={NIGHT_AUDIT_ROLES} />}>
                 <Route path="/night-audit" element={<NightAudit />} />
               </Route>
@@ -122,9 +129,6 @@ function App() {
                 <Route path="/owner-dashboard" element={<OwnerDashboard />} />
                 <Route path="/admin/users" element={<AdminUsers />} />
                 <Route path="/profile/hotel" element={<HotelProfile />} />
-                <Route path="/settings/system" element={<SettingsSystem />} />
-                <Route path="/settings/city-tax" element={<SettingsCityTax />} />
-                <Route path="/settings/privacy" element={<SettingsPrivacy />} />
               </Route>
             </Route>
           </Route>

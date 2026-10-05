@@ -18,6 +18,7 @@ export * from './PasswordRequirementsChecklist';
 export * from './ProtectedRoute';
 export * from './RouteAnnouncer';
 export * from './SettingsPageHeader';
+export * from './SettingsSectionTitle';
 export * from './StructuredAddressFields';
 export * from './ThemeToggle';
 export * from './Toast';

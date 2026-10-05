@@ -31,11 +31,9 @@
   "lang_english": "English",
   "user_menu_label": "User menu for {{name}}",
   "log_out": "Log out",
-
   "settings_section_system": "System",
   "alloggiati_auto_send_label": "Auto-send Alloggiati",
   "alloggiati_auto_send_desc": "Automatically submit the Alloggiati report to the Polizia di Stato portal at each check-in",
-
   "settings_section_email_notifications": "Email notifications",
   "email_reservation_confirmed_label": "Reservation confirmation email",
   "email_reservation_confirmed_desc": "Email the guest when a reservation is created",
@@ -46,7 +44,6 @@
   "email_greeting_label": "Greeting/signature text",
   "email_greeting_desc": "Appended to the footer of every email sent to guests (e.g. \"We look forward to welcoming you, the team at Hotel Bella Vista\")",
   "email_greeting_placeholder": "E.g. We look forward to welcoming you, the team at Hotel Bella Vista",
-
   "settings_section_city_tax": "Tourist Tax",
   "settings_hub_city_tax_desc": "Property category and tourist-tax rates",
   "city_tax_page_subtitle": "Manage the property's classification and the municipal tourist-tax rates (art. 4 D.Lgs. 23/2011)",
@@ -74,7 +71,6 @@
   "city_tax_err_loading_category": "Failed to load category history",
   "city_tax_err_loading_rates": "Failed to load rates",
   "city_tax_err_invalid_age": "Age must be between 0 and 120",
-
   "city_tax_applicability_section_title": "Tax applicability",
   "city_tax_applicability_section_desc": "Declare whether the property's comune levies a tourist tax. Declaring \"Not applicable\" turns off the not-configured warnings; if you're not sure, leave it as \"To be declared\".",
   "city_tax_applicability_label": "Applicability",
@@ -82,7 +78,6 @@
   "city_tax_applicability_applicable": "Applicable",
   "city_tax_applicability_not_applicable": "Not applicable (comune does not levy it)",
   "city_tax_err_loading_applicability": "Failed to load tax applicability",
-
   "city_tax_backfill_section_title": "Recover unassessed stays",
   "city_tax_backfill_section_desc": "Check for stays whose tourist tax was never assessed because of a missing configuration, and recover the amount owed on invoices that are still open. Closed invoices are never touched — those are handled with a credit note.",
   "city_tax_backfill_action_preview": "Check for unassessed stays",
@@ -100,7 +95,6 @@
   "city_tax_backfill_success": "Charged {{count}} stays.",
   "city_tax_backfill_err_preview": "Check failed. Please try again.",
   "city_tax_backfill_err_confirm": "Charge failed. Please try again.",
-
   "settings_section_privacy": "Privacy",
   "settings_hub_privacy_desc": "Guest data export (GDPR) and retention settings",
   "privacy_page_subtitle": "Manage guest data export and the data retention period (GDPR)",
@@ -113,5 +107,6 @@
   "privacy_fiscal_min_label": "Fiscal legal minimum (invoices)",
   "privacy_years_value": "{{count}} years",
   "privacy_err_loading": "Failed to load privacy settings",
-  "privacy_err_save": "Save failed. Please try again."
+  "privacy_err_save": "Save failed. Please try again.",
+  "settings_nav_label": "Settings sections"
 }

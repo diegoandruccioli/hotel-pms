@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback, memo, type ChangeEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { stayService } from '../../services';
 import type { HotelSettingsResponse, HotelSettingsRequest } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Card } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
-import { SettingsPageHeader } from '../../components/SettingsPageHeader';
+import { SettingsSectionTitle } from '../../components/SettingsSectionTitle';
 import { cn } from '../../utils';
 
 const EMAIL_GREETING_MAX_LENGTH = 300;
@@ -113,7 +112,6 @@ SubjectField.displayName = 'SubjectField';
 
 export const SettingsSystem = () => {
   const { t } = useTranslation('settings');
-  const navigate = useNavigate();
 
   const [hotelSettings, setHotelSettings] = useState<HotelSettingsResponse | null>(null);
   const [saving, setSaving] = useState(false);
@@ -126,7 +124,6 @@ export const SettingsSystem = () => {
     }).catch(() => undefined);
   }, []);
 
-  const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const patch = useCallback(async (partial: HotelSettingsRequest) => {
     setSaving(true);
@@ -174,10 +171,10 @@ export const SettingsSystem = () => {
   );
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto pb-10">
-      <SettingsPageHeader icon="admin_panel_settings" title={t('settings_section_system')} onBack={handleBack} />
+    <div className="space-y-6">
+      <SettingsSectionTitle title={t('settings_section_system')} />
 
-      <M3Card className="p-6">
+      <M3Card variant="solid" className="p-6">
         <ToggleRow
           icon="verified_user"
           label={t('alloggiati_auto_send_label')}
@@ -188,7 +185,7 @@ export const SettingsSystem = () => {
         />
       </M3Card>
 
-      <M3Card className="p-6 space-y-4">
+      <M3Card variant="solid" className="p-6 space-y-4">
         <h2 className="text-sm font-semibold text-on-surface">{t('settings_section_email_notifications')}</h2>
 
         <div className="space-y-2">

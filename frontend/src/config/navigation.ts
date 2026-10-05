@@ -87,6 +87,23 @@ export const getSidebarSections = (role: Role | undefined): SidebarSection[] => 
     .filter((section) => section.entries.length > 0);
 };
 
+/** Order of the settings sections in the settings navigation (the layout's side nav). */
+const SETTINGS_NAV_ORDER = [
+  'settings-profile',
+  'settings-password',
+  'settings-appearance',
+  'settings-accessibility',
+  'settings-city-tax',
+  'settings-system',
+  'settings-privacy',
+] as const;
+
+/** The sections of the settings area the role may open, in nav order. */
+export const getSettingsEntries = (role: Role | undefined): NavEntry[] =>
+  SETTINGS_NAV_ORDER
+    .map((id) => NAV_ENTRIES.find((e) => e.id === id))
+    .filter((e): e is NavEntry => e !== undefined && isVisibleTo(e, role));
+
 export const getPaletteEntries = (role: Role | undefined): NavEntry[] =>
   NAV_ENTRIES.filter((e) => isVisibleTo(e, role));
 
