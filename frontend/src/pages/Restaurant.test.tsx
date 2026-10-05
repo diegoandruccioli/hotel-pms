@@ -13,12 +13,17 @@ import type { MenuItemResponse, RestaurantOrderResponse } from '../types';
 const render = (ui: ReactElement) => renderWithQuery(<MemoryRouter>{ui}</MemoryRouter>);
 
 vi.mock('react-i18next', () => {
-  const t = (key: string) => key;
+  const t = (key: string, opts?: { open?: number }) =>
+    (key === 'restaurant_open_orders' ? `${key}:${opts?.open}` : key);
   return {
     useTranslation: () => ({ t, i18n: { language: 'en' } }),
     initReactI18next: { type: '3rdParty', init: vi.fn() },
   };
 });
+
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
 
 vi.mock('../services/fbService', () => ({
   fbService: {
@@ -309,6 +314,54 @@ describe('Restaurant', () => {
     expect(rows[1]).toHaveTextContent('New Guest');
   });
 
+  describe('order filter chips', () => {
+    const CANCELLED_ORDER: RestaurantOrderResponse = {
+      ...PENDING_ORDER, id: 'cancelled-1', roomNumber: '309', guestDisplayName: 'Verdi Luca', status: 'CANCELLED',
+    };
+
+    beforeEach(() => {
+      vi.mocked(fbService.getAllOrders).mockResolvedValue([PENDING_ORDER, BILLED_ORDER, CANCELLED_ORDER]);
+    });
+
+    it('lists every order under "all" and marks it pressed', async () => {
+      render(<Restaurant />);
+      await waitFor(() => expect(screen.getByText('Rossi Mario')).toBeInTheDocument());
+      expect(screen.getByText('Bianchi Anna')).toBeInTheDocument();
+      expect(screen.getByText('Verdi Luca')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'order_filter_all' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it.each([
+      ['order_filter_open', 'Rossi Mario', ['Bianchi Anna', 'Verdi Luca']],
+      ['order_filter_closed', 'Bianchi Anna', ['Rossi Mario', 'Verdi Luca']],
+      ['order_filter_cancelled', 'Verdi Luca', ['Rossi Mario', 'Bianchi Anna']],
+    ])('%s shows only its own orders', async (chip, shown, hidden) => {
+      render(<Restaurant />);
+      await waitFor(() => expect(screen.getByText('Rossi Mario')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: chip }));
+
+      expect(screen.getByRole('button', { name: chip })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText(shown)).toBeInTheDocument();
+      for (const name of hidden) expect(screen.queryByText(name)).not.toBeInTheDocument();
+    });
+
+    it('shows the empty message when the chosen group has no orders', async () => {
+      vi.mocked(fbService.getAllOrders).mockResolvedValue([PENDING_ORDER]);
+      render(<Restaurant />);
+      await waitFor(() => expect(screen.getByText('Rossi Mario')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: 'order_filter_cancelled' }));
+
+      expect(screen.getByText('no_orders')).toBeInTheDocument();
+    });
+
+    it('counts only open orders in the subtitle', async () => {
+      render(<Restaurant />);
+      expect(await screen.findByText('restaurant_open_orders:1')).toBeInTheDocument();
+    });
+  });
+
   describe('menu management (ADMIN/OWNER only)', () => {
     beforeEach(() => {
       mockRole = 'ADMIN';
@@ -369,25 +422,26 @@ describe('Restaurant', () => {
       vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
       vi.mocked(fbService.getMenuItems).mockResolvedValue([MENU_ITEM]);
       vi.mocked(fbService.deleteMenuItem).mockResolvedValueOnce(undefined);
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
       render(<Restaurant />);
       await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
 
       fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'delete' }));
 
       await waitFor(() => expect(fbService.deleteMenuItem).toHaveBeenCalledWith('mi1'));
       expect(mockAddToast).toHaveBeenCalledWith('menu_delete_success', 'success');
     });
 
-    it('does not delete a menu item when the confirmation dialog is declined', async () => {
+    it('does not delete a menu item when the confirmation dialog is cancelled', async () => {
       vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
       vi.mocked(fbService.getMenuItems).mockResolvedValue([MENU_ITEM]);
-      vi.spyOn(window, 'confirm').mockReturnValue(false);
       render(<Restaurant />);
       await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
 
       fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'cancel' }));
 
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(fbService.deleteMenuItem).not.toHaveBeenCalled();
     });
 
@@ -395,11 +449,11 @@ describe('Restaurant', () => {
       vi.mocked(fbService.getAllOrders).mockResolvedValueOnce([]);
       vi.mocked(fbService.getMenuItems).mockResolvedValue([MENU_ITEM]);
       vi.mocked(fbService.deleteMenuItem).mockRejectedValueOnce(new Error('boom'));
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
       render(<Restaurant />);
       await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
 
       fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'delete' }));
 
       await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('menu_delete_error', 'error'));
     });
@@ -410,11 +464,11 @@ describe('Restaurant', () => {
       vi.mocked(fbService.deleteMenuItem).mockRejectedValueOnce(
         mockAxiosErrorWithDetail('MENU_ITEM_IN_USE', 409),
       );
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
       render(<Restaurant />);
       await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
 
       fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'delete' }));
 
       await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('MENU_ITEM_IN_USE', 'error'));
     });

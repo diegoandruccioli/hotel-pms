@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   groupStatusTone,
   invoiceStatusTone,
+  matchesOrderFilter,
   nightAuditStatusTone,
   orderStatusTone,
   quotationStatusTone,
@@ -10,6 +11,7 @@ import {
   sdiStatusTone,
   stayStatusTone,
 } from './domainStatus';
+import type { OrderStatus } from '../types';
 
 describe('domainStatus tone maps', () => {
   it('maps invoice statuses', () => {
@@ -85,6 +87,17 @@ describe('domainStatus tone maps', () => {
       CANCELLED: 'error',
       BILLED_TO_ROOM: 'info',
     });
+  });
+
+  it('groups every F&B order status into exactly one of open, closed or cancelled', () => {
+    const statuses = Object.keys(orderStatusTone) as OrderStatus[];
+    for (const status of statuses) {
+      const hits = (['OPEN', 'CLOSED', 'CANCELLED'] as const).filter((f) => matchesOrderFilter(status, f));
+      expect(hits, status).toHaveLength(1);
+      expect(matchesOrderFilter(status, 'ALL')).toBe(true);
+    }
+    expect(matchesOrderFilter('PENDING', 'OPEN')).toBe(true);
+    expect(matchesOrderFilter('BILLED_TO_ROOM', 'CLOSED')).toBe(true);
   });
 
   it('maps night audit run statuses', () => {
