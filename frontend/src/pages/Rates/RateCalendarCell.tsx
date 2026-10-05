@@ -63,7 +63,7 @@ export const RateCalendarCell = memo(({
           ? 'bg-primary-container'
           : isToday
             ? 'bg-surface-container'
-            : 'bg-surface hover:bg-surface-container-low'
+            : 'bg-surface-container-lowest hover:bg-surface-container-low'
       )}
     >
       {hasSeason && <span className="w-2 h-2 rounded-full" style={dotStyle} aria-hidden="true" />}

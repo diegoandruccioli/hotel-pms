@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { CalendarPlanning } from './CalendarPlanning';
 
@@ -100,6 +100,21 @@ describe('CalendarPlanning', () => {
       expect(screen.getByText('view_planning')).toBeInTheDocument();
       expect(screen.getByText('view_month')).toBeInTheDocument();
     });
+  });
+
+  it('offers the views as a named radio group, planning selected first', async () => {
+    render(<CalendarPlanning />);
+    const group = await screen.findByRole('radiogroup', { name: 'calendar_view_label' });
+    expect(within(group).getByRole('radio', { name: 'view_planning' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'view_month' })).not.toBeChecked();
+  });
+
+  it('moves the selection to the month view with the arrow keys', async () => {
+    render(<CalendarPlanning />);
+    const planning = await screen.findByRole('radio', { name: 'view_planning' });
+    fireEvent.keyDown(planning, { key: 'ArrowRight' });
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'view_month' })).toBeChecked());
+    expect(screen.getByTestId('rbc-calendar')).toBeInTheDocument();
   });
 
   it('switches to calendar view when month button clicked', async () => {

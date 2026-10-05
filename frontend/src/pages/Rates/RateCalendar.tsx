@@ -10,17 +10,11 @@ import { M3ErrorState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
+import { CELL_STYLE, CELL_WIDTH, ROW_STYLE, SIDEBAR_STYLE, SIDEBAR_WIDTH } from '../planningGrid';
 import { RateCalendarCell } from './RateCalendarCell';
 import { RateBulkApplyDialog } from './RateBulkApplyDialog';
 import { useAuthStore } from '../../store';
 import { getErrorMessage, cn, resolveDesignToken, dateFnsLocale } from '../../utils';
-
-const SIDEBAR_WIDTH = 192;
-const CELL_WIDTH = 100;
-const ROW_HEIGHT = 64;
-const SIDEBAR_STYLE = { width: SIDEBAR_WIDTH };
-const ROW_STYLE = { height: ROW_HEIGHT };
-const CELL_STYLE = { width: CELL_WIDTH };
 
 /** Fixed accent palette for season identification — cycles if there are more
  * distinct seasons in view than colors (rare: a room type rarely has more
@@ -247,11 +241,11 @@ export const RateCalendar = () => {
           onRetry={loadCalendar}
         />
       ) : roomTypeOptions.length === 0 ? (
-        <M3Card variant="outlined">
+        <M3Card variant="solid">
           <M3EmptyState icon="payments" title={t('no_room_types_for_calendar')} />
         </M3Card>
       ) : (
-        <M3Card variant="outlined" className="overflow-hidden">
+        <M3Card variant="solid" className="overflow-hidden">
           <div className="overflow-auto" ref={scrollRef}>
             <div style={containerStyle}>
               <div className="sticky top-0 z-40 flex bg-surface-container-low border-b border-outline-variant" style={ROW_STYLE}>

@@ -12,23 +12,21 @@ import { M3ErrorState } from '../components/m3';
 import { PageHeader } from '../components/PageHeader';
 import { M3StatusChip } from '../components/m3';
 import { M3Card } from '../components/m3';
+import { M3SegmentedRow } from '../components/m3';
+import type { M3SegmentOption } from '../components/m3';
 import PlanningBoard from '@/pages/PlanningBoard';
 import { inventoryService } from '../services';
 import type { RoomResponse } from '../types';
-import { getErrorMessage, cn, resolveDesignToken, dateFnsLocale, reservationStatusTone, toneSolidTokens } from '../utils';
+import { getErrorMessage, resolveDesignToken, dateFnsLocale, reservationStatusTone, toneSolidTokens } from '../utils';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 const locales = { 'en-US': enUS, 'it-IT': it, en: enUS, it: it };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
 
-
-
 interface ReservationEvent extends Event {
   resource: ReservationResponse;
 }
-
-
 
 const mapToEvent = (reservation: ReservationResponse): ReservationEvent => ({
   title: `${reservation.guestFullName || `Guest ${reservation.guestId.slice(0, 8)}`} (${reservation.status})`,
@@ -36,8 +34,6 @@ const mapToEvent = (reservation: ReservationResponse): ReservationEvent => ({
   end: new Date(reservation.checkOutDate),
   resource: reservation,
 });
-
-
 
 // `tone` alone drives the rendered swatch (M3StatusChip resolves it to the
 // matching M3 token) -- derived from the shared reservation map so the legend
@@ -50,6 +46,12 @@ const statusLegend = LEGEND_STATUSES.map((status) => ({
 }));
 
 const CALENDAR_VIEWS: View[] = ['month'];
+
+type CalendarViewMode = 'month' | 'planning';
+const VIEW_OPTIONS: M3SegmentOption<CalendarViewMode>[] = [
+  { value: 'planning', labelKey: 'view_planning' },
+  { value: 'month', labelKey: 'view_month' },
+];
 const CALENDAR_STYLE = { height: 600 };
 
 export const CalendarPlanning = () => {
@@ -57,7 +59,7 @@ export const CalendarPlanning = () => {
   const [reservations, setReservations] = useState<ReservationResponse[]>([]);
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'month' | 'planning'>('planning');
+  const [view, setView] = useState<CalendarViewMode>('planning');
   const [error, setError] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const addToast = useToastStore((s) => s.addToast);
@@ -83,7 +85,6 @@ export const CalendarPlanning = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
 
   const handlePlanningBoardDrop = useCallback(
     async (reservationId: string, oldRoomId: string, newRoomId: string) => {
@@ -167,9 +168,6 @@ export const CalendarPlanning = () => {
     }
   }, []);
 
-  const setPlanningView = useCallback(() => setView('planning'), []);
-  const setMonthView = useCallback(() => setView('month'), []);
-
   const events: ReservationEvent[] = useMemo(
     () => reservations.filter(r => r.active !== false).map(mapToEvent),
     [reservations]
@@ -242,26 +240,13 @@ export const CalendarPlanning = () => {
 
         {/* View Switcher Group */}
         <div className="flex justify-start lg:justify-end">
-          <div className="flex bg-surface-container rounded-shape-full p-1">
-            <button
-              onClick={setPlanningView}
-              className={cn(
-                'px-4 py-1.5 text-sm font-medium rounded-shape-full transition-all',
-                view === 'planning' ? 'bg-primary text-on-primary shadow-elevation-1' : 'text-on-surface-variant hover:bg-surface-container-high'
-              )}
-            >
-              {t('view_planning')}
-            </button>
-            <button
-              onClick={setMonthView}
-              className={cn(
-                'px-4 py-1.5 text-sm font-medium rounded-shape-full transition-all',
-                view === 'month' ? 'bg-primary text-on-primary shadow-elevation-1' : 'text-on-surface-variant hover:bg-surface-container-high'
-              )}
-            >
-              {t('view_month')}
-            </button>
-          </div>
+          <M3SegmentedRow
+            options={VIEW_OPTIONS}
+            value={view}
+            onChange={setView}
+            ariaLabel={t('calendar_view_label')}
+            ns="common"
+          />
         </div>
       </div>
 
@@ -291,7 +276,7 @@ export const CalendarPlanning = () => {
           onReservationMove={handlePlanningBoardDrop}
         />
       ) : (
-        <M3Card variant="outlined" className="p-4">
+        <M3Card variant="solid" className="p-4">
           <Calendar
             localizer={localizer}
             culture={i18n.language}

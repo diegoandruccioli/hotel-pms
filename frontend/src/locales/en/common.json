@@ -178,6 +178,7 @@
   "calendar_subtitle": "Drag reservations between rooms in Planning Board. Edit dates via the reservation form.",
   "view_planning": "Planning Board",
   "view_month": "Month View",
+  "calendar_view_label": "Calendar view",
   "status_confirmed": "Confirmed",
   "status_pending": "Pending",
   "status_checked_in": "Checked-In",
