@@ -71,10 +71,13 @@ export const PaymentModal = memo(({ invoice, onClose, onPaid }: Props) => {
           paymentMethod: method,
           transactionReference: reference.trim() || undefined,
         });
+        const payments = [...invoice.payments, payment];
+        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
         onPaid({
           ...invoice,
-          status: 'PAID',
-          payments: [...invoice.payments, payment],
+          // The backend flips to PAID only once the balance is settled.
+          status: totalPaid >= invoice.totalAmount ? 'PAID' : invoice.status,
+          payments,
         });
         addToast(t('payment_registered', { ns: 'billing' }), 'success');
         onClose();
