@@ -68,7 +68,7 @@ const OptionCard = ({ option, isAccepted, isConvertChoice, selectable, onChoose 
 };
 
 export const QuotationDetail = () => {
-  const { formatCurrency } = useFormatters();
+  const { formatCurrency, formatDate } = useFormatters();
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation(['quotations', 'common']);
   const navigate = useNavigate();
@@ -252,15 +252,15 @@ export const QuotationDetail = () => {
         <Alert tone="error">{t('send_failed_banner')}</Alert>
       )}
 
-      <M3Card className="p-6 space-y-4">
+      <M3Card variant="solid" className="p-6 space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
             <p className="text-xs font-body text-on-surface-variant">{t('col_check_in')}</p>
-            <p className="text-sm font-medium text-on-surface">{quotation.checkInDate}</p>
+            <p className="text-sm font-medium text-on-surface">{formatDate(quotation.checkInDate)}</p>
           </div>
           <div>
             <p className="text-xs font-body text-on-surface-variant">{t('col_check_out')}</p>
-            <p className="text-sm font-medium text-on-surface">{quotation.checkOutDate}</p>
+            <p className="text-sm font-medium text-on-surface">{formatDate(quotation.checkOutDate)}</p>
           </div>
           <div>
             <p className="text-xs font-body text-on-surface-variant">{t('label_expected_guests')}</p>
@@ -269,7 +269,7 @@ export const QuotationDetail = () => {
           <div>
             <p className="text-xs font-body text-on-surface-variant">{t('col_valid_until')}</p>
             <p className={cn('text-sm font-medium', quotation.status === 'EXPIRED' ? 'text-error' : 'text-on-surface')}>
-              {quotation.validUntil}
+              {formatDate(quotation.validUntil)}
             </p>
           </div>
         </div>
