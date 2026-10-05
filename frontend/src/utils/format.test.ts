@@ -53,6 +53,12 @@ describe('formatCurrency', () => {
     expect(nbsp(formatCurrency(12345.5, 'it'))).toBe('12.345,50 €');
   });
 
+  it('groups four-digit amounts in Italian too, so side-by-side figures read alike', () => {
+    expect(nbsp(formatCurrency(2310, 'it'))).toBe('2.310,00 €');
+    expect(nbsp(formatCurrency(12480, 'it'))).toBe('12.480,00 €');
+    expect(formatCurrency(2310, 'en')).toBe('€2,310.00');
+  });
+
   it('formats zero and negative amounts', () => {
     expect(formatCurrency(0, 'en')).toBe('€0.00');
     expect(formatCurrency(-5, 'en')).toBe('-€5.00');

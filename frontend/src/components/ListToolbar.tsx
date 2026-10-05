@@ -5,6 +5,9 @@ import { cn } from '../utils';
 interface ListToolbarProps {
   /** Accessible name of the search field (also shown as the placeholder). */
   searchLabel: string;
+  /** Shown inside the empty field instead of `searchLabel`, which can be a full sentence too long for
+   * the field's ~30 characters. Say what is searched, not how. */
+  searchPlaceholder?: string;
   searchValue: string;
   onSearchChange: (e: ChangeEvent<HTMLInputElement>) => void;
   /** Names the chip row for assistive tech (rendered as a group). */
@@ -20,6 +23,7 @@ interface ListToolbarProps {
  * Wraps on narrow screens, with the search field taking the full width. */
 export const ListToolbar = ({
   searchLabel,
+  searchPlaceholder,
   searchValue,
   onSearchChange,
   filtersLabel,
@@ -30,6 +34,7 @@ export const ListToolbar = ({
   <div className={cn('flex flex-wrap items-center gap-3', className)}>
     <M3TextField
       label={searchLabel}
+      placeholder={searchPlaceholder ?? searchLabel}
       hideLabel
       leadingIcon="search"
       type="search"

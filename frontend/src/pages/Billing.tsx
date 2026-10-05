@@ -56,7 +56,7 @@ const ActionsCell = ({ invoice, onView, onPay, tView, tRegisterPayment }: Action
     <div className="flex items-center justify-end gap-1">
       <M3TableActionLink onClick={handleView}>{tView}</M3TableActionLink>
       {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
-        <M3TableActionLink tone="primary" onClick={handlePay}>{tRegisterPayment}</M3TableActionLink>
+        <M3TableActionLink tone="tertiary" onClick={handlePay}>{tRegisterPayment}</M3TableActionLink>
       )}
     </div>
   );
@@ -262,6 +262,7 @@ export const Billing = memo(() => {
 
       <ListToolbar
         searchLabel={t('invoice_search_placeholder')}
+        searchPlaceholder={t('invoice_search_hint')}
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}
         filtersLabel={t('filter_status')}

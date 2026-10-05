@@ -478,6 +478,10 @@
 
   "search_placeholder": "Search",
   "list_range_summary": "{{from}}–{{to}} of {{total}}",
+  "invoice_search_hint": "Invoice #, guest or email",
+  "guests_search_hint": "Name, email or city",
+  "reservations_search_hint": "Guest name or email",
+  "stays_search_hint": "Room or guest name",
   "billing_kpi_billed": "Billed this month",
   "billing_kpi_outstanding": "To collect",
   "filter_all": "All",

@@ -286,6 +286,7 @@ export const Stays = memo(() => {
 
       <ListToolbar
         searchLabel={t('search_placeholder')}
+        searchPlaceholder={t('stays_search_hint')}
         filtersLabel={t('filter_status')}
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}

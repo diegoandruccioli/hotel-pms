@@ -18,6 +18,17 @@ describe('ListToolbar', () => {
     expect(onSearchChange).toHaveBeenCalledTimes(1);
   });
 
+  it('uses the label as placeholder by default', () => {
+    renderToolbar();
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveAttribute('placeholder', 'Search');
+  });
+
+  it('shows a shorter placeholder while the accessible name stays the full label', () => {
+    renderToolbar({ searchLabel: 'Search by invoice number, guest name or email', searchPlaceholder: 'Invoice #, guest or email' });
+    const field = screen.getByRole('searchbox', { name: 'Search by invoice number, guest name or email' });
+    expect(field).toHaveAttribute('placeholder', 'Invoice #, guest or email');
+  });
+
   it('renders chips and trailing actions when given', () => {
     renderToolbar({ children: <button type="button">Chip</button>, trailing: <button type="button">Export</button> });
     expect(screen.getByRole('button', { name: 'Chip' })).toBeInTheDocument();
