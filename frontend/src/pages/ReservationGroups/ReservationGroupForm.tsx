@@ -142,7 +142,7 @@ export const ReservationGroupForm = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <M3Card className="p-6 space-y-4">
+        <M3Card variant="solid" className="p-6 space-y-4">
           <h2 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider">
             {t('group_details')}
           </h2>
@@ -174,7 +174,7 @@ export const ReservationGroupForm = () => {
           />
         </M3Card>
 
-        <M3Card className="p-6 space-y-4">
+        <M3Card variant="solid" className="p-6 space-y-4">
           <h2 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider">
             {t('contact_guest')}
           </h2>
@@ -186,7 +186,7 @@ export const ReservationGroupForm = () => {
           />
         </M3Card>
 
-        <M3Card className="p-6 space-y-4">
+        <M3Card variant="solid" className="p-6 space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider">
               {t('rooming_list')}
