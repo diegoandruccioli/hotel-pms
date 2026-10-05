@@ -14,15 +14,6 @@ export const toneChipClasses: Record<StatusTone, string> = {
   neutral: 'bg-surface-container-highest text-on-surface-variant',
 };
 
-/** Selectable card with a full border (Housekeeping cards, active filter badge). */
-export const toneCardClasses: Record<StatusTone, string> = {
-  success: 'bg-tertiary-container/30 border-tertiary',
-  warning: 'bg-secondary-container/30 border-secondary',
-  error: 'bg-error-container/30 border-error',
-  info: 'bg-primary-container/30 border-primary',
-  neutral: 'bg-surface-container-highest/30 border-outline',
-};
-
 /** Outlined action button that sets a status (Housekeeping). */
 export const toneOutlineButtonClasses: Record<StatusTone, string> = {
   success: 'border-tertiary text-tertiary hover:bg-tertiary-container',
@@ -43,7 +34,7 @@ export const toneSolidClasses: Record<StatusTone, string> = {
   neutral: 'bg-surface-container-highest text-on-surface border border-outline',
 };
 
-/** Small status dot. */
+/** Small status dot, or any thin decorative bar in the tone colour (Housekeeping card top edge). */
 export const toneDotClasses: Record<StatusTone, string> = {
   success: 'bg-tertiary',
   warning: 'bg-secondary',

@@ -156,6 +156,8 @@
   "rooms_updated": "{{count}} camere aggiornate a {{status}}",
   "failed_bulk_update_rooms": "Aggiornamento massivo fallito. Riprova.",
   "housekeeping_subtitle": "Monitora e aggiorna lo stato pulizia camere.",
+  "housekeeping_status_summary": "Da pulire: {{dirty}} · Pulite: {{clean}} · Fuori servizio: {{maintenance}} · Occupate: {{occupied}}",
+  "housekeeping_filter_label": "Filtra le camere per stato",
   "refresh": "Aggiorna",
   "error_loading_rooms": "Errore caricamento camere",
   "no_rooms_found": "Nessuna camera trovata.",

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  toneCardClasses,
   toneChipClasses,
   toneDotClasses,
   toneOutlineButtonClasses,
@@ -20,7 +19,6 @@ const ROLE_OF: Record<Exclude<StatusTone, 'neutral'>, string> = {
 describe('toneStyles', () => {
   it.each([
     ['chip', toneChipClasses],
-    ['card', toneCardClasses],
     ['outline button', toneOutlineButtonClasses],
     ['solid', toneSolidClasses],
     ['dot', toneDotClasses],
@@ -33,7 +31,6 @@ describe('toneStyles', () => {
     for (const tone of ['success', 'warning', 'error', 'info'] as const) {
       const role = ROLE_OF[tone];
       expect(toneChipClasses[tone]).toContain(`${role}-container`);
-      expect(toneCardClasses[tone]).toContain(`border-${role}`);
       expect(toneOutlineButtonClasses[tone]).toContain(`border-${role}`);
       expect(toneSolidClasses[tone]).toBe(`bg-${role} text-on-${role}`);
       expect(toneDotClasses[tone]).toBe(`bg-${role}`);
