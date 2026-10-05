@@ -195,4 +195,16 @@ describe('ReservationGroupDetail', () => {
     });
     expect(await screen.findByText('checkout_room_success')).toBeInTheDocument();
   });
+
+  it('shows the rooming list as a table with named columns and locale dates', async () => {
+    vi.mocked(reservationGroupService.getGroup).mockResolvedValue(GROUP as never);
+    renderDetail();
+
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Acme Corp Offsite/ })).toBeInTheDocument());
+    const table = within(screen.getByRole('region', { name: 'rooming_list' })).getByRole('table');
+    ['guest', 'label_expected_guests', 'status', 'billed_to_master_folio', 'amount'].forEach((name) => {
+      expect(within(table).getByRole('columnheader', { name })).toBeInTheDocument();
+    });
+    expect(screen.getByText('10/1/2026 — 10/3/2026')).toBeInTheDocument();
+  });
 });
