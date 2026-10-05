@@ -8,7 +8,7 @@ import { M3Card } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { Alert } from '../../components/Alert';
-import { SettingsPageHeader } from '../../components/SettingsPageHeader';
+import { SettingsSectionTitle } from '../../components/SettingsSectionTitle';
 import { PasswordRequirementsChecklist } from '../../components/PasswordRequirementsChecklist';
 import { isPasswordValid } from '../../utils';
 
@@ -26,7 +26,6 @@ export const SettingsPassword = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const handleCurrentPasswordChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => setCurrentPassword(e.target.value),
@@ -87,8 +86,8 @@ export const SettingsPassword = () => {
   }, [currentPassword, newPassword, confirmPassword, t, addToast, checkAuth, navigate, mustChangePassword]);
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto pb-10">
-      <SettingsPageHeader icon="lock" title={t('section_change_password')} onBack={handleBack} />
+    <div className="space-y-6">
+      <SettingsSectionTitle title={t('section_change_password')} />
 
       {mustChangePassword && (
         <Alert tone="warning" role="alert" className="font-medium">
@@ -96,7 +95,7 @@ export const SettingsPassword = () => {
         </Alert>
       )}
 
-      <M3Card className="p-6">
+      <M3Card variant="solid" className="p-6">
         {error && (
           <Alert tone="error" className="mb-4">{error}</Alert>
         )}

@@ -42,11 +42,33 @@ describe('SettingsSystem', () => {
     vi.clearAllMocks();
   });
 
-  it('navigates back in history when the back button is clicked', async () => {
+  it('has no back button of its own: the settings layout provides the navigation', async () => {
     vi.mocked(stayService.getHotelSettings).mockResolvedValue(SETTINGS);
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'back' }));
-    expect(mockNavigate).toHaveBeenCalledWith(-1);
+    expect(screen.queryByRole('button', { name: 'back' })).not.toBeInTheDocument();
+  });
+
+  it('tells the user when the settings fail to load instead of showing dead switches', async () => {
+    vi.mocked(stayService.getHotelSettings).mockRejectedValue(new Error('boom'));
+    renderPage();
+    expect(await screen.findByRole('alert')).toHaveTextContent('settings_system_load_failed');
+    screen.getAllByRole('switch').forEach((sw) => expect(sw).toBeDisabled());
+  });
+
+  it('does not let the greeting be edited while the settings are not loaded', async () => {
+    vi.mocked(stayService.getHotelSettings).mockRejectedValue(new Error('boom'));
+    renderPage();
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('email_greeting_label')).toBeDisabled();
+  });
+
+  it('labels the greeting field and keeps its description and character count', async () => {
+    vi.mocked(stayService.getHotelSettings).mockResolvedValue({ ...SETTINGS, emailGreetingText: 'Welcome' });
+    renderPage();
+    const field = await screen.findByLabelText('email_greeting_label');
+    expect(field).toHaveValue('Welcome');
+    expect(field).toHaveAccessibleDescription('email_greeting_desc');
+    expect(screen.getByText('7/300')).toBeInTheDocument();
   });
 
   it('loads hotel settings and reflects the current alloggiatiAutoSend value', async () => {

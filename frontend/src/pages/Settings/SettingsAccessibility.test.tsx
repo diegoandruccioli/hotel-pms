@@ -32,10 +32,9 @@ describe('SettingsAccessibility', () => {
     } as never);
   });
 
-  it('navigates back in history when the back button is clicked', () => {
+  it('has no back button of its own: the settings layout provides the navigation', () => {
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'back' }));
-    expect(mockNavigate).toHaveBeenCalledWith(-1);
+    expect(screen.queryByRole('button', { name: 'back' })).not.toBeInTheDocument();
   });
 
   it('renders the 3 font size options', () => {

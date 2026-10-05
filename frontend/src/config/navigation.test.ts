@@ -5,6 +5,7 @@ import {
   NIGHT_AUDIT_ROLES,
   getSidebarSections,
   getPaletteEntries,
+  getSettingsEntries,
   NESTED_ROUTES,
   NAV_GROUP_LABEL_KEYS,
   matchRoute,
@@ -139,7 +140,7 @@ describe('resolveAnnouncement', () => {
     ['/admin/users', 'page_title', 'admin'],
     ['/profile/hotel', 'hotel_profile_title', 'admin'],
     ['/settings', 'settings', 'settings'],
-    ['/settings/privacy', 'settings', 'settings'],
+    ['/settings/privacy', 'settings_section_privacy', 'settings'],
     ['/', 'nav_dashboard', 'common'],
     ['/unknown/path', 'nav_dashboard', 'common'],
   ])('%s announces %s (%s)', (path, key, ns) => {
@@ -252,5 +253,40 @@ describe('resolveCrumbs', () => {
       { labelKey: 'nav_group_admin', ns: 'common' },
       { labelKey: 'settings_section_admin_users', ns: 'settings', path: '/admin/users' },
     ]);
+  });
+});
+
+describe('settings route announcements', () => {
+  it('announces each settings section by its own name, not as plain "Settings"', () => {
+    const parent = resolveAnnouncement('/settings');
+    for (const path of ['/settings/profile', '/settings/password', '/settings/appearance', '/settings/city-tax']) {
+      expect(resolveAnnouncement(path), path).not.toEqual(parent);
+    }
+    expect(resolveAnnouncement('/settings/password').key).toBe('change_password');
+  });
+});
+
+describe('getSettingsEntries', () => {
+  it('gives front-desk staff only the personal sections', () => {
+    expect(getSettingsEntries('RECEPTIONIST').map((e) => e.id)).toEqual([
+      'settings-profile', 'settings-password', 'settings-appearance', 'settings-accessibility',
+    ]);
+  });
+
+  it.each(['ADMIN', 'OWNER'] as const)('adds tourist tax, system and privacy for %s, in nav order', (role) => {
+    expect(getSettingsEntries(role).map((e) => e.id)).toEqual([
+      'settings-profile', 'settings-password', 'settings-appearance', 'settings-accessibility',
+      'settings-city-tax', 'settings-system', 'settings-privacy',
+    ]);
+  });
+
+  it('leaves out the admin pages that live elsewhere (hotel profile, users)', () => {
+    const ids = getSettingsEntries('ADMIN').map((e) => e.id);
+    expect(ids).not.toContain('hotel-profile');
+    expect(ids).not.toContain('admin-users');
+  });
+
+  it('returns nothing sensitive without a role', () => {
+    expect(getSettingsEntries(undefined).map((e) => e.id)).not.toContain('settings-system');
   });
 });

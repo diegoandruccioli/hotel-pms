@@ -58,15 +58,15 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { id: 'rates', path: '/rates', icon: 'payments', labelKey: 'nav_rates', ns: 'common', sidebar: true, group: 'revenue', announce: true },
   { id: 'owner-dashboard', path: '/owner-dashboard', icon: 'bar_chart', labelKey: 'nav_owner_dashboard', ns: 'common', sidebar: true, group: 'revenue', announce: true, allowedRoles: OWNER_ADMIN_ROLES },
   { id: 'settings', path: '/settings', icon: 'settings', labelKey: 'settings', ns: 'settings', announce: true },
-  { id: 'settings-profile', path: '/settings/profile', icon: 'person', labelKey: 'my_profile', parent: 'settings', ns: 'common' },
-  { id: 'settings-password', path: '/settings/password', icon: 'lock', labelKey: 'change_password', parent: 'settings', ns: 'common' },
-  { id: 'settings-accessibility', path: '/settings/accessibility', icon: 'accessibility_new', labelKey: 'settings_section_accessibility', parent: 'settings', ns: 'settings' },
-  { id: 'settings-appearance', path: '/settings/appearance', icon: 'palette', labelKey: 'settings_appearance_language_title', parent: 'settings', ns: 'settings' },
-  { id: 'settings-privacy', path: '/settings/privacy', icon: 'privacy_tip', labelKey: 'settings_section_privacy', parent: 'settings', ns: 'settings', allowedRoles: OWNER_ADMIN_ROLES },
-  { id: 'settings-system', path: '/settings/system', icon: 'admin_panel_settings', labelKey: 'settings_section_system', parent: 'settings', ns: 'settings', allowedRoles: OWNER_ADMIN_ROLES },
+  { id: 'settings-profile', path: '/settings/profile', icon: 'person', labelKey: 'my_profile', parent: 'settings', ns: 'common', announce: true },
+  { id: 'settings-password', path: '/settings/password', icon: 'lock', labelKey: 'change_password', parent: 'settings', ns: 'common', announce: true },
+  { id: 'settings-accessibility', path: '/settings/accessibility', icon: 'accessibility_new', labelKey: 'settings_section_accessibility', parent: 'settings', ns: 'settings', announce: true },
+  { id: 'settings-appearance', path: '/settings/appearance', icon: 'palette', labelKey: 'settings_appearance_language_title', parent: 'settings', ns: 'settings', announce: true },
+  { id: 'settings-privacy', path: '/settings/privacy', icon: 'privacy_tip', labelKey: 'settings_section_privacy', parent: 'settings', ns: 'settings', announce: true, allowedRoles: OWNER_ADMIN_ROLES },
+  { id: 'settings-system', path: '/settings/system', icon: 'admin_panel_settings', labelKey: 'settings_section_system', parent: 'settings', ns: 'settings', announce: true, allowedRoles: OWNER_ADMIN_ROLES },
   { id: 'hotel-profile', path: '/profile/hotel', icon: 'apartment', labelKey: 'settings_section_hotel_profile', ns: 'settings', sidebar: true, group: 'admin', announce: { key: 'hotel_profile_title', ns: 'admin' }, allowedRoles: OWNER_ADMIN_ROLES },
   { id: 'admin-users', path: '/admin/users', icon: 'manage_accounts', labelKey: 'settings_section_admin_users', ns: 'settings', sidebar: true, group: 'admin', announce: { key: 'page_title', ns: 'admin' }, allowedRoles: OWNER_ADMIN_ROLES },
-  { id: 'settings-city-tax', path: '/settings/city-tax', icon: 'account_balance', labelKey: 'settings_section_city_tax', parent: 'settings', ns: 'settings', allowedRoles: OWNER_ADMIN_ROLES },
+  { id: 'settings-city-tax', path: '/settings/city-tax', icon: 'account_balance', labelKey: 'settings_section_city_tax', parent: 'settings', ns: 'settings', announce: true, allowedRoles: OWNER_ADMIN_ROLES },
 ];
 
 const isVisibleTo = (entry: NavEntry, role: Role | undefined): boolean =>
@@ -86,6 +86,23 @@ export const getSidebarSections = (role: Role | undefined): SidebarSection[] => 
     .map((group) => ({ group, entries: visible.filter((e) => (e.group ?? null) === group) }))
     .filter((section) => section.entries.length > 0);
 };
+
+/** Order of the settings sections in the settings navigation (the layout's side nav). */
+const SETTINGS_NAV_ORDER = [
+  'settings-profile',
+  'settings-password',
+  'settings-appearance',
+  'settings-accessibility',
+  'settings-city-tax',
+  'settings-system',
+  'settings-privacy',
+] as const;
+
+/** The sections of the settings area the role may open, in nav order. */
+export const getSettingsEntries = (role: Role | undefined): NavEntry[] =>
+  SETTINGS_NAV_ORDER
+    .map((id) => NAV_ENTRIES.find((e) => e.id === id))
+    .filter((e): e is NavEntry => e !== undefined && isVisibleTo(e, role));
 
 export const getPaletteEntries = (role: Role | undefined): NavEntry[] =>
   NAV_ENTRIES.filter((e) => isVisibleTo(e, role));

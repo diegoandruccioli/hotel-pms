@@ -21,6 +21,10 @@ vi.mock('../../store/toastStore', () => ({
     (sel as (s: { addToast: () => void }) => unknown)({ addToast: mockAddToast }),
 }));
 
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 const CATEGORY_ENTRY: HotelCategoryHistoryResponse = {
   id: 'ch1', category: '4_STAR', validFrom: '2026-01-01', validTo: null,
 };
@@ -262,11 +266,35 @@ describe('SettingsCityTax', () => {
       await waitFor(() => expect(screen.getByText('city_tax_backfill_action_confirm')).toBeInTheDocument());
 
       fireEvent.click(screen.getByText('city_tax_backfill_action_confirm'));
+      // Charging guests is not undone by a second click: it asks first.
+      expect(stayService.confirmCityTaxBackfill).not.toHaveBeenCalled();
+      expect(screen.getByText('city_tax_backfill_confirm_title')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('city_tax_backfill_confirm_yes'));
 
       await waitFor(() => expect(stayService.confirmCityTaxBackfill).toHaveBeenCalled());
       expect(mockAddToast).toHaveBeenCalledWith('city_tax_backfill_success', 'success');
       // Confirmed — the action disappears rather than allowing a duplicate charge.
       await waitFor(() => expect(screen.queryByText('city_tax_backfill_action_confirm')).not.toBeInTheDocument());
+    });
+
+    it('charges nothing when the confirmation is cancelled', async () => {
+      vi.mocked(stayService.previewCityTaxBackfill).mockResolvedValue({
+        lines: [{ stayId: 's1', checkInDate: '2026-05-01', amount: 2.5, charged: false, skipReason: null }],
+        totalAmount: 2.5,
+        chargedCount: 0,
+        skippedCount: 0,
+      });
+      renderPage();
+      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('city_tax_backfill_action_preview'));
+      await waitFor(() => expect(screen.getByText('city_tax_backfill_action_confirm')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('city_tax_backfill_action_confirm'));
+      fireEvent.click(screen.getByText('cancel'));
+
+      expect(stayService.confirmCityTaxBackfill).not.toHaveBeenCalled();
+      expect(screen.queryByText('city_tax_backfill_confirm_title')).not.toBeInTheDocument();
+      expect(screen.getByText('city_tax_backfill_action_confirm')).toBeInTheDocument();
     });
 
     it('shows an empty state when no unassessed stays are found', async () => {
