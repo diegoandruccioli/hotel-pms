@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { renderWithQuery } from '../test-utils';
 import { mockAxiosErrorWithDetail } from '../test-utils';
@@ -9,6 +9,7 @@ import { nightAuditService } from '../services';
 import { reservationService } from '../services';
 import { stayService } from '../services';
 import { useToastStore } from '../store';
+import { formatDate } from '../utils';
 
 // The pre-check widget links to /reservations and /stays (react-router-dom
 // <Link>), so every render needs a Router context now, not just a QueryClient.
@@ -75,6 +76,10 @@ const FAILED_RUN = {
 const page = (content: unknown[], totalPages = 1) => ({ content, totalPages, totalElements: content.length });
 
 const mockAddToast = vi.fn();
+const RUN_DATE = formatDate('2026-06-15', 'en');
+const FAILED_DATE = formatDate('2026-06-14', 'en');
+// The row action is named "View <date>" so each row's button is distinguishable.
+const VIEW = /^view /;
 
 describe('NightAudit', () => {
   beforeEach(() => {
@@ -110,7 +115,7 @@ describe('NightAudit', () => {
     vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([COMPLETED_RUN]) as never);
     render(<NightAudit />);
 
-    await waitFor(() => expect(screen.getByText('2026-06-15')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(RUN_DATE)).toBeInTheDocument());
   });
 
   it('should show an error state when history fails to load', async () => {
@@ -183,8 +188,8 @@ describe('NightAudit', () => {
     vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([COMPLETED_RUN]) as never);
     render(<NightAudit />);
 
-    await waitFor(() => expect(screen.getByText('2026-06-15')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: 'view' }));
+    await waitFor(() => expect(screen.getByText(RUN_DATE)).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: VIEW }));
 
     expect(screen.getByText('CASH')).toBeInTheDocument();
   });
@@ -220,9 +225,42 @@ describe('NightAudit', () => {
     vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([FAILED_RUN]) as never);
     render(<NightAudit />);
 
-    await waitFor(() => expect(screen.getByText('2026-06-14')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: 'view' }));
+    await waitFor(() => expect(screen.getByText(FAILED_DATE)).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: VIEW }));
 
     expect(screen.getByText('DAY_SHEET_BOOM')).toBeInTheDocument();
+  });
+
+  it('summarises the most recent completed closing above the history', async () => {
+    vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([FAILED_RUN, COMPLETED_RUN]) as never);
+    render(<NightAudit />);
+
+    const heading = await screen.findByRole('heading', { name: /night_audit_last_run_title/ });
+    expect(heading).toHaveTextContent(RUN_DATE);
+  });
+
+  it('hides the closing summary when no run completed', async () => {
+    vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([FAILED_RUN]) as never);
+    render(<NightAudit />);
+
+    await waitFor(() => expect(screen.getByText(FAILED_DATE)).toBeInTheDocument());
+    expect(screen.queryByRole('heading', { name: /night_audit_last_run_title/ })).not.toBeInTheDocument();
+  });
+
+  it('shows the range summary under the history', async () => {
+    vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([COMPLETED_RUN]) as never);
+    render(<NightAudit />);
+
+    expect(await screen.findByText(/list_range_summary/)).toBeInTheDocument();
+  });
+
+  it('keeps the date field and the run button in the closing card', async () => {
+    vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([]) as never);
+    render(<NightAudit />);
+
+    const card = within(screen.getByRole('region', { name: 'night_audit_run_card_title' }));
+    expect(card.getByLabelText('night_audit_business_date')).toBeInTheDocument();
+    expect(card.getByRole('button', { name: 'night_audit_run_action' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('night_audit_no_runs_found')).toBeInTheDocument());
   });
 });
