@@ -109,5 +109,8 @@
   "privacy_err_loading": "Failed to load privacy settings",
   "privacy_err_save": "Save failed. Please try again.",
   "settings_nav_label": "Settings sections",
-  "settings_system_load_failed": "Could not load the system settings. Reload the page to try again."
+  "settings_system_load_failed": "Could not load the system settings. Reload the page to try again.",
+  "city_tax_backfill_confirm_title": "Charge tourist tax now?",
+  "city_tax_backfill_confirm_message": "This adds the tax to {{count}} open guest invoices, {{total}} in total. Closed or paid invoices are not touched.",
+  "city_tax_backfill_confirm_yes": "Charge now"
 }

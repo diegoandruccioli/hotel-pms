@@ -109,5 +109,8 @@
   "privacy_err_loading": "Errore caricamento impostazioni privacy",
   "privacy_err_save": "Salvataggio fallito. Riprova.",
   "settings_nav_label": "Sezioni delle impostazioni",
-  "settings_system_load_failed": "Impossibile caricare le impostazioni di sistema. Ricarica la pagina per riprovare."
+  "settings_system_load_failed": "Impossibile caricare le impostazioni di sistema. Ricarica la pagina per riprovare.",
+  "city_tax_backfill_confirm_title": "Addebitare ora l'imposta di soggiorno?",
+  "city_tax_backfill_confirm_message": "L'imposta viene aggiunta a {{count}} fatture ospite ancora aperte, {{total}} in totale. Le fatture chiuse o pagate non vengono toccate.",
+  "city_tax_backfill_confirm_yes": "Addebita ora"
 }
