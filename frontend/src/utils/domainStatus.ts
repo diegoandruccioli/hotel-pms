@@ -5,6 +5,7 @@ import type {
   OrderStatus,
   QuotationStatus,
   ReservationStatus,
+  Role,
   RoomStatus,
   SdiStatus,
   StayStatus,
@@ -48,6 +49,14 @@ export const roomStatusTone: Record<RoomStatus, StatusTone> = {
   DIRTY: 'warning',
   MAINTENANCE: 'error',
   OCCUPIED: 'info',
+};
+
+/** Staff role chip: the two management roles stand out from front-desk and guest accounts. */
+export const userRoleTone: Record<Role, StatusTone> = {
+  ADMIN: 'info',
+  OWNER: 'success',
+  RECEPTIONIST: 'neutral',
+  GUEST: 'neutral',
 };
 
 export const reservationStatusTone: Record<ReservationStatus, StatusTone> = {

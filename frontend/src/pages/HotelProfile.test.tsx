@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
@@ -77,6 +77,42 @@ describe('HotelProfile', () => {
     expect(screen.getByRole('button', { name: 'back' })).toBeInTheDocument();
   });
 
+  describe('document header preview', () => {
+    it('shows the hotel as it will appear on documents and follows what is typed', async () => {
+      renderComponent();
+      await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+      const preview = screen.getByRole('region', { name: 'hotel_preview_title' });
+      expect(within(preview).getByText('Hotel Test')).toBeInTheDocument();
+      expect(within(preview).getByText('Via Roma 1')).toBeInTheDocument();
+      expect(within(preview).getByText(/12345678901/)).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText(/label_hotel_name/i), { target: { value: 'Grand Hotel' } });
+      expect(within(preview).getByText('Grand Hotel')).toBeInTheDocument();
+    });
+
+    it('shows the logo in the preview, not in the form', async () => {
+      vi.mocked(stayService.getHotelSettings).mockResolvedValue({ ...baseSettings, logoUrl: 'https://example.com/logo.png' });
+      renderComponent();
+      await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+
+      const preview = screen.getByRole('region', { name: 'hotel_preview_title' });
+      expect(within(preview).getByAltText('hotel_logo_preview_alt')).toBeInTheDocument();
+    });
+  });
+
+  it('keeps the save action in the page header, as the only save button', async () => {
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+    expect(screen.getAllByRole('button', { name: /btn_save_profile/i })).toHaveLength(1);
+  });
+
+  it('links to the tourist tax settings', async () => {
+    renderComponent();
+    await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: /hotel_city_tax_link/i })).toHaveAttribute('href', '/settings/city-tax');
+  });
+
   it('loads alloggiatiAutoSend=false and renders checkbox unchecked', async () => {
     renderComponent();
     await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
@@ -144,14 +180,14 @@ describe('HotelProfile', () => {
     expect(toggle).toBeChecked();
   });
 
-  it('hides the logo preview image on load error', async () => {
+  it('drops the logo preview image when it fails to load', async () => {
     vi.mocked(stayService.getHotelSettings).mockResolvedValue({ ...baseSettings, logoUrl: 'https://example.com/logo.png' });
     renderComponent();
     await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
 
-    const img = screen.getByAltText('hotel logo preview') as HTMLImageElement;
+    const img = screen.getByAltText('hotel_logo_preview_alt') as HTMLImageElement;
     fireEvent.error(img);
-    expect(img.style.display).toBe('none');
+    expect(screen.queryByAltText('hotel_logo_preview_alt')).not.toBeInTheDocument();
   });
 
   it('shows an error toast when loading settings fails', async () => {

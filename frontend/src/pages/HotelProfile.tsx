@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { stayService } from '../services';
@@ -7,12 +7,14 @@ import type { HotelSettingsResponse, HotelSettingsRequest } from '../types';
 import { M3LoadingState } from '../components/m3';
 import { M3Button } from '../components/m3';
 import { M3Card } from '../components/m3';
+import { M3StatusChip } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { M3Checkbox } from '../components/m3';
 import { StructuredAddressFields } from '../components/StructuredAddressFields';
 import { SettingsPageHeader } from '../components/SettingsPageHeader';
 import { useToastStore } from '../store';
-import { getErrorMessage, cn } from '../utils';
+import { getErrorMessage } from '../utils';
+import { HotelDocumentPreview } from './HotelProfile/HotelDocumentPreview';
 
 const VAT_NUMBER_REGEX = /^\d{11}$/;
 const FISCAL_CODE_REGEX = /^(\d{11}|[A-Za-z]{6}\d{2}[A-Za-z]\d{2}[A-Za-z]\d{3}[A-Za-z])$/;
@@ -47,16 +49,12 @@ export function HotelProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const imgRef = useRef<HTMLImageElement>(null);
 
   const profileSchema = useMemo(() => z.object({
     vatNumber: z.union([z.string().regex(VAT_NUMBER_REGEX, t('common:err_invalid_vat')), z.literal('')]),
     fiscalCode: z.union([z.string().regex(FISCAL_CODE_REGEX, t('common:err_invalid_fiscal_code')), z.literal('')]),
     logoUrl: z.union([z.string().url(t('common:err_invalid_url')), z.literal('')]),
   }), [t]);
-  const handleLogoError = useCallback(() => {
-    if (imgRef.current) imgRef.current.style.display = 'none';
-  }, []);
 
   useEffect(() => {
     stayService
@@ -155,28 +153,22 @@ export function HotelProfile() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto pb-10">
+    <div className="space-y-6 max-w-6xl mx-auto pb-10">
       <SettingsPageHeader
         icon="apartment"
         title={t('hotel_profile_title')}
         subtitle={t('hotel_profile_subtitle')}
         onBack={handleBack}
+        actions={
+          <M3Button icon="save" onClick={handleSave} disabled={saving}>
+            {saving ? t('btn_saving') : t('btn_save_profile')}
+          </M3Button>
+        }
       />
 
-      <M3Card className="p-6 space-y-4">
-        {/* Logo preview */}
-        {form.logoUrl && (
-          <div className="flex justify-center mb-2">
-            <img
-              ref={imgRef}
-              src={form.logoUrl}
-              alt="hotel logo preview"
-              className="max-h-20 object-contain rounded-md border border-outline-variant"
-              onError={handleLogoError}
-            />
-          </div>
-        )}
-
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="space-y-6">
+      <M3Card variant="solid" className="p-6 space-y-4">
         <M3TextField
           label={t('label_hotel_name')}
           value={form.hotelName ?? ''}
@@ -235,7 +227,7 @@ export function HotelProfile() {
         />
       </M3Card>
 
-      <M3Card className="p-6 space-y-4">
+      <M3Card variant="solid" className="p-6 space-y-4">
         <div>
           <h2 className="text-base font-semibold text-on-surface">{t('section_title_housekeeping')}</h2>
           <p className="text-xs text-on-surface-variant mt-0.5">{t('hint_housekeeping')}</p>
@@ -260,19 +252,20 @@ export function HotelProfile() {
         </div>
       </M3Card>
 
-      <M3Card className="p-6 space-y-4">
+      <M3Card variant="solid" className="p-6 space-y-4">
         <div>
           <h2 className="text-base font-semibold text-on-surface">{t('section_title_alloggiati_credentials')}</h2>
           <p className="text-xs text-on-surface-variant mt-0.5">{t('hint_alloggiati_credentials')}</p>
         </div>
 
-        <p
-          className={cn('text-sm font-medium', credentialsConfigured ? 'text-primary' : 'text-on-surface-variant')}
-        >
-          {credentialsConfigured
-            ? t('status_alloggiati_credentials_configured')
-            : t('status_alloggiati_credentials_not_configured')}
-        </p>
+        <div>
+          <M3StatusChip
+            label={credentialsConfigured
+              ? t('status_alloggiati_credentials_configured')
+              : t('status_alloggiati_credentials_not_configured')}
+            tone={credentialsConfigured ? 'success' : 'neutral'}
+          />
+        </div>
 
         <M3TextField
           label={t('label_alloggiati_username')}
@@ -306,10 +299,29 @@ export function HotelProfile() {
         </div>
       </M3Card>
 
-      <div className="flex justify-end">
-        <M3Button icon="save" onClick={handleSave} disabled={saving}>
-          {saving ? t('btn_saving') : t('btn_save_profile')}
-        </M3Button>
+      </div>
+
+      <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+        <HotelDocumentPreview
+          hotelName={form.hotelName ?? ''}
+          address={form.address ?? ''}
+          cap={form.cap ?? ''}
+          comune={form.comune ?? ''}
+          provincia={form.provincia ?? ''}
+          vatNumber={form.vatNumber ?? ''}
+          logoUrl={form.logoUrl ?? ''}
+        />
+        <M3Card variant="solid" className="p-5 space-y-2">
+          <h2 className="text-base font-semibold text-on-surface">{t('hotel_city_tax_title')}</h2>
+          <p className="text-xs text-on-surface-variant">{t('hotel_city_tax_hint')}</p>
+          <Link
+            to="/settings/city-tax"
+            className="inline-flex min-h-10 items-center text-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('hotel_city_tax_link')}
+          </Link>
+        </M3Card>
+      </aside>
       </div>
     </div>
   );

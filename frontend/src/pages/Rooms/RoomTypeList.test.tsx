@@ -40,10 +40,11 @@ const ROOM_TYPE = {
 describe('RoomTypeList', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('renders heading', async () => {
+  it('has no heading of its own, only the add action', async () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     render(<RoomTypeList />);
-    await waitFor(() => expect(screen.getByText('tab_room_types')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('add_room_type')).toBeInTheDocument());
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
   });
 
   it('renders room type row after data loads', async () => {
