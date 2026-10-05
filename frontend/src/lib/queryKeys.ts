@@ -63,6 +63,7 @@ export const queryKeys = {
     reservations: (query: string) => ['command-palette', 'reservations', query] as const,
   },
   ownerReport: {
+    all: ['owner-report'] as const,
     summary: (startDate: string, endDate: string) =>
       ['owner-report', 'summary', startDate, endDate] as const,
   },

@@ -478,6 +478,8 @@
 
   "search_placeholder": "Cerca",
   "list_range_summary": "{{from}}–{{to}} di {{total}}",
+  "billing_kpi_billed": "Fatturato del mese",
+  "billing_kpi_outstanding": "Da incassare",
   "filter_all": "Tutti",
   "filter_status": "Filtra per stato",
   "sort_by": "Ordina per",

@@ -29,8 +29,11 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../../components/m3/M3Dialog', () => ({
-  M3Dialog: ({ children, title }: { children: React.ReactNode; title: string }) => (
-    <div role="dialog" aria-label={title}>{children}</div>
+  M3Dialog: ({ children, title, onClose }: { children: React.ReactNode; title: string; onClose: () => void }) => (
+    <div role="dialog" aria-label={title}>
+      <button type="button" data-testid={`dialog-dismiss-${title}`} onClick={onClose} hidden />
+      {children}
+    </div>
   ),
 }));
 
@@ -246,12 +249,13 @@ describe('InvoiceDetailModal', () => {
   });
 
   it('removes a charge after confirmation and calls onUpdated with the adjusted total', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(billingService.removeCharge).mockResolvedValueOnce(undefined);
     const onUpdated = vi.fn();
 
     render(<InvoiceDetailModal invoice={INVOICE_WITH_EXTRA_CHARGE} onClose={onClose} onUpdated={onUpdated} />);
     fireEvent.click(screen.getByRole('button', { name: /remove_charge/i }));
+    expect(billingService.removeCharge).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('confirm'));
 
     await waitFor(() => expect(billingService.removeCharge).toHaveBeenCalledWith('s1', 'c2'));
     expect(onUpdated).toHaveBeenCalledWith({ ...INVOICE_WITH_EXTRA_CHARGE, charges: [], totalAmount: 0 });
@@ -259,20 +263,40 @@ describe('InvoiceDetailModal', () => {
   });
 
   it('does not remove the charge when the confirmation is declined', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<InvoiceDetailModal invoice={INVOICE_WITH_EXTRA_CHARGE} onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /remove_charge/i }));
+    fireEvent.click(screen.getByText('cancel'));
     expect(billingService.removeCharge).not.toHaveBeenCalled();
+    expect(screen.queryByText('confirm_remove_charge')).not.toBeInTheDocument();
+  });
+
+  it('does not close the invoice dialog while the remove-charge confirmation is open', () => {
+    render(<InvoiceDetailModal invoice={INVOICE_WITH_EXTRA_CHARGE} onClose={onClose} />);
+    fireEvent.click(screen.getByTestId('dialog-dismiss-invoice_detail_title'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    onClose.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: /remove_charge/i }));
+    fireEvent.click(screen.getByTestId('dialog-dismiss-invoice_detail_title'));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('asks for confirmation in a dialog, not window.confirm', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    render(<InvoiceDetailModal invoice={INVOICE_WITH_EXTRA_CHARGE} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: /remove_charge/i }));
+    expect(screen.getByText('confirm_remove_charge')).toBeInTheDocument();
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
   it('shows error toast when removeCharge fails', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(billingService.removeCharge).mockRejectedValueOnce(
       mockAxiosErrorWithDetail('CHARGE_NOT_FOUND', 404),
     );
 
     render(<InvoiceDetailModal invoice={INVOICE_WITH_EXTRA_CHARGE} onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /remove_charge/i }));
+    fireEvent.click(screen.getByText('confirm'));
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('CHARGE_NOT_FOUND', 'error'));
   });

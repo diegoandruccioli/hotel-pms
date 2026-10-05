@@ -1,22 +1,27 @@
 import { useState, useCallback, memo, useMemo } from 'react';
+import { format, startOfMonth } from 'date-fns';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types';
 import { Alert } from '../components/Alert';
+import { ListToolbar } from '../components/ListToolbar';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
+import { M3EmptyState } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3FilterChip } from '../components/m3';
 import { M3Pagination } from '../components/m3';
+import { M3TableActionLink } from '../components/m3';
 import { M3TextField } from '../components/m3';
+import { BillingKpiCards } from './Billing/BillingKpiCards';
 import { PaymentModal } from './Billing/PaymentModal';
 import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useTranslation } from 'react-i18next';
-import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries';
-import { useDebounce, useFormatters } from '../hooks';
-import { getErrorMessage, cn, invoiceStatusTone } from '../utils';
+import { useInvoicesSearch, useOwnerFinancialSummary, usePatchInvoiceInCache } from '../hooks/queries';
+import { useDebounce, useFormatters, useListRangeSummary } from '../hooks';
+import { getErrorMessage, invoiceStatusTone } from '../utils';
 import { billingService } from '../services';
 import { useAuthStore, useToastStore } from '../store';
 
@@ -35,16 +40,6 @@ const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'desc';
  */
 const PILOT_MODE = import.meta.env.VITE_PILOT_MODE !== 'false';
 
-const VIEW_BTN_CLASS = cn(
-  'text-primary hover:text-primary/80 font-medium text-sm mr-4',
-  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm'
-);
-
-const PAY_BTN_CLASS = cn(
-  'text-tertiary hover:text-tertiary/80 font-medium text-sm',
-  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-tertiary rounded-sm'
-);
-
 interface ActionsCellProps {
   invoice: InvoiceResponse;
   onView: (inv: InvoiceResponse) => void;
@@ -58,14 +53,10 @@ const ActionsCell = ({ invoice, onView, onPay, tView, tRegisterPayment }: Action
   const handlePay  = useCallback(() => onPay(invoice),  [onPay,  invoice]);
 
   return (
-    <div className="text-right">
-      <button type="button" onClick={handleView} className={VIEW_BTN_CLASS}>
-        {tView}
-      </button>
+    <div className="flex items-center justify-end gap-1">
+      <M3TableActionLink onClick={handleView}>{tView}</M3TableActionLink>
       {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
-        <button type="button" onClick={handlePay} className={PAY_BTN_CLASS}>
-          {tRegisterPayment}
-        </button>
+        <M3TableActionLink tone="primary" onClick={handlePay}>{tRegisterPayment}</M3TableActionLink>
       )}
     </div>
   );
@@ -91,14 +82,14 @@ export const Billing = memo(() => {
     try {
       await billingService.exportInvoicesCsv({
         status: statusFilter === 'ALL' ? undefined : statusFilter,
-        query: searchQuery,
+        query: debouncedSearch,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       });
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('csv_export_failed')), 'error');
     }
-  }, [statusFilter, searchQuery, dateFrom, dateTo, addToast, t]);
+  }, [statusFilter, debouncedSearch, dateFrom, dateTo, addToast, t]);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
 
   // Any filter change invalidates the current page — always restart from page 0.
@@ -162,6 +153,14 @@ export const Billing = memo(() => {
   const { data, isLoading: loading, error: queryError, refetch } = useInvoicesSearch(searchParams);
   const results = data?.content ?? EMPTY_RESULTS;
   const totalPages = data?.totalPages ?? 1;
+  const summary = useListRangeSummary(page, PAGE_SIZE, results.length, data?.totalElements ?? 0);
+
+  // Month-to-date window for the KPI cards; the summary endpoint is owner/admin only.
+  const [monthStart, today] = useMemo(() => {
+    const now = new Date();
+    return [format(startOfMonth(now), 'yyyy-MM-dd'), format(now, 'yyyy-MM-dd')];
+  }, []);
+  const { data: kpiSummary } = useOwnerFinancialSummary(monthStart, today, isAdminOrOwner);
   const error = queryError ? getErrorMessage(queryError, t('failed_load_invoices')) : null;
   const handleRetry = useCallback(() => { refetch(); }, [refetch]);
 
@@ -257,54 +256,49 @@ export const Billing = memo(() => {
         icon="receipt_long"
         title={t('nav_billing')}
         subtitle={t('billing_subtitle')}
-        actionsClassName="w-full sm:w-auto"
-        actions={
-          <M3TextField
-            label={t('invoice_search_placeholder')}
-            hideLabel
-            leadingIcon="search"
-            type="search"
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="w-full sm:w-72"
-          />
-        }
       />
 
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex flex-wrap gap-2" role="group" aria-label={t('filter_status')}>
-          {(['ALL', 'ISSUED', 'PAID', 'CANCELLED'] as const).map((s) => (
-            <M3FilterChip
-              key={s}
-              value={s}
-              selected={statusFilter === s}
-              label={s === 'ALL' ? t('filter_all') : t(`invoice_status_${s}`, s)}
-              onValueSelect={setStatusFilter}
+      {isAdminOrOwner && kpiSummary && <BillingKpiCards summary={kpiSummary} />}
+
+      <ListToolbar
+        searchLabel={t('invoice_search_placeholder')}
+        searchValue={searchQuery}
+        onSearchChange={handleSearchChange}
+        filtersLabel={t('filter_status')}
+        trailing={
+          <>
+            <M3TextField
+              label={t('date_from')}
+              type="date"
+              value={dateFrom}
+              onChange={handleDateFromChange}
+              className="w-40"
             />
-          ))}
-        </div>
-        <div className="flex items-center gap-2 text-sm font-body">
-          <M3TextField
-            label={t('date_from')}
-            type="date"
-            value={dateFrom}
-            onChange={handleDateFromChange}
-            className="w-40"
+            <M3TextField
+              label={t('date_to')}
+              type="date"
+              value={dateTo}
+              onChange={handleDateToChange}
+              className="w-40"
+            />
+            {isAdminOrOwner && (
+              <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
+                {t('export_csv')}
+              </M3Button>
+            )}
+          </>
+        }
+      >
+        {(['ALL', 'ISSUED', 'PAID', 'CANCELLED'] as const).map((s) => (
+          <M3FilterChip
+            key={s}
+            value={s}
+            selected={statusFilter === s}
+            label={s === 'ALL' ? t('filter_all') : t(`invoice_status_${s}`, s)}
+            onValueSelect={setStatusFilter}
           />
-          <M3TextField
-            label={t('date_to')}
-            type="date"
-            value={dateTo}
-            onChange={handleDateToChange}
-            className="w-40"
-          />
-        </div>
-        {isAdminOrOwner && (
-          <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
-            {t('export_csv')}
-          </M3Button>
-        )}
-      </div>
+        ))}
+      </ListToolbar>
 
       {loading ? (
         <M3LoadingState label={t('loading')} />
@@ -315,6 +309,8 @@ export const Billing = memo(() => {
           retryLabel={t('try_again')}
           onRetry={handleRetry}
         />
+      ) : results.length === 0 ? (
+        <M3EmptyState icon="receipt_long" title={t('no_invoices')} />
       ) : (
         <M3DataTable
           data={results}
@@ -336,6 +332,7 @@ export const Billing = memo(() => {
           prevLabel={t('prev_page')}
           nextLabel={t('next_page')}
           pageOfLabel={pageOfLabel}
+          summary={summary}
         />
       )}
 
