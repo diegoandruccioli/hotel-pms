@@ -2,70 +2,14 @@ import { useState, useEffect, useCallback, memo, type ChangeEvent } from 'react'
 import { useTranslation } from 'react-i18next';
 import { stayService } from '../../services';
 import type { HotelSettingsResponse, HotelSettingsRequest } from '../../types';
-import { MaterialIcon } from '../../components/MaterialIcon';
+import { Alert } from '../../components/Alert';
 import { M3Card } from '../../components/m3';
+import { M3Switch } from '../../components/m3';
+import { M3Textarea } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { SettingsSectionTitle } from '../../components/SettingsSectionTitle';
-import { cn } from '../../utils';
 
 const EMAIL_GREETING_MAX_LENGTH = 300;
-
-// -----------------------------------------------------------------------
-// ToggleRow — reusable switch row (Alloggiati auto-send + email toggles)
-// -----------------------------------------------------------------------
-
-interface ToggleRowProps {
-  icon: string;
-  label: string;
-  description: string;
-  checked: boolean;
-  disabled: boolean;
-  onToggle: () => void;
-}
-
-const ToggleRow = memo(({ icon, label, description, checked, disabled, onToggle }: ToggleRowProps) => (
-  <button
-    type="button"
-    role="switch"
-    aria-checked={checked}
-    onClick={onToggle}
-    disabled={disabled}
-    className={cn(
-      'flex items-center justify-between w-full',
-      'px-4 py-3 rounded-shape-md',
-      'border border-outline-variant',
-      'hover:bg-surface-container-highest',
-      'focus-visible:outline-hidden focus-visible:ring-2',
-      'focus-visible:ring-primary focus-visible:ring-offset-2',
-      'transition-colors disabled:opacity-50'
-    )}
-  >
-    <div className="flex items-center gap-3">
-      <MaterialIcon name={icon} size={20} className="text-on-surface-variant" />
-      <div className="text-left">
-        <p className="text-sm font-medium text-on-surface">{label}</p>
-        <p className="text-xs text-on-surface-variant">{description}</p>
-      </div>
-    </div>
-
-    <div
-      aria-hidden="true"
-      className={cn(
-        'relative w-12 h-7 rounded-shape-full border-2 transition-colors shrink-0',
-        checked ? 'bg-primary border-primary' : 'bg-surface-container-highest border-outline'
-      )}
-    >
-      <span
-        className={cn(
-          'absolute top-0.5 block w-5 h-5 rounded-shape-full',
-          'shadow-elevation-1 transition-all duration-200',
-          checked ? 'translate-x-[22px] bg-on-primary' : 'translate-x-0.5 bg-outline'
-        )}
-      />
-    </div>
-  </button>
-));
-ToggleRow.displayName = 'ToggleRow';
 
 // -----------------------------------------------------------------------
 // SubjectField — labelled text input for a per-email-type custom subject
@@ -116,14 +60,14 @@ export const SettingsSystem = () => {
   const [hotelSettings, setHotelSettings] = useState<HotelSettingsResponse | null>(null);
   const [saving, setSaving] = useState(false);
   const [greetingDraft, setGreetingDraft] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     stayService.getHotelSettings().then((settings) => {
       setHotelSettings(settings);
       setGreetingDraft(settings.emailGreetingText ?? '');
-    }).catch(() => undefined);
+    }).catch(() => setLoadFailed(true));
   }, []);
-
 
   const patch = useCallback(async (partial: HotelSettingsRequest) => {
     setSaving(true);
@@ -174,14 +118,16 @@ export const SettingsSystem = () => {
     <div className="space-y-6">
       <SettingsSectionTitle title={t('settings_section_system')} />
 
+      {loadFailed && <Alert tone="error">{t('settings_system_load_failed')}</Alert>}
+
       <M3Card variant="solid" className="p-6">
-        <ToggleRow
+        <M3Switch
           icon="verified_user"
           label={t('alloggiati_auto_send_label')}
           description={t('alloggiati_auto_send_desc')}
           checked={hotelSettings?.alloggiatiAutoSend ?? false}
           disabled={saving || hotelSettings === null}
-          onToggle={handleAlloggiatiToggle}
+          onChange={handleAlloggiatiToggle}
         />
       </M3Card>
 
@@ -189,13 +135,13 @@ export const SettingsSystem = () => {
         <h2 className="text-sm font-semibold text-on-surface">{t('settings_section_email_notifications')}</h2>
 
         <div className="space-y-2">
-          <ToggleRow
+          <M3Switch
             icon="mail"
             label={t('email_reservation_confirmed_label')}
             description={t('email_reservation_confirmed_desc')}
             checked={hotelSettings?.sendReservationConfirmedEmail ?? false}
             disabled={saving || hotelSettings === null}
-            onToggle={handleReservationEmailToggle}
+            onChange={handleReservationEmailToggle}
           />
           {hotelSettings?.sendReservationConfirmedEmail && (
             <SubjectField
@@ -208,13 +154,13 @@ export const SettingsSystem = () => {
         </div>
 
         <div className="space-y-2">
-          <ToggleRow
+          <M3Switch
             icon="receipt_long"
             label={t('email_checkout_label')}
             description={t('email_checkout_desc')}
             checked={hotelSettings?.sendCheckoutEmail ?? false}
             disabled={saving || hotelSettings === null}
-            onToggle={handleCheckoutEmailToggle}
+            onChange={handleCheckoutEmailToggle}
           />
           {hotelSettings?.sendCheckoutEmail && (
             <SubjectField
@@ -227,20 +173,16 @@ export const SettingsSystem = () => {
         </div>
 
         <div className="pt-2 border-t border-outline-variant">
-          <label htmlFor="email-greeting-text" className="block text-sm font-medium text-on-surface mb-1 mt-3">
-            {t('email_greeting_label')}
-          </label>
-          <p className="text-xs text-on-surface-variant mb-2">{t('email_greeting_desc')}</p>
-          <textarea
-            id="email-greeting-text"
+          <M3Textarea
+            className="mt-3"
+            label={t('email_greeting_label')}
+            supportingText={t('email_greeting_desc')}
             value={greetingDraft}
             placeholder={t('email_greeting_placeholder')}
             maxLength={EMAIL_GREETING_MAX_LENGTH}
             rows={2}
             onChange={handleGreetingChange}
             onBlur={handleGreetingBlur}
-            className="w-full rounded-md border border-outline bg-surface px-3 py-2 text-sm text-on-surface
-              focus:outline-hidden focus:ring-2 focus:ring-primary resize-none"
           />
           <p className="text-xs text-on-surface-variant text-right mt-1">
             {greetingDraft.length}/{EMAIL_GREETING_MAX_LENGTH}

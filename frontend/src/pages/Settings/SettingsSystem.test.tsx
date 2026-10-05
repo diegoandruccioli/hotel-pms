@@ -48,6 +48,22 @@ describe('SettingsSystem', () => {
     expect(screen.queryByRole('button', { name: 'back' })).not.toBeInTheDocument();
   });
 
+  it('tells the user when the settings fail to load instead of showing dead switches', async () => {
+    vi.mocked(stayService.getHotelSettings).mockRejectedValue(new Error('boom'));
+    renderPage();
+    expect(await screen.findByRole('alert')).toHaveTextContent('settings_system_load_failed');
+    screen.getAllByRole('switch').forEach((sw) => expect(sw).toBeDisabled());
+  });
+
+  it('labels the greeting field and keeps its description and character count', async () => {
+    vi.mocked(stayService.getHotelSettings).mockResolvedValue({ ...SETTINGS, emailGreetingText: 'Welcome' });
+    renderPage();
+    const field = await screen.findByLabelText('email_greeting_label');
+    expect(field).toHaveValue('Welcome');
+    expect(field).toHaveAccessibleDescription('email_greeting_desc');
+    expect(screen.getByText('7/300')).toBeInTheDocument();
+  });
+
   it('loads hotel settings and reflects the current alloggiatiAutoSend value', async () => {
     vi.mocked(stayService.getHotelSettings).mockResolvedValue(SETTINGS);
     renderPage();

@@ -108,5 +108,6 @@
   "privacy_years_value": "{{count}} anni",
   "privacy_err_loading": "Errore caricamento impostazioni privacy",
   "privacy_err_save": "Salvataggio fallito. Riprova.",
-  "settings_nav_label": "Sezioni delle impostazioni"
+  "settings_nav_label": "Sezioni delle impostazioni",
+  "settings_system_load_failed": "Impossibile caricare le impostazioni di sistema. Ricarica la pagina per riprovare."
 }
