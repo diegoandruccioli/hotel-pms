@@ -353,6 +353,7 @@ export const Reservations = () => {
 
       <ListToolbar
         searchLabel={t('search_placeholder')}
+        searchPlaceholder={t('reservations_search_hint')}
         filtersLabel={t('reservations_filters_label')}
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}

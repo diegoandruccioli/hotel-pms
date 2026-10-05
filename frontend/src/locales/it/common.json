@@ -478,6 +478,10 @@
 
   "search_placeholder": "Cerca",
   "list_range_summary": "{{from}}–{{to}} di {{total}}",
+  "invoice_search_hint": "N° fattura, ospite o email",
+  "guests_search_hint": "Nome, email o città",
+  "reservations_search_hint": "Nome o email ospite",
+  "stays_search_hint": "Camera o nome ospite",
   "billing_kpi_billed": "Fatturato del mese",
   "billing_kpi_outstanding": "Da incassare",
   "filter_all": "Tutti",

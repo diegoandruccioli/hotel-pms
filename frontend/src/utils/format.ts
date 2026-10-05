@@ -28,7 +28,7 @@ export const dateFnsLocale = (language: string): Locale => (language.startsWith(
 export const formatCurrency = (amount: number | null | undefined, language: string): string =>
   amount == null
     ? EMPTY_PLACEHOLDER
-    : new Intl.NumberFormat(language, { style: 'currency', currency: 'EUR' }).format(amount);
+    : new Intl.NumberFormat(language, { style: 'currency', currency: 'EUR', useGrouping: true }).format(amount);
 
 /** Signed whole number as text ("+3", "−2", "0"): trend icons are decorative, so the sign must be in the words. */
 export const formatSigned = (value: number): string =>

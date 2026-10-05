@@ -265,6 +265,7 @@ export const Guests = memo(() => {
 
       <ListToolbar
         searchLabel={t('search_placeholder')}
+        searchPlaceholder={t('guests_search_hint')}
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}
         trailing={isAdminOrOwner && (
