@@ -1,13 +1,13 @@
 import { useFormatters } from '../hooks';
 import { useState, useCallback, memo, useMemo } from 'react';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import type { MenuItemResponse, RestaurantOrderResponse } from '../types';
+import type { RestaurantOrderResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
+import { M3FilterChip } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
-import { M3Card } from '../components/m3';
 import { M3TableActionLink } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
@@ -15,62 +15,29 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
-import { getErrorMessage, orderStatusTone } from '../utils';
+import { getErrorMessage, orderStatusTone, matchesOrderFilter, ORDER_FILTERS } from '../utils';
+import type { OrderFilter } from '../utils';
 import { useQueryClient } from '@tanstack/react-query';
-import { useOrders, useMenuItems, useConfirmOrder, useDeleteMenuItem } from '../hooks/queries';
+import { useOrders, useConfirmOrder } from '../hooks/queries';
 import { queryKeys } from '../lib';
 import { OrderFormModal } from './Restaurant/OrderFormModal';
 import { OrderDetailModal } from './Restaurant/OrderDetailModal';
-import { MenuFormModal } from './Restaurant/MenuFormModal';
+import { MenuSection } from './Restaurant/MenuSection';
 
 const CONFIRMABLE_STATUSES = new Set<string>(['PENDING', 'PREPARED']);
 const EMPTY_ORDERS: RestaurantOrderResponse[] = [];
-const EMPTY_MENU_ITEMS: MenuItemResponse[] = [];
+
+const FILTER_LABEL_KEYS: Record<OrderFilter, string> = {
+  ALL: 'order_filter_all',
+  OPEN: 'order_filter_open',
+  CLOSED: 'order_filter_closed',
+  CANCELLED: 'order_filter_cancelled',
+};
 
 type OrderSortField = 'orderDate' | 'roomNumber' | 'guestDisplayName';
 type SortDir = 'asc' | 'desc';
 const DEFAULT_ORDER_SORT_FIELD: OrderSortField = 'orderDate';
 const DEFAULT_ORDER_SORT_DIR: SortDir = 'desc';
-const DEFAULT_MENU_SORT_FIELD = 'name';
-const DEFAULT_MENU_SORT_DIR: SortDir = 'asc';
-
-interface MenuActionsCellProps {
-  mi: MenuItemResponse;
-  deletingMenuId: string | null;
-  onEdit: (mi: MenuItemResponse) => void;
-  onDelete: (mi: MenuItemResponse) => void;
-  tLabel: (key: string) => string;
-  tCommon: (key: string) => string;
-}
-
-const MenuActionsCell = ({ mi, deletingMenuId, onEdit, onDelete, tLabel, tCommon }: MenuActionsCellProps) => {
-  const handleEdit = useCallback(() => onEdit(mi), [onEdit, mi]);
-  const handleDelete = useCallback(() => onDelete(mi), [onDelete, mi]);
-  return (
-    <div className="flex justify-end gap-2">
-      <button type="button" onClick={handleEdit}
-        className="text-primary hover:text-primary/80 text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-primary rounded-sm"
-        aria-label={`${tLabel('menu_edit_item')} ${mi.name}`}>
-        {tCommon('edit')}
-      </button>
-      <button type="button" onClick={handleDelete}
-        disabled={deletingMenuId === mi.id}
-        className="text-error hover:text-error/80 text-xs font-medium disabled:opacity-50 focus:outline-hidden focus:ring-2 focus:ring-error rounded-sm"
-        aria-label={`${tLabel('menu_delete_item')} ${mi.name}`}>
-        {tCommon('delete')}
-      </button>
-    </div>
-  );
-};
-
-function compareMenuItems(a: MenuItemResponse, b: MenuItemResponse, field: string): number {
-  switch (field) {
-    case 'category': return a.category.localeCompare(b.category);
-    case 'price': return a.price - b.price;
-    case 'available': return Number(a.available) - Number(b.available);
-    default: return a.name.localeCompare(b.name);
-  }
-}
 
 interface OrderActionsCellProps {
   order: RestaurantOrderResponse;
@@ -109,7 +76,6 @@ const OrderActionsCell = ({ order, confirmingId, onConfirm, onView, t }: OrderAc
 
 export const Restaurant = memo(() => {
   const { t } = useTranslation('common');
-  const { t: tMenu } = useTranslation('restaurant');
   const role = useAuthStore((s) => s.user?.role);
   const { addToast } = useToastStore();
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
@@ -117,22 +83,15 @@ export const Restaurant = memo(() => {
   const queryClient = useQueryClient();
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<RestaurantOrderResponse | null>(null);
-
-  const [menuFormTarget, setMenuFormTarget] = useState<MenuItemResponse | 'new' | null>(null);
-  const [deletingMenuId, setDeletingMenuId] = useState<string | null>(null);
+  const [orderFilter, setOrderFilter] = useState<OrderFilter>('ALL');
 
   const [sortField, setSortField] = useState<OrderSortField>(DEFAULT_ORDER_SORT_FIELD);
   const [sortDir, setSortDir] = useState<SortDir>(DEFAULT_ORDER_SORT_DIR);
-  const [menuSortField, setMenuSortField] = useState(DEFAULT_MENU_SORT_FIELD);
-  const [menuSortDir, setMenuSortDir] = useState<SortDir>(DEFAULT_MENU_SORT_DIR);
 
   const { data: ordersData, isLoading: loading, error: queryError, refetch } = useOrders();
   const orders = ordersData ?? EMPTY_ORDERS;
   const error = queryError ? getErrorMessage(queryError, t('failed_load_orders')) : null;
   const handleRetry = useCallback(() => { refetch(); }, [refetch]);
-
-  const { data: menuItemsData } = useMenuItems(isAdminOrOwner);
-  const menuItems = menuItemsData ?? EMPTY_MENU_ITEMS;
 
   const confirmOrderMutation = useConfirmOrder();
   const confirmingId = confirmOrderMutation.isPending
@@ -146,30 +105,6 @@ export const Restaurant = memo(() => {
       addToast(getErrorMessage(err, t('confirm_order_failed')), 'error');
     }
   }, [confirmOrderMutation, t, addToast]);
-
-  const handleMenuSaved = useCallback(() => {
-    setMenuFormTarget(null);
-    queryClient.invalidateQueries({ queryKey: queryKeys.menuItems.all });
-  }, [queryClient]);
-
-  const handleMenuEdit = useCallback((mi: MenuItemResponse) => setMenuFormTarget(mi), []);
-  const handleOpenMenuForm = useCallback(() => setMenuFormTarget('new'), []);
-  const handleCloseMenuForm = useCallback(() => setMenuFormTarget(null), []);
-
-  const deleteMenuItemMutation = useDeleteMenuItem();
-  const handleDeleteMenuItem = useCallback(async (item: MenuItemResponse) => {
-    const confirmed = window.confirm(tMenu('menu_delete_confirm', { name: item.name }));
-    if (!confirmed) return;
-    setDeletingMenuId(item.id);
-    try {
-      await deleteMenuItemMutation.mutateAsync(item.id);
-      addToast(tMenu('menu_delete_success'), 'success');
-    } catch (err: unknown) {
-      addToast(getErrorMessage(err, tMenu('menu_delete_error')), 'error');
-    } finally {
-      setDeletingMenuId(null);
-    }
-  }, [addToast, deleteMenuItemMutation, tMenu]);
 
   const handleOrderCreated = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.fbOrders.all });
@@ -185,28 +120,20 @@ export const Restaurant = memo(() => {
     setSortDir(next[0].desc ? 'desc' : 'asc');
   }, []);
 
-  const sortedOrders = useMemo(() => {
-    const sorted = [...orders].sort((a, b) => {
+  const visibleOrders = useMemo(() => {
+    const filtered = orders.filter((o) => matchesOrderFilter(o.status, orderFilter));
+    return filtered.sort((a, b) => {
       const cmp = (a[sortField] ?? '').localeCompare(b[sortField] ?? '');
       return sortDir === 'asc' ? cmp : -cmp;
     });
-    return sorted;
-  }, [orders, sortField, sortDir]);
+  }, [orders, orderFilter, sortField, sortDir]);
 
-  const menuSorting = useMemo<SortingState>(
-    () => [{ id: menuSortField, desc: menuSortDir === 'desc' }],
-    [menuSortField, menuSortDir],
+  const openOrdersCount = useMemo(
+    () => orders.filter((o) => matchesOrderFilter(o.status, 'OPEN')).length,
+    [orders],
   );
 
-  const handleMenuSortingChange = useCallback((next: SortingState) => {
-    setMenuSortField(next[0].id);
-    setMenuSortDir(next[0].desc ? 'desc' : 'asc');
-  }, []);
-
-  const sortedMenuItems = useMemo(() => {
-    const sign = menuSortDir === 'desc' ? -1 : 1;
-    return [...menuItems].sort((a, b) => sign * compareMenuItems(a, b, menuSortField));
-  }, [menuItems, menuSortField, menuSortDir]);
+  const filterLabel = useCallback((f: OrderFilter) => t(FILTER_LABEL_KEYS[f]), [t]);
 
   const handleOpenOrderModal = useCallback(() => setIsOrderModalOpen(true), []);
   const handleCloseOrderModal = useCallback(() => setIsOrderModalOpen(false), []);
@@ -263,67 +190,28 @@ export const Restaurant = memo(() => {
     },
   ], [t, formatDate, formatCurrency, confirmingId, handleConfirm, handleViewOrder]);
 
-  const getMenuItemRowId = useCallback((mi: MenuItemResponse) => mi.id, []);
-
-  const menuColumns = useMemo<ColumnDef<MenuItemResponse>[]>(() => [
-    {
-      id: 'name',
-      accessorKey: 'name',
-      header: tMenu('menu_name'),
-      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
-    },
-    {
-      id: 'category',
-      accessorKey: 'category',
-      header: tMenu('menu_category'),
-      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.category}</span>,
-    },
-    {
-      id: 'price',
-      accessorKey: 'price',
-      header: tMenu('menu_price'),
-      cell: ({ row }) => <span className="text-right block">{formatCurrency(row.original.price)}</span>,
-    },
-    {
-      id: 'available',
-      accessorKey: 'available',
-      header: tMenu('menu_available'),
-      cell: ({ row }) => (
-        <div className="text-center">
-          <M3StatusChip
-            label={row.original.available ? tMenu('menu_available_yes') : tMenu('menu_available_no')}
-            tone={row.original.available ? 'success' : 'neutral'}
-          />
-        </div>
-      ),
-    },
-    {
-      id: 'actions',
-      header: t('actions'),
-      enableSorting: false,
-      cell: ({ row }) => (
-        <MenuActionsCell
-          mi={row.original}
-          deletingMenuId={deletingMenuId}
-          onEdit={handleMenuEdit}
-          onDelete={handleDeleteMenuItem}
-          tLabel={tMenu}
-          tCommon={t}
-        />
-      ),
-    },
-  ], [t, tMenu, formatCurrency, deletingMenuId, handleMenuEdit, handleDeleteMenuItem]);
-
   return (
     <div className="space-y-6">
       <PageHeader
         icon="restaurant"
         title={t('nav_restaurant')}
-        subtitle={t('restaurant_subtitle')}
+        subtitle={ordersData ? t('restaurant_open_orders', { open: openOrdersCount }) : t('restaurant_subtitle')}
         actions={
           <M3Button icon="add" onClick={handleOpenOrderModal}>{t('new_order')}</M3Button>
         }
       />
+
+      <div role="group" aria-label={t('order_filter_label')} className="flex flex-wrap items-center gap-2">
+        {ORDER_FILTERS.map((f) => (
+          <M3FilterChip
+            key={f}
+            label={filterLabel(f)}
+            value={f}
+            selected={orderFilter === f}
+            onValueSelect={setOrderFilter}
+          />
+        ))}
+      </div>
 
       {loading ? (
         <M3LoadingState label={t('loading')} />
@@ -336,7 +224,7 @@ export const Restaurant = memo(() => {
         />
       ) : (
         <M3DataTable
-          data={sortedOrders}
+          data={visibleOrders}
           columns={orderColumns}
           getRowId={getOrderRowId}
           sorting={orderSorting}
@@ -345,31 +233,7 @@ export const Restaurant = memo(() => {
         />
       )}
 
-      {isAdminOrOwner && (
-        <M3Card variant="outlined" className="p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MaterialIcon name="menu_book" size={20} className="text-primary" />
-              <h2 className="text-sm font-display font-semibold text-on-surface">{tMenu('menu_title')}</h2>
-            </div>
-            <M3Button icon="add" variant="tonal" onClick={handleOpenMenuForm}>
-              {tMenu('menu_add_item')}
-            </M3Button>
-          </div>
-          {menuItems.length === 0 ? (
-            <p className="text-sm text-on-surface-variant text-center py-4">{tMenu('menu_no_items')}</p>
-          ) : (
-            <M3DataTable
-              data={sortedMenuItems}
-              columns={menuColumns}
-              getRowId={getMenuItemRowId}
-              sorting={menuSorting}
-              onSortingChange={handleMenuSortingChange}
-              emptyMessage={tMenu('menu_no_items')}
-            />
-          )}
-        </M3Card>
-      )}
+      {isAdminOrOwner && <MenuSection />}
 
       {isOrderModalOpen && (
         <OrderFormModal onClose={handleCloseOrderModal} onCreated={handleOrderCreated} />
@@ -377,14 +241,6 @@ export const Restaurant = memo(() => {
 
       {selectedOrder && (
         <OrderDetailModal order={selectedOrder} onClose={handleCloseDetail} />
-      )}
-
-      {menuFormTarget && (
-        <MenuFormModal
-          item={menuFormTarget === 'new' ? undefined : menuFormTarget}
-          onClose={handleCloseMenuForm}
-          onSaved={handleMenuSaved}
-        />
       )}
     </div>
   );

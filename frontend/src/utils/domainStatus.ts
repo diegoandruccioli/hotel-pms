@@ -77,6 +77,20 @@ export const orderStatusTone: Record<OrderStatus, StatusTone> = {
   BILLED_TO_ROOM: 'info',
 };
 
+export type OrderFilter = 'ALL' | 'OPEN' | 'CLOSED' | 'CANCELLED';
+
+/** Chip order of the restaurant order list. */
+export const ORDER_FILTERS: readonly OrderFilter[] = ['ALL', 'OPEN', 'CLOSED', 'CANCELLED'];
+
+const orderFilterStatuses: Record<Exclude<OrderFilter, 'ALL'>, readonly OrderStatus[]> = {
+  OPEN: ['PENDING', 'PREPARING', 'PREPARED', 'READY'],
+  CLOSED: ['DELIVERED', 'BILLED_TO_ROOM'],
+  CANCELLED: ['CANCELLED'],
+};
+
+export const matchesOrderFilter = (status: OrderStatus, filter: OrderFilter): boolean =>
+  filter === 'ALL' || orderFilterStatuses[filter].includes(status);
+
 export const nightAuditStatusTone: Record<NightAuditRunResponse['status'], StatusTone> = {
   RUNNING: 'neutral',
   COMPLETED: 'success',
