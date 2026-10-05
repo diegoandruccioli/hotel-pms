@@ -140,7 +140,7 @@ describe('resolveAnnouncement', () => {
     ['/admin/users', 'page_title', 'admin'],
     ['/profile/hotel', 'hotel_profile_title', 'admin'],
     ['/settings', 'settings', 'settings'],
-    ['/settings/privacy', 'settings', 'settings'],
+    ['/settings/privacy', 'settings_section_privacy', 'settings'],
     ['/', 'nav_dashboard', 'common'],
     ['/unknown/path', 'nav_dashboard', 'common'],
   ])('%s announces %s (%s)', (path, key, ns) => {
@@ -253,6 +253,16 @@ describe('resolveCrumbs', () => {
       { labelKey: 'nav_group_admin', ns: 'common' },
       { labelKey: 'settings_section_admin_users', ns: 'settings', path: '/admin/users' },
     ]);
+  });
+});
+
+describe('settings route announcements', () => {
+  it('announces each settings section by its own name, not as plain "Settings"', () => {
+    const parent = resolveAnnouncement('/settings');
+    for (const path of ['/settings/profile', '/settings/password', '/settings/appearance', '/settings/city-tax']) {
+      expect(resolveAnnouncement(path), path).not.toEqual(parent);
+    }
+    expect(resolveAnnouncement('/settings/password').key).toBe('change_password');
   });
 });
 

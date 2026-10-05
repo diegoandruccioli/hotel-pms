@@ -82,7 +82,7 @@ export const SettingsPrivacy = () => {
 
       <M3Card variant="solid" className="p-6 space-y-4">
         <div>
-          <h2 className="text-sm font-semibold text-on-surface">{t('privacy_retention_section_title')}</h2>
+          <h3 className="text-sm font-semibold text-on-surface">{t('privacy_retention_section_title')}</h3>
           <p className="text-xs text-on-surface-variant mt-0.5">{t('privacy_retention_section_desc')}</p>
         </div>
 

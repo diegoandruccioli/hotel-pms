@@ -10,6 +10,7 @@ import { M3EmptyState } from '../../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../../components/m3';
 import { useToastStore } from '../../../store';
 import { getErrorMessage } from '../../../utils';
+import { pendingBackfill } from './cityTaxForm';
 
 /** Recovers tourist tax for stays that were never assessed because of a configuration gap (Parte 5.4).
  * Preview never writes or charges anything; only the explicit, confirmed step posts charges, and only
@@ -83,13 +84,13 @@ export const CityTaxBackfillSection = () => {
     t('city_tax_backfill_col_status'),
   ], [t]);
 
-  const pendingCount = result ? result.lines.filter((l) => !l.charged && !l.skipReason).length : 0;
-  const canConfirm = !!result && !confirmed && pendingCount > 0;
+  const pending = pendingBackfill(result?.lines ?? []);
+  const canConfirm = !!result && !confirmed && pending.count > 0;
 
   return (
     <M3Card variant="solid" className="p-6 space-y-4">
       <div>
-        <h2 className="text-sm font-semibold text-on-surface">{t('city_tax_backfill_section_title')}</h2>
+        <h3 className="text-sm font-semibold text-on-surface">{t('city_tax_backfill_section_title')}</h3>
         <p className="text-xs text-on-surface-variant mt-0.5">{t('city_tax_backfill_section_desc')}</p>
       </div>
 
@@ -124,7 +125,7 @@ export const CityTaxBackfillSection = () => {
       {askingConfirmation && (
         <M3ConfirmDialog
           title={t('city_tax_backfill_confirm_title')}
-          message={t('city_tax_backfill_confirm_message', { count: pendingCount, total: formatCurrency(result?.totalAmount ?? 0) })}
+          message={t('city_tax_backfill_confirm_message', { count: pending.count, total: formatCurrency(pending.total) })}
           confirmLabel={t('city_tax_backfill_confirm_yes')}
           onConfirm={handleConfirm}
           onCancel={closeConfirmation}

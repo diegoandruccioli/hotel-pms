@@ -132,7 +132,7 @@ export const SettingsSystem = () => {
       </M3Card>
 
       <M3Card variant="solid" className="p-6 space-y-4">
-        <h2 className="text-sm font-semibold text-on-surface">{t('settings_section_email_notifications')}</h2>
+        <h3 className="text-sm font-semibold text-on-surface">{t('settings_section_email_notifications')}</h3>
 
         <div className="space-y-2">
           <M3Switch
@@ -180,6 +180,7 @@ export const SettingsSystem = () => {
             value={greetingDraft}
             placeholder={t('email_greeting_placeholder')}
             maxLength={EMAIL_GREETING_MAX_LENGTH}
+            disabled={hotelSettings === null}
             rows={2}
             onChange={handleGreetingChange}
             onBlur={handleGreetingBlur}

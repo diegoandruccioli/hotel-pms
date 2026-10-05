@@ -30,7 +30,7 @@ export const SettingsLayout = memo(() => {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[17.5rem_minmax(0,1fr)]">
         <M3Card variant="solid" className="h-fit p-2 lg:sticky lg:top-6">
           <nav aria-label={t('settings_nav_label')}>
-            <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
+            <ul className="flex gap-1 overflow-x-auto p-1 lg:flex-col lg:overflow-visible">
               {entries.map((entry) => (
                 <li key={entry.id}>
                   <NavLink to={entry.path} className={linkClass}>

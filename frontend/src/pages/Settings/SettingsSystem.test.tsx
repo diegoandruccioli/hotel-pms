@@ -55,6 +55,13 @@ describe('SettingsSystem', () => {
     screen.getAllByRole('switch').forEach((sw) => expect(sw).toBeDisabled());
   });
 
+  it('does not let the greeting be edited while the settings are not loaded', async () => {
+    vi.mocked(stayService.getHotelSettings).mockRejectedValue(new Error('boom'));
+    renderPage();
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('email_greeting_label')).toBeDisabled();
+  });
+
   it('labels the greeting field and keeps its description and character count', async () => {
     vi.mocked(stayService.getHotelSettings).mockResolvedValue({ ...SETTINGS, emailGreetingText: 'Welcome' });
     renderPage();

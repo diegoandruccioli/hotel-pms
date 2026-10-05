@@ -37,9 +37,9 @@ export const SettingsAppearance = () => {
 
       <M3Card variant="solid" className="p-6 space-y-6">
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-on-surface-variant mb-3">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-on-surface-variant mb-3">
             {t('settings_section_appearance')}
-          </h2>
+          </h3>
           <M3SegmentedRow<ThemeValue>
             options={THEME_OPTIONS}
             value={theme}
@@ -49,9 +49,9 @@ export const SettingsAppearance = () => {
         </section>
 
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-on-surface-variant mb-3">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-on-surface-variant mb-3">
             {t('settings_section_language')}
-          </h2>
+          </h3>
           <M3SegmentedRow<LanguageValue>
             options={LANGUAGE_OPTIONS}
             value={language}

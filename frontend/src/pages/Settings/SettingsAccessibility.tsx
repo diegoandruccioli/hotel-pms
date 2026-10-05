@@ -27,9 +27,9 @@ export const SettingsAccessibility = () => {
 
       <M3Card variant="solid" className="p-6 space-y-6">
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-on-surface-variant mb-3">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-on-surface-variant mb-3">
             {t('settings_section_typography')}
-          </h2>
+          </h3>
           <M3SegmentedRow<FontScale>
             options={FONT_OPTIONS}
             value={fontScale}

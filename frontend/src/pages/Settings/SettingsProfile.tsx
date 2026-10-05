@@ -18,7 +18,7 @@ export const SettingsProfile = () => {
       <M3Card variant="solid" className="p-6">
         <div className="flex items-center gap-2 mb-5">
           <MaterialIcon name="person" className="text-primary" />
-          <h2 className="text-lg font-medium text-on-surface">{t('section_account_info')}</h2>
+          <h3 className="text-lg font-medium text-on-surface">{t('section_account_info')}</h3>
         </div>
         <div className="flex items-center gap-4">
           <M3Avatar name={user?.username} size="lg" aria-hidden="true" />
