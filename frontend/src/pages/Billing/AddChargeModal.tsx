@@ -1,10 +1,10 @@
-import { useFormatters } from '../../hooks';
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { M3Select } from '../../components/m3';
+import { InvoiceSummaryBox } from './InvoiceSummaryBox';
 import { billingService } from '../../services';
 import { useToastStore } from '../../store';
 import { getErrorMessage } from '../../utils';
@@ -32,8 +32,6 @@ export const AddChargeModal = memo(({ invoice, stayId, onClose, onAdded }: Props
   const [loading, setLoading] = useState(false);
   const [amountError, setAmountError] = useState('');
   const [descriptionError, setDescriptionError] = useState('');
-
-  const { formatCurrency } = useFormatters();
 
   const handlePresetChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => setPreset(e.target.value as Preset),
@@ -111,18 +109,7 @@ export const AddChargeModal = memo(({ invoice, stayId, onClose, onAdded }: Props
     >
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         {/* Invoice summary */}
-        <div className="rounded-shape-sm bg-surface-container px-4 py-3 text-sm font-body space-y-1">
-          <p className="text-on-surface-variant">
-            {t('invoice_number', { ns: 'common' })}{' '}
-            <span className="font-medium text-on-surface">{invoice.invoiceNumber}</span>
-          </p>
-          <p className="text-on-surface-variant">
-            {t('total_amount', { ns: 'common' })}{' '}
-            <span className="font-medium text-on-surface">
-              {formatCurrency(invoice.totalAmount)}
-            </span>
-          </p>
-        </div>
+        <InvoiceSummaryBox invoice={invoice} />
 
         {/* Charge description preset */}
         <M3Select

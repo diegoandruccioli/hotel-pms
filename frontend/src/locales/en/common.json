@@ -478,6 +478,8 @@
 
   "search_placeholder": "Search",
   "list_range_summary": "{{from}}–{{to}} of {{total}}",
+  "billing_kpi_billed": "Billed this month",
+  "billing_kpi_outstanding": "To collect",
   "filter_all": "All",
   "filter_status": "Filter by status",
   "sort_by": "Sort by",

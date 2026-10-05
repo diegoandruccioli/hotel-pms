@@ -1,10 +1,10 @@
-import { useFormatters } from '../../hooks';
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { M3Select } from '../../components/m3';
+import { InvoiceSummaryBox } from './InvoiceSummaryBox';
 import { billingService } from '../../services';
 import { useToastStore } from '../../store';
 import { getErrorMessage } from '../../utils';
@@ -33,8 +33,6 @@ export const PaymentModal = memo(({ invoice, onClose, onPaid }: Props) => {
   const [reference, setReference] = useState('');
   const [loading, setLoading] = useState(false);
   const [amountError, setAmountError] = useState('');
-
-  const { formatCurrency } = useFormatters();
 
   const handleAmountChange = useCallback((val: string) => {
     setAmount(val);
@@ -71,10 +69,13 @@ export const PaymentModal = memo(({ invoice, onClose, onPaid }: Props) => {
           paymentMethod: method,
           transactionReference: reference.trim() || undefined,
         });
+        const payments = [...invoice.payments, payment];
+        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
         onPaid({
           ...invoice,
-          status: 'PAID',
-          payments: [...invoice.payments, payment],
+          // The backend flips to PAID only once the balance is settled.
+          status: totalPaid >= invoice.totalAmount ? 'PAID' : invoice.status,
+          payments,
         });
         addToast(t('payment_registered', { ns: 'billing' }), 'success');
         onClose();
@@ -104,18 +105,7 @@ export const PaymentModal = memo(({ invoice, onClose, onPaid }: Props) => {
     >
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         {/* Invoice summary */}
-        <div className="rounded-shape-sm bg-surface-container px-4 py-3 text-sm font-body space-y-1">
-          <p className="text-on-surface-variant">
-            {t('invoice_number', { ns: 'common' })}{' '}
-            <span className="font-medium text-on-surface">{invoice.invoiceNumber}</span>
-          </p>
-          <p className="text-on-surface-variant">
-            {t('total_amount', { ns: 'common' })}{' '}
-            <span className="font-medium text-on-surface">
-              {formatCurrency(invoice.totalAmount)}
-            </span>
-          </p>
-        </div>
+        <InvoiceSummaryBox invoice={invoice} />
 
         {/* Amount */}
         <M3TextField
