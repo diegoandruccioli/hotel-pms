@@ -111,6 +111,7 @@ test.describe('Admin Users management', () => {
     await page.goto('/admin/users');
     const firstDeactivateBtn = page.getByRole('button', { name: /deactivate/i }).first();
     await firstDeactivateBtn.click();
+    await page.getByRole('dialog').getByRole('button', { name: /confirm|conferma/i }).click();
 
     // The user row should now show inactive
     await expect(page.getByText('inactive').first()).toBeVisible({ timeout: 3000 });

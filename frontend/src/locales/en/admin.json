@@ -65,7 +65,6 @@
   "placeholder_alloggiati_credential_unconfigured": "Not configured — global one will be used",
   "status_alloggiati_credentials_configured": "Hotel-specific credentials configured",
   "status_alloggiati_credentials_not_configured": "No hotel-specific credentials — using the installation's global ones",
-
   "btn_reset_password": "Reset password",
   "modal_reset_title": "Reset password for {{username}}",
   "label_new_password": "New password",
@@ -74,5 +73,21 @@
   "err_password_too_short": "Password must be at least 16 characters",
   "err_password_too_weak": "Password must have 2 uppercase, 2 digits, 2 special characters",
   "err_reset_failed": "Failed to reset password",
-  "toast_reset_success": "Password reset. User must change it on next login."
+  "toast_reset_success": "Password reset. User must change it on next login.",
+  "col_created": "Created",
+  "users_search_label": "Search users by username or email",
+  "users_search_hint": "Username or email",
+  "users_filters_label": "Filter users",
+  "users_filter_admin": "Admin",
+  "users_filter_owner": "Owner",
+  "users_filter_receptionist": "Reception",
+  "users_filter_deactivated": "Deactivated",
+  "users_no_match": "No users match these filters.",
+  "users_active_summary_one": "{{count}} user can sign in",
+  "users_active_summary_other": "{{count}} users can sign in",
+  "users_roles_title": "Roles and permissions",
+  "users_role_admin_desc": "Full access, including users and hotel settings.",
+  "users_role_owner_desc": "Reports and financial figures, plus users and hotel settings.",
+  "users_role_receptionist_desc": "Front desk work: guests, reservations, stays, housekeeping and billing.",
+  "users_deactivate_confirm": "{{username}} will no longer be able to sign in. You can reactivate the account later."
 }

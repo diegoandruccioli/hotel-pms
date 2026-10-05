@@ -5,17 +5,46 @@ import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import { userService } from '../services';
 import type { UserResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3';
+import { ListToolbar } from '../components/ListToolbar';
+import { M3Avatar, M3Button, M3Card } from '../components/m3';
+import { M3ConfirmDialog } from '../components/m3';
 import { M3DataTable } from '../components/m3';
+import { M3FilterChip } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3EmptyState } from '../components/m3';
+import { M3StatusChip } from '../components/m3';
 import { SettingsPageHeader } from '../components/SettingsPageHeader';
+import { useFormatters } from '../hooks';
 import { useToastStore } from '../store';
 import { useAuthStore } from '../store';
-import { getErrorMessage, cn } from '../utils';
+import { getErrorMessage, userRoleTone } from '../utils';
 import { CreateUserModal } from './AdminUsers/CreateUserModal';
 import { ResetPasswordModal } from './AdminUsers/ResetPasswordModal';
 import type { TFunction } from 'i18next';
+
+type UserFilter = 'ALL' | 'ADMIN' | 'OWNER' | 'RECEPTIONIST' | 'DEACTIVATED';
+
+const USER_FILTERS: readonly UserFilter[] = ['ALL', 'ADMIN', 'OWNER', 'RECEPTIONIST', 'DEACTIVATED'];
+
+const FILTER_LABEL_KEYS: Record<UserFilter, string> = {
+  ALL: 'filter_all',
+  ADMIN: 'users_filter_admin',
+  OWNER: 'users_filter_owner',
+  RECEPTIONIST: 'users_filter_receptionist',
+  DEACTIVATED: 'users_filter_deactivated',
+};
+
+const matchesFilter = (user: UserResponse, filter: UserFilter): boolean => {
+  if (filter === 'ALL') return true;
+  if (filter === 'DEACTIVATED') return !user.active;
+  return user.role === filter;
+};
+
+const ROLE_DESCRIPTIONS = [
+  ['ADMIN', 'users_role_admin_desc'],
+  ['OWNER', 'users_role_owner_desc'],
+  ['RECEPTIONIST', 'users_role_receptionist_desc'],
+] as const;
 
 const DEFAULT_SORT_FIELD = 'username';
 const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'asc';
@@ -57,6 +86,7 @@ function compareUsers(a: UserResponse, b: UserResponse, field: string): number {
     case 'email': return a.email.localeCompare(b.email);
     case 'role': return a.role.localeCompare(b.role);
     case 'active': return Number(a.active) - Number(b.active);
+    case 'createdAt': return a.createdAt.localeCompare(b.createdAt);
     default: return a.username.localeCompare(b.username);
   }
 }
@@ -71,6 +101,10 @@ export function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [resetTarget, setResetTarget] = useState<UserResponse | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<UserResponse | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<UserFilter>('ALL');
+  const { formatDate } = useFormatters();
   const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
 
@@ -105,7 +139,7 @@ export function AdminUsers() {
     addToast(t('toast_reset_success'), 'success');
   }, [closeReset, addToast, t]);
 
-  const handleToggle = useCallback(
+  const performToggle = useCallback(
     async (u: UserResponse) => {
       try {
         const updated = u.active
@@ -125,13 +159,42 @@ export function AdminUsers() {
     [addToast, t],
   );
 
+  // Locking someone out asks first; re-activating is harmless and goes straight through.
+  const handleToggle = useCallback(
+    (u: UserResponse) => {
+      if (u.active) setDeactivateTarget(u);
+      else void performToggle(u);
+    },
+    [performToggle],
+  );
+
+  const cancelDeactivate = useCallback(() => setDeactivateTarget(null), []);
+  const confirmDeactivate = useCallback(() => {
+    if (deactivateTarget) void performToggle(deactivateTarget);
+    setDeactivateTarget(null);
+  }, [deactivateTarget, performToggle]);
+
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  const activeCount = useMemo(() => users.filter((u) => u.active).length, [users]);
+
+  const visibleUsers = useMemo(() => {
+    const needle = searchQuery.trim().toLowerCase();
+    return users.filter(
+      (u) => matchesFilter(u, filter)
+        && (needle === '' || u.username.toLowerCase().includes(needle) || u.email.toLowerCase().includes(needle)),
+    );
+  }, [users, filter, searchQuery]);
+
   // Small, unpaginated admin-only list (a hotel's staff accounts) — sorted
   // client-side, unlike the paginated pages where M3DataTable's sorting
   // state drives a server request instead.
   const sortedUsers = useMemo(() => {
     const sign = sortDir === 'desc' ? -1 : 1;
-    return [...users].sort((a, b) => sign * compareUsers(a, b, sortField));
-  }, [users, sortField, sortDir]);
+    return [...visibleUsers].sort((a, b) => sign * compareUsers(a, b, sortField));
+  }, [visibleUsers, sortField, sortDir]);
 
   const sorting = useMemo<SortingState>(
     () => [{ id: sortField, desc: sortDir === 'desc' }],
@@ -150,7 +213,12 @@ export function AdminUsers() {
       id: 'username',
       accessorKey: 'username',
       header: t('col_username'),
-      cell: ({ row }) => <span className="font-medium">{row.original.username}</span>,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <M3Avatar name={row.original.username} size="md" aria-hidden="true" />
+          <span className="font-medium">{row.original.username}</span>
+        </div>
+      ),
     },
     {
       id: 'email',
@@ -163,9 +231,7 @@ export function AdminUsers() {
       accessorKey: 'role',
       header: t('col_role'),
       cell: ({ row }) => (
-        <span className="rounded-full bg-secondary-container text-on-secondary-container px-2 py-0.5 text-xs font-medium">
-          {row.original.role}
-        </span>
+        <M3StatusChip label={row.original.role} tone={userRoleTone[row.original.role]} />
       ),
     },
     {
@@ -173,13 +239,17 @@ export function AdminUsers() {
       accessorKey: 'active',
       header: t('col_status'),
       cell: ({ row }) => (
-        <span className={cn(
-          'rounded-full px-2 py-0.5 text-xs font-medium',
-          row.original.active ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-error-container text-on-error-container'
-        )}>
-          {row.original.active ? t('status_active') : t('status_inactive')}
-        </span>
+        <M3StatusChip
+          label={row.original.active ? t('status_active') : t('status_inactive')}
+          tone={row.original.active ? 'success' : 'error'}
+        />
       ),
+    },
+    {
+      id: 'createdAt',
+      accessorKey: 'createdAt',
+      header: t('col_created'),
+      cell: ({ row }) => <span className="text-on-surface-variant">{formatDate(row.original.createdAt)}</span>,
     },
     {
       id: 'mustChangePassword',
@@ -208,14 +278,14 @@ export function AdminUsers() {
         />
       ),
     },
-  ], [t, handleToggle, openReset, currentUser?.username]);
+  ], [t, formatDate, handleToggle, openReset, currentUser?.username]);
 
   return (
     <div className="space-y-6">
       <SettingsPageHeader
         icon="manage_accounts"
         title={t('page_title')}
-        subtitle={t('page_subtitle')}
+        subtitle={loading || users.length === 0 ? t('page_subtitle') : t('users_active_summary', { count: activeCount })}
         onBack={handleBack}
         actions={
           <M3Button icon="person_add" onClick={openCreate}>
@@ -229,13 +299,58 @@ export function AdminUsers() {
       ) : users.length === 0 ? (
         <M3EmptyState icon="manage_accounts" title={t('no_users')} className="bg-surface rounded-shape-md shadow-elevation-1" />
       ) : (
-        <M3DataTable
-          data={sortedUsers}
-          columns={columns}
-          getRowId={getUserRowId}
-          sorting={sorting}
-          onSortingChange={handleSortingChange}
-          emptyMessage={t('no_users')}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="space-y-4">
+            <ListToolbar
+              searchLabel={t('users_search_label')}
+              searchPlaceholder={t('users_search_hint')}
+              filtersLabel={t('users_filters_label')}
+              searchValue={searchQuery}
+              onSearchChange={handleSearchChange}
+            >
+              {USER_FILTERS.map((value) => (
+                <M3FilterChip
+                  key={value}
+                  value={value}
+                  selected={filter === value}
+                  label={t(FILTER_LABEL_KEYS[value])}
+                  onValueSelect={setFilter}
+                />
+              ))}
+            </ListToolbar>
+            {visibleUsers.length === 0 ? (
+              <M3EmptyState icon="manage_accounts" title={t('users_no_match')} className="bg-surface rounded-shape-md shadow-elevation-1" />
+            ) : (
+              <M3DataTable
+                data={sortedUsers}
+                columns={columns}
+                getRowId={getUserRowId}
+                sorting={sorting}
+                onSortingChange={handleSortingChange}
+                emptyMessage={t('no_users')}
+              />
+            )}
+          </div>
+          <M3Card variant="solid" className="h-fit p-5">
+            <h2 className="text-base font-display font-medium text-on-surface">{t('users_roles_title')}</h2>
+            <dl className="mt-3 space-y-3 text-sm font-body">
+              {ROLE_DESCRIPTIONS.map(([role, descKey]) => (
+                <div key={role}>
+                  <dt className="font-medium text-on-surface">{t(FILTER_LABEL_KEYS[role])}</dt>
+                  <dd className="mt-1 text-on-surface-variant">{t(descKey)}</dd>
+                </div>
+              ))}
+            </dl>
+          </M3Card>
+        </div>
+      )}
+
+      {deactivateTarget && (
+        <M3ConfirmDialog
+          title={t('btn_deactivate')}
+          message={t('users_deactivate_confirm', { username: deactivateTarget.username })}
+          onConfirm={confirmDeactivate}
+          onCancel={cancelDeactivate}
         />
       )}
 
