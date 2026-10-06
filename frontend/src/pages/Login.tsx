@@ -52,40 +52,47 @@ export const Login = memo(() => {
   }, []);
 
   return (
-    <form data-testid="login-form" className="space-y-5" onSubmit={handleSubmit}>
-      {error && (
-        <Alert tone="error">{error}</Alert>
-      )}
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold text-on-surface">{t('login_title')}</h1>
+        <p className="mt-1 text-sm font-body text-on-surface-variant">{t('login_subtitle')}</p>
+      </div>
 
-      <M3TextField
-        label={t('username')}
-        name="username"
-        type="text"
-        required
-        value={username}
-        onChange={handleUsernameChange}
-        leadingIcon="person"
-      />
+      <form data-testid="login-form" className="space-y-5" onSubmit={handleSubmit}>
+        {error && (
+          <Alert tone="error">{error}</Alert>
+        )}
 
-      <M3TextField
-        label={t('password')}
-        name="password"
-        type="password"
-        required
-        value={password}
-        onChange={handlePasswordChange}
-        leadingIcon="lock"
-      />
+        <M3TextField
+          label={t('username')}
+          name="username"
+          type="text"
+          required
+          value={username}
+          onChange={handleUsernameChange}
+          leadingIcon="person"
+        />
 
-      <M3Button
-        data-testid="login-submit"
-        type="submit"
-        disabled={isLoading}
-        loading={isLoading}
-        className="w-full"
-      >
-        {isLoading ? t('signing_in') : t('sign_in')}
-      </M3Button>
-    </form>
+        <M3TextField
+          label={t('password')}
+          name="password"
+          type="password"
+          required
+          value={password}
+          onChange={handlePasswordChange}
+          leadingIcon="lock"
+        />
+
+        <M3Button
+          data-testid="login-submit"
+          type="submit"
+          disabled={isLoading}
+          loading={isLoading}
+          className="w-full"
+        >
+          {isLoading ? t('signing_in') : t('sign_in')}
+        </M3Button>
+      </form>
+    </div>
   );
 });

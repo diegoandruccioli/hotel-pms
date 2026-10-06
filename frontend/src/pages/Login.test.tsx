@@ -41,6 +41,33 @@ describe('Login Component', () => {
     expect(screen.getByTestId('login-submit')).toBeInTheDocument();
   });
 
+  it('titles the page with a level-1 heading and a subtitle', () => {
+    render(
+      <BrowserRouter>
+        <Login />
+      </BrowserRouter>
+    );
+    expect(screen.getByRole('heading', { level: 1, name: 'login_title' })).toBeInTheDocument();
+    expect(screen.getByText('login_subtitle')).toBeInTheDocument();
+  });
+
+  it('lets the user reveal and hide the password, keeping the field name', () => {
+    render(
+      <BrowserRouter>
+        <Login />
+      </BrowserRouter>
+    );
+    const field = screen.getByLabelText('password') as HTMLInputElement;
+    expect(field.type).toBe('password');
+
+    fireEvent.click(screen.getByRole('button', { name: 'show_password' }));
+    expect(field.type).toBe('text');
+    expect(screen.getByLabelText('password')).toBe(field);
+
+    fireEvent.click(screen.getByRole('button', { name: 'hide_password' }));
+    expect(field.type).toBe('password');
+  });
+
   it('should have no accessibility violations', async () => {
     const { container } = render(
       <BrowserRouter>
