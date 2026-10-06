@@ -1,17 +1,6 @@
 # ============================================================
 # .trivyignore — Accepted CVE suppressions for Trivy
 # ============================================================
-# CVE-2026-22732 — Spring Security: security policy bypass and information
-# disclosure (spring-security-web). Fixed in Spring Security 6.5.9, included
-# in Spring Boot 3.5.x. Project is now on Spring Boot 3.5.14 — suppression
-# retained as belt-and-suspenders pending confirmation from next Trivy run.
-# Remove after next clean scan confirms the CVE no longer appears.
-CVE-2026-22732
-# CVE-2026-22739 — Spring Cloud Config Server: path traversal via profile parameter.
-# Fixed in spring-cloud-config-server 4.3.2 (Spring Cloud 2025.x train).
-# Project is now on Spring Cloud 2025.0.0 — suppression retained pending
-# confirmation from next Trivy run. Remove after next clean scan.
-CVE-2026-22739
 # ── Go stdlib CVEs (gosu + Grafana binaries) ────────────────────────────────
 # These CVEs are in Go standard library code compiled into gosu and Grafana
 # binaries. They are NOT present in our Java Spring Boot service images.
