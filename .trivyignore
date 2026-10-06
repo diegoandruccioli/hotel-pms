@@ -139,16 +139,6 @@ CVE-2026-41002
 #   Re-check on the next grafana patch bump.
 CVE-2026-21728
 CVE-2026-28377
-# ── Spring Framework (spring-webmvc) ─────────────────────────────────────────
-# CVE-2026-47884 — Spring MVC XsltView SSRF/RCE (CVSS 9.8) when an XsltView is
-#   rendered from a "/**" mapping without an explicit view name. Fixed only in
-#   Framework 7.0.9; 6.2.19 (Boot 3.5.16) is the last OSS 6.2.x — no 6.2 fix
-#   will be published. Not reachable: no service declares XsltView /
-#   XsltViewResolver or loads XSLT stylesheets; all Servlet services are
-#   @RestController-only (no view rendering); notification-service's Thymeleaf
-#   renders e-mail bodies only. Remove when migrating to Spring Boot 4 /
-#   Framework 7.0.9+ (verified 2026-10-06).
-CVE-2026-47884
 # Format: one CVE-ID per line, with a comment explaining the
 # justification — mirrors the approach used in
 # config/dependency-check/suppressions.xml for OWASP DC.
