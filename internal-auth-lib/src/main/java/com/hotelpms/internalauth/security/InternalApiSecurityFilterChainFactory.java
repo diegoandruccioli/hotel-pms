@@ -37,11 +37,10 @@ public final class InternalApiSecurityFilterChainFactory {
      * @param exemptPathPrefixes path prefixes {@link InternalAuthFilter} should not
      *                           enforce the HMAC signature on (typically actuator)
      * @return the configured SecurityFilterChain
-     * @throws Exception if configuration fails
      */
-    @SuppressWarnings({"PMD.SignatureDeclareThrowsException", "null"})
+    @SuppressWarnings("null")
     public static SecurityFilterChain build(final HttpSecurity http, final String hmacSecret,
-            final NonceStore nonceStore, final List<String> exemptPathPrefixes) throws Exception {
+            final NonceStore nonceStore, final List<String> exemptPathPrefixes) {
         // No browser ever reaches this chain — it gates only internal, gateway-fronted
         // service-to-service calls, stateless (no session cookie, the CSRF attack vector this rule
         // protects against) and authenticated by an HMAC signature (InternalAuthFilter) an

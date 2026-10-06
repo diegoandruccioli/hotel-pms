@@ -1,28 +1,6 @@
 # ============================================================
 # .trivyignore — Accepted CVE suppressions for Trivy
 # ============================================================
-# CVE-2026-22732 — Spring Security: security policy bypass and information
-# disclosure (spring-security-web). Fixed in Spring Security 6.5.9, included
-# in Spring Boot 3.5.x. Project is now on Spring Boot 3.5.14 — suppression
-# retained as belt-and-suspenders pending confirmation from next Trivy run.
-# Remove after next clean scan confirms the CVE no longer appears.
-CVE-2026-22732
-# CVE-2026-22739 — Spring Cloud Config Server: path traversal via profile parameter.
-# Fixed in spring-cloud-config-server 4.3.2 (Spring Cloud 2025.x train).
-# Project is now on Spring Cloud 2025.0.0 — suppression retained pending
-# confirmation from next Trivy run. Remove after next clean scan.
-CVE-2026-22739
-# ── tomcat-embed-core CRITICAL — fix version not yet published ─────────────
-# Trivy's DB marks these "fixed" (advisory names 11.0.25/10.1.58/9.0.121), but
-# none of those versions exist on Maven Central as of 2026-09-11 (verified:
-# GET .../tomcat-embed-core/10.1.58/... -> 404; Gradle dependency resolution
-# fails against it — see root build.gradle.kts's tomcat.version comment).
-# Blocks the CI CRITICAL gate on every one of the 8 Boot services otherwise.
-# Remove as soon as 10.1.58 (or newer 10.1.x) is actually published and the
-# root build.gradle.kts pin is bumped to match.
-CVE-2026-65182
-CVE-2026-65905
-CVE-2026-68525
 # ── Go stdlib CVEs (gosu + Grafana binaries) ────────────────────────────────
 # These CVEs are in Go standard library code compiled into gosu and Grafana
 # binaries. They are NOT present in our Java Spring Boot service images.
@@ -139,16 +117,6 @@ CVE-2026-41002
 #   Re-check on the next grafana patch bump.
 CVE-2026-21728
 CVE-2026-28377
-# ── Spring Framework (spring-webmvc) ─────────────────────────────────────────
-# CVE-2026-47884 — Spring MVC XsltView SSRF/RCE (CVSS 9.8) when an XsltView is
-#   rendered from a "/**" mapping without an explicit view name. Fixed only in
-#   Framework 7.0.9; 6.2.19 (Boot 3.5.16) is the last OSS 6.2.x — no 6.2 fix
-#   will be published. Not reachable: no service declares XsltView /
-#   XsltViewResolver or loads XSLT stylesheets; all Servlet services are
-#   @RestController-only (no view rendering); notification-service's Thymeleaf
-#   renders e-mail bodies only. Remove when migrating to Spring Boot 4 /
-#   Framework 7.0.9+ (verified 2026-10-06).
-CVE-2026-47884
 # Format: one CVE-ID per line, with a comment explaining the
 # justification — mirrors the approach used in
 # config/dependency-check/suppressions.xml for OWASP DC.

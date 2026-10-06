@@ -50,7 +50,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
                 "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration",
                 "spring.jpa.hibernate.ddl-auto=validate",
                 "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect",
-                "spring.cache.type=none"
+                "spring.cache.type=none",
+                "spring.autoconfigure.exclude="
+                        + "org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration"
         }
 )
 @Testcontainers(disabledWithoutDocker = true)

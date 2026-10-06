@@ -191,7 +191,6 @@ public class StayController {
      */
     @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     @GetMapping("/reports/alloggiati")
-    @SuppressWarnings("PMD.LooseCoupling")
     public ResponseEntity<byte[]> downloadAlloggiatiReport(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
         final String content = alloggiatiReportService.generateReport(
@@ -218,7 +217,6 @@ public class StayController {
      */
     @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     @GetMapping("/reports/alloggiati/json")
-    @SuppressWarnings("PMD.LooseCoupling")
     public ResponseEntity<List<AlloggiatiRowDto>> downloadAlloggiatiJson(
             @NonNull @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) final LocalDate date) {
         final List<AlloggiatiRowDto> rows =
