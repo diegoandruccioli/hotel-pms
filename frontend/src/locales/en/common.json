@@ -285,6 +285,7 @@
   "rate_season_nightly_price": "Price per night",
   "no_rate_seasons": "No seasonal rates configured — the base price applies.",
   "confirm_delete_rate_season": "Are you sure you want to delete this rate?",
+  "delete_rate_season_title": "Delete rate",
   "err_rate_season_overlap": "This period overlaps an existing rate for this room type.",
   "error_loading_rate_seasons": "Error loading seasonal rates",
   "nav_rates": "Rate Calendar",

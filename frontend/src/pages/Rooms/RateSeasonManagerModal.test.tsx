@@ -160,6 +160,46 @@ describe('RateSeasonManagerModal', () => {
     await waitFor(() => expect(rateSeasonService.deleteSeason).toHaveBeenCalledWith('rt1', 's1'));
   });
 
+  it('asks for the delete confirmation in its own dialog, on top of the season list', async () => {
+    vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
+    render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+    await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('delete'));
+
+    expect(await screen.findAllByRole('dialog')).toHaveLength(2);
+    // The list stays behind the confirmation instead of being replaced by it.
+    expect(screen.getByText('High season')).toBeInTheDocument();
+  });
+
+  it('Escape on the delete confirmation closes only the confirmation', async () => {
+    vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
+    render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+    await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('delete'));
+    await screen.findByText('confirm_delete_rate_season');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByText('confirm_delete_rate_season')).not.toBeInTheDocument());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(rateSeasonService.deleteSeason).not.toHaveBeenCalled();
+    expect(screen.getByText('High season')).toBeInTheDocument();
+  });
+
+  it('cancelling the delete confirmation keeps the season', async () => {
+    vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
+    render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+    await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('delete'));
+    await screen.findByText('confirm_delete_rate_season');
+
+    fireEvent.click(screen.getByText('cancel'));
+
+    await waitFor(() => expect(screen.queryByText('confirm_delete_rate_season')).not.toBeInTheDocument());
+    expect(rateSeasonService.deleteSeason).not.toHaveBeenCalled();
+  });
+
   it('calls onClose when close clicked from the list view', async () => {
     vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([]);
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);

@@ -285,6 +285,7 @@
   "rate_season_nightly_price": "Prezzo a notte",
   "no_rate_seasons": "Nessuna tariffa stagionale configurata — si applica il prezzo base.",
   "confirm_delete_rate_season": "Sei sicuro di voler eliminare questa tariffa?",
+  "delete_rate_season_title": "Elimina tariffa",
   "err_rate_season_overlap": "Questo periodo si sovrappone a una tariffa già esistente per questa tipologia.",
   "error_loading_rate_seasons": "Errore caricamento tariffe stagionali",
   "nav_rates": "Calendario tariffe",

@@ -325,6 +325,8 @@ readable is *consistency*, not *sparseness*. Concretely:
 - **Confirmations go through `M3ConfirmDialog`** — a message plus Cancel/Confirm, with
   `loading` while the action runs. A confirmation that needs more (a result list, a
   second step) uses `M3Dialog` directly.
+  Inside a dialog it opens as a nested `M3ConfirmDialog` on top of it, never as an inline
+  Confirm/Cancel row that replaces the content.
 - **Filter pills go through `M3FilterChip`** — a pill toggle with `aria-pressed`. Use
   `onClick` for a standalone toggle, or `value` + `onValueSelect` for a row of chips sharing one
   handler (the `react-perf` lint rule forbids inline arrow functions as props).
@@ -362,7 +364,9 @@ historical baseline pointer).
   preserve information density on PMS dashboards rather than the MD3 default).
 - **Entire UI navigable using TAB alone.** Every interactive element keyboard
   operable (Tab / Enter / Space / Arrow / Escape).
-- **Focus trapped inside open modals/dialogs** (`focus-trap-react`); Escape closes.
+- **Focus trapped inside open modals/dialogs** (`focus-trap-react`); Escape closes. With dialogs
+  stacked, Escape closes **only the topmost** one: `useEscapeKey` keeps a shared stack, so a
+  parent dialog needs no workaround to ignore Escape while a nested one is open.
 - **Skip-to-main-content link** is the first focusable element on every page.
 - Semantic HTML first (`<nav>`, `<main>`, `<dialog>`, …) — ARIA only when semantic
   HTML is insufficient.

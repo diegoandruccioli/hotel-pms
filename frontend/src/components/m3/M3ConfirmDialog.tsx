@@ -14,11 +14,13 @@ interface M3ConfirmDialogProps {
   /** Defaults to the common `cancel` label. */
   cancelLabel?: string;
   onConfirm: () => void;
-  /** Cancel button, header close button, Escape and scrim click all land here. */
+  /** Cancel button, header close button, Escape and scrim click all land here (ignored while `loading`). */
   onCancel: () => void;
   /** While the confirmed action is running: cancel is disabled and confirm shows a spinner. */
   loading?: boolean;
 }
+
+const NOOP = () => {};
 
 /**
  * Replaces the `M3Dialog` + paragraph + Cancel/Confirm row copied into ~10
@@ -38,8 +40,9 @@ export const M3ConfirmDialog = ({
 }: M3ConfirmDialogProps) => {
   const { t } = useTranslation('common');
 
+  // While the action runs, dismissing would hide a request that is still in flight.
   return (
-    <M3Dialog open={open} title={title} titleId={titleId} onClose={onCancel}>
+    <M3Dialog open={open} title={title} titleId={titleId} onClose={loading ? NOOP : onCancel}>
       <p className="text-sm font-body text-on-surface">{message}</p>
       <div className="flex justify-end gap-3 pt-4">
         <M3Button type="button" variant="outlined" onClick={onCancel} disabled={loading}>

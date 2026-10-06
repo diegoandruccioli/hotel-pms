@@ -70,6 +70,38 @@ test.describe('Billing flow', () => {
     await expect(page.getByRole('button', { name: /Download FatturaPA XML/i })).toBeVisible();
   });
 
+  test('Escape closes the remove-charge confirmation first, then the invoice', async ({ page }) => {
+    const withCharge = {
+      ...MOCK_INVOICE,
+      totalAmount: 20,
+      charges: [{ id: 'c-001', type: 'EXTRA', description: 'Minibar', amount: 20 }],
+    };
+    await page.route('**/api/v1/invoices**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(route.request().url().includes('/api/v1/invoices/inv-001')
+          ? withCharge
+          : { content: [{ invoice: withCharge, guestName: null }], totalElements: 1, totalPages: 1, number: 0, size: 20 }),
+      }),
+    );
+    await page.goto('/billing');
+    await expect(page.locator('table')).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: /View/i }).first().click();
+    const invoiceDialog = page.getByRole('dialog', { name: /Invoice/i });
+    await expect(invoiceDialog).toBeVisible();
+
+    await page.getByRole('button', { name: /Remove charge/i }).click();
+    await expect(page.getByText('Remove this charge from the invoice?')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByText('Remove this charge from the invoice?')).toBeHidden();
+    await expect(invoiceDialog).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
   test('passes accessibility audit on billing page', async ({ page }) => {
     const AxeBuilder = (await import('@axe-core/playwright')).default;
     await page.goto('/billing');

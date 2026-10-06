@@ -94,6 +94,7 @@
   "btn_record_departure": "Registra partenza",
   "btn_promote_primary": "Rendi principale",
   "confirm_remove_guest": "Confermare la rimozione?",
+  "confirm_remove_guest_title": "Rimuovi ospite",
   "hint_remove_disabled_sent": "Non rimovibile: già trasmesso ad Alloggiati Web. Usa \"Registra partenza\" per una partenza anticipata.",
   "hint_remove_disabled_primary": "Non rimovibile: è l'ospite principale del soggiorno. Promuovi un altro ospite prima di rimuoverlo."
 }

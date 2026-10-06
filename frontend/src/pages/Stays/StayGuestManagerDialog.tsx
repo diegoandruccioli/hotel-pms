@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
+import { M3ConfirmDialog } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
@@ -72,7 +73,6 @@ interface GuestRowProps {
   guest: StayGuestResponse;
   t: ErrorTranslator;
   busyGuestId: string | null;
-  confirmRemoveId: string | null;
   departureTargetId: string | null;
   departureDate: string;
   onEdit: (guest: StayGuestResponse) => void;
@@ -82,21 +82,18 @@ interface GuestRowProps {
   onDepartureDateChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onPromote: (id: string) => void;
   onRequestRemove: (id: string) => void;
-  onCancelRemove: () => void;
-  onConfirmRemove: (id: string) => void;
 }
 
 const GuestRow = memo(({
-  guest, t, busyGuestId, confirmRemoveId, departureTargetId, departureDate,
+  guest, t, busyGuestId, departureTargetId, departureDate,
   onEdit, onStartDeparture, onCancelDeparture, onConfirmDeparture, onDepartureDateChange,
-  onPromote, onRequestRemove, onCancelRemove, onConfirmRemove,
+  onPromote, onRequestRemove,
 }: GuestRowProps) => {
   const isBusy = busyGuestId === guest.id;
   const handleEdit = useCallback(() => onEdit(guest), [onEdit, guest]);
   const handleStartDeparture = useCallback(() => onStartDeparture(guest.id), [onStartDeparture, guest.id]);
   const handlePromote = useCallback(() => onPromote(guest.id), [onPromote, guest.id]);
   const handleRequestRemove = useCallback(() => onRequestRemove(guest.id), [onRequestRemove, guest.id]);
-  const handleConfirmRemove = useCallback(() => onConfirmRemove(guest.id), [onConfirmRemove, guest.id]);
 
   return (
     <div className="border border-outline-variant rounded-shape-md p-4">
@@ -146,31 +143,19 @@ const GuestRow = memo(({
               {t('btn_promote_primary')}
             </M3Button>
           )}
-          {confirmRemoveId === guest.id ? (
-            <>
-              <span className="text-sm text-error self-center">{t('confirm_remove_guest')}</span>
-              <M3Button variant="text" onClick={handleConfirmRemove} loading={isBusy} disabled={isBusy}>
-                {t('btn_confirm')}
-              </M3Button>
-              <M3Button variant="text" onClick={onCancelRemove}>
-                {t('btn_cancel')}
-              </M3Button>
-            </>
-          ) : (
-            <M3Button
-              variant="text"
-              icon="delete"
-              onClick={handleRequestRemove}
-              disabled={guest.alloggiatiSent || guest.isPrimaryGuest}
-              title={guest.alloggiatiSent
-                ? t('hint_remove_disabled_sent')
-                : guest.isPrimaryGuest
-                  ? t('hint_remove_disabled_primary')
-                  : undefined}
-            >
-              {t('btn_remove')}
-            </M3Button>
-          )}
+          <M3Button
+            variant="text"
+            icon="delete"
+            onClick={handleRequestRemove}
+            disabled={guest.alloggiatiSent || guest.isPrimaryGuest}
+            title={guest.alloggiatiSent
+              ? t('hint_remove_disabled_sent')
+              : guest.isPrimaryGuest
+                ? t('hint_remove_disabled_primary')
+                : undefined}
+          >
+            {t('btn_remove')}
+          </M3Button>
         </div>
       )}
     </div>
@@ -316,6 +301,10 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
     }
   }, [stayId, t, addToast, refreshStay]);
 
+  const handleConfirmRemove = useCallback(() => {
+    if (confirmRemoveId) void handleRemove(confirmRemoveId);
+  }, [confirmRemoveId, handleRemove]);
+
   const handleStartDeparture = useCallback((guestId: string) => {
     setDepartureTargetId(guestId);
     setDepartureDate(todayIsoDate());
@@ -381,7 +370,6 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
               guest={guest}
               t={t}
               busyGuestId={busyGuestId}
-              confirmRemoveId={confirmRemoveId}
               departureTargetId={departureTargetId}
               departureDate={departureDate}
               onEdit={handleOpenEdit}
@@ -391,8 +379,6 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
               onDepartureDateChange={handleDepartureDateChange}
               onPromote={handlePromote}
               onRequestRemove={handleRequestRemove}
-              onCancelRemove={handleCancelRemove}
-              onConfirmRemove={handleRemove}
             />
           ))}
 
@@ -423,6 +409,19 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
             </M3Button>
           )}
         </div>
+      )}
+
+      {confirmRemoveId && (
+        <M3ConfirmDialog
+          title={t('confirm_remove_guest_title')}
+          titleId="stay-guest-remove-title"
+          message={t('confirm_remove_guest')}
+          confirmLabel={t('btn_confirm')}
+          cancelLabel={t('btn_cancel')}
+          onConfirm={handleConfirmRemove}
+          onCancel={handleCancelRemove}
+          loading={busyGuestId === confirmRemoveId}
+        />
       )}
     </M3Dialog>
   );
