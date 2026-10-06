@@ -1,12 +1,13 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { SettingsCityTax } from './SettingsCityTax';
 import { stayService } from '../../services';
-import { mockAxiosErrorWithDetail } from '../../test-utils';
 import type { CityTaxRateResponse, HotelCategoryHistoryResponse } from '../../types';
 
+// The page only composes the four sections; each one is tested next to its component
+// in ./CityTax. Here: the page mounts all of them, and the composed page is accessible.
 const stableT = (key: string) => key;
 const stableI18n = { language: 'en' };
 vi.mock('react-i18next', () => ({
@@ -15,11 +16,6 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('../../services/stayService');
-const mockAddToast = vi.fn();
-vi.mock('../../store/toastStore', () => ({
-  useToastStore: (sel: unknown) =>
-    (sel as (s: { addToast: () => void }) => unknown)({ addToast: mockAddToast }),
-}));
 
 vi.mock('focus-trap-react', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -50,275 +46,17 @@ describe('SettingsCityTax', () => {
     vi.mocked(stayService.getCityTaxApplicability).mockResolvedValue({ applicability: 'UNKNOWN' });
   });
 
-  it('renders the page title', async () => {
+  it('renders the page title', () => {
     renderPage();
     expect(screen.getByText('settings_section_city_tax')).toBeInTheDocument();
   });
 
-  it('shows empty states when no category history and no rates exist', async () => {
+  it('mounts the applicability, category, rates and backfill sections', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByText('city_tax_no_category_history')).toBeInTheDocument());
-    expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument();
-  });
-
-  it('shows current category and history row after data loads', async () => {
-    vi.mocked(stayService.getHotelCategoryHistory).mockResolvedValue([CATEGORY_ENTRY]);
-    renderPage();
-    await waitFor(() => expect(screen.getByText('city_tax_current_category')).toBeInTheDocument());
-    expect(screen.getByText('4_STAR')).toBeInTheDocument();
-  });
-
-  it('shows a rate row after data loads', async () => {
-    vi.mocked(stayService.getCityTaxRates).mockResolvedValue([RATE]);
-    renderPage();
-    await waitFor(() => expect(screen.getByText('€2.50')).toBeInTheDocument());
-  });
-
-  it('submits a new category entry and reloads the history', async () => {
-    vi.mocked(stayService.recordHotelCategory).mockResolvedValue(CATEGORY_ENTRY);
-    renderPage();
-    await waitFor(() => expect(screen.getByText('city_tax_no_category_history')).toBeInTheDocument());
-
-    fireEvent.change(screen.getAllByLabelText(/city_tax_category \*/i)[0], { target: { value: '4_STAR' } });
-    fireEvent.change(screen.getAllByLabelText(/city_tax_valid_from \*/i)[0], { target: { value: '2026-06-01' } });
-    fireEvent.click(screen.getByText('city_tax_add_category'));
-
-    await waitFor(() => expect(stayService.recordHotelCategory).toHaveBeenCalledWith({
-      category: '4_STAR', validFrom: '2026-06-01',
-    }));
-    expect(stayService.getHotelCategoryHistory).toHaveBeenCalledTimes(2);
-  });
-
-  it('blocks category submission when the category field is blank', async () => {
-    renderPage();
-    await waitFor(() => expect(screen.getByText('city_tax_no_category_history')).toBeInTheDocument());
-
-    fireEvent.change(screen.getAllByLabelText(/city_tax_valid_from \*/i)[0], { target: { value: '2026-06-01' } });
-    fireEvent.click(screen.getByText('city_tax_add_category'));
-
-    expect(await screen.findByText('common:err_required')).toBeInTheDocument();
-    expect(stayService.recordHotelCategory).not.toHaveBeenCalled();
-  });
-
-  it('submits a new rate with optional fields converted to numbers', async () => {
-    vi.mocked(stayService.createCityTaxRate).mockResolvedValue(RATE);
-    renderPage();
-    await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
-
-    fireEvent.change(screen.getAllByLabelText(/city_tax_category \*/i)[1], { target: { value: '4_STAR' } });
-    fireEvent.change(screen.getByLabelText(/city_tax_amount_per_night/i), { target: { value: '2.50' } });
-    fireEvent.change(screen.getByLabelText(/city_tax_max_taxable_nights/i), { target: { value: '7' } });
-    fireEvent.change(screen.getByLabelText(/city_tax_exempt_under_age/i), { target: { value: '14' } });
-    fireEvent.change(screen.getAllByLabelText(/city_tax_valid_from \*/i)[1], { target: { value: '2026-06-01' } });
-    fireEvent.click(screen.getByText('city_tax_add_rate'));
-
-    await waitFor(() => expect(stayService.createCityTaxRate).toHaveBeenCalledWith({
-      category: '4_STAR', amountPerNight: 2.5, maxTaxableNights: 7, exemptUnderAge: 14,
-      validFrom: '2026-06-01', note: undefined,
-    }));
-  });
-
-  it('shows the backend detail message on a 409 rate overlap', async () => {
-    // Two distinct 400s exist server-side (CITY_TAX_COMUNE_NOT_CONFIGURED vs.
-    // CITY_TAX_RATE_VALID_FROM_NOT_AFTER_CURRENT), so the component no longer
-    // branches on HTTP status — it surfaces the backend's `detail` code, which
-    // the real Axios interceptor translates via locales/*/errors.json.
-    vi.mocked(stayService.createCityTaxRate)
-      .mockRejectedValue(mockAxiosErrorWithDetail('CITY_TAX_RATE_OVERLAP', 409));
-    renderPage();
-    await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
-
-    fireEvent.change(screen.getAllByLabelText(/city_tax_category \*/i)[1], { target: { value: '4_STAR' } });
-    fireEvent.change(screen.getByLabelText(/city_tax_amount_per_night/i), { target: { value: '2.50' } });
-    fireEvent.change(screen.getAllByLabelText(/city_tax_valid_from \*/i)[1], { target: { value: '2026-06-01' } });
-    fireEvent.click(screen.getByText('city_tax_add_rate'));
-
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('CITY_TAX_RATE_OVERLAP', 'error'));
-  });
-
-  it('shows the backend detail message when the comune is not configured (400)', async () => {
-    vi.mocked(stayService.createCityTaxRate)
-      .mockRejectedValue(mockAxiosErrorWithDetail('CITY_TAX_COMUNE_NOT_CONFIGURED', 400));
-    renderPage();
-    await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
-
-    fireEvent.change(screen.getAllByLabelText(/city_tax_category \*/i)[1], { target: { value: '4_STAR' } });
-    fireEvent.change(screen.getByLabelText(/city_tax_amount_per_night/i), { target: { value: '2.50' } });
-    fireEvent.change(screen.getAllByLabelText(/city_tax_valid_from \*/i)[1], { target: { value: '2026-06-01' } });
-    fireEvent.click(screen.getByText('city_tax_add_rate'));
-
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('CITY_TAX_COMUNE_NOT_CONFIGURED', 'error'));
-  });
-
-  it('shows the backend detail message when the new rate does not start after the current one (400)', async () => {
-    vi.mocked(stayService.createCityTaxRate)
-      .mockRejectedValue(mockAxiosErrorWithDetail('CITY_TAX_RATE_VALID_FROM_NOT_AFTER_CURRENT', 400));
-    renderPage();
-    await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
-
-    fireEvent.change(screen.getAllByLabelText(/city_tax_category \*/i)[1], { target: { value: '4_STAR' } });
-    fireEvent.change(screen.getByLabelText(/city_tax_amount_per_night/i), { target: { value: '2.50' } });
-    fireEvent.change(screen.getAllByLabelText(/city_tax_valid_from \*/i)[1], { target: { value: '2025-01-01' } });
-    fireEvent.click(screen.getByText('city_tax_add_rate'));
-
-    await waitFor(() => expect(mockAddToast)
-      .toHaveBeenCalledWith('CITY_TAX_RATE_VALID_FROM_NOT_AFTER_CURRENT', 'error'));
-  });
-
-  it('shows the backend detail message on a generic failure', async () => {
-    vi.mocked(stayService.createCityTaxRate).mockRejectedValue(mockAxiosErrorWithDetail('CITY_TAX_RATE_INVALID', 422));
-    renderPage();
-    await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
-
-    fireEvent.change(screen.getAllByLabelText(/city_tax_category \*/i)[1], { target: { value: '4_STAR' } });
-    fireEvent.change(screen.getByLabelText(/city_tax_amount_per_night/i), { target: { value: '2.50' } });
-    fireEvent.change(screen.getAllByLabelText(/city_tax_valid_from \*/i)[1], { target: { value: '2026-06-01' } });
-    fireEvent.click(screen.getByText('city_tax_add_rate'));
-
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('CITY_TAX_RATE_INVALID', 'error'));
-  });
-
-  describe('applicability section', () => {
-    it('loads and shows the current applicability', async () => {
-      vi.mocked(stayService.getCityTaxApplicability).mockResolvedValue({ applicability: 'NOT_APPLICABLE' });
-      renderPage();
-
-      await waitFor(() => expect(screen.getByLabelText('city_tax_applicability_label'))
-        .toHaveValue('NOT_APPLICABLE'));
-    });
-
-    it('saves a new applicability on change', async () => {
-      vi.mocked(stayService.updateCityTaxApplicability).mockResolvedValue({ applicability: 'APPLICABLE' });
-      renderPage();
-      await waitFor(() => expect(screen.getByLabelText('city_tax_applicability_label')).toHaveValue('UNKNOWN'));
-
-      fireEvent.change(screen.getByLabelText('city_tax_applicability_label'), { target: { value: 'APPLICABLE' } });
-
-      await waitFor(() => expect(stayService.updateCityTaxApplicability)
-        .toHaveBeenCalledWith({ applicability: 'APPLICABLE' }));
-      expect(mockAddToast).toHaveBeenCalledWith('save', 'success');
-    });
-
-    it('reverts the selection and shows an error toast when saving fails', async () => {
-      vi.mocked(stayService.updateCityTaxApplicability)
-        .mockRejectedValue(mockAxiosErrorWithDetail('INTERNAL_SERVER_ERROR', 500));
-      renderPage();
-      await waitFor(() => expect(screen.getByLabelText('city_tax_applicability_label')).toHaveValue('UNKNOWN'));
-
-      fireEvent.change(screen.getByLabelText('city_tax_applicability_label'), { target: { value: 'APPLICABLE' } });
-
-      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('INTERNAL_SERVER_ERROR', 'error'));
-      expect(screen.getByLabelText('city_tax_applicability_label')).toHaveValue('UNKNOWN');
-    });
-  });
-
-  describe('backfill section', () => {
-    it('previews without charging or writing anything', async () => {
-      vi.mocked(stayService.previewCityTaxBackfill).mockResolvedValue({
-        lines: [{ stayId: 's1', checkInDate: '2026-05-01', amount: 2.5, charged: false, skipReason: null }],
-        totalAmount: 2.5,
-        chargedCount: 0,
-        skippedCount: 0,
-      });
-      renderPage();
-      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
-
-      fireEvent.click(screen.getByText('city_tax_backfill_action_preview'));
-
-      await waitFor(() => expect(stayService.previewCityTaxBackfill).toHaveBeenCalled());
-      expect(screen.getByText('2026-05-01')).toBeInTheDocument();
-      expect(stayService.confirmCityTaxBackfill).not.toHaveBeenCalled();
-      expect(screen.getByText('city_tax_backfill_action_confirm')).toBeInTheDocument();
-    });
-
-    it('shows no confirm action when the preview has nothing chargeable', async () => {
-      vi.mocked(stayService.previewCityTaxBackfill).mockResolvedValue({
-        lines: [{ stayId: 's1', checkInDate: '2026-05-01', amount: 2.5, charged: false, skipReason: 'INVOICE_NOT_OPEN' }],
-        totalAmount: 2.5,
-        chargedCount: 0,
-        skippedCount: 1,
-      });
-      renderPage();
-      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
-
-      fireEvent.click(screen.getByText('city_tax_backfill_action_preview'));
-
-      await waitFor(() => expect(screen.getByText('2026-05-01')).toBeInTheDocument());
-      expect(screen.queryByText('city_tax_backfill_action_confirm')).not.toBeInTheDocument();
-    });
-
-    it('confirms and charges after a preview', async () => {
-      vi.mocked(stayService.previewCityTaxBackfill).mockResolvedValue({
-        lines: [{ stayId: 's1', checkInDate: '2026-05-01', amount: 2.5, charged: false, skipReason: null }],
-        totalAmount: 2.5,
-        chargedCount: 0,
-        skippedCount: 0,
-      });
-      vi.mocked(stayService.confirmCityTaxBackfill).mockResolvedValue({
-        lines: [{ stayId: 's1', checkInDate: '2026-05-01', amount: 2.5, charged: true, skipReason: null }],
-        totalAmount: 2.5,
-        chargedCount: 1,
-        skippedCount: 0,
-      });
-      renderPage();
-      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
-      fireEvent.click(screen.getByText('city_tax_backfill_action_preview'));
-      await waitFor(() => expect(screen.getByText('city_tax_backfill_action_confirm')).toBeInTheDocument());
-
-      fireEvent.click(screen.getByText('city_tax_backfill_action_confirm'));
-      // Charging guests is not undone by a second click: it asks first.
-      expect(stayService.confirmCityTaxBackfill).not.toHaveBeenCalled();
-      expect(screen.getByText('city_tax_backfill_confirm_title')).toBeInTheDocument();
-      fireEvent.click(screen.getByText('city_tax_backfill_confirm_yes'));
-
-      await waitFor(() => expect(stayService.confirmCityTaxBackfill).toHaveBeenCalled());
-      expect(mockAddToast).toHaveBeenCalledWith('city_tax_backfill_success', 'success');
-      // Confirmed — the action disappears rather than allowing a duplicate charge.
-      await waitFor(() => expect(screen.queryByText('city_tax_backfill_action_confirm')).not.toBeInTheDocument());
-    });
-
-    it('charges nothing when the confirmation is cancelled', async () => {
-      vi.mocked(stayService.previewCityTaxBackfill).mockResolvedValue({
-        lines: [{ stayId: 's1', checkInDate: '2026-05-01', amount: 2.5, charged: false, skipReason: null }],
-        totalAmount: 2.5,
-        chargedCount: 0,
-        skippedCount: 0,
-      });
-      renderPage();
-      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
-      fireEvent.click(screen.getByText('city_tax_backfill_action_preview'));
-      await waitFor(() => expect(screen.getByText('city_tax_backfill_action_confirm')).toBeInTheDocument());
-
-      fireEvent.click(screen.getByText('city_tax_backfill_action_confirm'));
-      fireEvent.click(screen.getByText('cancel'));
-
-      expect(stayService.confirmCityTaxBackfill).not.toHaveBeenCalled();
-      expect(screen.queryByText('city_tax_backfill_confirm_title')).not.toBeInTheDocument();
-      expect(screen.getByText('city_tax_backfill_action_confirm')).toBeInTheDocument();
-    });
-
-    it('shows an empty state when no unassessed stays are found', async () => {
-      vi.mocked(stayService.previewCityTaxBackfill).mockResolvedValue({
-        lines: [], totalAmount: 0, chargedCount: 0, skippedCount: 0,
-      });
-      renderPage();
-      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
-
-      fireEvent.click(screen.getByText('city_tax_backfill_action_preview'));
-
-      await waitFor(() => expect(screen.getByText('city_tax_backfill_none_found')).toBeInTheDocument());
-    });
-
-    it('shows an error toast when the preview fails', async () => {
-      vi.mocked(stayService.previewCityTaxBackfill)
-        .mockRejectedValue(mockAxiosErrorWithDetail('INTERNAL_SERVER_ERROR', 500));
-      renderPage();
-      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
-
-      fireEvent.click(screen.getByText('city_tax_backfill_action_preview'));
-
-      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('INTERNAL_SERVER_ERROR', 'error'));
-    });
+    await waitFor(() => expect(screen.getByLabelText('city_tax_applicability_label')).toBeInTheDocument());
+    expect(await screen.findByText('city_tax_no_category_history')).toBeInTheDocument();
+    expect(await screen.findByText('city_tax_no_rates')).toBeInTheDocument();
+    expect(screen.getByText('city_tax_backfill_action_preview')).toBeInTheDocument();
   });
 
   it('passes axe accessibility check', async () => {
