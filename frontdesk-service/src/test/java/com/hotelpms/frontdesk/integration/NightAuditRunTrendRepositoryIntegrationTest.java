@@ -6,8 +6,9 @@ import com.hotelpms.frontdesk.nightaudit.repository.NightAuditRunRepository;
 import com.hotelpms.frontdesk.stays.security.StayGuestDocumentEncryptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.cache.test.autoconfigure.AutoConfigureCache;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -28,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * {@link NightAuditRunRepository#findByHotelIdAndStatusAndBusinessDateBetweenOrderByBusinessDateAsc}:
  * hotel scoping, the COMPLETED filter, inclusive window ends and ascending order.
  */
+@AutoConfigureCache
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers(disabledWithoutDocker = true)
