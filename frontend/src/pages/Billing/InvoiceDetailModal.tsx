@@ -127,13 +127,6 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
     setChargeToRemove(null);
   }, [chargeToRemove, handleRemoveChargeAsync]);
 
-  // Escape (useEscapeKey) is a document-level listener on every open dialog, so it would
-  // also close this one underneath a nested dialog: ignore the parent's close meanwhile.
-  const nestedDialogOpen = chargeToRemove !== null || addingCharge;
-  const handleDialogClose = useCallback(() => {
-    if (!nestedDialogOpen) onClose();
-  }, [nestedDialogOpen, onClose]);
-
   const { formatCurrency, formatDateTime } = useFormatters();
 
   const totalPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
@@ -143,7 +136,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
       open
       title={t('invoice_detail_title', { ns: 'billing' })}
       titleId="invoice-detail-title"
-      onClose={handleDialogClose}
+      onClose={onClose}
     >
       <div className="space-y-6 text-sm font-body">
         {/* Document type toggle */}

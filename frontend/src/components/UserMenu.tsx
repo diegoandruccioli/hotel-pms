@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
 import { M3Avatar } from './m3';
+import { useEscapeKey } from '../hooks';
 import { cn } from '../utils';
 
 interface UserMenuProps {
@@ -83,18 +84,12 @@ export const UserMenu = ({
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, [open, onClose]);
 
-  // Close on Escape, while open
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-        triggerRef.current?.focus();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
+  // Close on Escape, while open, and give focus back to the trigger
+  const handleEscape = useCallback(() => {
+    onClose();
+    triggerRef.current?.focus();
+  }, [onClose]);
+  useEscapeKey(open, handleEscape);
 
   // Stable handlers for sub-components
   const handleSettingsClick = useCallback(() => {

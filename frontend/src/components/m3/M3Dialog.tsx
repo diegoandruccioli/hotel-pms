@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import * as FocusTrapModule from 'focus-trap-react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../MaterialIcon';
@@ -6,13 +6,16 @@ import { useEscapeKey } from '../../hooks';
 import { cn } from '../../utils';
 
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
+// Escape is owned by useEscapeKey: the trap must not deactivate itself on it, or a nested
+// dialog dismissed with Escape would leave focus free in the one underneath.
+const FOCUS_TRAP_OPTIONS = { escapeDeactivates: false };
 
 interface M3DialogProps {
   /** Controls visibility */
   open: boolean;
   /** Accessible title shown in the dialog header */
   title: string;
-  /** Unique id wired to aria-labelledby */
+  /** Id wired to aria-labelledby; generated per instance so stacked dialogs never share one */
   titleId?: string;
   onClose: () => void;
   children: React.ReactNode;
@@ -33,17 +36,19 @@ interface M3DialogProps {
  *  - Scrim (semi-transparent backdrop)
  *  - focus-trap-react for keyboard containment
  *  - role="dialog" + aria-modal + aria-labelledby for screen readers
- *  - Escape key closes the dialog
+ *  - Escape key closes the dialog (the topmost one, when dialogs are stacked)
  */
 export const M3Dialog = ({
   open,
   title,
-  titleId = 'dialog-title',
+  titleId: titleIdProp,
   onClose,
   children,
   footer,
 }: M3DialogProps) => {
   const { t } = useTranslation('common');
+  const generatedTitleId = useId();
+  const titleId = titleIdProp ?? generatedTitleId;
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Move focus to close button when dialog opens
@@ -53,13 +58,13 @@ export const M3Dialog = ({
     }
   }, [open]);
 
-  // Close on Escape key
+  // Close on Escape key (only the topmost of stacked dialogs reacts, see useEscapeKey)
   useEscapeKey(open, onClose);
 
   if (!open) return null;
 
   return (
-    <FocusTrap>
+    <FocusTrap focusTrapOptions={FOCUS_TRAP_OPTIONS}>
       {/* Portal-like fixed overlay */}
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4"

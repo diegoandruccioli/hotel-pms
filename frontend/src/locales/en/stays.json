@@ -94,6 +94,7 @@
   "btn_record_departure": "Record departure",
   "btn_promote_primary": "Make primary",
   "confirm_remove_guest": "Confirm removal?",
+  "confirm_remove_guest_title": "Remove guest",
   "hint_remove_disabled_sent": "Cannot remove: already sent to Alloggiati Web. Use \"Record departure\" for an early departure instead.",
   "hint_remove_disabled_primary": "Cannot remove: this is the stay's primary guest. Promote another guest first."
 }

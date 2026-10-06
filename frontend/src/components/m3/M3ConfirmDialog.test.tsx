@@ -77,6 +77,16 @@ describe('M3ConfirmDialog', () => {
     expect(screen.getByRole('button', { name: /confirm/ })).toBeDisabled();
   });
 
+  it('ignores Escape, the close button and the scrim while the confirmed action is running', () => {
+    const { onCancel } = renderDialog({ loading: true });
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'close' }));
+    fireEvent.click(document.querySelector('[class*="bg-scrim"]') as Element);
+
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it('renders nothing when closed', () => {
     renderDialog({ open: false });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

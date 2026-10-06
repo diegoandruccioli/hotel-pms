@@ -270,15 +270,10 @@ describe('InvoiceDetailModal', () => {
     expect(screen.queryByText('confirm_remove_charge')).not.toBeInTheDocument();
   });
 
-  it('does not close the invoice dialog while the remove-charge confirmation is open', () => {
+  it('closes the invoice dialog when it is dismissed', () => {
     render(<InvoiceDetailModal invoice={INVOICE_WITH_EXTRA_CHARGE} onClose={onClose} />);
     fireEvent.click(screen.getByTestId('dialog-dismiss-invoice_detail_title'));
     expect(onClose).toHaveBeenCalledTimes(1);
-
-    onClose.mockClear();
-    fireEvent.click(screen.getByRole('button', { name: /remove_charge/i }));
-    fireEvent.click(screen.getByTestId('dialog-dismiss-invoice_detail_title'));
-    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('asks for confirmation in a dialog, not window.confirm', () => {
