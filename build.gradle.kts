@@ -25,8 +25,13 @@ subprojects {
     //         CVE-2026-56745/55833/55831/59901 fixed in 4.1.136.Final;
     //         CVE-2026-75595 (CRITICAL) fixed in 4.1.137.Final (Trivy alert #617) —
     //         published and resolves cleanly.
+    // Jackson: jackson-databind CVE-2026-68497/91776/91777 and jackson-core
+    //         CVE-2026-89407/89425 (HIGH, Trivy alerts #621-625) fixed in 2.21.7.
+    //         Boot 3.5.16's BOM pins 2.21.4. `jackson-bom.version` realigns every
+    //         Jackson artifact (databind, core, annotations, modules) at once.
     extra["tomcat.version"] = "10.1.55"
     extra["netty.version"] = "4.1.137.Final"
+    extra["jackson-bom.version"] = "2.21.7"
 
     // CVE-2026-54399 / CVE-2026-54428 (security-report.md Finding #7): Apache
     // HttpComponents Core HTTP/1.1 and HTTP/2 parser DoS (unbounded header
