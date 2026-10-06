@@ -34,8 +34,8 @@ subprojects {
     plugins.withId("io.spring.dependency-management") {
         configure<DependencyManagementExtension> {
             dependencies {
-                dependency("org.apache.httpcomponents.core5:httpcore5:5.4.3")
-                dependency("org.apache.httpcomponents.core5:httpcore5-h2:5.4.3")
+                dependency("org.apache.httpcomponents.core5:httpcore5:5.4.4")
+                dependency("org.apache.httpcomponents.core5:httpcore5-h2:5.4.4")
             }
         }
     }
