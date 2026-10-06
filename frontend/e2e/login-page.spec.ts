@@ -24,6 +24,16 @@ test.describe('Login page', () => {
     await expect(page.locator('html')).toHaveAttribute('data-contrast', 'high');
   });
 
+  test('keeps <html lang> in step with the chosen language', async ({ page }) => {
+    const group = page.getByRole('group', { name: /display preferences|preferenze di visualizzazione/i });
+
+    await group.getByRole('button', { name: 'Italiano' }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'it');
+
+    await group.getByRole('button', { name: 'English' }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  });
+
   test('reveals and hides the password', async ({ page }) => {
     const field = page.locator('input[name="password"]');
     await expect(field).toHaveAttribute('type', 'password');
