@@ -8,180 +8,182 @@ spring:
       port: 6379
   cloud:
     gateway:
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOrigins: "${GW_CORS_ALLOWED_ORIGINS:http://localhost:5173}"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - OPTIONS
-            allowedHeaders:
-              - Content-Type
-              - X-CSRF-Token
-            allowCredentials: true
-            maxAge: 3600
-      routes:
-        # Must be listed BEFORE auth-service to take precedence (Gateway first-match routing)
-        - id: auth-service-users
-          uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
-          predicates:
-            - Path=/api/v1/auth/users,/api/v1/auth/users/**
-          filters:
-            - AuthenticationFilter
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 10
-                redis-rate-limiter.burstCapacity: 20
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@userKeyResolver}"
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins: "${GW_CORS_ALLOWED_ORIGINS:http://localhost:5173}"
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders:
+                  - Content-Type
+                  - X-CSRF-Token
+                allowCredentials: true
+                maxAge: 3600
+          routes:
+            # Must be listed BEFORE auth-service to take precedence (Gateway first-match routing)
+            - id: auth-service-users
+              uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
+              predicates:
+                - Path=/api/v1/auth/users,/api/v1/auth/users/**
+              filters:
+                - AuthenticationFilter
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 20
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@userKeyResolver}"
 
-        # /me is a read-only session-bootstrap check called on every page load/reload — it
-        # must NOT share the strict anti-brute-force bucket below (5 req/s, meant for
-        # /login). A 429 there was previously indistinguishable from "not authenticated" to
-        # the frontend's axios interceptor (api.ts), spuriously logging a real user out
-        # under normal rapid navigation. Listed before the auth-service catch-all, same
-        # first-match-wins reasoning as auth-service-users above.
-        - id: auth-service-me
-          uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
-          predicates:
-            - Path=/api/v1/auth/me
-          filters:
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 20
-                redis-rate-limiter.burstCapacity: 50
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@remoteAddrKeyResolver}"
+            # /me is a read-only session-bootstrap check called on every page load/reload — it
+            # must NOT share the strict anti-brute-force bucket below (5 req/s, meant for
+            # /login). A 429 there was previously indistinguishable from "not authenticated" to
+            # the frontend's axios interceptor (api.ts), spuriously logging a real user out
+            # under normal rapid navigation. Listed before the auth-service catch-all, same
+            # first-match-wins reasoning as auth-service-users above.
+            - id: auth-service-me
+              uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
+              predicates:
+                - Path=/api/v1/auth/me
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 20
+                    redis-rate-limiter.burstCapacity: 50
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@remoteAddrKeyResolver}"
 
-        - id: auth-service
-          uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
-          predicates:
-            - Path=/api/v1/auth/**
-          filters:
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 5
-                redis-rate-limiter.burstCapacity: 10
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@remoteAddrKeyResolver}"
+            - id: auth-service
+              uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
+              predicates:
+                - Path=/api/v1/auth/**
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 5
+                    redis-rate-limiter.burstCapacity: 10
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@remoteAddrKeyResolver}"
 
-        - id: guest-service
-          uri: "${GW_GUEST_SERVICE_URI:http://guest-service:8083}"
-          predicates:
-            - Path=/api/v1/guests/**
-          filters:
-            - AuthenticationFilter
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 20
-                redis-rate-limiter.burstCapacity: 50
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@userKeyResolver}"
+            - id: guest-service
+              uri: "${GW_GUEST_SERVICE_URI:http://guest-service:8083}"
+              predicates:
+                - Path=/api/v1/guests/**
+              filters:
+                - AuthenticationFilter
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 20
+                    redis-rate-limiter.burstCapacity: 50
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@userKeyResolver}"
 
-        # frontdesk-service consolidates the former inventory/reservation/stay
-        # services into one deployable (ADR-001, backup/DECISIONS.md).
-        - id: frontdesk-service
-          uri: "${GW_FRONTDESK_SERVICE_URI:http://frontdesk-service:8081}"
-          predicates:
-            - Path=/api/v1/rooms/**, /api/v1/room-types/**, /api/v1/reservations/**, /api/v1/reservation-groups/**, /api/v1/stays/**, /api/v1/quotations/**, /api/v1/rate-calendar/**, /api/v1/frontdesk/**
-          filters:
-            - AuthenticationFilter
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 20
-                redis-rate-limiter.burstCapacity: 50
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@userKeyResolver}"
+            # frontdesk-service consolidates the former inventory/reservation/stay
+            # services into one deployable (ADR-001, backup/DECISIONS.md).
+            - id: frontdesk-service
+              uri: "${GW_FRONTDESK_SERVICE_URI:http://frontdesk-service:8081}"
+              predicates:
+                - Path=/api/v1/rooms/**, /api/v1/room-types/**, /api/v1/reservations/**, /api/v1/reservation-groups/**, /api/v1/stays/**, /api/v1/quotations/**, /api/v1/rate-calendar/**, /api/v1/frontdesk/**
+              filters:
+                - AuthenticationFilter
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 20
+                    redis-rate-limiter.burstCapacity: 50
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@userKeyResolver}"
 
-        # Self-referencing route (T-GW-11): forward: dispatches in-process to
-        # EventStreamController via DispatcherHandler rather than proxying
-        # through the reactive HTTP client, so SSE streaming is unaffected —
-        # but the request still passes through AuthenticationFilter and every
-        # global filter exactly like a proxied route. The forward: target
-        # (/local/events/stream) is deliberately a DIFFERENT path from this
-        # route's own predicate (/api/v1/events/stream) — mapping the
-        # controller at the same public path it's routed from would let
-        # WebFlux's RequestMappingHandlerMapping (checked before Gateway's own
-        # route matching) resolve the request directly, bypassing
-        # AuthenticationFilter entirely (caught in security review; see
-        # EventStreamControllerMappingTest).
-        - id: events-stream
-          uri: forward:/local/events/stream
-          predicates:
-            - Path=/api/v1/events/stream
-          filters:
-            - AuthenticationFilter
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 20
-                redis-rate-limiter.burstCapacity: 50
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@userKeyResolver}"
+            # Self-referencing route (T-GW-11): forward: dispatches in-process to
+            # EventStreamController via DispatcherHandler rather than proxying
+            # through the reactive HTTP client, so SSE streaming is unaffected —
+            # but the request still passes through AuthenticationFilter and every
+            # global filter exactly like a proxied route. The forward: target
+            # (/local/events/stream) is deliberately a DIFFERENT path from this
+            # route's own predicate (/api/v1/events/stream) — mapping the
+            # controller at the same public path it's routed from would let
+            # WebFlux's RequestMappingHandlerMapping (checked before Gateway's own
+            # route matching) resolve the request directly, bypassing
+            # AuthenticationFilter entirely (caught in security review; see
+            # EventStreamControllerMappingTest).
+            - id: events-stream
+              uri: forward:/local/events/stream
+              predicates:
+                - Path=/api/v1/events/stream
+              filters:
+                - AuthenticationFilter
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 20
+                    redis-rate-limiter.burstCapacity: 50
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@userKeyResolver}"
 
-        - id: billing-service
-          uri: "${GW_BILLING_SERVICE_URI:http://billing-service:8085}"
-          predicates:
-            - Path=/api/v1/invoices/**, /api/v1/reports/**
-          filters:
-            - AuthenticationFilter
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 20
-                redis-rate-limiter.burstCapacity: 50
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@userKeyResolver}"
+            - id: billing-service
+              uri: "${GW_BILLING_SERVICE_URI:http://billing-service:8085}"
+              predicates:
+                - Path=/api/v1/invoices/**, /api/v1/reports/**
+              filters:
+                - AuthenticationFilter
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 20
+                    redis-rate-limiter.burstCapacity: 50
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@userKeyResolver}"
 
-        - id: fb-service
-          uri: "${GW_FB_SERVICE_URI:http://fb-service:8086}"
-          predicates:
-            - Path=/api/v1/fb/**
-          filters:
-            - AuthenticationFilter
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter.replenishRate: 20
-                redis-rate-limiter.burstCapacity: 50
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@userKeyResolver}"
+            - id: fb-service
+              uri: "${GW_FB_SERVICE_URI:http://fb-service:8086}"
+              predicates:
+                - Path=/api/v1/fb/**
+              filters:
+                - AuthenticationFilter
+                - name: RequestRateLimiter
+                  args:
+                    redis-rate-limiter.replenishRate: 20
+                    redis-rate-limiter.burstCapacity: 50
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@userKeyResolver}"
 
-        - id: auth-service-docs
-          uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
-          predicates:
-            - Path=/auth-service/v3/api-docs
-          filters:
-            - RewritePath=/auth-service/(?<remaining>.*), /${remaining}
+            - id: auth-service-docs
+              uri: "${GW_AUTH_SERVICE_URI:http://auth-service:8087}"
+              predicates:
+                - Path=/auth-service/v3/api-docs
+              filters:
+                - RewritePath=/auth-service/(?<remaining>.*), /${remaining}
 
-        - id: frontdesk-service-docs
-          uri: "${GW_FRONTDESK_SERVICE_URI:http://frontdesk-service:8081}"
-          predicates:
-            - Path=/frontdesk-service/v3/api-docs
-          filters:
-            - RewritePath=/frontdesk-service/(?<remaining>.*), /${remaining}
+            - id: frontdesk-service-docs
+              uri: "${GW_FRONTDESK_SERVICE_URI:http://frontdesk-service:8081}"
+              predicates:
+                - Path=/frontdesk-service/v3/api-docs
+              filters:
+                - RewritePath=/frontdesk-service/(?<remaining>.*), /${remaining}
 
-        - id: guest-service-docs
-          uri: "${GW_GUEST_SERVICE_URI:http://guest-service:8083}"
-          predicates:
-            - Path=/guest-service/v3/api-docs
-          filters:
-            - RewritePath=/guest-service/(?<remaining>.*), /${remaining}
+            - id: guest-service-docs
+              uri: "${GW_GUEST_SERVICE_URI:http://guest-service:8083}"
+              predicates:
+                - Path=/guest-service/v3/api-docs
+              filters:
+                - RewritePath=/guest-service/(?<remaining>.*), /${remaining}
 
-        - id: billing-service-docs
-          uri: "${GW_BILLING_SERVICE_URI:http://billing-service:8085}"
-          predicates:
-            - Path=/billing-service/v3/api-docs
-          filters:
-            - RewritePath=/billing-service/(?<remaining>.*), /${remaining}
+            - id: billing-service-docs
+              uri: "${GW_BILLING_SERVICE_URI:http://billing-service:8085}"
+              predicates:
+                - Path=/billing-service/v3/api-docs
+              filters:
+                - RewritePath=/billing-service/(?<remaining>.*), /${remaining}
 
-        - id: fb-service-docs
-          uri: "${GW_FB_SERVICE_URI:http://fb-service:8086}"
-          predicates:
-            - Path=/fb-service/v3/api-docs
-          filters:
-            - RewritePath=/fb-service/(?<remaining>.*), /${remaining}
+            - id: fb-service-docs
+              uri: "${GW_FB_SERVICE_URI:http://fb-service:8086}"
+              predicates:
+                - Path=/fb-service/v3/api-docs
+              filters:
+                - RewritePath=/fb-service/(?<remaining>.*), /${remaining}
 
 springdoc:
   api-docs:
@@ -215,9 +217,9 @@ management:
   tracing:
     sampling:
       probability: 1.0
-  zipkin:
-    tracing:
-      endpoint: http://zipkin:9411/api/v2/spans
+    export:
+      zipkin:
+        endpoint: http://zipkin:9411/api/v2/spans
 
 jwt:
   secret: "${JWT_SECRET}"

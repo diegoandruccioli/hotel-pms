@@ -51,8 +51,7 @@ dependencies {
     implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j")
     // --- Observability: Actuator + Micrometer Tracing (Zipkin/Brave) ---
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("io.micrometer:micrometer-tracing-bridge-brave")
-    implementation("io.zipkin.reporter2:zipkin-reporter-brave")
+    implementation("org.springframework.boot:spring-boot-starter-zipkin")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     
     compileOnly("org.projectlombok:lombok:1.18.38")

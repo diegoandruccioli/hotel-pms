@@ -37,8 +37,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-redis-reactive")
 
     // --- Observability: Micrometer Tracing (Zipkin/Brave) ---
-    implementation("io.micrometer:micrometer-tracing-bridge-brave")
-    implementation("io.zipkin.reporter2:zipkin-reporter-brave")
+    implementation("org.springframework.boot:spring-boot-starter-zipkin")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     // --- OpenAPI / Swagger UI (WebFlux / Reactive Gateway) ---
