@@ -7842,6 +7842,22 @@ gateway e auth, build completa verde (test, PMD, Checkstyle, jacoco) e
 rescan Trivy dell'immagine costruita senza CVE Jackson.
 Commit: \commitref{08106221}{fix(security): pin jackson-bom to 2.21.7 for databind/core CVEs}
 
+\paragraph{Rischio accettato: XsltView in spring-webmvc (DEP-CVE-14)}
+Il gate Trivy CRITICAL ha segnalato CVE-2026-47884 (CVSS 9.8) su
+\texttt{spring-webmvc} 6.2.19 in tutti i servizi Boot Servlet: SSRF/RCE tramite
+\texttt{XsltView} renderizzata da un mapping \texttt{/**} senza nome vista
+esplicito. La correzione esiste solo in Spring Framework 7.0.9; la 6.2.19 è
+l'ultima 6.2.x open source e Framework 7 non è compatibile con Spring Boot
+3.5.16, perciò né un override di versione né un backport sono praticabili.
+La CVE è stata classificata come \emph{rischio accettato per non
+raggiungibilità}: nessun servizio dichiara \texttt{XsltView} o
+\texttt{XsltViewResolver} né carica stylesheet XSLT, i servizi Servlet
+espongono soltanto \texttt{@RestController} (nessun rendering di viste) e
+Thymeleaf in notification-service produce solo corpi e-mail. La soppressione
+in \texttt{.trivyignore} è motivata e va rimossa con la migrazione a Spring
+Boot 4 / Framework 7.0.9 o successivo.
+Commit: \commitref{1f1ae6f2}{fix(security): suppress unreachable spring-webmvc XsltView CVE-2026-47884}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Appendice B --- Utilizzo dell'IA e Revisione Critica}
 \label{app:ia}
