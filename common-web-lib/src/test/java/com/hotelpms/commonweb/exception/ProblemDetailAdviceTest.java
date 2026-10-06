@@ -5,11 +5,12 @@ import feign.Request;
 import feign.RequestTemplate;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
-import org.springframework.data.mapping.PropertyPath;
-import org.springframework.data.mapping.PropertyReferenceException;
+import org.springframework.data.core.PropertyPath;
+import org.springframework.data.core.PropertyReferenceException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -44,9 +45,9 @@ class ProblemDetailAdviceTest {
     private final TestAdvice advice = new TestAdvice();
 
     @Test
-    @SuppressWarnings("deprecation")
     void handlesHttpMessageNotReadableExceptionAs400() {
-        final HttpMessageNotReadableException ex = new HttpMessageNotReadableException("bad json");
+        final HttpMessageNotReadableException ex = new HttpMessageNotReadableException("bad json",
+                new MockHttpInputMessage(new byte[0]));
 
         final ProblemDetail result = advice.handleHttpMessageNotReadableException(ex);
 
@@ -126,7 +127,7 @@ class ProblemDetailAdviceTest {
 
     @Test
     void handlesNoResourceFoundExceptionAs404() {
-        final NoResourceFoundException ex = new NoResourceFoundException(HttpMethod.GET, "actuator/health");
+        final NoResourceFoundException ex = new NoResourceFoundException(HttpMethod.GET, "/actuator/health", "actuator/health");
 
         final ProblemDetail result = advice.handleNoResourceFoundException(ex);
 

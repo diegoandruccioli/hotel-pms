@@ -2,8 +2,8 @@ package com.hotelpms.frontdesk.nightaudit.service.impl;
 
 import com.hotelpms.internalauth.security.TenantContext;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.hotelpms.frontdesk.client.BillingClient;
 import com.hotelpms.frontdesk.client.dto.PaymentMethodTotalDto;
 import com.hotelpms.frontdesk.client.dto.PaymentSummaryClientResponse;
@@ -258,7 +258,7 @@ public class NightAuditServiceImpl implements NightAuditService {
     private String writeCashSummaryJson(final List<PaymentMethodTotalDto> byMethod) {
         try {
             return objectMapper.writeValueAsString(byMethod);
-        } catch (final JsonProcessingException e) {
+        } catch (final JacksonException e) {
             log.warn("[NIGHT_AUDIT] failed to serialize cash summary — storing as degraded", e);
             return null;
         }
@@ -270,7 +270,7 @@ public class NightAuditServiceImpl implements NightAuditService {
         }
         try {
             return objectMapper.readerForListOf(PaymentMethodTotalDto.class).readValue(json);
-        } catch (final JsonProcessingException e) {
+        } catch (final JacksonException e) {
             log.warn("[NIGHT_AUDIT] failed to deserialize stored cash summary — returning empty", e);
             return List.of();
         }

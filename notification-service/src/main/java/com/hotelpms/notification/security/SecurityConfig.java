@@ -58,12 +58,10 @@ public class SecurityConfig {
      * @param http       the HttpSecurity builder
      * @param nonceStore the nonce store for anti-replay checks
      * @return the configured SecurityFilterChain
-     * @throws Exception if configuration fails
      */
     @Bean
-    @SuppressWarnings({"PMD.SignatureDeclareThrowsException", "null"})
-    public SecurityFilterChain securityFilterChain(final HttpSecurity http, final NonceStore nonceStore)
-            throws Exception {
+    @SuppressWarnings("null")
+    public SecurityFilterChain securityFilterChain(final HttpSecurity http, final NonceStore nonceStore) {
         return InternalApiSecurityFilterChainFactory.build(http, hmacSecret, nonceStore, HMAC_EXEMPT_PATH_PREFIXES);
     }
 }
