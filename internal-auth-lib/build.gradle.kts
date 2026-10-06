@@ -21,7 +21,6 @@ repositories {
 ext {
     // Matches the version every consuming service imports (see */build.gradle.kts) —
     // manages the feign-core version below.
-    set("springCloudVersion", "2025.0.0")
 }
 
 // Version alignment only — this is a plain java-library, not a Spring Boot
@@ -31,7 +30,7 @@ ext {
 // and Feign artifact versions on every service's classpath.
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.boot:spring-boot-dependencies:3.5.16")
+        mavenBom("org.springframework.boot:spring-boot-dependencies:4.0.8")
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
     }
 }

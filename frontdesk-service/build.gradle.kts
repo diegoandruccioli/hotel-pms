@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.5.16"
+    id("org.springframework.boot") version "4.0.8"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.danilopianini.gradle-java-qa") version "1.165.0"
 }
@@ -29,7 +29,6 @@ repositories {
 }
 
 ext {
-    set("springCloudVersion", "2025.0.0")
     set("mapStructVersion", "1.6.3")
     // tomcat.version / netty.version: centralized in the root build.gradle.kts's
     // subprojects{} block — see that file for the CVE history.
@@ -42,7 +41,7 @@ dependencies {
     implementation(project(":pdf-template-engine"))
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-security")
     // Redis-backed nonce store for internal HMAC anti-replay (T-GW-08)
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
@@ -57,7 +56,7 @@ dependencies {
     implementation("org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j")
 
     // --- Database migration (Flyway) ---
-    implementation("org.flywaydb:flyway-core")
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
 
     // --- Caching (RoomType reference data + Alloggiati lookup tables) ---
@@ -80,7 +79,7 @@ dependencies {
     annotationProcessor("org.mapstruct:mapstruct-processor:${property("mapStructVersion")}")
 
     // --- OpenAPI / Swagger UI ---
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1")
 
     runtimeOnly("org.postgresql:postgresql")
 
@@ -93,13 +92,12 @@ dependencies {
     implementation("org.apache.commons:commons-csv:1.9.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("net.bytebuddy:byte-buddy:1.15.11")
-    testImplementation("net.bytebuddy:byte-buddy-agent:1.15.11")
-    testImplementation("org.mockito:mockito-core:5.15.2")
-    testImplementation("org.mockito:mockito-junit-jupiter:5.15.2")
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-cache-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
-    testImplementation("org.testcontainers:junit-jupiter")
-    testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
     // ADR-004: enforces hotel_id scoping on multi-tenant repositories (T-BILL-04 class of bug) —
     // TenantIsolationRules + archunit-junit5 come transitively via the testFixtures below.
     testImplementation(testFixtures(project(":internal-auth-lib")))

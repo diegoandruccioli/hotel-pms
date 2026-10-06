@@ -52,13 +52,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * describes: an entity is loaded (version N), a concurrent transaction bumps
  * the row's version to N+1 without that loaded instance knowing, then a
  * delete is attempted using the stale in-memory version. With
- * {@code check = ResultCheckStyle.COUNT} on the entity's {@code @SQLDelete},
+ * {@code verify = Expectation.RowCount.class} on the entity's {@code @SQLDelete},
  * Hibernate notices the 0-row update and raises a {@code StaleStateException}
  * that Spring translates to {@link ObjectOptimisticLockingFailureException}
  * (mapped to HTTP 409 {@code CONCURRENT_MODIFICATION} by
  * {@code GlobalExceptionHandler}). Without that flag (the pre-fix state),
  * the same stale delete silently affects 0 rows and reports success — these
- * tests fail if {@code check = ResultCheckStyle.COUNT} is removed from any
+ * tests fail if {@code verify = Expectation.RowCount.class} is removed from any
  * of the three entities.
  */
 @SpringBootTest(
@@ -74,7 +74,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
                 "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration",
                 "spring.jpa.hibernate.ddl-auto=validate",
                 "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect",
-                "spring.cache.type=none"
+                "spring.cache.type=none",
+                "spring.autoconfigure.exclude="
+                        + "org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration"
         }
 )
 @Testcontainers(disabledWithoutDocker = true)

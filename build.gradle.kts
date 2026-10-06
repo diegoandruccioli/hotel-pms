@@ -9,34 +9,20 @@ plugins {
 
 subprojects {
     // Centralized override for CVEs fixed by newer transitive versions than Spring
-    // Boot 3.5.16's BOM pins — set once for every subproject instead of the
-    // per-service `ext { set(...) }` block each of the 8 Boot services used to
-    // carry. That duplication is exactly what let Tomcat 10.1.55 go stale in all
-    // 8 places at once (Trivy alerts #597/598/599, CRITICAL).
-    // Tomcat: CVE-2026-43512/43513/43515/41284/41293/42498 fixed in 10.1.55 (2026-05-05).
-    //         Trivy alerts #597/598/599 (CRITICAL) claim a fix in 10.1.58, but that
-    //         version is NOT published on Maven Central as of 2026-09-10 (verified:
-    //         GET .../tomcat-embed-core/10.1.58/... -> 404; ./gradlew :auth-service:dependencies
-    //         fails to resolve it). Left pinned at 10.1.55 — the highest version that
-    //         actually exists — until Apache publishes the fix. Re-check on release
-    //         and bump both this value and dismiss the three alerts if still open.
-    // Netty:  CVE-2026-42583/42584/42579/42587 fixed in 4.1.133.Final;
-    //         CVE-2026-47691/45674/45416/44249 fixed in 4.1.135.Final;
-    //         CVE-2026-56745/55833/55831/59901 fixed in 4.1.136.Final;
-    //         CVE-2026-75595 (CRITICAL) fixed in 4.1.137.Final (Trivy alert #617) —
-    //         published and resolves cleanly.
-    // Jackson: jackson-databind CVE-2026-68497/91776/91777 and jackson-core
-    //         CVE-2026-89407/89425 (HIGH, Trivy alerts #621-625) fixed in 2.21.7.
-    //         Boot 3.5.16's BOM pins 2.21.4. `jackson-bom.version` realigns every
-    //         Jackson artifact (databind, core, annotations, modules) at once.
-    extra["tomcat.version"] = "10.1.55"
-    extra["netty.version"] = "4.1.137.Final"
-    extra["jackson-bom.version"] = "2.21.7"
+    // Boot 4.0.8's BOM pins — set once for every subproject instead of per service.
+    // Tomcat 11.0.24 / Netty 4.2.17 come from the Boot 4.0.8 BOM: the old 10.1.x /
+    // 4.1.x overrides (migration F14) no longer apply and were dropped; re-check
+    // Trivy and re-add a pin here only if a newer fix is needed.
+    // Jackson 2 (still used transitively, e.g. jjwt-jackson): jackson-databind
+    //         CVE-2026-68497/91776/91777 and jackson-core CVE-2026-89407/89425 fixed
+    //         in 2.21.7; Boot 4.0.8's BOM pins 2.21.5 via `jackson-2-bom.version`.
+    //         Jackson 3 (`jackson-bom.version`, tools.jackson.*) stays at the BOM's 3.1.5.
+    extra["jackson-2-bom.version"] = "2.21.7"
 
     // CVE-2026-54399 / CVE-2026-54428 (security-report.md Finding #7): Apache
     // HttpComponents Core HTTP/1.1 and HTTP/2 parser DoS (unbounded header
     // count/length), fixed in 5.4.3. Transitive on every service via Spring Boot
-    // 3.5.16's BOM, which still pins both httpcore5 and its HTTP/2 sibling
+    // 4.0.8's BOM, which still pins both httpcore5 and its HTTP/2 sibling
     // httpcore5-h2 at 5.3.6 (vulnerable) — no service declares either directly.
     // One override here instead of repeating it in each service's own
     // build.gradle.kts, per the report's remediation (centralized bump, not a

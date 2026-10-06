@@ -14,7 +14,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestOperations;
 import org.xml.sax.SAXException;
@@ -281,7 +280,7 @@ public class AlloggiatiWebSenderServiceImpl implements AlloggiatiWebSenderServic
      * @throws ExternalServiceException on HTTP or connection error
      */
     private String callSoap(final String soapBody, final String soapAction) {
-        final MultiValueMap<String, String> headers = new HttpHeaders();
+        final HttpHeaders headers = new HttpHeaders();
         headers.set(HttpHeaders.CONTENT_TYPE, MEDIA_TYPE_XML);
         headers.set("SOAPAction", DQUOTE + soapAction + DQUOTE);
 
