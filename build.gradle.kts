@@ -16,8 +16,11 @@ subprojects {
     // Jackson 2 (still used transitively, e.g. jjwt-jackson): jackson-databind
     //         CVE-2026-68497/91776/91777 and jackson-core CVE-2026-89407/89425 fixed
     //         in 2.21.7; Boot 4.0.8's BOM pins 2.21.5 via `jackson-2-bom.version`.
-    //         Jackson 3 (`jackson-bom.version`, tools.jackson.*) stays at the BOM's 3.1.5.
+    // Jackson 3 (tools.jackson.*): the same advisories (jackson-core CVE-2026-89407/89425,
+    //         jackson-databind CVE-2026-68497/91776/91777, HIGH, found by the Trivy rescan
+    //         after the Boot 4 migration) are fixed in 3.1.7; Boot 4.0.8 pins 3.1.5.
     extra["jackson-2-bom.version"] = "2.21.7"
+    extra["jackson-bom.version"] = "3.1.7"
 
     // CVE-2026-54399 / CVE-2026-54428 (security-report.md Finding #7): Apache
     // HttpComponents Core HTTP/1.1 and HTTP/2 parser DoS (unbounded header

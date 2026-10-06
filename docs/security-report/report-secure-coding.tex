@@ -7854,7 +7854,7 @@ gateway su \texttt{spring-cloud-starter-gateway-server-webflux} con prefisso
 \texttt{check} e rimozione degli override Tomcat/Netty ormai superati.
 Verificato: \texttt{./gradlew build} verde (test, PMD, Checkstyle, SpotBugs, jacoco),
 stack Docker con tutti i servizi healthy, migrazioni Flyway applicate, tracing
-Zipkin e target Prometheus attivi.
+Zipkin e target Prometheus attivi. Il rescan Trivy delle immagini ha rivelato cinque HIGH su Jackson~3 (3.1.5, 	exttt{tools.jackson}), risolti con l'override 	exttt{jackson-bom.version} a 3.1.7; dopo la correzione le otto immagini dei servizi risultano senza vulnerabilit\`a CRITICAL/HIGH.
 Commit: \commitref{7256d859}{feat(security): migrate backend to Spring Boot 4.0.8 / Framework 7.0.9}
 
 % ═════════════════════════════════════════════════════════════════════════════
