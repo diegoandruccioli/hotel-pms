@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.5.16"
+    id("org.springframework.boot") version "4.0.8"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.danilopianini.gradle-java-qa") version "1.165.0"
 }
@@ -29,7 +29,6 @@ repositories {
 }
 
 ext {
-    set("springCloudVersion", "2025.0.0")
     // tomcat.version / netty.version: centralized in the root build.gradle.kts's
     // subprojects{} block — see that file for the CVE history.
 }
@@ -42,6 +41,8 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok:1.18.38")
     
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.boot:spring-boot-resttestclient")
+    testImplementation("org.springframework.boot:spring-boot-restclient")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
@@ -58,11 +59,6 @@ dependencyManagement {
         // CVE-2026-5598: fixed in BouncyCastle 1.84. CVE-2026-8763 (name
         // constraints bypass via trailing dot, CRITICAL): fixed in 1.85.
         dependency("org.bouncycastle:bcprov-jdk18on:1.85")
-        // CVE-2026-40981 (GCP Secrets Manager backend info disclosure, not used here, defense
-        // in depth) + CVE-2026-40982 CRITICAL (path traversal serving arbitrary files via crafted
-        // URL): Spring Cloud 2025.0.0 BOM pins spring-cloud-config-server 4.3.0, vulnerable through
-        // 4.3.2. Fixed in 4.3.3 — override regardless of BOM.
-        dependency("org.springframework.cloud:spring-cloud-config-server:4.3.3")
     }
 }
 

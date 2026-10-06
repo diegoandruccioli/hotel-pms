@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.5.16"
+    id("org.springframework.boot") version "4.0.8"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.danilopianini.gradle-java-qa") version "1.165.0"
 }
@@ -29,7 +29,6 @@ repositories {
 }
 
 ext {
-    set("springCloudVersion", "2025.0.0")
     // tomcat.version / netty.version: centralized in the root build.gradle.kts's
     // subprojects{} block — see that file for the CVE history.
 }
@@ -39,7 +38,7 @@ dependencies {
     implementation(project(":common-web-lib"))
 
     // Core web (REST endpoints to receive notification requests from other services)
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
     // Email sending — Jakarta Mail via Spring Boot Starter Mail
@@ -57,25 +56,21 @@ dependencies {
 
     // Observability
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("io.micrometer:micrometer-tracing-bridge-brave")
-    implementation("io.zipkin.reporter2:zipkin-reporter-brave")
+    implementation("org.springframework.boot:spring-boot-starter-zipkin")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     // GAP-4: Log aggregation SIEM (Loki via logback appender)
     implementation("com.github.loki4j:loki-logback-appender:1.5.2")
 
     // OpenAPI / Swagger UI
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1")
 
     compileOnly("org.projectlombok:lombok:1.18.38")
     annotationProcessor("org.projectlombok:lombok:1.18.38")
 
     // Test
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("net.bytebuddy:byte-buddy:1.15.11")
-    testImplementation("net.bytebuddy:byte-buddy-agent:1.15.11")
-    testImplementation("org.mockito:mockito-core:5.15.2")
-    testImplementation("org.mockito:mockito-junit-jupiter:5.15.2")
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     // GreenMail: fake SMTP server for unit/integration tests — no external SMTP required
     testImplementation("com.icegreen:greenmail-spring:2.1.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

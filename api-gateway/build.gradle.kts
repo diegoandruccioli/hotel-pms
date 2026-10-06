@@ -1,6 +1,6 @@
 plugins {
     java
-    id("org.springframework.boot") version "3.5.16"
+    id("org.springframework.boot") version "4.0.8"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -22,14 +22,13 @@ repositories {
 }
 
 ext {
-    set("springCloudVersion", "2025.0.0")
     set("jjwtVersion", "0.11.5")
     // tomcat.version / netty.version: centralized in the root build.gradle.kts's
     // subprojects{} block — see that file for the CVE history.
 }
 
 dependencies {
-    implementation("org.springframework.cloud:spring-cloud-starter-gateway")
+    implementation("org.springframework.cloud:spring-cloud-starter-gateway-server-webflux")
     implementation("org.springframework.cloud:spring-cloud-starter-config")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
@@ -38,12 +37,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-redis-reactive")
 
     // --- Observability: Micrometer Tracing (Zipkin/Brave) ---
-    implementation("io.micrometer:micrometer-tracing-bridge-brave")
-    implementation("io.zipkin.reporter2:zipkin-reporter-brave")
+    implementation("org.springframework.boot:spring-boot-starter-zipkin")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     // --- OpenAPI / Swagger UI (WebFlux / Reactive Gateway) ---
-    implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:2.8.4")
+    implementation("org.springdoc:springdoc-openapi-starter-webflux-ui:3.1.1")
 
     implementation("io.jsonwebtoken:jjwt-api:${property("jjwtVersion")}")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:${property("jjwtVersion")}")
@@ -59,8 +57,6 @@ dependencyManagement {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
     }
     dependencies {
-        // CVE-2025-41253: EL injection fixed in spring-cloud-gateway-server 4.3.2.
-        dependency("org.springframework.cloud:spring-cloud-gateway-server:4.3.2")
         // CVE-2026-5598: fixed in BouncyCastle 1.84. CVE-2026-8763 (name
         // constraints bypass via trailing dot, CRITICAL): fixed in 1.85.
         dependency("org.bouncycastle:bcprov-jdk18on:1.85")

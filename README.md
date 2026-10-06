@@ -2,7 +2,7 @@
 
 [![CI Quality Gate](https://github.com/diegoandruccioli/hotel-pms/actions/workflows/ci.yml/badge.svg)](https://github.com/diegoandruccioli/hotel-pms/actions/workflows/ci.yml)
 [![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
-[![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Spring Boot 4.0](https://img.shields.io/badge/Spring%20Boot-4.0-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![TypeScript 5](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
@@ -72,7 +72,7 @@ See [`docs/COMPLIANCE_AUDIT_2026-08.md`](docs/COMPLIANCE_AUDIT_2026-08.md) and [
 |-------|-----------|
 | **Language (Backend)** | Java 21 |
 | **Language (Frontend)** | TypeScript 5.x |
-| **Backend Framework** | Spring Boot 3.5.x, Spring Cloud 2025.0 |
+| **Backend Framework** | Spring Boot 4.0.x, Spring Cloud 2025.1 |
 | **Frontend Framework** | React 19, Vite 7.x |
 | **State Management** | Zustand |
 | **Styling** | Tailwind CSS 3.x |
