@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { SettingsSystem } from './SettingsSystem';
 import { stayService } from '../../services';
 import type { HotelSettingsResponse } from '../../types';
+import { mockAxiosErrorWithDetail } from '../../test-utils/mockAxiosError';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -19,6 +20,12 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../services/stayService', () => ({
   stayService: { getHotelSettings: vi.fn(), updateHotelSettings: vi.fn() },
+}));
+
+const mockAddToast = vi.fn();
+vi.mock('../../store/toastStore', () => ({
+  useToastStore: (sel: unknown) =>
+    (sel as (s: { addToast: () => void }) => unknown)({ addToast: mockAddToast }),
 }));
 
 const SETTINGS: HotelSettingsResponse = {
@@ -167,6 +174,61 @@ describe('SettingsSystem', () => {
     fireEvent.blur(textarea);
     await waitFor(() => expect(stayService.updateHotelSettings)
       .toHaveBeenCalledWith({ emailGreetingText: 'New greeting' }));
+  });
+
+  describe('when saving fails', () => {
+    beforeEach(() => {
+      vi.mocked(stayService.getHotelSettings).mockResolvedValue(
+        { ...SETTINGS, sendReservationConfirmedEmail: true });
+    });
+
+    it('shows the backend detail in an error toast and leaves the switch unchanged', async () => {
+      vi.mocked(stayService.updateHotelSettings).mockRejectedValue(mockAxiosErrorWithDetail('HOTEL_SETTINGS_INVALID'));
+      renderPage();
+      const toggle = screen.getByRole('switch', { name: ALLOGGIATI_SWITCH });
+      await waitFor(() => expect(toggle).not.toBeDisabled());
+
+      fireEvent.click(toggle);
+
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('HOTEL_SETTINGS_INVALID', 'error'));
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+      await waitFor(() => expect(toggle).not.toBeDisabled());
+    });
+
+    it('falls back to the generic message when the error has no detail', async () => {
+      vi.mocked(stayService.updateHotelSettings).mockRejectedValue(new Error('network'));
+      renderPage();
+      const toggle = screen.getByRole('switch', { name: CHECKOUT_EMAIL_SWITCH });
+      await waitFor(() => expect(toggle).not.toBeDisabled());
+
+      fireEvent.click(toggle);
+
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('settings_system_save_failed', 'error'));
+    });
+
+    it('reports a failed subject save', async () => {
+      vi.mocked(stayService.updateHotelSettings).mockRejectedValue(new Error('network'));
+      renderPage();
+      const input = await screen.findByLabelText('email_subject_label');
+
+      fireEvent.change(input, { target: { value: 'New subject' } });
+      fireEvent.blur(input);
+
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('settings_system_save_failed', 'error'));
+      expect(input).toHaveValue('New subject');
+    });
+
+    it('reports a failed greeting save and keeps what was typed', async () => {
+      vi.mocked(stayService.updateHotelSettings).mockRejectedValue(new Error('network'));
+      renderPage();
+      const textarea = await screen.findByLabelText('email_greeting_label');
+
+      fireEvent.change(textarea, { target: { value: 'Draft' } });
+      fireEvent.blur(textarea);
+
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('settings_system_save_failed', 'error'));
+      expect(textarea).toHaveValue('Draft');
+    });
   });
 
   it('should have no accessibility violations', async () => {

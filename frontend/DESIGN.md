@@ -367,6 +367,8 @@ historical baseline pointer).
 - **Focus trapped inside open modals/dialogs** (`focus-trap-react`); Escape closes. With dialogs
   stacked, Escape closes **only the topmost** one: `useEscapeKey` keeps a shared stack, so a
   parent dialog needs no workaround to ignore Escape while a nested one is open.
+- **`<html lang>` follows the active language** (WCAG 3.1.1): `i18n.ts` syncs it on every
+  `languageChanged`, so language switches (login chips, settings) need no extra code.
 - **Skip-to-main-content link** is the first focusable element on every page.
 - Semantic HTML first (`<nav>`, `<main>`, `<dialog>`, …) — ARIA only when semantic
   HTML is insufficient.

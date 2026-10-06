@@ -8,6 +8,8 @@ import { M3Switch } from '../../components/m3';
 import { M3Textarea } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { SettingsSectionTitle } from '../../components/SettingsSectionTitle';
+import { useToastStore } from '../../store/toastStore';
+import { getErrorMessage } from '../../utils';
 
 const EMAIL_GREETING_MAX_LENGTH = 300;
 
@@ -56,6 +58,7 @@ SubjectField.displayName = 'SubjectField';
 
 export const SettingsSystem = () => {
   const { t } = useTranslation('settings');
+  const addToast = useToastStore((s) => s.addToast);
 
   const [hotelSettings, setHotelSettings] = useState<HotelSettingsResponse | null>(null);
   const [saving, setSaving] = useState(false);
@@ -74,11 +77,12 @@ export const SettingsSystem = () => {
     try {
       const updated = await stayService.updateHotelSettings(partial);
       setHotelSettings(updated);
-      return updated;
+    } catch (err) {
+      addToast(getErrorMessage(err, t('settings_system_save_failed')), 'error');
     } finally {
       setSaving(false);
     }
-  }, []);
+  }, [addToast, t]);
 
   const handleAlloggiatiToggle = useCallback(async () => {
     if (!hotelSettings) return;
