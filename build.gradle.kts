@@ -10,9 +10,10 @@ plugins {
 subprojects {
     // Centralized override for CVEs fixed by newer transitive versions than Spring
     // Boot 4.0.8's BOM pins — set once for every subproject instead of per service.
-    // Tomcat 11.0.24 / Netty 4.2.17 come from the Boot 4.0.8 BOM: the old 10.1.x /
-    // 4.1.x overrides (migration F14) no longer apply and were dropped; re-check
-    // Trivy and re-add a pin here only if a newer fix is needed.
+    // Netty 4.2.17 comes from the Boot 4.0.8 BOM (the old 4.1.x override no longer applies).
+    // Tomcat: Boot 4.0.8's BOM pins 11.0.24, hit by CVE-2026-65182/65905/68525 (Trivy,
+    //         fixed in 11.0.25). 11.0.26 is published on Maven Central (verified 2026-10-06).
+    extra["tomcat.version"] = "11.0.26"
     // Jackson 2 (still used transitively, e.g. jjwt-jackson): jackson-databind
     //         CVE-2026-68497/91776/91777 and jackson-core CVE-2026-89407/89425 fixed
     //         in 2.21.7; Boot 4.0.8's BOM pins 2.21.5 via `jackson-2-bom.version`.
