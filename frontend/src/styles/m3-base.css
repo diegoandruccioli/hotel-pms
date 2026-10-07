@@ -64,10 +64,6 @@
   --md-elevation-4: 0px 6px 10px 4px rgba(0,0,0,0.15), 0px 2px 3px 0px rgba(0,0,0,0.30);
   --md-elevation-5: 0px 8px 12px 6px rgba(0,0,0,0.15), 0px 4px 4px 0px rgba(0,0,0,0.30);
 
-  /* Glass */
-  --md-glass-bg: rgba(255, 255, 255, 0.72);
-  --md-glass-border: rgba(255, 255, 255, 0.3);
-
   /* Scrollbar */
   --md-scrollbar-thumb: #C3C7CF;
   --md-scrollbar-thumb-hover: #73777F;
@@ -130,10 +126,6 @@
   --md-elevation-4: 0px 6px 10px 4px rgba(0,0,0,0.30), 0px 2px 3px 0px rgba(0,0,0,0.50);
   --md-elevation-5: 0px 8px 12px 6px rgba(0,0,0,0.30), 0px 4px 4px 0px rgba(0,0,0,0.50);
 
-  /* Glass — dark */
-  --md-glass-bg: rgba(30, 32, 35, 0.75);
-  --md-glass-border: rgba(255, 255, 255, 0.08);
-
   /* Scrollbar — dark */
   --md-scrollbar-thumb: #43474E;
   --md-scrollbar-thumb-hover: #8D9199;
@@ -185,9 +177,6 @@
   --md-season-4: #003940;
   --md-season-5: #4A2600;
   --md-season-6: #263238;
-
-  --md-glass-bg: rgba(255, 255, 255, 0.95);
-  --md-glass-border: rgba(0, 0, 0, 0.5);
 }
 
 .dark[data-contrast="high"] {
@@ -230,9 +219,6 @@
   --md-season-4: #C2ECF2;
   --md-season-5: #FFDCC0;
   --md-season-6: #DCEAF0;
-
-  --md-glass-bg: rgba(0, 0, 0, 0.95);
-  --md-glass-border: rgba(255, 255, 255, 0.5);
 }
 
 /* ── Typography Scale ───────────────────────────────── */
@@ -278,8 +264,6 @@ html {
     background-color: var(--md-surface-container-low);
   }
 }
-
-/* ── Glassmorphism Utilities ───────────────────────── */
 
 /* ── Scrollbar ─────────────────────────────────────── */
 

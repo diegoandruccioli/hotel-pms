@@ -107,11 +107,6 @@ themes by `src/styles/contrast.test.ts`.
 solid pair as `M3Card variant="solid"` (`surface-container-lowest`, 1px `outline-variant`
 border, `shape-lg`, `elevation-1`); the header row is `surface-container-highest`.
 
-**Glass surfaces — deprecated** — `.glass-surface`
-(`--md-glass-*` tokens) and `M3Card variant="glass"` have no consumers left and are
-removed in the final cleanup (C01).
-Don't use them for new surfaces; use the solid pair above.
-
 **App shell navigation** — from `lg` (1024px) a fixed 264px sidebar (`w-66`,
 `surface-container-lowest`, `outline-variant` right border); below it the same
 `SidebarNav` opens in the hamburger drawer. Entries come from `config/navigation.ts`
@@ -462,7 +457,7 @@ state instead of describing an aspirational one:
   baseline pointer, COMPLIANCE_AUDIT keeps the PDF/UA fiscal-document note).
 - **Still open**: the high-contrast rule above isn't fully honored today.
   `[data-contrast="high"]` and `.dark[data-contrast="high"]` in `m3-base.css`
-  define `primary`/`secondary`/`error`/`surface-*`/`outline-*`/glass tokens, but
+  define `primary`/`secondary`/`error`/`surface-*`/`outline-*` tokens, but
   **not** `tertiary`, `on-tertiary`, `tertiary-container`, `on-tertiary-container`,
   `inverse-surface`, `inverse-on-surface`, `inverse-primary`, or `scrim`. Those
   fall back to the base `:root`/`.dark` values even in high-contrast mode. Not
