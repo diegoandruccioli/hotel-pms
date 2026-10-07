@@ -10,7 +10,10 @@ import org.slf4j.MDC;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -65,6 +68,13 @@ import java.util.List;
 public final class InternalAuthFilter extends OncePerRequestFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(InternalAuthFilter.class);
+
+    /**
+     * Keeps the authenticated context on the request so the ASYNC dispatch of a
+     * {@code StreamingResponseBody} (CSV/PDF export) re-authorizes against it instead of an empty
+     * context — this filter does not run again on that dispatch.
+     */
+    private static final SecurityContextRepository CONTEXT_REPOSITORY = new RequestAttributeSecurityContextRepository();
 
     private static final String HEADER_USER = "X-Auth-User";
     private static final String HEADER_ROLE = "X-Auth-Role";
@@ -175,7 +185,9 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
         // without coupling the controller to the security mechanism.
         auth.setDetails(hotelId);
 
-        SecurityContextHolder.getContext().setAuthentication(auth);
+        final SecurityContext context = SecurityContextHolder.getContext();
+        context.setAuthentication(auth);
+        CONTEXT_REPOSITORY.saveContext(context, request, response);
         final String correlationId = request.getHeader(CORRELATION_ID_HEADER);
         if (correlationId != null) {
             MDC.put("correlationId", correlationId);
