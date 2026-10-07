@@ -11,6 +11,7 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -338,6 +339,25 @@ class InternalAuthFilterTest {
             assertThat(auth.getDetails()).isEqualTo(TEST_HOTEL_ID);
             assertThat(auth.getAuthorities())
                     .anyMatch(a -> ("ROLE_" + TEST_ROLE).equals(a.getAuthority()));
+        }
+
+        @Test
+        @DisplayName("Valid headers → context saved on the request, so ASYNC dispatches stay authenticated")
+        void shouldKeepContextOnRequestForAsyncDispatch()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            final String timestamp = String.valueOf(System.currentTimeMillis());
+            final String nonce = freshNonce();
+            final String sig = computeHmac(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce);
+            final MockHttpServletRequest request =
+                    buildRequest(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce, sig);
+
+            filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+            SecurityContextHolder.clearContext();
+            final var saved = new RequestAttributeSecurityContextRepository()
+                    .loadDeferredContext(request).get().getAuthentication();
+            assertThat(saved).isNotNull();
+            assertThat(saved.getName()).isEqualTo(TEST_USER);
         }
     }
 

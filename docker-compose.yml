@@ -504,7 +504,7 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${AUTH_DB_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - JWT_SECRET=${JWT_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -560,7 +560,7 @@ services:
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - GUEST_DOCUMENTS_ENCRYPTION_KEY=${GUEST_DOCUMENTS_ENCRYPTION_KEY:-ci_placeholder_encryption_key}
       - GUEST_DOCUMENTS_ENCRYPTION_SALT=${GUEST_DOCUMENTS_ENCRYPTION_SALT:-deadbeefdeadbeefdeadbeefdeadbeef}
-      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -733,7 +733,7 @@ services:
       - APPLICATION_CONFIG_FRONTDESK_SERVICE_URL=http://frontdesk-service:8081
       - APPLICATION_CONFIG_BILLING_SERVICE_URL=http://billing-service:8085
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
