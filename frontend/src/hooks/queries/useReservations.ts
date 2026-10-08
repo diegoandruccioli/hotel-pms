@@ -81,3 +81,11 @@ export function useRetryConfirmationEmail() {
     },
   });
 }
+
+/** Unpaged reservation snapshot, used to mark rooms already booked in a date window. */
+export function useReservationsSnapshot() {
+  return useQuery({
+    queryKey: queryKeys.reservations.snapshot,
+    queryFn: () => reservationService.getAllReservations(),
+  });
+}

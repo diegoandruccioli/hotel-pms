@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 /* eslint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop -- test-only mock components, not the real perf-sensitive render path */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -9,6 +9,7 @@ import { inventoryService } from '../../services';
 import { reservationService } from '../../services';
 import { quotationService } from '../../services';
 import { guestService } from '../../services';
+import { renderWithQuery } from '../../test-utils';
 
 vi.mock('../../services/inventoryService');
 vi.mock('../../services/reservationService');
@@ -72,7 +73,7 @@ describe('QuotationForm', () => {
     vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue([]);
   });
 
-  const renderForm = () => render(
+  const renderForm = () => renderWithQuery(
     <MemoryRouter initialEntries={['/quotations/new']}>
       <Routes>
         <Route path="/quotations/new" element={<QuotationForm />} />
@@ -80,7 +81,7 @@ describe('QuotationForm', () => {
     </MemoryRouter>
   );
 
-  const renderEditForm = () => render(
+  const renderEditForm = () => renderWithQuery(
     <MemoryRouter initialEntries={['/quotations/q1/edit']}>
       <Routes>
         <Route path="/quotations/:id/edit" element={<QuotationForm />} />

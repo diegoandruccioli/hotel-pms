@@ -11,6 +11,7 @@ export const queryKeys = {
     search: (query: string, page: number, size: number, sort?: string) =>
       ['guests', 'search', query, page, size, sort] as const,
     detail: (id: string) => ['guests', 'detail', id] as const,
+    suggest: (query: string) => ['guests', 'suggest', query] as const,
   },
   rooms: {
     all: ['rooms'] as const,
@@ -20,12 +21,16 @@ export const queryKeys = {
      * it fetches a different page size and callers shouldn't share a cache
      * entry that could silently swap between the two shapes. */
     lookup: ['rooms', 'lookup'] as const,
+    /** Availability (with resolved stay prices) for a date range. */
+    available: (checkIn: string, checkOut: string) => ['rooms', 'available', checkIn, checkOut] as const,
   },
   roomTypes: {
     all: ['room-types'] as const,
   },
   reservations: {
     all: ['reservations'] as const,
+    /** Unpaged snapshot (first 500) used for occupancy checks while picking rooms. */
+    snapshot: ['reservations', 'snapshot'] as const,
     search: (params: {
       query: string;
       upcomingOnly: boolean;

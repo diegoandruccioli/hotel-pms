@@ -24,3 +24,21 @@ export function useDeleteGuest() {
     },
   });
 }
+
+export function useGuestById(id: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.guests.detail(id ?? ''),
+    queryFn: () => guestService.getGuestById(id as string),
+    enabled: !!id,
+  });
+}
+
+/** Type-ahead guest lookup: idle for a blank query. */
+export function useGuestSuggestions(query: string) {
+  const trimmed = query.trim();
+  return useQuery({
+    queryKey: queryKeys.guests.suggest(trimmed),
+    queryFn: () => guestService.searchGuests(trimmed),
+    enabled: trimmed.length > 0,
+  });
+}
