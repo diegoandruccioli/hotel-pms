@@ -46,6 +46,9 @@ export const queryKeys = {
     all: ['quotations'] as const,
     detail: (id: string) => ['quotations', 'detail', id] as const,
   },
+  users: {
+    all: ['users'] as const,
+  },
   invoices: {
     all: ['invoices'] as const,
     search: (params: { status?: string; query: string; dateFrom?: string; dateTo?: string; page: number; sort?: string }) =>
@@ -60,6 +63,9 @@ export const queryKeys = {
   stays: {
     all: ['stays'] as const,
     list: (page: number) => ['stays', 'list', page] as const,
+    detail: (id: string) => ['stays', 'detail', id] as const,
+    lookupStati: ['stays', 'lookup', 'stati'] as const,
+    lookupTipdoc: ['stays', 'lookup', 'tipdoc'] as const,
     search: (params: { status?: string; page: number; size?: number }) =>
       ['stays', 'search', params] as const,
   },

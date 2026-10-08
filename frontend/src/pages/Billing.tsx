@@ -1,6 +1,6 @@
 import { useState, useCallback, memo, useMemo } from 'react';
 import { format, startOfMonth } from 'date-fns';
-import type { ColumnDef, SortingState } from '@tanstack/react-table';
+import type { SortingState } from '@tanstack/react-table';
 import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types';
 import { Alert } from '../components/Alert';
 import { ListToolbar } from '../components/ListToolbar';
@@ -8,20 +8,19 @@ import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3EmptyState } from '../components/m3';
-import { M3StatusChip } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3FilterChip } from '../components/m3';
 import { M3Pagination } from '../components/m3';
-import { M3TableActionLink } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { BillingKpiCards } from './Billing/BillingKpiCards';
 import { PaymentModal } from './Billing/PaymentModal';
 import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
+import { useInvoiceColumns } from './Billing/useInvoiceColumns';
 import { useTranslation } from 'react-i18next';
 import { useInvoicesSearch, useOwnerFinancialSummary, usePatchInvoiceInCache } from '../hooks/queries';
-import { useDebounce, useFormatters, useListRangeSummary } from '../hooks';
-import { getErrorMessage, invoiceStatusTone } from '../utils';
+import { useDebounce, useListRangeSummary } from '../hooks';
+import { getErrorMessage } from '../utils';
 import { billingService } from '../services';
 import { useAuthStore, useToastStore } from '../store';
 
@@ -39,28 +38,6 @@ const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'desc';
  * with a commercialista.
  */
 const PILOT_MODE = import.meta.env.VITE_PILOT_MODE !== 'false';
-
-interface ActionsCellProps {
-  invoice: InvoiceResponse;
-  onView: (inv: InvoiceResponse) => void;
-  onPay: (inv: InvoiceResponse) => void;
-  tView: string;
-  tRegisterPayment: string;
-}
-
-const ActionsCell = ({ invoice, onView, onPay, tView, tRegisterPayment }: ActionsCellProps) => {
-  const handleView = useCallback(() => onView(invoice), [onView, invoice]);
-  const handlePay  = useCallback(() => onPay(invoice),  [onPay,  invoice]);
-
-  return (
-    <div className="flex items-center justify-end gap-1">
-      <M3TableActionLink onClick={handleView}>{tView}</M3TableActionLink>
-      {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
-        <M3TableActionLink tone="tertiary" onClick={handlePay}>{tRegisterPayment}</M3TableActionLink>
-      )}
-    </div>
-  );
-};
 
 const EMPTY_RESULTS: InvoiceSearchResult[] = [];
 
@@ -179,73 +156,9 @@ export const Billing = memo(() => {
     setDetailTarget(updated);
   }, [patchInvoiceInCache]);
 
-  const { formatCurrency, formatDate } = useFormatters();
-
-  const tView            = t('view');
-  const tRegisterPayment = t('register_payment');
-  const tPending         = t('pending');
-
   const getInvoiceRowId = useCallback((r: InvoiceSearchResult) => r.invoice.id, []);
 
-  const columns = useMemo<ColumnDef<InvoiceSearchResult>[]>(() => [
-    {
-      id: 'invoiceNumber',
-      enableSorting: false,
-      header: t('invoice_number'),
-      cell: ({ row }) => (
-        <span className="font-medium">
-          {row.original.invoice.invoiceNumber || (
-            <span className="text-on-surface-variant italic">{tPending}</span>
-          )}
-        </span>
-      ),
-    },
-    {
-      id: 'guestName',
-      enableSorting: false,
-      header: t('guest_name'),
-      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.guestName ?? '—'}</span>,
-    },
-    {
-      id: 'issueDate',
-      accessorFn: (r) => r.invoice.issueDate,
-      header: t('issue_date'),
-      cell: ({ row }) => (
-        <span className="text-on-surface-variant">{formatDate(row.original.invoice.issueDate)}</span>
-      ),
-    },
-    {
-      id: 'totalAmount',
-      accessorFn: (r) => r.invoice.totalAmount,
-      header: t('total_amount'),
-      cell: ({ row }) => <span className="font-medium">{formatCurrency(row.original.invoice.totalAmount)}</span>,
-    },
-    {
-      id: 'status',
-      accessorFn: (r) => r.invoice.status,
-      header: t('status'),
-      cell: ({ row }) => (
-        <M3StatusChip
-          label={t(`invoice_status_${row.original.invoice.status}`, row.original.invoice.status)}
-          tone={invoiceStatusTone[row.original.invoice.status]}
-        />
-      ),
-    },
-    {
-      id: 'actions',
-      enableSorting: false,
-      header: () => <span className="sr-only">{t('actions')}</span>,
-      cell: ({ row }) => (
-        <ActionsCell
-          invoice={row.original.invoice}
-          onView={handleOpenDetail}
-          onPay={handleOpenPayment}
-          tView={tView}
-          tRegisterPayment={tRegisterPayment}
-        />
-      ),
-    },
-  ], [t, tPending, formatDate, formatCurrency, handleOpenDetail, handleOpenPayment, tView, tRegisterPayment]);
+  const columns = useInvoiceColumns({ onView: handleOpenDetail, onPay: handleOpenPayment });
 
   return (
     <div className="space-y-6">

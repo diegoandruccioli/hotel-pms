@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import type { ColumnDef, SortingState } from '@tanstack/react-table';
+import type { SortingState } from '@tanstack/react-table';
 import type { ReservationResponse, RoomResponse } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { ListToolbar } from '../components/ListToolbar';
@@ -14,23 +14,16 @@ import { M3Pagination } from '../components/m3';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
-import { EMPTY_PLACEHOLDER, getErrorMessage, nightsBetween, todayIsoDate } from '../utils';
+import { getErrorMessage, todayIsoDate } from '../utils';
 import { reservationService } from '../services';
 import {
   useReservationsSearch,
   useRoomsLookup,
-  useDeleteReservation,
   useRetryConfirmationEmail,
-  useUpdateReservationStatus,
 } from '../hooks/queries';
-import { useDebounce, useFormatters, useListRangeSummary } from '../hooks';
-import {
-  ActionsCell,
-  GuestNameCell,
-  GuestsCountCell,
-  RoomsCell,
-  StatusCell,
-} from './Reservations/ReservationRowCells';
+import { useDebounce, useListRangeSummary } from '../hooks';
+import { useReservationRowActions } from './Reservations/useReservationRowActions';
+import { useReservationColumns } from './Reservations/useReservationColumns';
 import { RESERVATION_PRESETS, reservationFilterParams } from './Reservations/reservationFilters';
 import type { ReservationPreset } from './Reservations/reservationFilters';
 
@@ -71,11 +64,8 @@ export const Reservations = () => {
   const addToast = useToastStore((s) => s.addToast);
   const role = useAuthStore((s) => s.user?.role);
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
-  const { formatDate } = useFormatters();
 
   const [page, setPage] = useState(0);
-  const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
-  const [reservationToMarkNoShow, setReservationToMarkNoShow] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery);
   const [sortField, setSortField] = useState<SortField>(() => navState?.sortField ?? DEFAULT_SORT_FIELD);
@@ -96,9 +86,18 @@ export const Reservations = () => {
   }, [searchQuery, filterParams, addToast, t]);
 
   // Any filter/sort change invalidates the current page — always restart from page 0.
-  useEffect(() => {
+  // Adjusted during render (same pattern as Billing) rather than in an effect.
+  const activeFilters = { debouncedSearch, sortField, sortDir, preset };
+  const [prevFilters, setPrevFilters] = useState(activeFilters);
+  if (
+    prevFilters.debouncedSearch !== activeFilters.debouncedSearch ||
+    prevFilters.sortField !== activeFilters.sortField ||
+    prevFilters.sortDir !== activeFilters.sortDir ||
+    prevFilters.preset !== activeFilters.preset
+  ) {
+    setPrevFilters(activeFilters);
     setPage(0);
-  }, [debouncedSearch, sortField, sortDir, preset]);
+  }
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -195,136 +194,22 @@ export const Reservations = () => {
     navigate(`/reservations/edit/${reservationId}`);
   }, [navigate]);
 
-  const handleDeleteRequest = useCallback((id: string) => {
-    setReservationToDelete(id);
-  }, []);
+  const {
+    reservationToDelete, deleting, handleDeleteRequest, handleDeleteDialogClose, handleDeleteConfirm,
+    reservationToMarkNoShow, markingNoShow, handleMarkNoShowRequest, handleMarkNoShowDialogClose,
+    handleMarkNoShowConfirm,
+  } = useReservationRowActions(reservations);
 
-  const handleDeleteDialogClose = useCallback(() => {
-    setReservationToDelete(null);
-  }, []);
-
-  const deleteReservationMutation = useDeleteReservation();
-  const deleting = deleteReservationMutation.isPending;
-
-  const handleDeleteConfirm = useCallback(async () => {
-    if (!reservationToDelete) return;
-    try {
-      await deleteReservationMutation.mutateAsync(reservationToDelete);
-      addToast(t('reservation_deleted_success'), 'success');
-    } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('delete_reservation_failed')), 'error');
-    } finally {
-      setReservationToDelete(null);
-    }
-  }, [reservationToDelete, addToast, t, deleteReservationMutation]);
-
-  const handleMarkNoShowRequest = useCallback((id: string) => {
-    setReservationToMarkNoShow(id);
-  }, []);
-
-  const handleMarkNoShowDialogClose = useCallback(() => {
-    setReservationToMarkNoShow(null);
-  }, []);
-
-  const updateReservationStatusMutation = useUpdateReservationStatus();
-  const markingNoShow = updateReservationStatusMutation.isPending;
-
-  const handleMarkNoShowConfirm = useCallback(async () => {
-    if (!reservationToMarkNoShow) return;
-    const reservation = reservations.find((r) => r.id === reservationToMarkNoShow);
-    // Explicit null/undefined check, not a truthiness check: a
-    // never-yet-updated reservation's @Version starts at 0, a valid value
-    // that a falsy check would wrongly reject.
-    if (reservation?.version === null || reservation?.version === undefined) {
-      addToast(t('mark_no_show_failed'), 'error');
-      setReservationToMarkNoShow(null);
-      return;
-    }
-    try {
-      await updateReservationStatusMutation.mutateAsync({
-        id: reservationToMarkNoShow,
-        status: 'NO_SHOW',
-        version: reservation.version,
-      });
-      addToast(t('no_show_marked_success'), 'success');
-    } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('mark_no_show_failed')), 'error');
-    } finally {
-      setReservationToMarkNoShow(null);
-    }
-  }, [reservationToMarkNoShow, reservations, addToast, t, updateReservationStatusMutation]);
-  const columns = useMemo<ColumnDef<ReservationResponse>[]>(() => [
-    {
-      id: 'guestFullName',
-      header: t('guest_name'),
-      enableSorting: false,
-      cell: ({ row }) => <GuestNameCell name={row.original.guestFullName} />,
-    },
-    {
-      id: 'checkInDate',
-      accessorKey: 'checkInDate',
-      header: t('check_in'),
-      cell: ({ row }) => <span className="text-on-surface-variant">{formatDate(row.original.checkInDate)}</span>,
-    },
-    {
-      id: 'checkOutDate',
-      accessorKey: 'checkOutDate',
-      header: t('check_out'),
-      cell: ({ row }) => <span className="text-on-surface-variant">{formatDate(row.original.checkOutDate)}</span>,
-    },
-    {
-      id: 'nights',
-      header: t('nights'),
-      enableSorting: false,
-      cell: ({ row }) => (
-        <span data-testid={`nights-${row.original.id}`} className="text-on-surface-variant tabular-nums">
-          {nightsBetween(row.original.checkInDate, row.original.checkOutDate) ?? EMPTY_PLACEHOLDER}
-        </span>
-      ),
-    },
-    {
-      id: 'rooms',
-      header: t('nav_rooms'),
-      enableSorting: false,
-      cell: ({ row }) => <RoomsCell reservation={row.original} rooms={rooms} />,
-    },
-    {
-      id: 'guests',
-      header: t('guests'),
-      enableSorting: false,
-      cell: ({ row }) => <GuestsCountCell reservation={row.original} />,
-    },
-    {
-      id: 'status',
-      accessorKey: 'status',
-      header: t('status'),
-      cell: ({ row }) => (
-        <StatusCell
-          reservation={row.original}
-          onRetryConfirmationEmail={handleRetryConfirmationEmail}
-          retryingEmail={retryingEmail}
-          t={t}
-        />
-      ),
-    },
-    {
-      id: 'actions',
-      header: () => <span className="sr-only">{t('actions')}</span>,
-      enableSorting: false,
-      cell: ({ row }) => (
-        <ActionsCell
-          reservation={row.original}
-          onCheckIn={handleCheckIn}
-          onView={handleView}
-          onEdit={handleEdit}
-          onDelete={isAdminOrOwner ? handleDeleteRequest : undefined}
-          onMarkNoShow={handleMarkNoShowRequest}
-          t={t}
-        />
-      ),
-    },
-  ], [t, formatDate, rooms, handleRetryConfirmationEmail, retryingEmail, handleCheckIn, handleView, handleEdit,
-      isAdminOrOwner, handleDeleteRequest, handleMarkNoShowRequest]);
+  const columns = useReservationColumns({
+    rooms,
+    onRetryConfirmationEmail: handleRetryConfirmationEmail,
+    retryingEmail,
+    onCheckIn: handleCheckIn,
+    onView: handleView,
+    onEdit: handleEdit,
+    onDelete: isAdminOrOwner ? handleDeleteRequest : undefined,
+    onMarkNoShow: handleMarkNoShowRequest,
+  });
 
   const emptyMessage = EMPTY_MESSAGE_KEYS[preset] ? t(EMPTY_MESSAGE_KEYS[preset]) : t('no_reservations_match_filter');
 

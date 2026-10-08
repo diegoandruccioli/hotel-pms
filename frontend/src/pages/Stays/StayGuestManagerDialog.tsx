@@ -4,24 +4,20 @@ import { useQueryClient } from '@tanstack/react-query';
 import { M3ConfirmDialog } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
 import { M3Button } from '../../components/m3';
-import { M3StatusChip } from '../../components/m3';
-import { M3TextField } from '../../components/m3';
 import { M3LoadingState } from '../../components/m3';
-import { MaterialIcon } from '../../components/MaterialIcon';
 import { useToastStore } from '../../store';
 import { stayService } from '../../services';
+import { useAlloggiatiLookups, useStayDetail } from '../../hooks/queries';
 import { getErrorMessage, todayIsoDate } from '../../utils';
 import { queryKeys } from '../../lib';
-import type {
-  AlloggiatiStato,
-  AlloggiatiTipdoc,
-  StayGuestRequest,
-  StayGuestResponse,
-  StayResponse,
-} from '../../types';
+import type { AlloggiatiStato, AlloggiatiTipdoc, StayGuestResponse } from '../../types';
 import { GuestFieldSection } from './GuestFieldSection';
-import { emptyGuest, CODICE_ITALIA, TYPES_WITHOUT_DOC, alloggiatiPlaceIssues } from './stayGuestFieldHelpers';
+import { StayGuestRow } from './StayGuestRow';
+import { emptyGuest, toIdentifiableGuest, toRequest, validateSingleGuest } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
+
+const EMPTY_STATI: AlloggiatiStato[] = [];
+const EMPTY_TIPDOC: AlloggiatiTipdoc[] = [];
 
 interface StayGuestManagerDialogProps {
   /** null closes the dialog. */
@@ -29,167 +25,18 @@ interface StayGuestManagerDialogProps {
   onClose: () => void;
 }
 
-const toIdentifiableGuest = (g: StayGuestResponse, stati: AlloggiatiStato[]): IdentifiableGuest => {
-  const isStatoCode = (code: string) => stati.some((s) => s.codice === code);
-  return {
-    _id: g.id,
-    firstName: g.firstName,
-    lastName: g.lastName,
-    gender: g.gender,
-    dateOfBirth: g.dateOfBirth,
-    placeOfBirth: g.placeOfBirth,
-    citizenship: g.citizenship,
-    documentType: g.documentType ?? '',
-    documentNumber: g.documentNumber ?? '',
-    documentPlaceOfIssue: g.documentPlaceOfIssue ?? '',
-    isPrimaryGuest: g.isPrimaryGuest,
-    travellerType: g.travellerType,
-    travelPurpose: g.travelPurpose ?? '',
-    version: g.version,
-    _statoDiNascita: isStatoCode(g.placeOfBirth) ? g.placeOfBirth : CODICE_ITALIA,
-    _statoRilascioDoc: g.documentPlaceOfIssue && isStatoCode(g.documentPlaceOfIssue) ? g.documentPlaceOfIssue : CODICE_ITALIA,
-  };
-};
-
-const toRequest = (g: IdentifiableGuest): StayGuestRequest => ({
-  firstName: g.firstName,
-  lastName: g.lastName,
-  gender: g.gender,
-  dateOfBirth: g.dateOfBirth,
-  placeOfBirth: g.placeOfBirth,
-  citizenship: g.citizenship,
-  documentType: g.documentType || undefined,
-  documentNumber: g.documentNumber || undefined,
-  documentPlaceOfIssue: g.documentPlaceOfIssue || undefined,
-  isPrimaryGuest: g.isPrimaryGuest,
-  travellerType: g.travellerType,
-  travelPurpose: g.travelPurpose || undefined,
-  version: g.version,
-});
-
-type ErrorTranslator = (key: string, options?: Record<string, unknown>) => string;
-
-interface GuestRowProps {
-  guest: StayGuestResponse;
-  t: ErrorTranslator;
-  busyGuestId: string | null;
-  departureTargetId: string | null;
-  departureDate: string;
-  onEdit: (guest: StayGuestResponse) => void;
-  onStartDeparture: (id: string) => void;
-  onCancelDeparture: () => void;
-  onConfirmDeparture: () => void;
-  onDepartureDateChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onPromote: (id: string) => void;
-  onRequestRemove: (id: string) => void;
-}
-
-const GuestRow = memo(({
-  guest, t, busyGuestId, departureTargetId, departureDate,
-  onEdit, onStartDeparture, onCancelDeparture, onConfirmDeparture, onDepartureDateChange,
-  onPromote, onRequestRemove,
-}: GuestRowProps) => {
-  const isBusy = busyGuestId === guest.id;
-  const handleEdit = useCallback(() => onEdit(guest), [onEdit, guest]);
-  const handleStartDeparture = useCallback(() => onStartDeparture(guest.id), [onStartDeparture, guest.id]);
-  const handlePromote = useCallback(() => onPromote(guest.id), [onPromote, guest.id]);
-  const handleRequestRemove = useCallback(() => onRequestRemove(guest.id), [onRequestRemove, guest.id]);
-
-  return (
-    <div className="border border-outline-variant rounded-shape-md p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <MaterialIcon name="person" size={18} className="text-on-surface-variant" />
-          <span className="font-medium text-on-surface">{guest.lastName} {guest.firstName}</span>
-          {guest.isPrimaryGuest && <M3StatusChip label={t('guest_badge_primary')} tone="neutral" />}
-          {guest.alloggiatiSent && <M3StatusChip label={t('guest_badge_sent')} tone="success" />}
-          {guest.needsResubmit && <M3StatusChip label={t('guest_badge_needs_resubmit')} tone="error" />}
-          {guest.departureDate && (
-            <M3StatusChip label={t('guest_badge_departed', { date: guest.departureDate })} tone="neutral" />
-          )}
-        </div>
-        <span className="text-xs text-on-surface-variant">
-          {t('guest_arrival_date_label')}: {guest.arrivalDate}
-        </span>
-      </div>
-
-      {departureTargetId === guest.id ? (
-        <div className="flex items-end gap-2 mt-3">
-          <M3TextField
-            label={t('label_departure_date')}
-            type="date"
-            value={departureDate}
-            onChange={onDepartureDateChange}
-          />
-          <M3Button variant="tonal" onClick={onConfirmDeparture} loading={isBusy} disabled={isBusy}>
-            {t('btn_confirm')}
-          </M3Button>
-          <M3Button variant="text" onClick={onCancelDeparture}>
-            {t('btn_cancel')}
-          </M3Button>
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-2 mt-3">
-          <M3Button variant="text" icon="edit" onClick={handleEdit}>
-            {t('btn_edit')}
-          </M3Button>
-          {!guest.departureDate && (
-            <M3Button variant="text" icon="logout" onClick={handleStartDeparture}>
-              {t('btn_record_departure')}
-            </M3Button>
-          )}
-          {!guest.isPrimaryGuest && (
-            <M3Button variant="text" icon="star" onClick={handlePromote} loading={isBusy} disabled={isBusy}>
-              {t('btn_promote_primary')}
-            </M3Button>
-          )}
-          <M3Button
-            variant="text"
-            icon="delete"
-            onClick={handleRequestRemove}
-            disabled={guest.alloggiatiSent || guest.isPrimaryGuest}
-            title={guest.alloggiatiSent
-              ? t('hint_remove_disabled_sent')
-              : guest.isPrimaryGuest
-                ? t('hint_remove_disabled_primary')
-                : undefined}
-          >
-            {t('btn_remove')}
-          </M3Button>
-        </div>
-      )}
-    </div>
-  );
-});
-GuestRow.displayName = 'GuestRow';
-
-const validateSingleGuest = (g: IdentifiableGuest, t: ErrorTranslator): string | null => {
-  const hasDoc = !TYPES_WITHOUT_DOC.includes(g.travellerType as never);
-
-  if (!g.firstName || !g.lastName || !g.gender || !g.dateOfBirth || !g.travellerType) {
-    return t('err_required_fields');
-  }
-  if (hasDoc && (!g.documentType || !g.documentNumber)) {
-    return t('err_required_fields');
-  }
-  // Stato/comune-di-nascita and stato/comune-di-rilascio-documento rules are the
-  // same ones CheckInForm/WalkInCheckInForm enforce for every guest at check-in —
-  // shared here rather than re-derived, so a future Alloggiati rule change only
-  // needs to be made once (see alloggiatiPlaceIssues' own doc for why the
-  // required-field and primary-guest checks above/below aren't also shared: they
-  // don't apply the same way to a lone correction on an already-open stay).
-  return alloggiatiPlaceIssues(g, t, 1)[0] ?? null;
-};
-
 export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManagerDialogProps) => {
   const { t } = useTranslation(['stays', 'common']);
   const addToast = useToastStore((s) => s.addToast);
   const queryClient = useQueryClient();
 
-  const [stay, setStay] = useState<StayResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [stati, setStati] = useState<AlloggiatiStato[]>([]);
-  const [tipdoc, setTipdoc] = useState<AlloggiatiTipdoc[]>([]);
+  const stayQuery = useStayDetail(stayId);
+  const lookups = useAlloggiatiLookups(!!stayId);
+  const stay = stayQuery.data ?? null;
+  const stati = lookups.stati.data ?? EMPTY_STATI;
+  const tipdoc = lookups.tipdoc.data ?? EMPTY_TIPDOC;
+  const loading = !!stayId && (stayQuery.isLoading || lookups.stati.isLoading || lookups.tipdoc.isLoading);
+  const loadError = stayQuery.error ?? lookups.stati.error ?? lookups.tipdoc.error;
 
   const [formGuest, setFormGuest] = useState<IdentifiableGuest | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -201,41 +48,23 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
   const [departureTargetId, setDepartureTargetId] = useState<string | null>(null);
   const [departureDate, setDepartureDate] = useState('');
 
-  const refreshStay = useCallback(async (id: string) => {
-    const updated = await stayService.getStayById(id);
-    setStay(updated);
-    return updated;
-  }, []);
+  const { refetch: refetchStay } = stayQuery;
+  const refreshStay = useCallback(async () => { await refetchStay(); }, [refetchStay]);
 
   useEffect(() => {
-    if (!stayId) return;
-    let cancelled = false;
-    setLoading(true);
-    Promise.all([
-      stayService.getStayById(stayId),
-      stayService.getLookupStati(),
-      stayService.getLookupTipdoc(),
-    ]).then(([s, statiList, tipdocList]) => {
-      if (cancelled) return;
-      setStay(s);
-      setStati(statiList);
-      setTipdoc(tipdocList);
-    }).catch((err: unknown) => {
-      if (!cancelled) addToast(getErrorMessage(err, t('err_load_guests')), 'error');
-    }).finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [stayId, addToast, t]);
+    if (loadError) addToast(getErrorMessage(loadError, t('err_load_guests')), 'error');
+  }, [loadError, addToast, t]);
 
   const closeAndReset = useCallback(() => {
-    setStay(null);
     setFormGuest(null);
     setEditingId(null);
     setFormError(null);
     setConfirmRemoveId(null);
     setDepartureTargetId(null);
+    if (stayId) queryClient.removeQueries({ queryKey: queryKeys.stays.detail(stayId) });
     queryClient.invalidateQueries({ queryKey: queryKeys.stays.all });
     onClose();
-  }, [onClose, queryClient]);
+  }, [onClose, queryClient, stayId]);
 
   const handleOpenAdd = useCallback(() => {
     setFormGuest(emptyGuest(false));
@@ -276,7 +105,7 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
         await stayService.addGuest(stayId, toRequest(formGuest));
         addToast(t('guest_added_success'), 'success');
       }
-      await refreshStay(stayId);
+      await refreshStay();
       setFormGuest(null);
       setEditingId(null);
     } catch (err: unknown) {
@@ -292,7 +121,7 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
     try {
       await stayService.removeGuest(stayId, guestId);
       addToast(t('guest_removed_success'), 'success');
-      await refreshStay(stayId);
+      await refreshStay();
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('err_remove_guest')), 'error');
     } finally {
@@ -321,7 +150,7 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
     try {
       await stayService.recordGuestDeparture(stayId, departureTargetId, departureDate);
       addToast(t('guest_departure_success'), 'success');
-      await refreshStay(stayId);
+      await refreshStay();
       setDepartureTargetId(null);
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('err_record_departure')), 'error');
@@ -336,7 +165,7 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
     try {
       await stayService.promoteGuestToPrimary(stayId, guestId);
       addToast(t('guest_promoted_success'), 'success');
-      await refreshStay(stayId);
+      await refreshStay();
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('err_promote_guest')), 'error');
     } finally {
@@ -365,7 +194,7 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
       ) : (
         <div className="space-y-4">
           {!formGuest && guests.map((guest) => (
-            <GuestRow
+            <StayGuestRow
               key={guest.id}
               guest={guest}
               t={t}
