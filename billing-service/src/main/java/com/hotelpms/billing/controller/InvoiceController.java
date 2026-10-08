@@ -292,9 +292,14 @@ public class InvoiceController {
      * Returns all invoice summaries for a guest within the caller's hotel.
      * Called by guest-service GDPR Art. 20 data-export endpoint.
      *
+     * <p>Restricted to ADMIN/OWNER: it exposes per-guest financial totals. The GDPR export keeps
+     * working because it is itself ADMIN/OWNER-only and the Feign interceptor forwards the
+     * caller's real role to this service (there is no system principal).
+     *
      * @param guestId the guest UUID
      * @return list of invoice summaries, most recent first
      */
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     @GetMapping("/guest/{guestId}/history")
     public ResponseEntity<List<InvoiceSummaryResponse>> getInvoiceHistoryForGuest(
             @NonNull @PathVariable final UUID guestId) {

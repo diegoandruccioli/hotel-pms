@@ -68,6 +68,8 @@ class InvoiceControllerSecurityTest {
 
     private static final String BASE_URL = "/api/v1/invoices";
     private static final UUID INVOICE_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");
+    private static final String GUEST_HISTORY_URL = "/api/v1/invoices/guest/{guestId}/history";
+    private static final UUID GUEST_ID = UUID.fromString("00000000-0000-0000-0000-000000000042");
 
     private static final String HDR_USER = "X-Auth-User";
     private static final String HDR_ROLE = "X-Auth-Role";
@@ -80,6 +82,8 @@ class InvoiceControllerSecurityTest {
     private static final String ROLE_RECEPTIONIST = "RECEPTIONIST";
     private static final String USER_ADMIN = "admin";
     private static final String ROLE_ADMIN = "ADMIN";
+    private static final String USER_OWNER = "owner";
+    private static final String ROLE_OWNER = "OWNER";
 
     private static final String DOCUMENT_TYPE_BODY = "{\"documentType\":\"RICEVUTA\"}";
     private static final String SDI_STATUS_BODY = "{\"sdiStatus\":\"SENT\"}";
@@ -188,6 +192,30 @@ class InvoiceControllerSecurityTest {
         mockMvc.perform(withAuthHeaders(
                         get(BASE_URL + "/{id}", INVOICE_ID),
                         USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void guestInvoiceHistoryReturns403ForReceptionist() throws Exception {
+        mockMvc.perform(withAuthHeaders(
+                        get(GUEST_HISTORY_URL, GUEST_ID),
+                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void guestInvoiceHistoryReturnsOkForAdmin() throws Exception {
+        mockMvc.perform(withAuthHeaders(
+                        get(GUEST_HISTORY_URL, GUEST_ID),
+                        USER_ADMIN, ROLE_ADMIN, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void guestInvoiceHistoryReturnsOkForOwner() throws Exception {
+        mockMvc.perform(withAuthHeaders(
+                        get(GUEST_HISTORY_URL, GUEST_ID),
+                        USER_OWNER, ROLE_OWNER, TEST_HOTEL_ID))
                 .andExpect(status().isOk());
     }
 
