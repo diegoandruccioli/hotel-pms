@@ -190,6 +190,9 @@ Ogni `@FeignClient` deve avere `@CircuitBreaker` Resilience4j con fallback dichi
 - Barrel export (`index.ts`) per feature folder
 - `React.memo()` per componenti con props stabili
 - `React.lazy()` + `<Suspense>` per page-level components
+- Riusare i mattoni condivisi invece di riscriverli: `PageHeader` per il titolo, `Alert` /
+  `M3LoadingState` / `M3EmptyState` / `M3ErrorState` per i messaggi di pagina, `domainStatus.ts` +
+  `M3StatusChip` per gli stati, `useFormatters` per valuta e date (dettagli in `frontend/DESIGN.md`)
 
 ### Aggiungere una nuova pagina
 
@@ -203,6 +206,9 @@ Ogni `@FeignClient` deve avere `@CircuitBreaker` Resilience4j con fallback dichi
 Fonte unica: [`frontend/DESIGN.md`](frontend/DESIGN.md) — contrasto, focus/tastiera,
 tema alto-contrasto WCAG AAA, touch target, token di design, convenzioni componenti.
 Leggerlo prima di toccare codice UI; non ripetere le regole qui.
+
+Finché il redesign è in corso (ADR-009), le PR di UI hanno base `feature/ui-redesign`
+(branch `ui/<sigla>-<slug>`), non `main` — vedi `docs/BRANCH_STRATEGY.md`.
 
 ---
 
