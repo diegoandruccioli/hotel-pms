@@ -340,6 +340,32 @@ readable is *consistency*, not *sparseness*. Concretely:
 - **Initials circles go through `M3Avatar`** — `size="md"` (40px) or `"lg"` (64px); falls
   back to `?` without a name. Wrap it in a `<button>` when it must be interactive
   (see `UserMenu`).
+- **Page-level messages go through `Alert`** — an inline banner with a `tone`
+  (`error`/`warning`/`success`/`info`), optional `title`, `action` and `compact`. The icon
+  defaults to the tone's; `role` is `alert` for errors and `status` otherwise. Its colours come
+  from `toneChipClasses`, the same source as status chips — never a hand-written
+  `bg-*-container` block.
+- **Loading, empty and error states are components, not markup.** `M3LoadingState` (a
+  `label` for screen readers is required; `plain` drops the card surface) replaces the
+  hand-copied spinner; `M3EmptyState` (`icon`, `title`, optional `description`/`action`)
+  covers grids and cards, `M3TableEmptyRow` a table body (pass the same `colSpan` as the
+  header); `M3ErrorState` (`title`, `message`, optional `onRetry` + `retryLabel`) is the
+  page-level failure panel — resolve its `message` with `getErrorMessage()`
+  (`utils/errorMessage.ts`), never `err.message`.
+- **A domain status maps to one tone, in one place.** `utils/domainStatus.ts` holds the
+  `*StatusTone` tables (invoice, SDI, quotation, group, room, reservation, stay, order, night
+  audit, user role) that feed `M3StatusChip` (`label`, `tone`, optional `icon`). Don't write a
+  local status→colour map: room `DIRTY` is `warning` and `MAINTENANCE` is `error` everywhere.
+  Tone classes live in `utils/toneStyles.ts` (`toneChipClasses`, `toneSolidClasses`, …).
+- **Money, dates and numbers go through the shared formatters.** In components use
+  `useFormatters()` (`formatCurrency`, `formatDate`, `formatDateTime`, bound to the active
+  language); outside React use `utils/format.ts` (also `todayIsoDate`, `addDaysIso`,
+  `nightsBetween`, `formatSigned`, `dateFnsLocale`). No `€ ${x.toFixed(2)}` and no local
+  `Intl` instances. Debounce search/filter inputs with `useDebounce`.
+- **Auth pages use `AuthLayout`** — a split screen from `lg` (brand `aside` on
+  `primary-container`, the form in `main`), a compact header below it. The language,
+  high-contrast and large-text preferences sit inside `main` so they stay reachable before
+  login. Form fields, test ids and the auth flow belong to the page, not the layout.
 
 ---
 
@@ -442,9 +468,9 @@ state instead of describing an aspirational one:
   like `services/`, `store/`, and `hooks/queries` cross-reference each other and
   routing all of that through barrels is a well-known way to introduce circular
   ESM imports (`Cannot access 'X' before initialization` at runtime) in a
-  Vite/ESM project. Consequence: `npm run knip` now lists all ~20 barrel files
-  under "Unused files" — that's expected given they have no consumers yet, not a
-  regression to chase down. The `types/index.ts` barrel also disambiguates a real
+  Vite/ESM project. Consequence: the barrels have few or no consumers, so
+  `knip.json`'s `ignore` list covers the ones it would flag (see above), and `npm run knip`
+  is clean. The `types/index.ts` barrel also disambiguates a real
   naming collision: both `billing.types.ts` and `guest.types.ts` export a
   `DocumentType` (invoice type vs. identity-document type) — re-exported from the
   barrel as `BillingDocumentType`/`GuestDocumentType`; importing directly from
