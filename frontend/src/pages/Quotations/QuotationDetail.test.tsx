@@ -1,9 +1,10 @@
-import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { QuotationDetail } from './QuotationDetail';
 import { quotationService } from '../../services';
+import { renderWithQuery } from '../../test-utils';
 
 vi.mock('../../services/quotationService');
 
@@ -89,7 +90,7 @@ const MULTI_OPTION_QUOTATION = {
 
 const INITIAL_ENTRIES = ['/quotations/q1'];
 
-const renderDetail = () => render(
+const renderDetail = () => renderWithQuery(
   <MemoryRouter initialEntries={INITIAL_ENTRIES}>
     <Routes>
       <Route path="/quotations/:id" element={<QuotationDetail />} />
