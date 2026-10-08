@@ -37,6 +37,9 @@ export const queryKeys = {
       size?: number;
     }) => ['reservations', 'search', params] as const,
   },
+  users: {
+    all: ['users'] as const,
+  },
   invoices: {
     all: ['invoices'] as const,
     search: (params: { status?: string; query: string; dateFrom?: string; dateTo?: string; page: number; sort?: string }) =>
