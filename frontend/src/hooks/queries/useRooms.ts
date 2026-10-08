@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { todayIsoDate, addDaysIso } from '../../utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { inventoryService } from '../../services';
@@ -95,4 +96,25 @@ function invalidateFilteredRoomLists(queryClient: ReturnType<typeof useQueryClie
       return key[0] === 'rooms' && key[1] === 'list' && key[2] === false && key[3] !== undefined;
     },
   });
+}
+
+/**
+ * Rooms free for a stay window, as a roomId -> resolved total price map
+ * (seasonal/rate-plan aware, unlike base price times nights). Empty while the
+ * dates are incomplete or inverted, or if the lookup fails.
+ */
+export function useAvailableRoomPrices(checkInDate: string, checkOutDate: string) {
+  const validRange = !!checkInDate && !!checkOutDate && new Date(checkOutDate) > new Date(checkInDate);
+  const { data } = useQuery({
+    queryKey: queryKeys.rooms.available(checkInDate, checkOutDate),
+    queryFn: () => inventoryService.getAvailableRooms(checkInDate, checkOutDate),
+    enabled: validRange,
+  });
+  return useMemo(() => {
+    const priceMap = new Map<string, number>();
+    data?.forEach((room) => {
+      if (room.resolvedTotalPrice !== undefined) priceMap.set(room.id, room.resolvedTotalPrice);
+    });
+    return priceMap;
+  }, [data]);
 }
