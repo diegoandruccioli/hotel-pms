@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { StayGuestRequest, TravellerType } from '../../types';
+import type { AlloggiatiStato, StayGuestRequest, StayGuestResponse, TravellerType } from '../../types';
 
 export const TYPES_WITHOUT_DOC: TravellerType[] = ['FAMILIARE', 'MEMBRO_GRUPPO'];
 export const CODICE_ITALIA = '100000100';
@@ -30,7 +30,7 @@ export const emptyGuest = (isPrimary: boolean): IdentifiableGuest => ({
   _statoRilascioDoc: '',
 });
 
-type GuestErrorTranslator = (key: string, options?: Record<string, unknown>) => string;
+export type GuestErrorTranslator = (key: string, options?: Record<string, unknown>) => string;
 
 /**
  * Alloggiati Web stato/comune-di-nascita and stato/comune-di-rilascio-documento
@@ -107,4 +107,63 @@ const buildAlloggiatiGuestsSchema = (t: GuestErrorTranslator) =>
 export const validateAlloggiatiGuests = (guests: IdentifiableGuest[], t: GuestErrorTranslator): string | null => {
   const result = buildAlloggiatiGuestsSchema(t).safeParse(guests);
   return result.success ? null : (result.error.issues[0]?.message ?? null);
+};
+
+/** Maps a persisted stay guest back to the editable form shape (UI-only stato codes derived from the lookup table). */
+export const toIdentifiableGuest = (g: StayGuestResponse, stati: AlloggiatiStato[]): IdentifiableGuest => {
+  const isStatoCode = (code: string) => stati.some((s) => s.codice === code);
+  return {
+    _id: g.id,
+    firstName: g.firstName,
+    lastName: g.lastName,
+    gender: g.gender,
+    dateOfBirth: g.dateOfBirth,
+    placeOfBirth: g.placeOfBirth,
+    citizenship: g.citizenship,
+    documentType: g.documentType ?? '',
+    documentNumber: g.documentNumber ?? '',
+    documentPlaceOfIssue: g.documentPlaceOfIssue ?? '',
+    isPrimaryGuest: g.isPrimaryGuest,
+    travellerType: g.travellerType,
+    travelPurpose: g.travelPurpose ?? '',
+    version: g.version,
+    _statoDiNascita: isStatoCode(g.placeOfBirth) ? g.placeOfBirth : CODICE_ITALIA,
+    _statoRilascioDoc: g.documentPlaceOfIssue && isStatoCode(g.documentPlaceOfIssue) ? g.documentPlaceOfIssue : CODICE_ITALIA,
+  };
+};
+
+/** Strips the UI-only fields and empty optionals before sending to the API. */
+export const toRequest = (g: IdentifiableGuest): StayGuestRequest => ({
+  firstName: g.firstName,
+  lastName: g.lastName,
+  gender: g.gender,
+  dateOfBirth: g.dateOfBirth,
+  placeOfBirth: g.placeOfBirth,
+  citizenship: g.citizenship,
+  documentType: g.documentType || undefined,
+  documentNumber: g.documentNumber || undefined,
+  documentPlaceOfIssue: g.documentPlaceOfIssue || undefined,
+  isPrimaryGuest: g.isPrimaryGuest,
+  travellerType: g.travellerType,
+  travelPurpose: g.travelPurpose || undefined,
+  version: g.version,
+});
+
+/** Validates the lone guest being added/corrected on an already-open stay; returns the first problem or null. */
+export const validateSingleGuest = (g: IdentifiableGuest, t: GuestErrorTranslator): string | null => {
+  const hasDoc = !TYPES_WITHOUT_DOC.includes(g.travellerType as never);
+
+  if (!g.firstName || !g.lastName || !g.gender || !g.dateOfBirth || !g.travellerType) {
+    return t('err_required_fields');
+  }
+  if (hasDoc && (!g.documentType || !g.documentNumber)) {
+    return t('err_required_fields');
+  }
+  // Stato/comune-di-nascita and stato/comune-di-rilascio-documento rules are the
+  // same ones CheckInForm/WalkInCheckInForm enforce for every guest at check-in —
+  // shared here rather than re-derived, so a future Alloggiati rule change only
+  // needs to be made once (see alloggiatiPlaceIssues' own doc for why the
+  // required-field and primary-guest checks above/below aren't also shared: they
+  // don't apply the same way to a lone correction on an already-open stay).
+  return alloggiatiPlaceIssues(g, t, 1)[0] ?? null;
 };
