@@ -321,6 +321,12 @@ readable is *consistency*, not *sparseness*. Concretely:
   second step) uses `M3Dialog` directly.
   Inside a dialog it opens as a nested `M3ConfirmDialog` on top of it, never as an inline
   Confirm/Cancel row that replaces the content.
+- **A record's detail goes in `M3SideSheet`** — modal panel anchored right (400px from `sm`,
+  full width below), same contract as `M3Dialog` (scrim, focus trap, Escape closes only the
+  topmost overlay) with a `footer` slot for actions. Forms and confirmations stay in
+  `M3Dialog`/`M3ConfirmDialog`; to edit from a sheet, close it and open the form, don't stack
+  two modal panels. The entry animation is `animate-slide-in-from-right` (the nav drawer's
+  `animate-slide-in-right` enters from the left).
 - **Filter pills go through `M3FilterChip`** — a pill toggle with `aria-pressed`. Use
   `onClick` for a standalone toggle, or `value` + `onValueSelect` for a row of chips sharing one
   handler (the `react-perf` lint rule forbids inline arrow functions as props).
