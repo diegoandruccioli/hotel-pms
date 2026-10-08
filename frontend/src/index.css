@@ -10,7 +10,6 @@
 @import '@fontsource/outfit/700.css' layer(base);
 @import '@fontsource/outfit/800.css' layer(base);
 @import './styles/m3-base.css' layer(base);
-@import './styles/m3-base.utilities.css';
 
 @import 'tailwindcss';
 
