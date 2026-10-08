@@ -40,6 +40,8 @@ export const queryKeys = {
   quotations: {
     all: ['quotations'] as const,
     detail: (id: string) => ['quotations', 'detail', id] as const,
+  users: {
+    all: ['users'] as const,
   },
   invoices: {
     all: ['invoices'] as const,
@@ -55,6 +57,9 @@ export const queryKeys = {
   stays: {
     all: ['stays'] as const,
     list: (page: number) => ['stays', 'list', page] as const,
+    detail: (id: string) => ['stays', 'detail', id] as const,
+    lookupStati: ['stays', 'lookup', 'stati'] as const,
+    lookupTipdoc: ['stays', 'lookup', 'tipdoc'] as const,
     search: (params: { status?: string; page: number; size?: number }) =>
       ['stays', 'search', params] as const,
   },

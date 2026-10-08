@@ -1,25 +1,23 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import { userService } from '../services';
+import type { SortingState } from '@tanstack/react-table';
 import type { UserResponse } from '../types';
-import { MaterialIcon } from '../components/MaterialIcon';
 import { ListToolbar } from '../components/ListToolbar';
-import { M3Avatar, M3Button, M3Card } from '../components/m3';
+import { M3Button, M3Card } from '../components/m3';
 import { M3ConfirmDialog } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3FilterChip } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3EmptyState } from '../components/m3';
-import { M3StatusChip } from '../components/m3';
 import { SettingsPageHeader } from '../components/SettingsPageHeader';
 import { useToastStore } from '../store';
 import { useAuthStore } from '../store';
-import { getErrorMessage, userRoleTone } from '../utils';
+import { useAddUserToCache, useToggleUserActive, useUsersList } from '../hooks/queries';
+import { getErrorMessage } from '../utils';
 import { CreateUserModal } from './AdminUsers/CreateUserModal';
 import { ResetPasswordModal } from './AdminUsers/ResetPasswordModal';
-import type { TFunction } from 'i18next';
+import { useUserColumns } from './AdminUsers/useUserColumns';
 
 type UserFilter = 'ALL' | 'ADMIN' | 'OWNER' | 'RECEPTIONIST' | 'DEACTIVATED';
 
@@ -45,40 +43,9 @@ const ROLE_DESCRIPTIONS = [
   ['RECEPTIONIST', 'users_role_receptionist_desc'],
 ] as const;
 
+const EMPTY_USERS: UserResponse[] = [];
 const DEFAULT_SORT_FIELD = 'username';
 const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'asc';
-
-interface ActionsCellProps {
-  user: UserResponse;
-  onToggle: (u: UserResponse) => void;
-  onResetPassword: (u: UserResponse) => void;
-  currentUsername: string | undefined;
-  t: TFunction;
-}
-
-const ACTION_BTN_CLASS = 'h-auto min-h-10 px-3 py-1 text-xs';
-
-const ActionsCell = ({ user, onToggle, onResetPassword, currentUsername, t }: ActionsCellProps) => {
-  const handleToggle = useCallback(() => onToggle(user), [onToggle, user]);
-  const handleReset = useCallback(() => onResetPassword(user), [onResetPassword, user]);
-
-  return (
-    <div className="flex items-center gap-2">
-      <M3Button type="button" variant="outlined" onClick={handleToggle}
-        className={ACTION_BTN_CLASS}
-        aria-label={user.active ? t('btn_deactivate') : t('btn_activate')}>
-        {user.active ? t('btn_deactivate') : t('btn_activate')}
-      </M3Button>
-      {user.username !== currentUsername && (
-        <M3Button type="button" variant="outlined" onClick={handleReset}
-          className={ACTION_BTN_CLASS}
-          aria-label={`${t('btn_reset_password')} ${user.username}`}>
-          {t('btn_reset_password')}
-        </M3Button>
-      )}
-    </div>
-  );
-};
 
 function compareUsers(a: UserResponse, b: UserResponse, field: string): number {
   switch (field) {
@@ -95,8 +62,10 @@ export function AdminUsers() {
   const { addToast } = useToastStore();
   const currentUser = useAuthStore((s) => s.user);
   const handleBack = useCallback(() => navigate(-1), [navigate]);
-  const [users, setUsers] = useState<UserResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: usersData, isLoading: loading, isError: loadFailed } = useUsersList();
+  const users = usersData ?? EMPTY_USERS;
+  const toggleUserMutation = useToggleUserActive();
+  const addUserToCache = useAddUserToCache();
   const [showCreate, setShowCreate] = useState(false);
   const [resetTarget, setResetTarget] = useState<UserResponse | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<UserResponse | null>(null);
@@ -110,25 +79,17 @@ export function AdminUsers() {
   const openReset = useCallback((u: UserResponse) => setResetTarget(u), []);
   const closeReset = useCallback(() => setResetTarget(null), []);
 
-  const load = useCallback(() => {
-    userService
-      .listUsers()
-      .then(setUsers)
-      .catch(() => addToast(t('err_load_failed'), 'error'))
-      .finally(() => setLoading(false));
-  }, [addToast, t]);
-
   useEffect(() => {
-    load();
-  }, [load]);
+    if (loadFailed) addToast(t('err_load_failed'), 'error');
+  }, [loadFailed, addToast, t]);
 
   const handleCreated = useCallback(
     (u: UserResponse) => {
-      setUsers((prev) => [u, ...prev]);
+      addUserToCache(u);
       closeCreate();
       addToast(t('toast_created', { username: u.username }), 'success');
     },
-    [addToast, t, closeCreate],
+    [addUserToCache, addToast, t, closeCreate],
   );
 
   const handleResetSuccess = useCallback(() => {
@@ -139,10 +100,7 @@ export function AdminUsers() {
   const performToggle = useCallback(
     async (u: UserResponse) => {
       try {
-        const updated = u.active
-          ? await userService.deactivateUser(u.id)
-          : await userService.activateUser(u.id);
-        setUsers((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+        await toggleUserMutation.mutateAsync(u);
         addToast(
           u.active
             ? t('toast_deactivated', { username: u.username })
@@ -153,7 +111,7 @@ export function AdminUsers() {
         addToast(getErrorMessage(err, t('err_toggle_failed')), 'error');
       }
     },
-    [addToast, t],
+    [toggleUserMutation, addToast, t],
   );
 
   // Locking someone out asks first; re-activating is harmless and goes straight through.
@@ -205,66 +163,11 @@ export function AdminUsers() {
 
   const getUserRowId = useCallback((u: UserResponse) => u.id, []);
 
-  const columns = useMemo<ColumnDef<UserResponse>[]>(() => [
-    {
-      id: 'username',
-      accessorKey: 'username',
-      header: t('col_username'),
-      cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <M3Avatar name={row.original.username} size="md" aria-hidden="true" />
-          <span className="font-medium">{row.original.username}</span>
-        </div>
-      ),
-    },
-    {
-      id: 'email',
-      accessorKey: 'email',
-      header: t('col_email'),
-      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.email}</span>,
-    },
-    {
-      id: 'role',
-      accessorKey: 'role',
-      header: t('col_role'),
-      cell: ({ row }) => (
-        <M3StatusChip label={row.original.role} tone={userRoleTone[row.original.role]} />
-      ),
-    },
-    {
-      id: 'active',
-      accessorKey: 'active',
-      header: t('col_status'),
-      cell: ({ row }) => (
-        <div className="flex flex-col items-start gap-1">
-          <M3StatusChip
-            label={row.original.active ? t('status_active') : t('status_inactive')}
-            tone={row.original.active ? 'success' : 'error'}
-          />
-          {row.original.mustChangePassword && (
-            <span className="flex items-center gap-1 text-xs text-on-surface-variant">
-              <MaterialIcon name="warning" size={14} />
-              {t('must_change_pw')}
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      id: 'actions',
-      header: t('col_actions'),
-      enableSorting: false,
-      cell: ({ row }) => (
-        <ActionsCell
-          user={row.original}
-          onToggle={handleToggle}
-          onResetPassword={openReset}
-          currentUsername={currentUser?.username}
-          t={t}
-        />
-      ),
-    },
-  ], [t, handleToggle, openReset, currentUser?.username]);
+  const columns = useUserColumns({
+    onToggle: handleToggle,
+    onResetPassword: openReset,
+    currentUsername: currentUser?.username,
+  });
 
   return (
     <div className="space-y-6">

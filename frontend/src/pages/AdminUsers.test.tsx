@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import type { Role } from '../types';
 import { AdminUsers } from './AdminUsers';
 import { userService } from '../services';
-import { mockAxiosErrorWithDetail } from '../test-utils';
+import { mockAxiosErrorWithDetail, renderWithQuery } from '../test-utils';
 
 // SettingsPageHeader's back button needs react-router-dom's useNavigate,
 // which throws outside a Router — every render needs this wrapper now.
-const renderAdminUsers = () => render(<MemoryRouter><AdminUsers /></MemoryRouter>);
+const renderAdminUsers = () => renderWithQuery(<MemoryRouter><AdminUsers /></MemoryRouter>);
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
