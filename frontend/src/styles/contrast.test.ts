@@ -80,3 +80,37 @@ describe('page and solid-card surface contrast (WCAG AAA, 7:1)', () => {
     expect(ratio(tokens[text], tokens[surface])).toBeGreaterThanOrEqual(7);
   });
 });
+
+describe('high-contrast tertiary and inverse tokens (WCAG AAA, 7:1)', () => {
+  const hcThemes = { 'high-contrast light': hc, 'high-contrast dark': darkHc } as const;
+  const hcTokens = [
+    'tertiary',
+    'on-tertiary',
+    'tertiary-container',
+    'on-tertiary-container',
+    'inverse-surface',
+    'inverse-on-surface',
+    'inverse-primary',
+  ];
+
+  // Guards against the silent fallback to the base :root/.dark values.
+  it.each(Object.keys(hcThemes))('%s: defines every tertiary/inverse token in its own block', (theme) => {
+    for (const key of hcTokens) {
+      expect(hcThemes[theme as keyof typeof hcThemes][key], key).toMatch(/^#[0-9A-Fa-f]{6}$/);
+    }
+  });
+
+  const pairs: ReadonlyArray<readonly [string, string]> = [
+    ['on-tertiary', 'tertiary'],
+    ['on-tertiary-container', 'tertiary-container'],
+    ['inverse-on-surface', 'inverse-surface'],
+    ['inverse-primary', 'inverse-surface'],
+  ];
+
+  it.each(
+    Object.keys(hcThemes).flatMap((theme) => pairs.map(([fg, bg]) => [theme, fg, bg] as const)),
+  )('%s: %s vs %s', (theme, fg, bg) => {
+    const tokens = themes[theme];
+    expect(ratio(tokens[fg], tokens[bg])).toBeGreaterThanOrEqual(7);
+  });
+});

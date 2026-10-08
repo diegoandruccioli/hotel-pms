@@ -454,13 +454,10 @@ state instead of describing an aspirational one:
   `docs/COMPLIANCE_AUDIT_2026-08.md` §8 were all trimmed to point here; each keeps
   only what's genuinely specific to that file (DECISIONS keeps the historical
   baseline pointer, COMPLIANCE_AUDIT keeps the PDF/UA fiscal-document note).
-- **Still open**: the high-contrast rule above isn't fully honored today.
-  `[data-contrast="high"]` and `.dark[data-contrast="high"]` in `m3-base.css`
-  define `primary`/`secondary`/`error`/`surface-*`/`outline-*` tokens, but
-  **not** `tertiary`, `on-tertiary`, `tertiary-container`, `on-tertiary-container`,
-  `inverse-surface`, `inverse-on-surface`, `inverse-primary`, or `scrim`. Those
-  fall back to the base `:root`/`.dark` values even in high-contrast mode. Not
-  fixed by this update — flagged here so it isn't lost.
+- **Resolved (2026-10-08)**: both high-contrast blocks now define `tertiary*` and
+  `inverse-*` (guarded by `src/styles/contrast.test.ts`, which fails if a block falls back
+  to the base values). `scrim` needs no variant: it is the constant `--color-scrim: #000000`
+  in the `@theme` block of `index.css`, not a themed `--md-*` token, and already pure black.
 - **Resolved (2026-09-02): Tailwind 3→4 migration complete**, via the official
   `@tailwindcss/upgrade` codemod (`backup/DECISIONS.md` §7.1 updated accordingly).
   The `var(--md-*)` token indirection now lives in an `@theme` block in

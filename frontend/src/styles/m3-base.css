@@ -153,6 +153,11 @@
   --md-error-container: #FFDAD6;
   --md-on-error-container: #000000;
 
+  --md-tertiary: #0B3229;
+  --md-on-tertiary: #FFFFFF;
+  --md-tertiary-container: #D7F0EA;
+  --md-on-tertiary-container: #000000;
+
   --md-surface: #FFFFFF;
   --md-on-surface: #000000;
   --md-surface-variant: #E0E3E8;
@@ -167,6 +172,10 @@
 
   --md-outline: #000000;
   --md-outline-variant: #43474E;
+
+  --md-inverse-surface: #000000;
+  --md-inverse-on-surface: #FFFFFF;
+  --md-inverse-primary: #C8DFFF;
 
   /* Season/category accent palette — light high-contrast: same hues pushed
      darker/more saturated so each stays distinguishable against a pure-white
@@ -195,6 +204,11 @@
   --md-error-container: #7A0000;
   --md-on-error-container: #FFFFFF;
 
+  --md-tertiary: #B8EFDC;
+  --md-on-tertiary: #000000;
+  --md-tertiary-container: #0B5240;
+  --md-on-tertiary-container: #FFFFFF;
+
   --md-surface: #000000;
   --md-on-surface: #FFFFFF;
   --md-surface-variant: #2A2D34;
@@ -209,6 +223,10 @@
 
   --md-outline: #FFFFFF;
   --md-outline-variant: #C3C7CF;
+
+  --md-inverse-surface: #FFFFFF;
+  --md-inverse-on-surface: #000000;
+  --md-inverse-primary: #003070;
 
   /* Season/category accent palette — dark high-contrast: same hues pushed
      lighter/more saturated so each stays distinguishable against a pure-black
