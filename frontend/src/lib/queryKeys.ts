@@ -40,6 +40,7 @@ export const queryKeys = {
   quotations: {
     all: ['quotations'] as const,
     detail: (id: string) => ['quotations', 'detail', id] as const,
+  },
   users: {
     all: ['users'] as const,
   },
