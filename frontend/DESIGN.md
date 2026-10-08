@@ -128,9 +128,8 @@ replaces the sidebar altogether.
 **Motion** — a global rule in `m3-base.css` applies a 150ms
 `cubic-bezier(0.2,0,0,1)` transition to `color`/`background-color`/`border-color`/
 `box-shadow`/`opacity` on every element. Don't add a per-component transition for
-these properties — you'd be fighting or duplicating the global one. Opt out with
-`[data-no-transition]` only when the global transition actively breaks something
-(e.g. an instant theme-swap moment). `prefers-reduced-motion: reduce` zeroes all
+these properties — you'd be fighting or duplicating the global one.
+`prefers-reduced-motion: reduce` zeroes all
 animations/transitions automatically (WCAG 2.3.3) — this is handled globally, don't
 re-guard individual animations for it.
 
