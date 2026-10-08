@@ -52,6 +52,8 @@ export interface GuestResponseDTO {
   cap?: string;
   comune?: string;
   provincia?: string;
+  dateOfBirth?: string;
+  gdprConsentDate?: string;
   identityDocuments?: IdentityDocumentResponseDTO[];
   createdAt: string;
   updatedAt: string;

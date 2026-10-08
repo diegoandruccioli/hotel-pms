@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { guestService } from '../../services';
+import { billingService, guestService, stayService } from '../../services';
 import { queryKeys } from '../../lib';
 
 /**
@@ -40,5 +40,22 @@ export function useGuestSuggestions(query: string) {
     queryKey: queryKeys.guests.suggest(trimmed),
     queryFn: () => guestService.searchGuests(trimmed),
     enabled: trimmed.length > 0,
+  });
+}
+
+/** Stay history of a guest (primary guest only), for the detail sheet. */
+export function useGuestStayHistory(id: string) {
+  return useQuery({
+    queryKey: queryKeys.guests.stays(id),
+    queryFn: () => stayService.getGuestStayHistory(id),
+  });
+}
+
+/** Invoice history of a guest; `enabled` lets roles without financial access skip the call. */
+export function useGuestInvoiceHistory(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.guests.invoices(id),
+    queryFn: () => billingService.getGuestInvoiceHistory(id),
+    enabled,
   });
 }

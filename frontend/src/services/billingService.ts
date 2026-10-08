@@ -3,6 +3,7 @@ import type {
   BillingDocumentType as DocumentType,
   ChargeRequest,
   ChargeResponse,
+  GuestInvoiceSummary,
   InvoiceResponse,
   InvoiceSearchResult,
   InvoiceStatus,
@@ -18,6 +19,11 @@ const BASE_PATH = '/api/v1/invoices';
 export const billingService = {
   getInvoiceById: async (id: string): Promise<InvoiceResponse> => {
     const response = await api.get<InvoiceResponse>(`${BASE_PATH}/${id}`);
+    return response.data;
+  },
+
+  getGuestInvoiceHistory: async (guestId: string): Promise<GuestInvoiceSummary[]> => {
+    const response = await api.get<GuestInvoiceSummary[]>(`${BASE_PATH}/guest/${guestId}/history`);
     return response.data;
   },
 

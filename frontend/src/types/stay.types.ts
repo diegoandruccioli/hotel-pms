@@ -88,6 +88,15 @@ export interface StayGuestRequest {
   version?: number | null;
 }
 
+/** One row of GET /api/v1/stays/guest/{guestId}/history (newest first, primary guest only). */
+export interface GuestStaySummary {
+  stayId: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  roomId: string;
+  status: StayStatus;
+}
+
 export interface StayRequest {
   hotelId?: string;
   /** Null for walk-in check-ins (no reservation). */

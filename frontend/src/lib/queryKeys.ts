@@ -12,6 +12,8 @@ export const queryKeys = {
       ['guests', 'search', query, page, size, sort] as const,
     detail: (id: string) => ['guests', 'detail', id] as const,
     suggest: (query: string) => ['guests', 'suggest', query] as const,
+    stays: (id: string) => ['guests', 'stays', id] as const,
+    invoices: (id: string) => ['guests', 'invoices', id] as const,
   },
   rooms: {
     all: ['rooms'] as const,

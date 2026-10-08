@@ -16,6 +16,7 @@ import type {
   HotelCategoryHistoryResponse,
   HotelSettingsRequest,
   HotelSettingsResponse,
+  GuestStaySummary,
   StayGuestRequest,
   StayGuestResponse,
   StayRequest,
@@ -130,6 +131,11 @@ export const stayService = {
     iframe.src = `${BASE_PATH}/reports/alloggiati?date=${encodeURIComponent(date)}`;
     document.body.appendChild(iframe);
     setTimeout(() => document.body.removeChild(iframe), IFRAME_CLEANUP_DELAY_MS);
+  },
+
+  getGuestStayHistory: async (guestId: string): Promise<GuestStaySummary[]> => {
+    const response = await api.get<GuestStaySummary[]>(`${BASE_PATH}/guest/${guestId}/history`);
+    return response.data;
   },
 
   getLastCompletedStayForGuest: async (guestId: string): Promise<StayResponse | null> => {
