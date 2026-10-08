@@ -1,9 +1,8 @@
 import { useFormatters } from '../../hooks';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { quotationService } from '../../services';
-import type { QuotationResponse, QuotationOptionResponse } from '../../types';
+import { useQuotation } from '../../hooks/queries';
 import { Alert } from '../../components/Alert';
 import { M3LoadingState } from '../../components/m3';
 import { M3ErrorState } from '../../components/m3';
@@ -15,194 +14,30 @@ import { M3ConfirmDialog } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { QuotationPdfPreviewDialog } from './QuotationPdfPreviewDialog';
-import { useToastStore } from '../../store';
+import { QuotationOptionCard } from './QuotationOptionCard';
+import { useQuotationDetailActions } from './useQuotationDetailActions';
 import { getErrorMessage, cn, quotationStatusTone } from '../../utils';
-
-const OptionCard = ({ option, isAccepted, isConvertChoice, selectable, onChoose }: {
-  option: QuotationOptionResponse;
-  isAccepted: boolean;
-  isConvertChoice: boolean;
-  selectable: boolean;
-  onChoose?: (optionId: string) => void;
-}) => {
-  const { formatCurrency } = useFormatters();
-  const { t } = useTranslation(['quotations', 'common']);
-  const handleChoose = useCallback(() => onChoose?.(option.id), [onChoose, option.id]);
-
-  const lineItemHeaders = useMemo(() => [
-    <span key="room" className="sr-only">{t('common:room_number_col')}</span>,
-    <span key="type" className="sr-only">{t('common:room_type')}</span>,
-    <span key="price" className="sr-only">{t('common:amount')}</span>,
-  ], [t]);
-
-  return (
-    <M3Card
-      variant="outlined"
-      className={cn(
-        'p-4 space-y-3',
-        isAccepted && 'border-tertiary border-2',
-        isConvertChoice && 'border-primary border-2'
-      )}
-    >
-      <div className="flex items-center justify-between">
-        <h3 className="font-medium text-on-surface">{option.label}</h3>
-        {isAccepted && <M3StatusChip label={t('label_accepted_option')} tone="success" icon="check_circle" />}
-      </div>
-      <M3Table headers={lineItemHeaders}>
-        {option.lineItems.map((li) => (
-          <M3TableRow key={li.id}>
-            <M3TableCell className="py-1.5 first:pl-0 last:pr-0 text-on-surface">{li.roomNumber}</M3TableCell>
-            <M3TableCell className="py-1.5 first:pl-0 last:pr-0 text-on-surface-variant">{li.roomTypeName}</M3TableCell>
-            <M3TableCell className="py-1.5 first:pl-0 last:pr-0 text-right text-on-surface-variant">{formatCurrency(li.price)}</M3TableCell>
-          </M3TableRow>
-        ))}
-      </M3Table>
-      <p className="text-right font-medium text-on-surface">{formatCurrency(option.totalPrice)}</p>
-      {selectable && (
-        <M3Button type="button" variant={isConvertChoice ? 'filled' : 'outlined'} onClick={handleChoose} className="w-full">
-          {isConvertChoice ? t('common:selected') : t('action_choose_option')}
-        </M3Button>
-      )}
-    </M3Card>
-  );
-};
 
 export const QuotationDetail = () => {
   const { formatCurrency, formatDate } = useFormatters();
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation(['quotations', 'common']);
   const navigate = useNavigate();
-  const addToast = useToastStore((s) => s.addToast);
 
-  const [quotation, setQuotation] = useState<QuotationResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [declineConfirmOpen, setDeclineConfirmOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
-  const [convertChoiceId, setConvertChoiceId] = useState<string | null>(null);
-
-  const loadQuotation = useCallback(async () => {
-    if (!id) return;
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await quotationService.getQuotationById(id);
-      setQuotation(data);
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, t('error_loading_quotation')));
-    } finally {
-      setLoading(false);
-    }
-  }, [id, t]);
-
-  useEffect(() => {
-    loadQuotation();
-  }, [loadQuotation]);
+  const quotationQuery = useQuotation(id);
+  const quotation = quotationQuery.data;
+  const loading = quotationQuery.isLoading;
+  const error = quotationQuery.error ? getErrorMessage(quotationQuery.error, t('error_loading_quotation')) : null;
+  const { refetch } = quotationQuery;
+  const loadQuotation = useCallback(() => { void refetch(); }, [refetch]);
 
   const handleBack = useCallback(() => navigate('/quotations'), [navigate]);
-  const handleEdit = useCallback(() => navigate(`/quotations/${id}/edit`), [navigate, id]);
-  const openPreview = useCallback(() => setPreviewOpen(true), []);
-  const closePreview = useCallback(() => setPreviewOpen(false), []);
-  const handleDownload = useCallback(async () => {
-    if (!id) return;
-    try {
-      await quotationService.downloadPdf(id);
-    } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('download_failed', { ns: 'common' })), 'error');
-    }
-  }, [id, addToast, t]);
-
-  const handleSend = useCallback(async () => {
-    if (!id) return;
-    setBusy(true);
-    try {
-      const updated = await quotationService.sendQuotation(id);
-      setQuotation(updated);
-      addToast(updated.sendFailed ? t('toast_send_failed') : t('toast_sent'), updated.sendFailed ? 'error' : 'success');
-    } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('toast_send_failed')), 'error');
-    } finally {
-      setBusy(false);
-    }
-  }, [id, addToast, t]);
-
-  const performConvert = useCallback(async (optionId: string | null) => {
-    if (!id) return;
-    setBusy(true);
-    try {
-      const reservation = await quotationService.convertToReservation(id, optionId ?? undefined);
-      addToast(t('toast_converted'), 'success');
-      navigate(`/reservations/${reservation.id}`);
-    } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('toast_converted')), 'error');
-    } finally {
-      setBusy(false);
-      setConvertDialogOpen(false);
-    }
-  }, [id, addToast, t, navigate]);
-
-  const handleConvertClick = useCallback(() => {
-    if (!quotation) return;
-    if (quotation.options.length === 1) {
-      performConvert(quotation.options[0].id);
-      return;
-    }
-    setConvertChoiceId(quotation.acceptedOptionId ?? quotation.options[0]?.id ?? null);
-    setConvertDialogOpen(true);
-  }, [quotation, performConvert]);
-
-  const closeConvertDialog = useCallback(() => setConvertDialogOpen(false), []);
-  const confirmConvert = useCallback(() => performConvert(convertChoiceId), [performConvert, convertChoiceId]);
-
-  const handleDuplicate = useCallback(async () => {
-    if (!id) return;
-    setBusy(true);
-    try {
-      const duplicate = await quotationService.duplicateQuotation(id);
-      addToast(t('toast_duplicated'), 'success');
-      navigate(`/quotations/${duplicate.id}`);
-    } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('toast_duplicated')), 'error');
-    } finally {
-      setBusy(false);
-    }
-  }, [id, addToast, t, navigate]);
-
-  const openDeclineConfirm = useCallback(() => setDeclineConfirmOpen(true), []);
-  const closeDeclineConfirm = useCallback(() => setDeclineConfirmOpen(false), []);
-  const handleDeclineConfirmed = useCallback(async () => {
-    if (!id) return;
-    setBusy(true);
-    try {
-      const updated = await quotationService.declineQuotation(id);
-      setQuotation(updated);
-      addToast(t('toast_declined'), 'success');
-    } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('toast_declined')), 'error');
-    } finally {
-      setBusy(false);
-      setDeclineConfirmOpen(false);
-    }
-  }, [id, addToast, t]);
-
-  const openDeleteConfirm = useCallback(() => setDeleteConfirmOpen(true), []);
-  const closeDeleteConfirm = useCallback(() => setDeleteConfirmOpen(false), []);
-  const handleDeleteConfirmed = useCallback(async () => {
-    if (!id) return;
-    setBusy(true);
-    try {
-      await quotationService.deleteQuotation(id);
-      addToast(t('toast_deleted'), 'success');
-      navigate('/quotations');
-    } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('toast_deleted')), 'error');
-      setBusy(false);
-      setDeleteConfirmOpen(false);
-    }
-  }, [id, addToast, t, navigate]);
+  const {
+    busy, previewOpen, declineConfirmOpen, deleteConfirmOpen, convertDialogOpen, convertChoiceId, setConvertChoiceId,
+    handleEdit, openPreview, closePreview, handleDownload, handleSend, handleConvertClick, closeConvertDialog,
+    confirmConvert, handleDuplicate, openDeclineConfirm, closeDeclineConfirm, handleDeclineConfirmed,
+    openDeleteConfirm, closeDeleteConfirm, handleDeleteConfirmed,
+  } = useQuotationDetailActions(id, quotation);
 
   const sortedOptions = useMemo(
     () => (quotation ? [...quotation.options].sort((a, b) => a.position - b.position) : []),
@@ -277,7 +112,7 @@ export const QuotationDetail = () => {
         {sortedOptions.length > 1 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {sortedOptions.map((option) => (
-              <OptionCard
+              <QuotationOptionCard
                 key={option.id}
                 option={option}
                 isAccepted={quotation.acceptedOptionId === option.id}
@@ -351,7 +186,7 @@ export const QuotationDetail = () => {
           <p className="text-sm font-body text-on-surface mb-4">{t('label_choose_option_to_convert')}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {sortedOptions.map((option) => (
-              <OptionCard
+              <QuotationOptionCard
                 key={option.id}
                 option={option}
                 isAccepted={quotation.acceptedOptionId === option.id}

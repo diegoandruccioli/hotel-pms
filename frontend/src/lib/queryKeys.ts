@@ -37,6 +37,10 @@ export const queryKeys = {
       size?: number;
     }) => ['reservations', 'search', params] as const,
   },
+  quotations: {
+    all: ['quotations'] as const,
+    detail: (id: string) => ['quotations', 'detail', id] as const,
+  },
   invoices: {
     all: ['invoices'] as const,
     search: (params: { status?: string; query: string; dateFrom?: string; dateTo?: string; page: number; sort?: string }) =>

@@ -10,3 +10,4 @@ export * from './useReservationGroups';
 export * from './useReservations';
 export * from './useRooms';
 export * from './useStays';
+export * from './useQuotations';
