@@ -46,12 +46,15 @@ export const GuestActionsCell = ({ guest, onEdit, onDelete, onExport, t }: Actio
 
 interface NameCellProps {
   guest: GuestResponseDTO;
-  onOpen: (g: GuestResponseDTO) => void;
+  onOpen: (g: GuestResponseDTO, trigger: HTMLElement) => void;
 }
 
 /** The name is a button, not a clickable row, so keyboard and screen-reader users reach the detail too. */
 export const GuestNameCell = ({ guest, onOpen }: NameCellProps) => {
-  const handleOpen = useCallback(() => onOpen(guest), [onOpen, guest]);
+  const handleOpen = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => onOpen(guest, e.currentTarget),
+    [onOpen, guest],
+  );
   return (
     <button
       type="button"

@@ -10,7 +10,18 @@ import { useAuthStore } from '../../store/authStore';
 import type { GuestResponseDTO } from '../../types';
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+  // Surfaces interpolation values so a test can tell which room/count/date a key was given.
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (opts && typeof opts === 'object') {
+        for (const name of ['number', 'count']) {
+          if (name in opts) return `${key}:${String(opts[name])}`;
+        }
+      }
+      return key;
+    },
+    i18n: { language: 'en' },
+  }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
@@ -133,16 +144,17 @@ describe('GuestDetailSheet', () => {
 
   it('shows the stay history with the room number and a stays count', async () => {
     renderSheet();
-    expect((await screen.findAllByText('204')).length).toBe(2);
-    expect(screen.getByText('stat_stays_count')).toBeInTheDocument();
+    expect((await screen.findAllByText('label_room:204')).length).toBe(2);
+    expect(screen.getByText('stat_stays_count:2')).toBeInTheDocument();
     expect(screen.getAllByText('common:status_checked_out').length).toBe(2);
   });
 
   it('falls back to a dash when the room is not in the lookup', async () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValue({ content: [] } as never);
     renderSheet();
-    await screen.findAllByText('common:status_checked_out');
-    expect(screen.queryByText('204')).not.toBeInTheDocument();
+    await waitFor(() => expect(inventoryService.getAllRooms).toHaveBeenCalled());
+    expect(await screen.findAllByText('label_room:—')).toHaveLength(2);
+    expect(screen.queryByText('label_room:204')).not.toBeInTheDocument();
   });
 
   it('caps the stay history at 5 rows and reports the rest', async () => {
@@ -150,7 +162,7 @@ describe('GuestDetailSheet', () => {
     renderSheet();
     await screen.findAllByText('common:status_checked_out');
     expect(screen.getAllByText('common:status_checked_out')).toHaveLength(5);
-    expect(screen.getByText('msg_more_items')).toBeInTheDocument();
+    expect(screen.getByText('msg_more_items:2')).toBeInTheDocument();
   });
 
   it('shows an empty state when there are no stays', async () => {
@@ -172,6 +184,27 @@ describe('GuestDetailSheet', () => {
     expect(await screen.findByText('INV-001')).toBeInTheDocument();
     expect(screen.getByText(/€100.00/)).toBeInTheDocument();
     expect(screen.getByText('common:invoice_status_PAID')).toBeInTheDocument();
+  });
+
+  it('shows the invoice history to OWNER too', async () => {
+    vi.mocked(useAuthStore).mockImplementation(asRole('OWNER'));
+    renderSheet();
+    expect(await screen.findByText('INV-001')).toBeInTheDocument();
+  });
+
+  it('isolates a failing invoice history', async () => {
+    vi.mocked(billingService.getGuestInvoiceHistory).mockRejectedValue(new Error('boom'));
+    renderSheet();
+    expect(await screen.findByText('err_history_load')).toBeInTheDocument();
+    expect(await screen.findAllByText('label_room:204')).toHaveLength(2);
+  });
+
+  it('builds a mailto link that cannot add headers through the local part', () => {
+    renderSheet({ ...GUEST, email: 'x?cc=a@evil.com&body=hi@test.com' });
+    expect(screen.getByRole('link', { name: /evil\.com/ })).toHaveAttribute(
+      'href',
+      'mailto:x%3Fcc%3Da%40evil.com%26body%3Dhi@test.com',
+    );
   });
 
   it('shows an empty state when there are no invoices', async () => {

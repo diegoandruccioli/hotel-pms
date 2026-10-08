@@ -5,10 +5,9 @@ import { M3LoadingState } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
 import { useFormatters } from '../../hooks';
 import { useGuestInvoiceHistory, useGuestStayHistory, useRoomsLookup } from '../../hooks/queries';
-import { invoiceStatusTone, stayStatusTone } from '../../utils';
+import { EMPTY_PLACEHOLDER, invoiceStatusTone, stayStatusTone } from '../../utils';
 
 const HISTORY_LIMIT = 5;
-const NO_VALUE = '—';
 
 interface SectionProps {
   heading: string;
@@ -55,10 +54,10 @@ export const StayHistorySection = ({ guestId }: HistoryProps) => {
               <li key={stay.stayId} className="flex items-center justify-between gap-3 py-2">
                 <div className="min-w-0 text-sm">
                   <p className="text-on-surface">
-                    {formatDate(stay.checkInTime) || NO_VALUE} – {formatDate(stay.checkOutTime) || NO_VALUE}
+                    {formatDate(stay.checkInTime)} – {formatDate(stay.checkOutTime)}
                   </p>
                   <p className="text-xs text-on-surface-variant">
-                    {t('label_room')} <span>{roomNumbers.get(stay.roomId) ?? NO_VALUE}</span>
+                    {t('label_room', { number: roomNumbers.get(stay.roomId) ?? EMPTY_PLACEHOLDER })}
                   </p>
                 </div>
                 <M3StatusChip
@@ -78,7 +77,7 @@ export const StayHistorySection = ({ guestId }: HistoryProps) => {
 export const InvoiceHistorySection = ({ guestId }: HistoryProps) => {
   const { t } = useTranslation(['guests', 'common']);
   const { formatDate, formatCurrency } = useFormatters();
-  const { data, isLoading, isError } = useGuestInvoiceHistory(guestId, true);
+  const { data, isLoading, isError } = useGuestInvoiceHistory(guestId);
 
   return (
     <DetailSection heading={t('section_invoice_history')}>

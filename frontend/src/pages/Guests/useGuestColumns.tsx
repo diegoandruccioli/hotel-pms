@@ -6,7 +6,7 @@ import { GuestActionsCell, GuestNameCell } from './GuestCells';
 
 interface GuestColumnsOptions {
   isAdminOrOwner: boolean;
-  onOpen: (g: GuestResponseDTO) => void;
+  onOpen: (g: GuestResponseDTO, trigger: HTMLElement) => void;
   onEdit: (g: GuestResponseDTO) => void;
   onDelete: (g: GuestResponseDTO) => void;
   onExport: (g: GuestResponseDTO) => void;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { SortingState } from '@tanstack/react-table';
@@ -37,6 +37,10 @@ export const Guests = memo(() => {
   const [page, setPage] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<GuestResponseDTO | undefined>();
+  // Where focus goes back to when the form opened from the detail sheet closes: the sheet is
+  // unmounted by then, so the trap has no live opener to return to.
+  const detailTriggerRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const [detailGuest, setDetailGuest] = useState<GuestResponseDTO | null>(null);
   const [guestToDelete, setGuestToDelete] = useState<GuestResponseDTO | null>(null);
   const [guestToExport, setGuestToExport] = useState<GuestResponseDTO | null>(null);
@@ -110,17 +114,31 @@ export const Guests = memo(() => {
     setIsModalOpen(true);
   }, []);
 
-  const handleOpenDetail = useCallback((guest: GuestResponseDTO) => setDetailGuest(guest), []);
+  const handleOpenDetail = useCallback((guest: GuestResponseDTO, trigger: HTMLElement) => {
+    detailTriggerRef.current = trigger;
+    setDetailGuest(guest);
+  }, []);
+  const handleEditFromDetail = useCallback((guest: GuestResponseDTO) => {
+    returnFocusRef.current = detailTriggerRef.current;
+    handleOpenEditModal(guest);
+  }, [handleOpenEditModal]);
+  const restoreFocus = useCallback(() => {
+    const target = returnFocusRef.current;
+    returnFocusRef.current = null;
+    if (target?.isConnected) window.setTimeout(() => target.focus(), 0);
+  }, []);
   const handleCloseDetail = useCallback(() => setDetailGuest(null), []);
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
-  }, []);
+    restoreFocus();
+  }, [restoreFocus]);
 
   const handleSaved = useCallback(() => {
     setIsModalOpen(false);
     queryClient.invalidateQueries({ queryKey: queryKeys.guests.all });
-  }, [queryClient]);
+    restoreFocus();
+  }, [queryClient, restoreFocus]);
 
   const handleDeleteRequest = useCallback((guest: GuestResponseDTO) => {
     setGuestToDelete(guest);
@@ -246,7 +264,7 @@ export const Guests = memo(() => {
       )}
 
       {detailGuest && (
-        <GuestDetailSheet guest={detailGuest} onClose={handleCloseDetail} onEdit={handleOpenEditModal} />
+        <GuestDetailSheet guest={detailGuest} onClose={handleCloseDetail} onEdit={handleEditFromDetail} />
       )}
 
       {guestToDelete && (

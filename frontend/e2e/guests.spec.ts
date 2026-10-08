@@ -198,5 +198,31 @@ test.describe('Guests', () => {
 
     await page.keyboard.press('Escape');
     await expect(sheet).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Mario Rossi mario.rossi@test.com' })).toBeFocused();
+  });
+
+  test('returns focus to the guest name after editing from the sheet and closing the form', async ({ page }) => {
+    await page.route('**/api/v1/stays/guest/g-001/history', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+    );
+    await page.route('**/api/v1/invoices/guest/g-001/history', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+    );
+    await page.route('**/api/v1/rooms**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ content: [], totalElements: 0, totalPages: 1, number: 0, size: 500 }),
+      }),
+    );
+
+    await page.goto('/guests');
+    const nameButton = page.getByRole('button', { name: 'Mario Rossi mario.rossi@test.com' });
+    await nameButton.click();
+    await page.getByRole('dialog', { name: /guest detail|dettaglio ospite/i }).getByRole('button', { name: /^(edit|modifica)$/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(nameButton).toBeFocused();
   });
 });

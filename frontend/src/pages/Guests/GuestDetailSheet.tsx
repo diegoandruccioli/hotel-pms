@@ -27,6 +27,12 @@ const Field = ({ label, children }: FieldProps) => (
   </div>
 );
 
+/** `@Email` accepts `?`, `&` and `=` in the local part, which would inject headers into a mailto: link. */
+const mailtoHref = (email: string) => {
+  const at = email.lastIndexOf('@');
+  return at < 0 ? `mailto:${encodeURIComponent(email)}` : `mailto:${encodeURIComponent(email.slice(0, at))}${email.slice(at)}`;
+};
+
 const linkClass =
   'text-primary underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary';
 
@@ -47,7 +53,7 @@ const DocumentRow = ({ doc }: { doc: IdentityDocumentResponseDTO }) => {
           {t(`doc_type_${doc.documentType}`, doc.documentType)} · {doc.documentNumber}
         </p>
         <p className="text-xs text-on-surface-variant">
-          {t('label_document_expiry')} {formatDate(doc.expiryDate)}
+          {t('label_document_expiry', { date: formatDate(doc.expiryDate) })}
         </p>
       </div>
       {expired && <M3StatusChip tone="error" label={t('status_document_expired')} />}
@@ -93,7 +99,7 @@ export const GuestDetailSheet = ({ guest, onClose, onEdit }: GuestDetailSheetPro
           <dl className="space-y-2">
             {guest.email && (
               <Field label={t('common:email')}>
-                <a className={linkClass} href={`mailto:${guest.email}`}>{guest.email}</a>
+                <a className={linkClass} href={mailtoHref(guest.email)}>{guest.email}</a>
               </Field>
             )}
             {guest.phone && (
