@@ -8,6 +8,7 @@ import com.hotelpms.guest.dto.request.IdentityDocumentRequestDTO;
 import com.hotelpms.guest.dto.response.GuestDataExportResponse;
 import com.hotelpms.guest.dto.response.GuestResponse;
 import com.hotelpms.guest.dto.response.IdentityDocumentResponseDTO;
+import com.hotelpms.guest.exception.ExportSourceUnavailableException;
 import com.hotelpms.guest.exception.GlobalExceptionHandler;
 import com.hotelpms.guest.exception.GuestConflictException;
 import com.hotelpms.guest.exception.NotFoundException;
@@ -244,6 +245,16 @@ class GuestControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(guestService).removeIdentityDocument(guestId, docId);
+    }
+
+    @Test
+    void shouldReturn503WhenAnExportSourceIsUnavailable() throws Exception {
+        when(guestService.exportGuestData(guestId))
+                .thenThrow(new ExportSourceUnavailableException("invoices", new IllegalStateException("down")));
+
+        mockMvc.perform(get(BASE_URL + "/{id}/export", guestId))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.detail").value("EXTERNAL_SERVICE_UNAVAILABLE"));
     }
 
     @Test
