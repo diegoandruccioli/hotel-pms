@@ -327,6 +327,9 @@ readable is *consistency*, not *sparseness*. Concretely:
   `M3Dialog`/`M3ConfirmDialog`; to edit from a sheet, close it and open the form, don't stack
   two modal panels. The entry animation is `animate-slide-in-from-right` (the nav drawer's
   `animate-slide-in-right` enters from the left).
+  `M3Dialog` and `M3SideSheet` are thin wrappers over `M3ModalShell` (scrim, focus trap, Escape
+  stack, header, body, footer); a fix to that behaviour goes there once. Pages never import
+  `M3ModalShell` directly.
 - **Filter pills go through `M3FilterChip`** — a pill toggle with `aria-pressed`. Use
   `onClick` for a standalone toggle, or `value` + `onValueSelect` for a row of chips sharing one
   handler (the `react-perf` lint rule forbids inline arrow functions as props).
