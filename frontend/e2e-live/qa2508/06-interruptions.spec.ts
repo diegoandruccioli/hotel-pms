@@ -59,10 +59,10 @@ test.describe('Blocco 6 — interruptions', () => {
     await dateInputs.nth(1).fill(fmt(outDate));
     const nextBtn = page.getByRole('button', { name: /^(avanti|next)$/i });
     await nextBtn.click();
-    const roomTile = page.getByRole('button', { name: /101/i }).first();
-    if (await roomTile.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await roomTile.click();
-    }
+    // Any available room (same selector as 03): the stepper will not advance without one.
+    const roomTile = page.locator('.md\\:grid-cols-4 > button:not([disabled])').first();
+    await expect(roomTile).toBeVisible({ timeout: 8000 });
+    await roomTile.click();
     await nextBtn.click();
     await page.getByPlaceholder(/cerca ospite|search guest/i).fill('Qa Round');
     await page.waitForTimeout(500);
