@@ -67,8 +67,8 @@ public interface BillingServiceClient {
     default List<InvoiceSummaryClientResponse> invoiceHistoryFallback(
             final UUID guestId, final Throwable throwable) {
         LoggerFactory.getLogger(BillingServiceClient.class).warn(
-                "[BillingServiceClient] invoice history unavailable for GDPR export guestId={} cause={}: {}",
-                guestId, throwable.getClass().getSimpleName(), throwable.getMessage());
+                "[BillingServiceClient] invoice history unavailable for GDPR export guestId={} cause={}",
+                guestId, throwable.getClass().getSimpleName());
         throw new ExportSourceUnavailableException("invoices", throwable);
     }
 }

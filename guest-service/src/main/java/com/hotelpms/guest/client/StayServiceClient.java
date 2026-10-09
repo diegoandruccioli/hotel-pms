@@ -67,8 +67,8 @@ public interface StayServiceClient {
     default List<StaySummaryClientResponse> stayHistoryFallback(
             final UUID guestId, final Throwable throwable) {
         LoggerFactory.getLogger(StayServiceClient.class).warn(
-                "[StayServiceClient] stay history unavailable for GDPR export guestId={} cause={}: {}",
-                guestId, throwable.getClass().getSimpleName(), throwable.getMessage());
+                "[StayServiceClient] stay history unavailable for GDPR export guestId={} cause={}",
+                guestId, throwable.getClass().getSimpleName());
         throw new ExportSourceUnavailableException("stays", throwable);
     }
 }

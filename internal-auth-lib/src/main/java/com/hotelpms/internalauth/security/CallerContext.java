@@ -51,6 +51,6 @@ public final class CallerContext {
         final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth == null || auth.getName() == null
                 ? UNKNOWN_USER
-                : auth.getName().replaceAll("[\\r\\n]", "_");
+                : auth.getName().replaceAll("[\\r\\n\\u0085\\u2028\\u2029]", "_");
     }
 }

@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -31,7 +32,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -270,6 +273,30 @@ class InvoiceControllerSecurityTest {
                                 .contentType(MediaType.APPLICATION_JSON).content(GROUP_CHARGE_BODY),
                         USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void aNonExtraChargeRefusedByTheServiceIsAForbiddenNotAServerError() throws Exception {
+        when(invoiceService.addCharge(any(), any()))
+                .thenThrow(new AccessDeniedException("PUBLIC_CALLER_EXTRA_CHARGES_ONLY"));
+
+        mockMvc.perform(viaGateway(withAuthHeaders(
+                        post(BASE_URL + "/stay/{stayId}/charges", STAY_ID)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"type\":\"ROOM_NIGHT\",\"description\":\"x\",\"amount\":1.00}"),
+                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void removingARevenueChargeRefusedByTheServiceIsAForbiddenNotAServerError() throws Exception {
+        doThrow(new AccessDeniedException("PUBLIC_CALLER_EXTRA_CHARGES_ONLY"))
+                .when(invoiceService).removeCharge(any(), any());
+
+        mockMvc.perform(viaGateway(withAuthHeaders(
+                        delete(BASE_URL + "/stay/{stayId}/charges/{chargeId}", STAY_ID, GROUP_ID),
+                        USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID)))
+                .andExpect(status().isForbidden());
     }
 
     @Test

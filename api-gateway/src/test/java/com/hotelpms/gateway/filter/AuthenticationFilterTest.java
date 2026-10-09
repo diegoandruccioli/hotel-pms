@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.http.HttpCookie;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -214,6 +215,28 @@ class AuthenticationFilterTest {
                                 return Mono.empty();
                         }).block();
 
+                        assertThat(captured.get().getHeaders().get("X-Gateway-Origin")).containsExactly("true");
+                }
+
+                @Test
+                @DisplayName("should drop the inbound Connection header so a client cannot have the proxy strip X-Gateway-Origin as a hop-by-hop header")
+                void shouldDropInboundConnectionHeader() {
+                        final String validToken = buildJwt(ONE_HOUR_MS, "receptionist1", "RECEPTIONIST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/invoices")
+                                                        .cookie(new HttpCookie("jwt", validToken))
+                                                        .header("Connection", "close, X-Gateway-Origin")
+                                                        .header("Keep-Alive", "timeout=5")
+                                                        .build());
+                        final AtomicReference<ServerHttpRequest> captured = new AtomicReference<>();
+
+                        authenticationFilter.apply(config).filter(exchange, ex -> {
+                                captured.set(ex.getRequest());
+                                return Mono.empty();
+                        }).block();
+
+                        assertThat(captured.get().getHeaders().containsHeader("Connection")).isFalse();
+                        assertThat(captured.get().getHeaders().containsHeader("Keep-Alive")).isFalse();
                         assertThat(captured.get().getHeaders().get("X-Gateway-Origin")).containsExactly("true");
                 }
 
@@ -444,6 +467,57 @@ class AuthenticationFilterTest {
                                         .verifyComplete();
                         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
                         assertThat(bodyAsString(exchange)).isEqualTo("{\"error\":\"ACCESS_DENIED\"}");
+                }
+
+                @Test
+                @DisplayName("Internal-only invoice writes are refused for every role, even ADMIN (defense in depth for the gateway marker)")
+                void internalOnlyInvoiceWritesAreRefusedForEveryRole() {
+                        for (final String role : new String[] {"RECEPTIONIST", "ADMIN", "OWNER"}) {
+                                for (final String path : new String[] {
+                                                "/api/v1/invoices/stay",
+                                                "/api/v1/invoices/groups/00000000-0000-0000-0000-000000000001/master-folio",
+                                                "/api/v1/invoices/groups/00000000-0000-0000-0000-000000000001/charges",
+                                                "/api/v1/invoices/%73tay"}) {
+                                        final String token = buildJwt(ONE_HOUR_MS, "user1", role);
+                                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                                        MockServerHttpRequest.method(HttpMethod.POST, java.net.URI.create(path))
+                                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                                        .verifyComplete();
+                                        assertThat(exchange.getResponse().getStatusCode())
+                                                        .as(role + " POST " + path).isEqualTo(HttpStatus.FORBIDDEN);
+                                        assertThat(bodyAsString(exchange)).isEqualTo("{\"error\":\"ACCESS_DENIED\"}");
+                                }
+                        }
+                }
+
+                @Test
+                @DisplayName("RECEPTIONIST can still POST /api/v1/invoices/stay/{id}/charges (front-desk UI adds EXTRA charges)")
+                void receptionistCanStillPostStayCharges() {
+                        when(chainMock.filter(any())).thenReturn(Mono.empty());
+                        final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.post("/api/v1/invoices/stay/00000000-0000-0000-0000-000000000001/charges")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        verify(chainMock).filter(any());
+                }
+
+                @Test
+                @DisplayName("RECEPTIONIST can still GET /api/v1/invoices/stay/{id}/last-date (read on a stay sub-path)")
+                void receptionistCanStillReadStaySubPaths() {
+                        when(chainMock.filter(any())).thenReturn(Mono.empty());
+                        final String token = buildJwt(ONE_HOUR_MS, "desk1", "RECEPTIONIST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/invoices/stay/00000000-0000-0000-0000-000000000001/last-date")
+                                                        .cookie(new HttpCookie("jwt", token)).build());
+
+                        StepVerifier.create(authenticationFilter.apply(config).filter(exchange, chainMock))
+                                        .verifyComplete();
+                        verify(chainMock).filter(any());
                 }
 
                 @Test

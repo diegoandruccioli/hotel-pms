@@ -59,4 +59,12 @@ class CallerContextTest {
 
         assertThat(CallerContext.username()).doesNotContain("\r").doesNotContain("\n");
     }
+
+    @Test
+    void usernameNeverCarriesUnicodeLineSeparators() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "bob\u2028forged\u0085entry\u2029", "", List.of()));
+
+        assertThat(CallerContext.username()).doesNotContain("\u2028").doesNotContain("\u0085").doesNotContain("\u2029");
+    }
 }
