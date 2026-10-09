@@ -7554,6 +7554,61 @@ su fattura \texttt{PAID} resta \texttt{409} per un guard di business
 preesistente, non \texttt{403} --- nessuna regressione introdotta da questo fix).
 Commit: \commitref{a87d329}{fix(security): T-GST-07/T-BILL-07 --- missing RBAC on guest/invoice controllers}
 
+\paragraph{T-BILL-08 --- Storico fatture per ospite senza controllo di ruolo}
+Scoperto dalla revisione del pannello di dettaglio ospite del redesign UI:
+\texttt{GET /api/v1/invoices/guest/\{guestId\}/history} (numero, data,
+importo totale e stato di ogni fattura di un ospite) era nato come feed
+interno per l'export GDPR di guest-service, ma non aveva alcuna
+\texttt{@PreAuthorize} e il gateway non filtra \texttt{/api/v1/invoices/**}:
+un RECEPTIONIST poteva interrogarlo direttamente per qualunque ospite del
+proprio hotel. L'interfaccia nascondeva la sezione ai non amministratori,
+ma era solo una scelta di presentazione. Lo scoping per \texttt{hotelId}
+era già corretto, quindi non esiste un IDOR cross-tenant.
+
+\begin{insecurebox}[title={InvoiceController.java --- nessun controllo di ruolo (baseline)}]
+\begin{lstlisting}[style=java]
+@GetMapping("/guest/{guestId}/history")
+public ResponseEntity<List<InvoiceSummaryResponse>> getInvoiceHistoryForGuest(
+        @NonNull @PathVariable final UUID guestId) {
+    // raggiungibile da qualunque ruolo autenticato (anche RECEPTIONIST)
+    ...
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={InvoiceController.java --- riservato ad ADMIN/OWNER (main)}]
+\begin{lstlisting}[style=java]
+@PreAuthorize(ROLE_ADMIN_OR_OWNER)
+@GetMapping("/guest/{guestId}/history")
+public ResponseEntity<List<InvoiceSummaryResponse>> getInvoiceHistoryForGuest(
+        @NonNull @PathVariable final UUID guestId) {
+    ...
+}
+\end{lstlisting}
+\end{securebox}
+
+L'export GDPR continua a funzionare: \texttt{GuestController.exportGuestData}
+è già riservato ad ADMIN/OWNER e \texttt{InternalFeignAuthInterceptor} rifirma
+gli header con il ruolo reale dell'utente, senza un principal di sistema,
+quindi billing-service riceve sempre ADMIN o OWNER. Gli endpoint
+\texttt{/last-date} sono rimasti aperti di proposito: sono la sonda di
+legal hold usata dal job di retention e dalla guardia di cancellazione.
+Tre test in \texttt{InvoiceControllerSecurityTest} (RECEPTIONIST →
+\texttt{403}, ADMIN e OWNER → \texttt{200}).
+
+\begin{notebox}[title={Residui noti emersi dall'audit}]
+Il fallback Feign dell'export restituisce una lista vuota senza log, quindi
+un \texttt{403} o \texttt{5xx} produrrebbe un export GDPR silenziosamente
+incompleto; gli endpoint di scrittura \texttt{POST /stay},
+\texttt{POST}/\texttt{DELETE /stay/\{id\}/charges} e le operazioni di
+folio di gruppo sono chiamate interservizio legittime ma raggiungibili da
+un RECEPTIONIST via gateway; \texttt{GET /invoices}, \texttt{/search} e
+\texttt{/\{id\}} espongono dati finanziari e PII al front desk (scelta di
+policy). Nessuno è risolto da questo commit.
+\end{notebox}
+
+Commit: \commitref{c6899b9}{fix(billing): restrict guest invoice history to ADMIN/OWNER}
+
 \paragraph{GAP-17 --- Trust boundary IP rotto dalla topologia reale nginx→gateway}
 Trovato durante la ri-verifica post-hardening del 2026-08-16 da due
 sotto-agenti indipendenti (categorie \emph{auth-jwt} e \emph{access-control}),
