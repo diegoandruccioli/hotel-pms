@@ -1,7 +1,22 @@
 import { z } from 'zod';
-import type { AlloggiatiStato, StayGuestRequest, StayGuestResponse, TravellerType } from '../../types';
+import type {
+  AlloggiatiStato,
+  GuestDocumentType,
+  StayGuestRequest,
+  StayGuestResponse,
+  TravellerType,
+} from '../../types';
 
 export const TYPES_WITHOUT_DOC: TravellerType[] = ['FAMILIARE', 'MEMBRO_GRUPPO'];
+
+/** Alloggiati tipdoc code for a guest-service identity document; '' when there is no matching code. */
+export const mapDocType = (documentType: GuestDocumentType): string => {
+  switch (documentType) {
+    case 'PASSPORT':    return 'PASOR';
+    case 'NATIONAL_ID': return 'CARTE';
+    default:            return '';
+  }
+};
 export const CODICE_ITALIA = '100000100';
 
 export interface IdentifiableGuest extends StayGuestRequest {

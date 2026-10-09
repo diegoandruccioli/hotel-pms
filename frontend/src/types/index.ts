@@ -1,5 +1,5 @@
 // `DocumentType` is exported by both `billing.types` (FATTURA | RICEVUTA) and
-// `guest.types` (PASSPORT | ID_CARD | DRIVERS_LICENSE | OTHER) — two distinct
+// `guest.types` (PASSPORT | NATIONAL_ID | DRIVERS_LICENSE | OTHER) — two distinct
 // domain concepts that happen to share a name. Re-exported here under
 // disambiguated aliases so the barrel doesn't hit an ambiguous-export error;
 // importing directly from either `./billing.types` or `./guest.types` still

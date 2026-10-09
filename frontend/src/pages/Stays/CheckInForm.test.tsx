@@ -418,6 +418,24 @@ describe('CheckInForm', () => {
       expect(screen.getByLabelText('label_last_name')).toHaveValue('Bianchi');
     });
 
+    it('pre-fills the Alloggiati document type from a national ID in the guest profile', async () => {
+      vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([
+        { codice: 'CARTE', descrizione: "CARTA D'IDENTITA'" },
+      ]);
+      vi.mocked(stayService.getLastCompletedStayForGuest).mockResolvedValue(null);
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockProfile({
+        identityDocuments: [{
+          id: 'doc2', documentType: 'NATIONAL_ID', documentNumber: 'CA00001', issueDate: '2020-01-01',
+          expiryDate: '2030-01-01', createdAt: '2020-01-01T00:00:00', updatedAt: '2020-01-01T00:00:00', active: true,
+        }],
+      }));
+      renderComponent(1);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/^label_doc_type/, { selector: 'select' })).toHaveValue('CARTE');
+      });
+    });
+
     it('does not show a prefill banner when the profile lookup fails and there is no prior stay', async () => {
       vi.mocked(stayService.getLastCompletedStayForGuest).mockResolvedValue(null);
       vi.mocked(guestService.getGuestById).mockRejectedValue(new Error('not found'));
