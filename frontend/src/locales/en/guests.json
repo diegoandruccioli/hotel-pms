@@ -46,7 +46,6 @@
   "stat_stays_count_other": "{{count}} stays",
   "err_history_load": "Could not load the history.",
   "doc_type_PASSPORT": "Passport",
-  "doc_type_ID_CARD": "ID card",
   "doc_type_NATIONAL_ID": "ID card",
   "doc_type_DRIVERS_LICENSE": "Driver's license",
   "doc_type_OTHER": "Other document"

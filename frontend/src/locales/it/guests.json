@@ -46,7 +46,6 @@
   "stat_stays_count_other": "{{count}} soggiorni",
   "err_history_load": "Impossibile caricare lo storico.",
   "doc_type_PASSPORT": "Passaporto",
-  "doc_type_ID_CARD": "Carta d'identità",
   "doc_type_NATIONAL_ID": "Carta d'identità",
   "doc_type_DRIVERS_LICENSE": "Patente",
   "doc_type_OTHER": "Altro documento"
