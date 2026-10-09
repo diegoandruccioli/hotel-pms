@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { SortingState } from '@tanstack/react-table';
 import type { GuestResponseDTO } from '../types';
@@ -45,6 +45,7 @@ export const Guests = memo(() => {
   const [guestToDelete, setGuestToDelete] = useState<GuestResponseDTO | null>(null);
   const [guestToExport, setGuestToExport] = useState<GuestResponseDTO | null>(null);
   const [exporting, setExporting] = useState(false);
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') ?? '';
   const [searchQuery, setSearchQuery] = useState(initialSearch);
@@ -122,6 +123,9 @@ export const Guests = memo(() => {
     returnFocusRef.current = detailTriggerRef.current;
     handleOpenEditModal(guest);
   }, [handleOpenEditModal]);
+  const handleNewReservationFromDetail = useCallback((guest: GuestResponseDTO) => {
+    navigate('/reservations/new', { state: { guest } });
+  }, [navigate]);
   const restoreFocus = useCallback(() => {
     const target = returnFocusRef.current;
     returnFocusRef.current = null;
@@ -264,7 +268,7 @@ export const Guests = memo(() => {
       )}
 
       {detailGuest && (
-        <GuestDetailSheet guest={detailGuest} onClose={handleCloseDetail} onEdit={handleEditFromDetail} />
+        <GuestDetailSheet guest={detailGuest} onClose={handleCloseDetail} onEdit={handleEditFromDetail} onNewReservation={handleNewReservationFromDetail} />
       )}
 
       {guestToDelete && (
