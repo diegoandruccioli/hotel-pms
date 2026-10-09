@@ -13,6 +13,7 @@ interface GuestDetailSheetProps {
   guest: GuestResponseDTO;
   onClose: () => void;
   onEdit: (guest: GuestResponseDTO) => void;
+  onNewReservation: (guest: GuestResponseDTO) => void;
 }
 
 interface FieldProps {
@@ -61,13 +62,14 @@ const DocumentRow = ({ doc }: { doc: IdentityDocumentResponseDTO }) => {
   );
 };
 
-export const GuestDetailSheet = ({ guest, onClose, onEdit }: GuestDetailSheetProps) => {
+export const GuestDetailSheet = ({ guest, onClose, onEdit, onNewReservation }: GuestDetailSheetProps) => {
   const { t } = useTranslation(['guests', 'common']);
   const { formatDate } = useFormatters();
   const role = useAuthStore((s) => s.user?.role);
   const canSeeInvoices = role === 'ADMIN' || role === 'OWNER';
 
   const handleEdit = useCallback(() => onEdit(guest), [onEdit, guest]);
+  const handleNewReservation = useCallback(() => onNewReservation(guest), [onNewReservation, guest]);
 
   const fullName = `${guest.firstName} ${guest.lastName}`;
   const locality = [guest.cap, guest.comune, guest.provincia && `(${guest.provincia})`].filter(Boolean).join(' ');
@@ -81,7 +83,8 @@ export const GuestDetailSheet = ({ guest, onClose, onEdit }: GuestDetailSheetPro
       title={t('detail_title', { name: fullName })}
       onClose={onClose}
       footer={
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-3">
+          <M3Button variant="outlined" icon="event" onClick={handleNewReservation}>{t('common:new_reservation')}</M3Button>
           <M3Button icon="edit" onClick={handleEdit}>{t('common:edit')}</M3Button>
         </div>
       }

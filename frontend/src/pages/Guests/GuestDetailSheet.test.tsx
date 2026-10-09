@@ -83,8 +83,14 @@ const invoice = (n: number) => ({
   status: 'PAID',
 });
 
-const renderSheet = (guest: GuestResponseDTO = GUEST, onEdit = vi.fn(), onClose = vi.fn()) =>
-  render(<GuestDetailSheet guest={guest} onClose={onClose} onEdit={onEdit} />);
+const renderSheet = (
+  guest: GuestResponseDTO = GUEST,
+  onEdit = vi.fn(),
+  onClose = vi.fn(),
+  onNewReservation = vi.fn(),
+) => render(
+  <GuestDetailSheet guest={guest} onClose={onClose} onEdit={onEdit} onNewReservation={onNewReservation} />,
+);
 
 describe('GuestDetailSheet', () => {
   beforeEach(() => {
@@ -233,6 +239,13 @@ describe('GuestDetailSheet', () => {
     renderSheet(GUEST, onEdit);
     fireEvent.click(screen.getByRole('button', { name: 'common:edit' }));
     expect(onEdit).toHaveBeenCalledWith(GUEST);
+  });
+
+  it('calls onNewReservation with the guest from the footer button', () => {
+    const onNewReservation = vi.fn();
+    renderSheet(GUEST, vi.fn(), vi.fn(), onNewReservation);
+    fireEvent.click(screen.getByRole('button', { name: 'common:new_reservation' }));
+    expect(onNewReservation).toHaveBeenCalledWith(GUEST);
   });
 
   it('calls onClose from the close button', () => {

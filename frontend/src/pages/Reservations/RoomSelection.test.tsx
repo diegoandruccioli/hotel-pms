@@ -137,6 +137,28 @@ describe('RoomSelection', () => {
     expect(onToggleRoom).not.toHaveBeenCalled();
   });
 
+  it('keeps a selected room clickable even when it became occupied, so it can be unticked', () => {
+    const onToggleRoom = vi.fn();
+    render(
+      <RoomSelection
+        checkInDate="2026-08-01"
+        checkOutDate="2026-08-05"
+        expectedGuests={2}
+        availableRooms={ROOMS}
+        selectedRoomIds={SELECTED_R1}
+        allReservations={RESERVATIONS_R1_OCCUPIED}
+        onCheckInChange={noop}
+        onCheckOutChange={noop}
+        onExpectedGuestsChange={noop}
+        onToggleRoom={onToggleRoom}
+      />,
+    );
+    const occupiedButton = screen.getByRole('button', { name: /common:room_occupied/ });
+    expect(occupiedButton).toBeEnabled();
+    fireEvent.click(occupiedButton);
+    expect(onToggleRoom).toHaveBeenCalledWith('r1');
+  });
+
   it('does not treat the current reservation itself as an occupying conflict', () => {
     render(
       <RoomSelection

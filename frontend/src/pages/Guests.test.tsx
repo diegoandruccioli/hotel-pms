@@ -5,8 +5,10 @@ import { renderWithQuery as render } from '../test-utils';
 import { Guests } from './Guests';
 
 const mockUseSearchParams = vi.hoisted(() => vi.fn(() => [new URLSearchParams()] as [URLSearchParams]));
+const mockNavigate = vi.hoisted(() => vi.fn());
 vi.mock('react-router-dom', () => ({
   useSearchParams: mockUseSearchParams,
+  useNavigate: () => mockNavigate,
   useLocation: () => ({ pathname: '/guests' }),
 }));
 import { guestService, stayService, billingService, inventoryService } from '../services';
@@ -446,6 +448,15 @@ describe('Guests', () => {
     fireEvent.click(within(sheet).getByRole('button', { name: 'common:edit' }));
     expect(screen.queryByRole('dialog', { name: 'detail_title' })).not.toBeInTheDocument();
     expect(screen.getByText('trigger-saved')).toBeInTheDocument();
+  });
+
+  it('starts a reservation for the guest from the sheet', async () => {
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    render(<Guests />);
+    fireEvent.click(await screen.findByRole('button', { name: /John Doe/ }));
+    const sheet = screen.getByRole('dialog', { name: 'detail_title' });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'common:new_reservation' }));
+    expect(mockNavigate).toHaveBeenCalledWith('/reservations/new', { state: { guest: GUEST } });
   });
 
   it('closes the detail sheet with its close button', async () => {

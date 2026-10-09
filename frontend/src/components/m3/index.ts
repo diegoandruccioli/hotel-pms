@@ -15,6 +15,7 @@ export * from './M3Select';
 export * from './M3SideSheet';
 export * from './M3StatCard';
 export * from './M3StatusChip';
+export * from './M3Stepper';
 export * from './M3Switch';
 export * from './M3Table';
 export * from './M3TableActionLink';
