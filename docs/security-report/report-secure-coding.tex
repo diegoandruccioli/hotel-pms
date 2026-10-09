@@ -8015,6 +8015,25 @@ stack Docker con tutti i servizi healthy, migrazioni Flyway applicate, tracing
 Zipkin e target Prometheus attivi. Il rescan Trivy delle immagini ha rivelato cinque HIGH su Jackson~3 (3.1.5, \texttt{tools.jackson}), risolti con l'override \texttt{jackson-bom.version} a 3.1.7; dopo la correzione le otto immagini dei servizi risultano senza vulnerabilit\`a CRITICAL/HIGH.
 Commit: \commitref{7256d859}{feat(security): migrate backend to Spring Boot 4.0.8 / Framework 7.0.9}
 
+\paragraph{Go stdlib non ancora corretto in nessuna immagine Grafana (DEP-CVE-15)}
+Due alert HIGH sul binario \texttt{grafana/grafana:13.1.7} e sui plugin Go
+bundled: CVE-2026-97031 (\texttt{crypto/tls}, esaurimento di memoria con più
+riferimenti ECH \emph{outer extension}) e CVE-2026-78667 (\texttt{net/http},
+CPU DoS con header \texttt{Range} a molti intervalli), corrette in Go 1.26.9 e
+1.27.2. A differenza dei casi precedenti il bump del tag non basta: ho ispezionato
+il binario di \texttt{13.1.7}, \texttt{13.2.3} (ultima stabile) e \texttt{nightly}
+e nessuno è compilato con una versione corretta (rispettivamente Go 1.26.6 con
+plugin 1.26.7, e Go 1.27.1 con plugin 1.26.7); non esistono tag più recenti.
+L'opzione rimasta è un'accettazione del rischio motivata in
+\texttt{.trivyignore}: CVE-2026-97031 non è raggiungibile perché Grafana serve
+HTTP in chiaro, senza TLS né chiavi ECH; CVE-2026-78667 è raggiungibile sugli
+asset statici ma comporta solo un DoS di CPU sull'interfaccia di monitoraggio,
+che gira nel solo profilo \texttt{observability} e con porta non pubblicata in
+produzione. Condizione di rimozione: una release Grafana costruita con Go
+$\geq$ 1.26.9. Le descrizioni delle due CVE provengono da fonti secondarie;
+l'advisory ufficiale non è stato consultato.
+Commit: \commitref{7a82202}{chore(security): suppress Go stdlib CVEs with no fixed grafana image}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Appendice B --- Utilizzo dell'IA e Revisione Critica}
 \label{app:ia}
