@@ -117,6 +117,24 @@ CVE-2026-41002
 #   Re-check on the next grafana patch bump.
 CVE-2026-21728
 CVE-2026-28377
+# CVE-2026-97031, CVE-2026-78667 — Go stdlib (published 2026-10), fixed in Go 1.26.9 / 1.27.2+.
+#   Found in the grafana binary (go1.26.6) and its bundled datasource plugins (go1.26.7).
+#   No grafana image carries the fix yet: checked 2026-10-09, 13.1.7 and 13.2.3 (latest stable,
+#   2026-09-29) are still on go1.26.6/1.26.7 and `nightly` (13.3.0) is on go1.27.1 with plugins
+#   on 1.26.7. Only a grafana rebuild can fix them, so a tag bump does not help.
+#   CVE-2026-97031 — crypto/tls: a crafted ClientHello with several ECH outer-extension
+#     references exhausts server memory. Only a TLS *server* with Encrypted Client Hello keys
+#     configured is affected; grafana here serves plain HTTP (no TLS, no ECH).
+#   CVE-2026-78667 — net/http: Range header with many small ranges makes FileServer/ServeContent
+#     burn CPU. Grafana's static assets go through that path, so this one is reachable, but the
+#     impact is a CPU DoS of the monitoring UI only (no data access): grafana runs in the opt-in
+#     `observability` profile, needs a login for everything but static files, and
+#     docker-compose.prod.yml unpublishes its port (only :80/:8080 are exposed).
+#   Tracked as DEP-CVE-15 in THREAT_MODEL.md.
+#   REMOVE BOTH when a grafana/grafana release built with Go >= 1.26.9 exists (check tags newer
+#   than 13.2.3) and docker-compose.yml is bumped to it.
+CVE-2026-97031
+CVE-2026-78667
 # Format: one CVE-ID per line, with a comment explaining the
 # justification — mirrors the approach used in
 # config/dependency-check/suppressions.xml for OWASP DC.

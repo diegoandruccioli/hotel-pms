@@ -82,6 +82,8 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
     private static final String HEADER_TIMESTAMP = "X-Auth-Timestamp";
     private static final String HEADER_NONCE = "X-Auth-Nonce";
+    /** Set by the API gateway on every forwarded request; see {@link CallerContext}. Not signed. */
+    private static final String HEADER_GATEWAY_ORIGIN = "X-Gateway-Origin";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
 
@@ -179,8 +181,12 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
             return;
         }
 
+        final List<SimpleGrantedAuthority> authorities = StringUtils.hasText(request.getHeader(HEADER_GATEWAY_ORIGIN))
+                ? List.of(new SimpleGrantedAuthority("ROLE_" + role),
+                        new SimpleGrantedAuthority(CallerContext.GATEWAY_CALLER_AUTHORITY))
+                : List.of(new SimpleGrantedAuthority("ROLE_" + role));
         final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                username, "", List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                username, "", authorities);
         // Store hotelId as details so the service layer can extract tenant context
         // without coupling the controller to the security mechanism.
         auth.setDetails(hotelId);

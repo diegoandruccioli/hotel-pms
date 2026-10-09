@@ -17,23 +17,15 @@ import type {
   StayGuestRequest,
   StayRequest,
   TravellerType,
-  GuestDocumentType as DocumentType,
 } from '../../types';
 import { GuestFieldSection } from './GuestFieldSection';
 import {
   emptyGuest,
+  mapDocType,
   TYPES_WITHOUT_DOC,
   validateAlloggiatiGuests,
 } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
-
-const mapDocType = (dt: DocumentType): string => {
-  switch (dt) {
-    case 'PASSPORT': return 'PASOR';
-    case 'ID_CARD':  return 'CARTE';
-    default:         return '';
-  }
-};
 
 interface CheckInState {
   guestId: string;
@@ -142,7 +134,9 @@ export const CheckInForm = memo(() => {
         const doc = profile.identityDocuments?.[0];
         if (!updates.firstName    && profile.firstName)    { updates.firstName    = profile.firstName;           filled.push('firstName'); }
         if (!updates.lastName     && profile.lastName)     { updates.lastName     = profile.lastName;            filled.push('lastName'); }
-        if (!updates.documentType   && doc?.documentType)   { updates.documentType   = mapDocType(doc.documentType); filled.push('documentType'); }
+        // Only claim the field as pre-filled when the document maps to an Alloggiati code
+        const tipdoc = doc?.documentType ? mapDocType(doc.documentType) : '';
+        if (!updates.documentType   && tipdoc)              { updates.documentType   = tipdoc;                       filled.push('documentType'); }
         if (!updates.documentNumber && doc?.documentNumber) { updates.documentNumber = doc.documentNumber;           filled.push('documentNumber'); }
       }
 

@@ -275,11 +275,15 @@ public class StayController {
 
     /**
      * Returns the full stay history for a guest within the caller's hotel.
-     * Called by guest-service GDPR Art. 20 data-export endpoint.
+     * Called by guest-service GDPR Art. 20 data-export endpoint (which forwards the caller's
+     * ADMIN/OWNER role) and shown by the guest detail sheet to the front desk, so the three
+     * operational roles are allowed. The gateway already refuses GUEST; this makes it explicit
+     * at method level too.
      *
      * @param guestId the guest UUID
      * @return list of stay summaries, most recent first
      */
+    @PreAuthorize(ROLE_ADMIN_OWNER_OR_RECEPTIONIST)
     @GetMapping("/guest/{guestId}/history")
     public ResponseEntity<List<StaySummaryResponse>> getStayHistoryForGuest(
             @NonNull @PathVariable final UUID guestId) {

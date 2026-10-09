@@ -1,4 +1,4 @@
-export type DocumentType = 'PASSPORT' | 'ID_CARD' | 'DRIVERS_LICENSE' | 'OTHER';
+export type DocumentType = 'PASSPORT' | 'NATIONAL_ID' | 'DRIVERS_LICENSE' | 'OTHER';
 
 
 

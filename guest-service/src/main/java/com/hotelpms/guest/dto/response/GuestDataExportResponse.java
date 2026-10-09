@@ -30,8 +30,8 @@ import java.util.UUID;
  * @param gdprConsentDate   date GDPR consent was recorded
  * @param createdAt         profile creation timestamp
  * @param identityDocuments list of attached identity documents
- * @param stays             stay history from stay-service (empty if unavailable)
- * @param invoices          invoice history from billing-service (empty if unavailable)
+ * @param stays             stay history from frontdesk-service (the export fails if unavailable)
+ * @param invoices          invoice history from billing-service (the export fails if unavailable)
  */
 public record GuestDataExportResponse(
         LocalDateTime exportedAt,

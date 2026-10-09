@@ -17,6 +17,7 @@ import com.hotelpms.billing.dto.StayInvoiceCheckResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.service.FatturaPAService;
 import com.hotelpms.billing.service.InvoiceService;
+import com.hotelpms.internalauth.security.CallerContext;
 import com.hotelpms.billing.service.PdfInvoiceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +65,12 @@ public class InvoiceController {
     private static final String XML_EXTENSION = ".xml";
     private static final String ZIP_FILENAME_PREFIX = "fatturaPA-export-";
     private static final String ZIP_EXTENSION = ".zip";
+    /**
+     * Operations only frontdesk-service/fb-service perform over Feign (no gateway hop). A request that
+     * carries the gateway marker comes from a public client and is refused, whatever its role.
+     */
+    private static final String INTERNAL_ONLY =
+            "!hasAuthority('" + CallerContext.GATEWAY_CALLER_AUTHORITY + "')";
     private static final String ROLE_ADMIN_OR_OWNER = "hasAnyRole('ADMIN', 'OWNER')";
 
     private final InvoiceService invoiceService;
@@ -84,11 +91,14 @@ public class InvoiceController {
     }
 
     /**
-     * Retrieves a paginated list of invoices.
+     * Retrieves a paginated list of every invoice of the hotel. Restricted to ADMIN/OWNER:
+     * no screen or service calls it (the Billing page uses {@code /search}, which front desk
+     * needs to register payments), so it only widens the bulk-read surface.
      *
      * @param pageable the pagination parameters
      * @return a page of invoice responses
      */
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     @GetMapping
     public ResponseEntity<Page<InvoiceResponse>> getAllInvoices(
             @PageableDefault(size = DEFAULT_PAGE_SIZE, sort = "issueDate",
@@ -172,6 +182,7 @@ public class InvoiceController {
      * @param request the stay invoice creation request
      * @return the created invoice response with HTTP 201
      */
+    @PreAuthorize(INTERNAL_ONLY)
     @PostMapping("/stay")
     public ResponseEntity<InvoiceResponse> createInvoiceForStay(
             @NonNull @Valid @RequestBody final StayInvoiceRequest request) {
@@ -227,6 +238,7 @@ public class InvoiceController {
      * @param request the master folio request (contact guest)
      * @return the created (or existing) master folio invoice with HTTP 201
      */
+    @PreAuthorize(INTERNAL_ONLY)
     @PostMapping("/groups/{groupId}/master-folio")
     public ResponseEntity<InvoiceResponse> createMasterFolioForGroup(
             @NonNull @PathVariable final UUID groupId,
@@ -246,6 +258,7 @@ public class InvoiceController {
      * @param request the charge details, tagging the stay it's transferred from
      * @return the created charge response with HTTP 201
      */
+    @PreAuthorize(INTERNAL_ONLY)
     @PostMapping("/groups/{groupId}/charges")
     public ResponseEntity<ChargeResponse> addChargeToGroupFolio(
             @NonNull @PathVariable final UUID groupId,
@@ -292,9 +305,14 @@ public class InvoiceController {
      * Returns all invoice summaries for a guest within the caller's hotel.
      * Called by guest-service GDPR Art. 20 data-export endpoint.
      *
+     * <p>Restricted to ADMIN/OWNER: it exposes per-guest financial totals. The GDPR export keeps
+     * working because it is itself ADMIN/OWNER-only and the Feign interceptor forwards the
+     * caller's real role to this service (there is no system principal).
+     *
      * @param guestId the guest UUID
      * @return list of invoice summaries, most recent first
      */
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     @GetMapping("/guest/{guestId}/history")
     public ResponseEntity<List<InvoiceSummaryResponse>> getInvoiceHistoryForGuest(
             @NonNull @PathVariable final UUID guestId) {

@@ -39,6 +39,24 @@ public class GlobalExceptionHandler extends AbstractProblemDetailAdvice {
     }
 
     /**
+     * Handles ExportSourceUnavailableException — a stay or invoice source of the GDPR export
+     * could not be read, so no export is produced. 503 with the code the frontend already
+     * translates ({@code EXTERNAL_SERVICE_UNAVAILABLE}).
+     *
+     * @param ex the exception
+     * @return ProblemDetail with 503 status
+     */
+    @ExceptionHandler(ExportSourceUnavailableException.class)
+    public ProblemDetail handleExportSourceUnavailable(final ExportSourceUnavailableException ex) {
+        final ProblemDetail problemDetail =
+                ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, "EXTERNAL_SERVICE_UNAVAILABLE");
+        problemDetail.setTitle("Export Source Unavailable");
+        problemDetail.setType(errorType("service-unavailable"));
+        problemDetail.setProperty(TIMESTAMP_FIELD, Instant.now());
+        return problemDetail;
+    }
+
+    /**
      * Handles NotFoundException.
      *
      * @param ex the exception

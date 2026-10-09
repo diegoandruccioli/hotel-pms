@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   CODICE_ITALIA, emptyGuest, toIdentifiableGuest, toRequest, validateAlloggiatiGuests, validateSingleGuest,
   type IdentifiableGuest,
+  mapDocType,
 } from './stayGuestFieldHelpers';
 import type { StayGuestResponse } from '../../types';
+import type { DocumentType } from '../../types/guest.types';
 
 const t = (key: string): string => key;
 
@@ -109,5 +111,16 @@ describe('validateSingleGuest', () => {
 
   it('accepts a complete guest without document requirements', () => {
     expect(validateSingleGuest(validGuest({ gender: '1', firstName: 'A', lastName: 'B' }), t)).toBeNull();
+  });
+});
+
+describe('mapDocType', () => {
+  it.each<[DocumentType, string]>([
+    ['PASSPORT', 'PASOR'],
+    ['NATIONAL_ID', 'CARTE'],
+    ['DRIVERS_LICENSE', ''],
+    ['OTHER', ''],
+  ])('maps the guest-service %s document to the Alloggiati code %j', (documentType, tipdoc) => {
+    expect(mapDocType(documentType)).toBe(tipdoc);
   });
 });
