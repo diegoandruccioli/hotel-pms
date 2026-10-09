@@ -442,4 +442,73 @@ class InternalAuthFilterTest {
             assertThat(responseB.getStatus()).isEqualTo(OK);
         }
     }
+
+    @Nested
+    @DisplayName("X-Gateway-Origin marker")
+    class GatewayOriginMarker {
+
+        private MockHttpServletRequest signedRequest(final String marker)
+                throws NoSuchAlgorithmException, InvalidKeyException {
+            final String timestamp = String.valueOf(System.currentTimeMillis());
+            final String nonce = freshNonce();
+            final String sig = computeHmac(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce);
+            final MockHttpServletRequest request =
+                    buildRequest(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce, sig);
+            if (marker != null) {
+                request.addHeader("X-Gateway-Origin", marker);
+            }
+            return request;
+        }
+
+        @Test
+        @DisplayName("Marker present → GATEWAY_CALLER authority added, role and hotelId details unchanged")
+        void shouldGrantGatewayCallerAuthorityWhenMarkerPresent()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            final MockHttpServletResponse response = new MockHttpServletResponse();
+
+            filter.doFilter(signedRequest("true"), response, new MockFilterChain());
+
+            assertThat(response.getStatus()).isEqualTo(OK);
+            final var auth = SecurityContextHolder.getContext().getAuthentication();
+            assertThat(auth.getAuthorities())
+                    .anyMatch(a -> "GATEWAY_CALLER".equals(a.getAuthority()))
+                    .anyMatch(a -> ("ROLE_" + TEST_ROLE).equals(a.getAuthority()));
+            assertThat(auth.getDetails()).isEqualTo(TEST_HOTEL_ID);
+            assertThat(CallerContext.isViaGateway()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Marker absent (internal service-to-service call) → no GATEWAY_CALLER authority")
+        void shouldNotGrantGatewayCallerAuthorityWhenMarkerAbsent()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            final MockHttpServletResponse response = new MockHttpServletResponse();
+
+            filter.doFilter(signedRequest(null), response, new MockFilterChain());
+
+            assertThat(response.getStatus()).isEqualTo(OK);
+            final var auth = SecurityContextHolder.getContext().getAuthentication();
+            assertThat(auth.getAuthorities()).noneMatch(a -> "GATEWAY_CALLER".equals(a.getAuthority()));
+            assertThat(CallerContext.isViaGateway()).isFalse();
+        }
+
+        @Test
+        @DisplayName("Blank marker is ignored, so an empty header cannot flip the caller type")
+        void shouldIgnoreBlankMarker()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            filter.doFilter(signedRequest(" "), new MockHttpServletResponse(), new MockFilterChain());
+
+            assertThat(CallerContext.isViaGateway()).isFalse();
+        }
+
+        @Test
+        @DisplayName("The marker is not part of the signature: a valid signature still authenticates with it")
+        void shouldKeepSignatureFormatUnchanged()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            final MockHttpServletResponse response = new MockHttpServletResponse();
+
+            filter.doFilter(signedRequest("true"), response, new MockFilterChain());
+
+            assertThat(response.getStatus()).isEqualTo(OK);
+        }
+    }
 }

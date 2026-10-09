@@ -200,6 +200,43 @@ class AuthenticationFilterTest {
                 }
 
                 @Test
+                @DisplayName("should mark every forwarded request with X-Gateway-Origin so services can tell public calls from internal ones")
+                void shouldMarkForwardedRequestAsGatewayOriginated() {
+                        final String validToken = buildJwt(ONE_HOUR_MS, "admin", "ADMIN");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/invoices")
+                                                        .cookie(new HttpCookie("jwt", validToken))
+                                                        .build());
+                        final AtomicReference<ServerHttpRequest> captured = new AtomicReference<>();
+
+                        authenticationFilter.apply(config).filter(exchange, ex -> {
+                                captured.set(ex.getRequest());
+                                return Mono.empty();
+                        }).block();
+
+                        assertThat(captured.get().getHeaders().get("X-Gateway-Origin")).containsExactly("true");
+                }
+
+                @Test
+                @DisplayName("should replace a client-supplied X-Gateway-Origin instead of forwarding it")
+                void shouldOverwriteClientSuppliedGatewayOriginHeader() {
+                        final String validToken = buildJwt(ONE_HOUR_MS, "receptionist1", "RECEPTIONIST");
+                        final MockServerWebExchange exchange = MockServerWebExchange.from(
+                                        MockServerHttpRequest.get("/api/v1/invoices")
+                                                        .cookie(new HttpCookie("jwt", validToken))
+                                                        .header("X-Gateway-Origin", "false", "spoofed")
+                                                        .build());
+                        final AtomicReference<ServerHttpRequest> captured = new AtomicReference<>();
+
+                        authenticationFilter.apply(config).filter(exchange, ex -> {
+                                captured.set(ex.getRequest());
+                                return Mono.empty();
+                        }).block();
+
+                        assertThat(captured.get().getHeaders().get("X-Gateway-Origin")).containsExactly("true");
+                }
+
+                @Test
                 @DisplayName("should generate a different X-Auth-Nonce on every request (T-GW-08 replay protection)")
                 void shouldGenerateDifferentNoncePerRequest() {
                         final String token = buildJwt(ONE_HOUR_MS, "admin", "ADMIN");

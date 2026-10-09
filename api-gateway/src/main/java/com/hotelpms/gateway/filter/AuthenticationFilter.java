@@ -62,6 +62,8 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
     private static final String HEADER_TIMESTAMP = "X-Auth-Timestamp";
     private static final String HEADER_NONCE = "X-Auth-Nonce";
+    /** Tells downstream services the request came through the gateway (a public client), not from another service. */
+    private static final String HEADER_GATEWAY_ORIGIN = "X-Gateway-Origin";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
 
     // -----------------------------------------------------------------------
@@ -197,6 +199,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                                 headers.remove(HEADER_SIGNATURE);
                                 headers.remove(HEADER_TIMESTAMP);
                                 headers.remove(HEADER_NONCE);
+                                headers.remove(HEADER_GATEWAY_ORIGIN);
                             })
                             .header(HEADER_USER, username)
                             .header(HEADER_ROLE, role)
@@ -204,6 +207,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                             .header(HEADER_SIGNATURE, signature)
                             .header(HEADER_TIMESTAMP, timestamp)
                             .header(HEADER_NONCE, nonce)
+                            .header(HEADER_GATEWAY_ORIGIN, "true")
                             .build())
                     .build());
         };
