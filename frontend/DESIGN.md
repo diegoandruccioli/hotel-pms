@@ -330,6 +330,11 @@ readable is *consistency*, not *sparseness*. Concretely:
   `M3Dialog` and `M3SideSheet` are thin wrappers over `M3ModalShell` (scrim, focus trap, Escape
   stack, header, body, footer); a fix to that behaviour goes there once. Pages never import
   `M3ModalShell` directly.
+- **Multi-step creation flows use `M3Stepper`** — numbered circles with a check on completed
+  steps and `aria-current="step"` on the current one; the caller decides which steps can be
+  jumped to (`isSelectable`: sequential when creating, free when editing). Below `sm` only the
+  circles and `progressLabel` show, so it never scrolls sideways. Use it only when the steps
+  have a real order and a running summary; a short form stays a single card.
 - **Filter pills go through `M3FilterChip`** — a pill toggle with `aria-pressed`. Use
   `onClick` for a standalone toggle, or `value` + `onValueSelect` for a row of chips sharing one
   handler (the `react-perf` lint rule forbids inline arrow functions as props).
