@@ -18,22 +18,26 @@ interface RoomButtonProps {
 const RoomButton = memo(({ room, isSelected, isOccupied, readOnly, resolvedTotalPrice, onToggle }: RoomButtonProps) => {
   const { t } = useTranslation(['reservations', 'common']);
 
+  // An occupied room cannot be picked, but one that is already selected (dates changed
+  // after choosing it) must stay clickable so the user can untick it.
+  const blocked = isOccupied && !isSelected;
+
   const handleClick = useCallback(() => {
-    if (!readOnly && !isOccupied) {
+    if (!readOnly && !blocked) {
       onToggle(room.id);
     }
-  }, [readOnly, isOccupied, onToggle, room.id]);
+  }, [readOnly, blocked, onToggle, room.id]);
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      disabled={isOccupied}
+      disabled={blocked}
       aria-label={isOccupied ? `${t('common:room_number', { number: room.roomNumber })} — ${t('common:room_occupied')}` : undefined}
       className={cn(
         'p-3 rounded-shape-sm border text-left transition-colors flex flex-col gap-1',
         isOccupied
-          ? 'opacity-40 cursor-not-allowed bg-surface-variant border-outline-variant'
+          ? cn('bg-surface-variant border-outline-variant', blocked ? 'opacity-40 cursor-not-allowed' : 'border-error')
           : isSelected
             ? 'bg-primary/10 border-primary shadow-xs'
             : 'border-outline-variant hover:border-outline',

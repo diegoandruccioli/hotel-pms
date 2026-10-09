@@ -541,6 +541,24 @@ describe('ReservationForm', () => {
       expect(screen.getAllByText(/240/).length).toBeGreaterThan(0);
     });
 
+    it('shows the stored total in edit mode while the dates are unchanged, and drops it when they change', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
+        id: 'res123',
+        guestId: 'g1',
+        lineItems: [{ roomId: 'r1', active: true, price: 360 } as never],
+      }));
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+
+      renderEdit();
+      await waitForTitle('edit_reservation');
+      expect(screen.getByText('summary_estimated_total')).toBeInTheDocument();
+      expect(screen.getAllByText(/360/).length).toBeGreaterThan(0);
+
+      fillDates('2026-05-01', '2026-05-03');
+      await waitFor(() => expect(screen.queryByText('summary_estimated_total')).not.toBeInTheDocument());
+      expect(screen.getByText('summary_price_on_confirm')).toBeInTheDocument();
+    });
+
     it('says the price is calculated on confirmation when a room has no resolved price', async () => {
       renderNew();
       await waitForTitle('new_reservation');

@@ -70,6 +70,12 @@ export const useReservationForm = () => {
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [allReservations, setAllReservations] = useState<ReservationResponse[]>([]);
   const [resolvedPrices, setResolvedPrices] = useState<Map<string, number>>(new Map());
+  // Stay totals already stored on the reservation being edited, with the dates they were
+  // priced for. The availability lookup leaves out the rooms this reservation holds (they
+  // overlap with itself), so without these the edit summary would have no prices at all.
+  const [savedPricing, setSavedPricing] = useState<{
+    checkInDate: string; checkOutDate: string; prices: Map<string, number>;
+  } | null>(null);
 
   // Reservation state
   const [selectedGuest, setSelectedGuest] = useState<GuestResponseDTO | null>(
@@ -120,6 +126,15 @@ export const useReservationForm = () => {
         setSelectedRoomIds(res.lineItems?.map(li => li.roomId) || []);
         setStatus(res.status || 'CONFIRMED');
         setVersion(res.version ?? null);
+        setSavedPricing({
+          checkInDate: res.checkInDate || '',
+          checkOutDate: res.checkOutDate || '',
+          prices: new Map(
+            (res.lineItems ?? [])
+              .filter(li => li.active !== false && typeof li.price === 'number')
+              .map(li => [li.roomId, li.price] as const),
+          ),
+        });
 
         // Non-blocking: a stay lookup failure must never prevent viewing/editing the
         // reservation itself, so any error here just leaves the banner hidden.
@@ -181,6 +196,16 @@ export const useReservationForm = () => {
       });
     return () => { cancelled = true; };
   }, [checkInDate, checkOutDate]);
+
+  // Saved totals only hold for the dates they were priced for; fresh lookups win over them.
+  const displayPrices = useMemo(() => {
+    if (!savedPricing || savedPricing.checkInDate !== checkInDate || savedPricing.checkOutDate !== checkOutDate) {
+      return resolvedPrices;
+    }
+    const merged = new Map(savedPricing.prices);
+    resolvedPrices.forEach((price, roomId) => merged.set(roomId, price));
+    return merged;
+  }, [savedPricing, checkInDate, checkOutDate, resolvedPrices]);
 
   /** Error message for one step, or `null` when it is valid. */
   const validateStep = useCallback((target: number): string | null => {
@@ -344,7 +369,7 @@ export const useReservationForm = () => {
     id, isEdit, isView,
     loading, fetching, error,
     step, isStepSelectable, goToStep, goNext, goPrevious,
-    rooms, allReservations, resolvedPrices,
+    rooms, allReservations, resolvedPrices: displayPrices,
     selectedGuest, setSelectedGuest, clearGuest,
     checkInDate, setCheckInDate, checkOutDate, setCheckOutDate,
     expectedGuests, setExpectedGuests,
