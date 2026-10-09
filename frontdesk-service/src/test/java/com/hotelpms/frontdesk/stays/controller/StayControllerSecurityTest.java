@@ -87,6 +87,7 @@ class StayControllerSecurityTest {
     private static final String PATH_CITY_TAX_UNASSESSED_SUMMARY = "/api/v1/stays/city-tax/unassessed/summary";
     private static final String PATH_CITY_TAX_BACKFILL_PREVIEW = "/api/v1/stays/city-tax/backfill/preview";
     private static final String PATH_CITY_TAX_BACKFILL_CONFIRM = "/api/v1/stays/city-tax/backfill/confirm";
+    private static final String PATH_STAY_HISTORY = "/api/v1/stays/guest/00000000-0000-0000-0000-000000000042/history";
     private static final String PARAM_DATE = "date";
     private static final String TEST_DATE = "2026-05-17";
 
@@ -251,6 +252,33 @@ class StayControllerSecurityTest {
 
     // ──────────────────────────────── Alloggiati failures summary ──────────
     // Same rationale and pattern as the city-tax unassessed summary above.
+
+    // The guest detail sheet shows the stay history to the front desk, and the GDPR export reads it
+    // with the caller's ADMIN/OWNER role: the three operational roles are allowed, GUEST is not.
+
+    @Test
+    void stayHistoryReturns200ForReceptionist() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(PATH_STAY_HISTORY), USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void stayHistoryReturns200ForAdmin() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(PATH_STAY_HISTORY), USER_ADMIN, ROLE_ADMIN, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void stayHistoryReturns200ForOwner() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(PATH_STAY_HISTORY), USER_OWNER, ROLE_OWNER, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void stayHistoryReturns403ForGuest() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(PATH_STAY_HISTORY), USER_GUEST, ROLE_GUEST, TEST_HOTEL_ID))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
     void alloggiatiFailureSummaryReturns403ForGuest() throws Exception {

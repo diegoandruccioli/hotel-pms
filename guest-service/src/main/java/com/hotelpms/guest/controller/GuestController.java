@@ -180,7 +180,8 @@ public class GuestController {
     /**
      * GDPR Art. 20 — produces a full data-portability export for the specified guest.
      * Aggregates profile, identity documents, stay history and invoice history.
-     * Downstream service failures return empty lists — the export always completes.
+     * If the stay or invoice history cannot be read the export fails with {@code 503}
+     * instead of returning an incomplete file.
      *
      * @param id the guest UUID; must not be {@code null}
      * @return {@code 200 OK} with the complete export payload

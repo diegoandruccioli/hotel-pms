@@ -12,6 +12,8 @@ import com.hotelpms.guest.dto.request.GuestRequest;
 import com.hotelpms.guest.dto.request.IdentityDocumentRequestDTO;
 import com.hotelpms.guest.dto.response.GuestResponse;
 import com.hotelpms.guest.dto.response.IdentityDocumentResponseDTO;
+import com.hotelpms.guest.dto.response.GuestDataExportResponse;
+import com.hotelpms.guest.exception.ExportSourceUnavailableException;
 import com.hotelpms.guest.exception.GuestConflictException;
 import com.hotelpms.guest.exception.GuestValidationException;
 import com.hotelpms.guest.exception.NotFoundException;
@@ -340,6 +342,46 @@ class GuestServiceImplTest {
         guestService.deleteGuest(nonNullGuestId);
 
         verify(guestRepository).save(nonNullGuest);
+    }
+
+    @Test
+    void shouldExportGuestDataWithBothHistories() {
+        final UUID nonNullGuestId = Objects.requireNonNull(guestId);
+        when(guestRepository.findByIdAndHotelId(nonNullGuestId, hotelId))
+                .thenReturn(Optional.of(Objects.requireNonNull(guest)));
+        when(stayServiceClient.getStayHistory(nonNullGuestId)).thenReturn(List.of());
+        when(billingServiceClient.getInvoiceHistory(nonNullGuestId)).thenReturn(List.of());
+
+        final GuestDataExportResponse export = guestService.exportGuestData(nonNullGuestId);
+
+        assertEquals(nonNullGuestId, export.guestId());
+        verify(stayServiceClient).getStayHistory(nonNullGuestId);
+        verify(billingServiceClient).getInvoiceHistory(nonNullGuestId);
+    }
+
+    @Test
+    void shouldFailTheExportWhenStayHistoryIsUnavailable() {
+        final UUID nonNullGuestId = Objects.requireNonNull(guestId);
+        when(guestRepository.findByIdAndHotelId(nonNullGuestId, hotelId))
+                .thenReturn(Optional.of(Objects.requireNonNull(guest)));
+        when(stayServiceClient.getStayHistory(nonNullGuestId))
+                .thenThrow(new ExportSourceUnavailableException("stays", new IllegalStateException("down")));
+
+        assertThrows(ExportSourceUnavailableException.class, () -> guestService.exportGuestData(nonNullGuestId));
+
+        verify(billingServiceClient, never()).getInvoiceHistory(any());
+    }
+
+    @Test
+    void shouldFailTheExportWhenInvoiceHistoryIsUnavailable() {
+        final UUID nonNullGuestId = Objects.requireNonNull(guestId);
+        when(guestRepository.findByIdAndHotelId(nonNullGuestId, hotelId))
+                .thenReturn(Optional.of(Objects.requireNonNull(guest)));
+        when(stayServiceClient.getStayHistory(nonNullGuestId)).thenReturn(List.of());
+        when(billingServiceClient.getInvoiceHistory(nonNullGuestId))
+                .thenThrow(new ExportSourceUnavailableException("invoices", new IllegalStateException("down")));
+
+        assertThrows(ExportSourceUnavailableException.class, () -> guestService.exportGuestData(nonNullGuestId));
     }
 
     @Test
