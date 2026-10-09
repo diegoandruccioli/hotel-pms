@@ -7668,7 +7668,13 @@ spoofing o rimozione del marcatore, danno l'esito atteso, mentre le
 chiamate interne firmate senza marcatore restano accettate.
 Residuo di design: il marcatore non è firmato ed è \emph{fail-open}
 (assenza = chiamata interna), quindi una futura rotta verso billing senza
-\texttt{AuthenticationFilter} sarebbe considerata fidata.
+\texttt{AuthenticationFilter} o un nuovo endpoint senza regola sarebbero
+considerati fidati. Due test di guardia, verificati per mutazione, lo
+rendono una decisione esplicita: \texttt{EndpointAuthorizationArchTest}
+fa fallire la build se un endpoint di scrittura di billing non ha
+\texttt{@PreAuthorize} e non è in un elenco motivato, e
+\texttt{BillingRoutesAuthenticationTest} se una rotta verso billing
+salta \texttt{AuthenticationFilter}.
 \end{notebox}
 
 Il rilascio non richiede lockstep: con billing aggiornato prima del
