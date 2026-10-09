@@ -7652,6 +7652,25 @@ private static void assertPublicCallerHandlesExtraOnly(ChargeType type) {
 \end{lstlisting}
 \end{securebox}
 
+\begin{notebox}[title={Bypass trovato dalla verifica live}]
+La verifica su stack Docker ha mostrato che il marcatore, da solo, non
+bastava: con l'header \texttt{Connection: X-Gateway-Origin} il proxy lo
+tratta come hop-by-hop e lo elimina (RFC~9110, \S7.6.1), quindi billing
+vedeva come interna una richiesta pubblica e \texttt{POST /invoices/stay}
+rispondeva \texttt{201} creando una fattura. L'audit statico l'aveva
+segnalato come ipotesi non verificata; la prova dal vivo l'ha confermato.
+Il gateway ora rimuove \texttt{Connection} e \texttt{Keep-Alive} dalla
+richiesta in ingresso e, come difesa in profondità indipendente dal
+marcatore, rifiuta con \texttt{403} per qualunque ruolo
+\texttt{POST /api/v1/invoices/stay} e \texttt{POST /api/v1/invoices/groups/**}.
+Dopo la correzione 22 richieste via gateway, inclusi cinque tentativi di
+spoofing o rimozione del marcatore, danno l'esito atteso, mentre le
+chiamate interne firmate senza marcatore restano accettate.
+Residuo di design: il marcatore non è firmato ed è \emph{fail-open}
+(assenza = chiamata interna), quindi una futura rotta verso billing senza
+\texttt{AuthenticationFilter} sarebbe considerata fidata.
+\end{notebox}
+
 Il rilascio non richiede lockstep: con billing aggiornato prima del
 gateway nessuna richiesta porta il marcatore e il comportamento resta
 quello precedente. Lo username (con CR/LF sostituiti) compare ora nei log
@@ -7663,7 +7682,8 @@ addebito \texttt{EXTRA} oltre al log applicativo: servirebbero colonne
 insieme a T-BILL-06.
 \end{notebox}
 Commit: \commitref{6d62971}{feat(security): mark gateway-originated requests},
-\commitref{1d9e7a0}{fix(billing): restrict public invoice writes to EXTRA charges}
+\commitref{1d9e7a0}{fix(billing): restrict public invoice writes to EXTRA charges},
+\commitref{ad3a732}{fix(security): close the hop-by-hop bypass of the gateway marker}
 
 \paragraph{T-GST-08 --- Export GDPR silenziosamente incompleto}
 I fallback Feign di \texttt{BillingServiceClient.getInvoiceHistory} e
