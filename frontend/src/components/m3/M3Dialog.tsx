@@ -1,14 +1,15 @@
-import { useEffect, useId, useRef } from 'react';
-import * as FocusTrapModule from 'focus-trap-react';
-import { useTranslation } from 'react-i18next';
-import { MaterialIcon } from '../MaterialIcon';
-import { useEscapeKey } from '../../hooks';
 import { cn } from '../../utils';
+import { M3ModalShell } from './M3ModalShell';
 
-const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
-// Escape is owned by useEscapeKey: the trap must not deactivate itself on it, or a nested
-// dialog dismissed with Escape would leave focus free in the one underneath.
-const FOCUS_TRAP_OPTIONS = { escapeDeactivates: false };
+const OVERLAY_CLASSES = 'fixed inset-0 z-50 flex items-center justify-center p-4';
+
+// M3 elevation-3, rounded-shape-xl
+const SURFACE_CLASSES = cn(
+  'relative w-full max-w-lg max-h-[90dvh] overflow-hidden',
+  'flex flex-col',
+  'bg-surface-container-high rounded-shape-xl',
+  'shadow-elevation-3'
+);
 
 interface M3DialogProps {
   /** Controls visibility */
@@ -32,102 +33,19 @@ interface M3DialogProps {
 }
 
 /**
- * M3-compliant full-screen modal dialog with:
- *  - Scrim (semi-transparent backdrop)
- *  - focus-trap-react for keyboard containment
- *  - role="dialog" + aria-modal + aria-labelledby for screen readers
- *  - Escape key closes the dialog (the topmost one, when dialogs are stacked)
+ * M3-compliant centred modal dialog. Scrim, focus trap, role="dialog" + aria-modal, focus on
+ * the close button and Escape closing the topmost overlay come from `M3ModalShell`.
  */
-export const M3Dialog = ({
-  open,
-  title,
-  titleId: titleIdProp,
-  onClose,
-  children,
-  footer,
-}: M3DialogProps) => {
-  const { t } = useTranslation('common');
-  const generatedTitleId = useId();
-  const titleId = titleIdProp ?? generatedTitleId;
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Move focus to close button when dialog opens
-  useEffect(() => {
-    if (open) {
-      closeButtonRef.current?.focus();
-    }
-  }, [open]);
-
-  // Close on Escape key (only the topmost of stacked dialogs reacts, see useEscapeKey)
-  useEscapeKey(open, onClose);
-
-  if (!open) return null;
-
-  return (
-    <FocusTrap focusTrapOptions={FOCUS_TRAP_OPTIONS}>
-      {/* Portal-like fixed overlay */}
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-      >
-        {/* Scrim */}
-        <div
-          className="absolute inset-0 bg-scrim/40"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-
-        {/* Dialog surface — M3 elevation-3, rounded-shape-lg */}
-        <div
-          className={cn(
-            'relative w-full max-w-lg max-h-[90dvh] overflow-hidden',
-            'flex flex-col',
-            'bg-surface-container-high rounded-shape-xl',
-            'shadow-elevation-3'
-          )}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 pt-6 pb-4">
-            <h2
-              id={titleId}
-              className="text-xl font-semibold font-display text-on-surface leading-tight"
-            >
-              {title}
-            </h2>
-            <button
-              ref={closeButtonRef}
-              type="button"
-              onClick={onClose}
-              className={cn(
-                'flex items-center justify-center w-10 h-10',
-                'rounded-shape-full text-on-surface-variant',
-                'hover:bg-surface-container-highest',
-                'focus-visible:outline-hidden focus-visible:ring-2',
-                'focus-visible:ring-primary focus-visible:ring-offset-2',
-                'transition-colors'
-              )}
-              aria-label={t('close')}
-            >
-              <MaterialIcon name="close" size={20} />
-            </button>
-          </div>
-
-          {/* Divider */}
-          <div className="h-px bg-outline-variant mx-6" />
-
-          {/* Scrollable body */}
-          <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
-
-          {footer && (
-            <>
-              <div className="h-px bg-outline-variant mx-6" />
-              <div className="px-6 py-4">{footer}</div>
-            </>
-          )}
-        </div>
-      </div>
-    </FocusTrap>
-  );
-};
+export const M3Dialog = ({ open, title, titleId, onClose, children, footer }: M3DialogProps) => (
+  <M3ModalShell
+    open={open}
+    title={title}
+    titleId={titleId}
+    onClose={onClose}
+    footer={footer}
+    overlayClassName={OVERLAY_CLASSES}
+    surfaceClassName={SURFACE_CLASSES}
+  >
+    {children}
+  </M3ModalShell>
+);

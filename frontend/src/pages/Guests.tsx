@@ -1,19 +1,17 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import type { ColumnDef, SortingState } from '@tanstack/react-table';
+import type { SortingState } from '@tanstack/react-table';
 import type { GuestResponseDTO } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { ListToolbar } from '../components/ListToolbar';
-import { M3Avatar, M3Button } from '../components/m3';
+import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3ConfirmDialog } from '../components/m3';
-import { M3TableActionLink } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3Pagination } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 import { useGuestsSearch, useDeleteGuest } from '../hooks/queries';
@@ -22,51 +20,12 @@ import { queryKeys } from '../lib';
 import { getErrorMessage } from '../utils';
 import { guestService } from '../services';
 import { GuestFormModal } from './GuestFormModal';
+import { GuestDetailSheet } from './Guests/GuestDetailSheet';
+import { useGuestColumns } from './Guests/useGuestColumns';
 
 const PAGE_SIZE = 20;
 const DEFAULT_SORT_FIELD = 'lastName';
 const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'asc';
-
-interface ActionsCellProps {
-  guest: GuestResponseDTO;
-  onEdit: (g: GuestResponseDTO) => void;
-  onDelete?: (g: GuestResponseDTO) => void;
-  onExport?: (g: GuestResponseDTO) => void;
-  t: TFunction;
-}
-
-const ActionsCell = ({ guest, onEdit, onDelete, onExport, t }: ActionsCellProps) => {
-  const handleEdit = useCallback(() => onEdit(guest), [onEdit, guest]);
-  const handleDeleteClick = useCallback(() => onDelete?.(guest), [onDelete, guest]);
-  const handleExportClick = useCallback(() => onExport?.(guest), [onExport, guest]);
-
-  return (
-    <div className="text-right">
-      <M3TableActionLink onClick={handleEdit}>
-        {t('edit')}
-      </M3TableActionLink>
-      {onExport && (
-        <M3TableActionLink
-          className="ml-3"
-          aria-label={`${t('export_guest_data')} ${guest.firstName} ${guest.lastName}`}
-          onClick={handleExportClick}
-        >
-          {t('export_guest_data')}
-        </M3TableActionLink>
-      )}
-      {onDelete && (
-        <M3TableActionLink
-          tone="error"
-          className="ml-3"
-          aria-label={`${t('delete')} ${guest.firstName} ${guest.lastName}`}
-          onClick={handleDeleteClick}
-        >
-          {t('delete')}
-        </M3TableActionLink>
-      )}
-    </div>
-  );
-};
 
 export const Guests = memo(() => {
   const { t } = useTranslation('common');
@@ -78,6 +37,11 @@ export const Guests = memo(() => {
   const [page, setPage] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<GuestResponseDTO | undefined>();
+  // Where focus goes back to when the form opened from the detail sheet closes: the sheet is
+  // unmounted by then, so the trap has no live opener to return to.
+  const detailTriggerRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const [detailGuest, setDetailGuest] = useState<GuestResponseDTO | null>(null);
   const [guestToDelete, setGuestToDelete] = useState<GuestResponseDTO | null>(null);
   const [guestToExport, setGuestToExport] = useState<GuestResponseDTO | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -143,19 +107,38 @@ export const Guests = memo(() => {
     setIsModalOpen(true);
   }, []);
 
+  // The detail sheet and the form are never open together: editing from the sheet closes it first.
   const handleOpenEditModal = useCallback((guest: GuestResponseDTO) => {
+    setDetailGuest(null);
     setSelectedGuest(guest);
     setIsModalOpen(true);
   }, []);
 
+  const handleOpenDetail = useCallback((guest: GuestResponseDTO, trigger: HTMLElement) => {
+    detailTriggerRef.current = trigger;
+    setDetailGuest(guest);
+  }, []);
+  const handleEditFromDetail = useCallback((guest: GuestResponseDTO) => {
+    returnFocusRef.current = detailTriggerRef.current;
+    handleOpenEditModal(guest);
+  }, [handleOpenEditModal]);
+  const restoreFocus = useCallback(() => {
+    const target = returnFocusRef.current;
+    returnFocusRef.current = null;
+    if (target?.isConnected) window.setTimeout(() => target.focus(), 0);
+  }, []);
+  const handleCloseDetail = useCallback(() => setDetailGuest(null), []);
+
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
-  }, []);
+    restoreFocus();
+  }, [restoreFocus]);
 
   const handleSaved = useCallback(() => {
     setIsModalOpen(false);
     queryClient.invalidateQueries({ queryKey: queryKeys.guests.all });
-  }, [queryClient]);
+    restoreFocus();
+  }, [queryClient, restoreFocus]);
 
   const handleDeleteRequest = useCallback((guest: GuestResponseDTO) => {
     setGuestToDelete(guest);
@@ -205,50 +188,13 @@ export const Guests = memo(() => {
 
   const getGuestRowId = useCallback((g: GuestResponseDTO) => g.id, []);
 
-  const columns = useMemo<ColumnDef<GuestResponseDTO>[]>(() => [
-    {
-      id: 'lastName',
-      accessorKey: 'lastName',
-      header: t('name'),
-      cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <M3Avatar name={row.original.firstName || row.original.lastName} size="md" aria-hidden="true" />
-          <div className="min-w-0">
-            <p className="font-medium">{row.original.firstName} {row.original.lastName}</p>
-            {row.original.email && <p className="text-xs text-on-surface-variant">{row.original.email}</p>}
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: 'phone',
-      header: t('phone'),
-      enableSorting: false,
-      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.phone || '-'}</span>,
-    },
-    {
-      id: 'city',
-      header: t('city'),
-      enableSorting: false,
-      cell: ({ row }) => (
-        <span className="text-on-surface-variant">{row.original.city || '-'} ({row.original.country || '-'})</span>
-      ),
-    },
-    {
-      id: 'actions',
-      header: () => <span className="sr-only">{t('actions')}</span>,
-      enableSorting: false,
-      cell: ({ row }) => (
-        <ActionsCell
-          guest={row.original}
-          onEdit={handleOpenEditModal}
-          onDelete={isAdminOrOwner ? handleDeleteRequest : undefined}
-          onExport={isAdminOrOwner ? handleExportRequest : undefined}
-          t={t}
-        />
-      ),
-    },
-  ], [t, handleOpenEditModal, isAdminOrOwner, handleDeleteRequest, handleExportRequest]);
+  const columns = useGuestColumns({
+    isAdminOrOwner,
+    onOpen: handleOpenDetail,
+    onEdit: handleOpenEditModal,
+    onDelete: handleDeleteRequest,
+    onExport: handleExportRequest,
+  });
 
   return (
     <div className="space-y-6">
@@ -315,6 +261,10 @@ export const Guests = memo(() => {
           onClose={handleCloseModal}
           onSaved={handleSaved}
         />
+      )}
+
+      {detailGuest && (
+        <GuestDetailSheet guest={detailGuest} onClose={handleCloseDetail} onEdit={handleEditFromDetail} />
       )}
 
       {guestToDelete && (

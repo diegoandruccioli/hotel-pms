@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { guestService } from '../../services';
+import { billingService, guestService, stayService } from '../../services';
 import { queryKeys } from '../../lib';
+import { useAuthStore } from '../../store';
 
 /**
  * Server-side-searched, paginated guest list. Replaces the manual
@@ -40,5 +41,26 @@ export function useGuestSuggestions(query: string) {
     queryKey: queryKeys.guests.suggest(trimmed),
     queryFn: () => guestService.searchGuests(trimmed),
     enabled: trimmed.length > 0,
+  });
+}
+
+/** Stay history of a guest (primary guest only), for the detail sheet. */
+export function useGuestStayHistory(id: string) {
+  return useQuery({
+    queryKey: queryKeys.guests.stays(id),
+    queryFn: () => stayService.getGuestStayHistory(id),
+    // Check-in/out and payments invalidate other keys, so never serve this from cache.
+    staleTime: 0,
+  });
+}
+
+/** Invoice history of a guest. Financial figures: fetched only for ADMIN/OWNER, whoever mounts it. */
+export function useGuestInvoiceHistory(id: string) {
+  const role = useAuthStore((s) => s.user?.role);
+  return useQuery({
+    queryKey: queryKeys.guests.invoices(id),
+    queryFn: () => billingService.getGuestInvoiceHistory(id),
+    enabled: role === 'ADMIN' || role === 'OWNER',
+    staleTime: 0,
   });
 }

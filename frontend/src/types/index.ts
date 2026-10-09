@@ -19,6 +19,7 @@ export type {
   PaymentResponse,
   InvoiceResponse,
   InvoiceSearchResult,
+  GuestInvoiceSummary,
 } from './billing.types';
 export * from './daySheet.types';
 export * from './fb.types';

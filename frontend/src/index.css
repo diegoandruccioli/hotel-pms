@@ -87,6 +87,7 @@
 
   --animate-fade-in: fade-in 200ms ease-out;
   --animate-slide-in-right: slide-in-right 300ms cubic-bezier(0.2, 0, 0, 1);
+  --animate-slide-in-from-right: slide-in-from-right 300ms cubic-bezier(0.2, 0, 0, 1);
 
   @keyframes fade-in {
     from {
@@ -101,6 +102,14 @@
   @keyframes slide-in-right {
     from {
       transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes slide-in-from-right {
+    from {
+      transform: translateX(100%);
     }
     to {
       transform: translateX(0);
