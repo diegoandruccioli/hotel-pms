@@ -107,7 +107,8 @@ public interface GuestService {
     /**
      * Produces a GDPR Art. 20 data-portability export for the specified guest.
      * Aggregates: guest profile, identity documents, stay history, invoice history.
-     * Downstream Feign failures return empty lists — the export always succeeds.
+     * A downstream Feign failure fails the export ({@code ExportSourceUnavailableException}):
+     * a silently incomplete file would be indistinguishable from "no stays / no invoices".
      *
      * @param id the guest UUID; must not be {@code null}
      * @return the full export response

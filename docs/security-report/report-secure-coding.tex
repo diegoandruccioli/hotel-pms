@@ -7554,6 +7554,164 @@ su fattura \texttt{PAID} resta \texttt{409} per un guard di business
 preesistente, non \texttt{403} --- nessuna regressione introdotta da questo fix).
 Commit: \commitref{a87d329}{fix(security): T-GST-07/T-BILL-07 --- missing RBAC on guest/invoice controllers}
 
+\paragraph{T-BILL-08 --- Storico fatture per ospite senza controllo di ruolo}
+Scoperto dalla revisione del pannello di dettaglio ospite del redesign UI:
+\texttt{GET /api/v1/invoices/guest/\{guestId\}/history} (numero, data,
+importo totale e stato di ogni fattura di un ospite) era nato come feed
+interno per l'export GDPR di guest-service, ma non aveva alcuna
+\texttt{@PreAuthorize} e il gateway non filtra \texttt{/api/v1/invoices/**}:
+un RECEPTIONIST poteva interrogarlo direttamente per qualunque ospite del
+proprio hotel. L'interfaccia nascondeva la sezione ai non amministratori,
+ma era solo una scelta di presentazione. Lo scoping per \texttt{hotelId}
+era già corretto, quindi non esiste un IDOR cross-tenant.
+
+\begin{insecurebox}[title={InvoiceController.java --- nessun controllo di ruolo (baseline)}]
+\begin{lstlisting}[style=java]
+@GetMapping("/guest/{guestId}/history")
+public ResponseEntity<List<InvoiceSummaryResponse>> getInvoiceHistoryForGuest(
+        @NonNull @PathVariable final UUID guestId) {
+    // raggiungibile da qualunque ruolo autenticato (anche RECEPTIONIST)
+    ...
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={InvoiceController.java --- riservato ad ADMIN/OWNER (main)}]
+\begin{lstlisting}[style=java]
+@PreAuthorize(ROLE_ADMIN_OR_OWNER)
+@GetMapping("/guest/{guestId}/history")
+public ResponseEntity<List<InvoiceSummaryResponse>> getInvoiceHistoryForGuest(
+        @NonNull @PathVariable final UUID guestId) {
+    ...
+}
+\end{lstlisting}
+\end{securebox}
+
+L'export GDPR continua a funzionare: \texttt{GuestController.exportGuestData}
+è già riservato ad ADMIN/OWNER e \texttt{InternalFeignAuthInterceptor} rifirma
+gli header con il ruolo reale dell'utente, senza un principal di sistema,
+quindi billing-service riceve sempre ADMIN o OWNER. Gli endpoint
+\texttt{/last-date} sono rimasti aperti di proposito: sono la sonda di
+legal hold usata dal job di retention e dalla guardia di cancellazione.
+Tre test in \texttt{InvoiceControllerSecurityTest} (RECEPTIONIST →
+\texttt{403}, ADMIN e OWNER → \texttt{200}).
+
+\begin{notebox}[title={Residui emersi dall'audit}]
+L'audit ha segnalato tre residui oltre a questo fix: il fallback Feign
+dell'export GDPR che nascondeva un \texttt{403}/\texttt{5xx}
+(T-GST-08), le scritture sulle fatture raggiungibili dal front desk via
+gateway (T-BILL-09) e \texttt{GET /invoices} aperto a tutti i ruoli. Sono
+chiusi dai paragrafi seguenti; restano aperti per scelta di policy
+\texttt{GET /invoices/search}, \texttt{/\{id\}} e \texttt{/pdf}.
+\end{notebox}
+
+Commit: \commitref{c6899b9}{fix(billing): restrict guest invoice history to ADMIN/OWNER}
+
+\paragraph{T-BILL-09 --- Scritture sulle fatture raggiungibili dal front desk via gateway}
+Il secondo giro dell'audit su T-BILL-08 ha mostrato che le operazioni di
+scrittura di \texttt{InvoiceController} nate come chiamate interne
+(\texttt{POST /stay}, \texttt{POST /groups/\{id\}/master-folio},
+\texttt{POST /groups/\{id\}/charges}) e l'aggiunta/rimozione di addebiti
+erano raggiungibili da un RECEPTIONIST attraverso il gateway, che non
+filtra \texttt{/api/v1/invoices/**}. Un RECEPTIONIST poteva creare fatture
+arbitrarie consumando la numerazione fiscale e, soprattutto, rimuovere un
+addebito \texttt{ROOM\_NIGHT} o \texttt{CITY\_TAX} di un soggiorno aperto.
+Un controllo per ruolo non era praticabile: gli storni interni (cambio
+camera, rimozione ospite) rimuovono gli stessi addebiti con il ruolo del
+RECEPTIONIST inoltrato da \texttt{InternalFeignAuthInterceptor}.
+
+La distinzione necessaria è \emph{da dove} arriva la chiamata. Tutti i
+client Feign contattano billing-service direttamente, senza passare dal
+gateway. Il gateway aggiunge quindi l'header \texttt{X-Gateway-Origin},
+rimuovendo prima ogni copia inviata dal client; \texttt{InternalAuthFilter}
+lo traduce nell'autorità \texttt{GATEWAY\_CALLER}; l'interceptor Feign non
+lo propaga mai. Il marcatore non fa parte del payload HMAC: cambiare il
+formato della firma sarebbe stato un rilascio in lockstep di quattro
+firmatari/verificatori, e chi raggiunge un servizio direttamente possiede
+già il segreto condiviso.
+
+\begin{insecurebox}[title={InvoiceServiceImpl.java --- qualunque tipo di addebito, da chiunque (baseline)}]
+\begin{lstlisting}[style=java]
+public void removeCharge(UUID stayId, UUID chargeId) {
+    ...
+    invoice.removeCharge(charge);          // ROOM_NIGHT / CITY_TAX inclusi
+    invoiceChargeRepository.delete(charge);
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={InvoiceServiceImpl.java --- un chiamante pubblico gestisce solo EXTRA (main)}]
+\begin{lstlisting}[style=java]
+private static void assertPublicCallerHandlesExtraOnly(ChargeType type) {
+    if (CallerContext.isViaGateway() && type != ChargeType.EXTRA) {
+        throw new AccessDeniedException("PUBLIC_CALLER_EXTRA_CHARGES_ONLY");
+    }
+}
+// InvoiceController: @PreAuthorize("!hasAuthority('GATEWAY_CALLER')")
+// su POST /stay, /groups/{id}/master-folio, /groups/{id}/charges
+\end{lstlisting}
+\end{securebox}
+
+\begin{notebox}[title={Bypass trovato dalla verifica live}]
+La verifica su stack Docker ha mostrato che il marcatore, da solo, non
+bastava: con l'header \texttt{Connection: X-Gateway-Origin} il proxy lo
+tratta come hop-by-hop e lo elimina (RFC~9110, \S7.6.1), quindi billing
+vedeva come interna una richiesta pubblica e \texttt{POST /invoices/stay}
+rispondeva \texttt{201} creando una fattura. L'audit statico l'aveva
+segnalato come ipotesi non verificata; la prova dal vivo l'ha confermato.
+Il gateway ora rimuove \texttt{Connection} e \texttt{Keep-Alive} dalla
+richiesta in ingresso e, come difesa in profondità indipendente dal
+marcatore, rifiuta con \texttt{403} per qualunque ruolo
+\texttt{POST /api/v1/invoices/stay} e \texttt{POST /api/v1/invoices/groups/**}.
+Dopo la correzione 22 richieste via gateway, inclusi cinque tentativi di
+spoofing o rimozione del marcatore, danno l'esito atteso, mentre le
+chiamate interne firmate senza marcatore restano accettate.
+Residuo di design: il marcatore non è firmato ed è \emph{fail-open}
+(assenza = chiamata interna), quindi una futura rotta verso billing senza
+\texttt{AuthenticationFilter} o un nuovo endpoint senza regola sarebbero
+considerati fidati. Due test di guardia, verificati per mutazione, lo
+rendono una decisione esplicita: \texttt{EndpointAuthorizationArchTest}
+fa fallire la build se un endpoint di scrittura di billing non ha
+\texttt{@PreAuthorize} e non è in un elenco motivato, e
+\texttt{BillingRoutesAuthenticationTest} se una rotta verso billing
+salta \texttt{AuthenticationFilter}.
+\end{notebox}
+
+Il rilascio non richiede lockstep: con billing aggiornato prima del
+gateway nessuna richiesta porta il marcatore e il comportamento resta
+quello precedente. Lo username (con CR/LF sostituiti) compare ora nei log
+di aggiunta, rimozione e rifiuto degli addebiti.
+\begin{notebox}[title={Residuo dichiarato}]
+Non esiste una traccia persistente di chi ha aggiunto o rimosso un
+addebito \texttt{EXTRA} oltre al log applicativo: servirebbero colonne
+\texttt{created\_by}/soft delete e una migrazione Flyway, da decidere
+insieme a T-BILL-06.
+\end{notebox}
+Commit: \commitref{6d62971}{feat(security): mark gateway-originated requests},
+\commitref{1d9e7a0}{fix(billing): restrict public invoice writes to EXTRA charges},
+\commitref{ad3a732}{fix(security): close the hop-by-hop bypass of the gateway marker}
+
+\paragraph{T-GST-08 --- Export GDPR silenziosamente incompleto}
+I fallback Feign di \texttt{BillingServiceClient.getInvoiceHistory} e
+\texttt{StayServiceClient.getStayHistory} restituivano una lista vuota
+senza log: un guasto di billing, un circuito aperto o un \texttt{403}
+producevano un file di export valido in apparenza ma privo di sezioni,
+indistinguibile da un ospite senza soggiorni né fatture (Art.~15/20
+GDPR). I fallback ora registrano la causa a livello WARN e lanciano
+\texttt{ExportSourceUnavailableException}, mappata a \texttt{503} con
+\texttt{EXTERNAL\_SERVICE\_UNAVAILABLE}. I fallback di \texttt{last-date},
+già fail-closed con un sentinel che diventa \texttt{451}, restano
+invariati; non è stato aggiunto \texttt{ignoreExceptions} perché un 4xx non
+deve saltare quel fail-closed.
+Commit: \commitref{bdb22dd}{fix(guest): fail the GDPR export when history sources are unavailable}
+
+\paragraph{T-BILL-08 --- residui}
+Chiusi i tre residui dell'audit: T-GST-08, T-BILL-09 e la restrizione di
+\texttt{GET /invoices} a ADMIN/OWNER (\commitref{ce2552e}{fix(billing): restrict list-all invoices to ADMIN/OWNER}).
+Restano aperti per scelta di policy \texttt{GET /invoices/search},
+\texttt{GET /invoices/\{id\}} e \texttt{/pdf}, necessari al front desk per il
+pagamento e il checkout.
+
 \paragraph{GAP-17 --- Trust boundary IP rotto dalla topologia reale nginx→gateway}
 Trovato durante la ri-verifica post-hardening del 2026-08-16 da due
 sotto-agenti indipendenti (categorie \emph{auth-jwt} e \emph{access-control}),
