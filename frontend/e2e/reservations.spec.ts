@@ -181,6 +181,36 @@ test.describe('Reservations', () => {
     await expect(page).toHaveURL(/\/reservations$/);
   });
 
+  test('completes the stepper in order and creates the reservation', async ({ page }) => {
+    await page.goto('/reservations/new');
+    const next = page.getByRole('button', { name: /^(next|avanti)$/i });
+
+    // Step 1: the later steps are not reachable yet
+    await expect(page.getByRole('button', { name: /^(summary|riepilogo)$/i })).toHaveCount(0);
+    await page.getByLabel(/check-in date|data di check-in/i).fill('2099-03-01');
+    await page.getByLabel(/check-out date|data di check-out/i).fill('2099-03-03');
+    await next.click();
+
+    // Step 2: pick the only room
+    await page.getByRole('button', { name: /101/ }).first().click();
+    await next.click();
+
+    // Step 3: find and choose the guest
+    await page.getByPlaceholder(/cerca ospite|search guest/i).fill('Mario');
+    await page.getByRole('button', { name: /mario rossi/i }).click();
+    await next.click();
+
+    // Step 4: summary, then confirm
+    await expect(page.getByRole('region', { name: /^(summary|riepilogo)$/i })).toContainText('Mario Rossi');
+    const created = page.waitForRequest((req) => req.method() === 'POST' && req.url().includes('/api/v1/reservations'));
+    await page.getByRole('button', { name: /confirm reservation|conferma prenotazione/i }).click();
+    const body = JSON.parse((await created).postData() ?? '{}') as {
+      guestId: string; checkInDate: string; lineItems: { roomId: string }[];
+    };
+    expect(body).toMatchObject({ guestId: 'g-001', checkInDate: '2099-03-01', lineItems: [{ roomId: 'rm-101' }] });
+    await expect(page).toHaveURL(/\/reservations$/);
+  });
+
   test('search filters by guest name', async ({ page }) => {
     await page.goto('/reservations');
     await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });

@@ -14,9 +14,10 @@ vi.mock('../../services/guestService', () => ({
 }));
 
 vi.mock('../../components/m3/M3TextField', () => ({
-  M3TextField: ({ label, name, value, onChange, required }: {
-    label: string; name?: string; value: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void; required?: boolean;
-  }) => <input aria-label={label} name={name} value={value} onChange={onChange} required={required} />,
+  M3TextField: ({ label, name, value, onChange, onKeyDown, required }: {
+    label: string; name?: string; value: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void; required?: boolean;
+  }) => <input aria-label={label} name={name} value={value} onChange={onChange} onKeyDown={onKeyDown} required={required} />,
 }));
 
 const GUEST = {
@@ -95,5 +96,49 @@ describe('GuestSearchAndCreate', () => {
       <GuestSearchAndCreate selectedGuest={null} onSelectGuest={onSelectGuest} onClearGuest={onClearGuest} />
     );
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  describe('inside a surrounding form (reservation stepper)', () => {
+    const renderInForm = (selectedGuest: typeof GUEST | null = null) => {
+      const onSubmit = vi.fn((e: React.FormEvent) => e.preventDefault());
+      render(
+        <form onSubmit={onSubmit}>
+          <GuestSearchAndCreate selectedGuest={selectedGuest} onSelectGuest={onSelectGuest} onClearGuest={onClearGuest} />
+        </form>,
+      );
+      return onSubmit;
+    };
+
+    it('never submits the form from its own buttons', () => {
+      const onSubmit = renderInForm();
+      fireEvent.click(screen.getByText('btn_new_guest'));
+      fireEvent.click(screen.getByText('cancel'));
+      fireEvent.click(screen.getByText('btn_new_guest'));
+      fireEvent.click(screen.getByText('btn_save_guest'));
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it('does not submit the form when "change" clears the selected guest', () => {
+      const onSubmit = renderInForm(GUEST);
+      fireEvent.click(screen.getByText('btn_change'));
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(onClearGuest).toHaveBeenCalledOnce();
+    });
+
+    it('swallows Enter in the search field', () => {
+      renderInForm();
+      const notPrevented = fireEvent.keyDown(screen.getByLabelText('search_guest_placeholder'), { key: 'Enter' });
+      expect(notPrevented).toBe(false);
+    });
+
+    it('saves the new guest on Enter in the creation form instead of submitting the form', async () => {
+      vi.mocked(guestService.createGuest).mockResolvedValue(GUEST);
+      renderInForm();
+      fireEvent.click(screen.getByText('btn_new_guest'));
+      const notPrevented = fireEvent.keyDown(screen.getByLabelText('label_first_name'), { key: 'Enter' });
+      expect(notPrevented).toBe(false);
+      await waitFor(() => expect(guestService.createGuest).toHaveBeenCalledOnce());
+      await waitFor(() => expect(onSelectGuest).toHaveBeenCalledWith(GUEST));
+    });
   });
 });

@@ -54,21 +54,17 @@ vi.mock('./GuestSearchAndCreate', () => ({
   GuestSearchAndCreate: (props: GuestMockProps) => GuestSearchAndCreateMock(props),
 }));
 
-interface RoomMockProps {
+interface DatesMockProps {
   readOnly?: boolean;
   onCheckInChange: (v: string) => void;
   onCheckOutChange: (v: string) => void;
-  onToggleRoom: (roomId: string) => void;
-  selectedRoomIds: string[];
 }
 
-function RoomSelectionMock({ readOnly, onCheckInChange, onCheckOutChange, onToggleRoom, selectedRoomIds }: RoomMockProps) {
+function StayDatesFieldsMock({ readOnly, onCheckInChange, onCheckOutChange }: DatesMockProps) {
   const handleCheckIn = (e: ChangeEvent<HTMLInputElement>) => onCheckInChange(e.target.value);
   const handleCheckOut = (e: ChangeEvent<HTMLInputElement>) => onCheckOutChange(e.target.value);
-  const handleToggle = () => onToggleRoom('r1');
   return (
-    <div data-testid="room-mock">
-      Room Mock
+    <div data-testid="dates-mock">
       {readOnly && <span>Read Only</span>}
       {!readOnly && (
         <>
@@ -76,6 +72,29 @@ function RoomSelectionMock({ readOnly, onCheckInChange, onCheckOutChange, onTogg
           <input id="mock-checkin" onChange={handleCheckIn} />
           <label htmlFor="mock-checkout">Mock Check-out</label>
           <input id="mock-checkout" onChange={handleCheckOut} />
+        </>
+      )}
+    </div>
+  );
+}
+
+vi.mock('./StayDatesFields', () => ({
+  StayDatesFields: (props: DatesMockProps) => StayDatesFieldsMock(props),
+}));
+
+interface RoomGridMockProps {
+  readOnly?: boolean;
+  onToggleRoom: (roomId: string) => void;
+  selectedRoomIds: string[];
+}
+
+function RoomGridMock({ readOnly, onToggleRoom, selectedRoomIds }: RoomGridMockProps) {
+  const handleToggle = () => onToggleRoom('r1');
+  return (
+    <div data-testid="room-mock">
+      {readOnly && <span>Read Only</span>}
+      {!readOnly && (
+        <>
           <button type="button" onClick={handleToggle}>Toggle Room r1</button>
           <span>Selected: {selectedRoomIds.join(',')}</span>
         </>
@@ -84,11 +103,11 @@ function RoomSelectionMock({ readOnly, onCheckInChange, onCheckOutChange, onTogg
   );
 }
 
-vi.mock('./RoomSelection', () => ({
-  RoomSelection: (props: RoomMockProps) => RoomSelectionMock(props),
+vi.mock('./RoomGrid', () => ({
+  RoomGrid: (props: RoomGridMockProps) => RoomGridMock(props),
 }));
 
-// `t` must be a module-level stable reference: ReservationForm's loadInitialData
+// `t` must be a module-level stable reference: the hook's loadInitialData
 // useCallback depends on `t`, and that callback is the sole effect dependency that
 // triggers the initial fetch. An inline arrow recreated on every useTranslation()
 // call would give `t` (and therefore loadInitialData) a new identity on every
@@ -152,6 +171,64 @@ const mockReservation = (overrides: Partial<ReservationResponse> = {}): Reservat
   ...overrides,
 });
 
+// ---------------------------------------------------------------------------
+// Render + flow helpers
+// ---------------------------------------------------------------------------
+const renderNew = () => render(
+  <MemoryRouter initialEntries={['/reservations/new']}>
+    <Routes>
+      <Route path="/reservations/new" element={<ReservationForm />} />
+    </Routes>
+  </MemoryRouter>
+);
+
+const renderNewWithState = (state: unknown) => render(
+  <MemoryRouter initialEntries={[{ pathname: '/reservations/new', state }]}>
+    <Routes>
+      <Route path="/reservations/new" element={<ReservationForm />} />
+    </Routes>
+  </MemoryRouter>
+);
+
+const renderEdit = () => render(
+  <MemoryRouter initialEntries={['/reservations/edit/res123']}>
+    <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
+  </MemoryRouter>
+);
+
+const renderView = () => render(
+  <MemoryRouter initialEntries={['/reservations/res123']}>
+    <Routes><Route path="/reservations/:id" element={<ReservationForm />} /></Routes>
+  </MemoryRouter>
+);
+
+const waitForTitle = (name: string) => waitFor(() => screen.getByRole('heading', { level: 1, name }));
+const stepHeading = (name: string) => screen.getByRole('heading', { level: 2, name });
+const clickNext = () => fireEvent.click(screen.getByRole('button', { name: 'btn_next' }));
+const fillDates = (checkIn: string, checkOut: string) => {
+  fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: checkIn } });
+  fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: checkOut } });
+};
+const toggleRoom = () => fireEvent.click(screen.getByText('Toggle Room r1'));
+const selectGuest = () => fireEvent.click(screen.getByText('Select Guest'));
+
+/** Walks a new reservation through every step and stops on the summary. */
+const completeNewFlow = (checkIn = '2026-04-01', checkOut = '2026-04-03') => {
+  fillDates(checkIn, checkOut);
+  clickNext();
+  toggleRoom();
+  clickNext();
+  selectGuest();
+  clickNext();
+};
+
+/** In edit mode every step is reachable: fill dates and a room straight from the stepper. */
+const fillEditReservation = () => {
+  fillDates('2026-05-01', '2026-05-03');
+  fireEvent.click(screen.getByRole('button', { name: 'reservation_step_rooms' }));
+  toggleRoom();
+};
+
 describe('ReservationForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -163,199 +240,166 @@ describe('ReservationForm', () => {
       totalElements: 2,
     } as never);
     vi.mocked(reservationService.getAllReservations).mockResolvedValue([]);
-    // Resolved-price lookup (RoomSelection is mocked out in this file, so nothing
-    // asserts on the actual prices — this just keeps the effect's promise from
-    // resolving to undefined and throwing on `.then`).
+    // Resolved-price lookup: an empty list keeps the effect's promise from resolving
+    // to undefined and throwing on `.then`; individual tests override it.
     vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue([]);
     vi.mocked(stayService.getStaysByReservationId).mockResolvedValue(
       { content: [], totalElements: 0 } as never,
     );
   });
 
-  it('renders correctly and loads rooms in "New" mode', async () => {
-    render(
-      <MemoryRouter initialEntries={['/reservations/new']}>
-        <Routes>
-          <Route path="/reservations/new" element={<ReservationForm />} />
-        </Routes>
-      </MemoryRouter>
-    );
-    
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1, name: 'new_reservation' })).toBeInTheDocument();
-      expect(screen.getByTestId('room-mock')).toBeInTheDocument();
-    });
-  });
+  describe('modes', () => {
+    it('renders the first step with the stepper and the summary panel in "New" mode', async () => {
+      renderNew();
+      await waitForTitle('new_reservation');
 
-  it('renders correctly in "View" mode', async () => {
-    vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
-      id: 'res123',
-      guestId: 'g1',
-    }));
-    vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1', firstName: 'Mario', lastName: 'Rossi' }));
-
-    render(
-      <MemoryRouter initialEntries={['/reservations/res123']}>
-        <Routes>
-          <Route path="/reservations/:id" element={<ReservationForm />} />
-        </Routes>
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1, name: 'reservation_details' })).toBeInTheDocument();
-      expect(screen.getByText(/Mario Rossi/i)).toBeInTheDocument();
-      expect(screen.getAllByText(/Read Only/i).length).toBeGreaterThan(0);
+      expect(screen.getByRole('list', { name: 'stepper_aria_label' })).toBeInTheDocument();
+      expect(stepHeading('reservation_step_dates')).toBeInTheDocument();
+      expect(screen.getByTestId('dates-mock')).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'summary_title' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'btn_next' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'btn_previous' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /confirm_reservation/ })).not.toBeInTheDocument();
     });
 
-    expect(screen.queryByRole('button', { name: /confirm_reservation|update_reservation/i })).not.toBeInTheDocument();
-  });
+    it('renders only the read-only summary with Back and Edit in "View" mode', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
+        id: 'res123',
+        guestId: 'g1',
+        lineItems: [{ roomId: 'r1', active: true } as never],
+      }));
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1', firstName: 'Mario', lastName: 'Rossi' }));
 
-  it('renders correctly in "Edit" mode', async () => {
-    vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
-      id: 'res123',
-      guestId: 'g1',
-    }));
-    vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1', firstName: 'Luigi', lastName: 'Verdi' }));
+      renderView();
+      await waitForTitle('reservation_details');
 
-    render(
-      <MemoryRouter initialEntries={['/reservations/edit/res123']}>
-        <Routes>
-          <Route path="/reservations/edit/:id" element={<ReservationForm />} />
-        </Routes>
-      </MemoryRouter>
-    );
+      expect(screen.getByRole('region', { name: 'summary_title' })).toBeInTheDocument();
+      expect(screen.getByText(/Mario Rossi/)).toBeInTheDocument();
+      expect(screen.getByText('room_number')).toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: 'stepper_aria_label' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /confirm_reservation|update_reservation|btn_next/ })).not.toBeInTheDocument();
+      // header back arrow + footer Back button
+      expect(screen.getAllByRole('button', { name: 'back' })).toHaveLength(2);
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1, name: 'edit_reservation' })).toBeInTheDocument();
-      expect(screen.getByText(/Luigi Verdi/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'edit' }));
+      expect(mockNavigate).toHaveBeenCalledWith('/reservations/edit/res123');
     });
 
-    expect(screen.getByRole('button', { name: /update_reservation/i })).toBeInTheDocument();
-  });
+    it('lets "Edit" mode jump to any step and save from the summary panel', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
+        id: 'res123',
+        guestId: 'g1',
+      }));
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1', firstName: 'Luigi', lastName: 'Verdi' }));
 
-  it('shows the already-checked-in banner and disables dates/rooms when a CHECKED_IN stay exists', async () => {
-    vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
-      id: 'res123',
-      guestId: 'g1',
-    }));
-    vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1', firstName: 'Luigi', lastName: 'Verdi' }));
-    vi.mocked(stayService.getStaysByReservationId).mockResolvedValue({
-      content: [{ id: 'stay1', status: 'CHECKED_IN' }],
-      totalElements: 1,
-    } as never);
+      renderEdit();
+      await waitForTitle('edit_reservation');
 
-    render(
-      <MemoryRouter initialEntries={['/reservations/edit/res123']}>
-        <Routes>
-          <Route path="/reservations/edit/:id" element={<ReservationForm />} />
-        </Routes>
-      </MemoryRouter>
-    );
+      expect(within(screen.getByRole('region', { name: 'summary_title' })).getByText(/Luigi Verdi/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /update_reservation/i })).toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(screen.getByText('reservation_already_checked_in_banner')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'reservation_step_summary' }));
+      expect(screen.getByRole('button', { name: /update_reservation/i })).toHaveAttribute('type', 'submit');
+    });
+
+    it('shows the already-checked-in banner and locks dates and rooms when a CHECKED_IN stay exists', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
+        id: 'res123',
+        guestId: 'g1',
+      }));
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1', firstName: 'Luigi', lastName: 'Verdi' }));
+      vi.mocked(stayService.getStaysByReservationId).mockResolvedValue({
+        content: [{ id: 'stay1', status: 'CHECKED_IN' }],
+        totalElements: 1,
+      } as never);
+
+      renderEdit();
+
+      await waitFor(() => {
+        expect(screen.getByText('reservation_already_checked_in_banner')).toBeInTheDocument();
+        expect(screen.getByText('Read Only')).toBeInTheDocument();
+      });
+      expect(screen.getByRole('button', { name: 'reservation_go_to_stay' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'reservation_step_rooms' }));
       expect(screen.getByText('Read Only')).toBeInTheDocument();
     });
-    expect(screen.getByRole('button', { name: 'reservation_go_to_stay' })).toBeInTheDocument();
-  });
 
-  it('does not show the already-checked-in banner when no stay is CHECKED_IN', async () => {
-    vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
-      id: 'res123',
-      guestId: 'g1',
-    }));
-    vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1', firstName: 'Luigi', lastName: 'Verdi' }));
-    vi.mocked(stayService.getStaysByReservationId).mockResolvedValue({
-      content: [{ id: 'stay1', status: 'CHECKED_OUT' }],
-      totalElements: 1,
-    } as never);
+    it('does not show the already-checked-in banner when no stay is CHECKED_IN', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
+        id: 'res123',
+        guestId: 'g1',
+      }));
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1', firstName: 'Luigi', lastName: 'Verdi' }));
+      vi.mocked(stayService.getStaysByReservationId).mockResolvedValue({
+        content: [{ id: 'stay1', status: 'CHECKED_OUT' }],
+        totalElements: 1,
+      } as never);
 
-    render(
-      <MemoryRouter initialEntries={['/reservations/edit/res123']}>
-        <Routes>
-          <Route path="/reservations/edit/:id" element={<ReservationForm />} />
-        </Routes>
-      </MemoryRouter>
-    );
+      renderEdit();
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1, name: 'edit_reservation' })).toBeInTheDocument();
-    });
-    expect(screen.queryByText('reservation_already_checked_in_banner')).not.toBeInTheDocument();
-    expect(screen.queryByText('Read Only')).not.toBeInTheDocument();
-  });
-
-  it('should have no accessibility violations', async () => {
-    const { container } = render(
-      <MemoryRouter initialEntries={['/reservations/new']}>
-        <Routes>
-          <Route path="/reservations/new" element={<ReservationForm />} />
-        </Routes>
-      </MemoryRouter>
-    );
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'new_reservation' })).toBeInTheDocument());
-    const results = await axe(container);
-    expect(results).toHaveNoViolations();
-  });
-
-  const renderNew = () => render(
-    <MemoryRouter initialEntries={['/reservations/new']}>
-      <Routes>
-        <Route path="/reservations/new" element={<ReservationForm />} />
-      </Routes>
-    </MemoryRouter>
-  );
-
-  // The submit button is disabled until guest+room+both dates are set, so the
-  // validation-chain tests (which submit partial state on purpose) must fire
-  // the form's submit event directly rather than clicking the (disabled) button.
-  const submitForm = () => fireEvent.submit(document.querySelector('form')!);
-
-  describe('validation chain', () => {
-    it('shows msg_select_guest when no guest is selected', async () => {
-      renderNew();
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
-      submitForm();
-      expect(await screen.findByText('msg_select_guest')).toBeInTheDocument();
+      await waitForTitle('edit_reservation');
+      expect(screen.queryByText('reservation_already_checked_in_banner')).not.toBeInTheDocument();
+      expect(screen.queryByText('Read Only')).not.toBeInTheDocument();
     });
 
-    it('shows msg_select_room when a guest is selected but no room', async () => {
+    it('has no accessibility violations on the first and the summary step', async () => {
+      const { container } = renderNew();
+      await waitForTitle('new_reservation');
+      expect(await axe(container)).toHaveNoViolations();
+
+      completeNewFlow();
+      expect(stepHeading('summary_title')).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  describe('preselected guest', () => {
+    it('starts with the guest handed over by the guest sheet', async () => {
+      renderNewWithState({ guest: mockGuest({ id: 'g9', firstName: 'Anna', lastName: 'Bianchi' }) });
+      await waitForTitle('new_reservation');
+      expect(within(screen.getByRole('region', { name: 'summary_title' })).getByText('Anna Bianchi')).toBeInTheDocument();
+    });
+
+    it('ignores a malformed guest in the router state', async () => {
+      renderNewWithState({ guest: { firstName: 42 } });
+      await waitForTitle('new_reservation');
+      expect(screen.getByText('summary_no_guest')).toBeInTheDocument();
+    });
+
+    it('ignores router state that carries no guest', async () => {
+      renderNewWithState({ something: 'else' });
+      await waitForTitle('new_reservation');
+      expect(screen.getByText('summary_no_guest')).toBeInTheDocument();
+    });
+  });
+
+  describe('step navigation', () => {
+    it('does not advance from the dates step without valid dates', async () => {
       renderNew();
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
-      fireEvent.click(screen.getByText('Select Guest'));
-      submitForm();
+      await waitForTitle('new_reservation');
+      clickNext();
+      expect(await screen.findByText('msg_valid_dates')).toBeInTheDocument();
+      expect(stepHeading('reservation_step_dates')).toBeInTheDocument();
+    });
+
+    it('does not advance when the checkout date is not after the check-in date', async () => {
+      renderNew();
+      await waitForTitle('new_reservation');
+      fillDates('2026-04-05', '2026-04-01');
+      clickNext();
+      expect(await screen.findByText('msg_valid_dates')).toBeInTheDocument();
+      expect(stepHeading('reservation_step_dates')).toBeInTheDocument();
+    });
+
+    it('does not advance from the rooms step without a room', async () => {
+      renderNew();
+      await waitForTitle('new_reservation');
+      fillDates('2026-04-01', '2026-04-03');
+      clickNext();
+      clickNext();
       expect(await screen.findByText('msg_select_room')).toBeInTheDocument();
-    });
-
-    it('shows msg_valid_dates when guest and room are set but dates are missing', async () => {
-      renderNew();
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
-      fireEvent.click(screen.getByText('Select Guest'));
-      fireEvent.click(screen.getByText('Toggle Room r1'));
-      submitForm();
-      expect(await screen.findByText('msg_valid_dates')).toBeInTheDocument();
-    });
-
-    it('shows msg_valid_dates when checkout date is not after checkin date', async () => {
-      renderNew();
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
-      fireEvent.click(screen.getByText('Select Guest'));
-      fireEvent.click(screen.getByText('Toggle Room r1'));
-      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-04-05' } });
-      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-04-01' } });
-      submitForm();
-      expect(await screen.findByText('msg_valid_dates')).toBeInTheDocument();
-      expect(reservationService.createReservation).not.toHaveBeenCalled();
-    });
-
-    it('clears the selected guest via onClearGuest', async () => {
-      renderNew();
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
-      fireEvent.click(screen.getByText('Select Guest'));
-      expect(await screen.findByText('Mario Rossi')).toBeInTheDocument();
-      fireEvent.click(screen.getByText('Clear Guest'));
-      expect(await screen.findByText('No Guest')).toBeInTheDocument();
+      expect(stepHeading('reservation_step_rooms')).toBeInTheDocument();
     });
 
     it('shows reservation_overlap_error when the chosen room overlaps an existing booking', async () => {
@@ -367,14 +411,13 @@ describe('ReservationForm', () => {
         }),
       ]);
       renderNew();
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
-      fireEvent.click(screen.getByText('Select Guest'));
-      fireEvent.click(screen.getByText('Toggle Room r1'));
-      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-03-22' } });
-      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-03-26' } });
-      submitForm();
+      await waitForTitle('new_reservation');
+      fillDates('2026-03-22', '2026-03-26');
+      clickNext();
+      toggleRoom();
+      clickNext();
       expect(await screen.findByText('reservation_overlap_error')).toBeInTheDocument();
-      expect(reservationService.createReservation).not.toHaveBeenCalled();
+      expect(stepHeading('reservation_step_rooms')).toBeInTheDocument();
     });
 
     it('ignores overlap against a CANCELLED reservation on the same room', async () => {
@@ -385,15 +428,128 @@ describe('ReservationForm', () => {
           lineItems: [{ roomId: 'r1', active: true } as never],
         }),
       ]);
-      vi.mocked(reservationService.createReservation).mockResolvedValue(mockReservation());
       renderNew();
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
-      fireEvent.click(screen.getByText('Select Guest'));
-      fireEvent.click(screen.getByText('Toggle Room r1'));
-      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-03-22' } });
-      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-03-26' } });
-      submitForm();
-      await waitFor(() => expect(reservationService.createReservation).toHaveBeenCalledTimes(1));
+      await waitForTitle('new_reservation');
+      fillDates('2026-03-22', '2026-03-26');
+      clickNext();
+      toggleRoom();
+      clickNext();
+      expect(stepHeading('reservation_step_guest')).toBeInTheDocument();
+    });
+
+    it('does not advance from the guest step without a guest', async () => {
+      renderNew();
+      await waitForTitle('new_reservation');
+      fillDates('2026-04-01', '2026-04-03');
+      clickNext();
+      toggleRoom();
+      clickNext();
+      clickNext();
+      expect(await screen.findByText('msg_select_guest')).toBeInTheDocument();
+      expect(stepHeading('reservation_step_guest')).toBeInTheDocument();
+    });
+
+    it('clears the selected guest via onClearGuest', async () => {
+      renderNew();
+      await waitForTitle('new_reservation');
+      fillDates('2026-04-01', '2026-04-03');
+      clickNext();
+      toggleRoom();
+      clickNext();
+      selectGuest();
+      expect(within(screen.getByTestId('guest-mock')).getByText('Mario Rossi')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('Clear Guest'));
+      expect(await screen.findByText('No Guest')).toBeInTheDocument();
+    });
+
+    it('goes back with Previous and keeps the values already entered', async () => {
+      renderNew();
+      await waitForTitle('new_reservation');
+      fillDates('2026-04-01', '2026-04-03');
+      clickNext();
+      toggleRoom();
+      expect(stepHeading('reservation_step_rooms')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'btn_previous' }));
+      expect(stepHeading('reservation_step_dates')).toBeInTheDocument();
+      clickNext();
+      expect(screen.getByText('Selected: r1')).toBeInTheDocument();
+    });
+
+    it('only lets a new reservation jump to steps it has already reached', async () => {
+      renderNew();
+      await waitForTitle('new_reservation');
+      expect(screen.queryByRole('button', { name: 'reservation_step_summary' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'reservation_step_rooms' })).not.toBeInTheDocument();
+
+      completeNewFlow();
+      fireEvent.click(screen.getByRole('button', { name: 'reservation_step_dates' }));
+      expect(stepHeading('reservation_step_dates')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'reservation_step_summary' })).toBeInTheDocument();
+    });
+
+    it('does not let a new reservation skip validation by jumping forward in the stepper', async () => {
+      renderNew();
+      await waitForTitle('new_reservation');
+      completeNewFlow();
+      fireEvent.click(screen.getByRole('button', { name: 'reservation_step_dates' }));
+      fillDates('2026-04-05', '2026-04-01');
+      fireEvent.click(screen.getByRole('button', { name: 'reservation_step_summary' }));
+
+      expect(await screen.findByText('msg_valid_dates')).toBeInTheDocument();
+      expect(stepHeading('reservation_step_dates')).toBeInTheDocument();
+    });
+
+    it('treats Enter on a non-final step as Next, not as a save', async () => {
+      renderNew();
+      await waitForTitle('new_reservation');
+      fillDates('2026-04-01', '2026-04-03');
+      fireEvent.submit(document.querySelector('form')!);
+
+      expect(stepHeading('reservation_step_rooms')).toBeInTheDocument();
+      expect(reservationService.createReservation).not.toHaveBeenCalled();
+    });
+
+    it('does not steal focus on the first render', async () => {
+      renderNew();
+      await waitForTitle('new_reservation');
+      expect(stepHeading('reservation_step_dates')).not.toHaveFocus();
+    });
+
+    it('moves focus to the new step title', async () => {
+      renderNew();
+      await waitForTitle('new_reservation');
+      fillDates('2026-04-01', '2026-04-03');
+      clickNext();
+      expect(stepHeading('reservation_step_rooms')).toHaveFocus();
+    });
+  });
+
+  describe('summary', () => {
+    it('shows the estimated total when every selected room has a resolved price', async () => {
+      vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue([
+        mockRoom({ id: 'r1', resolvedTotalPrice: 240 }),
+      ]);
+      renderNew();
+      await waitForTitle('new_reservation');
+      fillDates('2026-04-01', '2026-04-03');
+      clickNext();
+      toggleRoom();
+
+      expect(await screen.findByText('summary_estimated_total')).toBeInTheDocument();
+      expect(screen.getByText('summary_price_note')).toBeInTheDocument();
+      expect(screen.getAllByText(/240/).length).toBeGreaterThan(0);
+    });
+
+    it('says the price is calculated on confirmation when a room has no resolved price', async () => {
+      renderNew();
+      await waitForTitle('new_reservation');
+      fillDates('2026-04-01', '2026-04-03');
+      clickNext();
+      toggleRoom();
+
+      expect(await screen.findByText('summary_price_on_confirm')).toBeInTheDocument();
+      expect(screen.queryByText('summary_estimated_total')).not.toBeInTheDocument();
     });
   });
 
@@ -401,12 +557,9 @@ describe('ReservationForm', () => {
     it('creates a reservation and navigates back on success', async () => {
       vi.mocked(reservationService.createReservation).mockResolvedValue(mockReservation());
       renderNew();
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
-      fireEvent.click(screen.getByText('Select Guest'));
-      fireEvent.click(screen.getByText('Toggle Room r1'));
-      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-04-01' } });
-      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-04-03' } });
-      submitForm();
+      await waitForTitle('new_reservation');
+      completeNewFlow();
+      fireEvent.click(screen.getByRole('button', { name: 'confirm_reservation' }));
 
       await waitFor(() => expect(reservationService.createReservation).toHaveBeenCalledWith(
         expect.objectContaining({ guestId: 'g1', checkInDate: '2026-04-01', checkOutDate: '2026-04-03' }),
@@ -414,24 +567,44 @@ describe('ReservationForm', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/reservations');
     });
 
-    it('updates an existing reservation in edit mode', async () => {
+    it('sends only one request when Confirm is clicked twice in a row', async () => {
+      vi.mocked(reservationService.createReservation).mockResolvedValue(mockReservation());
+      renderNew();
+      await waitForTitle('new_reservation');
+      completeNewFlow();
+      const confirm = screen.getByRole('button', { name: 'confirm_reservation' });
+      fireEvent.click(confirm);
+      fireEvent.click(confirm);
+
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/reservations'));
+      expect(reservationService.createReservation).toHaveBeenCalledTimes(1);
+    });
+
+    it('updates an existing reservation from the summary panel in edit mode', async () => {
       vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({ id: 'res123', guestId: 'g1' }));
       vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
       vi.mocked(reservationService.updateReservation).mockResolvedValue(mockReservation());
 
-      render(
-        <MemoryRouter initialEntries={['/reservations/edit/res123']}>
-          <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
-        </MemoryRouter>
-      );
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'edit_reservation' }));
-      fireEvent.click(screen.getByText('Toggle Room r1'));
-      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
-      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
+      renderEdit();
+      await waitForTitle('edit_reservation');
+      fillEditReservation();
       fireEvent.click(screen.getByRole('button', { name: /update_reservation/i }));
 
       await waitFor(() => expect(reservationService.updateReservation).toHaveBeenCalledWith('res123', expect.anything()));
       expect(mockNavigate).toHaveBeenCalledWith('/reservations');
+    });
+
+    it('sends an edit with a missing room back to the rooms step', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({ id: 'res123', guestId: 'g1' }));
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+
+      renderEdit();
+      await waitForTitle('edit_reservation');
+      fireEvent.click(screen.getByRole('button', { name: /update_reservation/i }));
+
+      expect(await screen.findByText('msg_select_room')).toBeInTheDocument();
+      expect(stepHeading('reservation_step_rooms')).toBeInTheDocument();
+      expect(reservationService.updateReservation).not.toHaveBeenCalled();
     });
 
     it('echoes back the version read from the server on update (optimistic-lock check)', async () => {
@@ -441,15 +614,9 @@ describe('ReservationForm', () => {
       vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
       vi.mocked(reservationService.updateReservation).mockResolvedValue(mockReservation());
 
-      render(
-        <MemoryRouter initialEntries={['/reservations/edit/res123']}>
-          <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
-        </MemoryRouter>
-      );
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'edit_reservation' }));
-      fireEvent.click(screen.getByText('Toggle Room r1'));
-      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
-      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
+      renderEdit();
+      await waitForTitle('edit_reservation');
+      fillEditReservation();
       fireEvent.click(screen.getByRole('button', { name: /update_reservation/i }));
 
       await waitFor(() => expect(reservationService.updateReservation).toHaveBeenCalledWith(
@@ -457,81 +624,45 @@ describe('ReservationForm', () => {
       ));
     });
 
-    it('shows a reload/cancel conflict dialog on a stale-version 409, without navigating away', async () => {
-      vi.mocked(reservationService.getReservationById).mockResolvedValue(
-        mockReservation({ id: 'res123', guestId: 'g1', version: 3 }),
-      );
-      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
-      vi.mocked(reservationService.updateReservation).mockRejectedValue({
-        response: { data: { errorCode: 'RESERVATION_STALE_VERSION' } },
+    describe('stale-version conflict', () => {
+      const openConflict = async () => {
+        vi.mocked(reservationService.getReservationById).mockResolvedValue(
+          mockReservation({ id: 'res123', guestId: 'g1', version: 3 }),
+        );
+        vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+        vi.mocked(reservationService.updateReservation).mockRejectedValue({
+          response: { data: { errorCode: 'RESERVATION_STALE_VERSION' } },
+        });
+
+        renderEdit();
+        await waitForTitle('edit_reservation');
+        fillEditReservation();
+        fireEvent.click(screen.getByRole('button', { name: /update_reservation/i }));
+        await screen.findByText('reservation_stale_version_body');
+      };
+
+      it('shows a reload/cancel dialog on a stale-version 409, without navigating away', async () => {
+        await openConflict();
+        expect(mockNavigate).not.toHaveBeenCalled();
       });
 
-      render(
-        <MemoryRouter initialEntries={['/reservations/edit/res123']}>
-          <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
-        </MemoryRouter>
-      );
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'edit_reservation' }));
-      fireEvent.click(screen.getByText('Toggle Room r1'));
-      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
-      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
-      fireEvent.click(screen.getByRole('button', { name: /update_reservation/i }));
+      it('reloads the reservation when Refresh is clicked', async () => {
+        vi.mocked(reservationService.getReservationById)
+          .mockResolvedValueOnce(mockReservation({ id: 'res123', guestId: 'g1', version: 3 }))
+          .mockResolvedValueOnce(mockReservation({ id: 'res123', guestId: 'g1', version: 4, checkInDate: '2026-06-01' }));
+        await openConflict();
 
-      expect(await screen.findByText('reservation_stale_version_body')).toBeInTheDocument();
-      expect(mockNavigate).not.toHaveBeenCalled();
-    });
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'refresh' }));
 
-    it('reloads the reservation when Refresh is clicked on the stale-version conflict dialog', async () => {
-      vi.mocked(reservationService.getReservationById)
-        .mockResolvedValueOnce(mockReservation({ id: 'res123', guestId: 'g1', version: 3 }))
-        .mockResolvedValueOnce(mockReservation({ id: 'res123', guestId: 'g1', version: 4, checkInDate: '2026-06-01' }));
-      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
-      vi.mocked(reservationService.updateReservation).mockRejectedValue({
-        response: { data: { errorCode: 'RESERVATION_STALE_VERSION' } },
+        await waitFor(() => expect(reservationService.getReservationById).toHaveBeenCalledTimes(2));
+        expect(screen.queryByText('reservation_stale_version_body')).not.toBeInTheDocument();
       });
 
-      render(
-        <MemoryRouter initialEntries={['/reservations/edit/res123']}>
-          <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
-        </MemoryRouter>
-      );
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'edit_reservation' }));
-      fireEvent.click(screen.getByText('Toggle Room r1'));
-      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
-      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
-      fireEvent.click(screen.getByRole('button', { name: /update_reservation/i }));
-      await screen.findByText('reservation_stale_version_body');
-
-      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'refresh' }));
-
-      await waitFor(() => expect(reservationService.getReservationById).toHaveBeenCalledTimes(2));
-      expect(screen.queryByText('reservation_stale_version_body')).not.toBeInTheDocument();
-    });
-
-    it('navigates back to the list when Cancel is clicked on the stale-version conflict dialog', async () => {
-      vi.mocked(reservationService.getReservationById).mockResolvedValue(
-        mockReservation({ id: 'res123', guestId: 'g1', version: 3 }),
-      );
-      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
-      vi.mocked(reservationService.updateReservation).mockRejectedValue({
-        response: { data: { errorCode: 'RESERVATION_STALE_VERSION' } },
+      it('navigates back to the list when Cancel is clicked', async () => {
+        await openConflict();
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'cancel' }));
+        expect(mockNavigate).toHaveBeenCalledWith('/reservations');
       });
-
-      render(
-        <MemoryRouter initialEntries={['/reservations/edit/res123']}>
-          <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
-        </MemoryRouter>
-      );
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'edit_reservation' }));
-      fireEvent.click(screen.getByText('Toggle Room r1'));
-      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-05-01' } });
-      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-05-03' } });
-      fireEvent.click(screen.getByRole('button', { name: /update_reservation/i }));
-      await screen.findByText('reservation_stale_version_body');
-
-      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'cancel' }));
-
-      expect(mockNavigate).toHaveBeenCalledWith('/reservations');
     });
 
     it('shows err_guest_not_found when the backend rejects with that error code', async () => {
@@ -539,12 +670,9 @@ describe('ReservationForm', () => {
         response: { data: { errorCode: 'GUEST_NOT_FOUND' } },
       });
       renderNew();
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
-      fireEvent.click(screen.getByText('Select Guest'));
-      fireEvent.click(screen.getByText('Toggle Room r1'));
-      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-04-01' } });
-      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-04-03' } });
-      submitForm();
+      await waitForTitle('new_reservation');
+      completeNewFlow();
+      fireEvent.click(screen.getByRole('button', { name: 'confirm_reservation' }));
 
       expect(await screen.findByText('err_guest_not_found')).toBeInTheDocument();
     });
@@ -552,12 +680,9 @@ describe('ReservationForm', () => {
     it('shows a generic failure message on a non-specific creation error', async () => {
       vi.mocked(reservationService.createReservation).mockRejectedValue({ response: { data: {} } });
       renderNew();
-      await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
-      fireEvent.click(screen.getByText('Select Guest'));
-      fireEvent.click(screen.getByText('Toggle Room r1'));
-      fireEvent.change(screen.getByLabelText('Mock Check-in'), { target: { value: '2026-04-01' } });
-      fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-04-03' } });
-      submitForm();
+      await waitForTitle('new_reservation');
+      completeNewFlow();
+      fireEvent.click(screen.getByRole('button', { name: 'confirm_reservation' }));
 
       expect(await screen.findByText('failed_create_reservation')).toBeInTheDocument();
     });
@@ -576,18 +701,14 @@ describe('ReservationForm', () => {
       }));
       vi.mocked(guestService.getGuestById).mockRejectedValue(new Error('not found'));
 
-      render(
-        <MemoryRouter initialEntries={['/reservations/edit/res123']}>
-          <Routes><Route path="/reservations/edit/:id" element={<ReservationForm />} /></Routes>
-        </MemoryRouter>
-      );
+      renderEdit();
       expect(await screen.findByText(/Fallback Guest/i)).toBeInTheDocument();
     });
   });
 
   it('navigates back to the list when the back button is clicked', async () => {
     renderNew();
-    await waitFor(() => screen.getByRole('heading', { level: 1, name: 'new_reservation' }));
+    await waitForTitle('new_reservation');
     fireEvent.click(screen.getByLabelText('back'));
     expect(mockNavigate).toHaveBeenCalledWith('/reservations');
   });
