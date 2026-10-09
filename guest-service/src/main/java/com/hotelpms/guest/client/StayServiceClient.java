@@ -2,7 +2,9 @@ package com.hotelpms.guest.client;
 
 import com.hotelpms.guest.client.dto.GuestLastStayClientResponse;
 import com.hotelpms.guest.client.dto.StaySummaryClientResponse;
+import com.hotelpms.guest.exception.ExportSourceUnavailableException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import org.slf4j.LoggerFactory;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -54,14 +56,19 @@ public interface StayServiceClient {
     List<StaySummaryClientResponse> getStayHistory(@PathVariable("guestId") UUID guestId);
 
     /**
-     * Fallback: returns an empty list so the export completes with a partial result.
+     * Fail-closed fallback: an empty list would be indistinguishable from "no stays" and
+     * produce a silently incomplete GDPR export, so the export fails instead.
      *
      * @param guestId   the guest UUID
      * @param throwable the cause of the failure
-     * @return empty list
+     * @return never returns normally
+     * @throws ExportSourceUnavailableException always
      */
     default List<StaySummaryClientResponse> stayHistoryFallback(
             final UUID guestId, final Throwable throwable) {
-        return List.of();
+        LoggerFactory.getLogger(StayServiceClient.class).warn(
+                "[StayServiceClient] stay history unavailable for GDPR export guestId={} cause={}: {}",
+                guestId, throwable.getClass().getSimpleName(), throwable.getMessage());
+        throw new ExportSourceUnavailableException("stays", throwable);
     }
 }
