@@ -44,10 +44,13 @@ public final class CallerContext {
     }
 
     /**
-     * @return the authenticated username, or {@code "unknown"} if there is none (for audit logs)
+     * @return the authenticated username with CR/LF replaced (log-injection safe), or
+     *         {@code "unknown"} if there is none; meant for audit logs
      */
     public static String username() {
         final Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return auth == null || auth.getName() == null ? UNKNOWN_USER : auth.getName();
+        return auth == null || auth.getName() == null
+                ? UNKNOWN_USER
+                : auth.getName().replaceAll("[\\r\\n]", "_");
     }
 }

@@ -51,4 +51,12 @@ class CallerContextTest {
 
         assertThat(CallerContext.username()).isEqualTo("recept1");
     }
+
+    @Test
+    void usernameNeverCarriesLineBreaks() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "bob\r\nINFO forged entry", "", List.of()));
+
+        assertThat(CallerContext.username()).doesNotContain("\r").doesNotContain("\n");
+    }
 }
