@@ -208,7 +208,7 @@ describe('GuestDetailSheet', () => {
 
   it('builds a mailto link that cannot add headers through the local part', () => {
     renderSheet({ ...GUEST, email: 'x?cc=a@evil.com&body=hi@test.com' });
-    expect(screen.getByRole('link', { name: /evil\.com/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'x?cc=a@evil.com&body=hi@test.com' })).toHaveAttribute(
       'href',
       'mailto:x%3Fcc%3Da%40evil.com%26body%3Dhi@test.com',
     );
