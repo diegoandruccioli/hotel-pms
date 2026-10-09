@@ -196,6 +196,30 @@ class InvoiceControllerSecurityTest {
     }
 
     @Test
+    void listAllInvoicesReturns403ForReceptionist() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(BASE_URL), USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void listAllInvoicesReturnsOkForAdmin() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(BASE_URL), USER_ADMIN, ROLE_ADMIN, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listAllInvoicesReturnsOkForOwner() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(BASE_URL), USER_OWNER, ROLE_OWNER, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void invoiceSearchRemainsReachableForReceptionist() throws Exception {
+        mockMvc.perform(withAuthHeaders(get(BASE_URL + "/search"), USER_RECEPT, ROLE_RECEPTIONIST, TEST_HOTEL_ID))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void guestInvoiceHistoryReturns403ForReceptionist() throws Exception {
         mockMvc.perform(withAuthHeaders(
                         get(GUEST_HISTORY_URL, GUEST_ID),

@@ -84,11 +84,14 @@ public class InvoiceController {
     }
 
     /**
-     * Retrieves a paginated list of invoices.
+     * Retrieves a paginated list of every invoice of the hotel. Restricted to ADMIN/OWNER:
+     * no screen or service calls it (the Billing page uses {@code /search}, which front desk
+     * needs to register payments), so it only widens the bulk-read surface.
      *
      * @param pageable the pagination parameters
      * @return a page of invoice responses
      */
+    @PreAuthorize(ROLE_ADMIN_OR_OWNER)
     @GetMapping
     public ResponseEntity<Page<InvoiceResponse>> getAllInvoices(
             @PageableDefault(size = DEFAULT_PAGE_SIZE, sort = "issueDate",
