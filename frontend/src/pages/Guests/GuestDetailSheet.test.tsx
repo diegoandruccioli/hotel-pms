@@ -14,7 +14,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) => {
       if (opts && typeof opts === 'object') {
-        for (const name of ['number', 'count']) {
+        for (const name of ['name', 'number', 'count']) {
           if (name in opts) return `${key}:${String(opts[name])}`;
         }
       }
@@ -99,7 +99,7 @@ describe('GuestDetailSheet', () => {
 
   it('shows the name, contacts and fiscal data', async () => {
     renderSheet();
-    expect(screen.getByRole('dialog', { name: 'detail_title' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'detail_title:Mario Rossi' })).toBeInTheDocument();
     expect(screen.getByText('Mario Rossi')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'mario@test.com' })).toHaveAttribute('href', 'mailto:mario@test.com');
     expect(screen.getByRole('link', { name: '+39 333 1234567' })).toHaveAttribute('href', 'tel:+393331234567');
@@ -107,6 +107,13 @@ describe('GuestDetailSheet', () => {
     expect(screen.getByText(/40100 Bologna \(BO\)/)).toBeInTheDocument();
     expect(screen.getByText('RSSMRA80E17A944X')).toBeInTheDocument();
     await waitFor(() => expect(stayService.getGuestStayHistory).toHaveBeenCalledWith('g-1'));
+  });
+
+  it('names the sheet after the guest so a screen reader announces which record is open', () => {
+    renderSheet({ ...GUEST, firstName: 'Anna', lastName: 'Bianchi' });
+
+    expect(screen.getByRole('dialog', { name: 'detail_title:Anna Bianchi' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'detail_title:Anna Bianchi' })).toBeInTheDocument();
   });
 
   it('omits contacts and fiscal rows the guest does not have', () => {

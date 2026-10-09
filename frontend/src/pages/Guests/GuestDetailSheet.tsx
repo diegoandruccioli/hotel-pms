@@ -78,7 +78,7 @@ export const GuestDetailSheet = ({ guest, onClose, onEdit }: GuestDetailSheetPro
   return (
     <M3SideSheet
       open
-      title={t('detail_title')}
+      title={t('detail_title', { name: fullName })}
       onClose={onClose}
       footer={
         <div className="flex justify-end">

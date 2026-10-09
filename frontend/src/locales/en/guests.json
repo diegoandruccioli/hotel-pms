@@ -27,7 +27,7 @@
   "heading_create_guest": "Create New Primary Guest",
   "btn_save_guest": "Save Guest",
   "no_guests_search": "No guests found. Try creating a new one.",
-  "detail_title": "Guest detail",
+  "detail_title": "Guest detail — {{name}}",
   "section_contacts": "Contacts",
   "section_documents": "Documents",
   "section_stay_history": "Stay history",

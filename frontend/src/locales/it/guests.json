@@ -27,7 +27,7 @@
   "heading_create_guest": "Crea Nuovo Ospite Principale",
   "btn_save_guest": "Salva Ospite",
   "no_guests_search": "Nessun ospite trovato. Prova a crearne uno nuovo.",
-  "detail_title": "Dettaglio ospite",
+  "detail_title": "Dettaglio ospite — {{name}}",
   "section_contacts": "Contatti",
   "section_documents": "Documenti",
   "section_stay_history": "Storico soggiorni",
