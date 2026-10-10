@@ -38,8 +38,14 @@ const MemberRow = memo(({ member, room }: MemberRowProps) => {
         <span className="font-medium">{room?.roomNumber ?? '—'}</span>
         {room?.roomType?.name && <span className="block text-xs text-on-surface-variant">{room.roomType.name}</span>}
       </M3TableCell>
-      <M3TableCell>{member.guestFullName}</M3TableCell>
-      <M3TableCell>{member.expectedGuests}</M3TableCell>
+      <M3TableCell>
+        {member.guestFullName}
+        <span className="flex items-center gap-1 text-xs text-on-surface-variant">
+          <MaterialIcon name="group" size={14} />
+          <span className="sr-only">{t('label_expected_guests')}: </span>
+          {member.expectedGuests}
+        </span>
+      </M3TableCell>
       <M3TableCell>
         <div className="flex flex-wrap gap-1">
           <M3StatusChip
@@ -54,7 +60,7 @@ const MemberRow = memo(({ member, room }: MemberRowProps) => {
       </M3TableCell>
       <M3TableCell>{formatCurrency(member.price)}</M3TableCell>
       <M3TableCell>
-        <div className="flex min-w-40 flex-wrap justify-end gap-x-4 gap-y-1">
+        <div className="flex justify-end gap-x-3 whitespace-nowrap">
           {member.status === 'CONFIRMED' && member.roomId !== null && <M3TableActionLink onClick={handleCheckIn}>{t('check_in')}</M3TableActionLink>}
           <M3TableActionLink onClick={handleView}>{t('view')}</M3TableActionLink>
           <M3TableActionLink onClick={handleEdit}>{t('edit')}</M3TableActionLink>
@@ -71,7 +77,7 @@ export const RoomingListCard = memo(({ members, rooms }: RoomingListCardProps) =
   const roomsById = useMemo(() => new Map((rooms ?? []).map((r) => [r.id, r])), [rooms]);
   const { ready, total } = useMemo(() => summarizeRoomingList(members), [members]);
   const headers = useMemo(
-    () => [t('label_room'), t('guest'), t('label_expected_guests'), t('status'),
+    () => [t('label_room'), t('guest'), t('status'),
       t('billed_to_master_folio'), t('amount'), t('actions')],
     [t],
   );
