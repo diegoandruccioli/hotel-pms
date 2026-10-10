@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { mockAuthMe, mockDaySheet, mockOwnerSummary, mockTodayArrivals, mockDueOutStays } from './fixtures/mockApi';
+import { mockUnhandledApi, mockServerEvents, mockAuthMe, mockDaySheet, mockOwnerSummary, mockTodayArrivals, mockDueOutStays } from './fixtures/mockApi';
 
 test.describe('Sidebar', () => {
   test.beforeEach(async ({ page }) => {
+    await mockUnhandledApi(page);
+    await mockServerEvents(page);
     await mockAuthMe(page);
     await mockDaySheet(page);
     await mockOwnerSummary(page);

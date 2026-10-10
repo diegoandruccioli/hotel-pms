@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const MOCK_USER = { username: 'admin', role: 'ADMIN', sub: 'admin', mustChangePassword: false };
+import { mockAuthMe, mockCityTaxStatus, mockServerEvents, mockUnhandledApi } from './fixtures/mockApi';
 
 const MOCK_ROOMS = [
   { id: 'room-001', roomNumber: '101', status: 'CLEAN', roomType: { name: 'Standard', basePrice: 80 } },
@@ -35,9 +34,10 @@ const MOCK_STATI = [
 
 test.describe('Walk-in Check-in', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/v1/auth/me', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER) }),
-    );
+    await mockUnhandledApi(page);
+    await mockAuthMe(page);
+    await mockServerEvents(page);
+    await mockCityTaxStatus(page);
     // Use pathname-based matcher so query params (?page=0&size=20&sort=...) are ignored.
     await page.route((url) => url.pathname === '/api/v1/stays', async (route) => {
       if (route.request().method() === 'POST') {
