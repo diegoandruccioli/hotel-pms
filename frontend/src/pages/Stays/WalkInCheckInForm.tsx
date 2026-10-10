@@ -73,6 +73,7 @@ export function WalkInCheckInForm() {
   // Bumped on every submit so a repeated identical error still remounts (re-announces) and re-scrolls.
   const [submitAttempt, setSubmitAttempt] = useState(0);
   const errorRef = useRef<HTMLDivElement>(null);
+  const lastGuestIdRef = useRef<string | null>(null);
   const [roomsLoading, setRoomsLoading] = useState(true);
 
   // Alloggiati lookup tables
@@ -120,6 +121,7 @@ export function WalkInCheckInForm() {
     const query = e.target.value;
     setGuestQuery(query);
     setSelectedGuest(null);
+    setPrefillFields([]);
     if (guestSearchDebounceRef.current !== null) clearTimeout(guestSearchDebounceRef.current);
     if (query.trim().length < 2) {
       setGuestResults([]);
@@ -139,18 +141,20 @@ export function WalkInCheckInForm() {
     setSelectedGuest(guest);
     setGuestQuery(`${guest.firstName} ${guest.lastName}`);
     setGuestResults([]);
-    // Pre-fill the first guest section with the selected guest's name and primary document. The
-    // previous guest's prefilled document is cleared first: it belongs to someone else.
+    // Pre-fill the first guest section with the selected guest's name and primary document. A
+    // different guest than before clears the document block first: it belonged to someone else.
     const { updates, filled } = profileDocumentPrefill(guest);
+    const changed = lastGuestIdRef.current !== guest.id;
+    lastGuestIdRef.current = guest.id;
     setGuests(prev => [{
       ...prev[0],
-      ...(prefillFields.length > 0 ? { documentType: '', documentNumber: '', documentExpiryDate: undefined } : {}),
+      ...(changed ? { documentType: '', documentNumber: '', documentPlaceOfIssue: '', documentExpiryDate: undefined } : {}),
       firstName: guest.firstName,
       lastName: guest.lastName,
       ...updates,
     }, ...prev.slice(1)]);
     setPrefillFields(filled);
-  }, [prefillFields]);
+  }, []);
 
   const handleCheckoutChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setExpectedCheckOutDate(e.target.value);
