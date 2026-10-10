@@ -25,6 +25,14 @@ interface ChecklistInput {
   checkOutDate?: string;
 }
 
+const guestName = (g: IdentifiableGuest): string => `${g.firstName} ${g.lastName}`.trim();
+
+const guestTitle = (g: IdentifiableGuest, index: number): Pick<ChecklistItem, 'titleKey' | 'titleParams'> => {
+  const name = guestName(g);
+  if (!name) return { titleKey: 'checklist_guest_unnamed', titleParams: { number: index + 1 } };
+  return { titleKey: g.isPrimaryGuest ? 'checklist_guest_primary' : 'checklist_guest', titleParams: { name } };
+};
+
 const cityTaxItem = (reason: ChecklistInput['cityTaxWarning']): ChecklistItem => {
   const base = { id: 'city-tax', titleKey: 'checklist_city_tax' };
   if (reason === undefined) return { ...base, tone: 'pending', detailKey: 'checklist_city_tax_unknown' };
@@ -32,9 +40,6 @@ const cityTaxItem = (reason: ChecklistInput['cityTaxWarning']): ChecklistItem =>
   if (reason === 'NOT_APPLICABLE') return { ...base, tone: 'ok', detailKey: 'checklist_city_tax_not_applicable' };
   return { ...base, tone: 'warn', detailKey: 'checklist_city_tax_not_configured' };
 };
-
-const guestName = (g: IdentifiableGuest, index: number): string =>
-  `${g.firstName} ${g.lastName}`.trim() || `#${index + 1}`;
 
 /**
  * Check-in readiness list: one entry per guest (complete / N fields missing), document-validity
@@ -57,8 +62,7 @@ export const buildCheckInChecklist = ({ guests, cityTaxWarning, checkOutDate }: 
     items.push({
       id: `guest-${index}`,
       tone: missing > 0 || expired ? 'warn' : 'ok',
-      titleKey: g.isPrimaryGuest ? 'checklist_guest_primary' : 'checklist_guest',
-      titleParams: { name: guestName(g, index) },
+      ...guestTitle(g, index),
       detailKey: missing > 0 ? 'checklist_status_missing' : expired ? 'checklist_doc_expired_short' : 'checklist_status_complete',
       detailParams: missing > 0 ? { count: missing } : undefined,
     });
@@ -75,7 +79,7 @@ export const buildCheckInChecklist = ({ guests, cityTaxWarning, checkOutDate }: 
       id: `doc-${index}`,
       tone: 'warn',
       titleKey: 'checklist_document',
-      titleParams: { name: guestName(g, index) },
+      titleParams: { name: guestName(g) || `#${index + 1}` },
       detailKey: expired ? 'checklist_doc_expired' : 'checklist_doc_expires_in_stay',
       detailParams: { date: expiry },
       dateParam: 'date',

@@ -95,8 +95,8 @@ export const GuestFieldSection = memo(({
 
   return (
     <M3Card variant="solid" className="p-6">
-      <div className="flex justify-between items-center gap-3 mb-6">
-        <h2 className="text-xl font-display font-medium text-on-surface flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-6">
+        <h2 className="text-xl font-display font-medium text-on-surface flex items-center gap-2 whitespace-nowrap">
           <MaterialIcon name="person" className="text-primary" />
           {t('guest_number', { number: index + 1 })}
           {guest.isPrimaryGuest && (
@@ -109,13 +109,14 @@ export const GuestFieldSection = memo(({
           <M3StatusChip
             tone={missingCount > 0 || expired ? 'warning' : 'success'}
             icon={missingCount > 0 || expired ? 'warning' : 'check_circle'}
+            className="whitespace-nowrap"
             label={missingCount > 0
               ? t('checklist_status_missing', { count: missingCount })
               : expired ? t('checklist_doc_expired_short') : t('checklist_status_complete')}
           />
         )}
         {canRemove && (
-          <M3Button variant="text" icon="close" onClick={handleRemove} type="button">
+          <M3Button variant="text" icon="close" onClick={handleRemove} type="button" className="ml-auto">
             {t('btn_remove')}
           </M3Button>
         )}

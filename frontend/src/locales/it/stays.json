@@ -109,6 +109,7 @@
   "checklist_tone_pending": "In attesa",
   "checklist_guest_primary": "Ospite principale: {{name}}",
   "checklist_guest": "Ospite: {{name}}",
+  "checklist_guest_unnamed": "Ospite {{number}}",
   "checklist_no_primary": "Nessun ospite principale",
   "checklist_status_complete": "Completo",
   "checklist_status_missing_one": "Manca {{count}} campo",

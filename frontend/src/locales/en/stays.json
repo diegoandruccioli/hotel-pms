@@ -109,6 +109,7 @@
   "checklist_tone_pending": "Pending",
   "checklist_guest_primary": "Primary guest: {{name}}",
   "checklist_guest": "Guest: {{name}}",
+  "checklist_guest_unnamed": "Guest {{number}}",
   "checklist_no_primary": "No primary guest",
   "checklist_status_complete": "Complete",
   "checklist_status_missing_one": "{{count}} field missing",

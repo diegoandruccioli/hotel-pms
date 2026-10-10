@@ -257,7 +257,7 @@ export const CheckInForm = memo(() => {
 
   // The error banner sits above a long form; bring it into view when submit is blocked.
   useEffect(() => {
-    if (error) errorRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    if (error) errorRef.current?.scrollIntoView?.({ block: 'center' });
   }, [error, submitAttempt]);
 
   return (
