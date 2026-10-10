@@ -6,10 +6,13 @@ import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { M3Checkbox } from '../../components/m3';
+import { M3StatusChip } from '../../components/m3';
 import type { AlloggiatiStato, AlloggiatiTipdoc, TravellerType } from '../../types';
 import {
   TYPES_WITHOUT_DOC,
   CODICE_ITALIA,
+  getGuestMissingFields,
+  hasExpiredDocument,
 } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
 import { StatoSelect } from './StatoSelect';
@@ -26,15 +29,19 @@ export interface GuestFieldSectionProps {
   tipdoc: AlloggiatiTipdoc[];
   onRemove: (idx: number) => void;
   onChange: (idx: number, patch: Partial<IdentifiableGuest>) => void;
+  /** Check-in flows only: completeness chip and document-expiry field. */
+  showReadiness?: boolean;
 }
 
 export const GuestFieldSection = memo(({
-  guest, index, canRemove, stati, tipdoc, onRemove, onChange,
+  guest, index, canRemove, stati, tipdoc, onRemove, onChange, showReadiness = false,
 }: GuestFieldSectionProps) => {
   const { t } = useTranslation('stays');
   const hasDoc = !TYPES_WITHOUT_DOC.includes(guest.travellerType as TravellerType);
   const isItalianBorn = guest._statoDiNascita === CODICE_ITALIA;
   const isItalianDocIssue = guest._statoRilascioDoc === CODICE_ITALIA;
+  const missingCount = showReadiness ? getGuestMissingFields(guest).length : 0;
+  const expired = showReadiness && hasExpiredDocument(guest);
 
   const handleSimpleChange = useCallback((e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     onChange(index, { [e.target.name]: e.target.value } as Partial<IdentifiableGuest>);
@@ -43,7 +50,7 @@ export const GuestFieldSection = memo(({
   const handleTravellerTypeChange = useCallback((e: ChangeEvent<HTMLSelectElement>) => {
     const type = e.target.value as TravellerType;
     if (TYPES_WITHOUT_DOC.includes(type)) {
-      onChange(index, { travellerType: type, documentType: '', documentNumber: '', documentPlaceOfIssue: '' });
+      onChange(index, { travellerType: type, documentType: '', documentNumber: '', documentPlaceOfIssue: '', documentExpiryDate: '' });
     } else {
       onChange(index, { travellerType: type });
     }
@@ -88,7 +95,7 @@ export const GuestFieldSection = memo(({
 
   return (
     <M3Card variant="solid" className="p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center gap-3 mb-6">
         <h2 className="text-xl font-display font-medium text-on-surface flex items-center gap-2">
           <MaterialIcon name="person" className="text-primary" />
           {t('guest_number', { number: index + 1 })}
@@ -98,6 +105,15 @@ export const GuestFieldSection = memo(({
             </span>
           )}
         </h2>
+        {showReadiness && (
+          <M3StatusChip
+            tone={missingCount > 0 || expired ? 'warning' : 'success'}
+            icon={missingCount > 0 || expired ? 'warning' : 'check_circle'}
+            label={missingCount > 0
+              ? t('checklist_status_missing', { count: missingCount })
+              : expired ? t('checklist_doc_expired_short') : t('checklist_status_complete')}
+          />
+        )}
         {canRemove && (
           <M3Button variant="text" icon="close" onClick={handleRemove} type="button">
             {t('btn_remove')}
@@ -220,6 +236,10 @@ export const GuestFieldSection = memo(({
             </div>
 
             <M3TextField label={t('label_doc_number')} name="documentNumber" value={guest.documentNumber ?? ''} onChange={handleSimpleChange} required />
+
+            {showReadiness && (
+              <M3TextField label={t('label_doc_expiry')} name="documentExpiryDate" type="date" value={guest.documentExpiryDate ?? ''} onChange={handleSimpleChange} />
+            )}
 
             <StatoSelect
               id={`stato-rilascio-${index}`}

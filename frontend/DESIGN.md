@@ -414,6 +414,10 @@ historical baseline pointer).
   never removed, never an `outline-hidden` without a visible `ring-*` replacement
   (Tailwind v4 renamed `outline-none` → `outline-hidden`; the old name now means
   "no outline ever, including forced-colors mode" — don't use it by accident).
+- Status is never conveyed by color alone: a readiness list (e.g. the check-in checklist,
+  `pages/Stays/CheckInChecklist.tsx`) pairs each tone with an icon *and* a visually hidden
+  text ("Complete" / "Needs attention" / "Pending"), and announces overall progress through a
+  `role="status"` line.
 
 **Dedicated WCAG AAA high-contrast mode.** Beyond the AAA-level baseline above, the
 project ships a *separate, distinct* high-contrast theme —

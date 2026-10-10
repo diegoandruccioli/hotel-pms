@@ -1,7 +1,9 @@
-import { useState, useCallback, memo, useEffect } from 'react';
+import { useState, useCallback, memo, useEffect, useMemo, useRef } from 'react';
 import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { useFormatters } from '../../hooks/useFormatters';
 import { Alert } from '../../components/Alert';
 import { M3LoadingState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
@@ -18,6 +20,8 @@ import type {
   StayRequest,
   TravellerType,
 } from '../../types';
+import { CheckInChecklist } from './CheckInChecklist';
+import { buildCheckInChecklist } from './checkInReadiness';
 import { GuestFieldSection } from './GuestFieldSection';
 import {
   emptyGuest,
@@ -43,6 +47,10 @@ export const CheckInForm = memo(() => {
   const { reservationId } = useParams<{ reservationId: string }>();
   const location = useLocation();
   const state = location.state as CheckInState | null;
+  const { formatDate } = useFormatters();
+  const errorRef = useRef<HTMLDivElement>(null);
+  // Bumped on every submit so a repeated identical error still remounts (re-announces) and re-scrolls.
+  const [submitAttempt, setSubmitAttempt] = useState(0);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +61,8 @@ export const CheckInForm = memo(() => {
   // Pre-flight check (Parte 5.3): tells the operator before submitting that the
   // tourist tax won't actually be charged, instead of only discovering it later on
   // the monthly comune declaration. Never blocks the check-in itself.
-  const [cityTaxWarning, setCityTaxWarning] = useState<CityTaxUnassessedReason | null>(null);
+  // `undefined` until the check resolves, so the checklist can tell "not checked yet" from "configured".
+  const [cityTaxWarning, setCityTaxWarning] = useState<CityTaxUnassessedReason | null | undefined>(undefined);
 
   useEffect(() => {
     stayService.getCityTaxConfigurationStatus()
@@ -69,15 +78,22 @@ export const CheckInForm = memo(() => {
   const [contextLoading, setContextLoading] = useState(!state && !!reservationId);
   const effectiveState = state ?? fallbackState;
 
+  // The reservation is also what feeds the header subtitle and the document-expiry check, so it is
+  // fetched even when location.state already carries the check-in context.
+  const [reservationDates, setReservationDates] = useState<{ checkIn: string; checkOut: string; guests: number } | null>(null);
+
   useEffect(() => {
-    if (state || !reservationId) return; // location.state present, or no id to look up
+    if (!reservationId) return; // no id to look up
     let cancelled = false;
-    setContextLoading(true);
+    if (!state) setContextLoading(true);
     reservationService.getReservationById(reservationId)
       .then((r) => {
         if (cancelled) return;
+        if (typeof r.checkInDate === 'string' && typeof r.checkOutDate === 'string') {
+          setReservationDates({ checkIn: r.checkInDate, checkOut: r.checkOutDate, guests: r.expectedGuests });
+        }
         const roomId = r.lineItems[0]?.roomId;
-        if (roomId) {
+        if (!state && roomId) {
           setFallbackState({ guestId: r.guestId, roomId, expectedGuests: r.expectedGuests });
         }
       })
@@ -138,6 +154,7 @@ export const CheckInForm = memo(() => {
         const tipdoc = doc?.documentType ? mapDocType(doc.documentType) : '';
         if (!updates.documentType   && tipdoc)              { updates.documentType   = tipdoc;                       filled.push('documentType'); }
         if (!updates.documentNumber && doc?.documentNumber) { updates.documentNumber = doc.documentNumber;           filled.push('documentNumber'); }
+        if (!updates.documentExpiryDate && tipdoc && doc?.expiryDate) { updates.documentExpiryDate = doc.expiryDate; filled.push('documentExpiryDate'); }
       }
 
       if (Object.keys(updates).length === 0) return;
@@ -165,6 +182,7 @@ export const CheckInForm = memo(() => {
   const handleSubmit = useCallback(async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSubmitAttempt((n) => n + 1);
 
     if (!reservationId || !effectiveState?.roomId || !effectiveState?.guestId) {
       setError(t('err_missing_context'));
@@ -221,9 +239,30 @@ export const CheckInForm = memo(() => {
     }
   }, [reservationId, effectiveState, guests, navigate, t, addToast]);
 
+  const checklist = useMemo(
+    () => buildCheckInChecklist({ guests, cityTaxWarning, checkOutDate: reservationDates?.checkOut }),
+    [guests, cityTaxWarning, reservationDates],
+  );
+
+  const subtitle = reservationDates
+    ? t('checkin_subtitle', {
+      checkIn: formatDate(reservationDates.checkIn),
+      checkOut: formatDate(reservationDates.checkOut),
+      nights: t('checkin_nights', {
+        count: differenceInCalendarDays(parseISO(reservationDates.checkOut), parseISO(reservationDates.checkIn)),
+      }),
+      guests: t('checkin_guests', { count: reservationDates.guests }),
+    })
+    : undefined;
+
+  // The error banner sits above a long form; bring it into view when submit is blocked.
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  }, [error, submitAttempt]);
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <PageHeader title={t('checkin_title')} onBack={handleBack} />
+    <div className="max-w-6xl mx-auto space-y-6">
+      <PageHeader title={t('checkin_title')} subtitle={subtitle} onBack={handleBack} />
 
       {prefillFields.length > 0 && (
         <Alert tone="warning" icon="auto_fix_high">
@@ -240,12 +279,15 @@ export const CheckInForm = memo(() => {
       )}
 
       {error && (
-        <Alert tone="error">{error}</Alert>
+        <div ref={errorRef} key={submitAttempt}>
+          <Alert tone="error">{error}</Alert>
+        </div>
       )}
 
       {contextLoading ? (
         <M3LoadingState label={t('common:loading')} plain className="h-auto py-12" />
       ) : (
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
       <form onSubmit={handleSubmit} noValidate className="space-y-6">
         {guests.map((guest, index) => (
           <GuestFieldSection
@@ -257,6 +299,7 @@ export const CheckInForm = memo(() => {
             tipdoc={tipdoc}
             onRemove={removeGuest}
             onChange={handleGuestChange}
+            showReadiness
           />
         ))}
 
@@ -269,6 +312,10 @@ export const CheckInForm = memo(() => {
           </M3Button>
         </div>
       </form>
+      <aside aria-label={t('checklist_title')} className="lg:sticky lg:top-6">
+        <CheckInChecklist items={checklist} />
+      </aside>
+      </div>
       )}
     </div>
   );

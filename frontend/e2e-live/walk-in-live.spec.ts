@@ -65,6 +65,10 @@ test.describe('Walk-in check-in against the real backend (Fase 7 / item 20)', ()
         // backend. Filling it here so this spec tests the invoice/charge flow
         // it's actually meant to test, not re-prove the validation gap.
         await page.locator('input[name="dateOfBirth"]').first().fill('1990-01-01');
+        // validateAlloggiatiGuests also requires gender and citizenship.
+        await page.locator('#gender-0').selectOption({ value: '1' });
+        await page.locator('#citizenship-0').fill('FRANC');
+        await page.getByRole('option', { name: /FRANCIA/i }).last().click();
 
         const [walkInResponse] = await Promise.all([
             page.waitForResponse((r) => r.url().includes('/api/v1/stays') && r.request().method() === 'POST'),

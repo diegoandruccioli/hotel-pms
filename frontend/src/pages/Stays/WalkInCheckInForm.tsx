@@ -298,6 +298,7 @@ export function WalkInCheckInForm() {
               tipdoc={tipdoc}
               onRemove={removeGuest}
               onChange={handleGuestChange}
+              showReadiness
             />
           ))}
           <M3Button type="button" variant="outlined" onClick={addGuest}>
