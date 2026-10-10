@@ -201,6 +201,12 @@ test.describe('Walk-in Check-in', () => {
     await expect(page.getByRole('option', { name: /ESTERO/i })).toBeVisible({ timeout: 3000 });
     await page.getByRole('option', { name: /ESTERO/i }).click();
 
+    // Required identity fields (name is prefilled from the selected guest).
+    await page.locator('#gender-0').selectOption({ value: '1' });
+    await page.locator('input[name="dateOfBirth"]').first().fill('1990-01-01');
+    await page.locator('#citizenship-0').fill('ES');
+    await page.getByRole('option', { name: /ESTERO/i }).click();
+
     // Submit
     await page.getByRole('button', { name: /complete walk-in/i }).click();
     await expect(page).toHaveURL(/\/stays/, { timeout: 5000 });

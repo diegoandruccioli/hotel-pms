@@ -57,9 +57,24 @@ const mockStayResponse = (overrides: Partial<StayResponse> = {}): StayResponse =
   ...overrides,
 });
 
+const baseReservation: ReservationResponse = {
+  id: 'res123',
+  guestId: 'g1',
+  checkInDate: '2999-06-01',
+  checkOutDate: '2999-06-04',
+  status: 'CONFIRMED',
+  expectedGuests: 1,
+  lineItems: [{ id: 'li1', roomId: 'r1', price: 90, active: true, createdAt: '', updatedAt: '' }],
+  active: true,
+  createdAt: '2026-01-01T00:00:00',
+  updatedAt: '2026-01-01T00:00:00',
+  confirmationEmailFailed: false,
+};
+
 describe('CheckInForm', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(reservationService.getReservationById).mockResolvedValue(baseReservation);
     // Lookup tables return empty arrays (non-blocking; form still renders)
     vi.mocked(stayService.getLookupStati).mockResolvedValue([]);
     vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([]);
@@ -125,17 +140,9 @@ describe('CheckInForm', () => {
     // direct navigation, bookmark, or page refresh lost them entirely. Now falls back to
     // fetching the reservation itself.
     const mockReservation = (overrides: Partial<ReservationResponse> = {}): ReservationResponse => ({
-      id: 'res123',
-      guestId: 'g1',
+      ...baseReservation,
       checkInDate: '2026-06-01',
       checkOutDate: '2026-06-02',
-      status: 'CONFIRMED',
-      expectedGuests: 1,
-      lineItems: [{ id: 'li1', roomId: 'r1', price: 90, active: true, createdAt: '', updatedAt: '' }],
-      active: true,
-      createdAt: '2026-01-01T00:00:00',
-      updatedAt: '2026-01-01T00:00:00',
-      confirmationEmailFailed: false,
       ...overrides,
     });
 
@@ -345,7 +352,11 @@ describe('CheckInForm', () => {
 
       // Switch the primary guest to FAMILIARE so no document is required, simplifying the path to submit.
       fireEvent.change(screen.getByLabelText(/^label_guest_type/, { selector: 'select' }), { target: { value: 'FAMILIARE' } });
+      fireEvent.change(screen.getByLabelText('label_first_name'), { target: { value: 'Mario' } });
+      fireEvent.change(screen.getByLabelText('label_last_name'), { target: { value: 'Rossi' } });
+      fireEvent.change(screen.getByLabelText(/^label_gender/, { selector: 'select' }), { target: { value: '1' } });
       fireEvent.change(screen.getByLabelText('label_date_of_birth'), { target: { value: '1990-01-01' } });
+      await selectStato('label_citizenship', 'FRANCIA');
       await selectStato('label_stato_nascita', 'FRANCIA');
 
       fireEvent.submit(container.querySelector('form')!);
@@ -353,6 +364,75 @@ describe('CheckInForm', () => {
       await waitFor(() => {
         expect(screen.getByText('ROOM_ALREADY_OCCUPIED')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('strict submit and checklist', () => {
+    // The mocked translator returns bare keys, so these assert on keys, not interpolated values.
+    async function selectStato(label: string, statoLabel: string) {
+      const combo = screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' });
+      fireEvent.change(combo, { target: { value: statoLabel.slice(0, 3) } });
+      fireEvent.mouseDown(await screen.findByRole('option', { name: new RegExp(statoLabel) }));
+    }
+
+    it('blocks submit with the required-fields error once the place data is filled', async () => {
+      vi.mocked(stayService.getLookupStati).mockResolvedValue([FRANCIA_STATO]);
+      const { container } = renderComponent(1);
+      await waitFor(() => expect(screen.getByText('checkin_title')).toBeInTheDocument());
+
+      fireEvent.change(screen.getByLabelText(/^label_guest_type/, { selector: 'select' }), { target: { value: 'FAMILIARE' } });
+      fireEvent.change(screen.getByLabelText('label_date_of_birth'), { target: { value: '1990-01-01' } });
+      await selectStato('label_stato_nascita', 'FRANCIA');
+      fireEvent.submit(container.querySelector('form')!);
+
+      expect(await screen.findByText('err_guest_fields_required')).toBeInTheDocument();
+      expect(stayService.createStay).not.toHaveBeenCalled();
+    });
+
+    it('shows the checklist and flips the guest to complete once every field is filled', async () => {
+      vi.mocked(stayService.getLookupStati).mockResolvedValue([FRANCIA_STATO]);
+      renderComponent(1);
+      await waitFor(() => expect(screen.getByText('checklist_title', { selector: 'h2' })).toBeInTheDocument());
+
+      // header chip + checklist detail
+      expect(screen.getAllByText('checklist_status_missing')).toHaveLength(2);
+      expect(screen.getByText('checklist_progress')).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText(/^label_guest_type/, { selector: 'select' }), { target: { value: 'FAMILIARE' } });
+      fireEvent.change(screen.getByLabelText('label_first_name'), { target: { value: 'Mario' } });
+      fireEvent.change(screen.getByLabelText('label_last_name'), { target: { value: 'Rossi' } });
+      fireEvent.change(screen.getByLabelText(/^label_gender/, { selector: 'select' }), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText('label_date_of_birth'), { target: { value: '1990-01-01' } });
+      await selectStato('label_citizenship', 'FRANCIA');
+      await selectStato('label_stato_nascita', 'FRANCIA');
+
+      await waitFor(() => expect(screen.getAllByText('checklist_status_complete')).toHaveLength(2));
+      expect(screen.queryByText('checklist_status_missing')).not.toBeInTheDocument();
+    });
+
+    it('shows the reservation dates in the header subtitle', async () => {
+      renderComponent(1);
+      expect(await screen.findByText('checkin_subtitle')).toBeInTheDocument();
+    });
+
+    it('reports the tourist tax as configured once the check resolves', async () => {
+      renderComponent(1);
+      expect(await screen.findByText('checklist_city_tax_configured')).toBeInTheDocument();
+    });
+
+    it('prefills the document expiry from the profile and blocks submit when it has passed', async () => {
+      vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([{ codice: 'CARTE', descrizione: 'CARTA' }]);
+      vi.mocked(guestService.getGuestById).mockResolvedValue({
+        id: 'g1', firstName: 'Anna', lastName: 'Bianchi', createdAt: '', updatedAt: '', active: true,
+        identityDocuments: [{
+          id: 'd', documentType: 'NATIONAL_ID', documentNumber: 'CA1', issueDate: '1990-01-01',
+          expiryDate: '2000-01-01', createdAt: '', updatedAt: '', active: true,
+        }],
+      } as GuestResponseDTO);
+      renderComponent(1);
+
+      await waitFor(() => expect(screen.getByLabelText('label_doc_expiry')).toHaveValue('2000-01-01'));
+      expect(await screen.findByText('checklist_doc_expired')).toBeInTheDocument();
     });
   });
 

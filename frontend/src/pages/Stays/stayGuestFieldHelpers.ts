@@ -6,6 +6,7 @@ import type {
   StayGuestResponse,
   TravellerType,
 } from '../../types';
+import { todayIsoDate } from '../../utils';
 
 export const TYPES_WITHOUT_DOC: TravellerType[] = ['FAMILIARE', 'MEMBRO_GRUPPO'];
 
@@ -25,6 +26,8 @@ export interface IdentifiableGuest extends StayGuestRequest {
   _statoDiNascita: string;
   /** UI-only: stato codice for documentPlaceOfIssue logic */
   _statoRilascioDoc: string;
+  /** UI-only: document expiry (YYYY-MM-DD), prefilled from the guest profile; never sent to the stay API. */
+  documentExpiryDate?: string;
 }
 
 export const emptyGuest = (isPrimary: boolean): IdentifiableGuest => ({
@@ -46,6 +49,61 @@ export const emptyGuest = (isPrimary: boolean): IdentifiableGuest => ({
 });
 
 export type GuestErrorTranslator = (key: string, options?: Record<string, unknown>) => string;
+
+export type GuestField =
+  | 'firstName' | 'lastName' | 'gender' | 'dateOfBirth' | 'citizenship' | 'travellerType'
+  | 'statoNascita' | 'comuneNascita' | 'documentType' | 'documentNumber' | 'statoRilascio' | 'comuneRilascio';
+
+/** i18n key (stays namespace) of each field's form label. */
+const GUEST_FIELD_LABEL_KEYS: Record<GuestField, string> = {
+  firstName: 'label_first_name',
+  lastName: 'label_last_name',
+  gender: 'label_gender',
+  dateOfBirth: 'label_date_of_birth',
+  citizenship: 'label_citizenship',
+  travellerType: 'label_guest_type',
+  statoNascita: 'label_stato_nascita',
+  comuneNascita: 'label_comune_nascita',
+  documentType: 'label_doc_type',
+  documentNumber: 'label_doc_number',
+  statoRilascio: 'label_stato_rilascio_doc',
+  comuneRilascio: 'label_comune_rilascio_doc',
+};
+
+/** Fields already reported by their own, more specific message in {@link alloggiatiPlaceIssues}. */
+const FIELDS_WITH_OWN_MESSAGE: GuestField[] = [
+  'dateOfBirth', 'statoNascita', 'comuneNascita', 'statoRilascio', 'comuneRilascio',
+];
+
+/**
+ * Every required field still empty for a guest, in form order. Single source of truth for the
+ * check-in checklist and the submit validation: a guest has every field when this is empty (an expired document is a separate, `hasExpiredDocument` check).
+ */
+export const getGuestMissingFields = (g: IdentifiableGuest): GuestField[] => {
+  const hasDoc = !TYPES_WITHOUT_DOC.includes(g.travellerType as TravellerType);
+  const missing: GuestField[] = [];
+  if (!g.firstName) missing.push('firstName');
+  if (!g.lastName) missing.push('lastName');
+  if (!g.gender) missing.push('gender');
+  if (!g.dateOfBirth) missing.push('dateOfBirth');
+  if (!g.citizenship) missing.push('citizenship');
+  if (!g.travellerType) missing.push('travellerType');
+  if (!g._statoDiNascita) missing.push('statoNascita');
+  if (g._statoDiNascita === CODICE_ITALIA && !g.placeOfBirth) missing.push('comuneNascita');
+  if (hasDoc) {
+    if (!g.documentType) missing.push('documentType');
+    if (!g.documentNumber) missing.push('documentNumber');
+    if (!g._statoRilascioDoc) missing.push('statoRilascio');
+    if (g._statoRilascioDoc === CODICE_ITALIA && !g.documentPlaceOfIssue) missing.push('comuneRilascio');
+  }
+  return missing;
+};
+
+/** True when the guest carries a document whose expiry date is set and already past. */
+export const hasExpiredDocument = (g: IdentifiableGuest): boolean =>
+  !TYPES_WITHOUT_DOC.includes(g.travellerType as TravellerType)
+  && !!g.documentExpiryDate
+  && g.documentExpiryDate < todayIsoDate();
 
 /**
  * Alloggiati Web stato/comune-di-nascita and stato/comune-di-rilascio-documento
@@ -111,6 +169,17 @@ const buildAlloggiatiGuestsSchema = (t: GuestErrorTranslator) =>
       alloggiatiPlaceIssues(g, t, idx + 1).forEach((message) => {
         ctx.addIssue({ code: 'custom', path: [idx], message });
       });
+
+      // After the specific place messages, so a guest with several gaps still reports
+      // the same first error as before; this only adds the plain required fields.
+      const missing = getGuestMissingFields(g).filter((f) => !FIELDS_WITH_OWN_MESSAGE.includes(f));
+      if (missing.length > 0) {
+        const fields = missing.map((f) => t(GUEST_FIELD_LABEL_KEYS[f])).join(', ');
+        ctx.addIssue({ code: 'custom', path: [idx], message: t('err_guest_fields_required', { number: idx + 1, fields }) });
+      }
+      if (hasExpiredDocument(g)) {
+        ctx.addIssue({ code: 'custom', path: [idx], message: t('err_document_expired', { number: idx + 1 }) });
+      }
     });
   });
 
