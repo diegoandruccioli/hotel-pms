@@ -145,6 +145,39 @@ test.describe('Walk-in Check-in', () => {
     await expect(page).toHaveURL(/\/stays\/walk-in/);
   });
 
+  test('checklist tracks room, guest and departure as they are chosen', async ({ page }) => {
+    await page.route('**/api/v1/rooms**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ content: MOCK_ROOMS, totalElements: MOCK_ROOMS.length, totalPages: 1, number: 0, size: 200 }),
+      }),
+    );
+    await page.route('**/api/v1/guests**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ content: [MOCK_GUEST], totalElements: 1, totalPages: 1, number: 0, size: 20 }),
+      }),
+    );
+    await page.goto('/stays/walk-in');
+    const checklist = page.getByRole('complementary', { name: /checklist/i });
+    await expect(page.getByLabel(/^Room/)).toBeVisible({ timeout: 10000 });
+    await expect(checklist.getByText('1 of 6 items complete')).toBeVisible();
+
+    await page.getByLabel(/^Room/).selectOption({ value: 'room-001' });
+    await page.getByRole('searchbox').fill('Lucia');
+    await page.getByRole('option', { name: /Lucia Bianchi/i }).click();
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    await page.getByLabel(/Expected Check-out Date/).fill(tomorrow.toISOString().split('T')[0]);
+
+    await expect(checklist.getByText('101 — Standard')).toBeVisible();
+    await expect(checklist.getByText('Lucia Bianchi').first()).toBeVisible();
+    await expect(checklist.getByText(/Check-out on/)).toBeVisible();
+    await expect(checklist.getByText('4 of 6 items complete')).toBeVisible();
+  });
+
   test('completes walk-in and redirects to stays', async ({ page }) => {
     await page.route('**/api/v1/rooms**', (route) =>
       route.fulfill({

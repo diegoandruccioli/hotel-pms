@@ -25,7 +25,7 @@ import { buildCheckInChecklist } from './checkInReadiness';
 import { GuestFieldSection } from './GuestFieldSection';
 import {
   emptyGuest,
-  mapDocType,
+  profileDocumentPrefill,
   TYPES_WITHOUT_DOC,
   validateAlloggiatiGuests,
 } from './stayGuestFieldHelpers';
@@ -147,14 +147,12 @@ export const CheckInForm = memo(() => {
 
       const profile = profileResult.status === 'fulfilled' ? profileResult.value : null;
       if (profile) {
-        const doc = profile.identityDocuments?.[0];
         if (!updates.firstName    && profile.firstName)    { updates.firstName    = profile.firstName;           filled.push('firstName'); }
         if (!updates.lastName     && profile.lastName)     { updates.lastName     = profile.lastName;            filled.push('lastName'); }
-        // Only claim the field as pre-filled when the document maps to an Alloggiati code
-        const tipdoc = doc?.documentType ? mapDocType(doc.documentType) : '';
-        if (!updates.documentType   && tipdoc)              { updates.documentType   = tipdoc;                       filled.push('documentType'); }
-        if (!updates.documentNumber && doc?.documentNumber) { updates.documentNumber = doc.documentNumber;           filled.push('documentNumber'); }
-        if (!updates.documentExpiryDate && tipdoc && doc?.expiryDate) { updates.documentExpiryDate = doc.expiryDate; filled.push('documentExpiryDate'); }
+        // A previous stay never carries document fields, so the profile's are never in conflict.
+        const docPrefill = profileDocumentPrefill(profile);
+        Object.assign(updates, docPrefill.updates);
+        filled.push(...docPrefill.filled);
       }
 
       if (Object.keys(updates).length === 0) return;

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
@@ -449,6 +449,72 @@ describe('WalkInCheckInForm', () => {
     const removeBtns = screen.getAllByRole('button', { name: 'btn_remove' });
     await user.click(removeBtns[1]);
     expect(screen.getAllByText('guest_number')).toHaveLength(1);
+  });
+
+  describe('checklist', () => {
+    const MARIO = {
+      id: 'g1', firstName: 'Mario', lastName: 'Rossi', email: 'mario@test.com',
+      createdAt: '2026-01-01T00:00:00', updatedAt: '2026-01-01T00:00:00', active: true,
+      identityDocuments: [{
+        id: 'd1', documentType: 'PASSPORT' as const, documentNumber: 'X123', issueDate: '2020-01-01',
+        expiryDate: '2099-05-06', createdAt: '2026-01-01T00:00:00', updatedAt: '2026-01-01T00:00:00', active: true,
+      }],
+    };
+
+    const pickMario = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.type(screen.getByPlaceholderText('walkin_placeholder_guest'), 'Ma');
+      await waitFor(() => expect(screen.getByText(/Mario/)).toBeInTheDocument(), { timeout: 5000 });
+      await user.click(screen.getByRole('button', { name: /Mario/ }));
+    };
+
+    const itemOf = (title: string) => screen.getByText(title).closest('li')!;
+
+    it('lists the walk-in items as pending, then complete as room, guest and departure are chosen', async () => {
+      vi.mocked(guestService.searchGuests).mockResolvedValue([MARIO]);
+      renderComponent();
+      await waitFor(() => expect(screen.getByLabelText(/walkin_label_room/i)).toBeInTheDocument());
+      const user = userEvent.setup();
+
+      expect(within(itemOf('checklist_room')).getByText('checklist_tone_pending:')).toBeInTheDocument();
+      expect(within(itemOf('checklist_checkout')).getByText('checklist_tone_pending:')).toBeInTheDocument();
+
+      await user.selectOptions(screen.getByLabelText(/walkin_label_room/i), 'r1');
+      expect(within(itemOf('checklist_room')).getByText('checklist_tone_ok:')).toBeInTheDocument();
+      expect(within(itemOf('checklist_room')).getByText('checklist_room_value')).toBeInTheDocument();
+
+      await pickMario(user);
+      expect(within(itemOf('checklist_walkin_guest')).getByText('checklist_tone_ok:')).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText(/walkin_label_checkout_date/i), '2099-12-31');
+      expect(within(itemOf('checklist_checkout')).getByText('checklist_tone_ok:')).toBeInTheDocument();
+    });
+
+    it('pre-fills the document from the selected guest profile and says so', async () => {
+      vi.mocked(guestService.searchGuests).mockResolvedValue([MARIO]);
+      const { container } = renderComponent();
+      await waitFor(() => expect(screen.getByLabelText(/walkin_label_room/i)).toBeInTheDocument());
+      const user = userEvent.setup();
+
+      await pickMario(user);
+
+      expect((container.querySelector('input[name="documentNumber"]') as HTMLInputElement).value).toBe('X123');
+      expect(screen.getByText(/prefill_banner_profile/)).toBeInTheDocument();
+    });
+
+    it('does not claim a pre-fill for a guest without documents', async () => {
+      vi.mocked(guestService.searchGuests).mockResolvedValue([{ ...MARIO, identityDocuments: [] }]);
+      renderComponent();
+      await waitFor(() => expect(screen.getByLabelText(/walkin_label_room/i)).toBeInTheDocument());
+
+      await pickMario(userEvent.setup());
+
+      expect(screen.queryByText(/prefill_banner_profile/)).not.toBeInTheDocument();
+    });
+
+    it('lists the tourist tax as configured once the check resolves', async () => {
+      renderComponent();
+      await waitFor(() => expect(within(itemOf('checklist_city_tax')).getByText('checklist_city_tax_configured')).toBeInTheDocument());
+    });
   });
 
   it('should have no accessibility violations', async () => {

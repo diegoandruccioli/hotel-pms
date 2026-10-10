@@ -23,7 +23,30 @@ interface ChecklistInput {
   cityTaxWarning: CityTaxUnassessedReason | null | undefined;
   /** Reservation check-out (YYYY-MM-DD); enables the "document expires during the stay" warning. */
   checkOutDate?: string;
+  /** Page-specific items (walk-in: room, guest, departure), listed before the guests. */
+  extra?: ChecklistItem[];
 }
+
+interface WalkInInput {
+  /** Label of the chosen room, '' while none is chosen. */
+  roomLabel: string;
+  guestName: string;
+  /** Expected check-out (YYYY-MM-DD), '' while unset. */
+  checkOutDate: string;
+}
+
+/** The walk-in specifics the reservation flow already has: room, primary guest and departure date. */
+export const buildWalkInItems = ({ roomLabel, guestName, checkOutDate }: WalkInInput): ChecklistItem[] => [
+  roomLabel
+    ? { id: 'room', tone: 'ok', titleKey: 'checklist_room', detailKey: 'checklist_room_value', detailParams: { room: roomLabel } }
+    : { id: 'room', tone: 'pending', titleKey: 'checklist_room', detailKey: 'checklist_room_pending' },
+  guestName
+    ? { id: 'walkin-guest', tone: 'ok', titleKey: 'checklist_walkin_guest', detailKey: 'checklist_walkin_guest_value', detailParams: { name: guestName } }
+    : { id: 'walkin-guest', tone: 'pending', titleKey: 'checklist_walkin_guest', detailKey: 'checklist_walkin_guest_pending' },
+  checkOutDate
+    ? { id: 'checkout', tone: 'ok', titleKey: 'checklist_checkout', detailKey: 'checklist_checkout_value', detailParams: { date: checkOutDate }, dateParam: 'date' }
+    : { id: 'checkout', tone: 'pending', titleKey: 'checklist_checkout', detailKey: 'checklist_checkout_pending' },
+];
 
 const guestName = (g: IdentifiableGuest): string => `${g.firstName} ${g.lastName}`.trim();
 
@@ -46,12 +69,12 @@ const cityTaxItem = (reason: ChecklistInput['cityTaxWarning']): ChecklistItem =>
  * warnings, the tourist-tax configuration and the Alloggiati submission. Pure — the form owns the
  * state, this only derives what the operator still has to do.
  */
-export const buildCheckInChecklist = ({ guests, cityTaxWarning, checkOutDate }: ChecklistInput): ChecklistItem[] => {
-  const items: ChecklistItem[] = [];
+export const buildCheckInChecklist = ({ guests, cityTaxWarning, checkOutDate, extra = [] }: ChecklistInput): ChecklistItem[] => {
+  const items: ChecklistItem[] = [...extra];
   const today = todayIsoDate();
-  let allClear = guests.some((g) => g.isPrimaryGuest);
+  let allClear = guests.some((g) => g.isPrimaryGuest) && extra.every((i) => i.tone === 'ok');
 
-  if (!allClear) {
+  if (!guests.some((g) => g.isPrimaryGuest)) {
     items.push({ id: 'primary', tone: 'warn', titleKey: 'checklist_no_primary' });
   }
 
