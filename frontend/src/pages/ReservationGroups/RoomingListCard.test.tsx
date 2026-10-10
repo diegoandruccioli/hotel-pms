@@ -59,6 +59,7 @@ describe('RoomingListCard', () => {
     expect(within(rowOf('Jane Doe')).getByText(/^status_confirmed/)).toBeInTheDocument();
     expect(within(rowOf('Mario Rossi')).getByText(/^status_pending/)).toBeInTheDocument();
     expect(within(rowOf('Anna Serra')).getByText('rooming_unassigned')).toBeInTheDocument();
+    expect(within(rowOf('Anna Serra')).getByText(/^status_confirmed/)).toBeInTheDocument();
   });
 
   it('reports the progress in the header and in an accessible progressbar', () => {
@@ -76,6 +77,18 @@ describe('RoomingListCard', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/stays/check-in/r1', {
       state: { roomId: 'room1', expectedGuests: 2, guestId: 'g1' },
     });
+  });
+
+  it('keeps a cancelled status visible on a member without a room, and shows no bar for an empty list', () => {
+    const { unmount } = renderCard([member({ roomId: null, status: 'CANCELLED' })]);
+    expect(screen.getByText(/^status_cancelled/)).toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    unmount();
+  });
+
+  it('does not offer check-in for a confirmed member that has no room yet', () => {
+    renderCard([member({ roomId: null })]);
+    expect(screen.queryByText('check_in')).not.toBeInTheDocument();
   });
 
   it('opens the reservation to view or edit it', () => {

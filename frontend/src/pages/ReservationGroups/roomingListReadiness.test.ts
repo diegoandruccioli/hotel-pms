@@ -24,7 +24,7 @@ describe('isMemberReady', () => {
 });
 
 describe('summarizeRoomingList', () => {
-  it('counts ready members over the non-cancelled ones', () => {
+  it('counts ready members over the ones still expected', () => {
     const summary = summarizeRoomingList([
       member({ reservationId: 'a' }),
       member({ reservationId: 'b', status: 'PENDING' }),
@@ -32,6 +32,10 @@ describe('summarizeRoomingList', () => {
       member({ reservationId: 'd', status: 'CANCELLED' }),
     ]);
     expect(summary).toEqual({ ready: 1, total: 3 });
+  });
+
+  it('leaves no-show members out too, so a group can still reach all-ready', () => {
+    expect(summarizeRoomingList([member(), member({ reservationId: 'b', status: 'NO_SHOW' })])).toEqual({ ready: 1, total: 1 });
   });
 
   it('is empty for an empty list or only cancelled members', () => {

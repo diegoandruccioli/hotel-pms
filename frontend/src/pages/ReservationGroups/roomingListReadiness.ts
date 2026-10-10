@@ -6,8 +6,8 @@ const READY_STATUSES = new Set(['CONFIRMED', 'PARTIALLY_CHECKED_IN', 'CHECKED_IN
 export const isMemberReady = (member: GroupMemberResponse): boolean =>
   member.roomId !== null && READY_STATUSES.has(member.status);
 
-/** Ready members over the non-cancelled ones: a cancelled room is not part of the rooming list any more. */
+/** Ready members over the ones still expected: a cancelled or no-show room can never become ready. */
 export const summarizeRoomingList = (members: GroupMemberResponse[]): { ready: number; total: number } => {
-  const active = members.filter((m) => m.status !== 'CANCELLED');
+  const active = members.filter((m) => m.status !== 'CANCELLED' && m.status !== 'NO_SHOW');
   return { ready: active.filter(isMemberReady).length, total: active.length };
 };

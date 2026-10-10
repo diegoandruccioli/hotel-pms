@@ -34,25 +34,28 @@ const MemberRow = memo(({ member, room }: MemberRowProps) => {
 
   return (
     <M3TableRow>
-      <M3TableCell className="font-medium">{room?.roomNumber ?? '—'}</M3TableCell>
+      <M3TableCell>
+        <span className="font-medium">{room?.roomNumber ?? '—'}</span>
+        {room?.roomType?.name && <span className="block text-xs text-on-surface-variant">{room.roomType.name}</span>}
+      </M3TableCell>
       <M3TableCell>{member.guestFullName}</M3TableCell>
-      <M3TableCell>{room?.roomType?.name ?? '—'}</M3TableCell>
       <M3TableCell>{member.expectedGuests}</M3TableCell>
       <M3TableCell>
-        {member.roomId === null
-          ? <M3StatusChip label={t('rooming_unassigned')} tone="neutral" />
-          : <M3StatusChip
+        <div className="flex flex-wrap gap-1">
+          <M3StatusChip
             label={t(`status_${member.status.toLowerCase()}`, member.status)}
             tone={reservationStatusTone[member.status as ReservationStatus] ?? 'neutral'}
-          />}
+          />
+          {member.roomId === null && <M3StatusChip label={t('rooming_unassigned')} tone="neutral" />}
+        </div>
       </M3TableCell>
       <M3TableCell>
         {member.billedToMasterFolio ? <MaterialIcon name="check" size={16} className="text-primary" /> : '—'}
       </M3TableCell>
       <M3TableCell>{formatCurrency(member.price)}</M3TableCell>
       <M3TableCell>
-        <div className="flex flex-wrap justify-end gap-x-4 gap-y-1">
-          {member.status === 'CONFIRMED' && <M3TableActionLink onClick={handleCheckIn}>{t('check_in')}</M3TableActionLink>}
+        <div className="flex min-w-40 flex-wrap justify-end gap-x-4 gap-y-1">
+          {member.status === 'CONFIRMED' && member.roomId !== null && <M3TableActionLink onClick={handleCheckIn}>{t('check_in')}</M3TableActionLink>}
           <M3TableActionLink onClick={handleView}>{t('view')}</M3TableActionLink>
           <M3TableActionLink onClick={handleEdit}>{t('edit')}</M3TableActionLink>
         </div>
@@ -68,12 +71,13 @@ export const RoomingListCard = memo(({ members, rooms }: RoomingListCardProps) =
   const roomsById = useMemo(() => new Map((rooms ?? []).map((r) => [r.id, r])), [rooms]);
   const { ready, total } = useMemo(() => summarizeRoomingList(members), [members]);
   const headers = useMemo(
-    () => [t('label_room'), t('guest'), t('room_type'), t('label_expected_guests'), t('status'),
+    () => [t('label_room'), t('guest'), t('label_expected_guests'), t('status'),
       t('billed_to_master_folio'), t('amount'), t('actions')],
     [t],
   );
   const allReady = total > 0 && ready === total;
-  const barStyle = useMemo(() => ({ width: total === 0 ? '0%' : `${(ready / total) * 100}%` }), [ready, total]);
+  const progressLabel = t('rooming_progress', { count: total, ready, total });
+  const barStyle = useMemo(() => ({ width: `${total === 0 ? 0 : (ready / total) * 100}%` }), [ready, total]);
 
   return (
     <M3Card variant="solid" className="p-6 space-y-4">
@@ -81,23 +85,23 @@ export const RoomingListCard = memo(({ members, rooms }: RoomingListCardProps) =
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="rooming-list-title" className="text-xl font-display font-medium text-on-surface">{t('rooming_list')}</h2>
           <M3StatusChip
-            label={t('rooming_progress', { count: total, ready, total })}
+            label={progressLabel}
             tone={allReady ? 'success' : 'warning'}
           />
         </div>
-        <div
-          role="progressbar"
-          aria-label={t('rooming_progress_label')}
-          aria-valuemin={0}
-          aria-valuemax={total}
-          aria-valuenow={ready}
-          className="h-2 w-full overflow-hidden rounded-full bg-surface-variant"
-        >
+        {total > 0 && (
           <div
-            className={allReady ? 'h-full bg-tertiary' : 'h-full bg-secondary'}
-            style={barStyle}
-          />
-        </div>
+            role="progressbar"
+            aria-label={t('rooming_progress_label')}
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-valuenow={ready}
+            aria-valuetext={progressLabel}
+            className="h-2 w-full overflow-hidden rounded-full bg-surface-variant"
+          >
+            <div className={allReady ? 'h-full bg-tertiary' : 'h-full bg-secondary'} style={barStyle} />
+          </div>
+        )}
         <M3Table headers={headers}>
           {members.map((member) => (
             <MemberRow key={member.reservationId} member={member} room={member.roomId ? roomsById.get(member.roomId) : undefined} />
