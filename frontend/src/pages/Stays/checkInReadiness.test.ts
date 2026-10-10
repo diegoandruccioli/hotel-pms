@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCheckInChecklist } from './checkInReadiness';
+import { buildCheckInChecklist, buildWalkInItems } from './checkInReadiness';
 import { CODICE_ITALIA, emptyGuest } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
 
@@ -76,5 +76,44 @@ describe('buildCheckInChecklist', () => {
   ] as const)('city tax %s gives %s', (warning, tone, detailKey) => {
     const items = buildCheckInChecklist({ guests: [complete()], cityTaxWarning: warning });
     expect(find(items, 'city-tax')).toMatchObject({ tone, detailKey });
+  });
+});
+
+describe('buildWalkInItems', () => {
+  it('is pending for room, guest and departure while nothing is chosen', () => {
+    const items = buildWalkInItems({ roomLabel: '', guestName: '', checkOutDate: '' });
+    expect(items.map((i) => [i.id, i.tone])).toEqual([['room', 'pending'], ['walkin-guest', 'pending'], ['checkout', 'pending']]);
+  });
+
+  it('is ok once each is chosen, and carries the room label, the guest name and the departure date', () => {
+    const items = buildWalkInItems({ roomLabel: '101 — Standard', guestName: 'Ada Rossi', checkOutDate: '2099-01-02' });
+    expect(items.every((i) => i.tone === 'ok')).toBe(true);
+    expect(items[0].detailParams).toMatchObject({ room: '101 — Standard' });
+    expect(items[1].detailParams).toMatchObject({ name: 'Ada Rossi' });
+    expect(items[2]).toMatchObject({ dateParam: 'date', detailParams: { date: '2099-01-02' } });
+  });
+});
+
+describe('buildCheckInChecklist — extra items', () => {
+  it('puts the extra items first', () => {
+    const extra = buildWalkInItems({ roomLabel: '101', guestName: 'Ada', checkOutDate: '2099-01-02' });
+    const items = buildCheckInChecklist({ guests: [complete()], cityTaxWarning: null, extra });
+    expect(items.slice(0, 3).map((i) => i.id)).toEqual(['room', 'walkin-guest', 'checkout']);
+  });
+
+  it('keeps Alloggiati pending while an extra item is not ok, even with complete guests', () => {
+    const extra = buildWalkInItems({ roomLabel: '', guestName: 'Ada', checkOutDate: '2099-01-02' });
+    const items = buildCheckInChecklist({ guests: [complete()], cityTaxWarning: null, extra });
+    expect(find(items, 'alloggiati')?.tone).toBe('pending');
+  });
+
+  it('is ok when every extra item and guest is ok', () => {
+    const extra = buildWalkInItems({ roomLabel: '101', guestName: 'Ada', checkOutDate: '2099-01-02' });
+    expect(find(buildCheckInChecklist({ guests: [complete()], cityTaxWarning: null, extra }), 'alloggiati')?.tone).toBe('ok');
+  });
+
+  it('warns about a document expiring before the walk-in departure', () => {
+    const items = buildCheckInChecklist({ guests: [withDoc('2099-01-01')], cityTaxWarning: null, checkOutDate: '2099-01-05' });
+    expect(find(items, 'doc-0')).toMatchObject({ detailKey: 'checklist_doc_expires_in_stay' });
   });
 });

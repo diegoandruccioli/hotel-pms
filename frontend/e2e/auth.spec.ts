@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockDaySheet, mockOwnerSummary } from './fixtures/mockApi';
+import { mockUnhandledApi, mockServerEvents, mockDaySheet, mockOwnerSummary } from './fixtures/mockApi';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -26,6 +26,9 @@ test.describe('Authentication – Happy Path', () => {
     //   • /auth/login                 → 200  (credentials accepted)
     // -----------------------------------------------------------------------
     let meCallCount = 0;
+
+    await mockUnhandledApi(page);
+    await mockServerEvents(page);
 
     await page.route('**/api/v1/auth/me', async (route) => {
       meCallCount += 1;

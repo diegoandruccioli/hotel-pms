@@ -129,5 +129,14 @@
   "checkin_nights_other": "{{count}} nights",
   "checkin_guests_one": "{{count}} guest",
   "checkin_guests_other": "{{count}} guests",
-  "checklist_doc_expired_short": "Document expired"
+  "checklist_doc_expired_short": "Document expired",
+  "checklist_room": "Room",
+  "checklist_room_value": "{{room}}",
+  "checklist_room_pending": "Not selected yet",
+  "checklist_walkin_guest": "Primary guest",
+  "checklist_walkin_guest_value": "{{name}}",
+  "checklist_walkin_guest_pending": "Not selected yet",
+  "checklist_checkout": "Departure",
+  "checklist_checkout_value": "Check-out on {{date}}",
+  "checklist_checkout_pending": "Date not set"
 }

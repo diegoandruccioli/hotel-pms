@@ -4,6 +4,7 @@ import {
   validateSingleGuest,
   type IdentifiableGuest,
   mapDocType,
+  profileDocumentPrefill,
 } from './stayGuestFieldHelpers';
 import type { StayGuestResponse } from '../../types';
 import type { DocumentType } from '../../types/guest.types';
@@ -223,5 +224,26 @@ describe('mapDocType', () => {
     ['OTHER', ''],
   ])('maps the guest-service %s document to the Alloggiati code %j', (documentType, tipdoc) => {
     expect(mapDocType(documentType)).toBe(tipdoc);
+  });
+});
+
+describe('profileDocumentPrefill', () => {
+  const doc = { documentType: 'PASSPORT', documentNumber: 'X123', expiryDate: '2099-05-06' } as const;
+
+  it('returns nothing for a profile without documents', () => {
+    expect(profileDocumentPrefill({})).toEqual({ updates: {}, filled: [] });
+    expect(profileDocumentPrefill({ identityDocuments: [] })).toEqual({ updates: {}, filled: [] });
+  });
+
+  it('fills type, number and expiry from the first document', () => {
+    const { updates, filled } = profileDocumentPrefill({ identityDocuments: [doc] });
+    expect(updates).toEqual({ documentType: 'PASOR', documentNumber: 'X123', documentExpiryDate: '2099-05-06' });
+    expect(filled).toEqual(['documentType', 'documentNumber', 'documentExpiryDate']);
+  });
+
+  it('skips the type and the expiry for a document with no Alloggiati code, keeping the number', () => {
+    const { updates, filled } = profileDocumentPrefill({ identityDocuments: [{ ...doc, documentType: 'DRIVERS_LICENSE' }] });
+    expect(updates).toEqual({ documentNumber: 'X123' });
+    expect(filled).toEqual(['documentNumber']);
   });
 });

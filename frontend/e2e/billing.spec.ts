@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const MOCK_USER = { username: 'admin', role: 'ADMIN', sub: 'admin', mustChangePassword: false };
+import { mockAuthMe, mockOwnerSummary, mockServerEvents, mockUnhandledApi } from './fixtures/mockApi';
 
 const MOCK_INVOICE = {
   id: 'inv-001',
@@ -20,9 +19,10 @@ const MOCK_INVOICE = {
 
 test.describe('Billing flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/v1/auth/me', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER) }),
-    );
+    await mockUnhandledApi(page);
+    await mockAuthMe(page);
+    await mockServerEvents(page);
+    await mockOwnerSummary(page);
     // '**/api/v1/invoices**' matches both /api/v1/invoices and /api/v1/invoices?page=0&size=20
     await page.route('**/api/v1/invoices**', (route) => {
       if (route.request().url().includes('/api/v1/invoices/inv-001')) {

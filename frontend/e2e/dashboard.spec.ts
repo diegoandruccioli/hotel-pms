@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { mockAuthMe, mockDaySheet, mockDaySheetTrend, mockOwnerSummary, mockTodayArrivals, mockDueOutStays } from './fixtures/mockApi';
+import { mockUnhandledApi, mockServerEvents, mockAuthMe, mockDaySheet, mockDaySheetTrend, mockOwnerSummary, mockTodayArrivals, mockDueOutStays } from './fixtures/mockApi';
 
 async function mockDashboardApis(page: import('@playwright/test').Page): Promise<void> {
+  await mockUnhandledApi(page);
+  await mockServerEvents(page);
   await mockAuthMe(page);
   await mockDaySheet(page);
   await mockOwnerSummary(page);

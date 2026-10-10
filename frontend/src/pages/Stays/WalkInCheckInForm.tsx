@@ -14,9 +14,12 @@ import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { M3Select } from '../../components/m3';
+import { CheckInChecklist } from './CheckInChecklist';
+import { buildCheckInChecklist, buildWalkInItems } from './checkInReadiness';
 import { GuestFieldSection } from './GuestFieldSection';
 import {
   emptyGuest,
+  profileDocumentPrefill,
   TYPES_WITHOUT_DOC,
   validateAlloggiatiGuests,
 } from './stayGuestFieldHelpers';
@@ -66,6 +69,11 @@ export function WalkInCheckInForm() {
   const [expectedCheckOutDate, setExpectedCheckOutDate] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [prefillFields, setPrefillFields] = useState<string[]>([]);
+  // Bumped on every submit so a repeated identical error still remounts (re-announces) and re-scrolls.
+  const [submitAttempt, setSubmitAttempt] = useState(0);
+  const errorRef = useRef<HTMLDivElement>(null);
+  const lastGuestIdRef = useRef<string | null>(null);
   const [roomsLoading, setRoomsLoading] = useState(true);
 
   // Alloggiati lookup tables
@@ -77,7 +85,8 @@ export function WalkInCheckInForm() {
   // Pre-flight check (Parte 5.3): tells the operator before submitting that the
   // tourist tax won't actually be charged, instead of only discovering it later on
   // the monthly comune declaration. Never blocks the check-in itself.
-  const [cityTaxWarning, setCityTaxWarning] = useState<CityTaxUnassessedReason | null>(null);
+  // `undefined` until the check resolves, so the checklist can tell "not checked yet" from "configured".
+  const [cityTaxWarning, setCityTaxWarning] = useState<CityTaxUnassessedReason | null | undefined>(undefined);
 
   useEffect(() => {
     stayService.getCityTaxConfigurationStatus()
@@ -112,6 +121,7 @@ export function WalkInCheckInForm() {
     const query = e.target.value;
     setGuestQuery(query);
     setSelectedGuest(null);
+    setPrefillFields([]);
     if (guestSearchDebounceRef.current !== null) clearTimeout(guestSearchDebounceRef.current);
     if (query.trim().length < 2) {
       setGuestResults([]);
@@ -131,12 +141,19 @@ export function WalkInCheckInForm() {
     setSelectedGuest(guest);
     setGuestQuery(`${guest.firstName} ${guest.lastName}`);
     setGuestResults([]);
-    // Pre-fill first guest section with the selected guest's name
+    // Pre-fill the first guest section with the selected guest's name and primary document. A
+    // different guest than before clears the document block first: it belonged to someone else.
+    const { updates, filled } = profileDocumentPrefill(guest);
+    const changed = lastGuestIdRef.current !== guest.id;
+    lastGuestIdRef.current = guest.id;
     setGuests(prev => [{
       ...prev[0],
+      ...(changed ? { documentType: '', documentNumber: '', documentPlaceOfIssue: '', documentExpiryDate: undefined } : {}),
       firstName: guest.firstName,
       lastName: guest.lastName,
+      ...updates,
     }, ...prev.slice(1)]);
+    setPrefillFields(filled);
   }, []);
 
   const handleCheckoutChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,6 +180,7 @@ export function WalkInCheckInForm() {
     async (e: FormEvent) => {
       e.preventDefault();
       setError('');
+      setSubmitAttempt((n) => n + 1);
       if (!selectedRoomId) { setError(t('walkin_err_room_required')); return; }
       if (!selectedGuest)   { setError(t('walkin_err_guest_required')); return; }
       if (!expectedCheckOutDate) { setError(t('walkin_err_checkout_required')); return; }
@@ -218,8 +236,28 @@ export function WalkInCheckInForm() {
 
   const guestListLabel = useMemo(() => t('walkin_label_guest'), [t]);
 
+  const roomLabel = roomOptions.find((o) => o.value === selectedRoomId)?.label ?? '';
+  const checklist = useMemo(
+    () => buildCheckInChecklist({
+      guests,
+      cityTaxWarning,
+      checkOutDate: expectedCheckOutDate || undefined,
+      extra: buildWalkInItems({
+        roomLabel,
+        guestName: selectedGuest ? `${selectedGuest.firstName} ${selectedGuest.lastName}`.trim() : '',
+        checkOutDate: expectedCheckOutDate,
+      }),
+    }),
+    [guests, cityTaxWarning, expectedCheckOutDate, roomLabel, selectedGuest],
+  );
+
+  // The error banner sits above a long form; bring it into view when submit is blocked.
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView?.({ block: 'center' });
+  }, [error, submitAttempt]);
+
   return (
-    <div className="max-w-2xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-6">
       <PageHeader id="walkin-title" title={t('walkin_title')} subtitle={t('walkin_subtitle')} className="mb-6" />
 
       {cityTaxWarning && cityTaxWarning !== 'NOT_APPLICABLE' && (
@@ -228,6 +266,19 @@ export function WalkInCheckInForm() {
         </Alert>
       )}
 
+      {prefillFields.length > 0 && (
+        <Alert tone="warning" icon="auto_fix_high" className="mb-6">
+          {t('prefill_banner_profile', { fields: prefillFields.map(f => t(`prefill_field_${f}`)).join(', ') })}
+        </Alert>
+      )}
+
+      {error && (
+        <div ref={errorRef} key={submitAttempt} className="mb-6">
+          <Alert tone="error">{error}</Alert>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         {/* Room selection */}
         <div>
@@ -306,8 +357,6 @@ export function WalkInCheckInForm() {
           </M3Button>
         </div>
 
-        {error && <p role="alert" className="text-sm text-error">{error}</p>}
-
         <div className="flex gap-3 pt-2">
           <M3Button type="button" variant="outlined" onClick={handleNavigateBack} className="flex-1">
             {t('cancel')}
@@ -317,6 +366,10 @@ export function WalkInCheckInForm() {
           </M3Button>
         </div>
       </form>
+      <aside aria-label={t('checklist_title')} className="lg:sticky lg:top-6">
+        <CheckInChecklist items={checklist} />
+      </aside>
+      </div>
     </div>
   );
 }

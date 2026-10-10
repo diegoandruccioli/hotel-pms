@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const MOCK_USER = { username: 'admin', role: 'ADMIN', sub: 'admin', mustChangePassword: false };
+import { mockAuthMe, mockCityTaxStatus, mockServerEvents, mockUnhandledApi } from './fixtures/mockApi';
 
 const MOCK_ROOMS = [
   { id: 'room-001', roomNumber: '101', status: 'CLEAN', roomType: { name: 'Standard', basePrice: 80 } },
@@ -35,9 +34,10 @@ const MOCK_STATI = [
 
 test.describe('Walk-in Check-in', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/v1/auth/me', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER) }),
-    );
+    await mockUnhandledApi(page);
+    await mockAuthMe(page);
+    await mockServerEvents(page);
+    await mockCityTaxStatus(page);
     // Use pathname-based matcher so query params (?page=0&size=20&sort=...) are ignored.
     await page.route((url) => url.pathname === '/api/v1/stays', async (route) => {
       if (route.request().method() === 'POST') {
@@ -143,6 +143,39 @@ test.describe('Walk-in Check-in', () => {
     await page.getByRole('button', { name: /complete walk-in/i }).click();
     await expect(page.getByRole('alert')).toBeVisible();
     await expect(page).toHaveURL(/\/stays\/walk-in/);
+  });
+
+  test('checklist tracks room, guest and departure as they are chosen', async ({ page }) => {
+    await page.route('**/api/v1/rooms**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ content: MOCK_ROOMS, totalElements: MOCK_ROOMS.length, totalPages: 1, number: 0, size: 200 }),
+      }),
+    );
+    await page.route('**/api/v1/guests**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ content: [MOCK_GUEST], totalElements: 1, totalPages: 1, number: 0, size: 20 }),
+      }),
+    );
+    await page.goto('/stays/walk-in');
+    const checklist = page.getByRole('complementary', { name: /checklist/i });
+    await expect(page.getByLabel(/^Room/)).toBeVisible({ timeout: 10000 });
+    await expect(checklist.getByText('1 of 6 items complete')).toBeVisible();
+
+    await page.getByLabel(/^Room/).selectOption({ value: 'room-001' });
+    await page.getByRole('searchbox').fill('Lucia');
+    await page.getByRole('option', { name: /Lucia Bianchi/i }).click();
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    await page.getByLabel(/Expected Check-out Date/).fill(tomorrow.toISOString().split('T')[0]);
+
+    await expect(checklist.getByText('101 — Standard')).toBeVisible();
+    await expect(checklist.getByText('Lucia Bianchi').first()).toBeVisible();
+    await expect(checklist.getByText(/Check-out on/)).toBeVisible();
+    await expect(checklist.getByText('4 of 6 items complete')).toBeVisible();
   });
 
   test('completes walk-in and redirects to stays', async ({ page }) => {

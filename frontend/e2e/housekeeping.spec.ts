@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockAuthMe, mockDaySheet } from './fixtures/mockApi';
+import { mockUnhandledApi, mockServerEvents, mockAuthMe, mockDaySheet } from './fixtures/mockApi';
 
 const MOCK_ROOMS = [
   {
@@ -46,6 +46,8 @@ const roomsPage = {
 
 test.describe('Housekeeping', () => {
   test.beforeEach(async ({ page }) => {
+    await mockUnhandledApi(page);
+    await mockServerEvents(page);
     await mockAuthMe(page);
     // Housekeeping's filter-badge counts come from the day-sheet aggregate,
     // not from re-counting the fetched room list — unmocked, the query 401s

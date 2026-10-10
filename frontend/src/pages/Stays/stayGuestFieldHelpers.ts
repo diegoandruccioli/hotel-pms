@@ -6,6 +6,7 @@ import type {
   StayGuestResponse,
   TravellerType,
 } from '../../types';
+import type { IdentityDocumentResponseDTO } from '../../types/guest.types';
 import { todayIsoDate } from '../../utils';
 
 export const TYPES_WITHOUT_DOC: TravellerType[] = ['FAMILIARE', 'MEMBRO_GRUPPO'];
@@ -19,6 +20,24 @@ export const mapDocType = (documentType: GuestDocumentType): string => {
   }
 };
 export const CODICE_ITALIA = '100000100';
+
+/**
+ * Document fields a guest profile can prefill on a check-in form (first identity document).
+ * `filled` names the prefilled fields for the banner; the type (and the expiry that only makes
+ * sense with it) is claimed only when the document maps to an Alloggiati code.
+ */
+export const profileDocumentPrefill = (
+  profile: { identityDocuments?: Pick<IdentityDocumentResponseDTO, 'documentType' | 'documentNumber' | 'expiryDate'>[] },
+): { updates: Partial<IdentifiableGuest>; filled: string[] } => {
+  const doc = profile.identityDocuments?.[0];
+  const updates: Partial<IdentifiableGuest> = {};
+  const filled: string[] = [];
+  const tipdoc = doc?.documentType ? mapDocType(doc.documentType) : '';
+  if (tipdoc) { updates.documentType = tipdoc; filled.push('documentType'); }
+  if (doc?.documentNumber) { updates.documentNumber = doc.documentNumber; filled.push('documentNumber'); }
+  if (tipdoc && doc?.expiryDate) { updates.documentExpiryDate = doc.expiryDate; filled.push('documentExpiryDate'); }
+  return { updates, filled };
+};
 
 export interface IdentifiableGuest extends StayGuestRequest {
   _id: string;
