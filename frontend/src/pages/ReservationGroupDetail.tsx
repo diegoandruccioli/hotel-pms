@@ -1,12 +1,11 @@
 import { useFormatters } from '../hooks';
 import { useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { GroupCheckoutOutcome, GroupMemberResponse } from '../types';
+import type { GroupCheckoutOutcome } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3Card } from '../components/m3';
-import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3Dialog } from '../components/m3';
 import { M3ConfirmDialog } from '../components/m3';
@@ -16,8 +15,9 @@ import { useTranslation } from 'react-i18next';
 import { getErrorMessage, groupStatusTone } from '../utils';
 import { useToastStore } from '../store';
 import {
-  useReservationGroup, useCancelReservationGroup, useCheckoutReservationGroup,
+  useReservationGroup, useCancelReservationGroup, useCheckoutReservationGroup, useRoomsLookup,
 } from '../hooks/queries';
+import { RoomingListCard } from './ReservationGroups/RoomingListCard';
 
 export const ReservationGroupDetail = () => {
   const { t } = useTranslation('common');
@@ -30,20 +30,12 @@ export const ReservationGroupDetail = () => {
   const [checkoutOutcomes, setCheckoutOutcomes] = useState<GroupCheckoutOutcome[] | null>(null);
 
   const { data: group, isLoading, error: queryError, refetch } = useReservationGroup(id);
+  const { data: rooms } = useRoomsLookup();
   const cancelGroup = useCancelReservationGroup();
   const checkoutGroup = useCheckoutReservationGroup();
   const error = queryError ? getErrorMessage(queryError, t('group_load_failed')) : null;
 
   const { formatCurrency, formatDate } = useFormatters();
-  const memberHeaders = useMemo(
-    () => [t('guest'), t('label_expected_guests'), t('status'), t('billed_to_master_folio'), t('amount')],
-    [t],
-  );
-
-  const getMemberStatusLabel = useCallback(
-    (status: string) => t(`status_${status.toLowerCase()}`, status),
-    [t],
-  );
 
   const handleCancelRequest = useCallback(() => setConfirmingCancel(true), []);
   const handleCancelDialogClose = useCallback(() => setConfirmingCancel(false), []);
@@ -160,31 +152,7 @@ export const ReservationGroupDetail = () => {
         )}
       </M3Card>
 
-      <section aria-labelledby="rooming-list-title" className="space-y-3">
-        <h2 id="rooming-list-title" className="text-sm font-medium text-on-surface-variant uppercase tracking-wider">
-          {t('rooming_list')}
-        </h2>
-        <M3Table headers={memberHeaders}>
-          {group.members.map((member: GroupMemberResponse) => (
-            <M3TableRow key={member.reservationId}>
-              <M3TableCell className="font-medium">{member.guestFullName}</M3TableCell>
-              <M3TableCell>{member.expectedGuests}</M3TableCell>
-              <M3TableCell>
-                <M3StatusChip
-                  label={getMemberStatusLabel(member.status)}
-                  tone={member.status === 'CANCELLED' || member.status === 'NO_SHOW' ? 'error' : 'neutral'}
-                />
-              </M3TableCell>
-              <M3TableCell>
-                {member.billedToMasterFolio
-                  ? <MaterialIcon name="check" size={16} className="text-primary" />
-                  : '—'}
-              </M3TableCell>
-              <M3TableCell>{formatCurrency(member.price)}</M3TableCell>
-            </M3TableRow>
-          ))}
-        </M3Table>
-      </section>
+      <RoomingListCard members={group.members} rooms={rooms} />
 
       {confirmingCancel && (
         <M3ConfirmDialog

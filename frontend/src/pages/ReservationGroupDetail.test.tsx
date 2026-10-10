@@ -13,6 +13,10 @@ vi.mock('../services/reservationGroupService', () => ({
   },
 }));
 
+vi.mock('../services/inventoryService', () => ({
+  inventoryService: { getAllRooms: vi.fn().mockResolvedValue({ content: [] }) },
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) => (opts ? `${key} ${JSON.stringify(opts)}` : key),
