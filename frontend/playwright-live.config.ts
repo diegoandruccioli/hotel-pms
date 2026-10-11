@@ -41,7 +41,6 @@ export default defineConfig({
     {
       name: 'cleanup',
       testMatch: /global\.teardown\.ts/,
-      use: { storageState: STORAGE_STATE },
     },
     {
       name: 'live',
