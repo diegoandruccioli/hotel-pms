@@ -22,6 +22,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -312,6 +313,20 @@ public class RoomServiceImpl implements RoomService {
                 .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
 
         roomRepository.delete(Objects.requireNonNull(room));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<RoomResponse> getActiveRoomsByIds(final Collection<UUID> ids, final UUID hotelId) {
+        Objects.requireNonNull(ids, "Room IDs cannot be null");
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return roomRepository.findAllByIdInAndActiveTrueAndHotelId(ids, hotelId).stream()
+                .map(roomMapper::toResponse)
+                .toList();
     }
 
     /**
