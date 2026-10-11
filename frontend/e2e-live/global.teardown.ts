@@ -1,7 +1,7 @@
 import { test as teardown } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
 import { csrfHeader } from './fixtures/api';
-import { LIVE_ADMIN } from './fixtures/hotel';
+import { LIVE_ADMIN, OTHER_HOTEL_ADMIN } from './fixtures/hotel';
 
 // Runs once after every "live" spec (even failed ones). createCleanRoom() makes a new
 // E2E-LIVE-<timestamp> room per call and many specs leave the stay they open checked-in, so the
@@ -15,8 +15,11 @@ import { LIVE_ADMIN } from './fixtures/hotel';
 //   (pay the invoice in full, then check out), and deletes the room only after that. A stay that
 //   cannot be closed keeps its room, and is listed at the end.
 // - It scans by prefix, so it also cleans what an interrupted earlier run left behind.
-// Soft delete only; touches nothing but E2E-LIVE-* rooms of the live-suite hotel.
+// - Cleans both tenants the suite writes to: the live-suite hotel (E2E-LIVE-*) and the second
+//   tenant used by the cross-tenant specs (QA-OTHER-*, qa-fiscal-settings-matrix).
+// Soft delete only; touches nothing but rooms carrying those fixture prefixes.
 const FIXTURE_PREFIX = 'E2E-LIVE-';
+const OTHER_HOTEL_PREFIX = 'QA-OTHER-';
 const PAGE_SIZE = 200;
 const CENTS = 100;
 
@@ -61,18 +64,20 @@ async function closeStay(request: APIRequestContext, headers: Record<string, str
     return checkout.status() === 200 ? null : `check-out ${stay.id}: ${checkout.status()} ${await checkout.text()}`;
 }
 
-teardown('remove the E2E-LIVE fixture rooms', async ({ request }) => {
-    teardown.setTimeout(300_000);
-
-    const login = await request.post('/api/v1/auth/login', {
-        data: { username: LIVE_ADMIN.username, password: LIVE_ADMIN.password },
-    });
+/** Logs in as `credentials` on `request`, closes the stays of the fixture rooms with `prefix`, and removes the rooms. */
+async function cleanTenant(
+    request: APIRequestContext,
+    label: string,
+    credentials: { username: string; password: string },
+    prefix: string,
+): Promise<void> {
+    const login = await request.post('/api/v1/auth/login', { data: credentials });
     if (login.status() !== 200) {
-        throw new Error(`[teardown] login failed (${login.status()}), fixture rooms were not cleaned up`);
+        throw new Error(`[teardown] ${label}: login failed (${login.status()}), fixture rooms were not cleaned up`);
     }
     const headers = await csrfHeader(request);
 
-    const fixtureRooms = (await listAll<RoomRow>(request, '/api/v1/rooms')).filter((r) => r.roomNumber.startsWith(FIXTURE_PREFIX));
+    const fixtureRooms = (await listAll<RoomRow>(request, '/api/v1/rooms')).filter((r) => r.roomNumber.startsWith(prefix));
     const occupiedIds = new Set(fixtureRooms.filter((r) => r.status === 'OCCUPIED').map((r) => r.id));
     const deletable = new Set(fixtureRooms.filter((r) => !occupiedIds.has(r.id)).map((r) => r.id));
 
@@ -104,11 +109,41 @@ teardown('remove the E2E-LIVE fixture rooms', async ({ request }) => {
     }
     const removed = statuses.get(204) ?? 0;
     console.log(
-        `[teardown] removed ${removed} of ${deletable.size} ${FIXTURE_PREFIX}* rooms`
+        `[teardown] ${label}: removed ${removed} of ${deletable.size} ${prefix}* rooms`
             + ` (${occupiedIds.size} were occupied, ${unclosed.length} problem(s) closing their stays)`,
     );
-    for (const problem of unclosed) console.warn(`[teardown] left in place: ${problem}`);
+    for (const problem of unclosed) console.warn(`[teardown] ${label}: left in place: ${problem}`);
     if (removed < deletable.size) {
-        throw new Error(`[teardown] some deletes failed, status counts: ${JSON.stringify([...statuses])}`);
+        throw new Error(`[teardown] ${label}: some deletes failed, status counts: ${JSON.stringify([...statuses])}`);
     }
+}
+
+teardown('remove the fixture rooms of both tenants', async ({ request, playwright, baseURL }) => {
+    teardown.setTimeout(300_000);
+    const failures: string[] = [];
+    const run = async (label: string, work: () => Promise<void>) => {
+        try {
+            await work();
+        } catch (error) {
+            failures.push(error instanceof Error ? error.message : String(error));
+        }
+    };
+
+    await run('live-suite hotel', () => cleanTenant(request, 'live-suite hotel', LIVE_ADMIN, FIXTURE_PREFIX));
+
+    // The second tenant only exists on a stack seeded with the e2e fixtures: when its admin cannot
+    // log in there is nothing of ours to clean, so that is a skip, not a failure.
+    const otherHotel = await playwright.request.newContext({ baseURL });
+    try {
+        const probe = await otherHotel.post('/api/v1/auth/login', { data: OTHER_HOTEL_ADMIN });
+        if (probe.status() === 200) {
+            await run('other hotel', () => cleanTenant(otherHotel, 'other hotel', OTHER_HOTEL_ADMIN, OTHER_HOTEL_PREFIX));
+        } else {
+            console.log(`[teardown] other hotel: admin login ${probe.status()}, skipped`);
+        }
+    } finally {
+        await otherHotel.dispose();
+    }
+
+    if (failures.length > 0) throw new Error(failures.join(' | '));
 });
