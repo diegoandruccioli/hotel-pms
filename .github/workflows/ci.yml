@@ -430,7 +430,7 @@ jobs:
           exit 1
 
       # Run the full Playwright suite against the Docker-hosted frontend.
-      # PLAYWRIGHT_BASE_URL overrides the config default (Vite dev server)
+      # PLAYWRIGHT_BASE_URL overrides the config default (the local production bundle on :4173)
       # so every page.goto('/') resolves to http://localhost:80/.
       - name: Run Playwright E2E tests
         working-directory: frontend
