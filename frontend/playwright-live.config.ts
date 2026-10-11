@@ -35,6 +35,13 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: /global\.setup\.ts/,
+      // Runs after every project that depends on this one, whatever their result.
+      teardown: 'cleanup',
+    },
+    {
+      name: 'cleanup',
+      testMatch: /global\.teardown\.ts/,
+      use: { storageState: STORAGE_STATE },
     },
     {
       name: 'live',
