@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,6 +54,16 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
      * @return the optional room
      */
     Optional<Room> findByIdAndActiveTrueAndHotelId(UUID id, UUID hotelId);
+
+    /**
+     * Finds the active rooms among {@code ids}, scoped to the given hotel, in one query. Ids that
+     * match no active room (removed, or another hotel's) are simply absent from the result.
+     *
+     * @param ids     the room UUIDs to look up
+     * @param hotelId the hotel UUID extracted from the authenticated user's JWT
+     * @return the active rooms found, in no particular order
+     */
+    List<Room> findAllByIdInAndActiveTrueAndHotelId(Collection<UUID> ids, UUID hotelId);
 
     /**
      * Same lookup as {@link #findByIdAndActiveTrueAndHotelId}, but takes a
