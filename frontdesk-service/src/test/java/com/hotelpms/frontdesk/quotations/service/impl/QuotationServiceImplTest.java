@@ -122,6 +122,7 @@ class QuotationServiceImplTest {
                 .thenReturn(PDF_BYTES);
         lenient().when(roomService.getRoomById(ROOM_ID, HOTEL_ID)).thenReturn(room());
         lenient().when(roomService.getRoomById(ROOM_ID_2, HOTEL_ID)).thenReturn(room2());
+        lenient().when(roomService.getActiveRoomsByIds(any(), eq(HOTEL_ID))).thenReturn(List.of(room(), room2()));
     }
 
     @AfterEach
@@ -560,7 +561,10 @@ class QuotationServiceImplTest {
     // A room soft-deleted after it was quoted must not break reading the quotation (or the whole list page).
 
     private void roomWasRemoved() {
-        when(roomService.getRoomById(ROOM_ID, HOTEL_ID)).thenThrow(new NotFoundException("ROOM_NOT_FOUND" + ROOM_ID));
+        // The lenient lookup never throws: a removed room is just absent from the result.
+        lenient().when(roomService.getActiveRoomsByIds(any(), eq(HOTEL_ID))).thenReturn(List.of(room2()));
+        // Strict paths still hit the throwing lookup.
+        lenient().when(roomService.getRoomById(ROOM_ID, HOTEL_ID)).thenThrow(new NotFoundException("ROOM_NOT_FOUND" + ROOM_ID));
     }
 
     @Test

@@ -197,7 +197,7 @@ public class QuotationServiceImpl implements QuotationService {
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        return toResponse(quotation, guest, resolveRoomsForQuotationLenient(quotation, hotelId));
+        return toResponse(quotation, guest, resolveRoomsLenient(List.of(quotation), hotelId));
     }
 
     /** {@inheritDoc} */
@@ -218,10 +218,11 @@ public class QuotationServiceImpl implements QuotationService {
                 : guestClient.getGuestsBatch(guestIds).stream()
                         .collect(java.util.stream.Collectors.toMap(GuestResponse::id, g -> g));
 
+        final Map<UUID, RoomResponse> roomsById = resolveRoomsLenient(page.getContent(), hotelId);
         return page.map(quotation -> toResponse(
                 quotation,
                 quotation.getGuestId() == null ? null : guestsById.get(quotation.getGuestId()),
-                resolveRoomsForQuotationLenient(quotation, hotelId)));
+                roomsById));
     }
 
     /** {@inheritDoc} */
@@ -232,7 +233,7 @@ public class QuotationServiceImpl implements QuotationService {
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        return renderPdf(quotation, guest, resolveRoomsForQuotationLenient(quotation, hotelId));
+        return renderPdf(quotation, guest, resolveRoomsLenient(List.of(quotation), hotelId));
     }
 
     /** {@inheritDoc} */
@@ -359,7 +360,7 @@ public class QuotationServiceImpl implements QuotationService {
         final Quotation saved = quotationRepository.save(quotation);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        return toResponse(saved, guest, resolveRoomsForQuotationLenient(quotation, hotelId));
+        return toResponse(saved, guest, resolveRoomsLenient(List.of(quotation), hotelId));
     }
 
     /** {@inheritDoc} */
@@ -454,25 +455,24 @@ public class QuotationServiceImpl implements QuotationService {
 
     /**
      * Same as {@link #resolveRoomsForQuotation} for read-only views: a room that was removed after it
-     * was quoted is left out of the map instead of failing the whole response (and, in the list, the
-     * whole page). {@link #toLineItemResponses} and the PDF rows then show a placeholder for it.
+     * was quoted is simply absent from the map instead of failing the whole response (and, in the
+     * list, the whole page). {@link #toLineItemResponses} and the PDF rows then show a placeholder.
+     * Uses one non-throwing lookup: a caught {@code NotFoundException} from the room service would
+     * still mark this read-only transaction rollback-only and fail the commit.
      *
-     * @param quotation the quotation whose rooms to resolve
-     * @param hotelId   the caller's hotel
+     * @param quotations the quotations whose rooms to resolve
+     * @param hotelId    the caller's hotel
      * @return the rooms that still exist, by id
      */
-    private Map<UUID, RoomResponse> resolveRoomsForQuotationLenient(final Quotation quotation, final UUID hotelId) {
-        final Map<UUID, RoomResponse> roomsById = new HashMap<>();
-        quotation.getOptions().stream()
-                .flatMap(option -> option.getLineItems().stream().map(QuotationLineItem::getRoomId))
+    private Map<UUID, RoomResponse> resolveRoomsLenient(final List<Quotation> quotations, final UUID hotelId) {
+        final List<UUID> roomIds = quotations.stream()
+                .flatMap(quotation -> quotation.getOptions().stream())
+                .flatMap(option -> option.getLineItems().stream())
+                .map(QuotationLineItem::getRoomId)
                 .distinct()
-                .forEach(roomId -> {
-                    try {
-                        roomsById.put(roomId, roomService.getRoomById(roomId, hotelId));
-                    } catch (final NotFoundException e) {
-                        log.warn("[QUOTATION] room {} no longer exists, shown as a placeholder: {}", roomId, e.getMessage());
-                    }
-                });
+                .toList();
+        final Map<UUID, RoomResponse> roomsById = new HashMap<>();
+        roomService.getActiveRoomsByIds(roomIds, hotelId).forEach(room -> roomsById.put(room.id(), room));
         return roomsById;
     }
 
