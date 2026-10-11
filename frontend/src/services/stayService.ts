@@ -184,8 +184,10 @@ export const stayService = {
   },
 
   getAvailableRooms: async (): Promise<AvailableRoom[]> => {
+    // Filtered by the server: filtering the first 200 rooms client-side would drop the clean ones
+    // beyond that for a hotel with more rooms. The client filter stays as a guard.
     const response = await api.get<{ content: AvailableRoom[] }>('/api/v1/rooms', {
-      params: { size: 200 },
+      params: { size: 200, status: 'CLEAN' },
     });
     return (response.data.content ?? []).filter((r) => r.status === 'CLEAN');
   },
