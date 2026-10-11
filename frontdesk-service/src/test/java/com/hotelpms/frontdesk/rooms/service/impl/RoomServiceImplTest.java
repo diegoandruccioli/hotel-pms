@@ -155,6 +155,25 @@ class RoomServiceImplTest {
     }
 
     @Test
+    void testGetActiveRoomsByIdsReturnsOnlyWhatTheRepositoryFinds() {
+        final UUID removedId = UUID.randomUUID();
+        when(roomRepository.findAllByIdInAndActiveTrueAndHotelId(List.of(roomId, removedId), hotelId))
+                .thenReturn(List.of(Objects.requireNonNull(room)));
+        when(roomMapper.toResponse(room)).thenReturn(response);
+
+        final List<RoomResponse> result = roomService.getActiveRoomsByIds(List.of(roomId, removedId), hotelId);
+
+        assertEquals(List.of(response), result);
+    }
+
+    @Test
+    void testGetActiveRoomsByIdsWithNoIdsSkipsTheQuery() {
+        assertTrue(roomService.getActiveRoomsByIds(List.of(), hotelId).isEmpty());
+        verify(roomRepository, never()).findAllByIdInAndActiveTrueAndHotelId(org.mockito.ArgumentMatchers.anyCollection(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void testGetRoomByIdWrongHotelReturnsNotFound() {
         final UUID otherHotelId = UUID.randomUUID();
         when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, otherHotelId)).thenReturn(Optional.empty());
