@@ -47,6 +47,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -85,6 +86,7 @@ class QuotationServiceImplTest {
     private static final LocalDate CHECK_OUT = LocalDate.now().plusDays(13);
     private static final LocalDate VALID_UNTIL = LocalDate.now().plusDays(5);
     private static final byte[] PDF_BYTES = {1, 2, 3};
+    private static final String REMOVED_ROOM_PLACEHOLDER = "—";
 
     @Mock
     private QuotationRepository quotationRepository;
@@ -553,5 +555,93 @@ class QuotationServiceImplTest {
         assertEquals(1, result.getTotalElements());
         assertEquals(GUEST_FIRST_NAME + " " + GUEST_LAST_NAME, result.getContent().get(0).guestFullName());
         verify(guestClient, never()).getGuestsBatch(any());
+    }
+
+    // A room soft-deleted after it was quoted must not break reading the quotation (or the whole list page).
+
+    private void roomWasRemoved() {
+        when(roomService.getRoomById(ROOM_ID, HOTEL_ID)).thenThrow(new NotFoundException("ROOM_NOT_FOUND" + ROOM_ID));
+    }
+
+    @Test
+    void allQuotationsWithARemovedRoomShowsPlaceholdersInsteadOfFailing() {
+        final Quotation quotation = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        when(quotationRepository.findAllByHotelId(eq(HOTEL_ID), any())).thenReturn(new PageImpl<>(List.of(quotation)));
+        when(guestClient.getGuestsBatch(List.of(GUEST_ID)))
+                .thenReturn(List.of(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL)));
+        roomWasRemoved();
+
+        final Page<QuotationResponse> result = quotationService.getAllQuotations(PageRequest.of(0, 10));
+
+        final var lineItem = result.getContent().get(0).options().get(0).lineItems().get(0);
+        assertEquals(REMOVED_ROOM_PLACEHOLDER, lineItem.roomNumber());
+        assertEquals(REMOVED_ROOM_PLACEHOLDER, lineItem.roomTypeName());
+        assertEquals(ROOM_ID, lineItem.roomId());
+        assertEquals(NIGHTLY_PRICE.multiply(BigDecimal.valueOf(3)), lineItem.price());
+    }
+
+    @Test
+    void allQuotationsKeepsTheRoomsThatStillExistNextToARemovedOne() {
+        final Quotation removed = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        final Quotation intact = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        intact.getOptions().get(0).getLineItems().get(0).setRoomId(ROOM_ID_2);
+        when(quotationRepository.findAllByHotelId(eq(HOTEL_ID), any())).thenReturn(new PageImpl<>(List.of(removed, intact)));
+        when(guestClient.getGuestsBatch(List.of(GUEST_ID)))
+                .thenReturn(List.of(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL)));
+        roomWasRemoved();
+
+        final Page<QuotationResponse> result = quotationService.getAllQuotations(PageRequest.of(0, 10));
+
+        assertEquals(REMOVED_ROOM_PLACEHOLDER, result.getContent().get(0).options().get(0).lineItems().get(0).roomNumber());
+        assertEquals(ROOM_NUMBER_2, result.getContent().get(1).options().get(0).lineItems().get(0).roomNumber());
+    }
+
+    @Test
+    void quotationByIdWithARemovedRoomShowsPlaceholders() {
+        final Quotation quotation = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        roomWasRemoved();
+
+        final QuotationResponse response = quotationService.getQuotationById(QUOTATION_ID);
+
+        assertEquals(REMOVED_ROOM_PLACEHOLDER, response.options().get(0).lineItems().get(0).roomNumber());
+    }
+
+    @Test
+    void quotationPdfWithARemovedRoomStillRenders() {
+        final Quotation quotation = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        roomWasRemoved();
+
+        assertArrayEquals(PDF_BYTES, quotationService.getQuotationPdf(QUOTATION_ID));
+    }
+
+    @Test
+    void declineQuotationWithARemovedRoomStillDeclines() {
+        final Quotation quotation = quotationEntity(QuotationStatus.SENT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        roomWasRemoved();
+
+        assertEquals(QuotationStatus.DECLINED, quotationService.declineQuotation(QUOTATION_ID).status());
+    }
+
+    @Test
+    void sendQuotationEmailWithARemovedRoomStillFails() {
+        // Sending is not a read: never mail a quote for a room that no longer exists.
+        final Quotation quotation = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        roomWasRemoved();
+
+        assertThrows(NotFoundException.class, () -> quotationService.sendQuotationEmail(QUOTATION_ID));
+        verify(notificationClient, never()).sendQuotation(any());
     }
 }

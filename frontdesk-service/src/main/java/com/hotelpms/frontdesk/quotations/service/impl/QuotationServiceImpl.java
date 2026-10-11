@@ -64,6 +64,8 @@ public class QuotationServiceImpl implements QuotationService {
     private static final String HOTEL_ID_NULL_MSG = "Hotel ID cannot be null";
     private static final String ID_NULL_MSG = "Quotation ID cannot be null";
     private static final String DEFAULT_CURRENCY = "EUR";
+    /** Shown in place of the number and type of a room that was removed after it was quoted. */
+    private static final String REMOVED_ROOM_PLACEHOLDER = "—";
     private static final String DEFAULT_LOCALE = "it";
     private static final String NOTIFICATION_SERVICE_UNAVAILABLE_REASON = "NOTIFICATION_SERVICE_UNAVAILABLE";
     private static final String PDF_TEMPLATE = "quotation";
@@ -195,7 +197,7 @@ public class QuotationServiceImpl implements QuotationService {
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        return toResponse(quotation, guest, resolveRoomsForQuotation(quotation, hotelId));
+        return toResponse(quotation, guest, resolveRoomsForQuotationLenient(quotation, hotelId));
     }
 
     /** {@inheritDoc} */
@@ -219,7 +221,7 @@ public class QuotationServiceImpl implements QuotationService {
         return page.map(quotation -> toResponse(
                 quotation,
                 quotation.getGuestId() == null ? null : guestsById.get(quotation.getGuestId()),
-                resolveRoomsForQuotation(quotation, hotelId)));
+                resolveRoomsForQuotationLenient(quotation, hotelId)));
     }
 
     /** {@inheritDoc} */
@@ -230,7 +232,7 @@ public class QuotationServiceImpl implements QuotationService {
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        return renderPdf(quotation, guest, resolveRoomsForQuotation(quotation, hotelId));
+        return renderPdf(quotation, guest, resolveRoomsForQuotationLenient(quotation, hotelId));
     }
 
     /** {@inheritDoc} */
@@ -357,7 +359,7 @@ public class QuotationServiceImpl implements QuotationService {
         final Quotation saved = quotationRepository.save(quotation);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        return toResponse(saved, guest, resolveRoomsForQuotation(quotation, hotelId));
+        return toResponse(saved, guest, resolveRoomsForQuotationLenient(quotation, hotelId));
     }
 
     /** {@inheritDoc} */
@@ -447,6 +449,30 @@ public class QuotationServiceImpl implements QuotationService {
         for (final UUID roomId : roomIds) {
             roomsById.computeIfAbsent(roomId, id -> roomService.getRoomById(id, hotelId));
         }
+        return roomsById;
+    }
+
+    /**
+     * Same as {@link #resolveRoomsForQuotation} for read-only views: a room that was removed after it
+     * was quoted is left out of the map instead of failing the whole response (and, in the list, the
+     * whole page). {@link #toLineItemResponses} and the PDF rows then show a placeholder for it.
+     *
+     * @param quotation the quotation whose rooms to resolve
+     * @param hotelId   the caller's hotel
+     * @return the rooms that still exist, by id
+     */
+    private Map<UUID, RoomResponse> resolveRoomsForQuotationLenient(final Quotation quotation, final UUID hotelId) {
+        final Map<UUID, RoomResponse> roomsById = new HashMap<>();
+        quotation.getOptions().stream()
+                .flatMap(option -> option.getLineItems().stream().map(QuotationLineItem::getRoomId))
+                .distinct()
+                .forEach(roomId -> {
+                    try {
+                        roomsById.put(roomId, roomService.getRoomById(roomId, hotelId));
+                    } catch (final NotFoundException e) {
+                        log.warn("[QUOTATION] room {} no longer exists, shown as a placeholder: {}", roomId, e.getMessage());
+                    }
+                });
         return roomsById;
     }
 
@@ -549,7 +575,9 @@ public class QuotationServiceImpl implements QuotationService {
         for (final QuotationLineItem lineItem : lineItems) {
             final RoomResponse room = roomsById.get(lineItem.getRoomId());
             final Map<String, String> row = new HashMap<>();
-            row.put("label", room.roomNumber() + " — " + room.roomType().name());
+            row.put("label", room == null
+                    ? REMOVED_ROOM_PLACEHOLDER
+                    : room.roomNumber() + " — " + room.roomType().name());
             row.put("priceFormatted", formatAmount(lineItem.getPrice()));
             rows.add(row);
         }
@@ -609,7 +637,9 @@ public class QuotationServiceImpl implements QuotationService {
                 .map(lineItem -> {
                     final RoomResponse room = roomsById.get(lineItem.getRoomId());
                     return new QuotationLineItemResponse(
-                            lineItem.getId(), lineItem.getRoomId(), room.roomNumber(), room.roomType().name(),
+                            lineItem.getId(), lineItem.getRoomId(),
+                            room == null ? REMOVED_ROOM_PLACEHOLDER : room.roomNumber(),
+                            room == null ? REMOVED_ROOM_PLACEHOLDER : room.roomType().name(),
                             lineItem.getPrice());
                 })
                 .toList();
