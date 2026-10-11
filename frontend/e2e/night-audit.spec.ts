@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockAuthMe, mockTodayArrivals, mockDueOutStays } from './fixtures/mockApi';
+import { mockAuthMe, mockDueOutStays, mockServerEvents, mockUnhandledApi } from './fixtures/mockApi';
 
 const COMPLETED_RUN = {
   id: 'run-1',
@@ -27,13 +27,45 @@ const historyPage = {
   size: 20,
 };
 
+const candidate = (id: string, guestFullName: string, status: string) => ({
+  id, guestId: `g-${id}`, guestFullName, checkInDate: '2026-06-14', checkOutDate: '2099-01-01', status,
+  expectedGuests: 2, lineItems: [{ id: `li-${id}`, roomId: 'room-1' }], active: true, version: 1,
+});
+
+const emptyPage = (content: unknown[]) => ({
+  content, totalElements: content.length, totalPages: 1, number: 0, size: 50, empty: content.length === 0,
+});
+
 test.describe('Night audit', () => {
+  const resolved = new Set<string>();
+
   test.beforeEach(async ({ page }) => {
+    resolved.clear();
+    await mockUnhandledApi(page);
     await mockAuthMe(page);
-    // The pre-check inside the closing card queries both; unmocked, they 401
-    // and the axios interceptor sends the whole page to /login.
-    await mockTodayArrivals(page);
+    await mockServerEvents(page);
     await mockDueOutStays(page);
+    await page.route('**/api/v1/rooms**', (route) =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ ...emptyPage([{ id: 'room-1', roomNumber: '201', status: 'CLEAN' }]), size: 500 }),
+      }),
+    );
+    // Arrivals still unresolved: one PENDING and one CONFIRMED until each is patched.
+    await page.route('**/api/v1/reservations/search**', (route) => {
+      const status = new URL(route.request().url()).searchParams.get('status');
+      const all = status === 'PENDING'
+        ? [candidate('res-p', 'Pia Pending', 'PENDING')]
+        : status === 'CONFIRMED' ? [candidate('res-c', 'Carl Confirmed', 'CONFIRMED')] : [];
+      return route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify(emptyPage(all.filter((r) => !resolved.has(r.id)))),
+      });
+    });
+    await page.route('**/api/v1/reservations/*/status-and-guests', (route) => {
+      resolved.add(route.request().url().split('/').at(-2) ?? '');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    });
     await page.route('**/api/v1/frontdesk/night-audit**', async (route) => {
       if (route.request().method() === 'POST') {
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(COMPLETED_RUN) });
@@ -55,6 +87,7 @@ test.describe('Night audit', () => {
     await page.goto('/night-audit');
     await expect(page.getByRole('heading', { name: 'Close a business day' })).toBeVisible({ timeout: 10000 });
 
+    await page.getByRole('button', { name: 'Continue' }).click();
     await page.getByRole('button', { name: 'Run closing' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
@@ -63,6 +96,23 @@ test.describe('Night audit', () => {
     await dialog.getByRole('button', { name: 'Confirm' }).click();
     await run;
     await expect(dialog).toBeHidden();
+  });
+
+  test('resolves an arrival as no-show before running the closing', async ({ page }) => {
+    await page.goto('/night-audit');
+    await expect(page.getByText('Pia Pending')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Carl Confirmed')).toBeVisible();
+
+    const patch = page.waitForRequest((req) => req.method() === 'PATCH' && req.url().includes('/res-p/status-and-guests'));
+    await page.getByRole('button', { name: 'Mark no-show Pia Pending' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
+    expect((await patch).postDataJSON()).toMatchObject({ status: 'NO_SHOW' });
+
+    await expect(page.getByText('Pia Pending')).toBeHidden();
+    await expect(page.getByText('Carl Confirmed')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.getByText(/1 reservation will be marked as no-show/)).toBeVisible();
   });
 
   test('opens the run detail dialog', async ({ page }) => {
