@@ -464,6 +464,23 @@ before adding new keys, don't improvise a naming pattern here.
 
 ---
 
+## Visual regression
+
+`npm run test:visual` (config `playwright-visual.config.ts`, specs in `e2e-visual/`)
+screenshots eight key screens in light, dark and high-contrast light at 1280px, plus
+mobile (390px), compact-sidebar and high-contrast dark variants, with every API call
+mocked and the clock frozen. CI runs it on frontend PRs (`.github/workflows/visual.yml`).
+
+- Baselines (`e2e-visual/__screenshots__/`) are generated **only by CI**: run the
+  workflow manually with `update=true`, download the `visual-baselines` artifact,
+  look at every image, commit it. Never commit PNGs made on Windows/macOS.
+- Regenerate only for an intended visual change, and say so in the PR; an unexpected
+  diff is a regression, not a baseline to refresh.
+- New screen: add it to `SCREENS` in `screens.spec.ts`; `stableShot` fails if a spinner
+  is still visible, which usually means an API mock is missing.
+
+---
+
 ## Known gaps / drift
 
 Kept explicit rather than papered over, so this file stays honest about the current
