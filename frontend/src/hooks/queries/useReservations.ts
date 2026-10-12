@@ -16,8 +16,9 @@ interface SearchParams {
   status?: string;
 }
 
-export function useReservationsSearch(params: SearchParams) {
+export function useReservationsSearch(params: SearchParams, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: queryKeys.reservations.search(params),
     queryFn: () => reservationService.searchReservations(params),
     placeholderData: (previousData) => previousData,

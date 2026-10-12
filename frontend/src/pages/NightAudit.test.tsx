@@ -11,7 +11,7 @@ import { stayService } from '../services';
 import { useToastStore } from '../store';
 import { formatDate } from '../utils';
 
-// The pre-check widget links to /reservations and /stays (react-router-dom
+// The pre-check and no-show widgets link to /reservations and /stays (react-router-dom
 // <Link>), so every render needs a Router context now, not just a QueryClient.
 const render = (ui: ReactElement) => renderWithQuery(<MemoryRouter>{ui}</MemoryRouter>);
 
@@ -33,6 +33,10 @@ vi.mock('../services/nightAuditService', () => ({
 
 vi.mock('../services/reservationService', () => ({
   reservationService: { searchReservations: vi.fn() },
+}));
+
+vi.mock('../services/inventoryService', () => ({
+  inventoryService: { getAllRooms: vi.fn().mockResolvedValue({ content: [] }) },
 }));
 
 vi.mock('../services/stayService', () => ({
@@ -92,7 +96,7 @@ describe('NightAudit', () => {
   it('should show loading state initially', () => {
     vi.mocked(nightAuditService.getHistory).mockReturnValue(new Promise(() => {}));
     render(<NightAudit />);
-    expect(screen.getByText('progress_activity')).toBeInTheDocument();
+    expect(screen.getAllByText('progress_activity').length).toBeGreaterThan(0);
   });
 
   it('defaults the business date to yesterday in local time, even just after midnight', async () => {
@@ -130,6 +134,7 @@ describe('NightAudit', () => {
     render(<NightAudit />);
 
     await waitFor(() => expect(screen.getByText('night_audit_no_runs_found')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'night_audit_continue' }));
     fireEvent.click(screen.getByRole('button', { name: 'night_audit_run_action' }));
 
     expect(screen.getByText(/night_audit_run_confirm/)).toBeInTheDocument();
@@ -143,6 +148,7 @@ describe('NightAudit', () => {
     render(<NightAudit />);
 
     await waitFor(() => expect(screen.getByText('night_audit_no_runs_found')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'night_audit_continue' }));
     fireEvent.click(screen.getByRole('button', { name: 'night_audit_run_action' }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
@@ -160,6 +166,7 @@ describe('NightAudit', () => {
     render(<NightAudit />);
 
     await waitFor(() => expect(screen.getByText('night_audit_no_runs_found')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'night_audit_continue' }));
     fireEvent.click(screen.getByRole('button', { name: 'night_audit_run_action' }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
@@ -178,6 +185,7 @@ describe('NightAudit', () => {
     render(<NightAudit />);
 
     await waitFor(() => expect(screen.getByText('night_audit_no_runs_found')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'night_audit_continue' }));
     fireEvent.click(screen.getByRole('button', { name: 'night_audit_run_action' }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
@@ -194,11 +202,8 @@ describe('NightAudit', () => {
     expect(screen.getByText('CASH')).toBeInTheDocument();
   });
 
-  it('shows the pre-check banner when arrivals and departures are still pending', async () => {
+  it('shows the open-departures banner on the confirm step', async () => {
     vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([]) as never);
-    vi.mocked(reservationService.searchReservations).mockResolvedValue({
-      content: [], totalPages: 1, totalElements: 2,
-    } as never);
     vi.mocked(stayService.searchStays).mockResolvedValue(
       page([
         { id: 's1', expectedCheckOutDate: '2026-06-14' },
@@ -208,16 +213,16 @@ describe('NightAudit', () => {
     render(<NightAudit />);
 
     await waitFor(() => expect(screen.getByText('night_audit_no_runs_found')).toBeInTheDocument());
-    expect(screen.getByText(/night_audit_precheck_pending_arrivals.*"count":2/)).toBeInTheDocument();
-    expect(screen.getByText(/night_audit_precheck_pending_departures.*"count":1/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'night_audit_continue' }));
+    await waitFor(() => expect(screen.getByText(/night_audit_precheck_pending_departures.*"count":1/)).toBeInTheDocument());
   });
 
-  it('hides the pre-check banner once nothing is pending', async () => {
+  it('hides the open-departures banner once nothing is pending', async () => {
     vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([]) as never);
     render(<NightAudit />);
 
     await waitFor(() => expect(screen.getByText('night_audit_no_runs_found')).toBeInTheDocument());
-    expect(screen.queryByText(/night_audit_precheck_pending_arrivals/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'night_audit_continue' }));
     expect(screen.queryByText(/night_audit_precheck_pending_departures/)).not.toBeInTheDocument();
   });
 
@@ -254,13 +259,13 @@ describe('NightAudit', () => {
     expect(await screen.findByText(/list_range_summary/)).toBeInTheDocument();
   });
 
-  it('keeps the date field and the run button in the closing card', async () => {
+  it('keeps the date field and the step buttons in the closing card', async () => {
     vi.mocked(nightAuditService.getHistory).mockResolvedValueOnce(page([]) as never);
     render(<NightAudit />);
 
     const card = within(screen.getByRole('region', { name: 'night_audit_run_card_title' }));
     expect(card.getByLabelText('night_audit_business_date')).toBeInTheDocument();
-    expect(card.getByRole('button', { name: 'night_audit_run_action' })).toBeInTheDocument();
+    expect(card.getByRole('button', { name: 'night_audit_continue' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('night_audit_no_runs_found')).toBeInTheDocument());
   });
 });

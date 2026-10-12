@@ -4,21 +4,16 @@ import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { NightAuditRunResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { PageHeader } from '../components/PageHeader';
-import { M3Button } from '../components/m3';
-import { M3Card } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
-import { M3ConfirmDialog } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3Pagination } from '../components/m3';
 import { M3TableActionLink } from '../components/m3';
-import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { useToastStore } from '../store';
-import { getErrorMessage, todayIsoDate, addDaysIso, nightAuditStatusTone } from '../utils';
-import { useNightAuditHistory, useRunNightAudit } from '../hooks/queries';
-import { NightAuditPreCheck } from './NightAudit/NightAuditPreCheck';
+import { getErrorMessage, nightAuditStatusTone } from '../utils';
+import { useNightAuditHistory } from '../hooks/queries';
+import { NightAuditRunWizard } from './NightAudit/NightAuditRunWizard';
 import { NightAuditDetailDialog } from './NightAudit/NightAuditDetailDialog';
 import { NightAuditLastRunSummary } from './NightAudit/NightAuditLastRunSummary';
 import { cashTotal, getStatusLabel } from './NightAudit/nightAuditUtils';
@@ -47,11 +42,8 @@ const ViewDetailCell = ({ run, label, onView, text }: ViewDetailCellProps) => {
 
 export const NightAudit = () => {
   const { t } = useTranslation('common');
-  const addToast = useToastStore((s) => s.addToast);
 
   const [page, setPage] = useState(0);
-  const [runDate, setRunDate] = useState(() => addDaysIso(todayIsoDate(), -1));
-  const [confirmingRun, setConfirmingRun] = useState(false);
   const [detailRun, setDetailRun] = useState<NightAuditRunResponse | null>(null);
 
   const { data: historyPage, isLoading, isPlaceholderData, error: queryError, refetch } = useNightAuditHistory(page, PAGE_SIZE);
@@ -66,35 +58,6 @@ export const NightAudit = () => {
   const lastCompletedRun = page === 0 && showPageSummary && !error ? runs.find((r) => r.status === 'COMPLETED') : undefined;
 
   const { formatCurrency, formatDate } = useFormatters();
-
-  const runMutation = useRunNightAudit();
-
-  const handleRunDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setRunDate(e.target.value);
-  }, []);
-
-  const handleRunRequest = useCallback(() => {
-    setConfirmingRun(true);
-  }, []);
-
-  const handleRunDialogClose = useCallback(() => {
-    setConfirmingRun(false);
-  }, []);
-
-  const handleRunConfirm = useCallback(async () => {
-    try {
-      const result = await runMutation.mutateAsync(runDate);
-      if (result.status === 'COMPLETED') {
-        addToast(t('night_audit_run_success', { date: formatDate(result.businessDate) }), 'success');
-      } else {
-        addToast(t('night_audit_run_failed_detail', { reason: result.failureReason ?? '' }), 'error');
-      }
-    } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('night_audit_run_failed')), 'error');
-    } finally {
-      setConfirmingRun(false);
-    }
-  }, [runDate, runMutation, addToast, t, formatDate]);
 
   const handleViewDetail = useCallback((run: NightAuditRunResponse) => {
     setDetailRun(run);
@@ -190,27 +153,7 @@ export const NightAudit = () => {
         subtitle={t('night_audit_subtitle')}
       />
 
-      <M3Card variant="solid" role="region" aria-labelledby="night-audit-run-card-title" className="space-y-4 p-5">
-        <div className="flex items-center gap-2">
-          <MaterialIcon name="play_circle" size={20} className="text-primary" />
-          <h2 id="night-audit-run-card-title" className="text-sm font-display font-semibold text-on-surface">{t('night_audit_run_card_title')}</h2>
-        </div>
-        <p className="text-xs font-body text-on-surface-variant">{t('night_audit_run_card_desc')}</p>
-        <div className="flex flex-col items-end gap-3 sm:flex-row">
-          <M3TextField
-            className="w-full sm:max-w-xs"
-            label={t('night_audit_business_date')}
-            type="date"
-            value={runDate}
-            onChange={handleRunDateChange}
-            max={todayIsoDate()}
-          />
-          <M3Button icon="play_arrow" onClick={handleRunRequest} loading={runMutation.isPending}>
-            {t('night_audit_run_action')}
-          </M3Button>
-        </div>
-        <NightAuditPreCheck businessDate={runDate} />
-      </M3Card>
+      <NightAuditRunWizard />
 
       {lastCompletedRun && <NightAuditLastRunSummary run={lastCompletedRun} />}
 
@@ -245,17 +188,6 @@ export const NightAudit = () => {
           nextLabel={t('next_page')}
           pageOfLabel={pageOfLabel}
           summary={showPageSummary ? rangeSummary : undefined}
-        />
-      )}
-
-      {confirmingRun && (
-        <M3ConfirmDialog
-          title={t('night_audit_run_action')}
-          titleId="confirm-night-audit-run-dialog"
-          message={t('night_audit_run_confirm', { date: formatDate(runDate) })}
-          onConfirm={handleRunConfirm}
-          onCancel={handleRunDialogClose}
-          loading={runMutation.isPending}
         />
       )}
 
