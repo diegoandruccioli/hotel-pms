@@ -1,0 +1,79 @@
+name: Visual Regression
+
+# Screenshot comparison of the key screens in every theme, with all API calls mocked and the
+# clock frozen. Baselines live in frontend/e2e-visual/__screenshots__ and MUST be generated
+# here (Linux runner), never on a developer machine: run this workflow manually with
+# update=true, download the `visual-baselines` artifact, review every image, then commit it.
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/visual.yml"
+  workflow_dispatch:
+    inputs:
+      update:
+        description: "Regenerate the baselines instead of comparing against them"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  visual:
+    name: "Visual — Playwright screenshots"
+    # Pinned (not ubuntu-latest) so a runner image bump cannot silently shift fonts/Chrome.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: visual-${{ github.ref }}
+      cancel-in-progress: true
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The runner ships google-chrome-stable (config uses channel: 'chrome').
+      - name: Install Playwright system dependencies
+        run: npx playwright install-deps chromium
+
+      - name: Compare against the committed baselines
+        if: ${{ !inputs.update }}
+        run: npm run test:visual
+
+      - name: Regenerate baselines
+        if: ${{ inputs.update }}
+        run: npm run test:visual:update
+
+      - name: Upload regenerated baselines
+        if: ${{ inputs.update }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: visual-baselines
+          path: frontend/e2e-visual/__screenshots__/
+          retention-days: 14
+
+      # test-results holds expected / actual / diff images for every failing screen.
+      - name: Upload diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: visual-diffs
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          retention-days: 14
