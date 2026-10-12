@@ -17,11 +17,10 @@ export const queryKeys = {
   },
   rooms: {
     all: ['rooms'] as const,
-    list: (availableOnly: boolean, status?: string) => ['rooms', 'list', availableOnly, status] as const,
-    /** Full unpaginated room list used as a lookup map (e.g. resolving room
-     * numbers on the Reservations table) — distinct key from `list()` since
-     * it fetches a different page size and callers shouldn't share a cache
-     * entry that could silently swap between the two shapes. */
+    list: (availableOnly: boolean) => ['rooms', 'list', availableOnly] as const,
+    /** Whole room list used as a lookup map (e.g. resolving room numbers on the
+     * Reservations table). Same data as `list(false)` but never patched by the
+     * status mutations, which only matter to the board. */
     lookup: ['rooms', 'lookup'] as const,
     /** Availability (with resolved stay prices) for a date range. */
     available: (checkIn: string, checkOut: string) => ['rooms', 'available', checkIn, checkOut] as const,
