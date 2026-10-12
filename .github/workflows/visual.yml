@@ -6,10 +6,9 @@ name: Visual Regression
 # update=true, download the `visual-baselines` artifact, review every image, then commit it.
 
 on:
+  # No `paths` filter: this is a required check, and a path-filtered required check stays
+  # "pending" forever on PRs that do not touch the filtered paths, blocking their merge.
   pull_request:
-    paths:
-      - "frontend/**"
-      - ".github/workflows/visual.yml"
   workflow_dispatch:
     inputs:
       update:
