@@ -63,6 +63,50 @@ describe('RoomCard', () => {
     expect(screen.getByTestId('room-card-tone')).toHaveClass(cls);
   });
 
+  it('is draggable and hands its id to the drop target, except when occupied', () => {
+    const { container } = setup('DIRTY');
+    const card = container.firstElementChild as HTMLElement;
+    expect(card).toHaveAttribute('draggable', 'true');
+    const setData = vi.fn();
+    fireEvent.dragStart(card, { dataTransfer: { setData, effectAllowed: '' } });
+    expect(setData).toHaveBeenCalledWith('text/plain', '1');
+    expect(card).toHaveClass('opacity-40');
+    fireEvent.dragEnd(card);
+    expect(card).not.toHaveClass('opacity-40');
+  });
+
+  it('is not draggable when occupied', () => {
+    const { container } = setup('OCCUPIED');
+    expect(container.firstElementChild).toHaveAttribute('draggable', 'false');
+  });
+
+  it('shows the priority chip only when asked', () => {
+    const { rerender } = render(
+      <RoomCard room={room('DIRTY')} selected={false} priority onToggleSelected={vi.fn()} onStatusChange={vi.fn()} />,
+    );
+    expect(screen.getByText('housekeeping_priority')).toBeInTheDocument();
+    rerender(<RoomCard room={room('DIRTY')} selected={false} onToggleSelected={vi.fn()} onStatusChange={vi.fn()} />);
+    expect(screen.queryByText('housekeeping_priority')).not.toBeInTheDocument();
+  });
+
+  it('cannot be dragged nor moved again while a change is in flight', () => {
+    const { container } = render(
+      <RoomCard room={room('DIRTY')} selected={false} busy onToggleSelected={vi.fn()} onStatusChange={vi.fn()} />,
+    );
+    expect(container.firstElementChild).toHaveAttribute('draggable', 'false');
+    expect(screen.getByRole('button', { name: '→ room_status_clean' })).toBeDisabled();
+  });
+
+  it('takes focus on its heading when asked and reports it', () => {
+    const onFocusHandled = vi.fn();
+    render(
+      <RoomCard room={room('DIRTY')} selected={false} focusRequested onFocusHandled={onFocusHandled}
+        onToggleSelected={vi.fn()} onStatusChange={vi.fn()} />,
+    );
+    expect(screen.getByRole('heading', { level: 3 })).toHaveFocus();
+    expect(onFocusHandled).toHaveBeenCalledTimes(1);
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = setup('CLEAN');
     expect(await axe(container)).toHaveNoViolations();

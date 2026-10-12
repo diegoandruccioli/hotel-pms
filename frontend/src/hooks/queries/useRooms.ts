@@ -70,10 +70,10 @@ export function useBulkUpdateRoomStatus() {
 }
 
 /**
- * Housekeeping's status-count badges read `useDaySheet()`'s
- * `roomStatusCounts` (Housekeeping.tsx:164-168) instead of counting the room
+ * Housekeeping's status counts (page subtitle) read `useDaySheet()`'s
+ * `roomStatusCounts` instead of counting the room
  * list client-side. Neither the single nor bulk status mutation invalidated
- * that query, so the badges stayed stuck at their value from page load —
+ * that query, so the counts stayed stuck at their value from page load —
  * even after the explicit "Aggiorna" button, which only refetches the room
  * list, not the day-sheet. `queryKeys.dashboard.daySheet` is keyed by
  * today's date string (not known here), so invalidate by predicate on the

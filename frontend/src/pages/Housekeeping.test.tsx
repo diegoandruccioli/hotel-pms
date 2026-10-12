@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactElement } from 'react';
@@ -134,7 +134,7 @@ describe('Housekeeping', () => {
     render(<Housekeeping />);
 
     await waitFor(() => {
-      expect(screen.getByText('room_status_occupied')).toBeInTheDocument();
+      expect(screen.getAllByText('room_status_occupied').length).toBeGreaterThan(0);
     });
     expect(screen.queryByText(/→/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('select_room')).not.toBeInTheDocument();
@@ -200,49 +200,10 @@ describe('Housekeeping', () => {
     render(<Housekeeping />);
     await waitFor(() => expect(screen.getByText('room_number')).toBeInTheDocument());
 
-    // CLEAN room only shows action buttons for DIRTY/MAINTENANCE — its own status is
-    // filtered out, even though the "CLEAN" filter badge above is always rendered.
-    const cleanButtons = screen.getAllByRole('button', { name: /room_status_clean/i });
-    expect(cleanButtons.some((b) => b.textContent?.startsWith('→'))).toBe(false);
+    // CLEAN room only shows action buttons for DIRTY/MAINTENANCE — its own status is filtered out.
+    expect(screen.queryByRole('button', { name: /^→ room_status_clean/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '→ room_status_dirty' })).toBeInTheDocument();
     expect(inventoryService.updateRoomStatus).not.toHaveBeenCalled();
-  });
-
-  it('filters by status through exclusive chips and "all" clears the filter', async () => {
-    vi.mocked(inventoryService.getAllRooms).mockResolvedValue({
-      content: [{ id: '2', roomNumber: '102', type: 'Standard', status: 'DIRTY', pricePerNight: 100 }],
-      totalElements: 1,
-    } as never);
-    render(<Housekeeping />);
-    await waitFor(() => expect(inventoryService.getAllRooms).toHaveBeenCalledWith(0, 100, undefined));
-
-    const all = screen.getByRole('button', { name: 'filter_all' });
-    const dirtyChip = await screen.findByRole('button', { name: 'room_status_dirty (1)' });
-    expect(all).toHaveAttribute('aria-pressed', 'true');
-    expect(dirtyChip).toHaveAttribute('aria-pressed', 'false');
-
-    fireEvent.click(dirtyChip);
-    await waitFor(() => expect(inventoryService.getAllRooms).toHaveBeenCalledWith(0, 100, 'DIRTY'));
-    expect(dirtyChip).toHaveAttribute('aria-pressed', 'true');
-    expect(all).toHaveAttribute('aria-pressed', 'false');
-
-    fireEvent.click(all);
-    await waitFor(() => expect(inventoryService.getAllRooms).toHaveBeenLastCalledWith(0, 100, undefined));
-    expect(all).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('clears the room selection when the filter changes', async () => {
-    vi.mocked(inventoryService.getAllRooms).mockResolvedValue({
-      content: [{ id: '1', roomNumber: '101', type: 'Standard', status: 'CLEAN', pricePerNight: 100 }],
-      totalElements: 1,
-    } as never);
-    render(<Housekeeping />);
-    await waitFor(() => expect(screen.getByText('room_number')).toBeInTheDocument());
-
-    fireEvent.click(screen.getByLabelText('select_all_visible'));
-    await waitFor(() => expect(screen.getByText(/n_rooms_selected 1/)).toBeInTheDocument());
-
-    fireEvent.click(await screen.findByRole('button', { name: 'room_status_dirty (1)' }));
-    await waitFor(() => expect(screen.queryByText(/n_rooms_selected/)).not.toBeInTheDocument());
   });
 
   it('marks each room card with its canonical tone (dirty = warning, maintenance = error)', async () => {
@@ -271,17 +232,6 @@ describe('Housekeeping', () => {
     expect(maintenance.className).toContain('border-error');
   });
 
-  it('shows status counts in the filter chips, sourced from the day-sheet aggregate', async () => {
-    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
-      content: [{ id: '1', roomNumber: '101', type: 'Standard', status: 'CLEAN', pricePerNight: 100 }],
-      totalElements: 1,
-    } as never);
-    render(<Housekeeping />);
-    expect(await screen.findByRole('button', { name: 'room_status_clean (3)' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'room_status_dirty (1)' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'room_status_maintenance (0)' })).toBeInTheDocument();
-  });
-
   it('summarises the day-sheet counts in the subtitle', async () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValue({ content: [], totalElements: 0 } as never);
     render(<Housekeeping />);
@@ -290,12 +240,110 @@ describe('Housekeeping', () => {
     expect(screen.queryByText('housekeeping_subtitle')).not.toBeInTheDocument();
   });
 
-  it('keeps the static subtitle and count-less chips when the day-sheet is unavailable', async () => {
+  it('keeps the static subtitle when the day-sheet is unavailable', async () => {
     vi.mocked(dashboardService.getDaySheet).mockRejectedValue(new Error('down'));
     vi.mocked(inventoryService.getAllRooms).mockResolvedValue({ content: [], totalElements: 0 } as never);
     render(<Housekeeping />);
     expect(await screen.findByText('housekeeping_subtitle')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'room_status_dirty' })).toBeInTheDocument();
+  });
+
+  const BOARD_ROOMS = [
+    { id: '1', roomNumber: '101', roomType: { name: 'Standard', basePrice: 100 }, status: 'DIRTY' },
+    { id: '2', roomNumber: '102', roomType: { name: 'Standard', basePrice: 100 }, status: 'CLEAN' },
+    { id: '3', roomNumber: '103', roomType: { name: 'Standard', basePrice: 100 }, status: 'MAINTENANCE' },
+    { id: '4', roomNumber: '104', roomType: { name: 'Standard', basePrice: 100 }, status: 'OCCUPIED' },
+    { id: '5', roomNumber: '105', roomType: { name: 'Standard', basePrice: 100 }, status: 'DIRTY' },
+  ];
+  const dropData = (roomId: string) => ({ dataTransfer: { getData: () => roomId, setData: vi.fn(), dropEffect: '', effectAllowed: '' } });
+  const loadBoard = async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue({ content: BOARD_ROOMS, totalElements: 5 } as never);
+    render(<Housekeeping />);
+    await screen.findByRole('group', { name: 'room_status_dirty' });
+  };
+
+  it('groups the rooms into one column per status with their counts', async () => {
+    await loadBoard();
+    const dirty = within(screen.getByRole('group', { name: 'room_status_dirty' }));
+    expect(dirty.getAllByRole('heading', { level: 3 })).toHaveLength(2);
+    expect(dirty.getByText('housekeeping_column_count 2')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'room_status_clean' })).getAllByRole('heading', { level: 3 })).toHaveLength(1);
+    expect(within(screen.getByRole('group', { name: 'room_status_maintenance' })).getAllByRole('heading', { level: 3 })).toHaveLength(1);
+    expect(within(screen.getByRole('group', { name: 'room_status_occupied' })).getAllByRole('heading', { level: 3 })).toHaveLength(1);
+  });
+
+  it('moves a room to another column when it is dropped there', async () => {
+    vi.mocked(inventoryService.updateRoomStatus).mockResolvedValue({ ...BOARD_ROOMS[0], status: 'CLEAN' } as never);
+    await loadBoard();
+
+    fireEvent.drop(screen.getByRole('group', { name: 'room_status_clean' }), dropData('1'));
+
+    await waitFor(() => expect(inventoryService.updateRoomStatus).toHaveBeenCalledWith('1', 'CLEAN'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(expect.any(String), 'success'));
+  });
+
+  it('ignores a drop on the same column, on the occupied column and of an occupied room', async () => {
+    await loadBoard();
+
+    fireEvent.drop(screen.getByRole('group', { name: 'room_status_dirty' }), dropData('1'));
+    fireEvent.drop(screen.getByRole('group', { name: 'room_status_occupied' }), dropData('1'));
+    fireEvent.drop(screen.getByRole('group', { name: 'room_status_clean' }), dropData('4'));
+
+    expect(inventoryService.updateRoomStatus).not.toHaveBeenCalled();
+  });
+
+  it('shows an error toast when a dropped room cannot be updated', async () => {
+    vi.mocked(inventoryService.updateRoomStatus).mockRejectedValue(new Error('boom'));
+    await loadBoard();
+
+    fireEvent.drop(screen.getByRole('group', { name: 'room_status_clean' }), dropData('1'));
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('failed_update_room', 'error'));
+  });
+
+  it('ignores a second drop of a room whose update is still in flight', async () => {
+    let resolve: (v: unknown) => void = () => {};
+    vi.mocked(inventoryService.updateRoomStatus).mockReturnValue(new Promise((r) => { resolve = r; }) as never);
+    await loadBoard();
+
+    fireEvent.drop(screen.getByRole('group', { name: 'room_status_clean' }), dropData('1'));
+    await waitFor(() => expect(inventoryService.updateRoomStatus).toHaveBeenCalledTimes(1));
+    fireEvent.drop(screen.getByRole('group', { name: 'room_status_maintenance' }), dropData('1'));
+
+    expect(inventoryService.updateRoomStatus).toHaveBeenCalledTimes(1);
+    resolve({ ...BOARD_ROOMS[0], status: 'CLEAN' });
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalled());
+  });
+
+  it('puts keyboard focus back on the moved card after a button move', async () => {
+    vi.mocked(inventoryService.updateRoomStatus).mockResolvedValue({ ...BOARD_ROOMS[0], status: 'CLEAN' } as never);
+    await loadBoard();
+
+    const dirty = within(screen.getByRole('group', { name: 'room_status_dirty' }));
+    fireEvent.click(dirty.getAllByRole('button', { name: '→ room_status_clean' })[0]);
+
+    await waitFor(() => expect(within(screen.getByRole('group', { name: 'room_status_clean' }))
+      .getAllByRole('heading', { level: 3 }).some((h) => h === document.activeElement)).toBe(true));
+  });
+
+  it('flags the dirty rooms of a turnover or arrival prep with a priority chip', async () => {
+    vi.mocked(housekeepingService.getWorksheet).mockResolvedValue(
+      { date: '2026-08-20', generatedAt: '2026-08-20T04:00:00', provisional: false, hotelName: null, summary: {},
+        rows: [
+          { roomNumber: '101', roomTypeName: 'Standard', taskType: 'DEPARTURE', currentStatus: 'DIRTY', pax: 1, expectedDepartureDate: null, turnover: true, departureDateUnknown: false },
+          { roomNumber: '102', roomTypeName: 'Standard', taskType: 'ARRIVAL_PREP', currentStatus: 'CLEAN', pax: 0, expectedDepartureDate: null, turnover: false, departureDateUnknown: false },
+        ] } as never);
+    await loadBoard();
+
+    const dirty = within(screen.getByRole('group', { name: 'room_status_dirty' }));
+    await waitFor(() => expect(dirty.getAllByText('housekeeping_priority')).toHaveLength(1));
+    // 102 is clean: priority only applies to rooms still to be cleaned.
+    expect(within(screen.getByRole('group', { name: 'room_status_clean' })).queryByText('housekeeping_priority')).not.toBeInTheDocument();
+  });
+
+  it('shows no priority chips when the worksheet is unavailable', async () => {
+    vi.mocked(housekeepingService.getWorksheet).mockRejectedValue(new Error('down'));
+    await loadBoard();
+    expect(screen.queryByText('housekeeping_priority')).not.toBeInTheDocument();
   });
 
   it('retries loading rooms when the try_again button is clicked after a failure', async () => {
@@ -350,7 +398,7 @@ describe('Housekeeping', () => {
       totalElements: 1,
     } as never);
     render(<Housekeeping />);
-    await waitFor(() => expect(screen.getByText('room_status_occupied')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('room_status_occupied').length).toBeGreaterThan(0));
     expect(screen.queryByLabelText('select_all_visible')).not.toBeInTheDocument();
   });
 

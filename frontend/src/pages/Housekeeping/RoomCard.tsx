@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, useEffect, useRef, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RoomResponse, RoomStatus } from '../../types';
 import { useFormatters } from '../../hooks';
@@ -7,9 +7,10 @@ import { M3Card, M3Checkbox, M3StatusChip } from '../../components/m3';
 import { cn, roomStatusTone, toneDotClasses, toneOutlineButtonClasses } from '../../utils';
 import { STATUS_KEYS, ALL_STATUSES } from './roomStatus';
 
-const StatusButton = memo(({ newStatus, updating, onClick, t }: {
+const StatusButton = memo(({ newStatus, updating, disabled, onClick, t }: {
   newStatus: RoomStatus;
   updating: RoomStatus | null;
+  disabled: boolean;
   onClick: (s: RoomStatus) => void;
   t: (k: string) => string;
 }) => {
@@ -20,7 +21,7 @@ const StatusButton = memo(({ newStatus, updating, onClick, t }: {
   return (
     <button
       onClick={handleClick}
-      disabled={updating !== null}
+      disabled={disabled}
       className={cn(
         'flex-1 flex items-center justify-center min-h-10 text-xs font-medium font-body border rounded-shape-sm px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
         toneOutlineButtonClasses[roomStatusTone[newStatus]]
@@ -43,13 +44,32 @@ StatusButton.displayName = 'StatusButton';
 interface RoomCardProps {
   room: RoomResponse;
   selected: boolean;
+  /** Cleaned first today (same-day turnover or arrival prep). */
+  priority?: boolean;
+  /** A status change for this room is already in flight (e.g. started by a drop): no second one. */
+  busy?: boolean;
+  /** Take focus on the heading: set after a status change, when the focused button may be gone. */
+  focusRequested?: boolean;
+  onFocusHandled?: () => void;
   onToggleSelected: (id: string) => void;
   onStatusChange: (id: string, status: RoomStatus) => Promise<void>;
 }
 
-export const RoomCard = memo(({ room, selected, onToggleSelected, onStatusChange }: RoomCardProps) => {
+export const RoomCard = memo(({ room, selected, priority = false, busy = false, focusRequested = false, onFocusHandled, onToggleSelected, onStatusChange }: RoomCardProps) => {
   const { t } = useTranslation('common');
   const [updating, setUpdating] = useState<RoomStatus | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  // OCCUPIED follows the stay, so it cannot be moved by hand.
+  const draggable = room.status !== 'OCCUPIED' && !busy;
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // A moved card is unmounted and remounted in its new column, dropping the focus of the
+  // button that triggered the move; the page hands it back here.
+  useEffect(() => {
+    if (!focusRequested) return;
+    headingRef.current?.focus();
+    onFocusHandled?.();
+  }, [focusRequested, onFocusHandled]);
 
   const { formatCurrency } = useFormatters();
 
@@ -63,22 +83,32 @@ export const RoomCard = memo(({ room, selected, onToggleSelected, onStatusChange
     }
   }, [room.status, room.id, onStatusChange]);
 
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    e.dataTransfer.setData('text/plain', room.id);
+    e.dataTransfer.effectAllowed = 'move';
+    setIsDragging(true);
+  }, [room.id]);
+
+  const handleDragEnd = useCallback(() => setIsDragging(false), []);
+
   const handleToggle = useCallback(() => {
     onToggleSelected(room.id);
   }, [onToggleSelected, room.id]);
 
   return (
-    <M3Card variant="solid" className="relative flex flex-col gap-3 overflow-hidden p-4">
+    <M3Card
+      variant="solid"
+      draggable={draggable}
+      onDragStart={draggable ? handleDragStart : undefined}
+      onDragEnd={draggable ? handleDragEnd : undefined}
+      className={cn('relative flex flex-col gap-3 overflow-hidden p-4', draggable && 'cursor-grab', isDragging && 'opacity-40')}
+    >
       <div
         data-testid="room-card-tone"
         aria-hidden="true"
         className={cn('absolute inset-x-0 top-0 h-1', toneDotClasses[roomStatusTone[room.status]])}
       />
-      {/* flex-wrap: the checkbox + room-number block + status chip can outgrow a
-          4-up grid column for the longer status labels (e.g. "Maintenance").
-          Without wrapping, the flex-1 min-w-16 heading block was the only shrinkable
-          item and got squeezed to zero width — the room number disappeared
-          entirely instead of just re-flowing the chip onto its own line. */}
+      {/* The status itself is the column heading; the card keeps the tone bar and carries no chip. */}
       <div className="flex items-start justify-between gap-2 flex-wrap">
         {room.status !== 'OCCUPIED' && (
           <M3Checkbox
@@ -89,21 +119,27 @@ export const RoomCard = memo(({ room, selected, onToggleSelected, onStatusChange
           />
         )}
         <div className="flex-1 min-w-16">
-          <h3 className="text-lg font-display font-bold text-on-surface truncate">{t('room_number', { number: room.roomNumber })}</h3>
+          <h3 ref={headingRef} tabIndex={-1} className="text-lg font-display font-bold text-on-surface truncate outline-none">{t('room_number', { number: room.roomNumber })}</h3>
           <p className="text-xs font-body font-medium uppercase tracking-wide text-on-surface-variant truncate">{room.roomType?.name}</p>
         </div>
-        <M3StatusChip label={t(STATUS_KEYS[room.status])} tone={roomStatusTone[room.status]} />
       </div>
+
+      {priority && (
+        <div>
+          <M3StatusChip label={t('housekeeping_priority')} tone="warning" icon="priority_high" />
+        </div>
+      )}
 
       <p className="text-sm font-body text-on-surface-variant">{formatCurrency(room.roomType?.basePrice)} / {t('night')}</p>
 
       {room.status !== 'OCCUPIED' && (
-        <div className="flex gap-2 flex-wrap mt-1">
+        <div className="flex flex-col gap-2 mt-1">
           {ALL_STATUSES.filter((s) => s !== room.status).map((newStatus) => (
             <StatusButton
               key={newStatus}
               newStatus={newStatus}
               updating={updating}
+              disabled={updating !== null || busy}
               onClick={handleStatusButton}
               t={t}
             />
