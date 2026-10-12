@@ -32,13 +32,13 @@ export const inventoryService = {
   },
 
   // Rooms
+  /** One page of rooms; use `fetchAllRooms` (lib) when the whole list is needed. */
   getAllRooms: async (
     page = 0,
     size = 100,
-    status?: RoomStatus,
   ): Promise<SpringPage<RoomResponse>> => {
     const response = await api.get<SpringPage<RoomResponse>>(ROOMS_PATH, {
-      params: { page, size, sort: 'roomNumber,asc', status },
+      params: { page, size, sort: 'roomNumber,asc' },
     });
     return response.data;
   },

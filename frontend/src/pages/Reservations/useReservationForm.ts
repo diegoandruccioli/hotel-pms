@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { inventoryService, reservationService, guestService, stayService } from '../../services';
+import { fetchAllRooms } from '../../lib';
 import type { GuestResponseDTO, RoomResponse } from '../../types';
 import type { ReservationRequest, ReservationResponse, ReservationStatus } from '../../types';
 
@@ -112,8 +113,7 @@ export const useReservationForm = () => {
       setFetching(true);
       setError(null);
 
-      const roomsData = await inventoryService.getAllRooms();
-      const allRooms = roomsData.content;
+      const allRooms = await fetchAllRooms();
 
       const allRes = await reservationService.getAllReservations();
       setAllReservations(allRes);

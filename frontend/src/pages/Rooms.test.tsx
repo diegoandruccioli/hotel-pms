@@ -94,20 +94,18 @@ describe('Rooms', () => {
     expect(screen.queryByText('rooms_subtitle')).not.toBeInTheDocument();
   });
 
-  it('does not state a room count when the list fills a whole page (it may be truncated)', async () => {
+  it('counts every room of the hotel even when it needs more than one page', async () => {
     const { inventoryService } = await import('../services/inventoryService');
     const type = { id: 't1', name: 'Single', maxOccupancy: 1, basePrice: 50 };
-    const full = Array.from({ length: 100 }, (_, i) => ({
-      id: 'r' + i, roomNumber: String(100 + i), status: 'CLEAN', roomType: type,
+    const make = (from: number, count: number) => Array.from({ length: count }, (_, i) => ({
+      id: 'r' + (from + i), roomNumber: String(from + i), status: 'CLEAN', roomType: type,
     }));
-    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
-      content: full, totalElements: 150, totalPages: 2, number: 0, size: 100,
-    } as never);
-    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValueOnce([type] as never);
+    vi.mocked(inventoryService.getAllRooms).mockImplementation(((p: number) =>
+      Promise.resolve({ content: p === 0 ? make(1, 200) : make(201, 50), totalElements: 250, totalPages: 2, number: p, size: 200 })) as never);
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([type] as never);
     render(<Rooms />);
-    await screen.findByText('100');
-    expect(screen.getByText('rooms_subtitle')).toBeInTheDocument();
-    expect(screen.queryByText('rooms_count_summary')).not.toBeInTheDocument();
+    expect(await screen.findByText('rooms_count_summary')).toBeInTheDocument();
+    expect(screen.queryByText('rooms_subtitle')).not.toBeInTheDocument();
   });
 
   it('has no critical accessibility violations', async () => {

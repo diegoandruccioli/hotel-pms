@@ -17,19 +17,7 @@ describe('inventoryService', () => {
     const result = await inventoryService.getAllRooms();
 
     expect(api.get).toHaveBeenCalledWith('/api/v1/rooms', {
-      params: { page: 0, size: 100, sort: 'roomNumber,asc', status: undefined },
-    });
-    expect(result).toEqual(mockRooms);
-  });
-
-  it('should fetch rooms filtered by status', async () => {
-    const mockRooms = { content: [{ id: '2', roomNumber: '102', status: 'DIRTY' }], totalElements: 1 };
-    vi.mocked(api.get).mockResolvedValueOnce({ data: mockRooms });
-
-    const result = await inventoryService.getAllRooms(0, 100, 'DIRTY');
-
-    expect(api.get).toHaveBeenCalledWith('/api/v1/rooms', {
-      params: { page: 0, size: 100, sort: 'roomNumber,asc', status: 'DIRTY' },
+      params: { page: 0, size: 100, sort: 'roomNumber,asc' },
     });
     expect(result).toEqual(mockRooms);
   });

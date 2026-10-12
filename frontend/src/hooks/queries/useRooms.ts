@@ -3,20 +3,17 @@ import { todayIsoDate, addDaysIso } from '../../utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { inventoryService } from '../../services';
 import type { RoomResponse, RoomStatus } from '../../types';
-import { queryKeys } from '../../lib';
+import { fetchAllRooms, queryKeys } from '../../lib';
 
-/** `availableOnly` switches between the full room list and today's
- * availability search — same two backend calls RoomList.tsx already made.
- * `status`, when set, applies the server-side housekeeping-status filter
- * instead of downloading every room and filtering in the browser
- * (Housekeeping.tsx). */
-export function useRoomsList(availableOnly: boolean, status?: RoomStatus) {
+/** `availableOnly` switches between the whole room list (every page, see
+ * `fetchAllRooms`) and today's availability search. */
+export function useRoomsList(availableOnly: boolean) {
   return useQuery({
-    queryKey: queryKeys.rooms.list(availableOnly, status),
+    queryKey: queryKeys.rooms.list(availableOnly),
     queryFn: () =>
       availableOnly
         ? inventoryService.getAvailableRooms(todayIsoDate(), addDaysIso(todayIsoDate(), 1))
-        : inventoryService.getAllRooms(0, 100, status).then((page) => page.content),
+        : fetchAllRooms(),
   });
 }
 
@@ -45,7 +42,6 @@ export function useUpdateRoomStatus() {
         prev?.map((r) => (r.id === updated.id ? updated : r)),
       );
       queryClient.invalidateQueries({ queryKey: queryKeys.rooms.list(true) });
-      invalidateFilteredRoomLists(queryClient);
       invalidateDaySheet(queryClient);
     },
   });
@@ -83,18 +79,6 @@ export function useBulkUpdateRoomStatus() {
 function invalidateDaySheet(queryClient: ReturnType<typeof useQueryClient>): void {
   queryClient.invalidateQueries({
     predicate: (query) => query.queryKey[0] === 'dashboard' && query.queryKey[1] === 'day-sheet',
-  });
-}
-
-/** Invalidates every cached status-filtered room list — their *membership*
- * changes when a room's status crosses the filter boundary, so (unlike the
- * unfiltered list) they can't be patched in place. */
-function invalidateFilteredRoomLists(queryClient: ReturnType<typeof useQueryClient>): void {
-  queryClient.invalidateQueries({
-    predicate: (query) => {
-      const key = query.queryKey;
-      return key[0] === 'rooms' && key[1] === 'list' && key[2] === false && key[3] !== undefined;
-    },
   });
 }
 

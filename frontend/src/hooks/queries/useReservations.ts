@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { reservationService } from '../../services';
-import { inventoryService } from '../../services';
 import type { ReservationResponse, ReservationStatus } from '../../types';
 import type { SpringPage } from '../../types';
-import { queryKeys } from '../../lib';
+import { fetchAllRooms, queryKeys } from '../../lib';
 
 interface SearchParams {
   query: string;
@@ -30,7 +29,7 @@ export function useReservationsSearch(params: SearchParams, enabled = true) {
 export function useRoomsLookup() {
   return useQuery({
     queryKey: queryKeys.rooms.lookup,
-    queryFn: () => inventoryService.getAllRooms(0, 500).then((page) => page.content),
+    queryFn: fetchAllRooms,
   });
 }
 

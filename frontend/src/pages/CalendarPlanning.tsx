@@ -15,7 +15,7 @@ import { M3Card } from '../components/m3';
 import { M3SegmentedRow } from '../components/m3';
 import type { M3SegmentOption } from '../components/m3';
 import PlanningBoard from '@/pages/PlanningBoard';
-import { inventoryService } from '../services';
+import { fetchAllRooms } from '../lib';
 import type { RoomResponse } from '../types';
 import { getErrorMessage, resolveDesignToken, dateFnsLocale, reservationStatusTone, toneSolidTokens } from '../utils';
 
@@ -70,10 +70,10 @@ export const CalendarPlanning = () => {
       setError(null);
       const [reservData, roomsData] = await Promise.all([
         reservationService.getAllReservations(),
-        inventoryService.getAllRooms(0, 500)
+        fetchAllRooms()
       ]);
       setReservations(reservData);
-      setRooms(roomsData.content);
+      setRooms(roomsData);
     } catch (err: unknown) {
       const message = getErrorMessage(err, t('failed_load_data'));
       setError(message);
