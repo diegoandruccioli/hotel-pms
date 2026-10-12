@@ -43,7 +43,7 @@ export const SettingsLayout = memo(() => {
           </nav>
         </M3Card>
 
-        <div className="min-w-0 space-y-6">
+        <div className="min-w-0 max-w-4xl space-y-6">
           <Outlet />
         </div>
       </div>

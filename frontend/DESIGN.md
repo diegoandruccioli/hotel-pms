@@ -281,6 +281,11 @@ tokens, so the contrast pairs are already covered by `src/styles/contrast.test.t
 PMS dashboards are inherently data-dense — the discipline that keeps a dense screen
 readable is *consistency*, not *sparseness*. Concretely:
 
+- **The page container is fluid** (`MainLayout` has no `max-w-*`): pages use the full width of the
+  viewport. Width limits belong to the component that needs them — forms and prose get
+  `max-w-3xl`…`5xl` (e.g. `SettingsLayout` content, the night-audit run card); tables, boards and
+  dashboards grow with the screen.
+
 - **Consistent card padding and radius across a screen.** Every card in a dashboard
   row uses the same `rounded-shape-md`, the same internal padding — don't vary these
   per-card even if one card "feels like it needs more room."
