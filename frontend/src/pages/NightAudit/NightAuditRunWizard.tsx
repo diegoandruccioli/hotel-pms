@@ -75,7 +75,7 @@ export const NightAuditRunWizard = () => {
   }, [runDate, runMutation, addToast, t, formatDate]);
 
   return (
-    <M3Card variant="solid" role="region" aria-labelledby="night-audit-run-card-title" className="space-y-4 p-5">
+    <M3Card variant="solid" role="region" aria-labelledby="night-audit-run-card-title" className="max-w-5xl space-y-4 p-5">
       <div className="flex items-center gap-2">
         <MaterialIcon name="play_circle" size={20} className="text-primary" />
         <h2 id="night-audit-run-card-title" className="text-sm font-display font-semibold text-on-surface">{t('night_audit_run_card_title')}</h2>
