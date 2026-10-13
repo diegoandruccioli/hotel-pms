@@ -32,6 +32,36 @@ export function mockAuthMe(page: Page, user: MockUser = DEFAULT_MOCK_USER): Prom
   );
 }
 
+/**
+ * Safety net: answers every `/api/v1/` call a spec did not mock with a 503.
+ * In CI only the nginx frontend runs, so an unmocked call fails harmlessly; locally the
+ * Docker stack is usually up, the gateway answers 401, the refresh 401s too and the app
+ * logs out to /login. Register this FIRST in `beforeEach` — the last matching route wins,
+ * so every specific mock added afterwards takes precedence.
+ */
+export function mockUnhandledApi(page: Page): Promise<void> {
+  return page.route(/\/api\/v1\//, (route) =>
+    route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }),
+  );
+}
+
+/** Tourist-tax pre-flight shown on the check-in and walk-in forms. */
+export function mockCityTaxStatus(
+  page: Page,
+  status: { configured: boolean; reason?: string | null } = { configured: true },
+): Promise<void> {
+  return page.route('**/api/v1/stays/city-tax/configuration-status', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(status) }),
+  );
+}
+
+/** Server-sent events stream opened by MainLayout (`useServerEvents`): an empty, idle stream. */
+export function mockServerEvents(page: Page): Promise<void> {
+  return page.route('**/api/v1/events/stream', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' }),
+  );
+}
+
 /** Local date, matching dashboardService.getTodayDateString() — not
  * toISOString(), which is UTC and can disagree with the local date near
  * local midnight. */
@@ -63,11 +93,35 @@ export const DEFAULT_MOCK_DAY_SHEET: MockDaySheet = {
   roomStatusCounts: { CLEAN: 1, DIRTY: 1, MAINTENANCE: 0, OCCUPIED: 1 },
 };
 
-export function mockDaySheet(page: Page, overrides: Partial<MockDaySheet> = {}): Promise<void> {
-  const body = { ...DEFAULT_MOCK_DAY_SHEET, ...overrides };
-  return page.route('**/api/v1/frontdesk/day-sheet**', (route) =>
+/** One night-audit snapshot — mirrors `DaySheetTrendPoint`. */
+export interface MockDaySheetTrendPoint {
+  date: string;
+  arrivals: number;
+  departures: number;
+  guestsInHouse: number;
+  availableRooms: number;
+}
+
+/** Matches by pathname: a `day-sheet**` glob would also swallow `/day-sheet/trend`
+ * and answer it with the day-sheet body. */
+const isDaySheetPath = (url: URL): boolean => url.pathname.endsWith('/api/v1/frontdesk/day-sheet');
+const isDaySheetTrendPath = (url: URL): boolean => url.pathname.endsWith('/api/v1/frontdesk/day-sheet/trend');
+
+/** Snapshots default to none, so KPI cards render without delta or sparkline. Call
+ * after `mockDaySheet` (which registers the empty default) to override them. */
+export function mockDaySheetTrend(page: Page, points: MockDaySheetTrendPoint[] = []): Promise<void> {
+  const body = { from: todayLocalDateString(), to: todayLocalDateString(), points };
+  return page.route(isDaySheetTrendPath, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }),
   );
+}
+
+export async function mockDaySheet(page: Page, overrides: Partial<MockDaySheet> = {}): Promise<void> {
+  const body = { ...DEFAULT_MOCK_DAY_SHEET, ...overrides };
+  await page.route(isDaySheetPath, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }),
+  );
+  await mockDaySheetTrend(page);
 }
 
 /** Mirrors `OwnerFinancialSummaryDto` — see

@@ -11,6 +11,10 @@ const FONT_SCALE_MAP: Record<FontScale, string> = {
 
 const STORAGE_KEY_CONTRAST = 'hotel-pms-contrast';
 const STORAGE_KEY_FONT = 'hotel-pms-font-scale';
+const STORAGE_KEY_SIDEBAR = 'hotel-pms-sidebar-collapsed';
+
+/** Viewports narrower than this start with the compact sidebar (until the user chooses). */
+const SIDEBAR_AUTO_COLLAPSE_BELOW = 1280;
 
 const applyContrast = (mode: ContrastMode) => {
   const root = document.documentElement;
@@ -40,17 +44,34 @@ const getInitialFontScale = (): FontScale => {
   return (localStorage.getItem(STORAGE_KEY_FONT) as FontScale) ?? 'normal';
 };
 
+const applySidebarCollapsed = (collapsed: boolean) => {
+  localStorage.setItem(STORAGE_KEY_SIDEBAR, String(collapsed));
+};
+
+// An explicit choice always wins; the width-based default only applies while
+// there is none, and is evaluated once, at store creation (resizing never flips it).
+const getInitialSidebarCollapsed = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const stored = localStorage.getItem(STORAGE_KEY_SIDEBAR);
+  if (stored === 'true' || stored === 'false') return stored === 'true';
+  return window.innerWidth < SIDEBAR_AUTO_COLLAPSE_BELOW;
+};
+
 interface SettingsState {
   contrast: ContrastMode;
   fontScale: FontScale;
+  sidebarCollapsed: boolean;
   setContrast: (mode: ContrastMode) => void;
   setFontScale: (scale: FontScale) => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  toggleSidebar: () => void;
   setLanguage: (lang: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>(() => {
   const initialContrast = getInitialContrast();
   const initialFontScale = getInitialFontScale();
+  const initialSidebarCollapsed = getInitialSidebarCollapsed();
 
   // Apply stored preferences immediately on store creation
   applyContrast(initialContrast);
@@ -59,6 +80,7 @@ export const useSettingsStore = create<SettingsState>(() => {
   return {
     contrast: initialContrast,
     fontScale: initialFontScale,
+    sidebarCollapsed: initialSidebarCollapsed,
     setContrast: (mode) => {
       applyContrast(mode);
       useSettingsStore.setState({ contrast: mode });
@@ -66,6 +88,14 @@ export const useSettingsStore = create<SettingsState>(() => {
     setFontScale: (scale) => {
       applyFontScale(scale);
       useSettingsStore.setState({ fontScale: scale });
+    },
+    setSidebarCollapsed: (collapsed) => {
+      applySidebarCollapsed(collapsed);
+      useSettingsStore.setState({ sidebarCollapsed: collapsed });
+    },
+    toggleSidebar: () => {
+      const { sidebarCollapsed, setSidebarCollapsed } = useSettingsStore.getState();
+      setSidebarCollapsed(!sidebarCollapsed);
     },
     setLanguage: (lang) => {
       // Dynamic import, not a static one: `../i18n` runs i18n.init() as a

@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { withTranslation, type WithTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
+import { M3Button } from './m3';
 
 interface Props extends WithTranslation {
   children: ReactNode;
@@ -49,13 +50,9 @@ class ErrorBoundaryBase extends Component<Props, State> {
             <p className="text-sm font-body text-on-surface-variant">
               {this.state.error?.message || t('error_unexpected_fallback')}
             </p>
-            <button
-              type="button"
-              onClick={this.handleReload}
-              className="mt-2 rounded-full bg-primary px-6 py-2 text-sm font-medium text-on-primary hover:bg-primary/90 focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2"
-            >
+            <M3Button type="button" onClick={this.handleReload} className="mt-2">
               {t('error_reload_button')}
-            </button>
+            </M3Button>
           </div>
         </div>
       );

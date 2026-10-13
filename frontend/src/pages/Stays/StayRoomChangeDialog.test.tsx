@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { StayRoomChangeDialog } from './StayRoomChangeDialog';
 import { stayService } from '../../services';
+import { addDaysIso, todayIsoDate } from '../../utils';
 import { inventoryService } from '../../services';
 import type { StayResponse } from '../../types';
 import type { RoomResponse } from '../../types';
@@ -50,7 +51,7 @@ const roomType = (maxOccupancy: number) => ({
 // Computed relative to the real system clock, not hardcoded, so this fixture
 // never drifts into the past (the dialog itself rejects an overdue checkout —
 // see the dedicated test for that).
-const FUTURE_CHECKOUT_DATE = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const FUTURE_CHECKOUT_DATE = addDaysIso(todayIsoDate(), 10);
 
 const room = (id: string, roomNumber: string, maxOccupancy: number): RoomResponse => ({
   id,

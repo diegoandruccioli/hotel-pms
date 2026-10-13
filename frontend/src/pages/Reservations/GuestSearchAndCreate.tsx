@@ -110,6 +110,16 @@ export const GuestSearchAndCreate = memo(({
     setSearchQuery(e.target.value);
   }, []);
 
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') e.preventDefault();
+  }, []);
+
+  const handleCreateKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    void handleCreateGuest();
+  }, [handleCreateGuest]);
+
   const handleStartCreation = useCallback(() => setIsCreatingGuest(true), []);
   const handleCancelCreation = useCallback(() => setIsCreatingGuest(false), []);
 
@@ -127,7 +137,7 @@ export const GuestSearchAndCreate = memo(({
             {selectedGuest.email} {selectedGuest.phone ? `• ${selectedGuest.phone}` : ''}
           </p>
         </div>
-        {!readOnly && <M3Button variant="text" icon="edit" onClick={onClearGuest}>{t('btn_change')}</M3Button>}
+        {!readOnly && <M3Button type="button" variant="text" icon="edit" onClick={onClearGuest}>{t('btn_change')}</M3Button>}
       </div>
     );
   }
@@ -138,16 +148,16 @@ export const GuestSearchAndCreate = memo(({
         <h3 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider mb-2">{t('heading_create_guest')}</h3>
         {error && <p className="text-error text-sm">{error}</p>}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <M3TextField label={t('label_first_name')} name="firstName" value={newGuest.firstName} onChange={handleInputChange} required />
-          <M3TextField label={t('label_last_name')} name="lastName" value={newGuest.lastName} onChange={handleInputChange} required />
-          <M3TextField label={t('email')} name="email" type="email" value={newGuest.email} onChange={handleInputChange} required />
-          <M3TextField label={t('phone')} name="phone" value={newGuest.phone || ''} onChange={handleInputChange} />
-          <M3TextField label={t('city')} name="city" value={newGuest.city || ''} onChange={handleInputChange} />
-          <M3TextField label={t('label_country')} name="country" value={newGuest.country || ''} onChange={handleInputChange} />
+          <M3TextField label={t('label_first_name')} name="firstName" value={newGuest.firstName} onChange={handleInputChange} onKeyDown={handleCreateKeyDown} required />
+          <M3TextField label={t('label_last_name')} name="lastName" value={newGuest.lastName} onChange={handleInputChange} onKeyDown={handleCreateKeyDown} required />
+          <M3TextField label={t('email')} name="email" type="email" value={newGuest.email} onChange={handleInputChange} onKeyDown={handleCreateKeyDown} required />
+          <M3TextField label={t('phone')} name="phone" value={newGuest.phone || ''} onChange={handleInputChange} onKeyDown={handleCreateKeyDown} />
+          <M3TextField label={t('city')} name="city" value={newGuest.city || ''} onChange={handleInputChange} onKeyDown={handleCreateKeyDown} />
+          <M3TextField label={t('label_country')} name="country" value={newGuest.country || ''} onChange={handleInputChange} onKeyDown={handleCreateKeyDown} />
         </div>
         <div className="flex gap-2 justify-end pt-2">
-          <M3Button variant="text" onClick={handleCancelCreation}>{t('cancel')}</M3Button>
-          <M3Button onClick={handleCreateGuest} loading={loading}>{t('btn_save_guest')}</M3Button>
+          <M3Button type="button" variant="text" onClick={handleCancelCreation}>{t('cancel')}</M3Button>
+          <M3Button type="button" onClick={handleCreateGuest} loading={loading}>{t('btn_save_guest')}</M3Button>
         </div>
       </div>
     );
@@ -161,11 +171,12 @@ export const GuestSearchAndCreate = memo(({
           leadingIcon="search"
           value={searchQuery}
           onChange={handleSearchChange}
+          onKeyDown={handleSearchKeyDown}
           className="flex-1"
           readOnly={readOnly}
           required={required}
         />
-        {!readOnly && <M3Button variant="tonal" icon="person_add" onClick={handleStartCreation}>{t('btn_new_guest')}</M3Button>}
+        {!readOnly && <M3Button type="button" variant="tonal" icon="person_add" onClick={handleStartCreation}>{t('btn_new_guest')}</M3Button>}
       </div>
       
       {searchQuery && (

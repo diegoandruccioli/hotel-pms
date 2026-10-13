@@ -16,7 +16,9 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ci": "playwright test",
-    "test:e2e:live": "playwright test --config=playwright-live.config.ts"
+    "test:e2e:live": "playwright test --config=playwright-live.config.ts",
+    "test:visual": "playwright test --config=playwright-visual.config.ts",
+    "test:visual:update": "playwright test --config=playwright-visual.config.ts --update-snapshots"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
@@ -71,7 +73,6 @@
     "jsdom": "^28.1.0",
     "knip": "^6.0.6",
     "madge": "^8.0.0",
-    "postcss": "^8.5.6",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",

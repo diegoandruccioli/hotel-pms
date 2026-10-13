@@ -61,10 +61,10 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
     try {
       if (room) {
         await inventoryService.updateRoom(room.id, submitData);
-        addToast(t('room_updated', { status: t('save') }), 'success');
+        addToast(t('room_saved'), 'success');
       } else {
         await inventoryService.createRoom(submitData);
-        addToast(t('saving'), 'success');
+        addToast(t('room_created'), 'success');
       }
       onSaved();
     } catch (err: unknown) {
@@ -104,8 +104,8 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
 
   const roomTypeOptions = useMemo(() => roomTypes.map((rt) => ({
     value: rt.id,
-    label: `${rt.name} (Max ${rt.maxOccupancy} pax)`,
-  })), [roomTypes]);
+    label: t('room_type_option', { name: rt.name, count: rt.maxOccupancy }),
+  })), [roomTypes, t]);
 
   const footer = showDeleteConfirm ? (
     <div className="flex flex-col sm:flex-row justify-between items-center gap-3">

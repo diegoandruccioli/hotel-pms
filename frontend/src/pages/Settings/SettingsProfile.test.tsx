@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { MemoryRouter } from 'react-router-dom';
 import { SettingsProfile } from './SettingsProfile';
@@ -39,10 +39,9 @@ describe('SettingsProfile', () => {
     expect(screen.getByText('A')).toBeInTheDocument();
   });
 
-  it('navigates back in history when the back button is clicked', () => {
+  it('has no back button of its own: the settings layout provides the navigation', () => {
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'back' }));
-    expect(mockNavigate).toHaveBeenCalledWith(-1);
+    expect(screen.queryByRole('button', { name: 'back' })).not.toBeInTheDocument();
   });
 
   it('should have no accessibility violations', async () => {

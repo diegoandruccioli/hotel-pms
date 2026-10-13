@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { CalendarPlanning } from './CalendarPlanning';
 
@@ -10,6 +10,12 @@ const lastCalendarProps: { current: Record<string, unknown> } = { current: {} };
 const lastPlanningBoardProps: { current: Record<string, unknown> } = { current: {} };
 
 // Default view is 'planning' → PlanningBoard renders; month view → Calendar renders
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
+
+// PageHeader derives its breadcrumbs from the router location.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
+
 vi.mock('react-big-calendar', () => ({
   Calendar: (props: Record<string, unknown>) => {
     lastCalendarProps.current = props;
@@ -94,6 +100,21 @@ describe('CalendarPlanning', () => {
       expect(screen.getByText('view_planning')).toBeInTheDocument();
       expect(screen.getByText('view_month')).toBeInTheDocument();
     });
+  });
+
+  it('offers the views as a named radio group, planning selected first', async () => {
+    render(<CalendarPlanning />);
+    const group = await screen.findByRole('radiogroup', { name: 'calendar_view_label' });
+    expect(within(group).getByRole('radio', { name: 'view_planning' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'view_month' })).not.toBeChecked();
+  });
+
+  it('moves the selection to the month view with the arrow keys', async () => {
+    render(<CalendarPlanning />);
+    const planning = await screen.findByRole('radio', { name: 'view_planning' });
+    fireEvent.keyDown(planning, { key: 'ArrowRight' });
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'view_month' })).toBeChecked());
+    expect(screen.getByTestId('rbc-calendar')).toBeInTheDocument();
   });
 
   it('switches to calendar view when month button clicked', async () => {
@@ -194,8 +215,10 @@ describe('CalendarPlanning', () => {
       ['PENDING', '--md-secondary'],
       ['CANCELLED', '--md-error'],
       ['CHECKED_IN', '--md-tertiary'],
-      ['CHECKED_OUT', '--md-outline'],
-      ['UNKNOWN_STATUS', '--md-primary'],
+      ['PARTIALLY_CHECKED_IN', '--md-secondary'],
+      ['NO_SHOW', '--md-error'],
+      ['CHECKED_OUT', '--md-surface-container-highest'],
+      ['UNKNOWN_STATUS', '--md-surface-container-highest'],
     ])('maps status %s to design token %s', async (status, expectedColor) => {
       vi.mocked(reservationService.getAllReservations).mockResolvedValue([reservation(status)] as never);
       render(<CalendarPlanning />);
@@ -207,6 +230,20 @@ describe('CalendarPlanning', () => {
       const result = getter({ resource: { status } });
 
       expect(result.style.backgroundColor).toBe(expectedColor);
+    });
+
+    it('renders a checked-out block as a tonal bar: readable text and an outline border', async () => {
+      vi.mocked(reservationService.getAllReservations).mockResolvedValue([reservation('CHECKED_OUT')] as never);
+      render(<CalendarPlanning />);
+      await waitFor(() => screen.getByText('view_month'));
+      fireEvent.click(screen.getByText('view_month'));
+      await waitFor(() => screen.getByTestId('rbc-calendar'));
+
+      const getter = lastCalendarProps.current.eventPropGetter as (e: { resource: { status: string } }) => { style: { color: string; borderColor: string } };
+      const { style } = getter({ resource: { status: 'CHECKED_OUT' } });
+
+      expect(style.color).toBe('--md-on-surface');
+      expect(style.borderColor).toBe('--md-outline');
     });
   });
 

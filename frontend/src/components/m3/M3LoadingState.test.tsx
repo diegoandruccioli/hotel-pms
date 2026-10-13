@@ -19,6 +19,14 @@ describe('M3LoadingState', () => {
     expect(screen.getByRole('status').className).toContain('custom-class');
   });
 
+  it('renders the card surface by default and drops it when plain', () => {
+    const { rerender } = render(<M3LoadingState label="Loading" />);
+    expect(screen.getByRole('status')).toHaveClass('bg-surface', 'shadow-elevation-1');
+    rerender(<M3LoadingState label="Loading" plain />);
+    expect(screen.getByRole('status')).not.toHaveClass('bg-surface');
+    expect(screen.getByRole('status')).not.toHaveClass('shadow-elevation-1');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(<M3LoadingState label="Loading guests" />);
     const results = await axe(container);

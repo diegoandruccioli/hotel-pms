@@ -1,31 +1,26 @@
+import { useFormatters } from '../hooks';
 import { useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { GroupCheckoutOutcome, GroupMemberResponse } from '../types';
+import type { GroupCheckoutOutcome } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3Card } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3Dialog } from '../components/m3';
+import { M3ConfirmDialog } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, groupStatusTone } from '../utils';
 import { useToastStore } from '../store';
 import {
-  useReservationGroup, useCancelReservationGroup, useCheckoutReservationGroup,
+  useReservationGroup, useCancelReservationGroup, useCheckoutReservationGroup, useRoomsLookup,
 } from '../hooks/queries';
-
-const getStatusTone = (status: string) => {
-  switch (status) {
-    case 'CHECKED_OUT': return 'success' as const;
-    case 'CHECKED_IN': return 'warning' as const;
-    case 'CANCELLED': return 'error' as const;
-    default: return 'neutral' as const;
-  }
-};
+import { RoomingListCard } from './ReservationGroups/RoomingListCard';
 
 export const ReservationGroupDetail = () => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const addToast = useToastStore((s) => s.addToast);
@@ -35,20 +30,12 @@ export const ReservationGroupDetail = () => {
   const [checkoutOutcomes, setCheckoutOutcomes] = useState<GroupCheckoutOutcome[] | null>(null);
 
   const { data: group, isLoading, error: queryError, refetch } = useReservationGroup(id);
+  const { data: rooms } = useRoomsLookup();
   const cancelGroup = useCancelReservationGroup();
   const checkoutGroup = useCheckoutReservationGroup();
   const error = queryError ? getErrorMessage(queryError, t('group_load_failed')) : null;
 
-  const formatCurrency = useCallback((amount: number | null) =>
-    amount === null
-      ? '—'
-      : new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(amount),
-  [i18n.language]);
-
-  const getMemberStatusLabel = useCallback(
-    (status: string) => t(`status_${status.toLowerCase()}`, status),
-    [t],
-  );
+  const { formatCurrency, formatDate } = useFormatters();
 
   const handleCancelRequest = useCallback(() => setConfirmingCancel(true), []);
   const handleCancelDialogClose = useCallback(() => setConfirmingCancel(false), []);
@@ -107,40 +94,34 @@ export const ReservationGroupDetail = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <button
-            type="button"
-            className="text-sm text-primary hover:underline flex items-center gap-1 mb-1"
-            onClick={handleBackToList}
-          >
-            <MaterialIcon name="arrow_back" size={16} />
-            {t('nav_reservation_groups')}
-          </button>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center gap-2">
-            <MaterialIcon name="groups" className="text-primary" />
-            {group.name}
-            <M3StatusChip
-              label={t(`group_status_${group.status.toLowerCase()}`)}
-              tone={getStatusTone(group.status)}
-            />
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {canCheckout && (
-            <M3Button variant="tonal" icon="logout" onClick={handleCheckoutRequest}>
-              {t('checkout_group')}
-            </M3Button>
-          )}
-          {canCancel && (
-            <M3Button variant="outlined" icon="cancel" onClick={handleCancelRequest}>
-              {t('cancel_group')}
-            </M3Button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        icon="groups"
+        title={group.name}
+        crumbLabel={group.name}
+        titleAdornment={
+          <M3StatusChip
+            label={t(`group_status_${group.status.toLowerCase()}`)}
+            tone={groupStatusTone[group.status]}
+          />
+        }
+        onBack={handleBackToList}
+        actions={
+          <>
+            {canCheckout && (
+              <M3Button variant="tonal" icon="logout" onClick={handleCheckoutRequest}>
+                {t('checkout_group')}
+              </M3Button>
+            )}
+            {canCancel && (
+              <M3Button variant="outlined" icon="cancel" onClick={handleCancelRequest}>
+                {t('cancel_group')}
+              </M3Button>
+            )}
+          </>
+        }
+      />
 
-      <M3Card className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+      <M3Card variant="solid" className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
         <div>
           <p className="text-on-surface-variant">{t('company_name')}</p>
           <p className="font-medium">{group.companyName ?? '—'}</p>
@@ -151,7 +132,7 @@ export const ReservationGroupDetail = () => {
         </div>
         <div>
           <p className="text-on-surface-variant">{t('label_checkin_date')} / {t('label_checkout_date')}</p>
-          <p className="font-medium">{group.checkInDate} — {group.checkOutDate}</p>
+          <p className="font-medium">{formatDate(group.checkInDate)} — {formatDate(group.checkOutDate)}</p>
         </div>
         <div>
           <p className="text-on-surface-variant">{t('group_rate_per_night')}</p>
@@ -171,57 +152,17 @@ export const ReservationGroupDetail = () => {
         )}
       </M3Card>
 
-      <M3Card className="p-6 space-y-4">
-        <h2 className="text-sm font-medium text-on-surface-variant uppercase tracking-wider">
-          {t('rooming_list')}
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-on-surface-variant border-b border-outline-variant">
-                <th className="py-2 pr-4">{t('guest')}</th>
-                <th className="py-2 pr-4">{t('label_expected_guests')}</th>
-                <th className="py-2 pr-4">{t('status')}</th>
-                <th className="py-2 pr-4">{t('billed_to_master_folio')}</th>
-                <th className="py-2 pr-4">{t('amount')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {group.members.map((member: GroupMemberResponse) => (
-                <tr key={member.reservationId} className="border-b border-outline-variant last:border-0">
-                  <td className="py-2 pr-4 font-medium">{member.guestFullName}</td>
-                  <td className="py-2 pr-4">{member.expectedGuests}</td>
-                  <td className="py-2 pr-4">
-                    <M3StatusChip
-                      label={getMemberStatusLabel(member.status)}
-                      tone={member.status === 'CANCELLED' || member.status === 'NO_SHOW' ? 'error' : 'neutral'}
-                    />
-                  </td>
-                  <td className="py-2 pr-4">
-                    {member.billedToMasterFolio
-                      ? <MaterialIcon name="check" size={16} className="text-primary" />
-                      : '—'}
-                  </td>
-                  <td className="py-2 pr-4">{formatCurrency(member.price)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </M3Card>
+      <RoomingListCard members={group.members} rooms={rooms} />
 
       {confirmingCancel && (
-        <M3Dialog open title={t('cancel_group')} titleId="confirm-cancel-group-dialog" onClose={handleCancelDialogClose}>
-          <p className="text-sm font-body text-on-surface">{t('cancel_group_confirm')}</p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={handleCancelDialogClose} disabled={cancelGroup.isPending}>
-              {t('cancel')}
-            </M3Button>
-            <M3Button type="button" onClick={handleCancelConfirm} loading={cancelGroup.isPending}>
-              {t('confirm')}
-            </M3Button>
-          </div>
-        </M3Dialog>
+        <M3ConfirmDialog
+          title={t('cancel_group')}
+          titleId="confirm-cancel-group-dialog"
+          message={t('cancel_group_confirm')}
+          onConfirm={handleCancelConfirm}
+          onCancel={handleCancelDialogClose}
+          loading={cancelGroup.isPending}
+        />
       )}
 
       {confirmingCheckout && (
@@ -234,7 +175,7 @@ export const ReservationGroupDetail = () => {
                     <MaterialIcon
                       name={outcome.success ? 'check_circle' : 'error'}
                       size={16}
-                      className={outcome.success ? 'text-success' : 'text-error'}
+                      className={outcome.success ? 'text-tertiary' : 'text-error'}
                     />
                     <span>{outcome.success ? t('checkout_room_success') : (outcome.errorCode ?? t('checkout_room_failed'))}</span>
                   </li>

@@ -1,5 +1,5 @@
 // `DocumentType` is exported by both `billing.types` (FATTURA | RICEVUTA) and
-// `guest.types` (PASSPORT | ID_CARD | DRIVERS_LICENSE | OTHER) — two distinct
+// `guest.types` (PASSPORT | NATIONAL_ID | DRIVERS_LICENSE | OTHER) — two distinct
 // domain concepts that happen to share a name. Re-exported here under
 // disambiguated aliases so the barrel doesn't hit an ambiguous-export error;
 // importing directly from either `./billing.types` or `./guest.types` still
@@ -19,16 +19,13 @@ export type {
   PaymentResponse,
   InvoiceResponse,
   InvoiceSearchResult,
+  GuestInvoiceSummary,
 } from './billing.types';
 export * from './daySheet.types';
 export * from './fb.types';
 export type {
-  IdentityDocumentResponseDTO,
   GuestRequestDTO,
   GuestResponseDTO,
-  GuestExportStaySummary,
-  GuestExportInvoiceSummary,
-  GuestDataExportResponse,
   GuestPrivacySettingsResponse,
   GuestPrivacySettingsRequest,
 } from './guest.types';

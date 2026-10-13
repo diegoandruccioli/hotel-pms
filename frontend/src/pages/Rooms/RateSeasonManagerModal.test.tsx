@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { RateSeasonManagerModal } from './RateSeasonManagerModal';
 import { rateSeasonService } from '../../services';
+import { formatDate } from '../../utils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string, opts?: Record<string, unknown>) => (opts?.roomType ? `${key}:${opts.roomType}` : key), i18n: { language: 'en' } }),
@@ -18,9 +19,10 @@ vi.mock('../../services/rateSeasonService', () => ({
   },
 }));
 
+const mockAddToast = vi.hoisted(() => vi.fn());
 vi.mock('../../store/toastStore', () => ({
   useToastStore: (sel: unknown) =>
-    (sel as (s: { addToast: () => void }) => unknown)({ addToast: vi.fn() }),
+    (sel as (s: { addToast: typeof mockAddToast }) => unknown)({ addToast: mockAddToast }),
 }));
 
 vi.mock('focus-trap-react', () => ({
@@ -59,7 +61,29 @@ describe('RateSeasonManagerModal', () => {
     vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
-    expect(screen.getByText('€ 150.00')).toBeInTheDocument();
+    expect(screen.getByText('€150.00')).toBeInTheDocument();
+  });
+
+  it('shows season dates in the user locale, not as raw ISO strings', async () => {
+    vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
+    render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+    await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
+    expect(screen.queryByText('2026-08-01')).not.toBeInTheDocument();
+    expect(screen.queryByText('2026-08-31')).not.toBeInTheDocument();
+    expect(screen.getByText(formatDate('2026-08-01', 'en'))).toBeInTheDocument();
+  });
+
+  it('toasts "rate_season_saved" after saving a season', async () => {
+    vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([]);
+    vi.mocked(rateSeasonService.createSeason).mockResolvedValue(SEASON);
+    render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+    await waitFor(() => expect(screen.getByText('add_rate_season')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('add_rate_season'));
+    fireEvent.change(screen.getByLabelText(/rate_season_start_date/i), { target: { value: '2026-08-01' } });
+    fireEvent.change(screen.getByLabelText(/rate_season_end_date/i), { target: { value: '2026-08-31' } });
+    fireEvent.change(screen.getByLabelText(/rate_season_nightly_price/i), { target: { value: '150' } });
+    fireEvent.submit(document.querySelector('form')!);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('rate_season_saved', 'success'));
   });
 
   it('add_rate_season opens the form', async () => {
@@ -134,6 +158,46 @@ describe('RateSeasonManagerModal', () => {
     await waitFor(() => expect(screen.getByText('confirm_delete_rate_season')).toBeInTheDocument());
     fireEvent.click(screen.getByText('btn_confirm'));
     await waitFor(() => expect(rateSeasonService.deleteSeason).toHaveBeenCalledWith('rt1', 's1'));
+  });
+
+  it('asks for the delete confirmation in its own dialog, on top of the season list', async () => {
+    vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
+    render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+    await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('delete'));
+
+    expect(await screen.findAllByRole('dialog')).toHaveLength(2);
+    // The list stays behind the confirmation instead of being replaced by it.
+    expect(screen.getByText('High season')).toBeInTheDocument();
+  });
+
+  it('Escape on the delete confirmation closes only the confirmation', async () => {
+    vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
+    render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+    await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('delete'));
+    await screen.findByText('confirm_delete_rate_season');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByText('confirm_delete_rate_season')).not.toBeInTheDocument());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(rateSeasonService.deleteSeason).not.toHaveBeenCalled();
+    expect(screen.getByText('High season')).toBeInTheDocument();
+  });
+
+  it('cancelling the delete confirmation keeps the season', async () => {
+    vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
+    render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+    await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('delete'));
+    await screen.findByText('confirm_delete_rate_season');
+
+    fireEvent.click(screen.getByText('cancel'));
+
+    await waitFor(() => expect(screen.queryByText('confirm_delete_rate_season')).not.toBeInTheDocument());
+    expect(rateSeasonService.deleteSeason).not.toHaveBeenCalled();
   });
 
   it('calls onClose when close clicked from the list view', async () => {

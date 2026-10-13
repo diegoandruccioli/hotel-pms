@@ -2,7 +2,6 @@ import api from './api';
 import type {
   GuestRequestDTO,
   GuestResponseDTO,
-  GuestDataExportResponse,
   GuestPrivacySettingsRequest,
   GuestPrivacySettingsResponse,
 } from '../types';
@@ -56,10 +55,11 @@ export const guestService = {
     await api.delete(`${BASE_PATH}/${id}`);
   },
 
-  /** GDPR Art. 20 — full data-portability export for one guest. Admin/Owner only. */
-  exportGuestData: async (id: string): Promise<GuestDataExportResponse> => {
-    const response = await api.get<GuestDataExportResponse>(`${BASE_PATH}/${id}/export`);
-    return response.data;
+  /** GDPR Art. 20 — downloads the full data-portability export for one guest as JSON
+   * via a hidden iframe (the endpoint replies with Content-Disposition: attachment).
+   * Admin/Owner only — PII. */
+  downloadGuestDataExport: async (id: string): Promise<void> => {
+    await downloadViaIframe(`${BASE_PATH}/${id}/export`);
   },
 
   /** Downloads every guest matching `query` (or every guest in the hotel when blank)

@@ -83,7 +83,7 @@ subscription for unless it's an actual reported problem.
 | `rounded-shape-xl` | 28px |
 | `rounded-shape-full` | 9999px |
 
-Pick from this scale — don't write an arbitrary `rounded-[Npx]`. Cards use `shape-md`,
+Pick from this scale — don't write an arbitrary `rounded-[Npx]`. Legacy card variants use `shape-md` (`solid` uses `shape-lg`),
 chips/buttons typically `shape-sm`/`shape-full`; match the existing `m3/` components
 for the component type you're building.
 
@@ -92,18 +92,44 @@ defined in `m3-base.css` for both light and dark (dark uses higher shadow alpha:
 0.30/0.50 vs light's 0.15/0.30, since a dark surface needs stronger shadows to read).
 Don't write a bespoke `box-shadow`.
 
-**Glass surfaces** — two purpose-built utility classes exist for translucent
-panels: `.glass-surface` (16px blur) and `.glass-surface-elevated` (24px blur),
-backed by `--md-glass-bg`/`--md-glass-border` tokens (light/dark variants). Use these
-instead of inventing a new `backdrop-blur` + `bg-white/70` combination — they're
-already tuned per-theme.
+**Solid surfaces (default for new UI)** — the page background is
+`surface-container-low` (`body` in `m3-base.css`, `MainLayout`, `AuthLayout`); cards on
+it are `<M3Card variant="solid">` (`surface-container-lowest`, 1px `outline-variant`
+border, `shape-lg`, `elevation-1`). Same token pair in all four themes. The card border
+is a decorative container edge (~1.7–2:1 in the standard themes; the high-contrast
+themes use a much stronger `outline-variant`), not a UI-component boundary; the card
+also reads through its fill and shadow. Text on both surfaces is checked at ≥7:1 in all four
+themes by `src/styles/contrast.test.ts`.
+
+**List pages** — `PageHeader` (title, breadcrumb, primary actions) → `ListToolbar`
+(search, `M3FilterChip` row, secondary actions such as export) → `M3DataTable` / `M3Table`
+→ `M3Pagination` with a `summary` ("1–20 of 214"). The table container uses the same
+solid pair as `M3Card variant="solid"` (`surface-container-lowest`, 1px `outline-variant`
+border, `shape-lg`, `elevation-1`); the header row is `surface-container-highest`.
+
+**App shell navigation** — from `lg` (1024px) a fixed 264px sidebar (`w-66`,
+`surface-container-lowest`, `outline-variant` right border); below it the same
+`SidebarNav` opens in the hamburger drawer. Entries come from `config/navigation.ts`
+(`getSidebarSections`): the dashboard first, then Front office / Operations / Revenue /
+Administration, each under a `role="group"` heading (`text-xs`, uppercase,
+`on-surface-variant`). Full labels at `text-sm` — no `text-2xs` in the nav. The top bar
+is a solid `surface-container-lowest` with an `outline-variant` bottom border.
+
+The sidebar has a compact mode (80px, `w-20`): icons only, each link keeping its accessible
+name as `sr-only` text plus an `M3Tooltip` (visible name on hover and keyboard focus),
+group headings `sr-only` with a divider between groups. Touch has no tooltip (a tap
+follows the link): the always-visible toggle expands the sidebar to show the names. It is toggled by the button pinned
+(`sticky`) at the foot of the sidebar, whose label names the action, and stored in `settingsStore`
+(`sidebarCollapsed`, key `hotel-pms-sidebar-collapsed`). With no stored choice it starts
+compact below 1280px and expanded from 1280px; that default is evaluated once at load, so
+resizing never flips it. The mobile drawer is always expanded. Below `lg` the drawer
+replaces the sidebar altogether.
 
 **Motion** — a global rule in `m3-base.css` applies a 150ms
 `cubic-bezier(0.2,0,0,1)` transition to `color`/`background-color`/`border-color`/
 `box-shadow`/`opacity` on every element. Don't add a per-component transition for
-these properties — you'd be fighting or duplicating the global one. Opt out with
-`[data-no-transition]` only when the global transition actively breaks something
-(e.g. an instant theme-swap moment). `prefers-reduced-motion: reduce` zeroes all
+these properties — you'd be fighting or duplicating the global one.
+`prefers-reduced-motion: reduce` zeroes all
 animations/transitions automatically (WCAG 2.3.3) — this is handled globally, don't
 re-guard individual animations for it.
 
@@ -229,12 +255,36 @@ is correct-but-useless noise that trains you to stop reading the report. Add a
 new folder to the list only after confirming (like these) that it truly can't
 have a safe consumer — not just because knip complained once.
 
+**Tooltips (`M3Tooltip`)** — visible label for a control that shows only an icon,
+shown to its right on hover (300ms) and keyboard focus. Portal + `position: fixed`, so a
+scrolling or clipping ancestor (the sidebar) can't cut it off. It is visual only
+(`aria-hidden`): the control must already have its own accessible name, and it is not
+a place for information that exists nowhere else. Meets WCAG 1.4.13 (dismissible with
+Escape, hoverable, hides on scroll/resize). Don't also set a native `title`. No touch
+behaviour: a tap activates the control. `inverse-surface` on `inverse-on-surface` is
+checked at ≥7:1 in all four themes by `src/styles/contrast.test.ts`.
+
+**Stat cards (`M3StatCard`)** — KPI tile on `M3Card variant="solid"`: optional tone icon
+tile (`toneChipClasses`), label, figure (`font-display text-2xl tabular-nums`), optional
+delta and inline sparkline. Presentational: the caller translates, formats and computes the
+delta. The delta carries its sign in the icon and the text, never in the colour alone. The
+sparkline is an inline SVG, decorative (`aria-hidden`), drawn only with ≥2 points; pass
+`trendLabel` for the text alternative (`sr-only`). With `to` the **whole card is one link**
+named by its content — no "view all" footer, and nothing else focusable inside the card (if a
+card ever needs an action, use a stretched link, never a nested `Link`). Uses only existing
+tokens, so the contrast pairs are already covered by `src/styles/contrast.test.ts`.
+
 ---
 
 ## Dashboard / layout composition rules
 
 PMS dashboards are inherently data-dense — the discipline that keeps a dense screen
 readable is *consistency*, not *sparseness*. Concretely:
+
+- **The page container is fluid** (`MainLayout` has no `max-w-*`): pages use the full width of the
+  viewport. Width limits belong to the component that needs them — forms and prose get
+  `max-w-3xl`…`5xl` (e.g. `SettingsLayout` content, the night-audit run card); tables, boards and
+  dashboards grow with the screen.
 
 - **Consistent card padding and radius across a screen.** Every card in a dashboard
   row uses the same `rounded-shape-md`, the same internal padding — don't vary these
@@ -252,6 +302,89 @@ readable is *consistency*, not *sparseness*. Concretely:
   Toggling theme should never change *which* components render or *how* they're
   laid out — only the token values underneath. If a component looks meaningfully
   different in dark mode beyond color, that's a bug, not a feature.
+- **Every page title goes through `PageHeader`** — never a hand-written `<h1>`. It
+  renders the page's single `h1` with optional `icon`, `subtitle`, `actions`,
+  `onBack` (round back button), `titleAdornment` (e.g. a status chip inside the
+  `h1`), `bordered` (form/detail divider), and `id`/`titleTestId` for
+  `aria-labelledby` and test hooks.
+- **Breadcrumbs come from the route, not from the page.** `PageHeader` renders a
+  `Breadcrumbs` trail above the `h1`, derived from `config/navigation.ts`
+  (`resolveCrumbs`): sidebar group (a heading, no link), parent entry, current page.
+  Nested pages (forms, details, check-in) are listed in `NESTED_ROUTES`; settings
+  sub-pages carry `parent: 'settings'`. A new route needs an entry or a nested route
+  there, or it shows no trail. Pass `crumbLabel` when the page name is data (a group,
+  a guest), `crumbs` to override the trail and `crumbs={[]}` to hide it. A trail of
+  fewer than two crumbs is not rendered (dashboard, `/settings`). The current page is
+  `aria-current="page"`, the separators are `aria-hidden`, links keep the 40px target
+  and the standard focus ring; below `sm` the group heading is dropped. Colours are
+  `on-surface-variant` (links, separators) and `on-surface` (current page) on
+  `surface-container-low`/`-lowest`, covered at ≥7:1 in all four themes by
+  `src/styles/contrast.test.ts`. The leaf label repeats the `h1`: tests that look the
+  title up must use `getByRole('heading', { level: 1 })`, not `getByText`.
+- **Confirmations go through `M3ConfirmDialog`** — a message plus Cancel/Confirm, with
+  `loading` while the action runs. A confirmation that needs more (a result list, a
+  second step) uses `M3Dialog` directly.
+  Inside a dialog it opens as a nested `M3ConfirmDialog` on top of it, never as an inline
+  Confirm/Cancel row that replaces the content.
+- **A record's detail goes in `M3SideSheet`** — modal panel anchored right (400px from `sm`,
+  full width below), same contract as `M3Dialog` (scrim, focus trap, Escape closes only the
+  topmost overlay) with a `footer` slot for actions. Forms and confirmations stay in
+  `M3Dialog`/`M3ConfirmDialog`; to edit from a sheet, close it and open the form, don't stack
+  two modal panels. The entry animation is `animate-slide-in-from-right` (the nav drawer's
+  `animate-slide-in-right` enters from the left).
+  `M3Dialog` and `M3SideSheet` are thin wrappers over `M3ModalShell` (scrim, focus trap, Escape
+  stack, header, body, footer); a fix to that behaviour goes there once. Pages never import
+  `M3ModalShell` directly.
+- **Multi-step creation flows use `M3Stepper`** — numbered circles with a check on completed
+  steps and `aria-current="step"` on the current one; the caller decides which steps can be
+  jumped to (`isSelectable`: sequential when creating, free when editing). Below `sm` only the
+  circles and `progressLabel` show, so it never scrolls sideways. Use it only when the steps
+  have a real order and a running summary; a short form stays a single card.
+- **Filter pills go through `M3FilterChip`** — a pill toggle with `aria-pressed`. Use
+  `onClick` for a standalone toggle, or `value` + `onValueSelect` for a row of chips sharing one
+  handler (the `react-perf` lint rule forbids inline arrow functions as props).
+- **Mutually exclusive switchers go through `M3SegmentedRow`** — view switchers, theme,
+  language. It renders a `radiogroup` with one Tab stop (the selected option) and arrow-key,
+  Home and End navigation that moves focus and selection together; pass `ns` when the labels
+  live outside `settings`, and optional `icon`s (shown on unselected options; the selected one
+  shows a check).
+- **Settings sections live under `SettingsLayout`** (`/settings/*`, nested routes): the page `h1`
+  ("Settings") and a side navigation built from `getSettingsEntries(role)` (`config/navigation.ts`,
+  the `settings-*` entries filtered by role, in nav order) next to the routed section; below `lg` the
+  nav becomes a scrolling row. The current section is `aria-current="page"`. A section renders its
+  own title with `SettingsSectionTitle` (an `h2`), never `PageHeader`/`SettingsPageHeader` and no back
+  button, on `M3Card variant="solid"`. Adding a section = a `settings-*` entry in `NAV_ENTRIES` plus its
+  id in `SETTINGS_NAV_ORDER` and a child `Route` in `App.tsx`. Admin pages outside the area (hotel
+  profile, users) keep `SettingsPageHeader`.
+- **Initials circles go through `M3Avatar`** — `size="md"` (40px) or `"lg"` (64px); falls
+  back to `?` without a name. Wrap it in a `<button>` when it must be interactive
+  (see `UserMenu`).
+- **Page-level messages go through `Alert`** — an inline banner with a `tone`
+  (`error`/`warning`/`success`/`info`), optional `title`, `action` and `compact`. The icon
+  defaults to the tone's; `role` is `alert` for errors and `status` otherwise. Its colours come
+  from `toneChipClasses`, the same source as status chips — never a hand-written
+  `bg-*-container` block.
+- **Loading, empty and error states are components, not markup.** `M3LoadingState` (a
+  `label` for screen readers is required; `plain` drops the card surface) replaces the
+  hand-copied spinner; `M3EmptyState` (`icon`, `title`, optional `description`/`action`)
+  covers grids and cards, `M3TableEmptyRow` a table body (pass the same `colSpan` as the
+  header); `M3ErrorState` (`title`, `message`, optional `onRetry` + `retryLabel`) is the
+  page-level failure panel — resolve its `message` with `getErrorMessage()`
+  (`utils/errorMessage.ts`), never `err.message`.
+- **A domain status maps to one tone, in one place.** `utils/domainStatus.ts` holds the
+  `*StatusTone` tables (invoice, SDI, quotation, group, room, reservation, stay, order, night
+  audit, user role) that feed `M3StatusChip` (`label`, `tone`, optional `icon`). Don't write a
+  local status→colour map: room `DIRTY` is `warning` and `MAINTENANCE` is `error` everywhere.
+  Tone classes live in `utils/toneStyles.ts` (`toneChipClasses`, `toneSolidClasses`, …).
+- **Money, dates and numbers go through the shared formatters.** In components use
+  `useFormatters()` (`formatCurrency`, `formatDate`, `formatDateTime`, bound to the active
+  language); outside React use `utils/format.ts` (also `todayIsoDate`, `addDaysIso`,
+  `nightsBetween`, `formatSigned`, `dateFnsLocale`). No `€ ${x.toFixed(2)}` and no local
+  `Intl` instances. Debounce search/filter inputs with `useDebounce`.
+- **Auth pages use `AuthLayout`** — a split screen from `lg` (brand `aside` on
+  `primary-container`, the form in `main`), a compact header below it. The language,
+  high-contrast and large-text preferences sit inside `main` so they stay reachable before
+  login. Form fields, test ids and the auth flow belong to the page, not the layout.
 
 ---
 
@@ -270,7 +403,11 @@ historical baseline pointer).
   preserve information density on PMS dashboards rather than the MD3 default).
 - **Entire UI navigable using TAB alone.** Every interactive element keyboard
   operable (Tab / Enter / Space / Arrow / Escape).
-- **Focus trapped inside open modals/dialogs** (`focus-trap-react`); Escape closes.
+- **Focus trapped inside open modals/dialogs** (`focus-trap-react`); Escape closes. With dialogs
+  stacked, Escape closes **only the topmost** one: `useEscapeKey` keeps a shared stack, so a
+  parent dialog needs no workaround to ignore Escape while a nested one is open.
+- **`<html lang>` follows the active language** (WCAG 3.1.1): `i18n.ts` syncs it on every
+  `languageChanged`, so language switches (login chips, settings) need no extra code.
 - **Skip-to-main-content link** is the first focusable element on every page.
 - Semantic HTML first (`<nav>`, `<main>`, `<dialog>`, …) — ARIA only when semantic
   HTML is insufficient.
@@ -282,6 +419,10 @@ historical baseline pointer).
   never removed, never an `outline-hidden` without a visible `ring-*` replacement
   (Tailwind v4 renamed `outline-none` → `outline-hidden`; the old name now means
   "no outline ever, including forced-colors mode" — don't use it by accident).
+- Status is never conveyed by color alone: a readiness list (e.g. the check-in checklist,
+  `pages/Stays/CheckInChecklist.tsx`) pairs each tone with an icon *and* a visually hidden
+  text ("Complete" / "Needs attention" / "Pending"), and announces overall progress through a
+  `role="status"` line.
 
 **Dedicated WCAG AAA high-contrast mode.** Beyond the AAA-level baseline above, the
 project ships a *separate, distinct* high-contrast theme —
@@ -328,6 +469,23 @@ before adding new keys, don't improvise a naming pattern here.
 
 ---
 
+## Visual regression
+
+`npm run test:visual` (config `playwright-visual.config.ts`, specs in `e2e-visual/`)
+screenshots eight key screens in light, dark and high-contrast light at 1280px, plus
+mobile (390px), compact-sidebar and high-contrast dark variants, with every API call
+mocked and the clock frozen. CI runs it on frontend PRs (`.github/workflows/visual.yml`).
+
+- Baselines (`e2e-visual/__screenshots__/`) are generated **only by CI**: run the
+  workflow manually with `update=true`, download the `visual-baselines` artifact,
+  look at every image, commit it. Never commit PNGs made on Windows/macOS.
+- Regenerate only for an intended visual change, and say so in the PR; an unexpected
+  diff is a regression, not a baseline to refresh.
+- New screen: add it to `SCREENS` in `screens.spec.ts`; `stableShot` fails if a spinner
+  is still visible, which usually means an API mock is missing.
+
+---
+
 ## Known gaps / drift
 
 Kept explicit rather than papered over, so this file stays honest about the current
@@ -350,9 +508,9 @@ state instead of describing an aspirational one:
   like `services/`, `store/`, and `hooks/queries` cross-reference each other and
   routing all of that through barrels is a well-known way to introduce circular
   ESM imports (`Cannot access 'X' before initialization` at runtime) in a
-  Vite/ESM project. Consequence: `npm run knip` now lists all ~20 barrel files
-  under "Unused files" — that's expected given they have no consumers yet, not a
-  regression to chase down. The `types/index.ts` barrel also disambiguates a real
+  Vite/ESM project. Consequence: the barrels have few or no consumers, so
+  `knip.json`'s `ignore` list covers the ones it would flag (see above), and `npm run knip`
+  is clean. The `types/index.ts` barrel also disambiguates a real
   naming collision: both `billing.types.ts` and `guest.types.ts` export a
   `DocumentType` (invoice type vs. identity-document type) — re-exported from the
   barrel as `BillingDocumentType`/`GuestDocumentType`; importing directly from
@@ -362,13 +520,10 @@ state instead of describing an aspirational one:
   `docs/COMPLIANCE_AUDIT_2026-08.md` §8 were all trimmed to point here; each keeps
   only what's genuinely specific to that file (DECISIONS keeps the historical
   baseline pointer, COMPLIANCE_AUDIT keeps the PDF/UA fiscal-document note).
-- **Still open**: the high-contrast rule above isn't fully honored today.
-  `[data-contrast="high"]` and `.dark[data-contrast="high"]` in `m3-base.css`
-  define `primary`/`secondary`/`error`/`surface-*`/`outline-*`/glass tokens, but
-  **not** `tertiary`, `on-tertiary`, `tertiary-container`, `on-tertiary-container`,
-  `inverse-surface`, `inverse-on-surface`, `inverse-primary`, or `scrim`. Those
-  fall back to the base `:root`/`.dark` values even in high-contrast mode. Not
-  fixed by this update — flagged here so it isn't lost.
+- **Resolved (2026-10-08)**: both high-contrast blocks now define `tertiary*` and
+  `inverse-*` (guarded by `src/styles/contrast.test.ts`, which fails if a block falls back
+  to the base values). `scrim` needs no variant: it is the constant `--color-scrim: #000000`
+  in the `@theme` block of `index.css`, not a themed `--md-*` token, and already pure black.
 - **Resolved (2026-09-02): Tailwind 3→4 migration complete**, via the official
   `@tailwindcss/upgrade` codemod (`backup/DECISIONS.md` §7.1 updated accordingly).
   The `var(--md-*)` token indirection now lives in an `@theme` block in

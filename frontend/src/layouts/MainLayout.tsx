@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect, memo } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
+import { useAuthStore, useSettingsStore } from '../store';
 import { authService } from '../services';
 import { ToastContainer } from '../components/Toast';
 import { useTranslation } from 'react-i18next';
@@ -11,122 +11,11 @@ import { CommandPalette } from '../components/CommandPalette';
 import { useEscapeKey } from '../hooks';
 import { useServerEvents } from '../hooks';
 import * as FocusTrapModule from 'focus-trap-react';
+import { SidebarNav } from '../components/SidebarNav';
+import { M3Tooltip } from '../components/m3/M3Tooltip';
+import { getSidebarSections } from '../config/navigation';
 import { cn } from '../utils';
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
-
-const navigation = [
-  { nameKey: 'dashboard', href: '/', icon: 'dashboard' },
-  { nameKey: 'guests', href: '/guests', icon: 'group' },
-  { nameKey: 'reservations', href: '/reservations', icon: 'event' },
-  { nameKey: 'reservation_groups', href: '/reservations/groups', icon: 'groups' },
-  { nameKey: 'quotations', href: '/quotations', icon: 'request_quote' },
-  { nameKey: 'calendar', href: '/calendar', icon: 'date_range' },
-  { nameKey: 'stays', href: '/stays', icon: 'hotel' },
-  { nameKey: 'housekeeping', href: '/housekeeping', icon: 'cleaning_services' },
-  { nameKey: 'night_audit', href: '/night-audit', icon: 'fact_check' },
-  { nameKey: 'billing', href: '/billing', icon: 'receipt_long' },
-  { nameKey: 'restaurant', href: '/restaurant', icon: 'restaurant' },
-  { nameKey: 'rooms', href: '/rooms', icon: 'meeting_room' },
-  { nameKey: 'rates', href: '/rates', icon: 'payments' },
-];
-
-// Night audit moved into `navigation` above (GAP-26, THREAT_MODEL.md) — it's
-// night-shift front-desk work, open to RECEPTIONIST, not ownership-only.
-const ownerNavigation = [
-  { nameKey: 'owner_dashboard', href: '/owner-dashboard', icon: 'bar_chart' },
-];
-
-// BUG-7 (docs/LIVE_E2E_AUDIT_2026-07.md): the sidebar had no focus-visible
-// ring at all, unlike the skip-link — same recipe as M3Button/M3TableActionLink
-// so focus indicators are consistent across the whole app.
-const NAV_ITEM_FOCUS_RING =
-  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2';
-
-const getRailNavItemClasses = ({ isActive }: { isActive: boolean }) =>
-  cn(
-    'group flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-shape-lg transition-colors w-full',
-    NAV_ITEM_FOCUS_RING,
-    isActive
-      ? 'text-on-primary-container'
-      : 'text-on-surface-variant hover:text-on-surface'
-  );
-
-const getDrawerNavItemClasses = ({ isActive }: { isActive: boolean }) =>
-  cn(
-    'flex items-center gap-3 px-4 py-3 mx-3 rounded-shape-full text-sm font-medium font-body transition-colors',
-    NAV_ITEM_FOCUS_RING,
-    isActive
-      ? 'bg-primary-container text-on-primary-container'
-      : 'text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface'
-  );
-
-/* ── Navigation Item (Rail — desktop) ───────────────── */
-
-const RailNavItem = memo(({
-  item,
-  label,
-  end,
-}: {
-  item: { nameKey: string; href: string; icon: string };
-  label: string;
-  end?: boolean;
-}) => (
-  <NavLink
-    to={item.href}
-    end={end}
-    className={getRailNavItemClasses}
-  >
-    {({ isActive }) => (
-      <>
-        <span
-          className={cn(
-            'flex items-center justify-center w-14 h-10 rounded-shape-full transition-colors',
-            isActive
-              ? 'bg-primary-container'
-              : 'group-hover:bg-surface-container-highest'
-          )}
-        >
-          <MaterialIcon name={item.icon} filled={isActive} size={24} />
-        </span>
-        <span className="text-2xs font-medium font-body leading-tight text-center truncate w-full">
-          {label}
-        </span>
-      </>
-    )}
-  </NavLink>
-));
-
-RailNavItem.displayName = 'RailNavItem';
-
-/* ── Navigation Item (Drawer — mobile) ──────────────── */
-
-const DrawerNavItem = memo(({
-  item,
-  label,
-  end,
-  onClose,
-}: {
-  item: { nameKey: string; href: string; icon: string };
-  label: string;
-  end?: boolean;
-  onClose: () => void;
-}) => (
-  <NavLink
-    to={item.href}
-    end={end}
-    onClick={onClose}
-    className={getDrawerNavItemClasses}
-  >
-    {({ isActive }) => (
-      <>
-        <MaterialIcon name={item.icon} filled={isActive} size={24} />
-        {label}
-      </>
-    )}
-  </NavLink>
-));
-
-DrawerNavItem.displayName = 'DrawerNavItem';
 
 /* ── Main Layout Component ──────────────────────────── */
 
@@ -135,6 +24,9 @@ export const MainLayout = () => {
   const { t: tCommand } = useTranslation('command');
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+
+  const sidebarCollapsed = useSettingsStore((s) => s.sidebarCollapsed);
+  const toggleSidebar    = useSettingsStore((s) => s.toggleSidebar);
 
   const [drawerOpen, setDrawerOpen]     = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -162,6 +54,18 @@ export const MainLayout = () => {
   const closePalette   = useCallback(() => setPaletteOpen(false), []);
 
   useEscapeKey(drawerOpen, closeDrawer);
+
+  // The drawer is `lg:hidden`: if the viewport grows past the breakpoint while
+  // it is open, its focus trap would be left holding a hidden dialog.
+  useEffect(() => {
+    if (!drawerOpen) return undefined;
+    const query = window.matchMedia('(min-width: 1024px)');
+    const closeOnDesktop = (e: MediaQueryListEvent) => {
+      if (e.matches) setDrawerOpen(false);
+    };
+    query.addEventListener('change', closeOnDesktop);
+    return () => query.removeEventListener('change', closeOnDesktop);
+  }, [drawerOpen]);
   useServerEvents();
 
   useEffect(() => {
@@ -175,12 +79,12 @@ export const MainLayout = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const isOwnerOrAdmin = user?.role === 'OWNER' || user?.role === 'ADMIN';
+  const sidebarSections = useMemo(() => getSidebarSections(user?.role), [user?.role]);
   const username       = user?.username ?? t('guest');
   const roleLabel      = user?.role ? t(`role_${user.role.toLowerCase()}`) : t('role_guest');
 
   return (
-    <div className="h-full flex overflow-hidden bg-surface">
+    <div className="h-full flex overflow-hidden bg-surface-container-low">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:rounded-shape-full focus:bg-primary focus:text-on-primary focus:ring-2 focus:ring-primary focus:ring-offset-2"
@@ -191,7 +95,7 @@ export const MainLayout = () => {
       {/* ── Mobile Modal Drawer ─────────────────────── */}
       {drawerOpen && (
         <FocusTrap>
-          <div className="fixed inset-0 z-50 flex md:hidden" role="dialog" aria-modal="true">
+          <div className="fixed inset-0 z-50 flex lg:hidden" role="dialog" aria-modal="true" aria-label={t('nav_menu')}>
             {/* Scrim */}
             <div
               className="fixed inset-0 bg-scrim/40 transition-opacity"
@@ -200,83 +104,58 @@ export const MainLayout = () => {
             />
 
             {/* Drawer Panel */}
-            <nav className="relative flex flex-col w-72 max-w-[85vw] h-full bg-surface rounded-r-shape-lg shadow-elevation-3 animate-slide-in-right overflow-y-auto">
+            <div className="relative flex flex-col w-72 max-w-[85vw] h-full bg-surface-container-lowest rounded-r-shape-lg shadow-elevation-3 animate-slide-in-right overflow-y-auto">
               <div className="flex items-center gap-3 px-4 pt-5 pb-3">
                 <div className="flex items-center justify-center w-10 h-10 bg-primary-container rounded-shape-lg">
                   <MaterialIcon name="apartment" size={24} className="text-on-primary-container" />
                 </div>
                 <span className="text-lg font-display font-bold text-on-surface">Hotel PMS</span>
               </div>
-
-              <div className="flex-1 pt-2 pb-4 space-y-0.5">
-                {navigation.map((item) => (
-                  <DrawerNavItem
-                    key={item.nameKey}
-                    item={item}
-                    label={t(`nav_${item.nameKey}`)}
-                    end={item.href === '/'}
-                    onClose={closeDrawer}
-                  />
-                ))}
-
-                {isOwnerOrAdmin && (
-                  <>
-                    <div className="my-2 mx-4 border-t border-outline-variant" />
-                    {ownerNavigation.map((item) => (
-                      <DrawerNavItem
-                        key={item.nameKey}
-                        item={item}
-                        label={t(`nav_${item.nameKey}`)}
-                        onClose={closeDrawer}
-                      />
-                    ))}
-                  </>
-                )}
-              </div>
-            </nav>
+              <SidebarNav sections={sidebarSections} onNavigate={closeDrawer} ariaLabel={t('nav_drawer')} />
+            </div>
           </div>
         </FocusTrap>
       )}
 
-      {/* ── Desktop Navigation Rail ─────────────────── */}
-      <aside className="hidden md:flex flex-col items-center md:fixed md:left-0 md:top-0 md:h-full w-24 shrink-0 glass-surface border-r border-outline-variant/50 py-4 gap-1 overflow-y-auto scrollbar-gutter-stable md:z-20">
-        <div className="flex items-center justify-center w-14 h-14 mb-3 bg-primary-container rounded-shape-lg">
-          <MaterialIcon name="apartment" size={28} className="text-on-primary-container" />
-        </div>
-
-        <nav className="flex flex-col items-center gap-0.5 flex-1 w-full">
-          {navigation.map((item) => (
-            <RailNavItem
-              key={item.nameKey}
-              item={item}
-              label={t(`nav_${item.nameKey}`)}
-              end={item.href === '/'}
-            />
-          ))}
-
-          {isOwnerOrAdmin && (
-            <>
-              <div className="w-8 my-1.5 border-t border-outline-variant" />
-              {ownerNavigation.map((item) => (
-                <RailNavItem
-                  key={item.nameKey}
-                  item={item}
-                  label={t(`nav_${item.nameKey}`)}
-                />
-              ))}
-            </>
+      {/* ── Desktop Sidebar ─────────────────────────── */}
+      <aside
+        id="app-sidebar"
+        className={cn(
+          'hidden lg:flex flex-col fixed left-0 top-0 h-full bg-surface-container-lowest border-r border-outline-variant overflow-y-auto scrollbar-gutter-stable z-20',
+          sidebarCollapsed ? 'w-20' : 'w-66'
+        )}
+      >
+        <div className={cn('flex items-center gap-3 pt-5 pb-4', sidebarCollapsed ? 'justify-center' : 'px-6')}>
+          <div className="flex items-center justify-center w-10 h-10 bg-primary-container rounded-shape-lg">
+            <MaterialIcon name="apartment" size={24} className="text-on-primary-container" />
+          </div>
+          {!sidebarCollapsed && (
+            <span className="text-lg font-display font-bold text-on-surface">Hotel PMS</span>
           )}
-        </nav>
+        </div>
+        <SidebarNav sections={sidebarSections} collapsed={sidebarCollapsed} />
+        <div className={cn('sticky bottom-0 mt-auto flex pb-4 pt-2 bg-surface-container-lowest', sidebarCollapsed ? 'justify-center' : 'px-5')}>
+          <M3Tooltip label={t('sidebar_expand')} disabled={!sidebarCollapsed}>
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label={sidebarCollapsed ? t('sidebar_expand') : t('sidebar_collapse')}
+              className="flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            >
+              <MaterialIcon name={sidebarCollapsed ? 'chevron_right' : 'chevron_left'} size={24} />
+            </button>
+          </M3Tooltip>
+        </div>
       </aside>
 
       {/* ── Main content area ───────────────────────── */}
-      <div className="flex flex-col flex-1 w-0 overflow-hidden md:ml-24">
+      <div className={cn('flex flex-col flex-1 w-0 overflow-hidden', sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-66')}>
         {/* Top Bar */}
-        <header className="relative z-10 shrink-0 flex items-center h-16 glass-surface-elevated border-b border-outline-variant/30 shadow-elevation-1 px-4">
+        <header className="relative z-10 shrink-0 flex items-center h-16 bg-surface-container-lowest border-b border-outline-variant px-4">
           {/* Mobile hamburger */}
           <button
             type="button"
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest md:hidden mr-2"
+            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest lg:hidden mr-2"
             onClick={openDrawer}
             aria-label={t('nav_menu') ?? 'Open menu'}
           >
@@ -319,7 +198,7 @@ export const MainLayout = () => {
         {/* Page content */}
         <main id="main-content" className="flex-1 relative overflow-y-auto focus:outline-hidden" tabIndex={-1}>
           <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+            <div className="px-4 sm:px-6 md:px-8">
               <Outlet />
             </div>
           </div>

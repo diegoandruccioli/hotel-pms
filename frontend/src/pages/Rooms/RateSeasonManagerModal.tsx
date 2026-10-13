@@ -1,10 +1,13 @@
+import { useFormatters } from '../../hooks';
 import { useState, useCallback, useMemo, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { rateSeasonService } from '../../services';
 import type { RateSeasonRequest, RateSeasonResponse, RoomTypeResponse } from '../../types';
-import { MaterialIcon } from '../../components/MaterialIcon';
+import { M3LoadingState } from '../../components/m3';
+import { M3EmptyState } from '../../components/m3';
 import { M3Button } from '../../components/m3';
+import { M3ConfirmDialog } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { M3TableActionLink } from '../../components/m3';
@@ -24,15 +27,16 @@ const SeasonRow = memo(({ season, onEdit, onDelete, t }: {
   onDelete: (season: RateSeasonResponse) => void;
   t: (k: string) => string;
 }) => {
+  const { formatCurrency, formatDate } = useFormatters();
   const handleEdit = useCallback(() => onEdit(season), [onEdit, season]);
   const handleDelete = useCallback(() => onDelete(season), [onDelete, season]);
 
   return (
     <M3TableRow>
       <M3TableCell className="font-medium">{season.name || '-'}</M3TableCell>
-      <M3TableCell>{season.startDate}</M3TableCell>
-      <M3TableCell>{season.endDate}</M3TableCell>
-      <M3TableCell>€ {season.nightlyPrice.toFixed(2)}</M3TableCell>
+      <M3TableCell>{formatDate(season.startDate)}</M3TableCell>
+      <M3TableCell>{formatDate(season.endDate)}</M3TableCell>
+      <M3TableCell>{formatCurrency(season.nightlyPrice)}</M3TableCell>
       <M3TableCell className="text-right space-x-2">
         <M3TableActionLink onClick={handleEdit}>
           {t('edit')}
@@ -134,14 +138,14 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
       } else {
         await rateSeasonService.createSeason(roomType.id, formData);
       }
-      addToast(t('save'), 'success');
+      addToast(t('rate_season_saved'), 'success');
       setMode('list');
       await loadSeasons();
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { detail?: string } } };
       const errorMsg = e.response?.status === 409
         ? t('err_rate_season_overlap')
-        : e.response?.data?.detail || t('toast_delete_error');
+        : e.response?.data?.detail || t('rate_season_save_failed');
       addToast(errorMsg, 'error');
     } finally {
       setSaving(false);
@@ -203,30 +207,27 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
           </div>
 
           {loading ? (
-            <div className="flex justify-center items-center h-32">
-              <MaterialIcon name="progress_activity" size={28} className="text-primary animate-spin" />
-            </div>
+            <M3LoadingState label={t('common:loading')} plain className="h-32" />
           ) : seasons.length === 0 ? (
-            <p className="text-sm font-body text-on-surface-variant py-4">{t('no_rate_seasons')}</p>
-          ) : deletingSeason ? (
-            <div className="flex flex-col gap-3 items-center py-4">
-              <span className="text-sm font-medium font-body text-error">
-                {t('confirm_delete_rate_season')}
-              </span>
-              <div className="flex gap-2">
-                <M3Button variant="text" onClick={closeDeleteConfirm} disabled={saving}>{t('cancel')}</M3Button>
-                <M3Button onClick={handleDelete} loading={saving} disabled={saving}
-                  className="bg-error text-on-error hover:bg-error/90 border-transparent">
-                  {t('btn_confirm')}
-                </M3Button>
-              </div>
-            </div>
+            <M3EmptyState icon="date_range" title={t('no_rate_seasons')} className="py-6" />
           ) : (
             <M3Table headers={tableHeaders}>
               {seasons.map((season) => (
                 <SeasonRow key={season.id} season={season} onEdit={openEditForm} onDelete={openDeleteConfirm} t={t} />
               ))}
             </M3Table>
+          )}
+
+          {deletingSeason && (
+            <M3ConfirmDialog
+              title={t('delete_rate_season_title')}
+              titleId="rate-season-delete-title"
+              message={t('confirm_delete_rate_season')}
+              confirmLabel={t('btn_confirm')}
+              onConfirm={handleDelete}
+              onCancel={closeDeleteConfirm}
+              loading={saving}
+            />
           )}
         </div>
       ) : (

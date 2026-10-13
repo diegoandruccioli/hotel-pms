@@ -1,23 +1,20 @@
+import { useFormatters } from '../../hooks';
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from 'date-fns';
-import { it, enUS } from 'date-fns/locale';
 import { rateSeasonService } from '../../services';
 import type { RateCalendarResponse } from '../../types';
-import { MaterialIcon } from '../../components/MaterialIcon';
+import { M3LoadingState } from '../../components/m3';
+import { M3EmptyState } from '../../components/m3';
+import { M3ErrorState } from '../../components/m3';
+import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
+import { CELL_STYLE, CELL_WIDTH, ROW_STYLE, SIDEBAR_STYLE, SIDEBAR_WIDTH } from '../planningGrid';
 import { RateCalendarCell } from './RateCalendarCell';
 import { RateBulkApplyDialog } from './RateBulkApplyDialog';
 import { useAuthStore } from '../../store';
-import { getErrorMessage, cn, resolveDesignToken } from '../../utils';
-
-const SIDEBAR_WIDTH = 192;
-const CELL_WIDTH = 100;
-const ROW_HEIGHT = 64;
-const SIDEBAR_STYLE = { width: SIDEBAR_WIDTH };
-const ROW_STYLE = { height: ROW_HEIGHT };
-const CELL_STYLE = { width: CELL_WIDTH };
+import { getErrorMessage, cn, resolveDesignToken, dateFnsLocale } from '../../utils';
 
 /** Fixed accent palette for season identification — cycles if there are more
  * distinct seasons in view than colors (rare: a room type rarely has more
@@ -51,7 +48,8 @@ LegendEntry.displayName = 'LegendEntry';
 
 export const RateCalendar = () => {
   const { t, i18n } = useTranslation(['common']);
-  const locale = i18n.language.startsWith('it') ? it : enUS;
+  const locale = dateFnsLocale(i18n.language);
+  const { formatCurrency } = useFormatters();
   const role = useAuthStore((s) => s.user?.role);
   const canApplyPrice = role === 'ADMIN' || role === 'OWNER';
 
@@ -190,18 +188,16 @@ export const RateCalendar = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="payments" className="mr-2 text-primary" />
-            {t('nav_rates')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('rate_calendar_subtitle')}</p>
-        </div>
-        {canApplyPrice && (
-          <M3Button icon="add" onClick={openDialog}>{t('btn_apply_price')}</M3Button>
-        )}
-      </div>
+      <PageHeader
+        icon="payments"
+        title={t('nav_rates')}
+        subtitle={t('rate_calendar_subtitle')}
+        actions={
+          canApplyPrice && (
+            <M3Button icon="add" onClick={openDialog}>{t('btn_apply_price')}</M3Button>
+          )
+        }
+      />
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -236,26 +232,20 @@ export const RateCalendar = () => {
       )}
 
       {loading ? (
-        <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('loading')} />
       ) : error ? (
-        <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium font-body">{t('error_loading_rate_calendar')}</h3>
-            <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button type="button" onClick={loadCalendar} className="mt-2 text-sm font-medium underline hover:no-underline">
-              {t('try_again')}
-            </button>
-          </div>
-        </div>
+        <M3ErrorState
+          title={t('error_loading_rate_calendar')}
+          message={error}
+          retryLabel={t('try_again')}
+          onRetry={loadCalendar}
+        />
       ) : roomTypeOptions.length === 0 ? (
-        <M3Card variant="outlined" className="p-8 text-center text-sm font-body text-on-surface-variant">
-          {t('no_room_types_for_calendar')}
+        <M3Card variant="solid">
+          <M3EmptyState icon="payments" title={t('no_room_types_for_calendar')} />
         </M3Card>
       ) : (
-        <M3Card variant="outlined" className="overflow-hidden">
+        <M3Card variant="solid" className="overflow-hidden">
           <div className="overflow-auto" ref={scrollRef}>
             <div style={containerStyle}>
               <div className="sticky top-0 z-40 flex bg-surface-container-low border-b border-outline-variant" style={ROW_STYLE}>
@@ -299,7 +289,7 @@ export const RateCalendar = () => {
                       className="border-b border-outline-variant flex flex-col justify-center px-4 bg-surface-container-low"
                     >
                       <span className="font-display font-bold text-on-surface truncate">{row.roomTypeName}</span>
-                      <span className="text-xs text-on-surface-variant">€ {row.basePrice.toFixed(2)}</span>
+                      <span className="text-xs text-on-surface-variant">{formatCurrency(row.basePrice)}</span>
                     </div>
                   ))}
                 </div>
@@ -318,7 +308,7 @@ export const RateCalendar = () => {
                             && dayIndex >= bounds.dayMin && dayIndex <= bounds.dayMax}
                           isToday={isSameDay(new Date(day.date), new Date())}
                           seasonColor={day.rateSeasonId ? seasonColors.get(day.rateSeasonId) : undefined}
-                          ariaLabel={`${row.roomTypeName}, ${format(new Date(day.date), 'd MMMM', { locale })}, € ${day.price.toFixed(2)}${day.seasonName ? ` — ${day.seasonName}` : ''}`}
+                          ariaLabel={`${row.roomTypeName}, ${format(new Date(day.date), 'd MMMM', { locale })}, ${formatCurrency(day.price)}${day.seasonName ? ` — ${day.seasonName}` : ''}`}
                           onPointerDown={canApplyPrice ? handlePointerDown : noop}
                           onPointerEnter={canApplyPrice ? handlePointerEnter : noop}
                           onKeyboardSelect={canApplyPrice ? handleKeyboardSelect : noop}

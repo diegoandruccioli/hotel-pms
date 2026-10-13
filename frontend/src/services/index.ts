@@ -1,4 +1,3 @@
-export { default as api } from './api';
 export * from './authService';
 export * from './billingReportService';
 export * from './billingService';

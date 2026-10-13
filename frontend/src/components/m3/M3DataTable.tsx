@@ -105,7 +105,7 @@ export function M3DataTable<T>({
   }, [onSortingChange]);
 
   return (
-    <div className={cn('bg-surface shadow-elevation-1 rounded-shape-md overflow-hidden', className)}>
+    <div className={cn('bg-surface-container-lowest border border-outline-variant shadow-elevation-1 rounded-shape-lg overflow-hidden', className)}>
       <div ref={scrollRef} className="overflow-x-auto" style={scrollContainerStyle}>
         <table className="min-w-full" aria-rowcount={virtualize ? rows.length + 1 : undefined}>
           <thead className={virtualize ? 'sticky top-0 z-10' : undefined}>

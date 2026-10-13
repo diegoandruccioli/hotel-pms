@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useRef, useEffect, memo, useCallback } from 'react';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, differenceInCalendarDays, addMonths } from 'date-fns';
-import { it, enUS } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
 import { M3Card } from '../components/m3';
 import type { RoomResponse } from '../types';
 import type { ReservationResponse } from '../types';
-import { cn } from '../utils';
+import { CELL_STYLE, CELL_WIDTH, ROW_STYLE, SIDEBAR_STYLE, SIDEBAR_WIDTH } from './planningGrid';
+import { cn, dateFnsLocale, reservationStatusTone, roomStatusTone, toneDotClasses, toneSolidClasses } from '../utils';
 
 interface PlanningBoardProps {
   rooms: RoomResponse[];
@@ -14,22 +14,6 @@ interface PlanningBoardProps {
   onNavigate: (date: Date) => void;
   onReservationMove?: (reservationId: string, oldRoomId: string, newRoomId: string) => void;
 }
-
-const CELL_WIDTH = 100;
-const SIDEBAR_WIDTH = 192;
-const ROW_HEIGHT = 64;
-
-const STATUS_COLORS: Record<string, string> = {
-  CONFIRMED: 'bg-primary text-on-primary',
-  PENDING: 'bg-secondary text-on-secondary',
-  CHECKED_IN: 'bg-tertiary text-on-tertiary',
-  CHECKED_OUT: 'bg-outline text-on-surface-variant',
-  CANCELLED: 'bg-error text-on-error',
-};
-
-const ROW_STYLE = { height: ROW_HEIGHT };
-const SIDEBAR_STYLE = { width: SIDEBAR_WIDTH };
-const CELL_STYLE = { width: CELL_WIDTH };
 
 const ReservationBar = memo(({ 
   reservation, 
@@ -97,7 +81,7 @@ const ReservationBar = memo(({
       onDragEnd={handleDragEnd}
       className={cn(
         'absolute top-2 h-12 rounded-shape-sm shadow-elevation-1 p-2 flex flex-col justify-center cursor-grab hover:shadow-elevation-2 transition-all z-0 overflow-hidden',
-        STATUS_COLORS[reservation.status] || STATUS_COLORS.CONFIRMED
+        toneSolidClasses[reservationStatusTone[reservation.status] ?? 'neutral']
       )}
       style={style}
       title={`${reservation.guestFullName} (${reservation.status})`}
@@ -183,7 +167,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
   onReservationMove,
 }) => {
   const { t, i18n } = useTranslation('common');
-  const locale = i18n.language.startsWith('it') ? it : enUS;
+  const locale = dateFnsLocale(i18n.language);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { monthStart, monthEnd, nextMonthStart, days } = useMemo(() => {
@@ -246,7 +230,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
   }, [onReservationMove]);
 
   return (
-    <M3Card variant="outlined" className="overflow-hidden flex flex-col flex-1 min-h-0 border-outline-variant">
+    <M3Card variant="solid" className="overflow-hidden flex flex-col flex-1 min-h-0">
       <div 
         className="flex-1 overflow-auto relative" 
         ref={scrollContainerRef}
@@ -301,7 +285,7 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-display font-bold text-on-surface">{room.roomNumber}</span>
-                    <div className={cn('w-2 h-2 rounded-full', room.status === 'CLEAN' ? 'bg-success' : room.status === 'DIRTY' ? 'bg-error' : 'bg-warning')} />
+                    <div className={cn('w-2 h-2 rounded-full', toneDotClasses[roomStatusTone[room.status] ?? 'neutral'])} />
                   </div>
                   <span className="text-xs text-on-surface-variant line-clamp-1">{room.roomType.name}</span>
                 </div>

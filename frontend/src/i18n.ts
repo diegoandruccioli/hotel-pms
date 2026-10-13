@@ -75,6 +75,13 @@ const resources = {
   },
 };
 
+// WCAG 3.1.1: keep <html lang> in step with the active language. Registered
+// before init so the detected initial language is covered too; the resolved
+// language drops regional suffixes ('it-IT' -> 'it') that have no translation.
+i18n.on('languageChanged', (lng: string) => {
+  document.documentElement.lang = i18n.resolvedLanguage ?? lng;
+});
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)

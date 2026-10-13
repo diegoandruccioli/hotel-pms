@@ -77,8 +77,8 @@ test.describe('Rooms management', () => {
     // rooms_title → "Inventory" (h1); also h2="Physical Rooms" exists — scope to level 1
     await expect(page.getByRole('heading', { name: /inventory/i, level: 1 })).toBeVisible({ timeout: 10000 });
     // tab_rooms → "Physical Rooms", tab_room_types → "Room Categories"
-    await expect(page.getByRole('button', { name: /Physical Rooms/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Room Categories/i })).toBeVisible();
+    await expect(page.getByRole('radio', { name: /Physical Rooms/i })).toBeVisible();
+    await expect(page.getByRole('radio', { name: /Room Categories/i })).toBeVisible();
   });
 
   test('shows room list on Rooms tab', async ({ page }) => {
@@ -89,7 +89,7 @@ test.describe('Rooms management', () => {
 
   test('switches to room types tab and shows types', async ({ page }) => {
     await page.goto('/rooms');
-    await page.getByRole('button', { name: /Room Categories/i }).click();
+    await page.getByRole('radio', { name: /Room Categories/i }).click();
     await expect(page.getByRole('cell', { name: 'Standard', exact: true })).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole('cell', { name: 'Suite', exact: true })).toBeVisible();
     await expect(page.getByText('80.00')).toBeVisible();
@@ -97,7 +97,7 @@ test.describe('Rooms management', () => {
 
   test('opens add room type modal', async ({ page }) => {
     await page.goto('/rooms');
-    await page.getByRole('button', { name: /Room Categories/i }).click();
+    await page.getByRole('radio', { name: /Room Categories/i }).click();
     await expect(page.getByRole('cell', { name: 'Standard', exact: true })).toBeVisible({ timeout: 5000 });
     // add_room_type → "Add Category"
     await page.getByRole('button', { name: /Add Category/i }).click();
@@ -106,7 +106,7 @@ test.describe('Rooms management', () => {
 
   test('creates a new room type', async ({ page }) => {
     await page.goto('/rooms');
-    await page.getByRole('button', { name: /Room Categories/i }).click();
+    await page.getByRole('radio', { name: /Room Categories/i }).click();
     await expect(page.getByRole('cell', { name: 'Standard', exact: true })).toBeVisible({ timeout: 5000 });
 
     await page.getByRole('button', { name: /Add Category/i }).click();

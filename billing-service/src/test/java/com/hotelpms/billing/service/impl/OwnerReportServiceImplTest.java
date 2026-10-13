@@ -127,6 +127,34 @@ class OwnerReportServiceImplTest {
         }
 
         @Test
+        void shouldLeaveCancelledInvoicesOutOfRevenueAndCountButKeepThemInTheList() {
+                // Arrange
+                final Invoice cancelledInvoice = Invoice.builder()
+                                .id(UUID.randomUUID())
+                                .invoiceNumber("INV-0004")
+                                .totalAmount(new BigDecimal("999.00"))
+                                .status(InvoiceStatus.CANCELLED)
+                                .issueDate(LocalDateTime.of(YEAR, MONTH_MAR, DAY_MAR_3, HOUR_9, 0))
+                                .guestId(UUID.randomUUID())
+                                .reservationId(UUID.randomUUID())
+                                .build();
+                when(invoiceRepository.findByHotelIdAndIssueDateBetween(
+                                eq(hotelId), any(LocalDateTime.class), any(LocalDateTime.class)))
+                                .thenReturn(List.of(paidInvoice1, paidInvoice2, issuedInvoice, cancelledInvoice));
+                when(invoiceMapper.toResponse(any(Invoice.class))).thenReturn(mock(InvoiceResponse.class));
+
+                // Act
+                final OwnerFinancialReportDto report = ownerReportService.getFinancialReport(hotelId, startDate, endDate);
+
+                // Assert
+                assertEquals(3, report.totalInvoices(), "A cancelled invoice is not an issued invoice");
+                assertEquals(2, report.paidInvoices());
+                assertEquals(new BigDecimal(TOTAL_REVENUE), report.totalRevenue(),
+                                "A cancelled invoice is not revenue");
+                assertEquals(4, report.invoices().size(), "The per-invoice list still shows every invoice");
+        }
+
+        @Test
         void shouldReturnZeroRevenueWhenNoInvoicesFound() {
                 // Arrange
                 when(invoiceRepository.findByHotelIdAndIssueDateBetween(

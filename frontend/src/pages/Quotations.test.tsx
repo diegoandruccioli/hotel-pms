@@ -97,7 +97,7 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     renderPage();
     await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
-    expect(screen.getByText('€ 200.00')).toBeInTheDocument();
+    expect(screen.getByText('€200.00')).toBeInTheDocument();
   });
 
   it('renders empty state when no quotations', async () => {
@@ -175,7 +175,7 @@ describe('Quotations', () => {
     await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_decline'));
     expect(screen.getByText('confirm_decline')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(quotationService.declineQuotation).toHaveBeenCalledWith('q1'));
     expect(mockAddToast).toHaveBeenCalledWith('toast_declined', 'success');
   });
@@ -186,7 +186,7 @@ describe('Quotations', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_decline'));
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_declined', 'error'));
   });
 
@@ -196,7 +196,7 @@ describe('Quotations', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_delete'));
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_deleted', 'error'));
   });
 
@@ -213,7 +213,7 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([equalOptionsQuotation]) as never);
     renderPage();
     await waitFor(() => expect(screen.getByText('Anna Neri')).toBeInTheDocument());
-    expect(screen.getByText('€ 90.00')).toBeInTheDocument();
+    expect(screen.getByText('€90.00')).toBeInTheDocument();
     expect(screen.queryByText('price_range')).not.toBeInTheDocument();
   });
 
@@ -243,7 +243,7 @@ describe('Quotations', () => {
     await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_decline'));
     expect(screen.getByText('confirm_decline')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:cancel'));
+    fireEvent.click(screen.getByText('cancel'));
     expect(screen.queryByText('confirm_decline')).not.toBeInTheDocument();
     expect(quotationService.declineQuotation).not.toHaveBeenCalled();
   });
@@ -254,7 +254,7 @@ describe('Quotations', () => {
     await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_delete'));
     expect(screen.getByText('confirm_delete')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:cancel'));
+    fireEvent.click(screen.getByText('cancel'));
     expect(screen.queryByText('confirm_delete')).not.toBeInTheDocument();
     expect(quotationService.deleteQuotation).not.toHaveBeenCalled();
   });
@@ -266,7 +266,7 @@ describe('Quotations', () => {
     await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_delete'));
     expect(screen.getByText('confirm_delete')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(quotationService.deleteQuotation).toHaveBeenCalledWith('q1'));
   });
 
@@ -291,5 +291,15 @@ describe('Quotations', () => {
     const { container } = renderPage();
     await waitFor(() => screen.getByText('Mario Rossi'));
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('shows locale-formatted dates and the result range', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+    expect(screen.getByText('9/1/2026')).toBeInTheDocument();
+    expect(screen.getByText('9/3/2026')).toBeInTheDocument();
+    expect(screen.getByText('8/20/2026')).toBeInTheDocument();
+    expect(screen.getByText('list_range_summary')).toBeInTheDocument();
   });
 });

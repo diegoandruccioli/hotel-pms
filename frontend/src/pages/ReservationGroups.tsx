@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { ReservationGroupResponse } from '../types';
-import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
@@ -10,8 +10,9 @@ import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3Pagination } from '../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, groupStatusTone } from '../utils';
 import { useReservationGroups } from '../hooks/queries';
+import { useFormatters, useListRangeSummary } from '../hooks';
 
 const PAGE_SIZE = 20;
 
@@ -35,15 +36,6 @@ const GroupNameCell = memo(({ group, onView }: GroupNameCellProps) => {
 
 GroupNameCell.displayName = 'GroupNameCell';
 
-const getStatusTone = (status: ReservationGroupResponse['status']) => {
-  switch (status) {
-    case 'CHECKED_OUT': return 'success' as const;
-    case 'CHECKED_IN': return 'warning' as const;
-    case 'CANCELLED': return 'error' as const;
-    default: return 'neutral' as const;
-  }
-};
-
 export const ReservationGroups = () => {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
@@ -52,6 +44,8 @@ export const ReservationGroups = () => {
   const { data: groupsPage, isLoading, error: queryError, refetch } = useReservationGroups(page, PAGE_SIZE);
   const groups = groupsPage?.content ?? [];
   const totalPages = groupsPage?.totalPages ?? 1;
+  const summary = useListRangeSummary(page, PAGE_SIZE, groups.length, groupsPage?.totalElements ?? 0);
+  const { formatDate } = useFormatters();
   const error = queryError ? getErrorMessage(queryError, t('groups_load_failed')) : null;
 
   const handleNewGroup = useCallback(() => navigate('/reservations/groups/new'), [navigate]);
@@ -87,12 +81,12 @@ export const ReservationGroups = () => {
     {
       id: 'checkInDate',
       header: t('label_checkin_date'),
-      cell: ({ row }) => <span>{row.original.checkInDate}</span>,
+      cell: ({ row }) => <span>{formatDate(row.original.checkInDate)}</span>,
     },
     {
       id: 'checkOutDate',
       header: t('label_checkout_date'),
-      cell: ({ row }) => <span>{row.original.checkOutDate}</span>,
+      cell: ({ row }) => <span>{formatDate(row.original.checkOutDate)}</span>,
     },
     {
       id: 'rooms',
@@ -103,35 +97,33 @@ export const ReservationGroups = () => {
       id: 'status',
       header: t('status'),
       cell: ({ row }) => (
-        <M3StatusChip label={getStatusLabel(row.original.status)} tone={getStatusTone(row.original.status)} />
+        <M3StatusChip label={getStatusLabel(row.original.status)} tone={groupStatusTone[row.original.status]} />
       ),
     },
-  ], [t, handleViewGroup, getStatusLabel]);
+  ], [t, handleViewGroup, getStatusLabel, formatDate]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="groups" className="mr-2 text-primary" />
-            {t('nav_reservation_groups')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('reservation_groups_subtitle')}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <M3Button
-            data-testid="view-reservations-btn"
-            icon="event"
-            variant="outlined"
-            onClick={handleViewReservations}
-          >
-            {t('nav_reservations')}
-          </M3Button>
-          <M3Button icon="add" onClick={handleNewGroup}>
-            {t('new_group')}
-          </M3Button>
-        </div>
-      </div>
+      <PageHeader
+        icon="groups"
+        title={t('nav_reservation_groups')}
+        subtitle={t('reservation_groups_subtitle')}
+        actions={
+          <>
+            <M3Button
+              data-testid="view-reservations-btn"
+              icon="event"
+              variant="outlined"
+              onClick={handleViewReservations}
+            >
+              {t('nav_reservations')}
+            </M3Button>
+            <M3Button icon="add" onClick={handleNewGroup}>
+              {t('new_group')}
+            </M3Button>
+          </>
+        }
+      />
 
       {isLoading ? (
         <M3LoadingState label={t('loading')} />
@@ -163,6 +155,7 @@ export const ReservationGroups = () => {
           prevLabel={t('prev_page')}
           nextLabel={t('next_page')}
           pageOfLabel={pageOfLabel}
+          summary={summary}
         />
       )}
     </div>

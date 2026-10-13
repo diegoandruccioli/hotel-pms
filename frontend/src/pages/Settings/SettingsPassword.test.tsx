@@ -6,7 +6,7 @@ import { SettingsPassword } from './SettingsPassword';
 import { authService } from '../../services';
 
 const mockNavigate = vi.fn();
-const mockUseLocation = vi.fn(() => ({ state: null }));
+const mockUseLocation = vi.fn(() => ({ pathname: '/settings/password', state: null }));
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return { ...actual, useNavigate: () => mockNavigate, useLocation: () => mockUseLocation() };
@@ -36,11 +36,11 @@ const renderPage = () => render(<MemoryRouter><SettingsPassword /></MemoryRouter
 describe('SettingsPassword', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseLocation.mockReturnValue({ state: null } as never);
+    mockUseLocation.mockReturnValue({ pathname: '/settings/password', state: null } as never);
   });
 
   it('shows the must-change-password banner when redirected with that state', () => {
-    mockUseLocation.mockReturnValue({ state: { mustChangePassword: true } } as never);
+    mockUseLocation.mockReturnValue({ pathname: '/settings/password', state: { mustChangePassword: true } } as never);
     renderPage();
     expect(screen.getByText('must_change_password_banner')).toBeInTheDocument();
   });
@@ -50,10 +50,9 @@ describe('SettingsPassword', () => {
     expect(screen.queryByText('must_change_password_banner')).not.toBeInTheDocument();
   });
 
-  it('navigates back in history when the back button is clicked', () => {
+  it('has no back button of its own: the settings layout provides the navigation', () => {
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'back' }));
-    expect(mockNavigate).toHaveBeenCalledWith(-1);
+    expect(screen.queryByRole('button', { name: 'back' })).not.toBeInTheDocument();
   });
 
   it('submit button disabled when fields empty', () => {
@@ -111,7 +110,7 @@ describe('SettingsPassword', () => {
   });
 
   it('navigates to the dashboard (not back) when the change was the forced mustChangePassword flow', async () => {
-    mockUseLocation.mockReturnValue({ state: { mustChangePassword: true } } as never);
+    mockUseLocation.mockReturnValue({ pathname: '/settings/password', state: { mustChangePassword: true } } as never);
     vi.mocked(authService.changePassword).mockResolvedValueOnce(undefined);
     vi.mocked(authService.fetchMe).mockResolvedValueOnce({
       sub: 'u1', username: 'r4pwtest', role: 'RECEPTIONIST', mustChangePassword: false,

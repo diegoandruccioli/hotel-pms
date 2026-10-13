@@ -122,4 +122,17 @@ describe('guestService', () => {
 
     document.body.replaceChildren();
   });
+
+  it('should download the GDPR data export for one guest via a hidden iframe', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({});
+
+    await guestService.downloadGuestDataExport('guest-1');
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/auth/me');
+    const iframe = document.body.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    expect(iframe?.src).toContain('/api/v1/guests/guest-1/export');
+
+    document.body.replaceChildren();
+  });
 });

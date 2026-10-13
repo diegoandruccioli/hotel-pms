@@ -211,7 +211,7 @@ describe('stayService — settings, lookups, downloads', () => {
 
     const result = await stayService.getAvailableRooms();
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/rooms', { params: { size: 200 } });
+    expect(api.get).toHaveBeenCalledWith('/api/v1/rooms', { params: { size: 200, status: 'CLEAN' } });
     expect(result).toEqual([mockRooms[0]]);
   });
 

@@ -17,9 +17,10 @@ vi.mock('../../services/inventoryService', () => ({
   },
 }));
 
+const mockAddToast = vi.hoisted(() => vi.fn());
 vi.mock('../../store/toastStore', () => ({
   useToastStore: (sel: unknown) =>
-    (sel as (s: { addToast: () => void }) => unknown)({ addToast: vi.fn() }),
+    (sel as (s: { addToast: typeof mockAddToast }) => unknown)({ addToast: mockAddToast }),
 }));
 
 vi.mock('focus-trap-react', () => ({
@@ -52,6 +53,13 @@ describe('RoomTypeFormModal', () => {
     render(<RoomTypeFormModal roomType={ROOM_TYPE} onClose={onClose} onSaved={onSaved} />);
     expect((screen.getByLabelText(/^name/i) as HTMLInputElement).value).toBe('Single');
     expect((screen.getByLabelText(/base_price/i) as HTMLInputElement).value).toBe('50');
+  });
+
+  it('toasts "room_type_saved" after editing a room type', async () => {
+    vi.mocked(inventoryService.updateRoomType).mockResolvedValue(ROOM_TYPE as never);
+    render(<RoomTypeFormModal roomType={ROOM_TYPE} onClose={onClose} onSaved={onSaved} />);
+    fireEvent.submit(document.querySelector('form')!);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('room_type_saved', 'success'));
   });
 
   it('calls onClose when cancel clicked', () => {

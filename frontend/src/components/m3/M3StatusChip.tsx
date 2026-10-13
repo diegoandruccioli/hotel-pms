@@ -1,22 +1,13 @@
-import { cn } from '../../utils';
+import { cn, toneChipClasses } from '../../utils';
+import type { StatusTone } from '../../utils';
 import { MaterialIcon } from '../MaterialIcon';
-
-type ChipTone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
 interface M3StatusChipProps {
   label: string;
-  tone?: ChipTone;
+  tone?: StatusTone;
   icon?: string;
   className?: string;
 }
-
-const toneClasses: Record<ChipTone, string> = {
-  success: 'bg-tertiary-container text-on-tertiary-container',
-  warning: 'bg-secondary-container text-on-secondary-container',
-  error: 'bg-error-container text-on-error-container',
-  info: 'bg-primary-container text-on-primary-container',
-  neutral: 'bg-surface-container-highest text-on-surface-variant',
-};
 
 export const M3StatusChip = ({
   label,
@@ -27,7 +18,7 @@ export const M3StatusChip = ({
   <span
     className={cn(
       'inline-flex items-center gap-1 px-2.5 py-1 rounded-shape-sm text-xs font-medium font-body',
-      toneClasses[tone],
+      toneChipClasses[tone],
       className
     )}
   >

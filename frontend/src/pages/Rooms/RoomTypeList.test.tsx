@@ -5,8 +5,10 @@ import { renderWithQuery as render } from '../../test-utils';
 import { RoomTypeList } from './RoomTypeList';
 import { inventoryService } from '../../services';
 
+let mockLanguage = 'en';
+
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: mockLanguage } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
@@ -38,17 +40,30 @@ const ROOM_TYPE = {
 describe('RoomTypeList', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('renders heading', async () => {
+  it('has no heading of its own, only the add action', async () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     render(<RoomTypeList />);
-    await waitFor(() => expect(screen.getByText('tab_room_types')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('add_room_type')).toBeInTheDocument());
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
   });
 
   it('renders room type row after data loads', async () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     render(<RoomTypeList />);
     await waitFor(() => expect(screen.getByText('Single')).toBeInTheDocument());
-    expect(screen.getByText('€ 50.00')).toBeInTheDocument();
+    expect(screen.getByText('€50.00')).toBeInTheDocument();
+  });
+
+  it('formats the base price in Italian locale', async () => {
+    mockLanguage = 'it';
+    try {
+      vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
+      render(<RoomTypeList />);
+      await waitFor(() => expect(screen.getByText('Single')).toBeInTheDocument());
+      expect(screen.getByText(/^50,00\s€$/)).toBeInTheDocument();
+    } finally {
+      mockLanguage = 'en';
+    }
   });
 
   it('renders empty state when no room types', async () => {

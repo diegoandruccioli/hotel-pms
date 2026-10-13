@@ -11,21 +11,27 @@ export const queryKeys = {
     search: (query: string, page: number, size: number, sort?: string) =>
       ['guests', 'search', query, page, size, sort] as const,
     detail: (id: string) => ['guests', 'detail', id] as const,
+    suggest: (query: string) => ['guests', 'suggest', query] as const,
+    stays: (id: string) => ['guests', 'stays', id] as const,
+    invoices: (id: string) => ['guests', 'invoices', id] as const,
   },
   rooms: {
     all: ['rooms'] as const,
-    list: (availableOnly: boolean, status?: string) => ['rooms', 'list', availableOnly, status] as const,
-    /** Full unpaginated room list used as a lookup map (e.g. resolving room
-     * numbers on the Reservations table) — distinct key from `list()` since
-     * it fetches a different page size and callers shouldn't share a cache
-     * entry that could silently swap between the two shapes. */
+    list: (availableOnly: boolean) => ['rooms', 'list', availableOnly] as const,
+    /** Whole room list used as a lookup map (e.g. resolving room numbers on the
+     * Reservations table). Same data as `list(false)` but never patched by the
+     * status mutations, which only matter to the board. */
     lookup: ['rooms', 'lookup'] as const,
+    /** Availability (with resolved stay prices) for a date range. */
+    available: (checkIn: string, checkOut: string) => ['rooms', 'available', checkIn, checkOut] as const,
   },
   roomTypes: {
     all: ['room-types'] as const,
   },
   reservations: {
     all: ['reservations'] as const,
+    /** Unpaged snapshot (first 500) used for occupancy checks while picking rooms. */
+    snapshot: ['reservations', 'snapshot'] as const,
     search: (params: {
       query: string;
       upcomingOnly: boolean;
@@ -36,6 +42,13 @@ export const queryKeys = {
       status?: string;
       size?: number;
     }) => ['reservations', 'search', params] as const,
+  },
+  quotations: {
+    all: ['quotations'] as const,
+    detail: (id: string) => ['quotations', 'detail', id] as const,
+  },
+  users: {
+    all: ['users'] as const,
   },
   invoices: {
     all: ['invoices'] as const,
@@ -51,17 +64,22 @@ export const queryKeys = {
   stays: {
     all: ['stays'] as const,
     list: (page: number) => ['stays', 'list', page] as const,
+    detail: (id: string) => ['stays', 'detail', id] as const,
+    lookupStati: ['stays', 'lookup', 'stati'] as const,
+    lookupTipdoc: ['stays', 'lookup', 'tipdoc'] as const,
     search: (params: { status?: string; page: number; size?: number }) =>
       ['stays', 'search', params] as const,
   },
   dashboard: {
     daySheet: (date: string) => ['dashboard', 'day-sheet', date] as const,
+    daySheetTrend: (date: string, days: number) => ['dashboard', 'day-sheet-trend', date, days] as const,
   },
   commandPalette: {
     guests: (query: string) => ['command-palette', 'guests', query] as const,
     reservations: (query: string) => ['command-palette', 'reservations', query] as const,
   },
   ownerReport: {
+    all: ['owner-report'] as const,
     summary: (startDate: string, endDate: string) =>
       ['owner-report', 'summary', startDate, endDate] as const,
   },

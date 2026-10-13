@@ -35,6 +35,15 @@ export interface ChargeRequest {
   nights?: number;
 }
 
+/** One row of GET /api/v1/invoices/guest/{guestId}/history (newest first). */
+export interface GuestInvoiceSummary {
+  invoiceId: string;
+  invoiceNumber: string;
+  issueDate: string;
+  totalAmount: number;
+  status: InvoiceStatus;
+}
+
 export interface PaymentRequest {
   amount: number;
   paymentMethod: PaymentMethod;

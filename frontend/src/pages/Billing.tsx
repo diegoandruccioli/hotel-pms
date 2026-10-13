@@ -1,24 +1,30 @@
-import { useState, useEffect, useCallback, memo, useMemo } from 'react';
-import type { ColumnDef, SortingState } from '@tanstack/react-table';
+import { useState, useCallback, memo, useMemo } from 'react';
+import { format, startOfMonth } from 'date-fns';
+import type { SortingState } from '@tanstack/react-table';
 import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types';
-import { MaterialIcon } from '../components/MaterialIcon';
+import { Alert } from '../components/Alert';
+import { ListToolbar } from '../components/ListToolbar';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
-import { M3StatusChip } from '../components/m3';
+import { M3EmptyState } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
+import { M3FilterChip } from '../components/m3';
 import { M3Pagination } from '../components/m3';
 import { M3TextField } from '../components/m3';
+import { BillingKpiCards } from './Billing/BillingKpiCards';
 import { PaymentModal } from './Billing/PaymentModal';
 import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
+import { useInvoiceColumns } from './Billing/useInvoiceColumns';
 import { useTranslation } from 'react-i18next';
-import { useInvoicesSearch, usePatchInvoiceInCache } from '../hooks/queries';
-import { getErrorMessage, cn } from '../utils';
+import { useInvoicesSearch, useOwnerFinancialSummary, usePatchInvoiceInCache } from '../hooks/queries';
+import { useDebounce, useListRangeSummary } from '../hooks';
+import { getErrorMessage } from '../utils';
 import { billingService } from '../services';
 import { useAuthStore, useToastStore } from '../store';
 
 const PAGE_SIZE = 20;
-const SEARCH_DEBOUNCE_MS = 300;
 const DEFAULT_SORT_FIELD = 'issueDate';
 const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'desc';
 
@@ -33,80 +39,10 @@ const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'desc';
  */
 const PILOT_MODE = import.meta.env.VITE_PILOT_MODE !== 'false';
 
-const getStatusTone = (status: InvoiceStatus) => {
-  switch (status) {
-    case 'ISSUED': return 'warning' as const;
-    case 'PAID':   return 'success' as const;
-    case 'CANCELLED': return 'error' as const;
-    default: return 'neutral' as const;
-  }
-};
-
-const VIEW_BTN_CLASS = cn(
-  'text-primary hover:text-primary/80 font-medium text-sm mr-4',
-  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm'
-);
-
-const PAY_BTN_CLASS = cn(
-  'text-tertiary hover:text-tertiary/80 font-medium text-sm',
-  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-tertiary rounded-sm'
-);
-
-interface ActionsCellProps {
-  invoice: InvoiceResponse;
-  onView: (inv: InvoiceResponse) => void;
-  onPay: (inv: InvoiceResponse) => void;
-  tView: string;
-  tRegisterPayment: string;
-}
-
-const ActionsCell = ({ invoice, onView, onPay, tView, tRegisterPayment }: ActionsCellProps) => {
-  const handleView = useCallback(() => onView(invoice), [onView, invoice]);
-  const handlePay  = useCallback(() => onPay(invoice),  [onPay,  invoice]);
-
-  return (
-    <div className="text-right">
-      <button type="button" onClick={handleView} className={VIEW_BTN_CLASS}>
-        {tView}
-      </button>
-      {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
-        <button type="button" onClick={handlePay} className={PAY_BTN_CLASS}>
-          {tRegisterPayment}
-        </button>
-      )}
-    </div>
-  );
-};
-
-const StatusFilterChip = memo(({ value, active, label, onClick }: {
-  value: InvoiceStatus | 'ALL';
-  active: boolean;
-  label: string;
-  onClick: (v: InvoiceStatus | 'ALL') => void;
-}) => {
-  const handleClick = useCallback(() => onClick(value), [onClick, value]);
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={handleClick}
-      className={cn(
-        'px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
-        active
-          ? 'bg-primary text-on-primary border-primary'
-          : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline'
-      )}
-    >
-      {label}
-    </button>
-  );
-});
-StatusFilterChip.displayName = 'StatusFilterChip';
-
 const EMPTY_RESULTS: InvoiceSearchResult[] = [];
 
 export const Billing = memo(() => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
   const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
@@ -115,7 +51,7 @@ export const Billing = memo(() => {
   const [detailTarget, setDetailTarget]   = useState<InvoiceResponse | null>(null);
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDebounce(searchQuery);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
@@ -123,20 +59,15 @@ export const Billing = memo(() => {
     try {
       await billingService.exportInvoicesCsv({
         status: statusFilter === 'ALL' ? undefined : statusFilter,
-        query: searchQuery,
+        query: debouncedSearch,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
       });
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('csv_export_failed')), 'error');
     }
-  }, [statusFilter, searchQuery, dateFrom, dateTo, addToast, t]);
+  }, [statusFilter, debouncedSearch, dateFrom, dateTo, addToast, t]);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
-
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [searchQuery]);
 
   // Any filter change invalidates the current page — always restart from page 0.
   // Adjusted during render (React's documented pattern for this — see
@@ -199,14 +130,18 @@ export const Billing = memo(() => {
   const { data, isLoading: loading, error: queryError, refetch } = useInvoicesSearch(searchParams);
   const results = data?.content ?? EMPTY_RESULTS;
   const totalPages = data?.totalPages ?? 1;
+  const summary = useListRangeSummary(page, PAGE_SIZE, results.length, data?.totalElements ?? 0);
+
+  // Month-to-date window for the KPI cards; the summary endpoint is owner/admin only.
+  const [monthStart, today] = useMemo(() => {
+    const now = new Date();
+    return [format(startOfMonth(now), 'yyyy-MM-dd'), format(now, 'yyyy-MM-dd')];
+  }, []);
+  const { data: kpiSummary } = useOwnerFinancialSummary(monthStart, today, isAdminOrOwner);
   const error = queryError ? getErrorMessage(queryError, t('failed_load_invoices')) : null;
   const handleRetry = useCallback(() => { refetch(); }, [refetch]);
 
   const patchInvoiceInCache = usePatchInvoiceInCache();
-
-  const handleStatusFilterClick = useCallback((s: InvoiceStatus | 'ALL') => {
-    setStatusFilter(s);
-  }, []);
 
   const handlePaid = useCallback((updated: InvoiceResponse) => {
     patchInvoiceInCache(updated);
@@ -221,147 +156,63 @@ export const Billing = memo(() => {
     setDetailTarget(updated);
   }, [patchInvoiceInCache]);
 
-  const formatCurrency = useCallback(
-    (amount: number) =>
-      new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(amount),
-    [i18n.language],
-  );
-
-  const formatDate = useCallback(
-    (dateStr?: string) => {
-      if (!dateStr) return '—';
-      return new Date(dateStr).toLocaleDateString(i18n.language);
-    },
-    [i18n.language],
-  );
-
-  const tView            = t('view');
-  const tRegisterPayment = t('register_payment');
-  const tPending         = t('pending');
-
   const getInvoiceRowId = useCallback((r: InvoiceSearchResult) => r.invoice.id, []);
 
-  const columns = useMemo<ColumnDef<InvoiceSearchResult>[]>(() => [
-    {
-      id: 'invoiceNumber',
-      enableSorting: false,
-      header: t('invoice_number'),
-      cell: ({ row }) => (
-        <span className="font-medium">
-          {row.original.invoice.invoiceNumber || (
-            <span className="text-on-surface-variant italic">{tPending}</span>
-          )}
-        </span>
-      ),
-    },
-    {
-      id: 'guestName',
-      enableSorting: false,
-      header: t('guest_name'),
-      cell: ({ row }) => <span className="text-on-surface-variant">{row.original.guestName ?? '—'}</span>,
-    },
-    {
-      id: 'issueDate',
-      accessorFn: (r) => r.invoice.issueDate,
-      header: t('issue_date'),
-      cell: ({ row }) => (
-        <span className="text-on-surface-variant">{formatDate(row.original.invoice.issueDate)}</span>
-      ),
-    },
-    {
-      id: 'totalAmount',
-      accessorFn: (r) => r.invoice.totalAmount,
-      header: t('total_amount'),
-      cell: ({ row }) => <span className="font-medium">{formatCurrency(row.original.invoice.totalAmount)}</span>,
-    },
-    {
-      id: 'status',
-      accessorFn: (r) => r.invoice.status,
-      header: t('status'),
-      cell: ({ row }) => (
-        <M3StatusChip
-          label={t(`invoice_status_${row.original.invoice.status}`, row.original.invoice.status)}
-          tone={getStatusTone(row.original.invoice.status)}
-        />
-      ),
-    },
-    {
-      id: 'actions',
-      enableSorting: false,
-      header: () => <span className="sr-only">{t('actions')}</span>,
-      cell: ({ row }) => (
-        <ActionsCell
-          invoice={row.original.invoice}
-          onView={handleOpenDetail}
-          onPay={handleOpenPayment}
-          tView={tView}
-          tRegisterPayment={tRegisterPayment}
-        />
-      ),
-    },
-  ], [t, tPending, formatDate, formatCurrency, handleOpenDetail, handleOpenPayment, tView, tRegisterPayment]);
+  const columns = useInvoiceColumns({ onView: handleOpenDetail, onPay: handleOpenPayment });
 
   return (
     <div className="space-y-6">
       {PILOT_MODE && (
-        <div role="status" className="flex items-start gap-3 rounded-2xl bg-warning-container text-on-warning-container px-4 py-3 text-sm font-medium">
-          <MaterialIcon name="warning" size={18} className="mt-0.5 shrink-0" />
-          {t('pilot_mode_fiscal_banner')}
-        </div>
+        <Alert tone="warning" className="font-medium">{t('pilot_mode_fiscal_banner')}</Alert>
       )}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="receipt_long" className="mr-2 text-primary" />
-            {t('nav_billing')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('billing_subtitle')}</p>
-        </div>
-        <M3TextField
-          label={t('invoice_search_placeholder')}
-          hideLabel
-          leadingIcon="search"
-          type="search"
-          value={searchQuery}
-          onChange={handleSearchChange}
-          className="w-full sm:w-72"
-        />
-      </div>
+      <PageHeader
+        icon="receipt_long"
+        title={t('nav_billing')}
+        subtitle={t('billing_subtitle')}
+      />
 
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex flex-wrap gap-2" role="group" aria-label={t('filter_status')}>
-          {(['ALL', 'ISSUED', 'PAID', 'CANCELLED'] as const).map((s) => (
-            <StatusFilterChip
-              key={s}
-              value={s}
-              active={statusFilter === s}
-              label={s === 'ALL' ? t('filter_all') : t(`invoice_status_${s}`, s)}
-              onClick={handleStatusFilterClick}
+      {isAdminOrOwner && kpiSummary && <BillingKpiCards summary={kpiSummary} />}
+
+      <ListToolbar
+        searchLabel={t('invoice_search_placeholder')}
+        searchPlaceholder={t('invoice_search_hint')}
+        searchValue={searchQuery}
+        onSearchChange={handleSearchChange}
+        filtersLabel={t('filter_status')}
+        trailing={
+          <>
+            <M3TextField
+              label={t('date_from')}
+              type="date"
+              value={dateFrom}
+              onChange={handleDateFromChange}
+              className="w-40"
             />
-          ))}
-        </div>
-        <div className="flex items-center gap-2 text-sm font-body">
-          <M3TextField
-            label={t('date_from')}
-            type="date"
-            value={dateFrom}
-            onChange={handleDateFromChange}
-            className="w-40"
+            <M3TextField
+              label={t('date_to')}
+              type="date"
+              value={dateTo}
+              onChange={handleDateToChange}
+              className="w-40"
+            />
+            {isAdminOrOwner && (
+              <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
+                {t('export_csv')}
+              </M3Button>
+            )}
+          </>
+        }
+      >
+        {(['ALL', 'ISSUED', 'PAID', 'CANCELLED'] as const).map((s) => (
+          <M3FilterChip
+            key={s}
+            value={s}
+            selected={statusFilter === s}
+            label={s === 'ALL' ? t('filter_all') : t(`invoice_status_${s}`, s)}
+            onValueSelect={setStatusFilter}
           />
-          <M3TextField
-            label={t('date_to')}
-            type="date"
-            value={dateTo}
-            onChange={handleDateToChange}
-            className="w-40"
-          />
-        </div>
-        {isAdminOrOwner && (
-          <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
-            {t('export_csv')}
-          </M3Button>
-        )}
-      </div>
+        ))}
+      </ListToolbar>
 
       {loading ? (
         <M3LoadingState label={t('loading')} />
@@ -372,6 +223,8 @@ export const Billing = memo(() => {
           retryLabel={t('try_again')}
           onRetry={handleRetry}
         />
+      ) : results.length === 0 ? (
+        <M3EmptyState icon="receipt_long" title={t('no_invoices')} />
       ) : (
         <M3DataTable
           data={results}
@@ -393,6 +246,7 @@ export const Billing = memo(() => {
           prevLabel={t('prev_page')}
           nextLabel={t('next_page')}
           pageOfLabel={pageOfLabel}
+          summary={summary}
         />
       )}
 

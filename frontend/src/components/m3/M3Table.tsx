@@ -7,7 +7,7 @@ interface M3TableProps {
 }
 
 export const M3Table = ({ headers, children, className = '' }: M3TableProps) => (
-  <div className={cn('bg-surface shadow-elevation-1 rounded-shape-md overflow-hidden', className)}>
+  <div className={cn('bg-surface-container-lowest border border-outline-variant shadow-elevation-1 rounded-shape-lg overflow-hidden', className)}>
     <div className="overflow-x-auto">
       <table className="min-w-full">
         <thead>

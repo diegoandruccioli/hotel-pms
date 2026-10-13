@@ -51,3 +51,29 @@ export function useRetryInvoiceCreation() {
 export function useRetryCheckoutEmail() {
   return useStayPatchMutation(stayService.retryCheckoutEmail);
 }
+
+/** One stay with its guest list; the query stays idle while no stay is selected. */
+export function useStayDetail(stayId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.stays.detail(stayId ?? ''),
+    queryFn: () => stayService.getStayById(stayId as string),
+    enabled: !!stayId,
+  });
+}
+
+/** Alloggiati state and document-type code tables — static reference data, fetched once per session. */
+export function useAlloggiatiLookups(enabled: boolean) {
+  const stati = useQuery({
+    queryKey: queryKeys.stays.lookupStati,
+    queryFn: () => stayService.getLookupStati(),
+    staleTime: Infinity,
+    enabled,
+  });
+  const tipdoc = useQuery({
+    queryKey: queryKeys.stays.lookupTipdoc,
+    queryFn: () => stayService.getLookupTipdoc(),
+    staleTime: Infinity,
+    enabled,
+  });
+  return { stati, tipdoc };
+}

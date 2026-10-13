@@ -1,38 +1,39 @@
+import { useFormatters, useListRangeSummary } from '../hooks';
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { quotationService } from '../services';
-import type { QuotationResponse, QuotationStatus } from '../types';
-import { MaterialIcon } from '../components/MaterialIcon';
+import type { QuotationResponse } from '../types';
+import { M3LoadingState } from '../components/m3';
+import { M3TableEmptyRow } from '../components/m3';
+import { M3ErrorState } from '../components/m3';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
+import { M3Pagination } from '../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
 import { M3TableActionLink } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
-import { M3Dialog } from '../components/m3';
+import { M3ConfirmDialog } from '../components/m3';
 import { useToastStore } from '../store';
-import { getErrorMessage } from '../utils';
+import { getErrorMessage, quotationStatusTone } from '../utils';
 
 const PAGE_SIZE = 20;
 
-const STATUS_TONE: Record<QuotationStatus, 'success' | 'warning' | 'error' | 'neutral' | 'info'> = {
-  DRAFT: 'neutral',
-  SENT: 'info',
-  ACCEPTED: 'success',
-  DECLINED: 'error',
-  EXPIRED: 'warning',
-};
-
-const formatTotal = (quotation: QuotationResponse, t: (key: string, opts?: Record<string, unknown>) => string): string => {
+const formatTotal = (
+  quotation: QuotationResponse,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  formatCurrency: (amount: number) => string,
+): string => {
   if (quotation.options.length <= 1) {
-    return `€ ${quotation.totalPrice.toFixed(2)}`;
+    return formatCurrency(quotation.totalPrice);
   }
   const totals = quotation.options.map((o) => o.totalPrice);
   const min = Math.min(...totals);
   const max = Math.max(...totals);
   if (min === max) {
-    return `€ ${min.toFixed(2)}`;
+    return formatCurrency(min);
   }
-  return t('price_range', { min: min.toFixed(2), max: max.toFixed(2) });
+  return t('price_range', { min: formatCurrency(min), max: formatCurrency(max) });
 };
 
 interface QuotationRowProps {
@@ -47,6 +48,7 @@ interface QuotationRowProps {
 }
 
 const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, onDownload, sendingId, t }: QuotationRowProps) => {
+  const { formatCurrency, formatDate } = useFormatters();
   const handleSend = useCallback(() => onSend(quotation.id), [onSend, quotation.id]);
   const handleConvert = useCallback(() => onConvert(quotation.id), [onConvert, quotation.id]);
   const handleDecline = useCallback(() => onDecline(quotation.id), [onDecline, quotation.id]);
@@ -64,13 +66,13 @@ const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, 
           {quotation.guestFullName}
         </Link>
       </M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{quotation.checkInDate}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{quotation.checkOutDate}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant font-medium">{formatTotal(quotation, t)}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{quotation.validUntil}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant">{formatDate(quotation.checkInDate)}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant">{formatDate(quotation.checkOutDate)}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant font-medium">{formatTotal(quotation, t, formatCurrency)}</M3TableCell>
+      <M3TableCell className="text-on-surface-variant">{formatDate(quotation.validUntil)}</M3TableCell>
       <M3TableCell>
         <div className="flex flex-col items-start gap-1">
-          <M3StatusChip label={t(`status_${quotation.status.toLowerCase()}`)} tone={STATUS_TONE[quotation.status]} />
+          <M3StatusChip label={t(`status_${quotation.status.toLowerCase()}`)} tone={quotationStatusTone[quotation.status]} />
           {quotation.sendFailed && (
             <M3StatusChip label={t('send_failed_badge')} tone="error" />
           )}
@@ -112,6 +114,7 @@ export const Quotations = () => {
   const [quotations, setQuotations] = useState<QuotationResponse[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
@@ -126,6 +129,7 @@ export const Quotations = () => {
       const data = await quotationService.getAllQuotations(page, PAGE_SIZE);
       setQuotations(data.content);
       setTotalPages(data.totalPages);
+      setTotalElements(data.totalElements);
     } catch (err: unknown) {
       setError(getErrorMessage(err, t('error_loading_quotations')));
     } finally {
@@ -137,9 +141,15 @@ export const Quotations = () => {
     loadQuotations();
   }, [loadQuotations]);
 
+  const summary = useListRangeSummary(page, PAGE_SIZE, quotations.length, totalElements);
+
   const handleNew = useCallback(() => navigate('/quotations/new'), [navigate]);
   const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
   const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
+  const pageOfLabel = useCallback(
+    (current: number, total: number) => t('common:page_x_of_y', { current, total }),
+    [t],
+  );
 
   const handleSend = useCallback(async (id: string) => {
     setSendingId(id);
@@ -223,40 +233,28 @@ export const Quotations = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="request_quote" className="mr-2 text-primary" />
-            {t('title')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('subtitle')}</p>
-        </div>
-        <M3Button icon="add" onClick={handleNew}>{t('new_quotation')}</M3Button>
-      </div>
+      <PageHeader
+        icon="request_quote"
+        title={t('title')}
+        subtitle={t('subtitle')}
+        actions={
+          <M3Button icon="add" onClick={handleNew}>{t('new_quotation')}</M3Button>
+        }
+      />
 
       {loading ? (
-        <div className="flex justify-center items-center h-64 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('common:loading')} />
       ) : error ? (
-        <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium font-body">{t('error_loading_quotations')}</h3>
-            <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button type="button" onClick={loadQuotations} className="mt-2 text-sm font-medium underline hover:no-underline">
-              {t('common:try_again')}
-            </button>
-          </div>
-        </div>
+        <M3ErrorState
+          title={t('error_loading_quotations')}
+          message={error}
+          retryLabel={t('common:try_again')}
+          onRetry={loadQuotations}
+        />
       ) : (
         <M3Table headers={tableHeaders}>
           {quotations.length === 0 ? (
-            <tr>
-              <td colSpan={7} className="py-8 text-center text-sm font-body text-on-surface-variant">
-                {t('no_quotations_found')}
-              </td>
-            </tr>
+            <M3TableEmptyRow colSpan={tableHeaders.length} message={t('no_quotations_found')} />
           ) : (
             quotations.map((quotation) => (
               <QuotationRow
@@ -275,38 +273,40 @@ export const Quotations = () => {
         </M3Table>
       )}
 
-      {!loading && !error && totalPages > 1 && (
-        <nav aria-label={t('common:pagination')} className="flex items-center justify-center gap-3">
-          <M3Button variant="outlined" icon="chevron_left" disabled={page === 0} onClick={handlePrevPage} aria-label={t('common:prev_page')}>
-            {t('common:prev_page')}
-          </M3Button>
-          <span className="text-sm font-body text-on-surface-variant">
-            {t('common:page_x_of_y', { current: page + 1, total: totalPages })}
-          </span>
-          <M3Button variant="outlined" icon="chevron_right" disabled={page >= totalPages - 1} onClick={handleNextPage} aria-label={t('common:next_page')}>
-            {t('common:next_page')}
-          </M3Button>
-        </nav>
+      {!loading && !error && (
+        <M3Pagination
+          page={page}
+          totalPages={totalPages}
+          onPrev={handlePrevPage}
+          onNext={handleNextPage}
+          pageLabel={t('common:pagination')}
+          prevLabel={t('common:prev_page')}
+          nextLabel={t('common:next_page')}
+          pageOfLabel={pageOfLabel}
+          summary={summary}
+        />
       )}
 
       {declineTarget && (
-        <M3Dialog open title={t('action_decline')} titleId="confirm-decline-quotation-dialog" onClose={handleDeclineClose}>
-          <p className="text-sm font-body text-on-surface">{t('confirm_decline')}</p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={handleDeclineClose} disabled={busy}>{t('common:cancel')}</M3Button>
-            <M3Button type="button" onClick={handleDeclineConfirm} loading={busy}>{t('common:confirm')}</M3Button>
-          </div>
-        </M3Dialog>
+        <M3ConfirmDialog
+          title={t('action_decline')}
+          titleId="confirm-decline-quotation-dialog"
+          message={t('confirm_decline')}
+          onConfirm={handleDeclineConfirm}
+          onCancel={handleDeclineClose}
+          loading={busy}
+        />
       )}
 
       {deleteTarget && (
-        <M3Dialog open title={t('action_delete')} titleId="confirm-delete-quotation-dialog" onClose={handleDeleteClose}>
-          <p className="text-sm font-body text-on-surface">{t('confirm_delete')}</p>
-          <div className="flex justify-end gap-3 pt-4">
-            <M3Button type="button" variant="outlined" onClick={handleDeleteClose} disabled={busy}>{t('common:cancel')}</M3Button>
-            <M3Button type="button" onClick={handleDeleteConfirm} loading={busy}>{t('common:confirm')}</M3Button>
-          </div>
-        </M3Dialog>
+        <M3ConfirmDialog
+          title={t('action_delete')}
+          titleId="confirm-delete-quotation-dialog"
+          message={t('confirm_delete')}
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleDeleteClose}
+          loading={busy}
+        />
       )}
     </div>
   );

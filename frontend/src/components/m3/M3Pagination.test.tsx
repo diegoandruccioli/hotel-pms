@@ -75,6 +75,23 @@ describe('M3Pagination', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
   });
 
+  const baseProps = {
+    onPrev: () => {}, onNext: () => {}, pageLabel: 'Pagination', prevLabel: 'Previous', nextLabel: 'Next', pageOfLabel,
+  };
+
+  it('shows the result summary and no page buttons when there is a single page', () => {
+    render(<M3Pagination {...baseProps} page={0} totalPages={1} summary="1–5 of 5" />);
+    expect(screen.getByText('1–5 of 5')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+  });
+
+  it('shows the summary alongside the page controls', () => {
+    render(<M3Pagination {...baseProps} page={0} totalPages={3} summary="1–20 of 50" />);
+    expect(screen.getByText('1–20 of 50')).toBeInTheDocument();
+    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <M3Pagination

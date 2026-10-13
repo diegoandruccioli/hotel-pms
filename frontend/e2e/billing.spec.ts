@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const MOCK_USER = { username: 'admin', role: 'ADMIN', sub: 'admin', mustChangePassword: false };
+import { mockAuthMe, mockOwnerSummary, mockServerEvents, mockUnhandledApi } from './fixtures/mockApi';
 
 const MOCK_INVOICE = {
   id: 'inv-001',
@@ -20,9 +19,10 @@ const MOCK_INVOICE = {
 
 test.describe('Billing flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/v1/auth/me', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER) }),
-    );
+    await mockUnhandledApi(page);
+    await mockAuthMe(page);
+    await mockServerEvents(page);
+    await mockOwnerSummary(page);
     // '**/api/v1/invoices**' matches both /api/v1/invoices and /api/v1/invoices?page=0&size=20
     await page.route('**/api/v1/invoices**', (route) => {
       if (route.request().url().includes('/api/v1/invoices/inv-001')) {
@@ -68,6 +68,38 @@ test.describe('Billing flow', () => {
     await page.getByRole('button', { name: /View/i }).first().click();
     await expect(page.getByText('SDI Status')).toBeVisible({ timeout: 3000 });
     await expect(page.getByRole('button', { name: /Download FatturaPA XML/i })).toBeVisible();
+  });
+
+  test('Escape closes the remove-charge confirmation first, then the invoice', async ({ page }) => {
+    const withCharge = {
+      ...MOCK_INVOICE,
+      totalAmount: 20,
+      charges: [{ id: 'c-001', type: 'EXTRA', description: 'Minibar', amount: 20 }],
+    };
+    await page.route('**/api/v1/invoices**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(route.request().url().includes('/api/v1/invoices/inv-001')
+          ? withCharge
+          : { content: [{ invoice: withCharge, guestName: null }], totalElements: 1, totalPages: 1, number: 0, size: 20 }),
+      }),
+    );
+    await page.goto('/billing');
+    await expect(page.locator('table')).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: /View/i }).first().click();
+    const invoiceDialog = page.getByRole('dialog', { name: /Invoice/i });
+    await expect(invoiceDialog).toBeVisible();
+
+    await page.getByRole('button', { name: /Remove charge/i }).click();
+    await expect(page.getByText('Remove this charge from the invoice?')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByText('Remove this charge from the invoice?')).toBeHidden();
+    await expect(invoiceDialog).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 
   test('passes accessibility audit on billing page', async ({ page }) => {

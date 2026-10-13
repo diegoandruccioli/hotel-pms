@@ -16,6 +16,7 @@ import type {
   HotelCategoryHistoryResponse,
   HotelSettingsRequest,
   HotelSettingsResponse,
+  GuestStaySummary,
   StayGuestRequest,
   StayGuestResponse,
   StayRequest,
@@ -132,6 +133,11 @@ export const stayService = {
     setTimeout(() => document.body.removeChild(iframe), IFRAME_CLEANUP_DELAY_MS);
   },
 
+  getGuestStayHistory: async (guestId: string): Promise<GuestStaySummary[]> => {
+    const response = await api.get<GuestStaySummary[]>(`${BASE_PATH}/guest/${guestId}/history`);
+    return response.data;
+  },
+
   getLastCompletedStayForGuest: async (guestId: string): Promise<StayResponse | null> => {
     const response = await api.get<StayResponse>(`${BASE_PATH}/guest/${guestId}/latest`, {
       validateStatus: (s) => s === 200 || s === 204,
@@ -178,8 +184,10 @@ export const stayService = {
   },
 
   getAvailableRooms: async (): Promise<AvailableRoom[]> => {
+    // Filtered by the server: filtering the first 200 rooms client-side would drop the clean ones
+    // beyond that for a hotel with more rooms. The client filter stays as a guard.
     const response = await api.get<{ content: AvailableRoom[] }>('/api/v1/rooms', {
-      params: { size: 200 },
+      params: { size: 200, status: 'CLEAN' },
     });
     return (response.data.content ?? []).filter((r) => r.status === 'CLEAN');
   },

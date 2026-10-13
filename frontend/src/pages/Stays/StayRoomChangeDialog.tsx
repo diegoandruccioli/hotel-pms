@@ -7,7 +7,7 @@ import { M3Select } from '../../components/m3';
 import { useToastStore } from '../../store';
 import { stayService } from '../../services';
 import { inventoryService } from '../../services';
-import { getErrorMessage } from '../../utils';
+import { getErrorMessage, todayIsoDate } from '../../utils';
 import type { StayResponse } from '../../types';
 import type { RoomResponse } from '../../types';
 
@@ -18,7 +18,6 @@ interface StayRoomChangeDialogProps {
   onChanged: (updated: StayResponse) => void;
 }
 
-const todayIso = (): string => new Date().toISOString().slice(0, 10);
 
 /**
  * Moves an already checked-in stay to a different room (Parte 6), effective
@@ -53,7 +52,7 @@ export const StayRoomChangeDialog = memo(({ stay, onClose, onChanged }: StayRoom
     // window to search: checked client-side first so the operator sees the
     // actionable reason immediately, instead of the generic "checkout must be
     // after checkin" the rooms/availability search would otherwise surface.
-    if (stay.expectedCheckOutDate <= todayIso()) {
+    if (stay.expectedCheckOutDate <= todayIsoDate()) {
       setError(t('errors:STAY_ROOM_CHANGE_CHECKOUT_IN_PAST'));
       return;
     }
@@ -61,7 +60,7 @@ export const StayRoomChangeDialog = memo(({ stay, onClose, onChanged }: StayRoom
     let cancelled = false;
     setLoadingRooms(true);
     inventoryService
-      .getAvailableRooms(todayIso(), stay.expectedCheckOutDate)
+      .getAvailableRooms(todayIsoDate(), stay.expectedCheckOutDate)
       .then((available) => {
         if (cancelled) return;
         setRooms(

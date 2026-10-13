@@ -49,12 +49,6 @@ test.describe('Blocco 6 — interruptions', () => {
     await page.goto('/reservations/new');
     await page.getByRole('heading', { name: /nuova prenotazione|new reservation/i }).waitFor();
 
-    await page.getByPlaceholder(/cerca ospite|search guest/i).fill('Qa Round');
-    await page.waitForTimeout(500);
-    const suggestion = page.getByRole('button', { name: /qa round/i }).first();
-    if (await suggestion.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await suggestion.click();
-    }
     const dateInputs = page.locator('input[type=date]');
     const inDate = new Date();
     inDate.setMonth(inDate.getMonth() + 5);
@@ -63,10 +57,20 @@ test.describe('Blocco 6 — interruptions', () => {
     const fmt = (d: Date) => d.toISOString().split('T')[0];
     await dateInputs.nth(0).fill(fmt(inDate));
     await dateInputs.nth(1).fill(fmt(outDate));
-    const roomTile = page.getByRole('button', { name: /101/i }).first();
-    if (await roomTile.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await roomTile.click();
+    const nextBtn = page.getByRole('button', { name: /^(avanti|next)$/i });
+    await nextBtn.click();
+    // Any available room (same selector as 03): the stepper will not advance without one.
+    const roomTile = page.locator('.md\\:grid-cols-4 > button:not([disabled])').first();
+    await expect(roomTile).toBeVisible({ timeout: 8000 });
+    await roomTile.click();
+    await nextBtn.click();
+    await page.getByPlaceholder(/cerca ospite|search guest/i).fill('Qa Round');
+    await page.waitForTimeout(500);
+    const suggestion = page.getByRole('button', { name: /qa round/i }).first();
+    if (await suggestion.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await suggestion.click();
     }
+    await nextBtn.click();
 
     const unroute = await fakeStatus(page, '**/api/v1/reservations', 500, { detail: 'INTERNAL_SERVER_ERROR' });
     const confirmBtn = page.getByRole('button', { name: /conferma prenotazione|confirm reservation/i });

@@ -1,31 +1,19 @@
+import { useMemo } from 'react';
+import { todayIsoDate, addDaysIso } from '../../utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { inventoryService } from '../../services';
 import type { RoomResponse, RoomStatus } from '../../types';
-import { queryKeys } from '../../lib';
+import { fetchAllRooms, queryKeys } from '../../lib';
 
-const getTodayString = (): string => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
-
-const getTomorrowString = (): string => {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-};
-
-/** `availableOnly` switches between the full room list and today's
- * availability search — same two backend calls RoomList.tsx already made.
- * `status`, when set, applies the server-side housekeeping-status filter
- * instead of downloading every room and filtering in the browser
- * (Housekeeping.tsx). */
-export function useRoomsList(availableOnly: boolean, status?: RoomStatus) {
+/** `availableOnly` switches between the whole room list (every page, see
+ * `fetchAllRooms`) and today's availability search. */
+export function useRoomsList(availableOnly: boolean) {
   return useQuery({
-    queryKey: queryKeys.rooms.list(availableOnly, status),
+    queryKey: queryKeys.rooms.list(availableOnly),
     queryFn: () =>
       availableOnly
-        ? inventoryService.getAvailableRooms(getTodayString(), getTomorrowString())
-        : inventoryService.getAllRooms(0, 100, status).then((page) => page.content),
+        ? inventoryService.getAvailableRooms(todayIsoDate(), addDaysIso(todayIsoDate(), 1))
+        : fetchAllRooms(),
   });
 }
 
@@ -54,7 +42,6 @@ export function useUpdateRoomStatus() {
         prev?.map((r) => (r.id === updated.id ? updated : r)),
       );
       queryClient.invalidateQueries({ queryKey: queryKeys.rooms.list(true) });
-      invalidateFilteredRoomLists(queryClient);
       invalidateDaySheet(queryClient);
     },
   });
@@ -79,10 +66,10 @@ export function useBulkUpdateRoomStatus() {
 }
 
 /**
- * Housekeeping's status-count badges read `useDaySheet()`'s
- * `roomStatusCounts` (Housekeeping.tsx:164-168) instead of counting the room
+ * Housekeeping's status counts (page subtitle) read `useDaySheet()`'s
+ * `roomStatusCounts` instead of counting the room
  * list client-side. Neither the single nor bulk status mutation invalidated
- * that query, so the badges stayed stuck at their value from page load —
+ * that query, so the counts stayed stuck at their value from page load —
  * even after the explicit "Aggiorna" button, which only refetches the room
  * list, not the day-sheet. `queryKeys.dashboard.daySheet` is keyed by
  * today's date string (not known here), so invalidate by predicate on the
@@ -95,14 +82,23 @@ function invalidateDaySheet(queryClient: ReturnType<typeof useQueryClient>): voi
   });
 }
 
-/** Invalidates every cached status-filtered room list — their *membership*
- * changes when a room's status crosses the filter boundary, so (unlike the
- * unfiltered list) they can't be patched in place. */
-function invalidateFilteredRoomLists(queryClient: ReturnType<typeof useQueryClient>): void {
-  queryClient.invalidateQueries({
-    predicate: (query) => {
-      const key = query.queryKey;
-      return key[0] === 'rooms' && key[1] === 'list' && key[2] === false && key[3] !== undefined;
-    },
+/**
+ * Rooms free for a stay window, as a roomId -> resolved total price map
+ * (seasonal/rate-plan aware, unlike base price times nights). Empty while the
+ * dates are incomplete or inverted, or if the lookup fails.
+ */
+export function useAvailableRoomPrices(checkInDate: string, checkOutDate: string) {
+  const validRange = !!checkInDate && !!checkOutDate && new Date(checkOutDate) > new Date(checkInDate);
+  const { data } = useQuery({
+    queryKey: queryKeys.rooms.available(checkInDate, checkOutDate),
+    queryFn: () => inventoryService.getAvailableRooms(checkInDate, checkOutDate),
+    enabled: validRange,
   });
+  return useMemo(() => {
+    const priceMap = new Map<string, number>();
+    data?.forEach((room) => {
+      if (room.resolvedTotalPrice !== undefined) priceMap.set(room.id, room.resolvedTotalPrice);
+    });
+    return priceMap;
+  }, [data]);
 }

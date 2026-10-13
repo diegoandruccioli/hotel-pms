@@ -76,7 +76,7 @@ describe('OrderDetailModal', () => {
 
   it('shows a dash when the order date is missing', () => {
     render(<OrderDetailModal order={{ ...ORDER, orderDate: undefined } as unknown as typeof ORDER} onClose={onClose} />);
-    expect(screen.getByText('-')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
   });
 
   it.each([
@@ -87,6 +87,13 @@ describe('OrderDetailModal', () => {
   ] as const)('renders the %s status chip', (status, expectedLabel) => {
     render(<OrderDetailModal order={{ ...ORDER, status }} onClose={onClose} />);
     expect(screen.getByText(expectedLabel)).toBeInTheDocument();
+  });
+
+  it('colours a cancelled order with the error tone and a prepared one with info', () => {
+    const { rerender } = render(<OrderDetailModal order={{ ...ORDER, status: 'CANCELLED' }} onClose={onClose} />);
+    expect(screen.getByText('CANCELLED').closest('span')?.className).toContain('bg-error-container');
+    rerender(<OrderDetailModal order={{ ...ORDER, status: 'PREPARED' }} onClose={onClose} />);
+    expect(screen.getByText('PREPARED').closest('span')?.className).toContain('bg-primary-container');
   });
 
   it('should have no accessibility violations', async () => {

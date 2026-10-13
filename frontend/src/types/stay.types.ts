@@ -1,4 +1,4 @@
-export type StayStatus = 'EXPECTED' | 'CHECKED_IN' | 'CHECKED_OUT';
+export type StayStatus = 'EXPECTED' | 'CHECKED_IN' | 'CHECKED_OUT' | 'CANCELLED';
 
 export interface AvailableRoom {
   id: string;
@@ -86,6 +86,15 @@ export interface StayGuestRequest {
    * updateGuest; omit or null to skip the check (e.g. on addGuest, where it's ignored).
    */
   version?: number | null;
+}
+
+/** One row of GET /api/v1/stays/guest/{guestId}/history (newest first, primary guest only). */
+export interface GuestStaySummary {
+  stayId: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  roomId: string;
+  status: StayStatus;
 }
 
 export interface StayRequest {

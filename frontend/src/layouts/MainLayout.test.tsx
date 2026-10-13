@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { MainLayout } from './MainLayout';
-import { useAuthStore } from '../store';
+import { useAuthStore, useSettingsStore } from '../store';
 import { renderWithQuery } from '../test-utils';
 import type { UserPayload } from '../types';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
+vi.mock('react-i18next', () => {
+  // One stable `t`, like the real hook: RouteAnnouncer re-focuses <main> whenever `t` changes.
+  const value = {
     t: (key: string, opts?: Record<string, unknown>) => {
       if (opts && typeof opts === 'object') {
         return Object.entries(opts).reduce(
@@ -18,9 +19,12 @@ vi.mock('react-i18next', () => ({
       }
       return key;
     },
-  }),
-  initReactI18next: { type: '3rdParty', init: vi.fn() },
-}));
+  };
+  return {
+    useTranslation: () => value,
+    initReactI18next: { type: '3rdParty', init: vi.fn() },
+  };
+});
 
 vi.mock('focus-trap-react', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -51,6 +55,8 @@ const renderLayout = () =>
 describe('MainLayout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    useSettingsStore.setState({ sidebarCollapsed: false });
   });
 
   it('renders the skip-link, sidebar nav, and the routed page content', () => {
@@ -85,6 +91,122 @@ describe('MainLayout', () => {
     mockAuthStore(RECEPTIONIST);
     renderLayout();
     expect(screen.getAllByText('nav_night_audit').length).toBeGreaterThan(0);
+  });
+
+  it('hides the night-audit nav item from a GUEST (route is closed to that role)', () => {
+    mockAuthStore({ sub: '3', username: 'carol', role: 'GUEST' });
+    renderLayout();
+    expect(screen.queryByText('nav_night_audit')).not.toBeInTheDocument();
+  });
+
+  it('groups the sidebar entries under headings, the admin group for an ADMIN', () => {
+    mockAuthStore(ADMIN);
+    renderLayout();
+    const sidebar = screen.getByRole('complementary');
+    for (const heading of ['nav_group_front_office', 'nav_group_operations', 'nav_group_revenue', 'nav_group_admin']) {
+      expect(within(sidebar).getByText(heading)).toBeInTheDocument();
+    }
+    expect(within(sidebar).getByRole('group', { name: 'nav_group_admin' })).toBeInTheDocument();
+    expect(within(sidebar).getByText('settings_section_admin_users')).toBeInTheDocument();
+  });
+
+  it('hides the admin group from a RECEPTIONIST', () => {
+    mockAuthStore(RECEPTIONIST);
+    renderLayout();
+    expect(screen.queryByText('nav_group_admin')).not.toBeInTheDocument();
+    expect(screen.queryByText('settings_section_admin_users')).not.toBeInTheDocument();
+  });
+
+  it('renders the same groups inside the mobile drawer', () => {
+    mockAuthStore(ADMIN);
+    renderLayout();
+    fireEvent.click(screen.getByLabelText('nav_menu'));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('nav_group_front_office')).toBeInTheDocument();
+    expect(within(dialog).getByText('nav_group_admin')).toBeInTheDocument();
+  });
+
+  it('toggles the sidebar between expanded and compact and remembers the choice', () => {
+    mockAuthStore(ADMIN);
+    const { container } = renderLayout();
+    const aside = container.querySelector('#app-sidebar');
+    const toggle = screen.getByRole('button', { name: 'sidebar_collapse' });
+    const content = container.querySelector('#app-sidebar + div');
+    expect(aside).toHaveClass('w-66');
+    expect(content).toHaveClass('lg:ml-66');
+
+    fireEvent.click(toggle);
+
+    expect(aside).toHaveClass('w-20');
+    expect(content).toHaveClass('lg:ml-20');
+    expect(localStorage.getItem('hotel-pms-sidebar-collapsed')).toBe('true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'sidebar_expand' }));
+
+    expect(aside).toHaveClass('w-66');
+    expect(content).toHaveClass('lg:ml-66');
+    expect(localStorage.getItem('hotel-pms-sidebar-collapsed')).toBe('false');
+  });
+
+  it('keeps keyboard focus on the sidebar toggle when it flips the sidebar', () => {
+    mockAuthStore(ADMIN);
+    renderLayout();
+    const toggle = screen.getByRole('button', { name: 'sidebar_collapse' });
+    toggle.focus();
+
+    fireEvent.click(toggle);
+
+    const after = screen.getByRole('button', { name: 'sidebar_expand' });
+    expect(after).toBe(toggle);
+    expect(after).toHaveFocus();
+  });
+
+  it('keeps the mobile drawer expanded while the desktop sidebar is compact', () => {
+    useSettingsStore.setState({ sidebarCollapsed: true });
+    mockAuthStore(ADMIN);
+    renderLayout();
+    fireEvent.click(screen.getByLabelText('nav_menu'));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('nav_group_front_office')).not.toHaveClass('sr-only');
+  });
+
+  it('has no accessibility violations with the compact sidebar', async () => {
+    useSettingsStore.setState({ sidebarCollapsed: true });
+    mockAuthStore(ADMIN);
+    const { container } = renderLayout();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('closes the drawer when the viewport grows past the lg breakpoint (its focus trap would hold a hidden dialog)', () => {
+    const original = window.matchMedia;
+    let onChange: ((e: { matches: boolean }) => void) | undefined;
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: (_: string, cb: (e: { matches: boolean }) => void) => { onChange = cb; },
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    try {
+      mockAuthStore(ADMIN);
+      renderLayout();
+      fireEvent.click(screen.getByLabelText('nav_menu'));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+      act(() => onChange?.({ matches: false }));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+      act(() => onChange?.({ matches: true }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it('has no accessibility violations with the drawer open (heading ids stay unique)', async () => {
+    mockAuthStore(ADMIN);
+    const { container } = renderLayout();
+    fireEvent.click(screen.getByLabelText('nav_menu'));
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('opens the mobile drawer from the hamburger button', () => {

@@ -7,25 +7,26 @@ import { useTranslation } from 'react-i18next';
 import { useToastStore } from '../store';
 import type { ReservationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
+import { M3LoadingState } from '../components/m3';
+import { M3ErrorState } from '../components/m3';
+import { PageHeader } from '../components/PageHeader';
 import { M3StatusChip } from '../components/m3';
 import { M3Card } from '../components/m3';
+import { M3SegmentedRow } from '../components/m3';
+import type { M3SegmentOption } from '../components/m3';
 import PlanningBoard from '@/pages/PlanningBoard';
-import { inventoryService } from '../services';
+import { fetchAllRooms } from '../lib';
 import type { RoomResponse } from '../types';
-import { getErrorMessage, cn, resolveDesignToken } from '../utils';
+import { getErrorMessage, resolveDesignToken, dateFnsLocale, reservationStatusTone, toneSolidTokens } from '../utils';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 const locales = { 'en-US': enUS, 'it-IT': it, en: enUS, it: it };
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales });
 
-
-
 interface ReservationEvent extends Event {
   resource: ReservationResponse;
 }
-
-
 
 const mapToEvent = (reservation: ReservationResponse): ReservationEvent => ({
   title: `${reservation.guestFullName || `Guest ${reservation.guestId.slice(0, 8)}`} (${reservation.status})`,
@@ -34,37 +35,23 @@ const mapToEvent = (reservation: ReservationResponse): ReservationEvent => ({
   resource: reservation,
 });
 
-
-
-type StatusTone = 'info' | 'warning' | 'success' | 'neutral' | 'error';
-
 // `tone` alone drives the rendered swatch (M3StatusChip resolves it to the
-// matching M3 token) -- there is deliberately no `color` field here anymore;
-// see EVENT_STATUS_TOKENS below for the (different) mapping the calendar's
-// solid event blocks use, which needs actual resolved color values, not a tone.
-const statusLegend: { labelKey: string; tone: StatusTone }[] = [
-  { labelKey: 'status_confirmed', tone: 'info' },
-  { labelKey: 'status_pending', tone: 'warning' },
-  { labelKey: 'status_checked_in', tone: 'success' },
-  { labelKey: 'status_checked_out', tone: 'neutral' },
-  { labelKey: 'status_cancelled', tone: 'error' },
-];
-
-// react-big-calendar renders events as solid-fill blocks via inline style, so
-// this can't use Tailwind classes like M3StatusChip's tones do -- same tone
-// semantics (success->tertiary, warning->secondary, error->error, info->primary,
-// neutral->outline), but the *base* token (not the pale "-container" variant
-// M3StatusChip's tag-shaped chips use) since a solid block needs real contrast
-// against its own on-* text color, not a subdued tag background.
-const EVENT_STATUS_TOKENS: Record<string, { bg: string; text: string }> = {
-  CONFIRMED: { bg: '--md-primary', text: '--md-on-primary' },
-  PENDING: { bg: '--md-secondary', text: '--md-on-secondary' },
-  CHECKED_IN: { bg: '--md-tertiary', text: '--md-on-tertiary' },
-  CHECKED_OUT: { bg: '--md-outline', text: '--md-on-surface' },
-  CANCELLED: { bg: '--md-error', text: '--md-on-error' },
-};
+// matching M3 token) -- derived from the shared reservation map so the legend
+// can't drift from the list; the solid event blocks below use toneSolidTokens,
+// since react-big-calendar needs actual resolved color values, not a tone.
+const LEGEND_STATUSES = ['CONFIRMED', 'PENDING', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'] as const;
+const statusLegend = LEGEND_STATUSES.map((status) => ({
+  labelKey: `status_${status.toLowerCase()}`,
+  tone: reservationStatusTone[status],
+}));
 
 const CALENDAR_VIEWS: View[] = ['month'];
+
+type CalendarViewMode = 'month' | 'planning';
+const VIEW_OPTIONS: M3SegmentOption<CalendarViewMode>[] = [
+  { value: 'planning', labelKey: 'view_planning' },
+  { value: 'month', labelKey: 'view_month' },
+];
 const CALENDAR_STYLE = { height: 600 };
 
 export const CalendarPlanning = () => {
@@ -72,7 +59,7 @@ export const CalendarPlanning = () => {
   const [reservations, setReservations] = useState<ReservationResponse[]>([]);
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'month' | 'planning'>('planning');
+  const [view, setView] = useState<CalendarViewMode>('planning');
   const [error, setError] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const addToast = useToastStore((s) => s.addToast);
@@ -83,10 +70,10 @@ export const CalendarPlanning = () => {
       setError(null);
       const [reservData, roomsData] = await Promise.all([
         reservationService.getAllReservations(),
-        inventoryService.getAllRooms(0, 500)
+        fetchAllRooms()
       ]);
       setReservations(reservData);
-      setRooms(roomsData.content);
+      setRooms(roomsData);
     } catch (err: unknown) {
       const message = getErrorMessage(err, t('failed_load_data'));
       setError(message);
@@ -98,7 +85,6 @@ export const CalendarPlanning = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
 
   const handlePlanningBoardDrop = useCallback(
     async (reservationId: string, oldRoomId: string, newRoomId: string) => {
@@ -182,9 +168,6 @@ export const CalendarPlanning = () => {
     }
   }, []);
 
-  const setPlanningView = useCallback(() => setView('planning'), []);
-  const setMonthView = useCallback(() => setView('month'), []);
-
   const events: ReservationEvent[] = useMemo(
     () => reservations.filter(r => r.active !== false).map(mapToEvent),
     [reservations]
@@ -192,17 +175,19 @@ export const CalendarPlanning = () => {
 
   const eventPropGetter = useCallback((event: ReservationEvent) => {
     const status = event.resource.status;
-    const tokens = EVENT_STATUS_TOKENS[status] ?? EVENT_STATUS_TOKENS.CONFIRMED;
+    // A status the map doesn't know (backend ahead of the frontend) renders neutral.
+    const tokens = toneSolidTokens[reservationStatusTone[status] ?? 'neutral'];
     // Resolved live (not memoized) so a theme change (light/dark, high-contrast)
     // is reflected on the next render instead of freezing whatever was current
     // when this callback happened to be created.
     const bg = resolveDesignToken(tokens.bg);
     const text = resolveDesignToken(tokens.text);
-    return { style: { backgroundColor: bg, borderColor: bg, color: text, borderRadius: '8px' } };
+    const border = resolveDesignToken(tokens.border);
+    return { style: { backgroundColor: bg, borderColor: border, color: text, borderRadius: '8px' } };
   }, []);
 
   const currentYear = format(currentDate, 'yyyy');
-  const monthName = format(currentDate, 'MMMM', { locale: i18n.language.startsWith('it') ? it : enUS });
+  const monthName = format(currentDate, 'MMMM', { locale: dateFnsLocale(i18n.language) });
   const monthValue = format(currentDate, 'yyyy-MM');
 
   return (
@@ -210,13 +195,7 @@ export const CalendarPlanning = () => {
       {/* Header */}
       <div className="grid grid-cols-1 lg:grid-cols-3 items-center gap-6">
         {/* Title Group */}
-        <div className="flex flex-col">
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center gap-2">
-            <MaterialIcon name="date_range" className="text-primary" />
-            {t('nav_calendar')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('calendar_subtitle')}</p>
-        </div>
+        <PageHeader icon="date_range" title={t('nav_calendar')} subtitle={t('calendar_subtitle')} />
 
         {/* Central Navigator */}
         <div className="flex items-center justify-center gap-2 bg-surface-container-low px-4 py-2 rounded-shape-full shadow-elevation-1">
@@ -261,26 +240,13 @@ export const CalendarPlanning = () => {
 
         {/* View Switcher Group */}
         <div className="flex justify-start lg:justify-end">
-          <div className="flex bg-surface-container rounded-shape-full p-1">
-            <button
-              onClick={setPlanningView}
-              className={cn(
-                'px-4 py-1.5 text-sm font-medium rounded-shape-full transition-all',
-                view === 'planning' ? 'bg-primary text-on-primary shadow-elevation-1' : 'text-on-surface-variant hover:bg-surface-container-high'
-              )}
-            >
-              {t('view_planning')}
-            </button>
-            <button
-              onClick={setMonthView}
-              className={cn(
-                'px-4 py-1.5 text-sm font-medium rounded-shape-full transition-all',
-                view === 'month' ? 'bg-primary text-on-primary shadow-elevation-1' : 'text-on-surface-variant hover:bg-surface-container-high'
-              )}
-            >
-              {t('view_month')}
-            </button>
-          </div>
+          <M3SegmentedRow
+            options={VIEW_OPTIONS}
+            value={view}
+            onChange={setView}
+            ariaLabel={t('calendar_view_label')}
+            ns="common"
+          />
         </div>
       </div>
 
@@ -293,20 +259,14 @@ export const CalendarPlanning = () => {
 
       {/* Calendar body */}
       {loading ? (
-        <div className="flex justify-center items-center h-96 bg-surface rounded-shape-md shadow-elevation-1">
-          <MaterialIcon name="progress_activity" size={32} className="text-primary animate-spin" />
-        </div>
+        <M3LoadingState label={t('common:loading')} className="h-96" />
       ) : error ? (
-        <div className="flex items-center gap-3 px-4 py-4 rounded-shape-sm bg-error-container text-on-error-container">
-          <MaterialIcon name="error" size={20} className="shrink-0" />
-          <div>
-            <h3 className="text-sm font-medium font-body">{t('error_loading_reservations')}</h3>
-            <p className="mt-1 text-sm font-body opacity-80">{error}</p>
-            <button type="button" onClick={loadData} className="mt-2 text-sm font-medium underline hover:no-underline">
-              {t('try_again')}
-            </button>
-          </div>
-        </div>
+        <M3ErrorState
+          title={t('error_loading_reservations')}
+          message={error}
+          retryLabel={t('try_again')}
+          onRetry={loadData}
+        />
       ) : view === 'planning' ? (
         <PlanningBoard
           rooms={rooms}
@@ -316,7 +276,7 @@ export const CalendarPlanning = () => {
           onReservationMove={handlePlanningBoardDrop}
         />
       ) : (
-        <M3Card variant="outlined" className="p-4">
+        <M3Card variant="solid" className="p-4">
           <Calendar
             localizer={localizer}
             culture={i18n.language}

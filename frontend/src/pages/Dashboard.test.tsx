@@ -1,6 +1,6 @@
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { renderWithQuery } from '../test-utils';
 import { Dashboard } from './Dashboard';
@@ -10,7 +10,7 @@ import { dashboardService } from '../services';
 import { billingReportService } from '../services';
 import { reservationService } from '../services';
 import { kpiReportService } from '../services';
-import type { DaySheetResponse } from '../types';
+import type { DaySheetResponse, DaySheetTrendResponse } from '../types';
 import type { OwnerFinancialSummaryDto } from '../types';
 
 vi.mock('../services/stayService', () => ({
@@ -23,7 +23,7 @@ vi.mock('../services/stayService', () => ({
 }));
 
 vi.mock('../services/dashboardService', () => ({
-  dashboardService: { getDaySheet: vi.fn() },
+  dashboardService: { getDaySheet: vi.fn(), getDaySheetTrend: vi.fn() },
 }));
 
 vi.mock('../services/billingReportService', () => ({
@@ -40,8 +40,9 @@ vi.mock('../services/kpiReportService', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { name?: string }) => {
+    t: (key: string, options?: { name?: string; value?: string }) => {
       if (key === 'welcome_back' && options?.name) return `welcome_back ${options.name}`;
+      if (key === 'dashboard_delta_vs_yesterday') return `${key} ${options?.value}`;
       return key;
     },
     i18n: { language: 'en' },
@@ -73,6 +74,27 @@ const EMPTY_PAGE = {
   numberOfElements: 0, first: true, last: true, empty: true,
 };
 
+const isoDaysAgo = (days: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const trendOf = (...points: [number, number][]): DaySheetTrendResponse => ({
+  from: isoDaysAgo(7),
+  to: isoDaysAgo(1),
+  points: points.map(([daysAgo, guestsInHouse]) => ({
+    date: isoDaysAgo(daysAgo), arrivals: 4, departures: 3, guestsInHouse, availableRooms: 10,
+  })),
+});
+
+const LocationProbe = () => {
+  const { pathname, state } = useLocation();
+  return <div data-testid="location" data-state={JSON.stringify(state)}>{pathname}</div>;
+};
+
+const openDeparturesTab = async () => fireEvent.click(await screen.findByRole('radio', { name: 'dashboard_tab_departures' }));
+
 const renderDashboard = () =>
   renderWithQuery(<MemoryRouter><Dashboard /></MemoryRouter>);
 
@@ -87,7 +109,9 @@ describe('Dashboard Component', () => {
       unassessedCount: 0, mostRecentUnassessedAt: null, mostRecentReason: null,
     });
     vi.mocked(dashboardService.getDaySheet).mockReset();
-    vi.mocked(dashboardService.getDaySheet).mockResolvedValue(MOCK_DAY_SHEET);
+    vi.mocked(dashboardService.getDaySheet).mockResolvedValue({ ...MOCK_DAY_SHEET, date: isoDaysAgo(0) });
+    vi.mocked(dashboardService.getDaySheetTrend).mockReset();
+    vi.mocked(dashboardService.getDaySheetTrend).mockResolvedValue(null);
     vi.mocked(billingReportService.getOwnerFinancialSummary).mockReset();
     vi.mocked(billingReportService.getOwnerFinancialSummary).mockResolvedValue(MOCK_SUMMARY);
     vi.mocked(reservationService.searchReservations).mockReset();
@@ -151,6 +175,7 @@ describe('Dashboard Component', () => {
     renderDashboard();
     await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
     expect(screen.getByTestId('dashboard-check-in-res-1')).toBeInTheDocument();
+    await openDeparturesTab();
     expect(screen.getByText('dashboard_no_departures_today')).toBeInTheDocument();
   });
 
@@ -175,6 +200,7 @@ describe('Dashboard Component', () => {
     } as never);
     vi.mocked(stayService.checkOut).mockResolvedValue({} as never);
     renderDashboard();
+    await openDeparturesTab();
 
     await waitFor(() => expect(screen.getByTestId('dashboard-check-out-stay-1')).toBeInTheDocument());
     expect(screen.getByText('101')).toBeInTheDocument();
@@ -189,6 +215,7 @@ describe('Dashboard Component', () => {
     } as never);
     vi.mocked(stayService.checkOut).mockRejectedValue(new Error('boom'));
     renderDashboard();
+    await openDeparturesTab();
 
     await waitFor(() => expect(screen.getByTestId('dashboard-check-out-stay-2')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('dashboard-check-out-stay-2'));
@@ -197,7 +224,14 @@ describe('Dashboard Component', () => {
 
   it('shows the owner summary section (occupancy/ADR/RevPAR) for ADMIN', async () => {
     renderDashboard();
-    await waitFor(() => expect(screen.getByText('dashboard_owner_summary_title')).toBeInTheDocument());
+    const section = await screen.findByRole('region', { name: 'dashboard_owner_summary_title' });
+    expect(within(section).getByText('75%')).toBeInTheDocument();
+    expect(within(section).getByText('€120.00')).toBeInTheDocument();
+    expect(within(section).getByText('€90.00')).toBeInTheDocument();
+    // The cards are plain tiles; the one link is the section's own, named by context.
+    expect(within(section).getAllByRole('link')).toHaveLength(1);
+    expect(within(section).getByRole('link', { name: 'dashboard_view_all_owner_report' }))
+      .toHaveAttribute('href', '/owner-dashboard');
   });
 
   it('hides the owner summary section for RECEPTIONIST', async () => {
@@ -222,6 +256,27 @@ describe('Dashboard Component', () => {
     await waitFor(() => expect(screen.getByTestId('room-status-summary')).toBeInTheDocument());
     expect(screen.getByText('10')).toBeInTheDocument(); // CLEAN
     expect(screen.getByText('2')).toBeInTheDocument();  // DIRTY
+  });
+
+  it('lists every room status with its count and canonical tone dot', async () => {
+    renderDashboard();
+    const legend = await screen.findByTestId('room-status-summary');
+    const rowOf = (label: string) => within(legend).getByText(label).closest('li');
+    expect(rowOf('room_status_clean')).toHaveTextContent('10');
+    expect(rowOf('room_status_dirty')).toHaveTextContent('2');
+    expect(rowOf('room_status_maintenance')).toHaveTextContent('1');
+    expect(rowOf('room_status_occupied')).toHaveTextContent('12');
+    expect(rowOf('room_status_clean')?.querySelector('span')?.className).toContain('bg-tertiary');
+    expect(rowOf('room_status_dirty')?.querySelector('span')?.className).toContain('bg-secondary');
+    expect(rowOf('room_status_maintenance')?.querySelector('span')?.className).toContain('bg-error');
+    expect(rowOf('room_status_occupied')?.querySelector('span')?.className).toContain('bg-primary');
+  });
+
+  it('offers the to-do list with links built from the day-sheet', async () => {
+    renderDashboard();
+    expect(await screen.findByText('dashboard_tasks_title')).toBeInTheDocument();
+    expect(screen.getByText('dashboard_task_dirty_rooms').closest('a')).toHaveAttribute('href', '/housekeeping');
+    expect(screen.getByText('dashboard_task_night_audit').closest('a')).toHaveAttribute('href', '/night-audit');
   });
 
   it('shows Alloggiati failure banner for ADMIN when failures exist', async () => {
@@ -282,6 +337,92 @@ describe('Dashboard Component', () => {
     renderDashboard();
     await waitFor(() => expect(screen.getByText('error_loading_dashboard')).toBeInTheDocument());
     expect(screen.getByText('try_again')).toBeInTheDocument();
+  });
+
+  it('shows each KPI as one link to its list, without separate "view all" links', async () => {
+    renderDashboard();
+    const grid = await screen.findByTestId('stats-grid');
+    const links = within(grid).getAllByRole('link');
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/stays', '/reservations', '/stays', '/rooms', '/billing']);
+    expect(within(grid).queryByText('view_all')).not.toBeInTheDocument();
+  });
+
+  it('shows a signed delta and a sparkline when yesterday has a snapshot', async () => {
+    vi.mocked(dashboardService.getDaySheetTrend).mockResolvedValue(trendOf([2, 190], [1, 195]));
+    renderDashboard();
+    const grid = await screen.findByTestId('stats-grid');
+    await waitFor(() => expect(within(grid).getByText('dashboard_delta_vs_yesterday +5')).toBeInTheDocument());
+    expect(grid.querySelectorAll('svg polyline')).toHaveLength(4);
+    expect(within(grid).getAllByText('dashboard_trend_label')).toHaveLength(4);
+  });
+
+  it('shows a negative delta with a minus sign', async () => {
+    vi.mocked(dashboardService.getDaySheetTrend).mockResolvedValue(trendOf([1, 210]));
+    renderDashboard();
+    await waitFor(() => expect(screen.getByText('dashboard_delta_vs_yesterday −10')).toBeInTheDocument());
+  });
+
+  it('keeps the sparkline but drops the delta when yesterday has no snapshot', async () => {
+    vi.mocked(dashboardService.getDaySheetTrend).mockResolvedValue(trendOf([3, 190], [2, 195]));
+    renderDashboard();
+    const grid = await screen.findByTestId('stats-grid');
+    await waitFor(() => expect(grid.querySelectorAll('svg polyline').length).toBeGreaterThan(0));
+    expect(within(grid).queryByText('dashboard_delta_vs_yesterday', { exact: false })).not.toBeInTheDocument();
+  });
+
+  it('renders KPIs without trend when the endpoint is missing or empty', async () => {
+    vi.mocked(dashboardService.getDaySheetTrend).mockResolvedValue({ from: '', to: '', points: [] });
+    renderDashboard();
+    const grid = await screen.findByTestId('stats-grid');
+    expect(grid.querySelectorAll('svg polyline')).toHaveLength(0);
+    expect(within(grid).queryByText('dashboard_delta_vs_yesterday', { exact: false })).not.toBeInTheDocument();
+  });
+
+  it('renders KPIs when the trend request fails', async () => {
+    vi.mocked(dashboardService.getDaySheetTrend).mockRejectedValue(new Error('boom'));
+    renderDashboard();
+    expect(await screen.findByTestId('stats-grid')).toBeInTheDocument();
+    expect(screen.queryByText('error_loading_dashboard')).not.toBeInTheDocument();
+  });
+
+  it('passes the list filter as router state when a KPI card is clicked', async () => {
+    renderWithQuery(
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="*" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const grid = await screen.findByTestId('stats-grid');
+    fireEvent.click(within(grid).getAllByRole('link')[1]);
+    const probe = await screen.findByTestId('location');
+    expect(probe).toHaveTextContent('/reservations');
+    expect(JSON.parse(probe.getAttribute('data-state') ?? '{}')).toEqual({ upcomingOnly: true, sortField: 'checkInDate', sortDir: 'asc' });
+  });
+
+  it('leaves out a zero delta', async () => {
+    vi.mocked(dashboardService.getDaySheetTrend).mockResolvedValue(trendOf([1, 200]));
+    renderDashboard();
+    const grid = await screen.findByTestId('stats-grid');
+    await waitFor(() => expect(within(grid).getAllByText('dashboard_trend_label').length).toBeGreaterThan(0));
+    expect(within(grid).queryByText('dashboard_delta_vs_yesterday 0')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['new_reservation', '/reservations/new'],
+    ['dashboard_action_walk_in', '/stays/walk-in'],
+  ])('header action %s navigates to %s', async (label, path) => {
+    renderWithQuery(
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="*" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: new RegExp(label) }));
+    expect(await screen.findByTestId('location')).toHaveTextContent(path);
   });
 
   it('has no accessibility violations', async () => {
