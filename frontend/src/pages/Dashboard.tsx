@@ -85,7 +85,7 @@ export const Dashboard = () => {
       icon: 'login',
       tone: 'success',
       to: '/reservations',
-      state: { upcomingOnly: true, sortField: 'checkInDate', sortDir: 'asc' },
+      state: { preset: 'arrivalsToday', sortField: 'checkInDate', sortDir: 'asc' },
       trend: { field: 'arrivals', today: daySheet?.todayArrivals ?? 0 },
     },
     {
@@ -116,6 +116,7 @@ export const Dashboard = () => {
       icon: 'receipt_long',
       tone: 'error',
       to: '/billing',
+      state: { statusFilter: 'ISSUED' },
     };
   }, [isOwnerOrAdmin, ownerSummary, formatCurrency]);
 
@@ -196,15 +197,18 @@ export const Dashboard = () => {
           title={t('city_tax_unassessed_banner_title')}
           className="mt-4"
           action={
-            <Link
-              to="/settings/city-tax"
-              className="inline-flex items-center min-h-10 text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
-            >
-              {t('city_tax_unassessed_banner_action')}
-            </Link>
+            isOwnerOrAdmin ? (
+              <Link
+                to="/settings/city-tax"
+                className="inline-flex items-center min-h-10 text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
+              >
+                {t('city_tax_unassessed_banner_action')}
+              </Link>
+            ) : undefined
           }
         >
           {t('city_tax_unassessed_banner_desc', { count: cityTaxUnassessed.unassessedCount })}
+          {!isOwnerOrAdmin && ` ${t('city_tax_unassessed_banner_ask_admin')}`}
         </Alert>
       )}
 

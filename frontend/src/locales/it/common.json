@@ -387,6 +387,7 @@
   "city_tax_unassessed_banner_desc_one": "1 soggiorno non ha avuto l'imposta di soggiorno calcolata per una configurazione mancante.",
   "city_tax_unassessed_banner_desc_other": "{{count}} soggiorni non hanno avuto l'imposta di soggiorno calcolata per una configurazione mancante.",
   "city_tax_unassessed_banner_action": "Verifica e recupera",
+  "city_tax_unassessed_banner_ask_admin": "Contatta un amministratore per recuperarla.",
   "download_json_export": "Scarica Esportazione JSON",
   "alloggiati_json_downloaded": "Esportazione JSON del {{date}} scaricata.",
 

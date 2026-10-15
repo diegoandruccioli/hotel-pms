@@ -387,6 +387,7 @@
   "city_tax_unassessed_banner_desc_one": "1 stay did not have its tourist tax assessed because of a missing configuration.",
   "city_tax_unassessed_banner_desc_other": "{{count}} stays did not have their tourist tax assessed because of a missing configuration.",
   "city_tax_unassessed_banner_action": "Check and recover",
+  "city_tax_unassessed_banner_ask_admin": "Ask an administrator to recover it.",
   "download_json_export": "Download JSON Export",
   "alloggiati_json_downloaded": "JSON export for {{date}} downloaded.",
 

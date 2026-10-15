@@ -330,6 +330,9 @@ describe('Dashboard Component', () => {
       expect(screen.getByText('city_tax_unassessed_banner_title')).toBeInTheDocument();
     });
     expect(stayService.getCityTaxUnassessedSummary).toHaveBeenCalled();
+    // The settings route is OWNER/ADMIN-only: no dead link for other roles, a hint instead.
+    expect(screen.queryByText('city_tax_unassessed_banner_action')).not.toBeInTheDocument();
+    expect(screen.getByText(/city_tax_unassessed_banner_ask_admin/)).toBeInTheDocument();
   });
 
   it('renders error state with retry button', async () => {
@@ -398,7 +401,7 @@ describe('Dashboard Component', () => {
     fireEvent.click(within(grid).getAllByRole('link')[1]);
     const probe = await screen.findByTestId('location');
     expect(probe).toHaveTextContent('/reservations');
-    expect(JSON.parse(probe.getAttribute('data-state') ?? '{}')).toEqual({ upcomingOnly: true, sortField: 'checkInDate', sortDir: 'asc' });
+    expect(JSON.parse(probe.getAttribute('data-state') ?? '{}')).toEqual({ preset: 'arrivalsToday', sortField: 'checkInDate', sortDir: 'asc' });
   });
 
   it('leaves out a zero delta', async () => {

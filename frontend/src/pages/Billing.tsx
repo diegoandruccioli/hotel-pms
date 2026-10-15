@@ -1,5 +1,6 @@
 import { useState, useCallback, memo, useMemo } from 'react';
 import { format, startOfMonth } from 'date-fns';
+import { useLocation } from 'react-router-dom';
 import type { SortingState } from '@tanstack/react-table';
 import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types';
 import { Alert } from '../components/Alert';
@@ -49,7 +50,9 @@ export const Billing = memo(() => {
   const [page, setPage] = useState(0);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceResponse | null>(null);
   const [detailTarget, setDetailTarget]   = useState<InvoiceResponse | null>(null);
-  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL');
+  const location = useLocation();
+  const navState = location.state as { statusFilter?: InvoiceStatus | 'ALL' } | null;
+  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>(() => navState?.statusFilter ?? 'ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery);
   const [dateFrom, setDateFrom] = useState('');

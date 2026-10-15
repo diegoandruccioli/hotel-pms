@@ -21,7 +21,10 @@ const TAB_OPTIONS: M3SegmentOption<PanelTab>[] = [
   { value: 'departures', labelKey: 'dashboard_tab_departures', icon: 'logout' },
 ];
 
-const VIEW_ALL_HREF: Record<PanelTab, string> = { arrivals: '/reservations', departures: '/stays' };
+const VIEW_ALL_TARGET: Record<PanelTab, { to: string; state: Record<string, unknown> }> = {
+  arrivals: { to: '/reservations', state: { preset: 'arrivalsToday', sortField: 'checkInDate', sortDir: 'asc' } },
+  departures: { to: '/stays', state: { statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc' } },
+};
 
 const ArrivalRow = ({ reservation }: { reservation: ReservationResponse }) => {
   const { t } = useTranslation('common');
@@ -143,7 +146,8 @@ export const ArrivalsDeparturesPanel = () => {
             className="w-56"
           />
           <Link
-            to={VIEW_ALL_HREF[tab]}
+            to={VIEW_ALL_TARGET[tab].to}
+            state={VIEW_ALL_TARGET[tab].state}
             aria-label={t(isArrivals ? 'dashboard_view_all_arrivals' : 'dashboard_view_all_departures')}
             className="inline-flex items-center min-h-10 text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm whitespace-nowrap"
           >
