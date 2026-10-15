@@ -6,6 +6,7 @@ import { inventoryService, reservationService, guestService, stayService } from 
 import { fetchAllRooms } from '../../lib';
 import type { GuestResponseDTO, RoomResponse } from '../../types';
 import type { ReservationRequest, ReservationResponse, ReservationStatus } from '../../types';
+import { isReservationEditable } from './reservationStatus';
 
 export const STEP_DATES = 0;
 export const STEP_ROOMS = 1;
@@ -120,6 +121,10 @@ export const useReservationForm = () => {
 
       if (id) {
         const res = await reservationService.getReservationById(id);
+        if (isEdit && !isReservationEditable(res.status)) {
+          navigate(`/reservations/${id}`, { replace: true });
+          return;
+        }
         setCheckInDate(res.checkInDate || '');
         setCheckOutDate(res.checkOutDate || '');
         setExpectedGuests(res.expectedGuests || 1);
@@ -164,7 +169,7 @@ export const useReservationForm = () => {
     } finally {
       setFetching(false);
     }
-  }, [id, t]);
+  }, [id, isEdit, navigate, t]);
 
   useEffect(() => {
     loadInitialData();
@@ -268,6 +273,13 @@ export const useReservationForm = () => {
   // double click (or panel Save + Confirm) could otherwise send the request twice.
   const savingRef = useRef(false);
 
+  // Back to wherever the user came from (group detail, night audit, quotation...);
+  // a direct visit has no in-app history to return to, so fall back to the list.
+  const goBack = useCallback(() => {
+    if (location.key !== 'default') navigate(-1);
+    else navigate('/reservations');
+  }, [location.key, navigate]);
+
   const save = useCallback(async () => {
     if (isView || savingRef.current) return;
 
@@ -305,7 +317,7 @@ export const useReservationForm = () => {
       } else {
         await reservationService.createReservation(request);
       }
-      navigate('/reservations');
+      if (id) goBack(); else navigate('/reservations');
     } catch (err: unknown) {
       const e = err as {response?: {data?: {detail?: string; errorCode?: string}}, message?: string};
       if (e.response?.data?.errorCode === 'GUEST_NOT_FOUND') {
@@ -323,7 +335,7 @@ export const useReservationForm = () => {
       setLoading(false);
     }
   }, [isView, validateStep, selectedGuest, reservationSchema, checkInDate, checkOutDate, expectedGuests,
-      status, selectedRoomIds, version, id, navigate, t]);
+      status, selectedRoomIds, version, id, navigate, goBack, t]);
 
   /** Enter inside a step moves forward; only the last step actually saves. */
   const handleFormSubmit = useCallback((e: React.FormEvent) => {
@@ -341,7 +353,7 @@ export const useReservationForm = () => {
     loadInitialData();
   }, [loadInitialData]);
 
-  const goToList = useCallback(() => navigate('/reservations'), [navigate]);
+  const goToList = goBack;
 
   const handleCancelAfterConflict = useCallback(() => {
     setStaleConflict(false);
@@ -361,12 +373,19 @@ export const useReservationForm = () => {
     navigate('/stays', { state: { statusFilter: 'CHECKED_IN' } });
   }, [navigate]);
 
+  const goToCheckIn = useCallback(() => {
+    if (!id || !selectedGuest) return;
+    navigate(`/stays/check-in/${id}`, {
+      state: { roomId: selectedRoomIds[0] ?? '', expectedGuests: Number(expectedGuests), guestId: selectedGuest.id },
+    });
+  }, [id, selectedGuest, selectedRoomIds, expectedGuests, navigate]);
+
   const goToEdit = useCallback(() => {
     if (id) navigate(`/reservations/edit/${id}`);
   }, [id, navigate]);
 
   return {
-    id, isEdit, isView,
+    id, isEdit, isView, status,
     loading, fetching, error,
     step, isStepSelectable, goToStep, goNext, goPrevious,
     rooms, allReservations, resolvedPrices: displayPrices,
@@ -377,6 +396,6 @@ export const useReservationForm = () => {
     checkedInStayId, staleConflict,
     save, handleFormSubmit,
     handleReloadAfterConflict, handleCancelAfterConflict,
-    goToList, goToStay, goToEdit,
+    goToList, goToStay, goToEdit, goToCheckIn,
   };
 };

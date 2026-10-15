@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { GuestNameCell } from './ReservationRowCells';
+import type { ReservationResponse } from '../../types';
+import { ActionsCell, GuestNameCell } from './ReservationRowCells';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -22,5 +23,28 @@ describe('GuestNameCell', () => {
   it('has no accessibility violations', async () => {
     const { container } = render(<GuestNameCell name="Marco Bianchi" />);
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe('ActionsCell', () => {
+  const tKey = ((key: string) => key) as never;
+  const noop = vi.fn();
+  const reservation = (status: string) => ({
+    id: 'r1', status, guestId: 'g1', expectedGuests: 1, checkInDate: '2099-01-01', lineItems: [],
+  }) as unknown as ReservationResponse;
+  const renderActions = (status: string) => render(
+    <ActionsCell reservation={reservation(status)} onCheckIn={noop} onView={noop} onEdit={noop} t={tKey} />,
+  );
+
+  it('offers View and Edit on an open reservation', () => {
+    renderActions('CONFIRMED');
+    expect(screen.getByText('view')).toBeInTheDocument();
+    expect(screen.getByText('edit')).toBeInTheDocument();
+  });
+
+  it.each(['CHECKED_OUT', 'CANCELLED', 'NO_SHOW'])('offers only View on a %s reservation', (status) => {
+    renderActions(status);
+    expect(screen.getByText('view')).toBeInTheDocument();
+    expect(screen.queryByText('edit')).not.toBeInTheDocument();
   });
 });

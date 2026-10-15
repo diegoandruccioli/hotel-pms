@@ -4,6 +4,7 @@ import type { ReservationResponse, RoomResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Avatar, M3StatusChip, M3TableActionLink } from '../../components/m3';
 import { cn, todayIsoDate, reservationStatusTone } from '../../utils';
+import { getStatusLabel, isReservationEditable } from './reservationStatus';
 
 const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 // Mirrors ReservationServiceImpl.ALLOWED_TRANSITIONS's NO_SHOW edges — a
@@ -12,9 +13,6 @@ const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 // (including the check-in-date-passed / no-existing-stay guards this list
 // can't express).
 const NO_SHOW_ELIGIBLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
-
-const getStatusLabel = (status: string, t: TFunction) =>
-  t(`status_${status.toLowerCase()}`, status);
 
 export const RoomsCell = ({ reservation, rooms }: { reservation: ReservationResponse; rooms: RoomResponse[] }) => {
   const roomNumbers = useMemo(() => (
@@ -127,9 +125,11 @@ export const ActionsCell = ({ reservation, onCheckIn, onView, onEdit, onDelete, 
       <M3TableActionLink onClick={handleViewClick}>
         {t('view')}
       </M3TableActionLink>
-      <M3TableActionLink onClick={handleEditClick}>
-        {t('edit')}
-      </M3TableActionLink>
+      {isReservationEditable(reservation.status) && (
+        <M3TableActionLink onClick={handleEditClick}>
+          {t('edit')}
+        </M3TableActionLink>
+      )}
       {onMarkNoShow && isNoShowEligible(reservation) && (
         <M3TableActionLink
           tone="error"
