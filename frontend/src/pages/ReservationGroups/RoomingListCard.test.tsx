@@ -37,7 +37,7 @@ const MEMBERS = [
 ];
 
 const renderCard = (members = MEMBERS, rooms: RoomResponse[] | undefined = ROOMS) =>
-  render(<MemoryRouter><RoomingListCard members={members} rooms={rooms} /></MemoryRouter>);
+  render(<MemoryRouter><RoomingListCard groupId="grp1" members={members} rooms={rooms} /></MemoryRouter>);
 
 const rowOf = (name: string) => screen.getByText(name).closest('tr')!;
 
@@ -75,8 +75,14 @@ describe('RoomingListCard', () => {
     expect(within(rowOf('Mario Rossi')).queryByText('check_in')).not.toBeInTheDocument();
     fireEvent.click(within(rowOf('Jane Doe')).getByText('check_in'));
     expect(mockNavigate).toHaveBeenCalledWith('/stays/check-in/r1', {
-      state: { roomId: 'room1', expectedGuests: 2, guestId: 'g1' },
+      state: { roomId: 'room1', expectedGuests: 2, guestId: 'g1', returnTo: '/reservations/groups/grp1' },
     });
+  });
+
+  it.each(['CHECKED_OUT', 'CANCELLED', 'NO_SHOW'])('offers no Edit for a %s member', (status) => {
+    renderCard([member({ status })]);
+    expect(screen.getByText('view')).toBeInTheDocument();
+    expect(screen.queryByText('edit')).not.toBeInTheDocument();
   });
 
   it('keeps a cancelled status visible on a member without a room, and shows no bar for an empty list', () => {

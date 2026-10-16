@@ -1,6 +1,6 @@
 import { useFormatters } from '../hooks';
 import { useState, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import type { GroupCheckoutOutcome } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { PageHeader } from '../components/PageHeader';
@@ -18,6 +18,9 @@ import {
   useReservationGroup, useCancelReservationGroup, useCheckoutReservationGroup, useRoomsLookup,
 } from '../hooks/queries';
 import { RoomingListCard } from './ReservationGroups/RoomingListCard';
+
+const LINK_CLASS =
+  'text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs';
 
 export const ReservationGroupDetail = () => {
   const { t } = useTranslation('common');
@@ -75,6 +78,9 @@ export const ReservationGroupDetail = () => {
 
   const handleBackToList = useCallback(() => navigate('/reservations/groups'), [navigate]);
 
+  const masterFolioState = useMemo(() => ({ invoiceId: group?.masterFolioInvoiceId }), [group?.masterFolioInvoiceId]);
+  const contactGuestHref = `/guests?search=${encodeURIComponent(group?.contactGuestName ?? '')}`;
+
   const canCancel = useMemo(
     () => !!group && group.status !== 'CANCELLED' && group.status !== 'CHECKED_OUT', [group]);
   const canCheckout = useMemo(
@@ -128,7 +134,7 @@ export const ReservationGroupDetail = () => {
         </div>
         <div>
           <p className="text-on-surface-variant">{t('contact_guest')}</p>
-          <p className="font-medium">{group.contactGuestName}</p>
+          <Link to={contactGuestHref} className={LINK_CLASS}>{group.contactGuestName}</Link>
         </div>
         <div>
           <p className="text-on-surface-variant">{t('label_checkin_date')} / {t('label_checkout_date')}</p>
@@ -140,9 +146,17 @@ export const ReservationGroupDetail = () => {
         </div>
         <div>
           <p className="text-on-surface-variant">{t('master_folio')}</p>
-          <p className="font-medium">
-            {group.masterFolioInvoiceId ? t('master_folio_open') : t('master_folio_none')}
-          </p>
+          {group.masterFolioInvoiceId ? (
+            <p className="font-medium">
+              <span>{t('master_folio_open')}</span>
+              {' · '}
+              <Link to="/billing" state={masterFolioState} className={LINK_CLASS}>
+                {t('master_folio_open_invoice')}
+              </Link>
+            </p>
+          ) : (
+            <p className="font-medium">{t('master_folio_none')}</p>
+          )}
         </div>
         {group.notes && (
           <div className="sm:col-span-2 md:col-span-3">
@@ -152,7 +166,7 @@ export const ReservationGroupDetail = () => {
         )}
       </M3Card>
 
-      <RoomingListCard members={group.members} rooms={rooms} />
+      <RoomingListCard groupId={group.id} members={group.members} rooms={rooms} />
 
       {confirmingCancel && (
         <M3ConfirmDialog

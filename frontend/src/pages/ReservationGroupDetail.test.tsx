@@ -177,6 +177,23 @@ describe('ReservationGroupDetail', () => {
     renderDetail();
 
     await waitFor(() => expect(screen.getByText('master_folio_open')).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'master_folio_open_invoice' })).toHaveAttribute('href', '/billing');
+  });
+
+  it('should not offer an invoice link when no master folio exists', async () => {
+    vi.mocked(reservationGroupService.getGroup).mockResolvedValueOnce(GROUP as never);
+    renderDetail();
+
+    await waitFor(() => expect(screen.getByText('master_folio_none')).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: 'master_folio_open_invoice' })).not.toBeInTheDocument();
+  });
+
+  it('should link the contact guest to the guest list search', async () => {
+    vi.mocked(reservationGroupService.getGroup).mockResolvedValueOnce(GROUP as never);
+    renderDetail();
+
+    const link = await screen.findByRole('link', { name: 'Mario Rossi' });
+    expect(link).toHaveAttribute('href', '/guests?search=Mario%20Rossi');
   });
 
   it('should check out the group and show per-room outcomes', async () => {

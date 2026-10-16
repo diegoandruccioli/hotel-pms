@@ -15,6 +15,8 @@ import type { InvoiceResponse, InvoiceSearchResult } from '../types';
 // PageHeader derives its breadcrumbs from the router location.
 const ISSUED_NAV_ENTRIES = [{ pathname: '/billing', state: { statusFilter: 'ISSUED' } }];
 
+const INVOICE_LINK_ENTRIES = [{ pathname: '/billing', state: { invoiceId: 'inv-linked' } }];
+
 const render = (ui: ReactElement) => renderWithQuery(<MemoryRouter>{ui}</MemoryRouter>);
 
 vi.mock('react-i18next', () => {
@@ -30,6 +32,7 @@ vi.mock('../services/billingService', () => ({
     searchInvoices: vi.fn(),
     processPayment: vi.fn(),
     exportInvoicesCsv: vi.fn(),
+    getInvoiceById: vi.fn(),
   },
 }));
 
@@ -195,6 +198,19 @@ describe('Billing', () => {
     await waitFor(() => screen.getByText('view'));
     fireEvent.click(screen.getByText('view'));
     expect(screen.getByText('invoice_detail_title')).toBeInTheDocument();
+  });
+
+  it('opens the detail of the invoice named by the navigation state', async () => {
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([]) as never);
+    vi.mocked(billingService.getInvoiceById).mockResolvedValueOnce(PAID_INVOICE as never);
+    renderWithQuery(
+      <MemoryRouter initialEntries={INVOICE_LINK_ENTRIES}>
+        <Billing />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('invoice_detail_title')).toBeInTheDocument());
+    expect(billingService.getInvoiceById).toHaveBeenCalledWith('inv-linked');
   });
 
   it('should close InvoiceDetailModal on close button', async () => {

@@ -608,6 +608,7 @@
   "cancel_group": "Annulla gruppo",
   "master_folio": "Master folio",
   "master_folio_open": "Aperto",
+  "master_folio_open_invoice": "Apri fattura",
   "master_folio_none": "Nessuno",
   "cancel_group_confirm": "Annullare questo gruppo e tutte le sue prenotazioni non terminali?",
   "group_cancelled_success": "Gruppo annullato",

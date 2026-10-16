@@ -6,29 +6,38 @@ import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Card, M3StatusChip, M3Table, M3TableActionLink, M3TableCell, M3TableRow } from '../../components/m3';
 import { reservationStatusTone } from '../../utils';
 import type { GroupMemberResponse, ReservationStatus, RoomResponse } from '../../types';
+import { isReservationEditable } from '../Reservations/reservationStatus';
 import { summarizeRoomingList } from './roomingListReadiness';
 
 interface RoomingListCardProps {
+  /** Group the list belongs to: a check-in started here returns to it. */
+  groupId: string;
   members: GroupMemberResponse[];
   /** Room lookup; undefined while loading or when it failed — rooms then show as a dash. */
   rooms: RoomResponse[] | undefined;
 }
 
 interface MemberRowProps {
+  groupId: string;
   member: GroupMemberResponse;
   room: RoomResponse | undefined;
 }
 
-const MemberRow = memo(({ member, room }: MemberRowProps) => {
+const MemberRow = memo(({ groupId, member, room }: MemberRowProps) => {
   const { t } = useTranslation('common');
   const { formatCurrency } = useFormatters();
   const navigate = useNavigate();
 
   const handleCheckIn = useCallback(() => {
     navigate(`/stays/check-in/${member.reservationId}`, {
-      state: { roomId: member.roomId ?? '', expectedGuests: member.expectedGuests, guestId: member.guestId },
+      state: {
+        roomId: member.roomId ?? '',
+        expectedGuests: member.expectedGuests,
+        guestId: member.guestId,
+        returnTo: `/reservations/groups/${groupId}`,
+      },
     });
-  }, [navigate, member]);
+  }, [navigate, member, groupId]);
   const handleView = useCallback(() => navigate(`/reservations/${member.reservationId}`), [navigate, member.reservationId]);
   const handleEdit = useCallback(() => navigate(`/reservations/edit/${member.reservationId}`), [navigate, member.reservationId]);
 
@@ -63,7 +72,7 @@ const MemberRow = memo(({ member, room }: MemberRowProps) => {
         <div className="flex justify-end gap-x-3 whitespace-nowrap">
           {member.status === 'CONFIRMED' && member.roomId !== null && <M3TableActionLink onClick={handleCheckIn}>{t('check_in')}</M3TableActionLink>}
           <M3TableActionLink onClick={handleView}>{t('view')}</M3TableActionLink>
-          <M3TableActionLink onClick={handleEdit}>{t('edit')}</M3TableActionLink>
+          {isReservationEditable(member.status) && <M3TableActionLink onClick={handleEdit}>{t('edit')}</M3TableActionLink>}
         </div>
       </M3TableCell>
     </M3TableRow>
@@ -72,7 +81,7 @@ const MemberRow = memo(({ member, room }: MemberRowProps) => {
 MemberRow.displayName = 'MemberRow';
 
 /** Rooming list of a group: room, guest, status per member and how many rooms are ready. */
-export const RoomingListCard = memo(({ members, rooms }: RoomingListCardProps) => {
+export const RoomingListCard = memo(({ groupId, members, rooms }: RoomingListCardProps) => {
   const { t } = useTranslation('common');
   const roomsById = useMemo(() => new Map((rooms ?? []).map((r) => [r.id, r])), [rooms]);
   const { ready, total } = useMemo(() => summarizeRoomingList(members), [members]);
@@ -110,7 +119,7 @@ export const RoomingListCard = memo(({ members, rooms }: RoomingListCardProps) =
         )}
         <M3Table headers={headers}>
           {members.map((member) => (
-            <MemberRow key={member.reservationId} member={member} room={member.roomId ? roomsById.get(member.roomId) : undefined} />
+            <MemberRow key={member.reservationId} groupId={groupId} member={member} room={member.roomId ? roomsById.get(member.roomId) : undefined} />
           ))}
         </M3Table>
       </section>
