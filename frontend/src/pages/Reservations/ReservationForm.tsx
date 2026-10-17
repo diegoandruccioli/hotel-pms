@@ -6,6 +6,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { GuestSearchAndCreate } from './GuestSearchAndCreate';
 import { StayDatesFields } from './StayDatesFields';
 import { RoomGrid } from './RoomGrid';
+import { ReservationGroupLink } from './ReservationGroupLink';
 import { ReservationSummary } from './ReservationSummary';
 import { getStatusLabel, isReservationEditable } from './reservationStatus';
 import { reservationStatusTone } from '../../utils';
@@ -59,6 +60,8 @@ export const ReservationForm = () => {
   const header = (
     <>
       <PageHeader title={titles.title} subtitle={titles.subtitle} onBack={f.goToList} bordered />
+
+      {f.groupId && <ReservationGroupLink groupId={f.groupId} />}
 
       {f.error && (
         <Alert tone="error">{f.error}</Alert>

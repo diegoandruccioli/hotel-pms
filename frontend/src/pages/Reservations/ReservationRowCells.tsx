@@ -1,4 +1,6 @@
 import { useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { ReservationResponse, RoomResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
@@ -152,10 +154,23 @@ export const ActionsCell = ({ reservation, onCheckIn, onView, onEdit, onDelete, 
   );
 };
 
-/** Guest column: initial avatar and full name. */
-export const GuestNameCell = ({ name }: { name?: string }) => (
-  <div className="flex items-center gap-3">
-    <M3Avatar name={name} size="md" aria-hidden="true" />
-    <span className="font-medium">{name}</span>
-  </div>
-);
+/** Guest column: initial avatar and full name, plus a link to the group a rooming-list member belongs to. */
+export const GuestNameCell = ({ name, groupId }: { name?: string; groupId?: string | null }) => {
+  const { t } = useTranslation('common');
+  return (
+    <div className="flex items-center gap-3">
+      <M3Avatar name={name} size="md" aria-hidden="true" />
+      <span className="font-medium">{name}</span>
+      {groupId && (
+        <Link
+          to={`/reservations/groups/${groupId}`}
+          aria-label={t('reservation_group_link')}
+          title={t('reservation_group_link')}
+          className="inline-flex items-center justify-center w-10 h-10 rounded-shape-full text-primary hover:bg-primary/8 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <MaterialIcon name="groups" size={18} />
+        </Link>
+      )}
+    </div>
+  );
+};

@@ -28,7 +28,7 @@ export function useReservationColumns({
       id: 'guestFullName',
       header: t('guest_name'),
       enableSorting: false,
-      cell: ({ row }) => <GuestNameCell name={row.original.guestFullName} />,
+      cell: ({ row }) => <GuestNameCell name={row.original.guestFullName} groupId={row.original.groupId} />,
     },
     {
       id: 'checkInDate',

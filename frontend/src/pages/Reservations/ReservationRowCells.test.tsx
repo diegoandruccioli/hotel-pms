@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import type { ReservationResponse } from '../../types';
 import { ActionsCell, GuestNameCell } from './ReservationRowCells';
@@ -23,6 +24,18 @@ describe('GuestNameCell', () => {
   it('has no accessibility violations', async () => {
     const { container } = render(<GuestNameCell name="Marco Bianchi" />);
     expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe('GuestNameCell group link', () => {
+  it('links a rooming-list member to its group', () => {
+    render(<MemoryRouter><GuestNameCell name="Marco Bianchi" groupId="grp1" /></MemoryRouter>);
+    expect(screen.getByRole('link', { name: 'reservation_group_link' })).toHaveAttribute('href', '/reservations/groups/grp1');
+  });
+
+  it('shows no group link for a standalone reservation', () => {
+    render(<GuestNameCell name="Marco Bianchi" />);
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });
 

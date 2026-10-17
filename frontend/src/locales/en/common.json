@@ -609,6 +609,8 @@
   "master_folio": "Master folio",
   "master_folio_open": "Open",
   "master_folio_open_invoice": "Open invoice",
+  "reservation_group_link": "Go to group",
+  "reservation_part_of_group": "Part of group {{name}}",
   "master_folio_none": "None",
   "cancel_group_confirm": "Cancel this group and every one of its non-terminal reservations?",
   "group_cancelled_success": "Group cancelled",

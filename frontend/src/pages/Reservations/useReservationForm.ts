@@ -99,6 +99,7 @@ export const useReservationForm = () => {
   // A non-blocking banner steers the operator there instead of leaving them confused why a
   // save here didn't move the guest's room or dates.
   const [checkedInStayId, setCheckedInStayId] = useState<string | null>(null);
+  const [groupId, setGroupId] = useState<string | null>(null);
 
   const reservationSchema = useMemo(() => z.object({
     checkInDate: z.string().min(1, t('msg_valid_dates')),
@@ -131,6 +132,7 @@ export const useReservationForm = () => {
         setSelectedRoomIds(res.lineItems?.map(li => li.roomId) || []);
         setStatus(res.status || 'CONFIRMED');
         setVersion(res.version ?? null);
+        setGroupId(res.groupId ?? null);
         setSavedPricing({
           checkInDate: res.checkInDate || '',
           checkOutDate: res.checkOutDate || '',
@@ -385,7 +387,7 @@ export const useReservationForm = () => {
   }, [id, navigate]);
 
   return {
-    id, isEdit, isView, status,
+    id, isEdit, isView, status, groupId,
     loading, fetching, error,
     step, isStepSelectable, goToStep, goNext, goPrevious,
     rooms, allReservations, resolvedPrices: displayPrices,

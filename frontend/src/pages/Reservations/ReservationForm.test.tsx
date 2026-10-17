@@ -50,6 +50,10 @@ function GuestSearchAndCreateMock({ selectedGuest, onSelectGuest, onClearGuest, 
   );
 }
 
+vi.mock('./ReservationGroupLink', () => ({
+  ReservationGroupLink: ({ groupId }: { groupId: string }) => <a href={`/reservations/groups/${groupId}`}>group_link_mock</a>,
+}));
+
 vi.mock('./GuestSearchAndCreate', () => ({
   GuestSearchAndCreate: (props: GuestMockProps) => GuestSearchAndCreateMock(props),
 }));
@@ -305,6 +309,22 @@ describe('ReservationForm', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/stays/check-in/res123', {
         state: { roomId: 'r1', expectedGuests: 2, guestId: 'g1' },
       });
+    });
+
+    it('links a rooming-list reservation back to its group, and a standalone one to none', async () => {
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
+        id: 'res123', guestId: 'g1', groupId: 'grp1',
+      }));
+      const { unmount } = renderView();
+      await waitForTitle('reservation_details');
+      expect(screen.getByText('group_link_mock')).toHaveAttribute('href', '/reservations/groups/grp1');
+      unmount();
+
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({ id: 'res123', guestId: 'g1' }));
+      renderView();
+      await waitForTitle('reservation_details');
+      expect(screen.queryByText('group_link_mock')).not.toBeInTheDocument();
     });
 
     it('shows a closed reservation read-only: status chip, no Edit, no Check-in', async () => {
