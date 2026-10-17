@@ -7,12 +7,15 @@ import { M3TextField } from '../components/m3';
 import { M3Button } from '../components/m3';
 import { Alert } from '../components/Alert';
 
-/** Page the visitor was heading to before being sent to the login: same-app paths only. */
-const requestedPath = (state: unknown): string | null => {
-  const from = (state as { from?: unknown } | null)?.from;
-  if (typeof from !== 'string' || !from.startsWith('/') || from.startsWith('//')) return null;
-  return from.startsWith('/login') ? null : from;
+/** A same-app path worth returning to after signing in; anything else (other origins, the login itself) is ignored. */
+const sameAppPath = (value: unknown): string | null => {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) return null;
+  return value.startsWith('/login') ? null : value;
 };
+
+/** Page the visitor was heading to before being sent to the login: router state (in-app redirect) or `?redirect=` (full reload). */
+const requestedPath = (state: unknown, search: string): string | null =>
+  sameAppPath((state as { from?: unknown } | null)?.from) ?? sameAppPath(new URLSearchParams(search).get('redirect'));
 
 export const Login = memo(() => {
   const { t } = useTranslation('auth');
@@ -23,7 +26,7 @@ export const Login = memo(() => {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const next = requestedPath(location.state);
+  const next = requestedPath(location.state, location.search);
 
   // Pages set their own tab title; without this the previous page's title lingers after a logout.
   useEffect(() => { document.title = 'Hotel PMS'; }, []);

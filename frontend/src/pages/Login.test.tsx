@@ -106,11 +106,11 @@ describe('Login Component', () => {
     });
   });
 
-  const loginAs = async (from?: unknown) => {
+  const loginAs = async (from?: unknown, search = '') => {
     vi.mocked(authService.login).mockResolvedValueOnce({ mustChangePassword: false });
     vi.mocked(authService.fetchMe).mockResolvedValueOnce({ sub: 'user', username: 'testuser', role: 'ADMIN' });
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/login', state: from === undefined ? null : { from } }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/login', search, state: from === undefined ? null : { from } }]}>
         <Login />
       </MemoryRouter>
     );
@@ -127,6 +127,16 @@ describe('Login Component', () => {
 
   it.each(['//evil.example', 'https://evil.example', '/login', 42])('ignores %s as a place to go back to', async (from) => {
     await loginAs(from);
+    expect(mockNavigate).toHaveBeenCalledWith('/');
+  });
+
+  it('also honours ?redirect= (the full-reload path used when a session expires)', async () => {
+    await loginAs(undefined, '?redirect=%2Fbilling%3FstatusFilter%3DISSUED');
+    expect(mockNavigate).toHaveBeenCalledWith('/billing?statusFilter=ISSUED');
+  });
+
+  it.each(['//evil.example', 'https://evil.example', '/login?x=1'])('ignores a ?redirect= of %s', async (target) => {
+    await loginAs(undefined, `?redirect=${encodeURIComponent(target)}`);
     expect(mockNavigate).toHaveBeenCalledWith('/');
   });
 
