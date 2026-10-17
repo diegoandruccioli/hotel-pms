@@ -47,8 +47,9 @@ test.describe('Reservation no-show against the real backend', () => {
         await page.goto('/reservations');
         await page.getByRole('searchbox').fill(guestEmail);
 
-        // The search leaves a single row; its secondary actions (no-show, delete, ...) sit in
-        // the "Actions for <guest>" menu (IT default, EN fallback).
+        // The search is debounced: wait until it leaves a single row, whose secondary actions
+        // (no-show, delete, ...) sit in the "Actions for <guest>" menu (IT default, EN fallback).
+        await expect(page.locator('tbody tr')).toHaveCount(1, { timeout: 10000 });
         const actionsButton = page.getByRole('button', { name: /^(Azioni per|Actions for) / });
         await expect(actionsButton).toBeVisible({ timeout: 10000 });
         await actionsButton.click();

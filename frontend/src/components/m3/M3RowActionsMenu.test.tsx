@@ -108,14 +108,37 @@ describe('M3RowActionsMenu', () => {
     expect(menu()).not.toBeInTheDocument();
   });
 
-  it('closes on scroll and on resize', async () => {
+  it('follows the trigger on scroll and resize instead of closing', async () => {
+    const rectAt = (top: number) => ({
+      left: 0, right: 1000, top, bottom: top + 40, width: 40, height: 40, x: 0, y: top, toJSON: () => ({}),
+    }) as DOMRect;
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(rectAt(10));
     const user = userEvent.setup();
     render(<M3RowActionsMenu label="Actions for Marco" items={makeItems()} />);
     await user.click(trigger());
+    expect(screen.getByRole('menu').style.top).toBe('54px');
+
+    spy.mockReturnValue(rectAt(110));
     fireEvent.scroll(window);
-    expect(menu()).not.toBeInTheDocument();
-    await user.click(trigger());
+    expect(menu()).toBeInTheDocument();
+    expect(screen.getByRole('menu').style.top).toBe('154px');
+
+    spy.mockReturnValue(rectAt(210));
     fireEvent(window, new Event('resize'));
+    expect(screen.getByRole('menu').style.top).toBe('254px');
+  });
+
+  it('closes on scroll once the trigger has left the viewport', async () => {
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      left: 0, right: 1000, top: 10, bottom: 50, width: 40, height: 40, x: 0, y: 10, toJSON: () => ({}),
+    } as DOMRect);
+    const user = userEvent.setup();
+    render(<M3RowActionsMenu label="Actions for Marco" items={makeItems()} />);
+    await user.click(trigger());
+    spy.mockReturnValue({
+      left: 0, right: 1000, top: -80, bottom: -40, width: 40, height: 40, x: 0, y: -80, toJSON: () => ({}),
+    } as DOMRect);
+    fireEvent.scroll(window);
     expect(menu()).not.toBeInTheDocument();
   });
 

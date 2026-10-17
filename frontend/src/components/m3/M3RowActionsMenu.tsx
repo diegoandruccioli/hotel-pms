@@ -95,7 +95,8 @@ InlineAction.displayName = 'InlineAction';
  * rendered in a portal with `position: fixed`, so a clipping table wrapper can't cut it off,
  * and it flips upward when there is no room below. Opens on click/Enter/Space/ArrowDown
  * (first item) or ArrowUp (last item); Arrow/Home/End move, Escape and Tab close, and
- * focus returns to the trigger before an action runs. Closes on outside press, scroll and resize.
+ * focus returns to the trigger before an action runs. Closes on outside press; on scroll and
+ * resize it follows the trigger and closes only once the trigger leaves the viewport.
  * Fewer than two items is no menu: none renders nothing, one renders that action inline.
  */
 export const M3RowActionsMenu = memo(({ label, items }: M3RowActionsMenuProps) => {
@@ -114,19 +115,22 @@ export const M3RowActionsMenu = memo(({ label, items }: M3RowActionsMenuProps) =
 
   const close = useCallback(() => setPosition(null), []);
 
+  /** Right-aligned under the trigger, or above it when the menu would not fit below. */
+  const placeMenu = useCallback((rect: DOMRect): MenuPosition => {
+    const right = window.innerWidth - rect.right;
+    const menuHeight = items.length * ITEM_HEIGHT_PX + MENU_PADDING_PX;
+    const fitsBelow = rect.bottom + GAP_PX + menuHeight <= window.innerHeight;
+    return fitsBelow
+      ? { right, top: rect.bottom + GAP_PX }
+      : { right, bottom: window.innerHeight - rect.top + GAP_PX };
+  }, [items.length]);
+
   const openMenu = useCallback((focus: 'first' | 'last') => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
     initialFocus.current = focus;
-    const right = window.innerWidth - rect.right;
-    const menuHeight = items.length * ITEM_HEIGHT_PX + MENU_PADDING_PX;
-    const fitsBelow = rect.bottom + GAP_PX + menuHeight <= window.innerHeight;
-    setPosition(
-      fitsBelow
-        ? { right, top: rect.bottom + GAP_PX }
-        : { right, bottom: window.innerHeight - rect.top + GAP_PX },
-    );
-  }, [items.length]);
+    setPosition(placeMenu(rect));
+  }, [placeMenu]);
 
   const handleTriggerClick = useCallback(() => {
     if (open) close();
@@ -160,16 +164,27 @@ export const M3RowActionsMenu = memo(({ label, items }: M3RowActionsMenuProps) =
       if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
       close();
     };
+    // The trigger can move under an open menu: focusing it scrolls a clipping table wrapper into
+    // view a frame after the click opens the menu, and the page can scroll or resize. Follow the
+    // trigger instead of closing, and close only once it has left the viewport.
+    const handleViewportChange = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect || rect.bottom < 0 || rect.top > window.innerHeight) {
+        close();
+        return;
+      }
+      setPosition(placeMenu(rect));
+    };
     document.addEventListener('pointerdown', handlePointerDown);
     // Capture phase: also catches scrolling of nested containers.
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
+    window.addEventListener('scroll', handleViewportChange, true);
+    window.addEventListener('resize', handleViewportChange);
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', handleViewportChange, true);
+      window.removeEventListener('resize', handleViewportChange);
     };
-  }, [open, close]);
+  }, [open, close, placeMenu]);
 
   const handleMenuKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Tab') {
