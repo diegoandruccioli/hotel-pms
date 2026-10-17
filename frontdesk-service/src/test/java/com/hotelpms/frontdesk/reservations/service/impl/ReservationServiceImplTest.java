@@ -29,6 +29,8 @@ import com.hotelpms.frontdesk.rooms.service.RoomService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -767,6 +769,83 @@ class ReservationServiceImplTest {
         verify(roomService, never()).getRoomById(any(), any());
         verify(reservationMapper, never()).updateEntityFromRequest(any(), any());
         verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    /**
+     * A closed reservation (checked out, cancelled, no-show) is history. The PUT used to copy
+     * whatever status the body carried onto it, so a direct API caller could reopen it and
+     * edit its dates and rooms, bypassing the transition table the dedicated status endpoint
+     * enforces.
+     *
+     * @param closed the closed status the persisted reservation is in
+     */
+    @ParameterizedTest
+    @EnumSource(value = ReservationStatus.class, names = {"CHECKED_OUT", "CANCELLED", "NO_SHOW"})
+    void testUpdateReservationOfAClosedReservationIsRejected(final ReservationStatus closed) {
+        entity.setStatus(closed);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        final ConflictException ex = assertThrows(ConflictException.class,
+                () -> reservationService.updateReservation(reservationId, request));
+
+        assertEquals("RESERVATION_NOT_EDITABLE", ex.getMessage());
+        verify(guestClient, never()).getGuestById(any());
+        verify(reservationMapper, never()).updateEntityFromRequest(any(), any());
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void testUpdateReservationCannotReopenAClosedReservationByChangingItsStatus() {
+        entity.setStatus(ReservationStatus.CANCELLED);
+        final ReservationRequest reopen = new ReservationRequest(
+                GUEST_ID, EXPECTED_GUESTS, request.checkInDate(), request.checkOutDate(),
+                STATUS_CONFIRMED, request.lineItems(), null);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        assertThrows(ConflictException.class, () -> reservationService.updateReservation(reservationId, reopen));
+
+        assertEquals(ReservationStatus.CANCELLED, entity.getStatus());
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void testUpdateReservationRejectsAStatusChangeTheTransitionTableForbids() {
+        entity.setStatus(ReservationStatus.CONFIRMED);
+        final ReservationRequest backToPending = new ReservationRequest(
+                GUEST_ID, EXPECTED_GUESTS, request.checkInDate(), request.checkOutDate(),
+                ReservationStatus.PENDING, request.lineItems(), null);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        final ConflictException ex = assertThrows(ConflictException.class,
+                () -> reservationService.updateReservation(reservationId, backToPending));
+
+        assertEquals("RESERVATION_INVALID_TRANSITION", ex.getMessage());
+        verify(reservationMapper, never()).updateEntityFromRequest(any(), any());
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void testUpdateReservationStillAllowsAPermittedStatusChange() {
+        entity.setStatus(ReservationStatus.PENDING);
+        final ReservationRequest confirm = new ReservationRequest(
+                GUEST_ID, EXPECTED_GUESTS, request.checkInDate(), request.checkOutDate(),
+                STATUS_CONFIRMED, request.lineItems(), null);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
+        when(reservationMapper.toResponse(entity)).thenReturn(response);
+        when(reservationMapper.toEntity(any(ReservationLineItemRequest.class))).thenAnswer(invocation -> {
+            final ReservationLineItemRequest lineItemRequest = invocation.getArgument(0);
+            final ReservationLineItem newItem = new ReservationLineItem();
+            newItem.setRoomId(lineItemRequest.roomId());
+            return newItem;
+        });
+
+        assertNotNull(reservationService.updateReservation(reservationId, confirm));
+
+        verify(reservationMapper, times(1)).updateEntityFromRequest(confirm, entity);
     }
 
     /**
