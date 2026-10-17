@@ -6725,6 +6725,87 @@ multi-riga.
 
 \paragraph{Riferimento} Commit: \commitref{3b62006}{fix(security): harden CWE-117 log injection across auth-service and gateway}
 
+\subsection{Riapertura di prenotazioni chiuse tramite PUT \threat{T-RES-04}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante la verifica dal vivo dell'audit dei collegamenti dell'interfaccia
+(2026-10-17) e confermato nel codice: il \texttt{PUT /api/v1/reservations/\{id\}} del
+\texttt{frontdesk-service} applicava la macchina a stati delle prenotazioni
+(\texttt{ALLOWED\_TRANSITIONS}) soltanto sull'endpoint dedicato al cambio di stato.
+\texttt{ReservationServiceImpl.updateReservation} non chiamava \texttt{verifyValidTransition}
+e non guardava lo stato persistito, mentre \texttt{ReservationMapper.updateEntityFromRequest}
+copia sull'entità tutti i campi del body tranne \texttt{lineItems} e \texttt{version},
+compreso \texttt{status} (\texttt{@NotNull} in \texttt{ReservationRequest}). L'unica difesa
+presente, \texttt{verifyNoActiveStayConflict}, riguarda i soli stay \texttt{CHECKED\_IN}.
+
+Un chiamante autenticato che usasse l'API direttamente poteva quindi riaprire una
+prenotazione chiusa (\texttt{CHECKED\_OUT}, \texttt{CANCELLED}, \texttt{NO\_SHOW}) e
+modificarne date e camere. Riprodotto: un \texttt{PUT} con \texttt{status=CONFIRMED} su una
+prenotazione \texttt{CHECKED\_OUT} ha risposto \texttt{200} e lo stato è tornato
+\texttt{CONFIRMED}. Le conseguenze sono storico falsato, camere che tornano prenotate e
+fatture o stay già chiusi non più allineati alla prenotazione. L'interfaccia non esponeva il
+percorso (il form non cambia lo stato), ma la regola di business non può dipendere dal client.
+Classificato \textbf{OWASP A04 --- Insecure Design} (regola di stato imposta su uno solo dei due
+percorsi di scrittura), con attinenza ad A01.
+
+\begin{insecurebox}[title={ReservationServiceImpl.java --- updateReservation senza controllo di stato (baseline)}]
+\begin{lstlisting}[style=java]
+final Reservation existingReservation = findReservationByIdAndHotelOrThrow(id, hotelId);
+verifyNotStale(existingReservation, request.version());
+verifyNoActiveStayConflict(id, hotelId, existingReservation, request);
+...
+// copia anche request.status() sull'entita': nessuna verifyValidTransition
+reservationMapper.updateEntityFromRequest(request, existingReservation);
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Nuovo \texttt{verifyUpdateAllowed(existing, request)}, eseguito subito dopo il lookup con
+scope sul tenant e prima di qualsiasi altro lavoro (nessuna chiamata a guest-service, camere
+o repository di scrittura per una richiesta rifiutata). Una prenotazione in
+\texttt{TERMINAL\_STATUSES} risponde \texttt{409 RESERVATION\_NOT\_EDITABLE}; per le altre,
+uno stato diverso da quello persistito deve essere una transizione ammessa, altrimenti
+\texttt{409 RESERVATION\_INVALID\_TRANSITION}, come sull'endpoint dedicato. Lo stato
+invariato che una normale modifica rinvia resta sempre ammesso. I due codici sono tradotti in
+italiano e inglese nel dizionario degli errori del frontend.
+
+\begin{securebox}[title={ReservationServiceImpl.java --- guard su stato chiuso e transizioni (fix)}]
+\begin{lstlisting}[style=java]
+private static void verifyUpdateAllowed(final Reservation existing, final ReservationRequest request) {
+    if (TERMINAL_STATUSES.contains(existing.getStatus())) {
+        throw new ConflictException("RESERVATION_NOT_EDITABLE");
+    }
+    if (request.status() != existing.getStatus()) {
+        verifyValidTransition(existing.getStatus(), request.status());
+    }
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test introdotti}
+Quattro scenari in \texttt{ReservationServiceImplTest}, scritti prima del fix e falliti prima
+di esso (tranne l'ultimo, che documenta il comportamento che deve restare):
+\begin{itemize}
+  \item \texttt{testUpdateReservationOfAClosedReservationIsRejected} --- parametrizzato su
+        \texttt{CHECKED\_OUT}, \texttt{CANCELLED}, \texttt{NO\_SHOW}; nessuna scrittura
+  \item \texttt{testUpdateReservationCannotReopenAClosedReservationByChangingItsStatus} ---
+        \texttt{CANCELLED} $\to$ \texttt{CONFIRMED} rifiutato, stato invariato
+  \item \texttt{testUpdateReservationRejectsAStatusChangeTheTransitionTableForbids} ---
+        \texttt{CONFIRMED} $\to$ \texttt{PENDING} rifiutato
+  \item \texttt{testUpdateReservationStillAllowsAPermittedStatusChange} --- \texttt{PENDING}
+        $\to$ \texttt{CONFIRMED} resta ammesso
+\end{itemize}
+
+\begin{notebox}[title={Residuo noto}]
+\texttt{PARTIALLY\_CHECKED\_IN} non è uno stato terminale e resta modificabile lato server, e la
+tabella delle transizioni consente ancora \texttt{CONFIRMED} $\to$ \texttt{CHECKED\_IN} anche
+tramite \texttt{PUT}, senza che venga creato uno Stay, esattamente come sull'endpoint dedicato.
+Va valutato separatamente: richiede una scelta di prodotto sul flusso di check-in.
+\end{notebox}
+
+\paragraph{Riferimento} Commit: \commitref{1345919}{fix(frontdesk): validate status and closed state on full reservation update}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════

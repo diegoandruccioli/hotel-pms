@@ -92,5 +92,10 @@
   "ROOM_NOT_AVAILABLE_FOR_ROOM_CHANGE": "The selected room isn't available for the stay's remaining nights.",
   "STAY_ROOM_CHANGE_INVOICE_NOT_OPEN": "Can't change rooms: this stay's invoice is no longer open.",
   "ROOM_CHARGE_SNAPSHOT_MISSING": "Can't recalculate the charge for this stay — contact technical support.",
-  "STAY_ROOM_CHANGE_CHECKOUT_IN_PAST": "This stay's expected check-out date has already passed — extend the stay first, then change rooms."
+  "STAY_ROOM_CHANGE_CHECKOUT_IN_PAST": "This stay's expected check-out date has already passed — extend the stay first, then change rooms.",
+  "RESERVATION_NOT_EDITABLE": "This reservation is closed (checked out, cancelled or no-show) and can no longer be edited.",
+  "RESERVATION_INVALID_TRANSITION": "This status change is not allowed for the reservation in its current state.",
+  "GROUP_NOT_FOUND": "The specified group could not be found.",
+  "GROUP_STALE_VERSION": "This group was changed by someone else. Reload it and try again.",
+  "MASTER_FOLIO_CREATION_FAILED": "The group's master folio could not be created. Try again."
 }

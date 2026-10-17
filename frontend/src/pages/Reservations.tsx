@@ -37,7 +37,7 @@ const DEFAULT_SORT_FIELD: SortField = 'checkInDate';
 const DEFAULT_SORT_DIR: SortDir = 'desc';
 
 interface ReservationsNavState {
-  upcomingOnly?: boolean;
+  preset?: ReservationPreset;
   sortField?: SortField;
   sortDir?: SortDir;
 }
@@ -70,7 +70,7 @@ export const Reservations = () => {
   const debouncedSearch = useDebounce(searchQuery);
   const [sortField, setSortField] = useState<SortField>(() => navState?.sortField ?? DEFAULT_SORT_FIELD);
   const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? DEFAULT_SORT_DIR);
-  const [preset, setPreset] = useState<ReservationPreset>(() => (navState?.upcomingOnly ? 'upcoming' : 'all'));
+  const [preset, setPreset] = useState<ReservationPreset>(() => (navState?.preset ?? 'all'));
   const handlePresetSelect = useCallback((next: ReservationPreset) => {
     setPage(0);
     setPreset(next);

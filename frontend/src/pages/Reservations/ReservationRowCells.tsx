@@ -1,9 +1,12 @@
 import { useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { ReservationResponse, RoomResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Avatar, M3StatusChip, M3TableActionLink } from '../../components/m3';
 import { cn, todayIsoDate, reservationStatusTone } from '../../utils';
+import { getStatusLabel, isReservationEditable } from './reservationStatus';
 
 const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 // Mirrors ReservationServiceImpl.ALLOWED_TRANSITIONS's NO_SHOW edges — a
@@ -12,9 +15,6 @@ const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 // (including the check-in-date-passed / no-existing-stay guards this list
 // can't express).
 const NO_SHOW_ELIGIBLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
-
-const getStatusLabel = (status: string, t: TFunction) =>
-  t(`status_${status.toLowerCase()}`, status);
 
 export const RoomsCell = ({ reservation, rooms }: { reservation: ReservationResponse; rooms: RoomResponse[] }) => {
   const roomNumbers = useMemo(() => (
@@ -127,9 +127,11 @@ export const ActionsCell = ({ reservation, onCheckIn, onView, onEdit, onDelete, 
       <M3TableActionLink onClick={handleViewClick}>
         {t('view')}
       </M3TableActionLink>
-      <M3TableActionLink onClick={handleEditClick}>
-        {t('edit')}
-      </M3TableActionLink>
+      {isReservationEditable(reservation.status) && (
+        <M3TableActionLink onClick={handleEditClick}>
+          {t('edit')}
+        </M3TableActionLink>
+      )}
       {onMarkNoShow && isNoShowEligible(reservation) && (
         <M3TableActionLink
           tone="error"
@@ -152,10 +154,23 @@ export const ActionsCell = ({ reservation, onCheckIn, onView, onEdit, onDelete, 
   );
 };
 
-/** Guest column: initial avatar and full name. */
-export const GuestNameCell = ({ name }: { name?: string }) => (
-  <div className="flex items-center gap-3">
-    <M3Avatar name={name} size="md" aria-hidden="true" />
-    <span className="font-medium">{name}</span>
-  </div>
-);
+/** Guest column: initial avatar and full name, plus a link to the group a rooming-list member belongs to. */
+export const GuestNameCell = ({ name, groupId }: { name?: string; groupId?: string | null }) => {
+  const { t } = useTranslation('common');
+  return (
+    <div className="flex items-center gap-3">
+      <M3Avatar name={name} size="md" aria-hidden="true" />
+      <span className="font-medium">{name}</span>
+      {groupId && (
+        <Link
+          to={`/reservations/groups/${groupId}`}
+          aria-label={t('reservation_group_link')}
+          title={t('reservation_group_link')}
+          className="inline-flex items-center justify-center w-10 h-10 rounded-shape-full text-primary hover:bg-primary/8 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <MaterialIcon name="groups" size={18} />
+        </Link>
+      )}
+    </div>
+  );
+};

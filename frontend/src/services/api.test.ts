@@ -187,6 +187,21 @@ describe('api (axios instance + interceptors)', () => {
     expect(logoutMock).not.toHaveBeenCalled();
   });
 
+  it('hands the page being left to the login so signing back in returns there', async () => {
+    Object.defineProperty(window, 'location', {
+      value: { ...originalLocation, pathname: '/reservations/groups/g1', search: '?tab=rooms', href: '' },
+      writable: true,
+    });
+    adapter.mockRejectedValueOnce({
+      config: { url: '/api/v1/auth/refresh', headers: {} },
+      response: { status: 401, data: {} },
+    });
+
+    await expect(api.post('/api/v1/auth/refresh')).rejects.toBeTruthy();
+
+    expect(window.location.href).toBe('/login?redirect=%2Freservations%2Fgroups%2Fg1%3Ftab%3Drooms');
+  });
+
   it('logs out immediately when the refresh endpoint itself returns 401', async () => {
     adapter.mockRejectedValueOnce({
       config: { url: '/api/v1/auth/refresh', headers: {} },

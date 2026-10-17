@@ -29,6 +29,8 @@ import com.hotelpms.frontdesk.rooms.service.RoomService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -147,7 +149,7 @@ class ReservationServiceImplTest {
 
     @NonNull
     private ReservationResponse response = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null, 0, 0,
-            LocalDate.now(), LocalDate.now(), STATUS_CONFIRMED, null, true, null, null, false, null, null);
+            LocalDate.now(), LocalDate.now(), STATUS_CONFIRMED, null, true, null, null, false, null, null, null);
 
     @NonNull
     private final UUID reservationId = Objects.requireNonNull(UUID.randomUUID());
@@ -188,7 +190,7 @@ class ReservationServiceImplTest {
 
         response = new ReservationResponse(reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 0,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                STATUS_CONFIRMED, null, true, null, null, false, null, null);
+                STATUS_CONFIRMED, null, true, null, null, false, null, null, null);
     }
 
     private static RoomTypeResponse roomType() {
@@ -411,6 +413,23 @@ class ReservationServiceImplTest {
 
         assertNotNull(result);
         verify(reservationRepository, times(1)).findByIdAndHotelId(reservationId, HOTEL_ID);
+    }
+
+    @Test
+    void testGetReservationByIdKeepsTheGroupId() {
+        final UUID groupId = UUID.randomUUID();
+        final ReservationResponse inGroup = new ReservationResponse(
+                response.id(), response.guestId(), response.guestFullName(), response.expectedGuests(),
+                response.actualGuests(), response.checkInDate(), response.checkOutDate(), response.status(),
+                response.lineItems(), response.active(), response.createdAt(), response.updatedAt(),
+                response.confirmationEmailFailed(), response.confirmationEmailFailureReason(), response.version(),
+                groupId);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(reservationMapper.toResponse(entity)).thenReturn(inGroup);
+
+        assertEquals(groupId, reservationService.getReservationById(reservationId).groupId());
     }
 
     @Test
@@ -753,6 +772,83 @@ class ReservationServiceImplTest {
     }
 
     /**
+     * A closed reservation (checked out, cancelled, no-show) is history. The PUT used to copy
+     * whatever status the body carried onto it, so a direct API caller could reopen it and
+     * edit its dates and rooms, bypassing the transition table the dedicated status endpoint
+     * enforces.
+     *
+     * @param closed the closed status the persisted reservation is in
+     */
+    @ParameterizedTest
+    @EnumSource(value = ReservationStatus.class, names = {"CHECKED_OUT", "CANCELLED", "NO_SHOW"})
+    void testUpdateReservationOfAClosedReservationIsRejected(final ReservationStatus closed) {
+        entity.setStatus(closed);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        final ConflictException ex = assertThrows(ConflictException.class,
+                () -> reservationService.updateReservation(reservationId, request));
+
+        assertEquals("RESERVATION_NOT_EDITABLE", ex.getMessage());
+        verify(guestClient, never()).getGuestById(any());
+        verify(reservationMapper, never()).updateEntityFromRequest(any(), any());
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void testUpdateReservationCannotReopenAClosedReservationByChangingItsStatus() {
+        entity.setStatus(ReservationStatus.CANCELLED);
+        final ReservationRequest reopen = new ReservationRequest(
+                GUEST_ID, EXPECTED_GUESTS, request.checkInDate(), request.checkOutDate(),
+                STATUS_CONFIRMED, request.lineItems(), null);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        assertThrows(ConflictException.class, () -> reservationService.updateReservation(reservationId, reopen));
+
+        assertEquals(ReservationStatus.CANCELLED, entity.getStatus());
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void testUpdateReservationRejectsAStatusChangeTheTransitionTableForbids() {
+        entity.setStatus(ReservationStatus.CONFIRMED);
+        final ReservationRequest backToPending = new ReservationRequest(
+                GUEST_ID, EXPECTED_GUESTS, request.checkInDate(), request.checkOutDate(),
+                ReservationStatus.PENDING, request.lineItems(), null);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+
+        final ConflictException ex = assertThrows(ConflictException.class,
+                () -> reservationService.updateReservation(reservationId, backToPending));
+
+        assertEquals("RESERVATION_INVALID_TRANSITION", ex.getMessage());
+        verify(reservationMapper, never()).updateEntityFromRequest(any(), any());
+        verify(reservationRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void testUpdateReservationStillAllowsAPermittedStatusChange() {
+        entity.setStatus(ReservationStatus.PENDING);
+        final ReservationRequest confirm = new ReservationRequest(
+                GUEST_ID, EXPECTED_GUESTS, request.checkInDate(), request.checkOutDate(),
+                STATUS_CONFIRMED, request.lineItems(), null);
+        when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(roomService.getRoomById(roomId, HOTEL_ID)).thenReturn(activeRoom(roomId));
+        when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
+        when(reservationMapper.toResponse(entity)).thenReturn(response);
+        when(reservationMapper.toEntity(any(ReservationLineItemRequest.class))).thenAnswer(invocation -> {
+            final ReservationLineItemRequest lineItemRequest = invocation.getArgument(0);
+            final ReservationLineItem newItem = new ReservationLineItem();
+            newItem.setRoomId(lineItemRequest.roomId());
+            return newItem;
+        });
+
+        assertNotNull(reservationService.updateReservation(reservationId, confirm));
+
+        verify(reservationMapper, times(1)).updateEntityFromRequest(confirm, entity);
+    }
+
+    /**
      * Server-side backstop for the frontend's own dates/rooms lock (see
      * ReservationForm.tsx's checkedInStayId banner): a direct API caller that
      * bypasses the UI must still be rejected when it tries to move the dates
@@ -986,7 +1082,7 @@ class ReservationServiceImplTest {
         final ReservationResponse checkedInResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 2,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.CHECKED_IN, null, true, null, null, false, null, null);
+                ReservationStatus.CHECKED_IN, null, true, null, null, false, null, null, null);
 
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
@@ -1009,7 +1105,7 @@ class ReservationServiceImplTest {
         final ReservationResponse cancelledResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 0,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.CANCELLED, null, true, null, null, false, null, null);
+                ReservationStatus.CANCELLED, null, true, null, null, false, null, null, null);
 
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
         when(reservationRepository.saveAndFlush(entity)).thenReturn(entity);
@@ -1066,7 +1162,7 @@ class ReservationServiceImplTest {
         final ReservationResponse confirmedResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 3,
                 entity.getCheckInDate(), entity.getCheckOutDate(),
-                ReservationStatus.CONFIRMED, null, true, null, null, false, null, null);
+                ReservationStatus.CONFIRMED, null, true, null, null, false, null, null, null);
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));
@@ -1087,7 +1183,7 @@ class ReservationServiceImplTest {
         final ReservationResponse noShowResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, EXPECTED_GUESTS, 0,
                 entity.getCheckInDate(), entity.getCheckOutDate(),
-                ReservationStatus.NO_SHOW, null, true, null, null, false, null, null);
+                ReservationStatus.NO_SHOW, null, true, null, null, false, null, null, null);
         final GuestResponse mockGuestResponse =
                 new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL);
         when(reservationRepository.findByIdAndHotelId(reservationId, HOTEL_ID)).thenReturn(Optional.of(entity));

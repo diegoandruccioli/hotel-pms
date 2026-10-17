@@ -50,6 +50,10 @@ function GuestSearchAndCreateMock({ selectedGuest, onSelectGuest, onClearGuest, 
   );
 }
 
+vi.mock('./ReservationGroupLink', () => ({
+  ReservationGroupLink: ({ groupId }: { groupId: string }) => <a href={`/reservations/groups/${groupId}`}>group_link_mock</a>,
+}));
+
 vi.mock('./GuestSearchAndCreate', () => ({
   GuestSearchAndCreate: (props: GuestMockProps) => GuestSearchAndCreateMock(props),
 }));
@@ -202,6 +206,8 @@ const renderView = () => render(
   </MemoryRouter>
 );
 
+const HISTORY_ENTRIES = ['/reservations/groups/g1', '/reservations/res123'];
+
 const waitForTitle = (name: string) => waitFor(() => screen.getByRole('heading', { level: 1, name }));
 const stepHeading = (name: string) => screen.getByRole('heading', { level: 2, name });
 const clickNext = () => fireEvent.click(screen.getByRole('button', { name: 'btn_next' }));
@@ -283,6 +289,102 @@ describe('ReservationForm', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'edit' }));
       expect(mockNavigate).toHaveBeenCalledWith('/reservations/edit/res123');
+    });
+
+    it('shows the status and offers Check-in from the detail of a confirmed reservation', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
+        id: 'res123',
+        guestId: 'g1',
+        status: 'CONFIRMED',
+        expectedGuests: 2,
+        lineItems: [{ roomId: 'r1', active: true } as never],
+      }));
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+
+      renderView();
+      await waitForTitle('reservation_details');
+
+      expect(screen.getByText('status_confirmed')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'check_in' }));
+      expect(mockNavigate).toHaveBeenCalledWith('/stays/check-in/res123', {
+        state: { roomId: 'r1', expectedGuests: 2, guestId: 'g1' },
+      });
+    });
+
+    it('links a rooming-list reservation back to its group, and a standalone one to none', async () => {
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
+        id: 'res123', guestId: 'g1', groupId: 'grp1',
+      }));
+      const { unmount } = renderView();
+      await waitForTitle('reservation_details');
+      expect(screen.getByText('group_link_mock')).toHaveAttribute('href', '/reservations/groups/grp1');
+      unmount();
+
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({ id: 'res123', guestId: 'g1' }));
+      renderView();
+      await waitForTitle('reservation_details');
+      expect(screen.queryByText('group_link_mock')).not.toBeInTheDocument();
+    });
+
+    it('shows an error state with retry, and no status or actions, when the reservation cannot be loaded', async () => {
+      vi.mocked(reservationService.getReservationById).mockRejectedValueOnce(new Error('not found'));
+      renderView();
+
+      expect(await screen.findByText('error_loading_reservations')).toBeInTheDocument();
+      expect(screen.queryByText('status_confirmed')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'check_in' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'edit' })).not.toBeInTheDocument();
+
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({ id: 'res123', guestId: 'g1' }));
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+      fireEvent.click(screen.getByRole('button', { name: 'try_again' }));
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'edit' })).toBeInTheDocument());
+      expect(screen.queryByText('error_loading_reservations')).not.toBeInTheDocument();
+    });
+
+    it('shows a closed reservation read-only: status chip, no Edit, no Check-in', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
+        id: 'res123',
+        guestId: 'g1',
+        status: 'CANCELLED',
+      }));
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+
+      renderView();
+      await waitForTitle('reservation_details');
+
+      expect(screen.getByText('status_cancelled')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'edit' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'check_in' })).not.toBeInTheDocument();
+    });
+
+    it('redirects the edit URL of a closed reservation to its read-only detail', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
+        id: 'res123',
+        guestId: 'g1',
+        status: 'CHECKED_OUT',
+      }));
+
+      renderEdit();
+
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/reservations/res123', { replace: true }));
+    });
+
+    it('goes back to the page the user came from when there is in-app history', async () => {
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({ id: 'res123', guestId: 'g1' }));
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+
+      render(
+        <MemoryRouter initialEntries={HISTORY_ENTRIES} initialIndex={1}>
+          <Routes><Route path="/reservations/:id" element={<ReservationForm />} /></Routes>
+        </MemoryRouter>,
+      );
+      await waitForTitle('reservation_details');
+      fireEvent.click(screen.getAllByRole('button', { name: 'back' })[0]);
+
+      expect(mockNavigate).toHaveBeenCalledWith(-1);
     });
 
     it('lets "Edit" mode jump to any step and save from the summary panel', async () => {

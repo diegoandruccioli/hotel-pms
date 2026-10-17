@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import { useAuthStore } from '../store';
 import type { UserPayload } from '../types';
@@ -24,7 +24,29 @@ const adminUser: UserPayload = { sub: '1', username: 'admin', role: 'ADMIN' };
 const ownerUser: UserPayload = { sub: '2', username: 'owner', role: 'OWNER' };
 const receptionistUser: UserPayload = { sub: '3', username: 'receptionist', role: 'RECEPTIONIST' };
 
+const LoginProbe = () => {
+  const state = useLocation().state as { from?: string } | null;
+  return <div>Login from {state?.from ?? 'nowhere'}</div>;
+};
+
 describe('ProtectedRoute', () => {
+  it('should hand the requested page (path and query) to the login so it can send the visitor back', () => {
+    mockStore({ isAuthenticated: false, user: null });
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/groups/g1?tab=rooms']}>
+        <Routes>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/reservations/groups/:id" element={<div>Group</div>} />
+          </Route>
+          <Route path="/login" element={<LoginProbe />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Login from /reservations/groups/g1?tab=rooms')).toBeInTheDocument();
+  });
+
   it('should render outlet when authenticated', () => {
     mockStore({ isAuthenticated: true, user: adminUser });
 

@@ -12,6 +12,7 @@ import { stayService } from '../../services';
 import { guestService } from '../../services';
 import { reservationService } from '../../services';
 import { useToastStore } from '../../store';
+import { queryClient, queryKeys } from '../../lib';
 import type {
   AlloggiatiStato,
   AlloggiatiTipdoc,
@@ -35,6 +36,8 @@ interface CheckInState {
   guestId: string;
   roomId: string;
   expectedGuests: number;
+  /** Page to go back to after a successful check-in (default: the stays list). */
+  returnTo?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -228,14 +231,18 @@ export const CheckInForm = memo(() => {
       if (created.cityTaxWarning && created.cityTaxWarning !== 'NOT_APPLICABLE') {
         addToast(t(`city_tax_post_checkin_warning_${created.cityTaxWarning.toLowerCase()}`), 'info');
       }
-      navigate('/stays', { replace: true });
+      // The stay changes the reservation's (and its group's) status: drop the cached copies so
+      // the page we return to does not show a stale "Check-in" action.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.reservationGroups.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.reservations.all });
+      navigate(state?.returnTo ?? '/stays', { replace: true });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
       setError(e.response?.data?.detail || e.message || t('err_checkin_failed'));
     } finally {
       setLoading(false);
     }
-  }, [reservationId, effectiveState, guests, navigate, t, addToast]);
+  }, [reservationId, effectiveState, guests, navigate, t, addToast, state?.returnTo]);
 
   const checklist = useMemo(
     () => buildCheckInChecklist({ guests, cityTaxWarning, checkOutDate: reservationDates?.checkOut }),
