@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { ReservationResponse, RoomResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Avatar, M3StatusChip, M3TableActionLink } from '../../components/m3';
+import { M3Avatar, M3RowActionsMenu, M3StatusChip, M3TableActionLink, type RowAction } from '../../components/m3';
 import { cn, todayIsoDate, reservationStatusTone } from '../../utils';
 import { getStatusLabel, isReservationEditable } from './reservationStatus';
 
@@ -98,58 +98,43 @@ export const ActionsCell = ({ reservation, onCheckIn, onView, onEdit, onDelete, 
     );
   }, [onCheckIn, reservation]);
 
-  const handleViewClick = useCallback(() => {
-    onView(reservation.id);
-  }, [onView, reservation.id]);
-
-  const handleEditClick = useCallback(() => {
-    onEdit(reservation.id);
-  }, [onEdit, reservation.id]);
-
-  const handleDeleteClick = useCallback(() => {
-    onDelete?.(reservation.id);
-  }, [onDelete, reservation.id]);
-
-  const handleMarkNoShowClick = useCallback(() => {
-    onMarkNoShow?.(reservation.id);
-  }, [onMarkNoShow, reservation.id]);
+  const items = useMemo<RowAction[]>(() => {
+    const list: RowAction[] = [
+      { id: 'view', label: t('view'), icon: 'visibility', onSelect: () => onView(reservation.id) },
+    ];
+    if (isReservationEditable(reservation.status)) {
+      list.push({ id: 'edit', label: t('edit'), icon: 'edit', onSelect: () => onEdit(reservation.id) });
+    }
+    if (onMarkNoShow && isNoShowEligible(reservation)) {
+      list.push({
+        id: 'no-show', label: t('mark_no_show'), icon: 'person_off', tone: 'error',
+        onSelect: () => onMarkNoShow(reservation.id),
+      });
+    }
+    if (onDelete && DELETABLE_STATUSES.has(reservation.status)) {
+      list.push({
+        id: 'delete', label: t('delete_reservation'), icon: 'delete', tone: 'error',
+        onSelect: () => onDelete(reservation.id),
+      });
+    }
+    return list;
+  }, [reservation, onView, onEdit, onDelete, onMarkNoShow, t]);
 
   return (
-    <div className="flex max-w-72 flex-wrap justify-end gap-x-4 gap-y-1">
+    <div className="-mr-4 flex items-center justify-end">
       {reservation.status === 'CONFIRMED' && (
         <M3TableActionLink
           data-testid={`check-in-btn-${reservation.id}`}
+          className="px-1"
           onClick={handleCheckInClick}
         >
           {t('check_in')}
         </M3TableActionLink>
       )}
-      <M3TableActionLink onClick={handleViewClick}>
-        {t('view')}
-      </M3TableActionLink>
-      {isReservationEditable(reservation.status) && (
-        <M3TableActionLink onClick={handleEditClick}>
-          {t('edit')}
-        </M3TableActionLink>
-      )}
-      {onMarkNoShow && isNoShowEligible(reservation) && (
-        <M3TableActionLink
-          tone="error"
-          aria-label={`${t('mark_no_show')} ${reservation.id}`}
-          onClick={handleMarkNoShowClick}
-        >
-          {t('mark_no_show')}
-        </M3TableActionLink>
-      )}
-      {onDelete && DELETABLE_STATUSES.has(reservation.status) && (
-        <M3TableActionLink
-          tone="error"
-          aria-label={`${t('delete_reservation')} ${reservation.id}`}
-          onClick={handleDeleteClick}
-        >
-          {t('delete_reservation')}
-        </M3TableActionLink>
-      )}
+      <M3RowActionsMenu
+        label={t('row_actions_for', { name: reservation.guestFullName ?? reservation.id })}
+        items={items}
+      />
     </div>
   );
 };

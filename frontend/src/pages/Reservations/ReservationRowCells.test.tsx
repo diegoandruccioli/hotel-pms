@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import type { ReservationResponse } from '../../types';
+import { openRowMenu } from '../../test-utils';
 import { ActionsCell, GuestNameCell } from './ReservationRowCells';
 
 vi.mock('react-i18next', () => ({
@@ -51,8 +52,9 @@ describe('ActionsCell', () => {
 
   it('offers View and Edit on an open reservation', () => {
     renderActions('CONFIRMED');
-    expect(screen.getByText('view')).toBeInTheDocument();
-    expect(screen.getByText('edit')).toBeInTheDocument();
+    openRowMenu();
+    expect(screen.getByRole('menuitem', { name: 'view' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'edit' })).toBeInTheDocument();
   });
 
   it.each(['CHECKED_OUT', 'CANCELLED', 'NO_SHOW'])('offers only View on a %s reservation', (status) => {

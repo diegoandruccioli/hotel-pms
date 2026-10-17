@@ -6,7 +6,7 @@ import type { ReactElement } from 'react';
 import { renderWithQuery } from '../test-utils';
 import { Restaurant } from './Restaurant';
 import { fbService } from '../services';
-import { mockAxiosErrorWithDetail } from '../test-utils';
+import { mockAxiosErrorWithDetail, openRowMenu } from '../test-utils';
 import type { MenuItemResponse, RestaurantOrderResponse } from '../types';
 
 // PageHeader derives its breadcrumbs from the router location.
@@ -411,7 +411,9 @@ describe('Restaurant', () => {
       render(<Restaurant />);
       await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
 
-      fireEvent.click(screen.getByRole('button', { name: /menu_edit_item Espresso/ }));
+      openRowMenu();
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'menu_edit_item' }));
       expect(screen.getByRole('dialog', { name: 'menu-form' })).toBeInTheDocument();
 
       fireEvent.click(screen.getByText('close-menu-form'));
@@ -425,7 +427,9 @@ describe('Restaurant', () => {
       render(<Restaurant />);
       await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
 
-      fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+      openRowMenu();
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'menu_delete_item' }));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'delete' }));
 
       await waitFor(() => expect(fbService.deleteMenuItem).toHaveBeenCalledWith('mi1'));
@@ -438,7 +442,9 @@ describe('Restaurant', () => {
       render(<Restaurant />);
       await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
 
-      fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+      openRowMenu();
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'menu_delete_item' }));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'cancel' }));
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -452,7 +458,9 @@ describe('Restaurant', () => {
       render(<Restaurant />);
       await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
 
-      fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+      openRowMenu();
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'menu_delete_item' }));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'delete' }));
 
       await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('menu_delete_error', 'error'));
@@ -467,7 +475,9 @@ describe('Restaurant', () => {
       render(<Restaurant />);
       await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
 
-      fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+      openRowMenu();
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'menu_delete_item' }));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'delete' }));
 
       await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('MENU_ITEM_IN_USE', 'error'));

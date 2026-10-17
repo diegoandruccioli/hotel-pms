@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useFormatters } from '../../hooks';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Card, M3StatusChip, M3Table, M3TableActionLink, M3TableCell, M3TableRow } from '../../components/m3';
+import {
+  M3Card, M3RowActionsMenu, M3StatusChip, M3Table, M3TableActionLink, M3TableCell, M3TableRow, type RowAction,
+} from '../../components/m3';
 import { reservationStatusTone } from '../../utils';
 import type { GroupMemberResponse, ReservationStatus, RoomResponse } from '../../types';
 import { isReservationEditable } from '../Reservations/reservationStatus';
@@ -41,6 +43,13 @@ const MemberRow = memo(({ groupId, member, room }: MemberRowProps) => {
   const handleView = useCallback(() => navigate(`/reservations/${member.reservationId}`), [navigate, member.reservationId]);
   const handleEdit = useCallback(() => navigate(`/reservations/edit/${member.reservationId}`), [navigate, member.reservationId]);
 
+  const canEdit = isReservationEditable(member.status);
+  const items = useMemo<RowAction[]>(() => {
+    const list: RowAction[] = [{ id: 'view', label: t('view'), icon: 'visibility', onSelect: handleView }];
+    if (canEdit) list.push({ id: 'edit', label: t('edit'), icon: 'edit', onSelect: handleEdit });
+    return list;
+  }, [t, canEdit, handleView, handleEdit]);
+
   return (
     <M3TableRow>
       <M3TableCell>
@@ -69,10 +78,9 @@ const MemberRow = memo(({ groupId, member, room }: MemberRowProps) => {
       </M3TableCell>
       <M3TableCell>{formatCurrency(member.price)}</M3TableCell>
       <M3TableCell>
-        <div className="flex justify-end gap-x-3 whitespace-nowrap">
+        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
           {member.status === 'CONFIRMED' && member.roomId !== null && <M3TableActionLink onClick={handleCheckIn}>{t('check_in')}</M3TableActionLink>}
-          <M3TableActionLink onClick={handleView}>{t('view')}</M3TableActionLink>
-          {isReservationEditable(member.status) && <M3TableActionLink onClick={handleEdit}>{t('edit')}</M3TableActionLink>}
+          <M3RowActionsMenu label={t('row_actions_for', { name: member.guestFullName })} items={items} />
         </div>
       </M3TableCell>
     </M3TableRow>

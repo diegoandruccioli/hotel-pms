@@ -47,13 +47,12 @@ test.describe('Reservation no-show against the real backend', () => {
         await page.goto('/reservations');
         await page.getByRole('searchbox').fill(guestEmail);
 
-        // The row also carries a Delete button whose aria-label ends with the same
-        // id, so anchor on the no-show label (IT default, EN fallback).
-        const noShowButton = page.getByRole('button', {
-            name: new RegExp(`(Segna no-show|Mark no-show) ${reservationId}`),
-        });
-        await expect(noShowButton).toBeVisible({ timeout: 10000 });
-        await noShowButton.click();
+        // The search leaves a single row; its secondary actions (no-show, delete, ...) sit in
+        // the "Actions for <guest>" menu (IT default, EN fallback).
+        const actionsButton = page.getByRole('button', { name: /^(Azioni per|Actions for) / });
+        await expect(actionsButton).toBeVisible({ timeout: 10000 });
+        await actionsButton.click();
+        await page.getByRole('menuitem', { name: /^(Segna no-show|Mark no-show)$/ }).click();
 
         await page.getByRole('button', { name: /^(confirm|conferma)$/i }).click();
 

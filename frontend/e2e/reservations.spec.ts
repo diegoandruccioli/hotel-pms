@@ -148,16 +148,22 @@ test.describe('Reservations', () => {
   test('shows delete button for CONFIRMED and PENDING reservations', async ({ page }) => {
     await page.goto('/reservations');
     await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
-    // Delete buttons have aria-label="Delete <reservationId>" (delete_reservation key → "Delete")
-    const deleteButtons = page.getByRole('button', { name: /^Delete res-/i });
-    await expect(deleteButtons).toHaveCount(2);
+    // Each row's secondary actions live in an "Actions for <guest>" menu; ADMIN finds Delete in both.
+    const triggers = page.getByRole('button', { name: /^Actions for /i });
+    await expect(triggers).toHaveCount(2);
+    for (const index of [0, 1]) {
+      await triggers.nth(index).click();
+      await expect(page.getByRole('menuitem', { name: /^Delete$/i })).toBeVisible();
+      await page.keyboard.press('Escape');
+    }
   });
 
   test('deletes reservation and removes it from the list', async ({ page }) => {
     await page.goto('/reservations');
     await expect(page.getByText('Anna Bianchi')).toBeVisible({ timeout: 10000 });
-    // Delete the second reservation (Anna Bianchi, PENDING) — aria-label="Delete res-002"
-    await page.getByRole('button', { name: /Delete res-002/i }).click();
+    // Delete the second reservation (Anna Bianchi, PENDING) from its row's actions menu
+    await page.getByRole('row', { name: /Anna Bianchi/ }).getByRole('button', { name: /^Actions for /i }).click();
+    await page.getByRole('menuitem', { name: /^Delete$/i }).click();
     // Confirmation dialog opens with a dismiss "Cancel" button and a primary "Confirm" button.
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 3000 });

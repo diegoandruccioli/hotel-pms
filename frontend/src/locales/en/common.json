@@ -65,6 +65,8 @@
   "phone": "Phone",
   "city": "City",
   "actions": "Actions",
+  "row_actions": "Actions",
+  "row_actions_for": "Actions for {{name}}",
   "no_guests_found": "No guests found. Add a new guest to get started.",
   "edit": "Edit",
   "delete": "Delete",

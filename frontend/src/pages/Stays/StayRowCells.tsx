@@ -1,8 +1,8 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import type { StayResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3Button, M3StatusChip, M3TableActionLink } from '../../components/m3';
+import { M3Button, M3RowActionsMenu, M3StatusChip, M3TableActionLink, type RowAction } from '../../components/m3';
 
 export const GuestCell = ({ stay, onGuestClick }: { stay: StayResponse; onGuestClick: (name: string) => void }) => {
   const handleClick = useCallback(() => {
@@ -112,28 +112,15 @@ export const ActionsCell = ({ stay, onCheckOut, checkingOut, onExtend, onChangeR
   const handleExtend = useCallback(() => onExtend(stay), [onExtend, stay]);
   const handleChangeRoom = useCallback(() => onChangeRoom(stay), [onChangeRoom, stay]);
 
+  const items = useMemo<RowAction[]>(() => [
+    { id: 'extend', label: t('action_extend_stay'), icon: 'event_repeat', onSelect: handleExtend, testId: `extend-btn-${stay.id}` },
+    { id: 'change-room', label: t('action_change_room'), icon: 'meeting_room', onSelect: handleChangeRoom, testId: `change-room-btn-${stay.id}` },
+  ], [t, handleExtend, handleChangeRoom, stay.id]);
+
   if (stay.status !== 'CHECKED_IN') return null;
 
   return (
-    <div className="flex justify-end gap-2">
-      <M3Button
-        variant="outlined"
-        icon="event_repeat"
-        onClick={handleExtend}
-        id={`extend-btn-${stay.id}`}
-        className="text-xs h-10 px-3"
-      >
-        {t('action_extend_stay')}
-      </M3Button>
-      <M3Button
-        variant="outlined"
-        icon="meeting_room"
-        onClick={handleChangeRoom}
-        id={`change-room-btn-${stay.id}`}
-        className="text-xs h-10 px-3"
-      >
-        {t('action_change_room')}
-      </M3Button>
+    <div className="flex items-center justify-end gap-2">
       <M3Button
         variant="tonal"
         icon={checkingOut === stay.id ? 'progress_activity' : 'logout'}
@@ -145,6 +132,10 @@ export const ActionsCell = ({ stay, onCheckOut, checkingOut, onExtend, onChangeR
       >
         {t('action_checkout')}
       </M3Button>
+      <M3RowActionsMenu
+        label={t('row_actions_for', { name: stay.guestDisplayName ?? stay.guestId })}
+        items={items}
+      />
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import { useFormatters } from '../../hooks';
 import { useState, useCallback, useMemo, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { z } from 'zod';
 import { rateSeasonService } from '../../services';
 import type { RateSeasonRequest, RateSeasonResponse, RoomTypeResponse } from '../../types';
@@ -10,7 +11,7 @@ import { M3Button } from '../../components/m3';
 import { M3ConfirmDialog } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
-import { M3TableActionLink } from '../../components/m3';
+import { M3RowActionsMenu, type RowAction } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { useToastStore } from '../../store';
 
@@ -25,11 +26,16 @@ const SeasonRow = memo(({ season, onEdit, onDelete, t }: {
   season: RateSeasonResponse;
   onEdit: (season: RateSeasonResponse) => void;
   onDelete: (season: RateSeasonResponse) => void;
-  t: (k: string) => string;
+  t: TFunction;
 }) => {
   const { formatCurrency, formatDate } = useFormatters();
   const handleEdit = useCallback(() => onEdit(season), [onEdit, season]);
   const handleDelete = useCallback(() => onDelete(season), [onDelete, season]);
+
+  const items = useMemo<RowAction[]>(() => [
+    { id: 'edit', label: t('edit'), icon: 'edit', onSelect: handleEdit },
+    { id: 'delete', label: t('delete'), icon: 'delete', tone: 'error', onSelect: handleDelete },
+  ], [t, handleEdit, handleDelete]);
 
   return (
     <M3TableRow>
@@ -37,13 +43,10 @@ const SeasonRow = memo(({ season, onEdit, onDelete, t }: {
       <M3TableCell>{formatDate(season.startDate)}</M3TableCell>
       <M3TableCell>{formatDate(season.endDate)}</M3TableCell>
       <M3TableCell>{formatCurrency(season.nightlyPrice)}</M3TableCell>
-      <M3TableCell className="text-right space-x-2">
-        <M3TableActionLink onClick={handleEdit}>
-          {t('edit')}
-        </M3TableActionLink>
-        <M3TableActionLink onClick={handleDelete} tone="error">
-          {t('delete')}
-        </M3TableActionLink>
+      <M3TableCell>
+        <div className="flex justify-end">
+          <M3RowActionsMenu label={t('row_actions_for', { ns: 'common', name: season.name || '-' })} items={items} />
+        </div>
       </M3TableCell>
     </M3TableRow>
   );

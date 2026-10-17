@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { MenuItemResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import {
-  M3Button, M3Card, M3ConfirmDialog, M3DataTable, M3EmptyState, M3StatusChip, M3TableActionLink,
+  M3Button, M3Card, M3ConfirmDialog, M3DataTable, M3EmptyState, M3RowActionsMenu, M3StatusChip, type RowAction,
 } from '../../components/m3';
 import { useFormatters } from '../../hooks';
 import { useMenuItems, useDeleteMenuItem } from '../../hooks/queries';
@@ -22,20 +22,19 @@ interface MenuActionsCellProps {
   onEdit: (mi: MenuItemResponse) => void;
   onDelete: (mi: MenuItemResponse) => void;
   tLabel: (key: string) => string;
-  tCommon: (key: string) => string;
+  tCommon: (key: string, options?: Record<string, unknown>) => string;
 }
 
 const MenuActionsCell = ({ mi, onEdit, onDelete, tLabel, tCommon }: MenuActionsCellProps) => {
   const handleEdit = useCallback(() => onEdit(mi), [onEdit, mi]);
   const handleDelete = useCallback(() => onDelete(mi), [onDelete, mi]);
+  const items = useMemo<RowAction[]>(() => [
+    { id: 'edit', label: tLabel('menu_edit_item'), icon: 'edit', onSelect: handleEdit },
+    { id: 'delete', label: tLabel('menu_delete_item'), icon: 'delete', tone: 'error', onSelect: handleDelete },
+  ], [tLabel, handleEdit, handleDelete]);
   return (
-    <div className="flex justify-end gap-2">
-      <M3TableActionLink onClick={handleEdit} aria-label={`${tLabel('menu_edit_item')} ${mi.name}`}>
-        {tCommon('edit')}
-      </M3TableActionLink>
-      <M3TableActionLink tone="error" onClick={handleDelete} aria-label={`${tLabel('menu_delete_item')} ${mi.name}`}>
-        {tCommon('delete')}
-      </M3TableActionLink>
+    <div className="flex justify-end">
+      <M3RowActionsMenu label={tCommon('row_actions_for', { name: mi.name })} items={items} />
     </div>
   );
 };
