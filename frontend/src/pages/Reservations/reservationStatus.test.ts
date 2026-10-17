@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { isReservationEditable } from './reservationStatus';
 
 describe('isReservationEditable', () => {
-  it.each(['PENDING', 'CONFIRMED', 'CHECKED_IN'])('allows editing a %s reservation', (status) => {
+  it.each(['PENDING', 'CONFIRMED', 'PARTIALLY_CHECKED_IN', 'CHECKED_IN'])('allows editing a %s reservation', (status) => {
     expect(isReservationEditable(status)).toBe(true);
   });
 
