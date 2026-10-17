@@ -11,6 +11,7 @@ vi.mock('react-router-dom', async () => {
 import { Quotations } from './Quotations';
 import { quotationService } from '../services';
 import { useToastStore } from '../store';
+import { openRowMenu } from '../test-utils';
 
 vi.mock('react-i18next', () => {
   const t = (key: string, opts?: Record<string, unknown>) => {
@@ -152,8 +153,9 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.convertToReservation).mockResolvedValue({ id: 'res1' } as never);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_convert'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_convert' }));
     await waitFor(() => expect(quotationService.convertToReservation).toHaveBeenCalledWith('q1'));
     expect(mockAddToast).toHaveBeenCalledWith('toast_converted', 'success');
     expect(mockNavigate).not.toHaveBeenCalledWith('/quotations/q1');
@@ -163,8 +165,9 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.convertToReservation).mockRejectedValue(new Error('boom'));
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_convert'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_convert' }));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_converted', 'error'));
   });
 
@@ -172,8 +175,9 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.declineQuotation).mockResolvedValue({ ...DRAFT_QUOTATION, status: 'DECLINED' } as never);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_decline'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_decline' }));
     expect(screen.getByText('confirm_decline')).toBeInTheDocument();
     fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(quotationService.declineQuotation).toHaveBeenCalledWith('q1'));
@@ -184,8 +188,9 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.declineQuotation).mockRejectedValue(new Error('boom'));
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_decline'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_decline' }));
     fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_declined', 'error'));
   });
@@ -194,8 +199,9 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.deleteQuotation).mockRejectedValue(new Error('boom'));
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_delete'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_delete' }));
     fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_deleted', 'error'));
   });
@@ -220,8 +226,9 @@ describe('Quotations', () => {
   it('action_download_pdf calls quotationService.downloadPdf', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_download_pdf')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_download_pdf'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_download_pdf' }));
     expect(quotationService.downloadPdf).toHaveBeenCalledWith('q1');
   });
 
@@ -240,8 +247,9 @@ describe('Quotations', () => {
   it('cancelling the decline dialog closes it without declining', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_decline'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_decline' }));
     expect(screen.getByText('confirm_decline')).toBeInTheDocument();
     fireEvent.click(screen.getByText('cancel'));
     expect(screen.queryByText('confirm_decline')).not.toBeInTheDocument();
@@ -251,8 +259,9 @@ describe('Quotations', () => {
   it('cancelling the delete dialog closes it without deleting', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_delete'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_delete' }));
     expect(screen.getByText('confirm_delete')).toBeInTheDocument();
     fireEvent.click(screen.getByText('cancel'));
     expect(screen.queryByText('confirm_delete')).not.toBeInTheDocument();
@@ -263,8 +272,9 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.deleteQuotation).mockResolvedValue(undefined);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_delete'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_delete' }));
     expect(screen.getByText('confirm_delete')).toBeInTheDocument();
     fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(quotationService.deleteQuotation).toHaveBeenCalledWith('q1'));
@@ -280,8 +290,9 @@ describe('Quotations', () => {
   it('action_convert on a multi-option quotation navigates to detail instead of converting directly', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([MULTI_OPTION_QUOTATION]) as never);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_convert'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_convert' }));
     expect(mockNavigate).toHaveBeenCalledWith('/quotations/q2');
     expect(quotationService.convertToReservation).not.toHaveBeenCalled();
   });

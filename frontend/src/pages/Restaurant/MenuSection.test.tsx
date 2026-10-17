@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { renderWithQuery } from '../../test-utils';
+import { openRowMenu, renderWithQuery } from '../../test-utils';
 import { MenuSection } from './MenuSection';
 import { fbService } from '../../services';
 import type { MenuItemResponse } from '../../types';
@@ -51,7 +51,9 @@ describe('MenuSection', () => {
     renderWithQuery(<MenuSection />);
     await screen.findByText('Espresso');
 
-    fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+    openRowMenu();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'menu_delete_item' }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('menu_delete_confirm:Espresso')).toBeInTheDocument();
 
@@ -66,7 +68,9 @@ describe('MenuSection', () => {
     renderWithQuery(<MenuSection />);
     await screen.findByText('Espresso');
 
-    fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+    openRowMenu();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'menu_delete_item' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'delete' }));
 
     await waitFor(() => expect(fbService.deleteMenuItem).toHaveBeenCalledWith('mi1'));
@@ -80,7 +84,9 @@ describe('MenuSection', () => {
     renderWithQuery(<MenuSection />);
     await screen.findByText('Espresso');
 
-    fireEvent.click(screen.getByRole('button', { name: /menu_delete_item Espresso/ }));
+    openRowMenu();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'menu_delete_item' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'delete' }));
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('menu_delete_error', 'error'));

@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { RateSeasonManagerModal } from './RateSeasonManagerModal';
 import { rateSeasonService } from '../../services';
+import { openRowMenu } from '../../test-utils';
 import { formatDate } from '../../utils';
 
 vi.mock('react-i18next', () => ({
@@ -145,7 +146,8 @@ describe('RateSeasonManagerModal', () => {
     vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('edit'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'edit' }));
     expect((screen.getByLabelText(/rate_season_nightly_price/i) as HTMLInputElement).value).toBe('150');
   });
 
@@ -154,7 +156,8 @@ describe('RateSeasonManagerModal', () => {
     vi.mocked(rateSeasonService.deleteSeason).mockResolvedValue(undefined);
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('delete'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     await waitFor(() => expect(screen.getByText('confirm_delete_rate_season')).toBeInTheDocument());
     fireEvent.click(screen.getByText('btn_confirm'));
     await waitFor(() => expect(rateSeasonService.deleteSeason).toHaveBeenCalledWith('rt1', 's1'));
@@ -165,7 +168,9 @@ describe('RateSeasonManagerModal', () => {
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByText('delete'));
+    openRowMenu();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
 
     expect(await screen.findAllByRole('dialog')).toHaveLength(2);
     // The list stays behind the confirmation instead of being replaced by it.
@@ -176,7 +181,8 @@ describe('RateSeasonManagerModal', () => {
     vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('delete'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     await screen.findByText('confirm_delete_rate_season');
 
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -191,7 +197,8 @@ describe('RateSeasonManagerModal', () => {
     vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('delete'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     await screen.findByText('confirm_delete_rate_season');
 
     fireEvent.click(screen.getByText('cancel'));

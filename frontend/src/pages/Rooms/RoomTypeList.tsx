@@ -2,10 +2,11 @@ import { useFormatters } from '../../hooks';
 import { useState, useCallback, useMemo, memo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { RoomTypeResponse } from '../../types';
 import { M3Button } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
-import { M3TableActionLink } from '../../components/m3';
+import { M3RowActionsMenu, type RowAction } from '../../components/m3';
 import { M3LoadingState } from '../../components/m3';
 import { M3ErrorState } from '../../components/m3';
 import { M3TableEmptyRow } from '../../components/m3';
@@ -19,7 +20,7 @@ const RoomTypeRow = memo(({ rt, onEdit, onManageSeasons, t }: {
   rt: RoomTypeResponse;
   onEdit: (rt: RoomTypeResponse) => void;
   onManageSeasons: (rt: RoomTypeResponse) => void;
-  t: (k: string) => string;
+  t: TFunction;
 }) => {
   const { formatCurrency } = useFormatters();
   const handleEdit = useCallback(() => {
@@ -30,19 +31,21 @@ const RoomTypeRow = memo(({ rt, onEdit, onManageSeasons, t }: {
     onManageSeasons(rt);
   }, [onManageSeasons, rt]);
 
+  const items = useMemo<RowAction[]>(() => [
+    { id: 'seasons', label: t('rate_seasons'), icon: 'date_range', onSelect: handleManageSeasons },
+    { id: 'edit', label: t('edit'), icon: 'edit', onSelect: handleEdit },
+  ], [t, handleManageSeasons, handleEdit]);
+
   return (
     <M3TableRow key={rt.id}>
       <M3TableCell className="font-medium">{rt.name}</M3TableCell>
       <M3TableCell className="text-on-surface-variant font-medium">{rt.maxOccupancy}</M3TableCell>
       <M3TableCell className="text-on-surface-variant font-medium">{formatCurrency(rt.basePrice)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant max-w-xs truncate" title={rt.description}>{rt.description || '-'}</M3TableCell>
-      <M3TableCell className="text-right">
-        <M3TableActionLink onClick={handleManageSeasons} className="lg:mr-4">
-          {t('rate_seasons')}
-        </M3TableActionLink>
-        <M3TableActionLink onClick={handleEdit} className="lg:mr-4">
-          {t('edit')}
-        </M3TableActionLink>
+      <M3TableCell>
+        <div className="flex justify-end">
+          <M3RowActionsMenu label={t('row_actions_for', { name: rt.name })} items={items} />
+        </div>
       </M3TableCell>
     </M3TableRow>
   );

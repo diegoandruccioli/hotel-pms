@@ -104,7 +104,8 @@ test.describe('Night audit', () => {
     await expect(page.getByText('Carl Confirmed')).toBeVisible();
 
     const patch = page.waitForRequest((req) => req.method() === 'PATCH' && req.url().includes('/res-p/status-and-guests'));
-    await page.getByRole('button', { name: 'Mark no-show Pia Pending' }).click();
+    await page.getByRole('row', { name: /Pia Pending/ }).getByRole('button', { name: /^Actions for /i }).click();
+    await page.getByRole('menuitem', { name: 'Mark no-show' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Confirm' }).click();
     expect((await patch).postDataJSON()).toMatchObject({ status: 'NO_SHOW' });
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../test-utils';
+import { openRowMenu, renderWithQuery as render } from '../test-utils';
 import { Guests } from './Guests';
 
 const mockUseSearchParams = vi.hoisted(() => vi.fn(() => [new URLSearchParams()] as [URLSearchParams]));
@@ -165,7 +165,7 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /delete John Doe/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'delete' })).not.toBeInTheDocument();
   });
 
   it('should show delete button for ADMIN', async () => {
@@ -174,7 +174,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /delete John Doe/ })).toBeInTheDocument();
+    openRowMenu();
+    expect(screen.getByRole('menuitem', { name: 'delete' })).toBeInTheDocument();
   });
 
   it('should not show the export CSV button for RECEPTIONIST', async () => {
@@ -203,7 +204,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
 
     expect(screen.getByText('delete_guest_confirm')).toBeInTheDocument();
   });
@@ -217,7 +219,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^delete$/ })[0]);
 
     await waitFor(() => {
@@ -233,7 +236,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     expect(screen.getByText('delete_guest_confirm')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
@@ -249,7 +253,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^delete$/ })[0]);
 
     await waitFor(() => {
@@ -280,7 +285,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^delete$/ })[0]);
 
     await waitFor(() => {
@@ -337,7 +343,7 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /export_guest_data John Doe/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'export_guest_data' })).not.toBeInTheDocument();
   });
 
   it('should show export button for ADMIN and open a confirmation dialog', async () => {
@@ -346,7 +352,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /export_guest_data John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'export_guest_data' }));
 
     expect(screen.getByText('export_guest_data_confirm_body')).toBeInTheDocument();
     expect(guestService.downloadGuestDataExport).not.toHaveBeenCalled();
@@ -359,7 +366,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /export_guest_data John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'export_guest_data' }));
     fireEvent.click(screen.getByRole('button', { name: 'export_guest_data_confirm_action' }));
 
     await waitFor(() => {
@@ -375,7 +383,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /export_guest_data John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'export_guest_data' }));
     fireEvent.click(screen.getByRole('button', { name: 'export_guest_data_confirm_action' }));
 
     await waitFor(() => {

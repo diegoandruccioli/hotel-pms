@@ -65,6 +65,8 @@
   "phone": "Telefono",
   "city": "Città",
   "actions": "Azioni",
+  "row_actions": "Azioni",
+  "row_actions_for": "Azioni per {{name}}",
   "no_guests_found": "Nessun ospite trovato. Aggiungi un nuovo ospite per iniziare.",
   "edit": "Modifica",
   "delete": "Elimina",
