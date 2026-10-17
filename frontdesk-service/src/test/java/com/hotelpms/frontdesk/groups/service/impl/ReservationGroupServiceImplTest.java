@@ -150,7 +150,7 @@ class ReservationGroupServiceImplTest {
         final ReservationResponse createdMember = new ReservationResponse(
                 UUID.randomUUID(), guestId, MEMBER_FULL_NAME_JANE_DOE, EXPECTED_GUESTS, 0,
                 request.checkInDate(), request.checkOutDate(), ReservationStatus.CONFIRMED,
-                List.of(), true, null, null, false, null, null);
+                List.of(), true, null, null, false, null, null, null);
         when(reservationService.createReservationForGroup(
                 ArgumentMatchers.any(), ArgumentMatchers.eq(guestId), ArgumentMatchers.eq(roomId),
                 ArgumentMatchers.eq(EXPECTED_GUESTS), ArgumentMatchers.any(), ArgumentMatchers.any(),
@@ -183,7 +183,7 @@ class ReservationGroupServiceImplTest {
         final ReservationResponse createdMember = new ReservationResponse(
                 UUID.randomUUID(), guestId, MEMBER_FULL_NAME_JANE_DOE, EXPECTED_GUESTS, 0,
                 request.checkInDate(), request.checkOutDate(), ReservationStatus.CONFIRMED,
-                List.of(), true, null, null, false, null, null);
+                List.of(), true, null, null, false, null, null, null);
         when(reservationService.createReservationForGroup(
                 ArgumentMatchers.any(), ArgumentMatchers.eq(guestId), ArgumentMatchers.eq(roomId),
                 ArgumentMatchers.eq(EXPECTED_GUESTS), ArgumentMatchers.any(), ArgumentMatchers.any(),

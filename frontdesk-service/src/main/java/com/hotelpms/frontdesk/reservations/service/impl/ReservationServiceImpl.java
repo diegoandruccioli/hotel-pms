@@ -611,7 +611,8 @@ public class ReservationServiceImpl implements ReservationService {
                 response.updatedAt(),
                 response.confirmationEmailFailed(),
                 response.confirmationEmailFailureReason(),
-                response.version()
+                response.version(),
+                response.groupId()
         );
     }
 
