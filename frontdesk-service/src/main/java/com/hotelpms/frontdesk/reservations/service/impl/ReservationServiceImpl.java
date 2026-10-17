@@ -311,6 +311,7 @@ public class ReservationServiceImpl implements ReservationService {
         Objects.requireNonNull(id, ID_NOT_NULL_MSG);
         final UUID hotelId = TenantContext.resolveHotelId();
         final Reservation existingReservation = findReservationByIdAndHotelOrThrow(id, hotelId);
+        verifyUpdateAllowed(existingReservation, request);
         verifyNotStale(existingReservation, request.version());
         verifyNoActiveStayConflict(id, hotelId, existingReservation, request);
 
@@ -751,6 +752,29 @@ public class ReservationServiceImpl implements ReservationService {
     private static void verifyValidTransition(final ReservationStatus current, final ReservationStatus next) {
         if (!ALLOWED_TRANSITIONS.getOrDefault(current, Set.of()).contains(next)) {
             throw new ConflictException("RESERVATION_INVALID_TRANSITION");
+        }
+    }
+
+    /**
+     * Guards the full-body update ({@code PUT}) the same way the dedicated status endpoint is
+     * guarded. {@link com.hotelpms.frontdesk.reservations.mapper.ReservationMapper#updateEntityFromRequest}
+     * copies the request's {@code status} onto the entity, so without this a direct API caller
+     * could reopen a closed reservation (checked out, cancelled, no-show) or skip the transition
+     * table altogether. A closed reservation is history and cannot be edited at all; for the
+     * others, a status that differs from the persisted one must be an allowed transition (the
+     * unchanged status that an ordinary edit resends is always fine).
+     *
+     * @param existing the reservation as currently persisted
+     * @param request  the incoming update request
+     * @throws ConflictException {@code RESERVATION_NOT_EDITABLE} if the reservation is closed, or
+     *         {@code RESERVATION_INVALID_TRANSITION} if the requested status change is not allowed
+     */
+    private static void verifyUpdateAllowed(final Reservation existing, final ReservationRequest request) {
+        if (TERMINAL_STATUSES.contains(existing.getStatus())) {
+            throw new ConflictException("RESERVATION_NOT_EDITABLE");
+        }
+        if (request.status() != existing.getStatus()) {
+            verifyValidTransition(existing.getStatus(), request.status());
         }
     }
 
