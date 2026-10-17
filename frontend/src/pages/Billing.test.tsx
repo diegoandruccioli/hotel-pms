@@ -40,9 +40,12 @@ vi.mock('../services/billingReportService', () => ({
   billingReportService: { getOwnerFinancialSummary: vi.fn() },
 }));
 
+// One stable function, like the real zustand action: a fresh vi.fn() per render would make every
+// effect that lists addToast as a dependency run again on each render.
+const mockAddToast = vi.hoisted(() => vi.fn());
 vi.mock('../store/toastStore', () => ({
   useToastStore: (sel: (s: { addToast: () => void }) => unknown) =>
-    sel({ addToast: vi.fn() }),
+    sel({ addToast: mockAddToast }),
 }));
 
 vi.mock('../store/authStore', () => ({
