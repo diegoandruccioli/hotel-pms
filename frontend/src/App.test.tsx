@@ -39,7 +39,10 @@ const mockStore = (state: MockAuthState) => {
 
 const ADMIN: UserPayload = { sub: '1', username: 'admin', role: 'ADMIN' };
 
-describe('App', () => {
+// The first render of an authenticated route pulls in the lazy Dashboard + MainLayout chunks; under a
+// loaded full-suite run that cold import alone can pass vitest's 5 s default, before the 8 s waitFor
+// budgets below ever expire. Keep the per-test cap above them.
+describe('App', { timeout: 15_000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.pushState({}, '', '/');

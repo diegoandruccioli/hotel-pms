@@ -372,7 +372,7 @@ class QuotationServiceImplTest {
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
         final ReservationResponse reservationResponse = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null,
                 2, 0, CHECK_IN, CHECK_OUT, com.hotelpms.frontdesk.reservations.domain.ReservationStatus.CONFIRMED,
-                null, true, null, null, false, null, null);
+                null, true, null, null, false, null, null, null);
         when(reservationService.createReservationFromPricedRooms(
                 eq(GUEST_ID), eq(CHECK_IN), eq(CHECK_OUT), eq(2), any()))
                 .thenReturn(reservationResponse);
@@ -413,7 +413,7 @@ class QuotationServiceImplTest {
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
         final ReservationResponse reservationResponse = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null,
                 2, 0, CHECK_IN, CHECK_OUT, com.hotelpms.frontdesk.reservations.domain.ReservationStatus.CONFIRMED,
-                null, true, null, null, false, null, null);
+                null, true, null, null, false, null, null, null);
         when(reservationService.createReservationFromPricedRooms(
                 eq(GUEST_ID), eq(CHECK_IN), eq(CHECK_OUT), eq(2), any()))
                 .thenReturn(reservationResponse);
@@ -456,7 +456,7 @@ class QuotationServiceImplTest {
                 .thenReturn(new GuestResponse(newGuestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         final ReservationResponse reservationResponse = new ReservationResponse(UUID.randomUUID(), newGuestId, null,
                 2, 0, CHECK_IN, CHECK_OUT, com.hotelpms.frontdesk.reservations.domain.ReservationStatus.CONFIRMED,
-                null, true, null, null, false, null, null);
+                null, true, null, null, false, null, null, null);
         when(reservationService.createReservationFromPricedRooms(
                 eq(newGuestId), eq(CHECK_IN), eq(CHECK_OUT), eq(2), any()))
                 .thenReturn(reservationResponse);

@@ -13,6 +13,10 @@ import { formatCurrency } from '../utils';
 import type { InvoiceResponse, InvoiceSearchResult } from '../types';
 
 // PageHeader derives its breadcrumbs from the router location.
+const ISSUED_NAV_ENTRIES = [{ pathname: '/billing', state: { statusFilter: 'ISSUED' } }];
+
+const INVOICE_LINK_ENTRIES = [{ pathname: '/billing', state: { invoiceId: 'inv-linked' } }];
+
 const render = (ui: ReactElement) => renderWithQuery(<MemoryRouter>{ui}</MemoryRouter>);
 
 vi.mock('react-i18next', () => {
@@ -28,6 +32,7 @@ vi.mock('../services/billingService', () => ({
     searchInvoices: vi.fn(),
     processPayment: vi.fn(),
     exportInvoicesCsv: vi.fn(),
+    getInvoiceById: vi.fn(),
   },
 }));
 
@@ -35,9 +40,12 @@ vi.mock('../services/billingReportService', () => ({
   billingReportService: { getOwnerFinancialSummary: vi.fn() },
 }));
 
+// One stable function, like the real zustand action: a fresh vi.fn() per render would make every
+// effect that lists addToast as a dependency run again on each render.
+const mockAddToast = vi.hoisted(() => vi.fn());
 vi.mock('../store/toastStore', () => ({
   useToastStore: (sel: (s: { addToast: () => void }) => unknown) =>
-    sel({ addToast: vi.fn() }),
+    sel({ addToast: mockAddToast }),
 }));
 
 vi.mock('../store/authStore', () => ({
@@ -107,6 +115,17 @@ describe('Billing', () => {
     vi.mocked(billingService.searchInvoices).mockReturnValue(new Promise(() => {}));
     render(<Billing />);
     expect(screen.getByText('pilot_mode_fiscal_banner')).toBeInTheDocument();
+  });
+
+  it('opens filtered on the status carried by the navigation state', async () => {
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
+    renderWithQuery(
+      <MemoryRouter initialEntries={ISSUED_NAV_ENTRIES}>
+        <Billing />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+    expect(billingService.searchInvoices).toHaveBeenCalledWith(expect.objectContaining({ status: 'ISSUED' }));
   });
 
   it('should render invoices on success', async () => {
@@ -182,6 +201,19 @@ describe('Billing', () => {
     await waitFor(() => screen.getByText('view'));
     fireEvent.click(screen.getByText('view'));
     expect(screen.getByText('invoice_detail_title')).toBeInTheDocument();
+  });
+
+  it('opens the detail of the invoice named by the navigation state', async () => {
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([]) as never);
+    vi.mocked(billingService.getInvoiceById).mockResolvedValueOnce(PAID_INVOICE as never);
+    renderWithQuery(
+      <MemoryRouter initialEntries={INVOICE_LINK_ENTRIES}>
+        <Billing />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('invoice_detail_title')).toBeInTheDocument());
+    expect(billingService.getInvoiceById).toHaveBeenCalledWith('inv-linked');
   });
 
   it('should close InvoiceDetailModal on close button', async () => {

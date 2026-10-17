@@ -387,6 +387,7 @@
   "city_tax_unassessed_banner_desc_one": "1 soggiorno non ha avuto l'imposta di soggiorno calcolata per una configurazione mancante.",
   "city_tax_unassessed_banner_desc_other": "{{count}} soggiorni non hanno avuto l'imposta di soggiorno calcolata per una configurazione mancante.",
   "city_tax_unassessed_banner_action": "Verifica e recupera",
+  "city_tax_unassessed_banner_ask_admin": "Contatta un amministratore per recuperarla.",
   "download_json_export": "Scarica Esportazione JSON",
   "alloggiati_json_downloaded": "Esportazione JSON del {{date}} scaricata.",
 
@@ -607,6 +608,9 @@
   "cancel_group": "Annulla gruppo",
   "master_folio": "Master folio",
   "master_folio_open": "Aperto",
+  "master_folio_open_invoice": "Apri fattura",
+  "reservation_group_link": "Vai al gruppo",
+  "reservation_part_of_group": "Parte del gruppo {{name}}",
   "master_folio_none": "Nessuno",
   "cancel_group_confirm": "Annullare questo gruppo e tutte le sue prenotazioni non terminali?",
   "group_cancelled_success": "Gruppo annullato",

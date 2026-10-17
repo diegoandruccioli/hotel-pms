@@ -190,7 +190,7 @@ class StayServiceGroupCheckoutTest {
     private ReservationResponse reservationResponse(
             final ReservationStatus status, final List<ReservationLineItemResponse> lineItems) {
         return new ReservationResponse(reservationId, guestId, null, 2, 0,
-                LocalDate.now(), LocalDate.now().plusDays(3), status, lineItems, true, null, null, false, null, null);
+                LocalDate.now(), LocalDate.now().plusDays(3), status, lineItems, true, null, null, false, null, null, null);
     }
 
     @Test
