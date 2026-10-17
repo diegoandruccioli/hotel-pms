@@ -191,7 +191,7 @@ export const ReservationGroupDetail = () => {
                       size={16}
                       className={outcome.success ? 'text-tertiary' : 'text-error'}
                     />
-                    <span>{outcome.success ? t('checkout_room_success') : (outcome.errorCode ?? t('checkout_room_failed'))}</span>
+                    <span>{outcome.success ? t('checkout_room_success') : (outcome.errorCode ? t(outcome.errorCode, { ns: 'errors', defaultValue: outcome.errorCode }) : t('checkout_room_failed'))}</span>
                   </li>
                 ))}
               </ul>

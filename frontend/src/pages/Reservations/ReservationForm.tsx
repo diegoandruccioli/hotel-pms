@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/Alert';
-import { M3LoadingState, M3Button, M3Card, M3Dialog, M3Stepper, M3StatusChip } from '../../components/m3';
+import { M3LoadingState, M3Button, M3Card, M3Dialog, M3Stepper, M3StatusChip, M3ErrorState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { GuestSearchAndCreate } from './GuestSearchAndCreate';
 import { StayDatesFields } from './StayDatesFields';
@@ -49,6 +49,20 @@ export const ReservationForm = () => {
   if (f.fetching) {
     return (
       <M3LoadingState label={t('loading')} plain />
+    );
+  }
+
+  if (f.loadFailed) {
+    return (
+      <div className="space-y-6 max-w-4xl mx-auto pb-10">
+        <PageHeader title={titles.title} subtitle={titles.subtitle} onBack={f.goToList} bordered />
+        <M3ErrorState
+          title={t('error_loading_reservations')}
+          message={f.error ?? t('failed_load_data')}
+          retryLabel={t('try_again')}
+          onRetry={f.reload}
+        />
+      </div>
     );
   }
 

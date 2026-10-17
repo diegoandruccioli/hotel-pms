@@ -100,6 +100,9 @@ export const useReservationForm = () => {
   // save here didn't move the guest's room or dates.
   const [checkedInStayId, setCheckedInStayId] = useState<string | null>(null);
   const [groupId, setGroupId] = useState<string | null>(null);
+  // The reservation being viewed/edited could not be read: the defaults below (status, dates...) are
+  // placeholders, so the form must not present them as that reservation's data or offer its actions.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const reservationSchema = useMemo(() => z.object({
     checkInDate: z.string().min(1, t('msg_valid_dates')),
@@ -114,6 +117,7 @@ export const useReservationForm = () => {
     try {
       setFetching(true);
       setError(null);
+      setLoadFailed(false);
 
       const allRooms = await fetchAllRooms();
 
@@ -168,6 +172,7 @@ export const useReservationForm = () => {
     } catch (err: unknown) {
       const e = err as {response?: {data?: {detail?: string}}, message?: string};
       setError(e.response?.data?.detail || e.message || t('failed_load_data'));
+      if (id) setLoadFailed(true);
     } finally {
       setFetching(false);
     }
@@ -387,7 +392,7 @@ export const useReservationForm = () => {
   }, [id, navigate]);
 
   return {
-    id, isEdit, isView, status, groupId,
+    id, isEdit, isView, status, groupId, loadFailed, reload: loadInitialData,
     loading, fetching, error,
     step, isStepSelectable, goToStep, goNext, goPrevious,
     rooms, allReservations, resolvedPrices: displayPrices,

@@ -327,6 +327,23 @@ describe('ReservationForm', () => {
       expect(screen.queryByText('group_link_mock')).not.toBeInTheDocument();
     });
 
+    it('shows an error state with retry, and no status or actions, when the reservation cannot be loaded', async () => {
+      vi.mocked(reservationService.getReservationById).mockRejectedValueOnce(new Error('not found'));
+      renderView();
+
+      expect(await screen.findByText('error_loading_reservations')).toBeInTheDocument();
+      expect(screen.queryByText('status_confirmed')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'check_in' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'edit' })).not.toBeInTheDocument();
+
+      vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({ id: 'res123', guestId: 'g1' }));
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+      fireEvent.click(screen.getByRole('button', { name: 'try_again' }));
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'edit' })).toBeInTheDocument());
+      expect(screen.queryByText('error_loading_reservations')).not.toBeInTheDocument();
+    });
+
     it('shows a closed reservation read-only: status chip, no Edit, no Check-in', async () => {
       vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({
         id: 'res123',

@@ -1,11 +1,18 @@
-import React, { useState, memo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, memo, useCallback, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store';
 import { authService } from '../services';
 import { useTranslation } from 'react-i18next';
 import { M3TextField } from '../components/m3';
 import { M3Button } from '../components/m3';
 import { Alert } from '../components/Alert';
+
+/** Page the visitor was heading to before being sent to the login: same-app paths only. */
+const requestedPath = (state: unknown): string | null => {
+  const from = (state as { from?: unknown } | null)?.from;
+  if (typeof from !== 'string' || !from.startsWith('/') || from.startsWith('//')) return null;
+  return from.startsWith('/login') ? null : from;
+};
 
 export const Login = memo(() => {
   const { t } = useTranslation('auth');
@@ -15,6 +22,11 @@ export const Login = memo(() => {
   const [error, setError] = useState('');
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const next = requestedPath(location.state);
+
+  // Pages set their own tab title; without this the previous page's title lingers after a logout.
+  useEffect(() => { document.title = 'Hotel PMS'; }, []);
   const login = useAuthStore((state) => state.login);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -29,7 +41,7 @@ export const Login = memo(() => {
       if (loginResult.mustChangePassword) {
         navigate('/settings/password', { state: { mustChangePassword: true } });
       } else {
-        navigate('/');
+        navigate(next ?? '/');
       }
     } catch (err: unknown) {
       const e = err as {response?: {status?: number}, message?: string};
@@ -41,7 +53,7 @@ export const Login = memo(() => {
     } finally {
       setIsLoading(false);
     }
-  }, [username, password, login, navigate, t]);
+  }, [username, password, login, navigate, next, t]);
 
   const handleUsernameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setUsername(e.target.value);

@@ -92,5 +92,8 @@
   "ROOM_NOT_AVAILABLE_FOR_ROOM_CHANGE": "La camera scelta non è disponibile per le notti restanti del soggiorno.",
   "STAY_ROOM_CHANGE_INVOICE_NOT_OPEN": "Impossibile cambiare camera: la fattura di questo soggiorno non è più aperta.",
   "ROOM_CHARGE_SNAPSHOT_MISSING": "Impossibile ricalcolare l'addebito per questo soggiorno — contatta l'assistenza tecnica.",
-  "STAY_ROOM_CHANGE_CHECKOUT_IN_PAST": "La data di check-out prevista di questo soggiorno è già passata — proroga prima il soggiorno (§3.5a), poi cambia camera."
+  "STAY_ROOM_CHANGE_CHECKOUT_IN_PAST": "La data di check-out prevista di questo soggiorno è già passata — proroga prima il soggiorno (§3.5a), poi cambia camera.",
+  "GROUP_NOT_FOUND": "Il gruppo specificato non è stato trovato.",
+  "GROUP_STALE_VERSION": "Questo gruppo è stato modificato da qualcun altro. Ricaricalo e riprova.",
+  "MASTER_FOLIO_CREATION_FAILED": "Impossibile creare il master folio del gruppo. Riprova."
 }

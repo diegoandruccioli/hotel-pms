@@ -155,7 +155,9 @@ describe('ReservationGroupDetail', () => {
     fireEvent.click(screen.getByText('checkout_group'));
     fireEvent.click(screen.getByText('confirm'));
 
-    expect(await screen.findByText('BILLING_NOT_PAID')).toBeInTheDocument();
+    // The failure code is looked up in the `errors` dictionary (the mocked `t` echoes the options it got),
+    // not printed raw.
+    expect(await screen.findByText('BILLING_NOT_PAID {"ns":"errors","defaultValue":"BILLING_NOT_PAID"}')).toBeInTheDocument();
   });
 
   it('should show an error toast when checkout fails outright', async () => {

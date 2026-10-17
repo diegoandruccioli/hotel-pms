@@ -1,7 +1,8 @@
+/* eslint-disable react-perf/jsx-no-new-array-as-prop */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Login } from './Login';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { authService } from '../services';
 
@@ -103,6 +104,45 @@ describe('Login Component', () => {
     await waitFor(() => {
       expect(authService.fetchMe).toHaveBeenCalled();
     });
+  });
+
+  const loginAs = async (from?: unknown) => {
+    vi.mocked(authService.login).mockResolvedValueOnce({ mustChangePassword: false });
+    vi.mocked(authService.fetchMe).mockResolvedValueOnce({ sub: 'user', username: 'testuser', role: 'ADMIN' });
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/login', state: from === undefined ? null : { from } }]}>
+        <Login />
+      </MemoryRouter>
+    );
+    fireEvent.change(screen.getByLabelText('username'), { target: { value: 'testuser' } });
+    fireEvent.change(screen.getByLabelText('password'), { target: { value: 'password123' } });
+    fireEvent.click(screen.getByTestId('login-submit'));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+  };
+
+  it('sends the visitor back to the page they asked for before being asked to sign in', async () => {
+    await loginAs('/reservations/groups/g1?tab=rooms');
+    expect(mockNavigate).toHaveBeenCalledWith('/reservations/groups/g1?tab=rooms');
+  });
+
+  it.each(['//evil.example', 'https://evil.example', '/login', 42])('ignores %s as a place to go back to', async (from) => {
+    await loginAs(from);
+    expect(mockNavigate).toHaveBeenCalledWith('/');
+  });
+
+  it('goes to the dashboard when nothing was requested', async () => {
+    await loginAs();
+    expect(mockNavigate).toHaveBeenCalledWith('/');
+  });
+
+  it('titles the browser tab itself instead of keeping the previous page title', () => {
+    document.title = 'My Profile · Hotel PMS';
+    render(
+      <BrowserRouter>
+        <Login />
+      </BrowserRouter>
+    );
+    expect(document.title).toBe('Hotel PMS');
   });
 
   it('redirects to the change-password settings page when mustChangePassword is true', async () => {
