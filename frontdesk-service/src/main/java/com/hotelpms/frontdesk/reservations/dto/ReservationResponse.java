@@ -27,6 +27,8 @@ import java.util.UUID;
  *                     must send it back unchanged on update (T-RES-XX: two tabs open on
  *                     the same reservation for a long time otherwise silently overwrite
  *                     each other on save, with no conflict warning)
+ * @param groupId      the reservation group this room belongs to, or null for a standalone
+ *                     reservation (lets the UI link a rooming-list member back to its group)
  */
 @SuppressWarnings({ "EI_EXPOSE_REP", "EI_EXPOSE_REP2" })
 public record ReservationResponse(
@@ -44,7 +46,8 @@ public record ReservationResponse(
                 LocalDateTime updatedAt,
                 boolean confirmationEmailFailed,
                 String confirmationEmailFailureReason,
-                Long version) {
+                Long version,
+                UUID groupId) {
 
         /**
          * Compact constructor.

@@ -283,25 +283,18 @@ describe('CheckInForm', () => {
       expect(stayService.createStay).not.toHaveBeenCalled();
     });
 
-    it('submits successfully once all required Alloggiati fields are filled, then navigates to /stays', async () => {
+    /** Renders the form with the given router state and fills every required Alloggiati field. */
+    const fillRequiredFieldsAndSubmit = async (state: Record<string, unknown>) => {
       vi.mocked(stayService.getLookupStati).mockResolvedValue([ITALIA_STATO, FRANCIA_STATO]);
       vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([PASOR_TIPDOC]);
       vi.mocked(stayService.searchLookupComuni).mockResolvedValue([FIANO_COMUNE]);
-      // cityTaxWarning on the response exercises the post-checkin warning toast
-      // (Parte 5.3) as part of this same full-flow test, rather than duplicating
-      // the whole fill sequence in a second test just to reach the same call.
-      vi.mocked(stayService.createStay).mockResolvedValue(mockStayResponse({ cityTaxWarning: 'NO_RATE_FOR_DATE' }));
 
       render(
-        <MemoryRouter
-          initialEntries={[{
-            pathname: '/stays/checkin/res123',
-            state: { guestId: 'g1', roomId: 'r1', expectedGuests: 1 },
-          }]}
-        >
+        <MemoryRouter initialEntries={[{ pathname: '/stays/checkin/res123', state }]}>
           <Routes>
             <Route path="/stays/checkin/:reservationId" element={<CheckInForm />} />
             <Route path="/stays" element={<div>stays_page</div>} />
+            <Route path="/reservations/groups/:id" element={<div>group_page</div>} />
           </Routes>
         </MemoryRouter>,
       );
@@ -320,6 +313,15 @@ describe('CheckInForm', () => {
       await selectComune('label_comune_rilascio_doc');
 
       fireEvent.submit(document.querySelector('form')!);
+    };
+
+    it('submits successfully once all required Alloggiati fields are filled, then navigates to /stays', async () => {
+      // cityTaxWarning on the response exercises the post-checkin warning toast
+      // (Parte 5.3) as part of this same full-flow test, rather than duplicating
+      // the whole fill sequence in a second test just to reach the same call.
+      vi.mocked(stayService.createStay).mockResolvedValue(mockStayResponse({ cityTaxWarning: 'NO_RATE_FOR_DATE' }));
+
+      await fillRequiredFieldsAndSubmit({ guestId: 'g1', roomId: 'r1', expectedGuests: 1 });
 
       await waitFor(() => {
         expect(stayService.createStay).toHaveBeenCalledWith(expect.objectContaining({
@@ -341,6 +343,17 @@ describe('CheckInForm', () => {
       await waitFor(() => expect(screen.getByText('stays_page')).toBeInTheDocument());
       expect(mockAddToast).toHaveBeenCalledWith('city_tax_post_checkin_warning_no_rate_for_date', 'info');
     }, 15000); // multi-field form fill + several async lookups — tight under --coverage instrumentation overhead
+
+    it('returns to the page named by returnTo (a group) instead of /stays after a successful check-in', async () => {
+      vi.mocked(stayService.createStay).mockResolvedValue(mockStayResponse());
+
+      await fillRequiredFieldsAndSubmit({
+        guestId: 'g1', roomId: 'r1', expectedGuests: 1, returnTo: '/reservations/groups/grp1',
+      });
+
+      await waitFor(() => expect(screen.getByText('group_page')).toBeInTheDocument());
+      expect(screen.queryByText('stays_page')).not.toBeInTheDocument();
+    }, 15000);
 
     it('shows the API error detail when the check-in request fails', async () => {
       vi.mocked(stayService.getLookupStati).mockResolvedValue([FRANCIA_STATO]);

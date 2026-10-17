@@ -387,6 +387,7 @@
   "city_tax_unassessed_banner_desc_one": "1 stay did not have its tourist tax assessed because of a missing configuration.",
   "city_tax_unassessed_banner_desc_other": "{{count}} stays did not have their tourist tax assessed because of a missing configuration.",
   "city_tax_unassessed_banner_action": "Check and recover",
+  "city_tax_unassessed_banner_ask_admin": "Ask an administrator to recover it.",
   "download_json_export": "Download JSON Export",
   "alloggiati_json_downloaded": "JSON export for {{date}} downloaded.",
 
@@ -607,6 +608,9 @@
   "cancel_group": "Cancel group",
   "master_folio": "Master folio",
   "master_folio_open": "Open",
+  "master_folio_open_invoice": "Open invoice",
+  "reservation_group_link": "Go to group",
+  "reservation_part_of_group": "Part of group {{name}}",
   "master_folio_none": "None",
   "cancel_group_confirm": "Cancel this group and every one of its non-terminal reservations?",
   "group_cancelled_success": "Group cancelled",

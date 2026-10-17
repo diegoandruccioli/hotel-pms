@@ -62,4 +62,6 @@ export interface ReservationResponse {
   confirmationEmailFailureReason?: string | null;
   /** Optimistic-lock version; echo back on update (see ReservationRequest.version). */
   version?: number | null;
+  /** Reservation group this room belongs to; absent/null for a standalone reservation. */
+  groupId?: string | null;
 }

@@ -60,7 +60,9 @@ function performLogout(): void {
   // bootstrap check, which lands back here — forever. Only navigate if we're
   // not already there.
   if (window.location.pathname !== '/login') {
-    window.location.href = '/login';
+    // Hand the page being left to the login (`?redirect=`), so signing back in lands there, not on '/'.
+    const here = `${window.location.pathname}${window.location.search}`;
+    window.location.href = here === '/' ? '/login' : `/login?redirect=${encodeURIComponent(here)}`;
   }
 }
 

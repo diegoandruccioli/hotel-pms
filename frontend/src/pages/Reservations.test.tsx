@@ -472,12 +472,27 @@ describe('Reservations', () => {
     });
   });
 
-  it('applies upcomingOnly, sortField and sortDir from navigation state on the first request', async () => {
+  it('opens on the arrivals-today preset when the navigation state asks for it', async () => {
+    vi.mocked(reservationService.searchReservations).mockResolvedValueOnce(page([CONFIRMED_RESERVATION]) as never);
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/reservations', state: { preset: 'arrivalsToday' } }]}>
+        <Reservations />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'reservations_filter_arrivals_today' })).toHaveAttribute('aria-pressed', 'true');
+    expect(reservationService.searchReservations).toHaveBeenCalledWith(
+      expect.objectContaining({ dateFrom: expect.any(String), dateTo: expect.any(String) }),
+    );
+  });
+
+  it('applies preset, sortField and sortDir from navigation state on the first request', async () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValueOnce(page([
       { ...CONFIRMED_RESERVATION, id: 'res-future', guestFullName: 'Future Guest' },
     ]) as never);
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/reservations', state: { upcomingOnly: true, sortField: 'checkInDate', sortDir: 'asc' } }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/reservations', state: { preset: 'upcoming', sortField: 'checkInDate', sortDir: 'asc' } }]}>
         <Reservations />
       </MemoryRouter>
     );
@@ -577,7 +592,7 @@ describe('Reservations', () => {
     it('marks "upcoming" as pressed when arriving from the dashboard link', async () => {
       vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
       render(
-        <MemoryRouter initialEntries={[{ pathname: '/reservations', state: { upcomingOnly: true } }]}>
+        <MemoryRouter initialEntries={[{ pathname: '/reservations', state: { preset: 'upcoming' } }]}>
           <Reservations />
         </MemoryRouter>,
       );

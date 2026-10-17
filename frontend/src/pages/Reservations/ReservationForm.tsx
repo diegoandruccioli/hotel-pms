@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/Alert';
-import { M3LoadingState, M3Button, M3Card, M3Dialog, M3Stepper } from '../../components/m3';
+import { M3LoadingState, M3Button, M3Card, M3Dialog, M3Stepper, M3StatusChip, M3ErrorState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { GuestSearchAndCreate } from './GuestSearchAndCreate';
 import { StayDatesFields } from './StayDatesFields';
 import { RoomGrid } from './RoomGrid';
+import { ReservationGroupLink } from './ReservationGroupLink';
 import { ReservationSummary } from './ReservationSummary';
+import { getStatusLabel, isReservationEditable } from './reservationStatus';
+import { reservationStatusTone } from '../../utils';
 import {
   useReservationForm,
   STEP_DATES,
@@ -49,6 +52,20 @@ export const ReservationForm = () => {
     );
   }
 
+  if (f.loadFailed) {
+    return (
+      <div className="space-y-6 max-w-4xl mx-auto pb-10">
+        <PageHeader title={titles.title} subtitle={titles.subtitle} onBack={f.goToList} bordered />
+        <M3ErrorState
+          title={t('error_loading_reservations')}
+          message={f.error ?? t('failed_load_data')}
+          retryLabel={t('try_again')}
+          onRetry={f.reload}
+        />
+      </div>
+    );
+  }
+
   // Dates and rooms are frozen once the guest is in house: the stay is a separate record.
   const locked = isView || !!f.checkedInStayId;
   const isLastStep = step === STEP_SUMMARY;
@@ -57,6 +74,8 @@ export const ReservationForm = () => {
   const header = (
     <>
       <PageHeader title={titles.title} subtitle={titles.subtitle} onBack={f.goToList} bordered />
+
+      {f.groupId && <ReservationGroupLink groupId={f.groupId} />}
 
       {f.error && (
         <Alert tone="error">{f.error}</Alert>
@@ -98,10 +117,16 @@ export const ReservationForm = () => {
     return (
       <div className="space-y-6 max-w-4xl mx-auto pb-10">
         {header}
+        <M3StatusChip label={getStatusLabel(f.status, t)} tone={reservationStatusTone[f.status]} />
         {renderSummary('full')}
         <div className="flex justify-end pt-4 gap-3">
           <M3Button type="button" variant="text" onClick={f.goToList}>{t('back')}</M3Button>
-          <M3Button type="button" icon="edit" onClick={f.goToEdit}>{t('edit')}</M3Button>
+          {f.status === 'CONFIRMED' && !f.checkedInStayId && (
+            <M3Button type="button" variant="tonal" icon="login" onClick={f.goToCheckIn}>{t('check_in')}</M3Button>
+          )}
+          {isReservationEditable(f.status) && (
+            <M3Button type="button" icon="edit" onClick={f.goToEdit}>{t('edit')}</M3Button>
+          )}
         </div>
       </div>
     );
