@@ -12,7 +12,7 @@ vi.mock('react-router-dom', async () => {
 });
 import { Reservations } from './Reservations';
 import { reservationService } from '../services';
-import { mockAxiosErrorWithDetail } from '../test-utils';
+import { mockAxiosErrorWithDetail, openRowMenu } from '../test-utils';
 import { inventoryService } from '../services';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
@@ -202,7 +202,8 @@ describe('Reservations', () => {
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /delete_reservation res-1/ })).not.toBeInTheDocument();
+    openRowMenu();
+    expect(screen.queryByRole('menuitem', { name: /delete_reservation/ })).not.toBeInTheDocument();
   });
 
   it('should show delete button for ADMIN on CONFIRMED reservation', async () => {
@@ -210,7 +211,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /delete_reservation res-1/ })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    expect(screen.getByRole('menuitem', { name: /delete_reservation/ })).toBeInTheDocument();
   });
 
   it('should not show delete button on CANCELLED reservation', async () => {
@@ -219,7 +222,7 @@ describe('Reservations', () => {
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /delete_reservation res-2/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /delete_reservation/ })).not.toBeInTheDocument();
   });
 
   it('should open confirmation dialog when delete button is clicked', async () => {
@@ -227,8 +230,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /delete_reservation res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete_reservation res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /delete_reservation/ }));
 
     expect(screen.getByText('delete_reservation_confirm')).toBeInTheDocument();
   });
@@ -241,8 +245,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.deleteReservation).mockResolvedValueOnce(undefined as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /delete_reservation res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete_reservation res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /delete_reservation/ }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => {
@@ -260,8 +265,9 @@ describe('Reservations', () => {
     );
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /delete_reservation res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete_reservation res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /delete_reservation/ }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('RESERVATION_HAS_INVOICE', 'error'));
@@ -272,8 +278,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmed]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    expect(screen.getByRole('menuitem', { name: /mark_no_show/ })).toBeInTheDocument();
   });
 
   it('should not show mark-no-show button when check-in date is still in the future', async () => {
@@ -282,7 +289,8 @@ describe('Reservations', () => {
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /mark_no_show res-1/ })).not.toBeInTheDocument();
+    openRowMenu();
+    expect(screen.queryByRole('menuitem', { name: /mark_no_show/ })).not.toBeInTheDocument();
   });
 
   it('should not show mark-no-show button on a CANCELLED reservation', async () => {
@@ -291,7 +299,7 @@ describe('Reservations', () => {
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /mark_no_show res-2/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /mark_no_show/ })).not.toBeInTheDocument();
   });
 
   it('should open confirmation dialog when mark-no-show button is clicked', async () => {
@@ -299,9 +307,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmed]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /mark_no_show/ }));
 
     expect(screen.getByText('mark_no_show_confirm')).toBeInTheDocument();
   });
@@ -311,9 +319,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmed]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /mark_no_show/ }));
     fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
 
     expect(screen.queryByText('mark_no_show_confirm')).not.toBeInTheDocument();
@@ -325,9 +333,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmedNoVersion]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /mark_no_show/ }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('mark_no_show_failed', 'error'));
@@ -344,9 +352,9 @@ describe('Reservations', () => {
     } as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /mark_no_show/ }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => {
@@ -363,9 +371,9 @@ describe('Reservations', () => {
     );
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /mark_no_show/ }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('RESERVATION_NO_SHOW_HAS_STAY', 'error'));

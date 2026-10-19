@@ -99,9 +99,11 @@ describe('RoomingListCard', () => {
 
   it('opens the reservation to view or edit it', () => {
     renderCard();
-    fireEvent.click(within(rowOf('Jane Doe')).getByText('view'));
+    fireEvent.click(within(rowOf('Jane Doe')).getByRole('button', { name: /row_actions_for/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'view' }));
     expect(mockNavigate).toHaveBeenCalledWith('/reservations/r1');
-    fireEvent.click(within(rowOf('Jane Doe')).getByText('edit'));
+    fireEvent.click(within(rowOf('Jane Doe')).getByRole('button', { name: /row_actions_for/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'edit' }));
     expect(mockNavigate).toHaveBeenCalledWith('/reservations/edit/r1');
   });
 

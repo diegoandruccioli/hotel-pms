@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import type { GuestResponseDTO } from '../../types';
-import { M3Avatar, M3TableActionLink } from '../../components/m3';
+import { M3Avatar, M3RowActionsMenu, M3TableActionLink, type RowAction } from '../../components/m3';
 
 interface ActionsCellProps {
   guest: GuestResponseDTO;
@@ -16,30 +16,22 @@ export const GuestActionsCell = ({ guest, onEdit, onDelete, onExport, t }: Actio
   const handleDeleteClick = useCallback(() => onDelete?.(guest), [onDelete, guest]);
   const handleExportClick = useCallback(() => onExport?.(guest), [onExport, guest]);
 
+  const items = useMemo<RowAction[]>(() => {
+    const list: RowAction[] = [];
+    if (onExport) list.push({ id: 'export', label: t('export_guest_data'), icon: 'download', onSelect: handleExportClick });
+    if (onDelete) list.push({ id: 'delete', label: t('delete'), icon: 'delete', tone: 'error', onSelect: handleDeleteClick });
+    return list;
+  }, [onExport, onDelete, t, handleExportClick, handleDeleteClick]);
+
   return (
-    <div className="text-right">
+    <div className="flex items-center justify-end gap-1">
       <M3TableActionLink onClick={handleEdit}>
         {t('edit')}
       </M3TableActionLink>
-      {onExport && (
-        <M3TableActionLink
-          className="ml-3"
-          aria-label={`${t('export_guest_data')} ${guest.firstName} ${guest.lastName}`}
-          onClick={handleExportClick}
-        >
-          {t('export_guest_data')}
-        </M3TableActionLink>
-      )}
-      {onDelete && (
-        <M3TableActionLink
-          tone="error"
-          className="ml-3"
-          aria-label={`${t('delete')} ${guest.firstName} ${guest.lastName}`}
-          onClick={handleDeleteClick}
-        >
-          {t('delete')}
-        </M3TableActionLink>
-      )}
+      <M3RowActionsMenu
+        label={t('row_actions_for', { name: `${guest.firstName} ${guest.lastName}` })}
+        items={items}
+      />
     </div>
   );
 };

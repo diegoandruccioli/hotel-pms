@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../../test-utils';
+import { openRowMenu, renderWithQuery as render } from '../../test-utils';
 import { RoomTypeList } from './RoomTypeList';
 import { inventoryService } from '../../services';
 
@@ -88,15 +88,17 @@ describe('RoomTypeList', () => {
   it('edit button opens modal for existing type', async () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     render(<RoomTypeList />);
-    await waitFor(() => expect(screen.getByText('edit')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('edit'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'edit' }));
   });
 
   it('rate_seasons action opens the seasons modal for the row', async () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     render(<RoomTypeList />);
-    await waitFor(() => expect(screen.getByText('rate_seasons')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('rate_seasons'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'rate_seasons' }));
     expect(await screen.findByTestId('rate-season-modal')).toHaveTextContent('Single');
   });
 

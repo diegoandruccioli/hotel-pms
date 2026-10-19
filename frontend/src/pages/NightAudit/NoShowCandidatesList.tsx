@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/Alert';
 import {
-  M3ConfirmDialog, M3EmptyState, M3LoadingState, M3StatusChip, M3Table, M3TableActionLink, M3TableCell, M3TableRow,
+  M3ConfirmDialog, M3EmptyState, M3LoadingState, M3RowActionsMenu, M3StatusChip, M3Table, M3TableActionLink, M3TableCell, M3TableRow, type RowAction,
 } from '../../components/m3';
 import { useFormatters } from '../../hooks';
 import { useRoomsLookup, useUpdateReservationStatus } from '../../hooks/queries';
@@ -46,6 +46,12 @@ const CandidateRow = memo(({ reservation, room, onResolve }: CandidateRowProps) 
     });
   }, [navigate, reservation]);
 
+  const items = useMemo<RowAction[]>(() => [
+    { id: 'edit', label: t('edit'), icon: 'edit', onSelect: handleEdit },
+    { id: 'no-show', label: t('mark_no_show'), icon: 'person_off', tone: 'error', onSelect: handleNoShow },
+    { id: 'cancel', label: t('cancel_reservation'), icon: 'event_busy', tone: 'error', onSelect: handleCancel },
+  ], [t, handleEdit, handleNoShow, handleCancel]);
+
   return (
     <M3TableRow>
       <M3TableCell>
@@ -62,17 +68,11 @@ const CandidateRow = memo(({ reservation, room, onResolve }: CandidateRowProps) 
         />
       </M3TableCell>
       <M3TableCell>
-        <div className="flex flex-wrap justify-end gap-x-4 gap-y-1">
+        <div className="flex items-center justify-end gap-1">
           {reservation.status === 'CONFIRMED' && reservation.checkOutDate > todayIsoDate() && (
             <M3TableActionLink aria-label={`${t('check_in')} ${name}`} onClick={handleCheckIn}>{t('check_in')}</M3TableActionLink>
           )}
-          <M3TableActionLink aria-label={`${t('edit')} ${name}`} onClick={handleEdit}>{t('edit')}</M3TableActionLink>
-          <M3TableActionLink tone="error" aria-label={`${t('mark_no_show')} ${name}`} onClick={handleNoShow}>
-            {t('mark_no_show')}
-          </M3TableActionLink>
-          <M3TableActionLink tone="error" aria-label={`${t('cancel_reservation')} ${name}`} onClick={handleCancel}>
-            {t('cancel_reservation')}
-          </M3TableActionLink>
+          <M3RowActionsMenu label={t('row_actions_for', { name })} items={items} />
         </div>
       </M3TableCell>
     </M3TableRow>

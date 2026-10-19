@@ -11,7 +11,7 @@ import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3Pagination } from '../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
-import { M3TableActionLink } from '../components/m3';
+import { M3RowActionsMenu, M3TableActionLink, type RowAction } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
 import { M3ConfirmDialog } from '../components/m3';
 import { useToastStore } from '../store';
@@ -59,6 +59,15 @@ const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, 
   const canConvert = quotation.status === 'DRAFT' || quotation.status === 'SENT';
   const canDecline = quotation.status === 'DRAFT' || quotation.status === 'SENT';
 
+  const items = useMemo<RowAction[]>(() => {
+    const list: RowAction[] = [];
+    if (canConvert) list.push({ id: 'convert', label: t('action_convert'), icon: 'event_available', onSelect: handleConvert });
+    list.push({ id: 'download', label: t('action_download_pdf'), icon: 'download', onSelect: handleDownload });
+    if (canDecline) list.push({ id: 'decline', label: t('action_decline'), icon: 'block', onSelect: handleDecline });
+    list.push({ id: 'delete', label: t('action_delete'), icon: 'delete', tone: 'error', onSelect: handleDelete });
+    return list;
+  }, [canConvert, canDecline, t, handleConvert, handleDownload, handleDecline, handleDelete]);
+
   return (
     <M3TableRow>
       <M3TableCell className="font-medium">
@@ -78,28 +87,15 @@ const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, 
           )}
         </div>
       </M3TableCell>
-      <M3TableCell className="text-right">
-        {canSend && (
-          <M3TableActionLink className="mr-2" onClick={handleSend} disabled={sendingId === quotation.id}>
-            {quotation.status === 'SENT' ? t('action_resend') : t('action_send')}
-          </M3TableActionLink>
-        )}
-        {canConvert && (
-          <M3TableActionLink className="mr-2" onClick={handleConvert}>
-            {t('action_convert')}
-          </M3TableActionLink>
-        )}
-        <M3TableActionLink className="mr-2" onClick={handleDownload}>
-          {t('action_download_pdf')}
-        </M3TableActionLink>
-        {canDecline && (
-          <M3TableActionLink className="mr-2" onClick={handleDecline}>
-            {t('action_decline')}
-          </M3TableActionLink>
-        )}
-        <M3TableActionLink tone="error" onClick={handleDelete}>
-          {t('action_delete')}
-        </M3TableActionLink>
+      <M3TableCell>
+        <div className="flex items-center justify-end gap-1">
+          {canSend && (
+            <M3TableActionLink onClick={handleSend} disabled={sendingId === quotation.id}>
+              {quotation.status === 'SENT' ? t('action_resend') : t('action_send')}
+            </M3TableActionLink>
+          )}
+          <M3RowActionsMenu label={t('row_actions_for', { ns: 'common', name: quotation.guestFullName })} items={items} />
+        </div>
       </M3TableCell>
     </M3TableRow>
   );

@@ -10,6 +10,7 @@ export * from './M3ErrorState';
 export * from './M3FilterChip';
 export * from './M3LoadingState';
 export * from './M3Pagination';
+export * from './M3RowActionsMenu';
 export * from './M3SegmentedRow';
 export * from './M3Select';
 export * from './M3SideSheet';

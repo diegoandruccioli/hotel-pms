@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../test-utils';
+import { openRowMenu, renderWithQuery as render } from '../test-utils';
 import { Stays } from './Stays';
 import { stayService } from '../services';
 import { useAuthStore } from '../store';
@@ -304,7 +304,8 @@ describe('Stays', () => {
     render(<Stays />);
     await waitFor(() => expect(screen.getByText('7/1/2026')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: 'action_extend_stay' }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_extend_stay' }));
     await waitFor(() => expect(screen.getByText('stay_extension_title')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));

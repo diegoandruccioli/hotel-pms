@@ -264,6 +264,21 @@ Escape, hoverable, hides on scroll/resize). Don't also set a native `title`. No 
 behaviour: a tap activates the control. `inverse-surface` on `inverse-on-surface` is
 checked at ≥7:1 in all four themes by `src/styles/contrast.test.ts`.
 
+**Row actions (`M3RowActionsMenu`)** — the secondary actions of a table row. A row shows at most
+one visible action, its contextual primary one (Check-in, Check-out, Send quotation), as an
+`M3TableActionLink` or `M3Button`; everything else goes in the `more_vert` menu, destructive items
+last (`tone: 'error'`, a divider is drawn before the first of them), each still followed by an
+`M3ConfirmDialog`. Fewer than two menu items is no menu: the component renders the lone action
+inline (or nothing), so the cell never branches on it. The trigger is a 40px round button named by
+the row (`row_actions_for` with the guest/record name, never just "Actions") and carries an
+`M3Tooltip`. WAI-ARIA menu button: `aria-haspopup="menu"` + `aria-expanded`, Enter/Space/ArrowDown
+open on the first item, ArrowUp on the last, Arrow/Home/End move, Escape and Tab close, and focus
+returns to the trigger before the action runs (so a dialog it opens restores focus to a live
+element). The surface is portalled with `position: fixed` and flips upward near the viewport
+bottom, so a clipping table wrapper can't cut it off; it closes on outside press, scroll and
+resize. Build `items` with `useMemo` in the cell. Tests open it with `openRowMenu()`
+(`src/test-utils`), then query `menuitem`.
+
 **Stat cards (`M3StatCard`)** — KPI tile on `M3Card variant="solid"`: optional tone icon
 tile (`toneChipClasses`), label, figure (`font-display text-2xl tabular-nums`), optional
 delta and inline sparkline. Presentational: the caller translates, formats and computes the

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
-import { renderWithQuery, mockAxiosErrorWithDetail } from '../../test-utils';
+import { renderWithQuery, mockAxiosErrorWithDetail, openRowMenu } from '../../test-utils';
 import { NoShowCandidatesList } from './NoShowCandidatesList';
 import { reservationService, inventoryService } from '../../services';
 import { useToastStore } from '../../store';
@@ -50,7 +50,9 @@ const mockSearch = (pending: unknown[], confirmed: unknown[], confirmedTotal = c
 };
 
 const clickAndConfirm = async (actionName: string) => {
-  fireEvent.click(await screen.findByRole('button', { name: actionName }));
+  await screen.findByText('Jane Doe');
+  openRowMenu();
+  fireEvent.click(screen.getByRole('menuitem', { name: actionName }));
   fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 };
 
@@ -107,7 +109,7 @@ describe('NoShowCandidatesList', () => {
     vi.mocked(reservationService.updateStatus).mockResolvedValue(reservation({ status: 'NO_SHOW' }) as never);
     render(<NoShowCandidatesList businessDate="2026-06-14" />);
 
-    await clickAndConfirm('mark_no_show Jane Doe');
+    await clickAndConfirm('mark_no_show');
 
     await waitFor(() => expect(reservationService.updateStatus).toHaveBeenCalledWith('r1', 'NO_SHOW', 3));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('no_show_marked_success', 'success'));
@@ -118,7 +120,11 @@ describe('NoShowCandidatesList', () => {
     vi.mocked(reservationService.updateStatus).mockResolvedValue(reservation({ status: 'CANCELLED' }) as never);
     render(<NoShowCandidatesList businessDate="2026-06-14" />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'cancel_reservation Jane Doe' }));
+    await screen.findByText('Jane Doe');
+
+    openRowMenu();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'cancel_reservation' }));
     expect(screen.getByText('cancel_reservation_confirm')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
@@ -131,7 +137,7 @@ describe('NoShowCandidatesList', () => {
     vi.mocked(reservationService.updateStatus).mockRejectedValue(mockAxiosErrorWithDetail('RESERVATION_NO_SHOW_HAS_STAY', 409));
     render(<NoShowCandidatesList businessDate="2026-06-14" />);
 
-    await clickAndConfirm('mark_no_show Jane Doe');
+    await clickAndConfirm('mark_no_show');
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('RESERVATION_NO_SHOW_HAS_STAY', 'error'));
   });
@@ -143,7 +149,7 @@ describe('NoShowCandidatesList', () => {
     await screen.findByText('Jane Doe');
     const before = vi.mocked(reservationService.searchReservations).mock.calls.length;
 
-    await clickAndConfirm('mark_no_show Jane Doe');
+    await clickAndConfirm('mark_no_show');
 
     await waitFor(() => expect(vi.mocked(reservationService.searchReservations).mock.calls.length).toBeGreaterThan(before));
   });
@@ -152,7 +158,11 @@ describe('NoShowCandidatesList', () => {
     mockSearch([], [reservation()]);
     render(<NoShowCandidatesList businessDate="2026-06-14" />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'mark_no_show Jane Doe' }));
+    await screen.findByText('Jane Doe');
+
+    openRowMenu();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'mark_no_show' }));
     fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
 
     expect(screen.queryByText('mark_no_show_confirm')).not.toBeInTheDocument();
@@ -163,7 +173,7 @@ describe('NoShowCandidatesList', () => {
     mockSearch([], [reservation({ version: undefined })]);
     render(<NoShowCandidatesList businessDate="2026-06-14" />);
 
-    await clickAndConfirm('mark_no_show Jane Doe');
+    await clickAndConfirm('mark_no_show');
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('mark_no_show_failed', 'error'));
     expect(reservationService.updateStatus).not.toHaveBeenCalled();
@@ -186,7 +196,11 @@ describe('NoShowCandidatesList', () => {
     mockSearch([], [reservation()]);
     render(<NoShowCandidatesList businessDate="2026-06-14" />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'edit Jane Doe' }));
+    await screen.findByText('Jane Doe');
+
+    openRowMenu();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'edit' }));
     expect(mockNavigate).toHaveBeenCalledWith('/reservations/edit/r1');
   });
 

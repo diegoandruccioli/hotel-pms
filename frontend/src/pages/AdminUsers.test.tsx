@@ -5,7 +5,7 @@ import { axe } from 'vitest-axe';
 import type { Role } from '../types';
 import { AdminUsers } from './AdminUsers';
 import { userService } from '../services';
-import { mockAxiosErrorWithDetail, renderWithQuery } from '../test-utils';
+import { mockAxiosErrorWithDetail, openRowMenu, renderWithQuery } from '../test-utils';
 
 // SettingsPageHeader's back button needs react-router-dom's useNavigate,
 // which throws outside a Router — every render needs this wrapper now.
@@ -116,7 +116,8 @@ describe('AdminUsers', () => {
     vi.mocked(userService.deactivateUser).mockResolvedValue({ ...USER_ACTIVE, active: false } as never);
     renderAdminUsers();
     await waitFor(() => screen.getByText('alice'));
-    fireEvent.click(screen.getByText('btn_deactivate'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'btn_deactivate' }));
     expect(userService.deactivateUser).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(userService.deactivateUser).toHaveBeenCalledWith('u1'));
@@ -126,7 +127,8 @@ describe('AdminUsers', () => {
     vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
     renderAdminUsers();
     await waitFor(() => screen.getByText('alice'));
-    fireEvent.click(screen.getByText('btn_deactivate'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'btn_deactivate' }));
     fireEvent.click(screen.getByText('cancel'));
     expect(userService.deactivateUser).not.toHaveBeenCalled();
     expect(screen.queryByText('confirm')).not.toBeInTheDocument();
@@ -137,7 +139,8 @@ describe('AdminUsers', () => {
     vi.mocked(userService.activateUser).mockResolvedValue({ ...USER_INACTIVE, active: true } as never);
     renderAdminUsers();
     await waitFor(() => screen.getByText('bob'));
-    fireEvent.click(screen.getByText('btn_activate'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'btn_activate' }));
     await waitFor(() => expect(userService.activateUser).toHaveBeenCalledWith('u2'));
     expect(screen.queryByText('confirm')).not.toBeInTheDocument();
   });
@@ -227,7 +230,8 @@ describe('AdminUsers', () => {
     vi.mocked(userService.deactivateUser).mockRejectedValue(new Error('fail'));
     renderAdminUsers();
     await waitFor(() => screen.getByText('alice'));
-    fireEvent.click(screen.getByText('btn_deactivate'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'btn_deactivate' }));
     fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_toggle_failed', 'error'));
   });
@@ -239,7 +243,8 @@ describe('AdminUsers', () => {
     );
     renderAdminUsers();
     await waitFor(() => screen.getByText('alice'));
-    fireEvent.click(screen.getByText('btn_deactivate'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'btn_deactivate' }));
     fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('CANNOT_DEACTIVATE_LAST_ADMIN', 'error'));
   });
@@ -340,7 +345,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
       expect(screen.getByText('modal_reset_title')).toBeInTheDocument();
     });
 
@@ -348,7 +354,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       const newPwInput = screen.getByLabelText('label_new_password');
       const confirmPwInput = screen.getByLabelText('label_confirm_password');
@@ -368,7 +375,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: 'short' } });
       fireEvent.click(screen.getByRole('button', { name: 'btn_reset_password' }));
@@ -381,7 +389,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: 'aaaaaaaaaaaaaaaa' } });
       fireEvent.click(screen.getByRole('button', { name: 'btn_reset_password' }));
@@ -393,7 +402,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: 'Secret123!!ABCDEF' } });
       fireEvent.change(screen.getByLabelText('label_confirm_password'), { target: { value: 'Different123!!ABC' } });
@@ -408,7 +418,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.resetUserPassword).mockResolvedValue(undefined);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       const strongPw = 'Secret123!!ABCDEF';
       fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: strongPw } });
@@ -425,7 +436,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.resetUserPassword).mockRejectedValue(new Error('fail'));
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       const strongPw = 'Secret123!!ABCDEF';
       fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: strongPw } });
@@ -442,7 +454,8 @@ describe('AdminUsers', () => {
       );
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       const strongPw = 'Secret123!!ABCDEF';
       fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: strongPw } });
@@ -456,11 +469,14 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
       fireEvent.click(screen.getByText('btn_cancel'));
       expect(screen.queryByText('modal_reset_title')).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(screen.queryByText('modal_reset_title')).not.toBeInTheDocument();
     });
