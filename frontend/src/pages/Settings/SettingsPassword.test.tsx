@@ -27,9 +27,12 @@ vi.mock('../../store/toastStore', () => ({
 }));
 
 const checkAuthMock = vi.fn();
+let mockUser: { sub: string; username: string; role: string; mustChangePassword?: boolean } | null = null;
 vi.mock('../../store/authStore', () => ({
-  useAuthStore: () => ({ checkAuth: checkAuthMock }),
+  useAuthStore: () => ({ checkAuth: checkAuthMock, user: mockUser }),
 }));
+
+const FORCED_USER = { sub: 'u1', username: 'r4pwtest', role: 'RECEPTIONIST', mustChangePassword: true };
 
 const renderPage = () => render(<MemoryRouter><SettingsPassword /></MemoryRouter>);
 
@@ -37,10 +40,11 @@ describe('SettingsPassword', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseLocation.mockReturnValue({ pathname: '/settings/password', state: null } as never);
+    mockUser = null;
   });
 
-  it('shows the must-change-password banner when redirected with that state', () => {
-    mockUseLocation.mockReturnValue({ pathname: '/settings/password', state: { mustChangePassword: true } } as never);
+  it('shows the must-change-password banner for a user flagged in the session, even after a reload (no router state)', () => {
+    mockUser = FORCED_USER;
     renderPage();
     expect(screen.getByText('must_change_password_banner')).toBeInTheDocument();
   });
@@ -110,7 +114,7 @@ describe('SettingsPassword', () => {
   });
 
   it('navigates to the dashboard (not back) when the change was the forced mustChangePassword flow', async () => {
-    mockUseLocation.mockReturnValue({ pathname: '/settings/password', state: { mustChangePassword: true } } as never);
+    mockUser = FORCED_USER;
     vi.mocked(authService.changePassword).mockResolvedValueOnce(undefined);
     vi.mocked(authService.fetchMe).mockResolvedValueOnce({
       sub: 'u1', username: 'r4pwtest', role: 'RECEPTIONIST', mustChangePassword: false,
@@ -121,6 +125,50 @@ describe('SettingsPassword', () => {
     fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'HotelPms@@2026xx' } });
     fireEvent.click(screen.getByRole('button', { name: 'change_password' }));
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'));
+  });
+
+  it('returns a forced change to the page the user was heading to', async () => {
+    mockUser = FORCED_USER;
+    mockUseLocation.mockReturnValue({ pathname: '/settings/password', state: { from: '/reservations?status=PENDING' } } as never);
+    vi.mocked(authService.changePassword).mockResolvedValueOnce(undefined);
+    vi.mocked(authService.fetchMe).mockResolvedValueOnce({ ...FORCED_USER, mustChangePassword: false } as never);
+    renderPage();
+    fireEvent.change(screen.getByLabelText('current_password'), { target: { value: 'oldPass1' } });
+    fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'HotelPms@@2026xx' } });
+    fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'HotelPms@@2026xx' } });
+    fireEvent.click(screen.getByRole('button', { name: 'change_password' }));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/reservations?status=PENDING'));
+  });
+
+  it.each(['//evil.example', 'https://evil.example', '/login', '/settings/password'])(
+    'ignores an unsafe or pointless return target (%s) and goes to the dashboard',
+    async (from) => {
+      mockUser = FORCED_USER;
+      mockUseLocation.mockReturnValue({ pathname: '/settings/password', state: { from } } as never);
+      vi.mocked(authService.changePassword).mockResolvedValueOnce(undefined);
+      vi.mocked(authService.fetchMe).mockResolvedValueOnce({ ...FORCED_USER, mustChangePassword: false } as never);
+      renderPage();
+      fireEvent.change(screen.getByLabelText('current_password'), { target: { value: 'oldPass1' } });
+      fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'HotelPms@@2026xx' } });
+      fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'HotelPms@@2026xx' } });
+      fireEvent.click(screen.getByRole('button', { name: 'change_password' }));
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'));
+    },
+  );
+
+  it('clears the forced flag locally when the post-change session refresh fails, so the guard does not bounce the user back', async () => {
+    mockUser = FORCED_USER;
+    vi.mocked(authService.changePassword).mockResolvedValueOnce(undefined);
+    vi.mocked(authService.fetchMe).mockRejectedValueOnce(new Error('network blip'));
+    renderPage();
+    fireEvent.change(screen.getByLabelText('current_password'), { target: { value: 'oldPass1' } });
+    fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'HotelPms@@2026xx' } });
+    fireEvent.change(screen.getByLabelText('confirm_new_password'), { target: { value: 'HotelPms@@2026xx' } });
+    fireEvent.click(screen.getByRole('button', { name: 'change_password' }));
+    await waitFor(() => expect(checkAuthMock).toHaveBeenCalledWith(
+      expect.objectContaining({ username: 'r4pwtest', mustChangePassword: false }),
+    ));
+    expect(mockNavigate).toHaveBeenCalledWith('/');
   });
 
   it('still completes the navigation if the post-change session refresh itself fails', async () => {

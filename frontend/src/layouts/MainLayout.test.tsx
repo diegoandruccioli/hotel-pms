@@ -69,6 +69,40 @@ describe('MainLayout', () => {
     expect(screen.getByText('Dashboard Content')).toBeInTheDocument();
   });
 
+  describe('while the user must change the password', () => {
+    const FORCED: UserPayload = { sub: '3', username: 'carol', role: 'ADMIN', mustChangePassword: true };
+
+    it('offers no navigation, no command palette and no drawer, only the page and the user menu', () => {
+      mockAuthStore(FORCED);
+      renderLayout();
+
+      expect(screen.getByText('Dashboard Content')).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'nav_dashboard' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('nav_menu')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('palette_open_button')).not.toBeInTheDocument();
+      expect(screen.getByText('carol')).toBeInTheDocument();
+    });
+
+    it('ignores Ctrl+K instead of opening the palette', () => {
+      mockAuthStore(FORCED);
+      renderLayout();
+
+      fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('opens no realtime stream', () => {
+      const sources: unknown[] = [];
+      vi.stubGlobal('EventSource', class { constructor() { sources.push(this); } close() {} });
+      mockAuthStore(FORCED);
+      renderLayout();
+      vi.unstubAllGlobals();
+
+      expect(sources).toHaveLength(0);
+    });
+  });
+
   it('shows username and role for the logged-in user', () => {
     mockAuthStore(RECEPTIONIST);
     renderLayout();

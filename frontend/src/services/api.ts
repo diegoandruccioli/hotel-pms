@@ -97,6 +97,15 @@ api.interceptors.response.use(
       }
     }
 
+    // The gateway refuses every call but change-password/me/logout/refresh while a password change
+    // is pending. If the stored session does not know yet, flag it: the route guard then sends the
+    // user to the change-password page instead of leaving them on a failing screen.
+    if (error.response?.status === 403 && error.response?.data?.error === 'PASSWORD_CHANGE_REQUIRED') {
+      useAuthStore.setState((state) =>
+        state.user ? { user: { ...state.user, mustChangePassword: true } } : {},
+      );
+    }
+
     if (error.response?.status === 401) {
       const url: string = error.config?.url ?? '';
 

@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { AxiosAdapter, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 const logoutMock = vi.fn();
+const setStateMock = vi.fn();
 
 vi.mock('../store/authStore', () => ({
   useAuthStore: {
     getState: vi.fn(() => ({ logout: logoutMock })),
+    setState: (...args: unknown[]) => setStateMock(...args),
   },
 }));
 
@@ -275,6 +277,35 @@ describe('api (axios instance + interceptors)', () => {
 
     await expect(api.get('/api/v1/guests')).rejects.toBeTruthy();
     expect(logoutMock).not.toHaveBeenCalled();
+  });
+
+  it('flags the session as needing a password change on a gateway PASSWORD_CHANGE_REQUIRED 403, and still rejects', async () => {
+    adapter.mockRejectedValueOnce({
+      config: { url: '/api/v1/guests', headers: {} },
+      response: { status: 403, data: { error: 'PASSWORD_CHANGE_REQUIRED' } },
+    });
+
+    await expect(api.get('/api/v1/guests')).rejects.toMatchObject({ response: { status: 403 } });
+
+    expect(setStateMock).toHaveBeenCalledTimes(1);
+    const updater = setStateMock.mock.calls[0][0] as (s: { user: object | null }) => object;
+    expect(updater({ user: { username: 'a', mustChangePassword: false } })).toEqual({
+      user: { username: 'a', mustChangePassword: true },
+    });
+    // No session yet: nothing to flag.
+    expect(updater({ user: null })).toEqual({});
+    expect(logoutMock).not.toHaveBeenCalled();
+  });
+
+  it('does not flag a password change for an ordinary 403 (an RBAC denial)', async () => {
+    adapter.mockRejectedValueOnce({
+      config: { url: '/api/v1/guests', headers: {} },
+      response: { status: 403, data: { error: 'ACCESS_DENIED' } },
+    });
+
+    await expect(api.get('/api/v1/guests')).rejects.toMatchObject({ response: { status: 403 } });
+
+    expect(setStateMock).not.toHaveBeenCalled();
   });
 
   it('passes through non-401 errors untouched', async () => {

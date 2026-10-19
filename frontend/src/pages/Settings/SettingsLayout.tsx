@@ -21,27 +21,31 @@ const linkClass = ({ isActive }: { isActive: boolean }) => cn(
 export const SettingsLayout = memo(() => {
   const { t } = useTranslation('settings');
   const role = useAuthStore((s) => s.user?.role);
+  // The other sections are unreachable until the password is changed (the gateway refuses their calls).
+  const passwordChangePending = useAuthStore((s) => s.user?.mustChangePassword === true);
   const entries = getSettingsEntries(role);
 
   return (
     <div className="space-y-6 pb-10">
       <PageHeader icon="settings" title={t('settings')} subtitle={t('settings_subtitle')} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[17.5rem_minmax(0,1fr)]">
-        <M3Card variant="solid" className="h-fit p-2 lg:sticky lg:top-6">
-          <nav aria-label={t('settings_nav_label')}>
-            <ul className="flex gap-1 overflow-x-auto p-1 lg:flex-col lg:overflow-visible">
-              {entries.map((entry) => (
-                <li key={entry.id}>
-                  <NavLink to={entry.path} className={linkClass}>
-                    <MaterialIcon name={entry.icon} size={20} />
-                    {t(entry.labelKey, { ns: entry.ns })}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </M3Card>
+      <div className={cn('grid grid-cols-1 gap-6', !passwordChangePending && 'lg:grid-cols-[17.5rem_minmax(0,1fr)]')}>
+        {!passwordChangePending && (
+          <M3Card variant="solid" className="h-fit p-2 lg:sticky lg:top-6">
+            <nav aria-label={t('settings_nav_label')}>
+              <ul className="flex gap-1 overflow-x-auto p-1 lg:flex-col lg:overflow-visible">
+                {entries.map((entry) => (
+                  <li key={entry.id}>
+                    <NavLink to={entry.path} className={linkClass}>
+                      <MaterialIcon name={entry.icon} size={20} />
+                      {t(entry.labelKey, { ns: entry.ns })}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </M3Card>
+        )}
 
         <div className="min-w-0 max-w-4xl space-y-6">
           <Outlet />

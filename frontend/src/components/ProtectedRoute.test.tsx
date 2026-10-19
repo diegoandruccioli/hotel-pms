@@ -154,6 +154,60 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByText('Owner Dashboard')).not.toBeInTheDocument();
   });
 
+  describe('forced password change', () => {
+    const mustChangeUser: UserPayload = { ...adminUser, mustChangePassword: true };
+
+    const FromProbe = () => {
+      const state = useLocation().state as { from?: string } | null;
+      return <div>Change password, then {state?.from ?? 'nowhere'}</div>;
+    };
+
+    const renderAt = (entry: string, allowedRoles?: UserPayload['role'][]) =>
+      render(
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes>
+            <Route element={<ProtectedRoute />}>
+              <Route path="/reservations" element={<div>Reservations</div>} />
+              <Route path="/settings/password" element={<FromProbe />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={allowedRoles} />}>
+              <Route path="/owner-dashboard" element={<div>Owner Dashboard</div>} />
+            </Route>
+            <Route path="/login" element={<div>Login Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+    it('sends a user who must change the password to the change-password page, remembering the requested one', () => {
+      mockStore({ isAuthenticated: true, user: mustChangeUser });
+      renderAt('/reservations?status=PENDING');
+
+      expect(screen.getByText('Change password, then /reservations?status=PENDING')).toBeInTheDocument();
+      expect(screen.queryByText('Reservations')).not.toBeInTheDocument();
+    });
+
+    it('lets the change-password page itself render', () => {
+      mockStore({ isAuthenticated: true, user: mustChangeUser });
+      renderAt('/settings/password');
+
+      expect(screen.getByText('Change password, then nowhere')).toBeInTheDocument();
+    });
+
+    it('asks for the new password before any role check', () => {
+      mockStore({ isAuthenticated: true, user: { ...receptionistUser, mustChangePassword: true } });
+      renderAt('/owner-dashboard', ['ADMIN', 'OWNER']);
+
+      expect(screen.getByText(/^Change password, then/)).toBeInTheDocument();
+    });
+
+    it('does not interfere when the flag is false or absent', () => {
+      mockStore({ isAuthenticated: true, user: { ...adminUser, mustChangePassword: false } });
+      renderAt('/reservations');
+
+      expect(screen.getByText('Reservations')).toBeInTheDocument();
+    });
+  });
+
   it('should have no accessibility violations when authenticated', async () => {
     mockStore({ isAuthenticated: true, user: adminUser });
     const { container } = render(

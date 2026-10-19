@@ -30,9 +30,9 @@ const renderAt = (path: string) => {
   );
 };
 
-const withRole = (role: string) =>
+const withRole = (role: string, mustChangePassword = false) =>
   vi.mocked(useAuthStore).mockImplementation(((sel?: (s: unknown) => unknown) => {
-    const state = { user: { username: 'u', role } };
+    const state = { user: { username: 'u', role, mustChangePassword } };
     return sel ? sel(state) : state;
   }) as never);
 
@@ -46,6 +46,15 @@ describe('SettingsLayout', () => {
     renderAt('/settings/profile');
     expect(screen.getByRole('heading', { level: 1, name: 'settings' })).toBeInTheDocument();
     expect(screen.getByText('profile content')).toBeInTheDocument();
+  });
+
+  it('shows only the section itself, with no navigation to other sections, while a password change is pending', () => {
+    withRole('ADMIN', true);
+    renderAt('/settings/password');
+
+    expect(screen.getByText('password content')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'settings_nav_label' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /my_profile/ })).not.toBeInTheDocument();
   });
 
   it('lists every section for ADMIN as links in a named navigation', () => {
