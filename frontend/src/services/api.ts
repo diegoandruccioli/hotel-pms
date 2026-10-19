@@ -115,7 +115,9 @@ api.interceptors.response.use(
       // call itself never routes back through this branch (see /refresh
       // handling below), and if the refresh fails performLogout() is called
       // once, not retried.
-      if (url.includes('/login')) {
+      // /change-password answers 401 INVALID_CURRENT_PASSWORD when the typed password is wrong: the
+      // session is fine, so surface that error instead of "refreshing" and replaying the request.
+      if (url.includes('/login') || url.includes('/change-password')) {
         return Promise.reject(error);
       }
       if (url.includes('/refresh')) {
@@ -124,10 +126,16 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      const originalConfig = error.config;
+      const originalConfig: (typeof error.config & { _retried?: boolean }) | undefined = error.config;
       if (!originalConfig) {
         return Promise.reject(error);
       }
+      // Already replayed once with a fresh token and still refused: this is not an expired session,
+      // so stop here instead of refreshing and replaying forever.
+      if (originalConfig._retried) {
+        return Promise.reject(error);
+      }
+      originalConfig._retried = true;
 
       if (isRefreshing) {
         // Another refresh is already in progress — queue this request

@@ -232,6 +232,38 @@ describe('api (axios instance + interceptors)', () => {
     expect(logoutMock).not.toHaveBeenCalled();
   });
 
+  it('rejects a 401 from change-password (wrong current password) with the translated detail, without refreshing', async () => {
+    const config = { url: '/api/v1/auth/change-password', headers: {} } as InternalAxiosRequestConfig;
+    adapter.mockRejectedValueOnce({
+      config,
+      response: { status: 401, data: { detail: 'INVALID_CURRENT_PASSWORD' } },
+    });
+
+    await expect(api.post('/api/v1/auth/change-password', {})).rejects.toMatchObject({
+      response: { status: 401, data: { errorCode: 'INVALID_CURRENT_PASSWORD' } },
+    });
+
+    // The session is fine: a 401 here means the typed password was wrong, so no refresh, no retry, no logout.
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(logoutMock).not.toHaveBeenCalled();
+  });
+
+  it('does not refresh and retry forever when the retried request still answers 401', async () => {
+    const protectedConfig = { url: '/api/v1/guests', headers: {} } as InternalAxiosRequestConfig;
+
+    adapter
+      .mockRejectedValueOnce({ config: protectedConfig, response: { status: 401, data: {} } })
+      .mockResolvedValueOnce(makeResponse(protectedConfig, 200, { ok: 'refreshed' }))
+      // The retry carries the fresh token and is still refused: that is not an expired session.
+      .mockRejectedValueOnce({ config: protectedConfig, response: { status: 401, data: {} } });
+
+    await expect(api.get('/api/v1/guests')).rejects.toMatchObject({ response: { status: 401 } });
+
+    // original + one refresh + one retry, and nothing more
+    expect(adapter).toHaveBeenCalledTimes(3);
+    expect(logoutMock).not.toHaveBeenCalled();
+  });
+
   it('logs out when the silent refresh attempt itself fails', async () => {
     const protectedConfig = { url: '/api/v1/guests', headers: {} } as InternalAxiosRequestConfig;
 
