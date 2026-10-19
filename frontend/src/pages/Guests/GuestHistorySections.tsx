@@ -24,7 +24,7 @@ export const DetailSection = ({ heading, children }: SectionProps) => (
 
 /** Stretches a row's link over the whole row (and its chip) without nesting any other control in it. */
 const STRETCHED_LINK =
-  'after:absolute after:inset-0 rounded-shape-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary';
+  'after:absolute after:inset-0 after:rounded-shape-sm focus-visible:outline-hidden focus-visible:after:ring-2 focus-visible:after:ring-primary';
 const ROW_CLASS = 'relative flex items-center justify-between gap-3 py-2';
 
 const MoreItems = ({ total }: { total: number }) => {

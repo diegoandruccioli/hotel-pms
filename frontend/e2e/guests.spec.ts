@@ -163,6 +163,23 @@ test.describe('Guests', () => {
   });
 
   test('links the history rows of the detail sheet to the reservation and the invoice', async ({ page }) => {
+    const invoice = {
+      id: 'i-1', hotelId: 'h-001', invoiceNumber: 'INV-2026-0001', issueDate: '2026-02-12T10:00:00',
+      totalAmount: 240, status: 'PAID', reservationId: 'res-9', guestId: 'g-001', stayId: 's-1',
+      documentType: 'RICEVUTA', sdiStatus: 'NOT_SENT', payments: [], charges: [],
+    };
+    // Billing's list and the deep-linked invoice. Registered before the history route below,
+    // which must win for /invoices/guest/... (the last matching route wins).
+    await page.route('**/api/v1/invoices**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ content: [{ invoice, guestName: 'Mario Rossi' }], totalElements: 1, totalPages: 1, number: 0, size: 20 }),
+      }),
+    );
+    await page.route('**/api/v1/invoices/i-1', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(invoice) }),
+    );
     await page.route('**/api/v1/stays/guest/g-001/history', (route) =>
       route.fulfill({
         status: 200,
@@ -203,6 +220,9 @@ test.describe('Guests', () => {
 
     await sheet.getByRole('link', { name: /INV-2026-0001/ }).click();
     await expect(page).toHaveURL(/\/billing$/);
+    // The router state carried the invoice id: its detail opens on arrival, with no click in billing.
+    const detail = page.getByRole('dialog').filter({ hasText: 'INV-2026-0001' });
+    await expect(detail).toBeVisible({ timeout: 5000 });
   });
 
   test('opens the detail side sheet with stay and invoice history and closes it with Escape', async ({ page }) => {
