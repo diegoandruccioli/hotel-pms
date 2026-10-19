@@ -64,6 +64,31 @@ describe('M3Table', () => {
     expect(container?.className).toContain('mt-4');
   });
 
+  describe('stickyEnd', () => {
+    const scroller = (container: HTMLElement) => container.querySelector('.overflow-x-auto') as HTMLElement;
+
+    it('keeps the last column pinned to the right while the table scrolls sideways', () => {
+      const { container } = render(
+        <M3Table headers={['Name', 'Actions']} stickyEnd>
+          <M3TableRow><M3TableCell>John</M3TableCell><M3TableCell>Edit</M3TableCell></M3TableRow>
+        </M3Table>
+      );
+      expect(scroller(container)).toHaveClass(
+        '[&_th:last-child]:sticky', '[&_th:last-child]:right-0',
+        '[&_td:last-child]:sticky', '[&_td:last-child]:right-0',
+      );
+    });
+
+    it('is opt-in: a table without it scrolls every column', () => {
+      const { container } = render(
+        <M3Table headers={['Name']}>
+          <M3TableRow><M3TableCell>John</M3TableCell></M3TableRow>
+        </M3Table>
+      );
+      expect(scroller(container).className).not.toContain('sticky');
+    });
+  });
+
   it('should have no accessibility violations', async () => {
     const { container } = render(
       <M3Table headers={['Name', 'Status']}>

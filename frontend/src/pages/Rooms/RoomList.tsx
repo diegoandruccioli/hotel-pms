@@ -185,7 +185,7 @@ export const RoomList = memo(() => {
           onRetry={handleRetry}
         />
       ) : (
-        <M3Table headers={headers}>
+        <M3Table headers={headers} stickyEnd>
           {visibleRooms.length === 0 ? (
             <M3TableEmptyRow colSpan={headers.length} message={emptyMessage} />
           ) : (

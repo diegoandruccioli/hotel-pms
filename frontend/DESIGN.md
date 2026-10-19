@@ -278,6 +278,10 @@ element). The surface is portalled with `position: fixed` and flips upward near 
 bottom, so a clipping table wrapper can't cut it off; it closes on outside press, scroll and
 resize. Build `items` with `useMemo` in the cell. Tests open it with `openRowMenu()`
 (`src/test-utils`), then query `menuitem`.
+On a phone the table scrolls sideways, so the **last column is pinned to the right edge**: `M3DataTable`
+does it by itself when its last column has `id: 'actions'`, `M3Table` when given `stickyEnd` (both use
+`STICKY_END_COLUMN`: sticky cells with an opaque surface and the row hover). Name the column `actions`
+and keep it last; `e2e/table-actions-mobile.spec.ts` checks at 390px that the trigger is on screen.
 
 **Stat cards (`M3StatCard`)** — KPI tile on `M3Card variant="solid"`: optional tone icon
 tile (`toneChipClasses`), label, figure (`font-display text-2xl tabular-nums`), optional
