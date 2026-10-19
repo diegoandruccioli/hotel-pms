@@ -44,7 +44,7 @@ describe('M3DataTable', () => {
       const { container } = render(
         <M3DataTable data={ROWS} columns={withActions} sorting={[]} onSortingChange={vi.fn()} emptyMessage="No rows" />,
       );
-      expect(scroller(container)).toHaveClass('[&_td:last-child]:sticky', '[&_td:last-child]:right-0');
+      expect(scroller(container)).toHaveClass('[&_td:last-child:not([colspan])]:sticky', '[&_td:last-child:not([colspan])]:right-0');
     });
 
     it('leaves a table whose last column is not `actions` scrolling normally', () => {

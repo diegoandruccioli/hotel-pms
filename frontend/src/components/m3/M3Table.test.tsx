@@ -75,7 +75,7 @@ describe('M3Table', () => {
       );
       expect(scroller(container)).toHaveClass(
         '[&_th:last-child]:sticky', '[&_th:last-child]:right-0',
-        '[&_td:last-child]:sticky', '[&_td:last-child]:right-0',
+        '[&_td:last-child:not([colspan])]:sticky', '[&_td:last-child:not([colspan])]:right-0', 'scroll-pe-32',
       );
     });
 

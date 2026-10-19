@@ -8,8 +8,13 @@ import { cn } from '../../utils';
  */
 export const STICKY_END_COLUMN = [
   '[&_th:last-child]:sticky [&_th:last-child]:right-0 [&_th:last-child]:z-1 [&_th:last-child]:bg-surface-container-highest',
-  '[&_td:last-child]:sticky [&_td:last-child]:right-0 [&_td:last-child]:z-1 [&_td:last-child]:bg-surface-container-lowest',
-  '[&_tr:hover_td:last-child]:bg-surface-container-low',
+  // `:not([colspan])`: the empty-state row's single full-width cell is also a last child, but is no actions cell.
+  '[&_td:last-child:not([colspan])]:sticky [&_td:last-child:not([colspan])]:right-0 [&_td:last-child:not([colspan])]:z-1',
+  '[&_td:last-child:not([colspan])]:bg-surface-container-lowest',
+  // Same `(hover: hover)` guard as Tailwind's own `hover:`, or a tap leaves the pinned cell tinted on a phone.
+  '[@media(hover:hover)]:[&_tr:hover_td:last-child:not([colspan])]:bg-surface-container-low',
+  // Focus that scrolls a control into view must not stop under the pinned column (WCAG 2.4.11).
+  'scroll-pe-32',
 ].join(' ');
 
 interface M3TableProps {
