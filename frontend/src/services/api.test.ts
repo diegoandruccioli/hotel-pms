@@ -308,6 +308,20 @@ describe('api (axios instance + interceptors)', () => {
     expect(setStateMock).not.toHaveBeenCalled();
   });
 
+  it.each([['an HTML string', '<html>Forbidden</html>'], ['null', null], ['an empty object', {}]])(
+    'does not flag a password change, nor throw, for a 403 whose body is %s',
+    async (_label, data) => {
+      adapter.mockRejectedValueOnce({
+        config: { url: '/api/v1/guests', headers: {} },
+        response: { status: 403, data },
+      });
+
+      await expect(api.get('/api/v1/guests')).rejects.toMatchObject({ response: { status: 403 } });
+
+      expect(setStateMock).not.toHaveBeenCalled();
+    },
+  );
+
   it('passes through non-401 errors untouched', async () => {
     adapter.mockRejectedValueOnce({
       config: { url: '/api/v1/guests', headers: {} },
