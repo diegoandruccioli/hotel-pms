@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { mockServerEvents, mockUnhandledApi } from './fixtures/mockApi';
 
 const MOCK_USER = { username: 'admin', role: 'ADMIN', sub: 'admin', mustChangePassword: false };
 
@@ -52,6 +53,8 @@ const guestPage = {
 
 test.describe('Guests', () => {
   test.beforeEach(async ({ page }) => {
+    await mockUnhandledApi(page);
+    await mockServerEvents(page);
     await page.route('**/api/v1/auth/me', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER) }),
     );
@@ -157,6 +160,49 @@ test.describe('Guests', () => {
     // After 300ms debounce + re-render, only Mario should be visible
     await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 2000 });
     await expect(page.getByText('Anna Bianchi')).not.toBeVisible();
+  });
+
+  test('links the history rows of the detail sheet to the reservation and the invoice', async ({ page }) => {
+    await page.route('**/api/v1/stays/guest/g-001/history', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { stayId: 's-1', reservationId: 'res-9', checkInTime: '2026-02-10T14:00:00', checkOutTime: '2026-02-12T10:00:00', roomId: 'r-204', status: 'CHECKED_OUT' },
+          { stayId: 's-2', reservationId: null, checkInTime: '2026-03-10T14:00:00', checkOutTime: '2026-03-12T10:00:00', roomId: 'r-204', status: 'CHECKED_OUT' },
+        ]),
+      }),
+    );
+    await page.route('**/api/v1/invoices/guest/g-001/history', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { invoiceId: 'i-1', invoiceNumber: 'INV-2026-0001', issueDate: '2026-02-12', totalAmount: 240, status: 'PAID' },
+        ]),
+      }),
+    );
+    await page.route('**/api/v1/rooms**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ content: [{ id: 'r-204', roomNumber: '204' }], totalElements: 1, totalPages: 1, number: 0, size: 500 }),
+      }),
+    );
+
+    await page.goto('/guests');
+    await expect(page.getByText('Anna Bianchi')).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Mario Rossi mario.rossi@test.com' }).click();
+    const sheet = page.getByRole('dialog', { name: /guest detail|dettaglio ospite/i });
+    await expect(sheet.getByText('INV-2026-0001')).toBeVisible({ timeout: 5000 });
+
+    // Only the stay that came from a reservation is a link; the walk-in row is plain text.
+    const stayLinks = sheet.getByRole('link', { name: /204/ });
+    await expect(stayLinks).toHaveCount(1);
+    await expect(stayLinks).toHaveAttribute('href', '/reservations/res-9');
+
+    await sheet.getByRole('link', { name: /INV-2026-0001/ }).click();
+    await expect(page).toHaveURL(/\/billing$/);
   });
 
   test('opens the detail side sheet with stay and invoice history and closes it with Escape', async ({ page }) => {
