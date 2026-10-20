@@ -113,19 +113,29 @@ export const useReservationForm = () => {
     { message: t('msg_valid_dates'), path: ['checkOutDate'] },
   ), [t]);
 
+  // Each load gets a number; answers of an older load (another reservation, a retry, a closed page)
+  // are dropped instead of overwriting the state of the current one.
+  const loadSeq = useRef(0);
+
   const loadInitialData = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    const isCurrent = () => seq === loadSeq.current;
     try {
       setFetching(true);
       setError(null);
       setLoadFailed(false);
 
-      const allRooms = await fetchAllRooms();
-
-      const allRes = await reservationService.getAllReservations();
+      // The three reads that decide what the page shows go out together instead of one after the
+      // other: one slow round trip no longer adds up with the rest.
+      const [allRooms, allRes, res] = await Promise.all([
+        fetchAllRooms(),
+        reservationService.getAllReservations(),
+        id ? reservationService.getReservationById(id) : Promise.resolve(null),
+      ]);
+      if (!isCurrent()) return;
       setAllReservations(allRes);
 
-      if (id) {
-        const res = await reservationService.getReservationById(id);
+      if (id && res) {
         if (isEdit && !isReservationEditable(res.status)) {
           navigate(`/reservations/${id}`, { replace: true });
           return;
@@ -147,39 +157,47 @@ export const useReservationForm = () => {
           ),
         });
 
-        // Non-blocking: a stay lookup failure must never prevent viewing/editing the
-        // reservation itself, so any error here just leaves the banner hidden.
-        try {
-          const stays = await stayService.getStaysByReservationId(id);
-          const openStay = stays.content.find(s => s.status === 'CHECKED_IN');
-          setCheckedInStayId(openStay?.id ?? null);
-        } catch {
-          setCheckedInStayId(null);
-        }
+        // Secondary lookups: they enrich the page but never hold it back. The page opens as soon as
+        // the reservation is read; a slow or failed answer here just leaves the banner hidden / the
+        // guest named from the reservation itself.
+        stayService.getStaysByReservationId(id)
+          .then(stays => {
+            if (!isCurrent()) return;
+            const openStay = stays.content.find(s => s.status === 'CHECKED_IN');
+            setCheckedInStayId(openStay?.id ?? null);
+          })
+          .catch(() => {
+            if (isCurrent()) setCheckedInStayId(null);
+          });
 
         if (res.guestId) {
-          try {
-            const guest = await guestService.getGuestById(res.guestId);
-            setSelectedGuest(guest);
-          } catch (err) {
-            console.error('Failed to fetch guest details', err);
-            setSelectedGuest({ id: res.guestId, firstName: res.guestFullName || '', lastName: '' } as GuestResponseDTO);
-          }
+          const guestId = res.guestId;
+          setSelectedGuest({ id: guestId, firstName: res.guestFullName || '', lastName: '' } as GuestResponseDTO);
+          guestService.getGuestById(guestId)
+            .then(guest => {
+              // Only if the operator has not picked another guest while the profile was on its way.
+              if (isCurrent()) setSelectedGuest(current => (current?.id === guestId ? guest : current));
+            })
+            .catch((err: unknown) => {
+              console.error('Failed to fetch guest details', err);
+            });
         }
       }
 
       setRooms(allRooms);
     } catch (err: unknown) {
+      if (!isCurrent()) return;
       const e = err as {response?: {data?: {detail?: string}}, message?: string};
       setError(e.response?.data?.detail || e.message || t('failed_load_data'));
       if (id) setLoadFailed(true);
     } finally {
-      setFetching(false);
+      if (isCurrent()) setFetching(false);
     }
   }, [id, isEdit, navigate, t]);
 
   useEffect(() => {
     loadInitialData();
+    return () => { loadSeq.current += 1; };
   }, [loadInitialData]);
 
   // Resolves a date-aware price per room once both dates are set (RatePricingService,
