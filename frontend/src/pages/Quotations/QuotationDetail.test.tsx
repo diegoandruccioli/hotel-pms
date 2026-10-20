@@ -238,6 +238,22 @@ describe('QuotationDetail', () => {
     expect(mockNavigate).toHaveBeenCalledWith(-1);
   });
 
+  it('links the guest name to the guest profile', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail();
+    const link = await screen.findByRole('link', { name: 'Mario Rossi' });
+    expect(link).toHaveAttribute('href', '/guests');
+  });
+
+  it('shows a prospect name as plain text with no profile link', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(
+      { ...DRAFT_QUOTATION, guestId: null, guestFullName: 'Luigi Verdi', prospectEmail: 'l@x.it' } as never,
+    );
+    renderDetail();
+    await waitFor(() => expect(screen.getAllByText('Luigi Verdi').length).toBeGreaterThan(0));
+    expect(screen.queryByRole('link', { name: 'Luigi Verdi' })).not.toBeInTheDocument();
+  });
+
   it('links an accepted quotation to the reservation it created', async () => {
     vi.mocked(quotationService.getQuotationById).mockResolvedValue(
       { ...DRAFT_QUOTATION, status: 'ACCEPTED', reservationId: 'res7' } as never,

@@ -1,6 +1,6 @@
 import { useFormatters } from '../../hooks';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuotation } from '../../hooks/queries';
 import { Alert } from '../../components/Alert';
@@ -51,6 +51,9 @@ export const QuotationDetail = () => {
     if (canConvertNow) handleConvertClick();
   }, [openConvertRequested, quotation, canConvertNow, handleConvertClick, navigate, location.pathname]);
 
+  const guestId = quotation?.guestId;
+  const guestLinkState = useMemo(() => ({ guestId }), [guestId]);
+
   const sortedOptions = useMemo(
     () => (quotation ? [...quotation.options].sort((a, b) => a.position - b.position) : []),
     [quotation],
@@ -100,7 +103,21 @@ export const QuotationDetail = () => {
       )}
 
       <M3Card variant="solid" className="p-6 space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+          <div>
+            <p className="text-xs font-body text-on-surface-variant">{t('col_guest')}</p>
+            {quotation.guestId ? (
+              <Link
+                to="/guests"
+                state={guestLinkState}
+                className="text-sm font-medium text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs"
+              >
+                {quotation.guestFullName}
+              </Link>
+            ) : (
+              <p className="text-sm font-medium text-on-surface">{quotation.guestFullName}</p>
+            )}
+          </div>
           <div>
             <p className="text-xs font-body text-on-surface-variant">{t('col_check_in')}</p>
             <p className="text-sm font-medium text-on-surface">{formatDate(quotation.checkInDate)}</p>
