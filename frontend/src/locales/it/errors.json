@@ -97,5 +97,7 @@
   "RESERVATION_INVALID_TRANSITION": "Questo cambio di stato non è consentito per la prenotazione nel suo stato attuale.",
   "GROUP_NOT_FOUND": "Il gruppo specificato non è stato trovato.",
   "GROUP_STALE_VERSION": "Questo gruppo è stato modificato da qualcun altro. Ricaricalo e riprova.",
-  "MASTER_FOLIO_CREATION_FAILED": "Impossibile creare il master folio del gruppo. Riprova."
+  "MASTER_FOLIO_CREATION_FAILED": "Impossibile creare il master folio del gruppo. Riprova.",
+  "QUOTATION_NOT_SENDABLE": "Questo preventivo non può essere inviato: è già accettato, rifiutato o scaduto.",
+  "QUOTATION_RESEND_TOO_SOON": "Il preventivo è stato inviato da poco. Attendi qualche minuto prima di reinviarlo."
 }

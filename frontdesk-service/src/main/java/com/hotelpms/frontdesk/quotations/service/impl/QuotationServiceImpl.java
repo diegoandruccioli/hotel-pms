@@ -41,7 +41,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -72,6 +75,10 @@ public class QuotationServiceImpl implements QuotationService {
     private static final String PDF_FILE_PREFIX = "preventivo-";
     private static final String PDF_FILE_EXTENSION = ".pdf";
     private static final int DUPLICATE_VALID_DAYS = 7;
+    private static final String NOT_SENDABLE_MSG = "QUOTATION_NOT_SENDABLE";
+    private static final String RESEND_TOO_SOON_MSG = "QUOTATION_RESEND_TOO_SOON";
+    /** Minimum gap between two successful sends of the same quotation. */
+    private static final Duration RESEND_COOLDOWN = Duration.ofMinutes(10);
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final QuotationRepository quotationRepository;
@@ -82,6 +89,7 @@ public class QuotationServiceImpl implements QuotationService {
     private final NotificationClient notificationClient;
     private final ReservationService reservationService;
     private final PdfTemplateRenderer pdfTemplateRenderer;
+    private final Clock clock;
 
     /** {@inheritDoc} */
     @Override
@@ -242,9 +250,8 @@ public class QuotationServiceImpl implements QuotationService {
     public QuotationResponse sendQuotationEmail(final UUID id) {
         final UUID hotelId = TenantContext.resolveHotelId();
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
-        if (quotation.getStatus() == QuotationStatus.DECLINED) {
-            throw new ConflictException("QUOTATION_DECLINED");
-        }
+        final LocalDateTime now = LocalDateTime.now(clock);
+        requireSendable(quotation, hotelId, now);
 
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
@@ -256,6 +263,7 @@ public class QuotationServiceImpl implements QuotationService {
 
         final byte[] pdf = renderPdf(quotation, guest, roomsById);
         final HotelSettingsResponse settings = hotelSettingsService.getOrCreate(hotelId);
+        claimSend(quotation, now);
         final boolean sent = notificationClient.sendQuotation(new NotificationQuotationRequest(
                 recipientEmail,
                 recipientName,
@@ -275,11 +283,54 @@ public class QuotationServiceImpl implements QuotationService {
 
         quotation.setSendFailed(!sent);
         quotation.setSendFailureReason(sent ? null : NOTIFICATION_SERVICE_UNAVAILABLE_REASON);
+        // A failed send keeps the cooldown stamp: the notification fallback also returns false on a
+        // timeout, where the mail may already have been delivered, so an instant retry could mail twice.
         if (sent && quotation.getStatus() == QuotationStatus.DRAFT) {
             quotation.setStatus(QuotationStatus.SENT);
         }
         final Quotation saved = quotationRepository.save(quotation);
         return toResponse(saved, guest, roomsById);
+    }
+
+    /**
+     * Only a live {@code DRAFT}/{@code SENT} quotation may be mailed, and a resend
+     * must wait out {@link #RESEND_COOLDOWN} since the last send attempt to the same recipient
+     * (any quotation of the hotel, so duplicating a quotation does not reset it).
+     *
+     * @param quotation the quotation about to be mailed
+     * @param hotelId   the hotel UUID
+     * @param now       the current UTC time
+     */
+    private void requireSendable(final Quotation quotation, final UUID hotelId, final LocalDateTime now) {
+        final QuotationStatus status = quotation.getStatus();
+        if (status != QuotationStatus.DRAFT && status != QuotationStatus.SENT || quotation.isExpired()) {
+            throw new ConflictException(NOT_SENDABLE_MSG);
+        }
+        final LocalDateTime since = now.minus(RESEND_COOLDOWN);
+        final boolean recentlySent = quotation.getGuestId() != null
+                ? quotationRepository.existsByHotelIdAndGuestIdAndLastSentAtAfter(hotelId, quotation.getGuestId(), since)
+                : quotationRepository.existsByHotelIdAndProspectEmailIgnoreCaseAndLastSentAtAfter(
+                        hotelId, quotation.getProspectEmail(), since);
+        if (recentlySent) {
+            throw new ConflictException(RESEND_TOO_SOON_MSG);
+        }
+    }
+
+    /**
+     * Stamps and flushes the send time <em>before</em> the email goes out: the
+     * {@code @Version} check makes the loser of two concurrent sends fail here,
+     * so the recipient is mailed once, not twice.
+     *
+     * @param quotation the quotation about to be mailed
+     * @param now       the current UTC time
+     */
+    private void claimSend(final Quotation quotation, final LocalDateTime now) {
+        quotation.setLastSentAt(now);
+        try {
+            quotationRepository.saveAndFlush(quotation);
+        } catch (final ObjectOptimisticLockingFailureException ex) {
+            throw new ConflictException(RESEND_TOO_SOON_MSG, ex);
+        }
     }
 
     /** {@inheritDoc} */

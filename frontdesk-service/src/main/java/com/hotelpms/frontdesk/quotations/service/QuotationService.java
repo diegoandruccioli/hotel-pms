@@ -74,10 +74,14 @@ public interface QuotationService {
     /**
      * Emails the quotation (with the PDF attached) to the guest or prospect.
      * Marks the quotation {@code SENT} on the first successful send; a resend
-     * of an already-{@code SENT} quotation is allowed and does not change status.
+     * of an already-{@code SENT} quotation is allowed and does not change status,
+     * but only once the resend cooldown since the last successful send has passed.
      *
      * @param id the quotation UUID
      * @return the updated quotation response
+     * @throws com.hotelpms.frontdesk.exception.ConflictException {@code QUOTATION_NOT_SENDABLE}
+     *         unless the quotation is {@code DRAFT} or {@code SENT} and not expired, or
+     *         {@code QUOTATION_RESEND_TOO_SOON} inside the cooldown (or when a concurrent send won)
      */
     QuotationResponse sendQuotationEmail(UUID id);
 
