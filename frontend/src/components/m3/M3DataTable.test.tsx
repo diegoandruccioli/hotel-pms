@@ -33,6 +33,28 @@ describe('M3DataTable', () => {
     expect(container.firstChild).toHaveClass('bg-surface-container-lowest', 'border', 'border-outline-variant', 'rounded-shape-lg');
   });
 
+  describe('actions column', () => {
+    const scroller = (container: HTMLElement) => container.querySelector('.overflow-x-auto') as HTMLElement;
+    const withActions: ColumnDef<TestRow>[] = [
+      ...COLUMNS,
+      { id: 'actions', header: 'Actions', enableSorting: false, cell: () => <button type="button">Edit</button> },
+    ];
+
+    it('pins an `actions` last column to the right so it stays in view on a narrow screen', () => {
+      const { container } = render(
+        <M3DataTable data={ROWS} columns={withActions} sorting={[]} onSortingChange={vi.fn()} emptyMessage="No rows" />,
+      );
+      expect(scroller(container)).toHaveClass('[&_td:last-child:not([colspan])]:sticky', '[&_td:last-child:not([colspan])]:right-0');
+    });
+
+    it('leaves a table whose last column is not `actions` scrolling normally', () => {
+      const { container } = render(
+        <M3DataTable data={ROWS} columns={COLUMNS} sorting={[]} onSortingChange={vi.fn()} emptyMessage="No rows" />,
+      );
+      expect(scroller(container).className).not.toContain('sticky');
+    });
+  });
+
   it('renders headers and row data', () => {
     render(
       <M3DataTable

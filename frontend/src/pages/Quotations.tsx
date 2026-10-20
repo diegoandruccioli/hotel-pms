@@ -248,7 +248,7 @@ export const Quotations = () => {
           onRetry={loadQuotations}
         />
       ) : (
-        <M3Table headers={tableHeaders}>
+        <M3Table headers={tableHeaders} stickyEnd>
           {quotations.length === 0 ? (
             <M3TableEmptyRow colSpan={tableHeaders.length} message={t('no_quotations_found')} />
           ) : (
