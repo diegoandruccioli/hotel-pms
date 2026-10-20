@@ -125,7 +125,7 @@ export const RoomingListCard = memo(({ groupId, members, rooms }: RoomingListCar
             <div className={allReady ? 'h-full bg-tertiary' : 'h-full bg-secondary'} style={barStyle} />
           </div>
         )}
-        <M3Table headers={headers}>
+        <M3Table headers={headers} stickyEnd>
           {members.map((member) => (
             <MemberRow key={member.reservationId} groupId={groupId} member={member} room={member.roomId ? roomsById.get(member.roomId) : undefined} />
           ))}

@@ -214,7 +214,7 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
           ) : seasons.length === 0 ? (
             <M3EmptyState icon="date_range" title={t('no_rate_seasons')} className="py-6" />
           ) : (
-            <M3Table headers={tableHeaders}>
+            <M3Table headers={tableHeaders} stickyEnd>
               {seasons.map((season) => (
                 <SeasonRow key={season.id} season={season} onEdit={openEditForm} onDelete={openDeleteConfirm} t={t} />
               ))}

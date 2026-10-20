@@ -141,7 +141,7 @@ export const NoShowCandidatesList = ({ businessDate }: { businessDate: string })
 
   return (
     <div className="space-y-3">
-      <M3Table headers={headers}>
+      <M3Table headers={headers} stickyEnd>
         {candidates.map((reservation) => (
           <CandidateRow
             key={reservation.id}

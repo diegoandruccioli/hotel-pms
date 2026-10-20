@@ -10,6 +10,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MaterialIcon } from '../MaterialIcon';
 import { M3TableEmptyRow } from './M3EmptyState';
+import { STICKY_END_COLUMN } from './M3Table';
 import { cn } from '../../utils';
 
 /** CLAUDE.md mandates virtual scrolling past this row count. Every page
@@ -93,6 +94,8 @@ export function M3DataTable<T>({
 
   const rows = table.getRowModel().rows;
   const virtualize = rows.length > VIRTUALIZATION_THRESHOLD;
+  // The `actions` column is always the last one: keep it in view when the table scrolls sideways.
+  const stickyActions = columns[columns.length - 1]?.id === 'actions';
 
   const scrollContainerStyle = useMemo(
     () => (virtualize ? { overflowY: 'auto' as const, maxHeight: VIRTUALIZED_VIEWPORT_HEIGHT } : undefined),
@@ -106,7 +109,7 @@ export function M3DataTable<T>({
 
   return (
     <div className={cn('bg-surface-container-lowest border border-outline-variant shadow-elevation-1 rounded-shape-lg overflow-hidden', className)}>
-      <div ref={scrollRef} className="overflow-x-auto" style={scrollContainerStyle}>
+      <div ref={scrollRef} className={cn('overflow-x-auto', stickyActions && STICKY_END_COLUMN)} style={scrollContainerStyle}>
         <table className="min-w-full" aria-rowcount={virtualize ? rows.length + 1 : undefined}>
           <thead className={virtualize ? 'sticky top-0 z-10' : undefined}>
             <tr className="bg-surface-container-highest">
