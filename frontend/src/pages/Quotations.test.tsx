@@ -60,6 +60,7 @@ const DRAFT_QUOTATION = {
     { id: 'opt1', label: 'Opzione 1', position: 0, totalPrice: 200, lineItems: [] },
   ],
   acceptedOptionId: null,
+  reservationId: null,
   sendFailed: false,
   sendFailureReason: null,
   createdAt: '2026-08-01T00:00:00',
@@ -149,7 +150,7 @@ describe('Quotations', () => {
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_send_failed', 'error'));
   });
 
-  it('action_convert on a single-option quotation converts directly and reloads', async () => {
+  it('action_convert on a single-option quotation converts directly and opens the new reservation', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.convertToReservation).mockResolvedValue({ id: 'res1' } as never);
     renderPage();
@@ -158,7 +159,26 @@ describe('Quotations', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'action_convert' }));
     await waitFor(() => expect(quotationService.convertToReservation).toHaveBeenCalledWith('q1'));
     expect(mockAddToast).toHaveBeenCalledWith('toast_converted', 'success');
+    expect(mockNavigate).toHaveBeenCalledWith('/reservations/res1');
     expect(mockNavigate).not.toHaveBeenCalledWith('/quotations/q1');
+  });
+
+  it('offers a link to the reservation only for a converted quotation that recorded it', async () => {
+    const converted = { ...DRAFT_QUOTATION, status: 'ACCEPTED', reservationId: 'res9' };
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([converted]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_open_reservation' }));
+    expect(mockNavigate).toHaveBeenCalledWith('/reservations/res9');
+  });
+
+  it('hides the reservation link when the quotation has none', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    expect(screen.queryByRole('menuitem', { name: 'action_open_reservation' })).not.toBeInTheDocument();
   });
 
   it('action_convert on a single-option quotation shows an error toast when conversion fails', async () => {
@@ -168,7 +188,7 @@ describe('Quotations', () => {
     await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'action_convert' }));
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_converted', 'error'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_convert', 'error'));
   });
 
   it('action_decline shows confirmation dialog then declines', async () => {
@@ -192,7 +212,7 @@ describe('Quotations', () => {
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'action_decline' }));
     fireEvent.click(screen.getByText('confirm'));
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_declined', 'error'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_decline', 'error'));
   });
 
   it('action_delete shows an error toast when deleteQuotation rejects', async () => {
@@ -203,7 +223,7 @@ describe('Quotations', () => {
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'action_delete' }));
     fireEvent.click(screen.getByText('confirm'));
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_deleted', 'error'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_delete', 'error'));
   });
 
   it('shows a single price (not a range) when all options happen to total the same amount', async () => {
@@ -293,7 +313,7 @@ describe('Quotations', () => {
     await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'action_convert' }));
-    expect(mockNavigate).toHaveBeenCalledWith('/quotations/q2');
+    expect(mockNavigate).toHaveBeenCalledWith('/quotations/q2', { state: { openConvert: true } });
     expect(quotationService.convertToReservation).not.toHaveBeenCalled();
   });
 

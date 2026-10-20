@@ -86,7 +86,7 @@ class QuotationControllerTest {
         quotationId = UUID.randomUUID();
         quotationResponse = new QuotationResponse(quotationId, GUEST_ID, "Mario Rossi", null,
                 CHECK_IN, CHECK_OUT, 2, QuotationStatus.DRAFT, VALID_UNTIL, TOTAL_PRICE,
-                List.of(), null, false, null, null, null);
+                List.of(), null, null, false, null, null, null);
     }
 
     private static QuotationRequest validRequest() {

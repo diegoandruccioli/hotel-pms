@@ -1,6 +1,6 @@
 import { useFormatters } from '../../hooks';
 import { useState, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { MaterialIcon } from '../../components/MaterialIcon';
@@ -24,6 +24,7 @@ export const QuotationForm = () => {
   const { formatCurrency } = useFormatters();
   const { t } = useTranslation(['quotations', 'guests', 'common']);
   const navigate = useNavigate();
+  const location = useLocation();
   const addToast = useToastStore((s) => s.addToast);
   const draft = useQuotationDraft();
   const {
@@ -45,10 +46,11 @@ export const QuotationForm = () => {
     { message: t('common:msg_valid_dates'), path: ['checkOutDate'] },
   ), [t]);
 
-  const handleBack = useCallback(
-    () => navigate(isEditMode && id ? `/quotations/${id}` : '/quotations'),
-    [navigate, isEditMode, id],
-  );
+  // Back to wherever the user came from; a direct visit has no in-app history to return to.
+  const handleBack = useCallback(() => {
+    if (location.key !== 'default') navigate(-1);
+    else navigate(isEditMode && id ? `/quotations/${id}` : '/quotations');
+  }, [location.key, navigate, isEditMode, id]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +104,7 @@ export const QuotationForm = () => {
         navigate('/quotations');
       }
     } catch (err: unknown) {
-      setSubmitError(getErrorMessage(err, isEditMode ? t('toast_updated') : t('toast_created')));
+      setSubmitError(getErrorMessage(err, isEditMode ? t('err_update') : t('err_create')));
     } finally {
       setLoading(false);
     }
@@ -114,6 +116,11 @@ export const QuotationForm = () => {
     return (
       <M3LoadingState label={t('common:loading')} plain />
     );
+  }
+
+  // Only DRAFT quotations are editable (the backend answers 409 otherwise).
+  if (isEditMode && draft.quotationStatus && draft.quotationStatus !== 'DRAFT') {
+    return <Navigate to={`/quotations/${id}`} replace />;
   }
 
   return (

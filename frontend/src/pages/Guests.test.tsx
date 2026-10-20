@@ -6,10 +6,11 @@ import { Guests } from './Guests';
 
 const mockUseSearchParams = vi.hoisted(() => vi.fn(() => [new URLSearchParams()] as [URLSearchParams]));
 const mockNavigate = vi.hoisted(() => vi.fn());
+const mockUseLocation = vi.hoisted(() => vi.fn((): { pathname: string; state?: unknown } => ({ pathname: '/guests' })));
 vi.mock('react-router-dom', () => ({
   useSearchParams: mockUseSearchParams,
   useNavigate: () => mockNavigate,
-  useLocation: () => ({ pathname: '/guests' }),
+  useLocation: mockUseLocation,
 }));
 import { guestService, stayService, billingService, inventoryService } from '../services';
 import { useAuthStore } from '../store';
@@ -23,6 +24,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('../services/guestService', () => ({
   guestService: {
     searchGuestsPaged: vi.fn(),
+    getGuestById: vi.fn(),
     deleteGuest: vi.fn(),
     downloadGuestDataExport: vi.fn(),
     exportGuestsCsv: vi.fn(),
@@ -87,6 +89,7 @@ const mockAuthNull = (selector: unknown) =>
 describe('Guests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseLocation.mockReturnValue({ pathname: '/guests' });
     vi.mocked(useAuthStore).mockImplementation(mockAuthNull);
     vi.mocked(useToastStore).mockReturnValue(mockAddToast);
     vi.mocked(stayService.getGuestStayHistory).mockResolvedValue([]);
@@ -447,6 +450,25 @@ describe('Guests', () => {
     fireEvent.click(await screen.findByRole('button', { name: /John Doe/ }));
     expect(screen.getByRole('dialog', { name: 'detail_title' })).toBeInTheDocument();
     await waitFor(() => expect(stayService.getGuestStayHistory).toHaveBeenCalledWith('guest-1'));
+  });
+
+  it('opens the detail sheet of the guest named in the navigation state', async () => {
+    mockUseLocation.mockReturnValue({ pathname: '/guests', state: { guestId: 'guest-1' } });
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValue(page([JANE]) as never);
+    vi.mocked(guestService.getGuestById).mockResolvedValue(GUEST as never);
+    render(<Guests />);
+    expect(await screen.findByRole('dialog', { name: 'detail_title' })).toBeInTheDocument();
+    expect(guestService.getGuestById).toHaveBeenCalledWith('guest-1');
+    expect(within(screen.getByRole('dialog', { name: 'detail_title' })).getByText(/John Doe/)).toBeInTheDocument();
+  });
+
+  it('shows an error toast when the linked guest cannot be loaded', async () => {
+    mockUseLocation.mockReturnValue({ pathname: '/guests', state: { guestId: 'gone' } });
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValue(page([JANE]) as never);
+    vi.mocked(guestService.getGuestById).mockRejectedValue(new Error('boom'));
+    render(<Guests />);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('error_unexpected_fallback', 'error'));
+    expect(screen.queryByRole('dialog', { name: 'detail_title' })).not.toBeInTheDocument();
   });
 
   it('closes the detail sheet and opens the form when Edit is pressed in the sheet', async () => {
