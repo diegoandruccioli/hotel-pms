@@ -61,6 +61,7 @@ const DRAFT_QUOTATION = {
     },
   ],
   acceptedOptionId: null,
+  reservationId: null,
   sendFailed: false,
   sendFailureReason: null,
   createdAt: '2026-08-01T00:00:00',
@@ -90,8 +91,8 @@ const MULTI_OPTION_QUOTATION = {
 
 const INITIAL_ENTRIES = ['/quotations/q1'];
 
-const renderDetail = () => renderWithQuery(
-  <MemoryRouter initialEntries={INITIAL_ENTRIES}>
+const renderDetail = (entries: Parameters<typeof MemoryRouter>[0]['initialEntries'] = INITIAL_ENTRIES, initialIndex?: number) => renderWithQuery(
+  <MemoryRouter initialEntries={entries} initialIndex={initialIndex}>
     <Routes>
       <Route path="/quotations/:id" element={<QuotationDetail />} />
     </Routes>
@@ -226,6 +227,50 @@ describe('QuotationDetail', () => {
 
     fireEvent.click(screen.getByLabelText('back'));
     expect(mockNavigate).toHaveBeenCalledWith('/quotations');
+  });
+
+  it('back arrow returns to the previous page when the user came from inside the app', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail(['/reservations', '/quotations/q1'], 1);
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Mario Rossi/ })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText('back'));
+    expect(mockNavigate).toHaveBeenCalledWith(-1);
+  });
+
+  it('links an accepted quotation to the reservation it created', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(
+      { ...DRAFT_QUOTATION, status: 'ACCEPTED', reservationId: 'res7' } as never,
+    );
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_open_reservation')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_open_reservation'));
+    expect(mockNavigate).toHaveBeenCalledWith('/reservations/res7');
+  });
+
+  it('shows no reservation link when none was recorded', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(
+      { ...DRAFT_QUOTATION, status: 'ACCEPTED' } as never,
+    );
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_duplicate')).toBeInTheDocument());
+    expect(screen.queryByText('action_open_reservation')).not.toBeInTheDocument();
+  });
+
+  it('opens the option chooser when the list asks to convert a multi-option quotation', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(MULTI_OPTION_QUOTATION as never);
+    renderDetail([{ pathname: '/quotations/q1', state: { openConvert: true } }]);
+
+    await waitFor(() => expect(screen.getByText('label_choose_option_to_convert')).toBeInTheDocument());
+    expect(mockNavigate).toHaveBeenCalledWith('/quotations/q1', { replace: true, state: null });
+  });
+
+  it('does not open the chooser on a plain visit', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(MULTI_OPTION_QUOTATION as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
+    expect(screen.queryByText('label_choose_option_to_convert')).not.toBeInTheDocument();
   });
 
   it('edit button navigates to the edit form for a DRAFT quotation', async () => {

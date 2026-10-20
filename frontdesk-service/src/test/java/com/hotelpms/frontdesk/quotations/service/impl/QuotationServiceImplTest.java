@@ -383,6 +383,7 @@ class QuotationServiceImplTest {
         assertNotNull(result);
         assertEquals(QuotationStatus.ACCEPTED, quotation.getStatus());
         assertEquals(OPTION_ID, quotation.getAcceptedOptionId());
+        assertEquals(result.id(), quotation.getReservationId());
         verify(guestClient, never()).createGuest(any());
     }
 

@@ -315,6 +315,7 @@ public class QuotationServiceImpl implements QuotationService {
                 quotation.getExpectedGuests(), roomPrices);
 
         quotation.setAcceptedOptionId(chosen.getId());
+        quotation.setReservationId(reservation.id());
         quotation.setStatus(QuotationStatus.ACCEPTED);
         try {
             quotationRepository.saveAndFlush(quotation);
@@ -625,6 +626,7 @@ public class QuotationServiceImpl implements QuotationService {
                 quotation.getTotalPrice(),
                 options,
                 quotation.getAcceptedOptionId(),
+                quotation.getReservationId(),
                 quotation.isSendFailed(),
                 quotation.getSendFailureReason(),
                 quotation.getCreatedAt(),

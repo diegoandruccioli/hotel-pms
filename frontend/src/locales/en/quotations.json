@@ -65,5 +65,12 @@
   "price_range": "from {{min}} to {{max}}",
   "label_accepted_option": "Accepted",
   "action_choose_option": "Choose",
-  "label_choose_option_to_convert": "This quotation has multiple options — choose which one to convert to a reservation."
+  "label_choose_option_to_convert": "This quotation has multiple options — choose which one to convert to a reservation.",
+  "action_open_reservation": "Go to reservation",
+  "err_convert": "Could not convert the quotation",
+  "err_decline": "Could not decline the quotation",
+  "err_delete": "Could not delete the quotation",
+  "err_duplicate": "Could not duplicate the quotation",
+  "err_create": "Could not create the quotation",
+  "err_update": "Could not update the quotation"
 }

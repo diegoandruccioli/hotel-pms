@@ -49,6 +49,7 @@ interface QuotationRowProps {
 
 const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, onDownload, sendingId, t }: QuotationRowProps) => {
   const { formatCurrency, formatDate } = useFormatters();
+  const navigate = useNavigate();
   const handleSend = useCallback(() => onSend(quotation.id), [onSend, quotation.id]);
   const handleConvert = useCallback(() => onConvert(quotation.id), [onConvert, quotation.id]);
   const handleDecline = useCallback(() => onDecline(quotation.id), [onDecline, quotation.id]);
@@ -59,14 +60,18 @@ const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, 
   const canConvert = quotation.status === 'DRAFT' || quotation.status === 'SENT';
   const canDecline = quotation.status === 'DRAFT' || quotation.status === 'SENT';
 
+  const reservationId = quotation.reservationId;
+  const handleOpenReservation = useCallback(() => navigate(`/reservations/${reservationId}`), [navigate, reservationId]);
+
   const items = useMemo<RowAction[]>(() => {
     const list: RowAction[] = [];
+    if (reservationId) list.push({ id: 'open-reservation', label: t('action_open_reservation'), icon: 'event_available', onSelect: handleOpenReservation });
     if (canConvert) list.push({ id: 'convert', label: t('action_convert'), icon: 'event_available', onSelect: handleConvert });
     list.push({ id: 'download', label: t('action_download_pdf'), icon: 'download', onSelect: handleDownload });
     if (canDecline) list.push({ id: 'decline', label: t('action_decline'), icon: 'block', onSelect: handleDecline });
     list.push({ id: 'delete', label: t('action_delete'), icon: 'delete', tone: 'error', onSelect: handleDelete });
     return list;
-  }, [canConvert, canDecline, t, handleConvert, handleDownload, handleDecline, handleDelete]);
+  }, [reservationId, canConvert, canDecline, t, handleOpenReservation, handleConvert, handleDownload, handleDecline, handleDelete]);
 
   return (
     <M3TableRow>
@@ -163,17 +168,17 @@ export const Quotations = () => {
   const handleConvert = useCallback(async (id: string) => {
     const target = quotations.find((q) => q.id === id);
     if (target && target.options.length > 1) {
-      navigate(`/quotations/${id}`);
+      navigate(`/quotations/${id}`, { state: { openConvert: true } });
       return;
     }
     try {
-      await quotationService.convertToReservation(id);
+      const reservation = await quotationService.convertToReservation(id);
       addToast(t('toast_converted'), 'success');
-      await loadQuotations();
+      navigate(`/reservations/${reservation.id}`);
     } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('toast_converted')), 'error');
+      addToast(getErrorMessage(err, t('err_convert')), 'error');
     }
-  }, [addToast, t, loadQuotations, quotations, navigate]);
+  }, [addToast, t, quotations, navigate]);
 
   const handleDownload = useCallback(async (id: string) => {
     try {
@@ -193,7 +198,7 @@ export const Quotations = () => {
       addToast(t('toast_declined'), 'success');
       await loadQuotations();
     } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('toast_declined')), 'error');
+      addToast(getErrorMessage(err, t('err_decline')), 'error');
     } finally {
       setBusy(false);
       setDeclineTarget(null);
@@ -210,7 +215,7 @@ export const Quotations = () => {
       addToast(t('toast_deleted'), 'success');
       await loadQuotations();
     } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('toast_deleted')), 'error');
+      addToast(getErrorMessage(err, t('err_delete')), 'error');
     } finally {
       setBusy(false);
       setDeleteTarget(null);

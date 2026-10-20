@@ -160,6 +160,7 @@ export function useQuotationDraft() {
 
   return {
     id, isEditMode, fetching, loadError,
+    quotationStatus: quotation?.status,
     rooms, allReservations, resolvedPrices,
     recipientMode, selectedGuest, guestQuery, guestSuggestions,
     prospectFirstName, prospectLastName, prospectEmail,

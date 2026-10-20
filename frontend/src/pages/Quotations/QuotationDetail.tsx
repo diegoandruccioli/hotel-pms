@@ -1,6 +1,6 @@
 import { useFormatters } from '../../hooks';
-import { useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuotation } from '../../hooks/queries';
 import { Alert } from '../../components/Alert';
@@ -23,6 +23,7 @@ export const QuotationDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation(['quotations', 'common']);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const quotationQuery = useQuotation(id);
   const quotation = quotationQuery.data;
@@ -31,13 +32,24 @@ export const QuotationDetail = () => {
   const { refetch } = quotationQuery;
   const loadQuotation = useCallback(() => { void refetch(); }, [refetch]);
 
-  const handleBack = useCallback(() => navigate('/quotations'), [navigate]);
   const {
     busy, previewOpen, declineConfirmOpen, deleteConfirmOpen, convertDialogOpen, convertChoiceId, setConvertChoiceId,
-    handleEdit, openPreview, closePreview, handleDownload, handleSend, handleConvertClick, closeConvertDialog,
+    handleEdit, handleOpenReservation, handleBack, openPreview, closePreview, handleDownload, handleSend, handleConvertClick, closeConvertDialog,
     confirmConvert, handleDuplicate, openDeclineConfirm, closeDeclineConfirm, handleDeclineConfirmed,
     openDeleteConfirm, closeDeleteConfirm, handleDeleteConfirmed,
   } = useQuotationDetailActions(id, quotation);
+
+  // The list sends "Convert" on a multi-option quotation here: open the option chooser once,
+  // then drop the flag so a reload does not reopen it.
+  const openConvertRequested = (location.state as { openConvert?: boolean } | null)?.openConvert === true;
+  const convertRequestHandled = useRef(false);
+  const canConvertNow = quotation?.status === 'DRAFT' || quotation?.status === 'SENT';
+  useEffect(() => {
+    if (!openConvertRequested || !quotation || convertRequestHandled.current) return;
+    convertRequestHandled.current = true;
+    navigate(location.pathname, { replace: true, state: null });
+    if (canConvertNow) handleConvertClick();
+  }, [openConvertRequested, quotation, canConvertNow, handleConvertClick, navigate, location.pathname]);
 
   const sortedOptions = useMemo(
     () => (quotation ? [...quotation.options].sort((a, b) => a.position - b.position) : []),
@@ -156,6 +168,11 @@ export const QuotationDetail = () => {
         {canEdit && (
           <M3Button variant="outlined" icon="edit" onClick={handleEdit} disabled={busy}>
             {t('common:edit')}
+          </M3Button>
+        )}
+        {quotation.reservationId && (
+          <M3Button variant="outlined" icon="event_available" onClick={handleOpenReservation} disabled={busy}>
+            {t('action_open_reservation')}
           </M3Button>
         )}
         {canConvert && (

@@ -26,6 +26,8 @@ import java.util.UUID;
  *                           for list sorting/display; each option carries its own total
  * @param options            the alternative room combinations offered (1-5)
  * @param acceptedOptionId   the option accepted at conversion time, or {@code null}
+ * @param reservationId      the reservation created at conversion time, or {@code null}
+ *                           (not converted yet, or converted before it was recorded)
  * @param sendFailed         whether the last email-send attempt failed
  * @param sendFailureReason  the reason for the last failed send, if any
  * @param createdAt          creation timestamp
@@ -44,6 +46,7 @@ public record QuotationResponse(
         BigDecimal totalPrice,
         List<QuotationOptionResponse> options,
         UUID acceptedOptionId,
+        UUID reservationId,
         boolean sendFailed,
         String sendFailureReason,
         LocalDateTime createdAt,
