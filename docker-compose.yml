@@ -476,7 +476,9 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
+          # 1.0 (not 0.5) for the two services every request crosses: on a cold start the JVM was throttled in 90%+ of
+          # the CFS periods, which stretched the first minutes after "healthy" (api-gateway and frontdesk-service).
+          cpus: "1.0"
           memory: 512M
         reservations:
           cpus: "0.10"
@@ -648,7 +650,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
+          cpus: "1.0"
           memory: 512M
         reservations:
           cpus: "0.10"
