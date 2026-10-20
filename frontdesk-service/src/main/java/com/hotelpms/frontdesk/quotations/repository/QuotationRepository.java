@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.repository.query.Param;
 import org.springframework.lang.NonNull;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,4 +33,29 @@ public interface QuotationRepository extends JpaRepository<Quotation, UUID> {
      * @return the quotation, if it exists and belongs to this hotel
      */
     Optional<Quotation> findByIdAndHotelId(@Param("id") @NonNull UUID id, @Param("hotelId") @NonNull UUID hotelId);
+
+    /**
+     * Whether any quotation of this hotel was mailed to the guest since {@code since} — the resend
+     * cooldown is per recipient, so duplicating a quotation does not reset it.
+     *
+     * @param hotelId the hotel UUID (multi-tenant scoping)
+     * @param guestId the guest UUID
+     * @param since   the start of the cooldown window
+     * @return true if a send happened inside the window
+     */
+    boolean existsByHotelIdAndGuestIdAndLastSentAtAfter(
+            @NonNull UUID hotelId, @NonNull UUID guestId,
+            @NonNull LocalDateTime since);
+
+    /**
+     * Same as {@link #existsByHotelIdAndGuestIdAndLastSentAtAfter} for a prospect, matched by email.
+     *
+     * @param hotelId       the hotel UUID (multi-tenant scoping)
+     * @param prospectEmail the prospect's email, compared case-insensitively
+     * @param since         the start of the cooldown window
+     * @return true if a send happened inside the window
+     */
+    boolean existsByHotelIdAndProspectEmailIgnoreCaseAndLastSentAtAfter(
+            @NonNull UUID hotelId, @NonNull String prospectEmail,
+            @NonNull LocalDateTime since);
 }

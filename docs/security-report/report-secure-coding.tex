@@ -7905,6 +7905,59 @@ fix e rieseguito --- tutti e 3 tornano verdi, insieme all'intera build
 (\texttt{checkstyle}/\texttt{PMD}/\texttt{SpotBugs}/\texttt{jacoco}).
 Commit: \commitref{5f5a698}{fix(security): version-check soft-deletes on Quotation/RateSeason, enforce it on all three (GAP-18)}, \commitref{83dfda4}{test(security): repository-level stale-delete race test for GAP-18}
 
+\paragraph{T-QUOT-02 --- Invio email dei preventivi senza gate di stato né limite di frequenza}
+Trovato durante l'audit dei link della schermata Preventivi (2026-10-20).
+\texttt{QuotationServiceImpl.sendQuotationEmail} rifiutava soltanto i
+preventivi \texttt{DECLINED}: un preventivo \texttt{ACCEPTED} (già convertito
+in prenotazione) o scaduto poteva essere inviato di nuovo, e lo stesso
+preventivo --- oppure una sua copia creata con \texttt{duplicateQuotation} ---
+poteva essere reinviato senza alcun limite. L'indirizzo di un contatto
+\emph{prospect} è digitato a mano dall'operatore e mai verificato, quindi
+l'endpoint permetteva di bombardare di email (con PDF allegato, dal dominio
+dell'hotel) un destinatario arbitrario.
+
+Fix: (1) l'invio è consentito solo a preventivi \texttt{DRAFT}/\texttt{SENT}
+non scaduti, altrimenti \texttt{409 QUOTATION\_NOT\_SENDABLE}; (2) nuova colonna
+\texttt{quotations.last\_sent\_at} (migrazione \texttt{V29}), timbrata con
+\texttt{saveAndFlush} \emph{prima} di chiamare il notification-service:
+il \texttt{@Version} già introdotto da T-QUOT-01 fa fallire il perdente di due
+invii concorrenti (\texttt{409}) prima che parta una seconda mail;
+(3) cooldown di 10 minuti \emph{per destinatario} --- guest o email prospect,
+su tutti i preventivi dell'hotel --- quindi una copia duplicata non lo
+azzera; \texttt{409 QUOTATION\_RESEND\_TOO\_SOON}. Il timbro viene mantenuto
+anche se l'invio fallisce: il fallback Feign (\texttt{quotationFallback})
+restituisce \texttt{false} anche su timeout, caso in cui la mail può essere
+già partita e un retry immediato la duplicherebbe. Revisione del
+\texttt{security-auditor} sul diff: i due rilievi ad alta gravità (bypass via
+duplicazione, ripristino del timbro su fallimento) sono stati corretti prima
+del commit.
+
+\begin{insecurebox}[title={QuotationServiceImpl.java --- solo DECLINED bloccato (baseline)}]
+\begin{lstlisting}[style=java]
+if (quotation.getStatus() == QuotationStatus.DECLINED) {
+    throw new ConflictException("QUOTATION_DECLINED");
+}
+// ... nessun limite: ACCEPTED/scaduto inviabili, reinvio illimitato
+final boolean sent = notificationClient.sendQuotation(...);
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={QuotationServiceImpl.java --- gate di stato e cooldown per destinatario (main)}]
+\begin{lstlisting}[style=java]
+if (status != QuotationStatus.DRAFT && status != QuotationStatus.SENT
+        || quotation.isExpired()) {
+    throw new ConflictException("QUOTATION_NOT_SENDABLE");
+}
+if (recentlySent) {  // exists...LastSentAtAfter(hotelId, guest|email, now - 10 min)
+    throw new ConflictException("QUOTATION_RESEND_TOO_SOON");
+}
+claimSend(quotation, now);   // saveAndFlush: @Version serializza i concorrenti
+final boolean sent = notificationClient.sendQuotation(...);
+\end{lstlisting}
+\end{securebox}
+
+Commit: \commitref{fcbe14e6}{fix(quotations): gate quotation emails by status and rate-limit them per recipient}
+
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Configurazione e SDLC avanzati}
 % ─────────────────────────────────────────────────────────────────────────────

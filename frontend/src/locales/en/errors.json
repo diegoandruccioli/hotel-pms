@@ -97,5 +97,7 @@
   "RESERVATION_INVALID_TRANSITION": "This status change is not allowed for the reservation in its current state.",
   "GROUP_NOT_FOUND": "The specified group could not be found.",
   "GROUP_STALE_VERSION": "This group was changed by someone else. Reload it and try again.",
-  "MASTER_FOLIO_CREATION_FAILED": "The group's master folio could not be created. Try again."
+  "MASTER_FOLIO_CREATION_FAILED": "The group's master folio could not be created. Try again.",
+  "QUOTATION_NOT_SENDABLE": "This quotation can't be sent: it is already accepted, declined or expired.",
+  "QUOTATION_RESEND_TOO_SOON": "This quotation was sent a moment ago. Wait a few minutes before resending it."
 }
