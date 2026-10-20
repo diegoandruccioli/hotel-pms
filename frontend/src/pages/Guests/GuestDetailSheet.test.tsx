@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { renderWithQuery as render } from '../../test-utils';
 import { GuestDetailSheet } from './GuestDetailSheet';
@@ -67,8 +68,9 @@ const GUEST: GuestResponseDTO = {
   active: true,
 };
 
-const stay = (n: number, status = 'CHECKED_OUT') => ({
+const stay = (n: number, status = 'CHECKED_OUT', reservationId: string | null = `res-${n}`) => ({
   stayId: `s-${n}`,
+  reservationId,
   checkInTime: `2026-0${n}-10T14:00:00`,
   checkOutTime: `2026-0${n}-12T10:00:00`,
   roomId: 'r-1',
@@ -83,13 +85,22 @@ const invoice = (n: number) => ({
   status: 'PAID',
 });
 
+/** Shows where a link navigated, and the router state it carried. */
+const LocationProbe = () => {
+  const location = useLocation();
+  return <output data-testid="location">{location.pathname}|{JSON.stringify(location.state)}</output>;
+};
+
 const renderSheet = (
   guest: GuestResponseDTO = GUEST,
   onEdit = vi.fn(),
   onClose = vi.fn(),
   onNewReservation = vi.fn(),
 ) => render(
-  <GuestDetailSheet guest={guest} onClose={onClose} onEdit={onEdit} onNewReservation={onNewReservation} />,
+  <MemoryRouter>
+    <GuestDetailSheet guest={guest} onClose={onClose} onEdit={onEdit} onNewReservation={onNewReservation} />
+    <LocationProbe />
+  </MemoryRouter>,
 );
 
 describe('GuestDetailSheet', () => {
@@ -190,6 +201,27 @@ describe('GuestDetailSheet', () => {
     expect(await screen.findByText('err_history_load')).toBeInTheDocument();
     expect(screen.getByText('Mario Rossi')).toBeInTheDocument();
     expect(await screen.findByText('INV-001')).toBeInTheDocument();
+  });
+
+  it('links each stay to its reservation, and leaves a walk-in stay without a link', async () => {
+    vi.mocked(stayService.getGuestStayHistory).mockResolvedValue([stay(1), stay(2, 'CHECKED_OUT', null)] as never);
+    renderSheet();
+    const links = await screen.findAllByRole('link', { name: /label_room:204/ });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', '/reservations/res-1');
+    expect(screen.getAllByText('label_room:204')).toHaveLength(2);
+  });
+
+  it('opens the reservation of a stay when its link is followed', async () => {
+    renderSheet();
+    fireEvent.click((await screen.findAllByRole('link', { name: /label_room:204/ }))[0] as HTMLElement);
+    expect(screen.getByTestId('location')).toHaveTextContent('/reservations/res-1|');
+  });
+
+  it('opens the invoice detail in billing when an invoice link is followed', async () => {
+    renderSheet();
+    fireEvent.click(await screen.findByRole('link', { name: /INV-001/ }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/billing|{"invoiceId":"i-1"}');
   });
 
   it('shows the invoice history with formatted totals to ADMIN', async () => {

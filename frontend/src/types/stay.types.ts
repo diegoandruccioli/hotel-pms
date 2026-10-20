@@ -95,6 +95,8 @@ export interface GuestStaySummary {
   checkOutTime?: string;
   roomId: string;
   status: StayStatus;
+  /** The reservation the stay was checked in from; null for a walk-in. */
+  reservationId?: string | null;
 }
 
 export interface StayRequest {

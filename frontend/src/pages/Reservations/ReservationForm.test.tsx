@@ -327,6 +327,90 @@ describe('ReservationForm', () => {
       expect(screen.queryByText('group_link_mock')).not.toBeInTheDocument();
     });
 
+    describe('loading does not wait for the secondary lookups', () => {
+      const never = () => new Promise<never>(() => {});
+
+      it('opens the reservation although the stay lookup never answers', async () => {
+        vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({ id: 'res123', guestId: 'g1' }));
+        vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+        vi.mocked(stayService.getStaysByReservationId).mockImplementation(never);
+
+        renderView();
+
+        await waitForTitle('reservation_details');
+        expect(screen.getByRole('button', { name: 'edit' })).toBeInTheDocument();
+      });
+
+      it('opens the reservation although the guest lookup never answers, naming the guest from the reservation', async () => {
+        vi.mocked(reservationService.getReservationById).mockResolvedValue(
+          mockReservation({ id: 'res123', guestId: 'g1', guestFullName: 'Anna Bianchi' }),
+        );
+        vi.mocked(guestService.getGuestById).mockImplementation(never);
+
+        renderView();
+
+        await waitForTitle('reservation_details');
+        expect(screen.getByText(/Anna Bianchi/)).toBeInTheDocument();
+      });
+
+      it('replaces that provisional guest with the full profile once it arrives', async () => {
+        let answer: (g: GuestResponseDTO) => void = () => {};
+        vi.mocked(reservationService.getReservationById).mockResolvedValue(
+          mockReservation({ id: 'res123', guestId: 'g1', guestFullName: 'Anna Bianchi' }),
+        );
+        vi.mocked(guestService.getGuestById).mockImplementation(
+          () => new Promise<GuestResponseDTO>((resolve) => { answer = resolve; }),
+        );
+
+        renderView();
+        await waitForTitle('reservation_details');
+        await waitFor(() => expect(guestService.getGuestById).toHaveBeenCalled());
+
+        answer(mockGuest({ id: 'g1', firstName: 'Anna', lastName: 'Bianchi-Verdi' }));
+
+        expect(await screen.findByText(/Anna Bianchi-Verdi/)).toBeInTheDocument();
+      });
+
+      it('shows the already-checked-in banner when a slow stay lookup finally answers', async () => {
+        let answer: (page: never) => void = () => {};
+        vi.mocked(reservationService.getReservationById).mockResolvedValue(
+          mockReservation({ id: 'res123', guestId: 'g1', status: 'CONFIRMED' }),
+        );
+        vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+        vi.mocked(stayService.getStaysByReservationId).mockImplementation(
+          () => new Promise((resolve) => { answer = resolve as (page: never) => void; }),
+        );
+
+        renderEdit();
+        await waitForTitle('edit_reservation');
+        expect(screen.queryByText('reservation_already_checked_in_banner')).not.toBeInTheDocument();
+
+        answer({ content: [{ id: 's1', status: 'CHECKED_IN' }], totalElements: 1 } as never);
+
+        expect(await screen.findByText('reservation_already_checked_in_banner')).toBeInTheDocument();
+      });
+
+      it('asks for the reservation without waiting for the list of all reservations', async () => {
+        vi.mocked(reservationService.getAllReservations).mockImplementation(never);
+        vi.mocked(reservationService.getReservationById).mockResolvedValue(mockReservation({ id: 'res123', guestId: 'g1' }));
+        vi.mocked(guestService.getGuestById).mockResolvedValue(mockGuest({ id: 'g1' }));
+
+        renderView();
+
+        await waitFor(() => expect(reservationService.getReservationById).toHaveBeenCalledWith('res123'));
+      });
+
+      it('still reports a reservation that cannot be loaded, whatever the other lookups do', async () => {
+        vi.mocked(reservationService.getReservationById).mockRejectedValue(new Error('not found'));
+        vi.mocked(stayService.getStaysByReservationId).mockImplementation(never);
+        vi.mocked(guestService.getGuestById).mockImplementation(never);
+
+        renderView();
+
+        expect(await screen.findByText('error_loading_reservations')).toBeInTheDocument();
+      });
+    });
+
     it('shows an error state with retry, and no status or actions, when the reservation cannot be loaded', async () => {
       vi.mocked(reservationService.getReservationById).mockRejectedValueOnce(new Error('not found'));
       renderView();

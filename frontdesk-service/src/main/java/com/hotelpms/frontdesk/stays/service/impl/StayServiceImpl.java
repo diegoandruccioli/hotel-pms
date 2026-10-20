@@ -448,7 +448,8 @@ public class StayServiceImpl implements StayService {
                         s.getActualCheckInTime(),
                         s.getActualCheckOutTime(),
                         s.getRoomId(),
-                        s.getStatus()))
+                        s.getStatus(),
+                        s.getReservationId()))
                 .toList();
     }
 

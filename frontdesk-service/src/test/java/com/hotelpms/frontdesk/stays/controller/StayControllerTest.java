@@ -15,6 +15,7 @@ import com.hotelpms.frontdesk.stays.dto.StayGuestRequest;
 import com.hotelpms.frontdesk.stays.dto.StayGuestResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
+import com.hotelpms.frontdesk.stays.dto.StaySummaryResponse;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.GlobalExceptionHandler;
@@ -44,6 +45,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -71,6 +73,7 @@ class StayControllerTest {
     private static final String PATH_BY_ID = "/{id}";
     private static final String PATH_CHECKOUT = "/{id}/check-out";
     private static final String PATH_GUEST_LATEST = "/guest/{guestId}/latest";
+    private static final String PATH_GUEST_HISTORY = "/guest/{guestId}/history";
     private static final String PATH_REPORT_TXT = "/reports/alloggiati";
     private static final String PATH_REPORT_JSON = "/reports/alloggiati/json";
     private static final String PATH_REPORT_SUBMIT = "/reports/alloggiati/submit";
@@ -280,6 +283,26 @@ class StayControllerTest {
 
         mockMvc.perform(get(BASE_URL + PATH_GUEST_LATEST, guestId))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldGetStayHistoryPutTheReservationIdOnTheWire() throws Exception {
+        final UUID reservationId = UUID.randomUUID();
+        final LocalDateTime checkIn = LocalDateTime.now().minusDays(3);
+        when(stayService.getStayHistoryForGuest(guestId, hotelId))
+                .thenReturn(List.of(
+                        new StaySummaryResponse(stayId, checkIn, checkIn.plusDays(2), UUID.randomUUID(),
+                                StayStatus.CHECKED_OUT, reservationId),
+                        new StaySummaryResponse(UUID.randomUUID(), checkIn, null, UUID.randomUUID(),
+                                StayStatus.CHECKED_IN, null)));
+
+        mockMvc.perform(get(BASE_URL + PATH_GUEST_HISTORY, guestId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].stayId").value(stayId.toString()))
+                .andExpect(jsonPath("$[0].reservationId").value(reservationId.toString()))
+                // A walk-in stay has no reservation: the key is present and null, not missing.
+                .andExpect(jsonPath("$[1].reservationId").hasJsonPath())
+                .andExpect(jsonPath("$[1].reservationId").value((Object) null));
     }
 
     @Test
