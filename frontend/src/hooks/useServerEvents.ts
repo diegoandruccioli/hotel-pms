@@ -32,11 +32,15 @@ function isRoomEvent(value: unknown): value is RoomEvent {
  * The browser's native `EventSource` auto-reconnects on drop without any
  * logic needed here, and ignores SSE comment lines (the server's keep-alive
  * heartbeat) — `onmessage` only fires for real `data:` events.
+ *
+ * `enabled = false` opens no stream: while a password change is pending the gateway
+ * answers the stream with a 403, and EventSource would keep reconnecting to it.
  */
-export function useServerEvents(): void {
+export function useServerEvents(enabled = true): void {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (!enabled) return undefined;
     const source = new EventSource(EVENTS_STREAM_URL, { withCredentials: true });
 
     source.onmessage = (message: MessageEvent<string>) => {
@@ -58,5 +62,5 @@ export function useServerEvents(): void {
     };
 
     return () => source.close();
-  }, [queryClient]);
+  }, [queryClient, enabled]);
 }

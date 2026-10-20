@@ -362,6 +362,7 @@
   "profile_subtitle": "Gestisci il tuo account e le impostazioni di sicurezza.",
   "section_account_info": "Informazioni Account",
   "section_change_password": "Cambia Password",
+  "must_change_password_banner": "Devi cambiare la password prima di continuare.",
   "current_password": "Password attuale",
   "new_password": "Nuova password",
   "confirm_new_password": "Conferma nuova password",

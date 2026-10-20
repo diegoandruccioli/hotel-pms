@@ -10,14 +10,22 @@ import { M3TextField } from '../../components/m3';
 import { Alert } from '../../components/Alert';
 import { SettingsSectionTitle } from '../../components/SettingsSectionTitle';
 import { PasswordRequirementsChecklist } from '../../components/PasswordRequirementsChecklist';
+import { CHANGE_PASSWORD_PATH } from '../../components/ProtectedRoute';
 import { isPasswordValid } from '../../utils';
+
+/** Where to go after a forced change: the page the user was heading to, if it is a same-app page worth returning to. */
+const returnTarget = (state: unknown): string => {
+  const from = (state as { from?: unknown } | null)?.from;
+  if (typeof from !== 'string' || !from.startsWith('/') || from.startsWith('//')) return '/';
+  return from.startsWith('/login') || from.startsWith(CHANGE_PASSWORD_PATH) ? '/' : from;
+};
 
 export const SettingsPassword = () => {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
   const location = useLocation();
-  const mustChangePassword = (location.state as { mustChangePassword?: boolean } | null)?.mustChangePassword === true;
-  const { checkAuth } = useAuthStore();
+  const { checkAuth, user } = useAuthStore();
+  const mustChangePassword = user?.mustChangePassword === true;
   const { addToast } = useToastStore();
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -70,10 +78,12 @@ export const SettingsPassword = () => {
       } catch {
         // Session refresh failed for some unrelated reason (e.g. network
         // blip) — the password change itself already succeeded, so fall
-        // through to navigation rather than blocking the user here.
+        // through to navigation rather than blocking the user here. Clear the
+        // flag locally: left set, the route guard would bounce the user straight back.
+        if (user) checkAuth({ ...user, mustChangePassword: false });
       }
       if (mustChangePassword) {
-        navigate('/');
+        navigate(returnTarget(location.state));
       } else {
         navigate(-1);
       }
@@ -83,7 +93,7 @@ export const SettingsPassword = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPassword, newPassword, confirmPassword, t, addToast, checkAuth, navigate, mustChangePassword]);
+  }, [currentPassword, newPassword, confirmPassword, t, addToast, checkAuth, navigate, mustChangePassword, user, location.state]);
 
   return (
     <div className="space-y-6">

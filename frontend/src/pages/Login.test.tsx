@@ -174,7 +174,7 @@ describe('Login Component', () => {
     fireEvent.click(screen.getByTestId('login-submit'));
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/settings/password', { state: { mustChangePassword: true } });
+      expect(mockNavigate).toHaveBeenCalledWith('/settings/password', { state: { from: null } });
     });
   });
 

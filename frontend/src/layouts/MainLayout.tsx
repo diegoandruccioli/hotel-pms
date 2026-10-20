@@ -24,6 +24,8 @@ export const MainLayout = () => {
   const { t: tCommand } = useTranslation('command');
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  // A pending password change leaves only the change-password page and "log out": every other call is refused.
+  const passwordChangePending = user?.mustChangePassword === true;
 
   const sidebarCollapsed = useSettingsStore((s) => s.sidebarCollapsed);
   const toggleSidebar    = useSettingsStore((s) => s.toggleSidebar);
@@ -66,18 +68,18 @@ export const MainLayout = () => {
     query.addEventListener('change', closeOnDesktop);
     return () => query.removeEventListener('change', closeOnDesktop);
   }, [drawerOpen]);
-  useServerEvents();
+  useServerEvents(!passwordChangePending);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if (!passwordChangePending && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setPaletteOpen((v) => !v);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [passwordChangePending]);
 
   const sidebarSections = useMemo(() => getSidebarSections(user?.role), [user?.role]);
   const username       = user?.username ?? t('guest');
@@ -93,7 +95,7 @@ export const MainLayout = () => {
       </a>
       <RouteAnnouncer />
       {/* ── Mobile Modal Drawer ─────────────────────── */}
-      {drawerOpen && (
+      {drawerOpen && !passwordChangePending && (
         <FocusTrap>
           <div className="fixed inset-0 z-50 flex lg:hidden" role="dialog" aria-modal="true" aria-label={t('nav_menu')}>
             {/* Scrim */}
@@ -133,19 +135,23 @@ export const MainLayout = () => {
             <span className="text-lg font-display font-bold text-on-surface">Hotel PMS</span>
           )}
         </div>
-        <SidebarNav sections={sidebarSections} collapsed={sidebarCollapsed} />
-        <div className={cn('sticky bottom-0 mt-auto flex pb-4 pt-2 bg-surface-container-lowest', sidebarCollapsed ? 'justify-center' : 'px-5')}>
-          <M3Tooltip label={t('sidebar_expand')} disabled={!sidebarCollapsed}>
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              aria-label={sidebarCollapsed ? t('sidebar_expand') : t('sidebar_collapse')}
-              className="flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            >
-              <MaterialIcon name={sidebarCollapsed ? 'chevron_right' : 'chevron_left'} size={24} />
-            </button>
-          </M3Tooltip>
-        </div>
+        {!passwordChangePending && (
+          <>
+            <SidebarNav sections={sidebarSections} collapsed={sidebarCollapsed} />
+            <div className={cn('sticky bottom-0 mt-auto flex pb-4 pt-2 bg-surface-container-lowest', sidebarCollapsed ? 'justify-center' : 'px-5')}>
+              <M3Tooltip label={t('sidebar_expand')} disabled={!sidebarCollapsed}>
+                <button
+                  type="button"
+                  onClick={toggleSidebar}
+                  aria-label={sidebarCollapsed ? t('sidebar_expand') : t('sidebar_collapse')}
+                  className="flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  <MaterialIcon name={sidebarCollapsed ? 'chevron_right' : 'chevron_left'} size={24} />
+                </button>
+              </M3Tooltip>
+            </div>
+          </>
+        )}
       </aside>
 
       {/* ── Main content area ───────────────────────── */}
@@ -153,29 +159,33 @@ export const MainLayout = () => {
         {/* Top Bar */}
         <header className="relative z-10 shrink-0 flex items-center h-16 bg-surface-container-lowest border-b border-outline-variant px-4">
           {/* Mobile hamburger */}
-          <button
-            type="button"
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest lg:hidden mr-2"
-            onClick={openDrawer}
-            aria-label={t('nav_menu') ?? 'Open menu'}
-          >
-            <MaterialIcon name="menu" size={24} />
-          </button>
+          {!passwordChangePending && (
+            <button
+              type="button"
+              className="flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest lg:hidden mr-2"
+              onClick={openDrawer}
+              aria-label={t('nav_menu') ?? 'Open menu'}
+            >
+              <MaterialIcon name="menu" size={24} />
+            </button>
+          )}
 
           <div className="flex-1" />
 
           {/* Command palette trigger */}
-          <button
-            type="button"
-            onClick={openPalette}
-            aria-label={tCommand('palette_open_button')}
-            className="flex items-center gap-2 h-10 px-3 mr-2 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          >
-            <MaterialIcon name="search" size={20} />
-            <kbd className="hidden sm:inline text-xs rounded-sm border border-outline-variant px-1.5 py-0.5">
-              {navigator.platform.toUpperCase().includes('MAC') ? '⌘K' : 'Ctrl K'}
-            </kbd>
-          </button>
+          {!passwordChangePending && (
+            <button
+              type="button"
+              onClick={openPalette}
+              aria-label={tCommand('palette_open_button')}
+              className="flex items-center gap-2 h-10 px-3 mr-2 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            >
+              <MaterialIcon name="search" size={20} />
+              <kbd className="hidden sm:inline text-xs rounded-sm border border-outline-variant px-1.5 py-0.5">
+                {navigator.platform.toUpperCase().includes('MAC') ? '⌘K' : 'Ctrl K'}
+              </kbd>
+            </button>
+          )}
 
           {/* Username + role (desktop only) */}
           <div className="hidden sm:flex flex-col items-end mr-2">
@@ -208,7 +218,7 @@ export const MainLayout = () => {
       {/* Global Toast Notifications */}
       <ToastContainer />
 
-      <CommandPalette open={paletteOpen} onClose={closePalette} />
+      {!passwordChangePending && <CommandPalette open={paletteOpen} onClose={closePalette} />}
     </div>
   );
 };
