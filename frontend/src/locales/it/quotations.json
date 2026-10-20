@@ -65,5 +65,12 @@
   "price_range": "da {{min}} a {{max}}",
   "label_accepted_option": "Accettata",
   "action_choose_option": "Scegli",
-  "label_choose_option_to_convert": "Questo preventivo ha più opzioni: scegli quale convertire in prenotazione."
+  "label_choose_option_to_convert": "Questo preventivo ha più opzioni: scegli quale convertire in prenotazione.",
+  "action_open_reservation": "Vai alla prenotazione",
+  "err_convert": "Impossibile convertire il preventivo",
+  "err_decline": "Impossibile rifiutare il preventivo",
+  "err_delete": "Impossibile eliminare il preventivo",
+  "err_duplicate": "Impossibile duplicare il preventivo",
+  "err_create": "Impossibile creare il preventivo",
+  "err_update": "Impossibile aggiornare il preventivo"
 }

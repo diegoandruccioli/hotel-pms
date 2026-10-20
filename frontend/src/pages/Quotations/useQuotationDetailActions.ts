@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { quotationService } from '../../services';
@@ -12,6 +12,7 @@ import { getErrorMessage } from '../../utils';
 export function useQuotationDetailActions(id: string | undefined, quotation: QuotationResponse | undefined) {
   const { t } = useTranslation(['quotations', 'common']);
   const navigate = useNavigate();
+  const location = useLocation();
   const addToast = useToastStore((s) => s.addToast);
   const queryClient = useQueryClient();
 
@@ -23,6 +24,15 @@ export function useQuotationDetailActions(id: string | undefined, quotation: Quo
   const [convertChoiceId, setConvertChoiceId] = useState<string | null>(null);
 
   const handleEdit = useCallback(() => navigate(`/quotations/${id}/edit`), [navigate, id]);
+  const reservationId = quotation?.reservationId;
+  const handleOpenReservation = useCallback(() => {
+    if (reservationId) navigate(`/reservations/${reservationId}`);
+  }, [navigate, reservationId]);
+  // Back to wherever the user came from; a direct visit has no in-app history to return to.
+  const handleBack = useCallback(() => {
+    if (location.key !== 'default') navigate(-1);
+    else navigate('/quotations');
+  }, [location.key, navigate]);
   const openPreview = useCallback(() => setPreviewOpen(true), []);
   const closePreview = useCallback(() => setPreviewOpen(false), []);
   const handleDownload = useCallback(async () => {
@@ -56,7 +66,7 @@ export function useQuotationDetailActions(id: string | undefined, quotation: Quo
       addToast(t('toast_converted'), 'success');
       navigate(`/reservations/${reservation.id}`);
     } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('toast_converted')), 'error');
+      addToast(getErrorMessage(err, t('err_convert')), 'error');
     } finally {
       setBusy(false);
       setConvertDialogOpen(false);
@@ -84,7 +94,7 @@ export function useQuotationDetailActions(id: string | undefined, quotation: Quo
       addToast(t('toast_duplicated'), 'success');
       navigate(`/quotations/${duplicate.id}`);
     } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('toast_duplicated')), 'error');
+      addToast(getErrorMessage(err, t('err_duplicate')), 'error');
     } finally {
       setBusy(false);
     }
@@ -100,7 +110,7 @@ export function useQuotationDetailActions(id: string | undefined, quotation: Quo
       queryClient.setQueryData(queryKeys.quotations.detail(id), updated);
       addToast(t('toast_declined'), 'success');
     } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('toast_declined')), 'error');
+      addToast(getErrorMessage(err, t('err_decline')), 'error');
     } finally {
       setBusy(false);
       setDeclineConfirmOpen(false);
@@ -117,7 +127,7 @@ export function useQuotationDetailActions(id: string | undefined, quotation: Quo
       addToast(t('toast_deleted'), 'success');
       navigate('/quotations');
     } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('toast_deleted')), 'error');
+      addToast(getErrorMessage(err, t('err_delete')), 'error');
       setBusy(false);
       setDeleteConfirmOpen(false);
     }
@@ -125,6 +135,6 @@ export function useQuotationDetailActions(id: string | undefined, quotation: Quo
 
   return {
     busy, previewOpen, declineConfirmOpen, deleteConfirmOpen, convertDialogOpen, convertChoiceId, setConvertChoiceId,
-    handleEdit, openPreview, closePreview, handleDownload, handleSend, handleConvertClick, closeConvertDialog, confirmConvert, handleDuplicate, openDeclineConfirm, closeDeclineConfirm, handleDeclineConfirmed, openDeleteConfirm, closeDeleteConfirm, handleDeleteConfirmed,
+    handleEdit, handleOpenReservation, handleBack, openPreview, closePreview, handleDownload, handleSend, handleConvertClick, closeConvertDialog, confirmConvert, handleDuplicate, openDeclineConfirm, closeDeclineConfirm, handleDeclineConfirmed, openDeleteConfirm, closeDeleteConfirm, handleDeleteConfirmed,
   };
 }

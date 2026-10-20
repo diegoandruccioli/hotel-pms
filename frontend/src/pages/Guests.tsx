@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { SortingState } from '@tanstack/react-table';
 import type { GuestResponseDTO } from '../types';
@@ -46,6 +46,7 @@ export const Guests = memo(() => {
   const [guestToExport, setGuestToExport] = useState<GuestResponseDTO | null>(null);
   const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') ?? '';
   const [searchQuery, setSearchQuery] = useState(initialSearch);
@@ -126,6 +127,19 @@ export const Guests = memo(() => {
   const handleNewReservationFromDetail = useCallback((guest: GuestResponseDTO) => {
     navigate('/reservations/new', { state: { guest } });
   }, [navigate]);
+  // Deep link (e.g. a quotation's guest): open that guest's detail sheet on arrival.
+  const linkedGuestId = (location.state as { guestId?: string } | null)?.guestId;
+  useEffect(() => {
+    if (!linkedGuestId) return undefined;
+    let cancelled = false;
+    guestService.getGuestById(linkedGuestId)
+      .then((guest) => { if (!cancelled) setDetailGuest(guest); })
+      .catch((err: unknown) => {
+        if (!cancelled) addToast(getErrorMessage(err, t('error_unexpected_fallback')), 'error');
+      });
+    return () => { cancelled = true; };
+  }, [linkedGuestId, addToast, t]);
+
   const restoreFocus = useCallback(() => {
     const target = returnFocusRef.current;
     returnFocusRef.current = null;

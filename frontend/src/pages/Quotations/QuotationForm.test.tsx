@@ -164,7 +164,7 @@ describe('QuotationForm', () => {
     fireEvent.click(screen.getByText('Toggle Room r1'));
 
     fireEvent.click(screen.getByText('common:save'));
-    await waitFor(() => expect(screen.getByText('toast_created')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('err_create')).toBeInTheDocument());
     expect(mockNavigate).not.toHaveBeenCalledWith('/quotations');
   });
 
@@ -415,6 +415,7 @@ describe('QuotationForm', () => {
         lineItems: [{ id: 'li1', roomId: 'r1', roomNumber: '101', roomTypeName: 'Standard', price: 200 }],
       }],
       acceptedOptionId: null,
+      reservationId: null,
       sendFailed: false,
       sendFailureReason: null,
       createdAt: '2026-08-01T00:00:00',
@@ -451,6 +452,32 @@ describe('QuotationForm', () => {
       })));
       expect(quotationService.createQuotation).not.toHaveBeenCalled();
       expect(mockNavigate).toHaveBeenCalledWith('/quotations/q1');
+    });
+
+    it('redirects to the detail page when the quotation is no longer a draft', async () => {
+      vi.mocked(quotationService.getQuotationById).mockResolvedValue({ ...existingQuotation, status: 'SENT' } as never);
+      renderWithQuery(
+        <MemoryRouter initialEntries={['/quotations/q1/edit']}>
+          <Routes>
+            <Route path="/quotations/:id/edit" element={<QuotationForm />} />
+            <Route path="/quotations/:id" element={<div>detail-page</div>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(screen.getByText('detail-page')).toBeInTheDocument());
+    });
+
+    it('cancel goes back in history when the user came from inside the app', async () => {
+      renderWithQuery(
+        <MemoryRouter initialEntries={['/quotations/q1', '/quotations/q1/edit']} initialIndex={1}>
+          <Routes>
+            <Route path="/quotations/:id/edit" element={<QuotationForm />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(screen.getByText('common:cancel')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('common:cancel'));
+      expect(mockNavigate).toHaveBeenCalledWith(-1);
     });
 
     it('cancel in edit mode navigates back to the quotation detail page', async () => {
