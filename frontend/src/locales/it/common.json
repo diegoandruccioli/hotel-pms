@@ -213,6 +213,8 @@
   "reschedule_failed": "Riprogrammazione fallita. Modifiche annullate.",
   "room_moved_success": "Camera cambiata per \"{{name}}\" con successo.",
   "room_move_failed": "Cambio camera fallito. Modifiche annullate.",
+  "room_move_stale": "La prenotazione è stata modificata da un altro utente. Dati ricaricati, riprova a spostarla.",
+  "guest_fallback": "Ospite {{id}}",
   "failed_load_orders": "Impossibile caricare le comande",
   "restaurant_subtitle": "Gestisci ordini del ristorante e monitora lo stato di consegna.",
   "restaurant_open_orders": "Comande aperte: {{open}}",

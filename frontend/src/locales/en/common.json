@@ -213,6 +213,8 @@
   "reschedule_failed": "Failed to reschedule reservation. Change reverted.",
   "room_moved_success": "Room changed for \"{{name}}\" successfully.",
   "room_move_failed": "Failed to change room. Change reverted.",
+  "room_move_stale": "This reservation was changed by someone else. Data reloaded, try moving it again.",
+  "guest_fallback": "Guest {{id}}",
   "failed_load_orders": "Failed to load restaurant orders",
   "restaurant_subtitle": "Manage restaurant orders and track delivery status.",
   "restaurant_open_orders": "Open orders: {{open}}",
