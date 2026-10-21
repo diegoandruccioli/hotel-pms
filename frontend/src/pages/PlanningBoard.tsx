@@ -160,10 +160,12 @@ const RoomRow = memo(({ room, allocations, onDragOver, onDrop, monthStart, month
   );
 
   // Pointer shortcut only: the same action is reachable by keyboard from "New reservation".
+  // A night spans noon to noon (bars start and end at mid-cell), so the left half of a cell is the
+  // tail of the previous night: the arrival day is read from the cell shifted by half a day.
   const handleRowClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!onSlotSelect) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const dayIndex = Math.floor((e.clientX - rect.left) / CELL_WIDTH);
+    const dayIndex = Math.floor((e.clientX - rect.left) / CELL_WIDTH - 0.5);
     onSlotSelect(addDays(monthStart, dayIndex), room.id);
   }, [onSlotSelect, CELL_WIDTH, monthStart, room.id]);
 

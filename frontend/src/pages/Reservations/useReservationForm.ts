@@ -31,13 +31,17 @@ const guestFromState = (state: unknown): GuestResponseDTO | null => {
 /** Day (and room) picked on the calendar, handed over through router state; anything malformed is ignored. */
 const slotFromState = (state: unknown): { checkInDate: string; checkOutDate: string; roomId: string | null } | null => {
   if (typeof state !== 'object' || state === null) return null;
-  const { checkInDate, roomId } = state as Record<string, unknown>;
+  const { checkInDate, checkOutDate, roomId } = state as Record<string, unknown>;
   if (typeof checkInDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(checkInDate)) return null;
   const arrival = new Date(`${checkInDate}T00:00:00`);
   if (!isValid(arrival)) return null;
+  const departure = typeof checkOutDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(checkOutDate)
+    && new Date(`${checkOutDate}T00:00:00`) > arrival
+    ? checkOutDate
+    : format(addDays(arrival, 1), 'yyyy-MM-dd');
   return {
     checkInDate,
-    checkOutDate: format(addDays(arrival, 1), 'yyyy-MM-dd'),
+    checkOutDate: departure,
     roomId: typeof roomId === 'string' ? roomId : null,
   };
 };

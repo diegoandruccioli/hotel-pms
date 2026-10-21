@@ -550,6 +550,18 @@ describe('ReservationForm', () => {
       expect(screen.getByLabelText('Mock Check-out')).toHaveValue('2026-12-01');
     });
 
+    it('keeps the departure picked on the calendar when it follows the arrival', async () => {
+      renderNewWithState({ checkInDate: '2026-11-09', checkOutDate: '2026-11-12' });
+      await waitForTitle('new_reservation');
+      expect(screen.getByLabelText('Mock Check-out')).toHaveValue('2026-11-12');
+    });
+
+    it('falls back to the next day when the departure does not follow the arrival', async () => {
+      renderNewWithState({ checkInDate: '2026-11-09', checkOutDate: '2026-11-09' });
+      await waitForTitle('new_reservation');
+      expect(screen.getByLabelText('Mock Check-out')).toHaveValue('2026-11-10');
+    });
+
     it('ignores a malformed date in the router state', async () => {
       renderNewWithState({ checkInDate: 'tomorrow' });
       await waitForTitle('new_reservation');

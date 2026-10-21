@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Calendar, dateFnsLocalizer, type Event, type SlotInfo, type View } from 'react-big-calendar';
-import { format, parse, startOfWeek, getDay, addMonths, subMonths, startOfMonth, isValid } from 'date-fns';
+import { format, parse, startOfWeek, getDay, addMonths, subMonths, startOfMonth, startOfToday, isBefore, addDays, isValid } from 'date-fns';
 import { enUS, it } from 'date-fns/locale';
 import { reservationService } from '../services';
 import { useTranslation } from 'react-i18next';
@@ -196,12 +196,21 @@ export const CalendarPlanning = () => {
   }, [navigate]);
 
   // An empty day (and room, on the planning board) starts a new booking with those already set.
-  const handleNewReservation = useCallback((date: Date, roomId?: string) => {
-    navigate('/reservations/new', { state: { checkInDate: format(date, 'yyyy-MM-dd'), roomId } });
+  const handleNewReservation = useCallback((date: Date, roomId?: string, checkOut?: Date) => {
+    if (isBefore(date, startOfToday())) return;
+    navigate('/reservations/new', {
+      state: {
+        checkInDate: format(date, 'yyyy-MM-dd'),
+        checkOutDate: checkOut ? format(checkOut, 'yyyy-MM-dd') : undefined,
+        roomId,
+      },
+    });
   }, [navigate]);
 
+  // Dragging over several days books them all: the departure is the day after the last one picked.
   const handleSelectSlot = useCallback((slot: SlotInfo) => {
-    handleNewReservation(slot.start);
+    const lastDay = slot.slots.length > 0 ? slot.slots[slot.slots.length - 1] : slot.start;
+    handleNewReservation(slot.start, undefined, addDays(lastDay, 1));
   }, [handleNewReservation]);
 
   const handleSelectEvent = useCallback((event: object) => {

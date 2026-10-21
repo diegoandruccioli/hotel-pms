@@ -365,15 +365,32 @@ describe('CalendarPlanning', () => {
     it('starts a new booking with the day and room picked on the planning board', async () => {
       render(<CalendarPlanning />);
       await waitFor(() => screen.getByTestId('planning-board'));
-      (lastPlanningBoardProps.current.onSlotSelect as (d: Date, r: string) => void)(new Date(2026, 10, 5), 'room-B');
-      expect(mockNavigate).toHaveBeenCalledWith('/reservations/new', { state: { checkInDate: '2026-11-05', roomId: 'room-B' } });
+      (lastPlanningBoardProps.current.onSlotSelect as (d: Date, r: string) => void)(new Date(2999, 10, 5), 'room-B');
+      expect(mockNavigate).toHaveBeenCalledWith('/reservations/new', { state: { checkInDate: '2999-11-05', checkOutDate: undefined, roomId: 'room-B' } });
     });
 
     it('starts a new booking on the day picked in the month view', async () => {
       renderAt('/calendar?view=month');
       await waitFor(() => screen.getByTestId('rbc-calendar'));
-      (lastCalendarProps.current.onSelectSlot as (s: { start: Date }) => void)({ start: new Date(2026, 10, 9) });
-      expect(mockNavigate).toHaveBeenCalledWith('/reservations/new', { state: { checkInDate: '2026-11-09', roomId: undefined } });
+      (lastCalendarProps.current.onSelectSlot as (s: { start: Date; slots: Date[] }) => void)({ start: new Date(2999, 10, 9), slots: [new Date(2999, 10, 9)] });
+      expect(mockNavigate).toHaveBeenCalledWith('/reservations/new', { state: { checkInDate: '2999-11-09', checkOutDate: '2999-11-10', roomId: undefined } });
+    });
+
+    it('books the whole range dragged in the month view', async () => {
+      renderAt('/calendar?view=month');
+      await waitFor(() => screen.getByTestId('rbc-calendar'));
+      const days = [new Date(2999, 10, 9), new Date(2999, 10, 10), new Date(2999, 10, 11)];
+      (lastCalendarProps.current.onSelectSlot as (s: object) => void)({ start: days[0], slots: days });
+      expect(mockNavigate).toHaveBeenCalledWith('/reservations/new', {
+        state: { checkInDate: '2999-11-09', checkOutDate: '2999-11-12', roomId: undefined },
+      });
+    });
+
+    it('ignores a day that is already past', async () => {
+      render(<CalendarPlanning />);
+      await waitFor(() => screen.getByTestId('planning-board'));
+      (lastPlanningBoardProps.current.onSlotSelect as (d: Date, r: string) => void)(new Date(2020, 0, 5), 'room-B');
+      expect(mockNavigate).not.toHaveBeenCalled();
     });
 
     it('opens the month and view named in the URL', async () => {

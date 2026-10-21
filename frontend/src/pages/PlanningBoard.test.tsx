@@ -348,11 +348,19 @@ describe('PlanningBoard', () => {
       const onSlot = vi.fn();
       renderBoard([], { onSlotSelect: onSlot });
       const row = document.querySelectorAll('.border-b.border-outline-variant.relative')[1];
-      fireEvent.click(row, { clientX: CELL_WIDTH * 2.5 });
+      fireEvent.click(row, { clientX: CELL_WIDTH * 2.7 });
       expect(onSlot).toHaveBeenCalledTimes(1);
       const [date, roomId] = onSlot.mock.calls[0];
       expect(roomId).toBe('r2');
       expect((date as Date).getDate()).toBe(3);
+    });
+
+    it('reads the morning half of a day as the tail of the previous night', () => {
+      const onSlot = vi.fn();
+      renderBoard([], { onSlotSelect: onSlot });
+      const row = document.querySelectorAll('.border-b.border-outline-variant.relative')[0];
+      fireEvent.click(row, { clientX: CELL_WIDTH * 2.2 });
+      expect((onSlot.mock.calls[0][0] as Date).getDate()).toBe(2);
     });
   });
 
