@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import PlanningBoard from './PlanningBoard';
+import { CELL_WIDTH } from './planningGrid';
 import type { RoomResponse } from '../types';
 import type { ReservationResponse } from '../types';
 
@@ -162,7 +163,7 @@ describe('PlanningBoard', () => {
         onNavigate={ON_NAVIGATE}
       />
     );
-    expect(screen.getByTitle(`Bar Guest (${status})`).className).toContain(expectedClasses);
+    expect(screen.getByTitle(`Bar Guest (status_${status.toLowerCase()})`).className).toContain(expectedClasses);
   });
 
   it('does not render a reservation bar entirely outside the visible month', () => {
@@ -293,6 +294,74 @@ describe('PlanningBoard', () => {
     expect(row.className).toContain('bg-primary-container/30');
     fireEvent.dragLeave(row, { relatedTarget: document.body });
     expect(row.className).not.toContain('bg-primary-container/30');
+  });
+
+  describe('links and moves', () => {
+    const barFor = (status: ReservationResponse['status']) => ({ ...RESERVATION, status });
+    const renderBoard = (reservations: ReservationResponse[], handlers: Record<string, unknown> = {}) => render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={reservations}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+        {...handlers}
+      />
+    );
+
+    it('opens the reservation when its bar is clicked, without starting a new booking', () => {
+      const onOpen = vi.fn();
+      const onSlot = vi.fn();
+      renderBoard([RESERVATION], { onReservationOpen: onOpen, onSlotSelect: onSlot });
+      fireEvent.click(screen.getByRole('button', { name: /John Doe/ }));
+      expect(onOpen).toHaveBeenCalledWith('res1');
+      expect(onSlot).not.toHaveBeenCalled();
+    });
+
+    it.each(['Enter', ' '])('opens the reservation with the "%s" key', (key) => {
+      const onOpen = vi.fn();
+      renderBoard([RESERVATION], { onReservationOpen: onOpen });
+      fireEvent.keyDown(screen.getByRole('button', { name: /John Doe/ }), { key });
+      expect(onOpen).toHaveBeenCalledWith('res1');
+    });
+
+    it('ignores other keys on the bar', () => {
+      const onOpen = vi.fn();
+      renderBoard([RESERVATION], { onReservationOpen: onOpen });
+      fireEvent.keyDown(screen.getByRole('button', { name: /John Doe/ }), { key: 'a' });
+      expect(onOpen).not.toHaveBeenCalled();
+    });
+
+    it.each(['PENDING', 'CONFIRMED'] as const)('lets a %s bar be dragged', (status) => {
+      renderBoard([barFor(status)]);
+      expect(screen.getByRole('button', { name: /John Doe/ })).toHaveAttribute('draggable', 'true');
+    });
+
+    it.each(['PARTIALLY_CHECKED_IN', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED', 'NO_SHOW'] as const)(
+      'keeps a %s bar in place',
+      (status) => {
+        renderBoard([barFor(status)]);
+        expect(screen.getByRole('button', { name: /John Doe/ })).toHaveAttribute('draggable', 'false');
+      },
+    );
+
+    it('starts a new booking on the clicked day and room of an empty row', () => {
+      const onSlot = vi.fn();
+      renderBoard([], { onSlotSelect: onSlot });
+      const row = document.querySelectorAll('.border-b.border-outline-variant.relative')[1];
+      fireEvent.click(row, { clientX: CELL_WIDTH * 2.7 });
+      expect(onSlot).toHaveBeenCalledTimes(1);
+      const [date, roomId] = onSlot.mock.calls[0];
+      expect(roomId).toBe('r2');
+      expect((date as Date).getDate()).toBe(3);
+    });
+
+    it('reads the morning half of a day as the tail of the previous night', () => {
+      const onSlot = vi.fn();
+      renderBoard([], { onSlotSelect: onSlot });
+      const row = document.querySelectorAll('.border-b.border-outline-variant.relative')[0];
+      fireEvent.click(row, { clientX: CELL_WIDTH * 2.2 });
+      expect((onSlot.mock.calls[0][0] as Date).getDate()).toBe(2);
+    });
   });
 
   // Default 5000ms timeout is occasionally exceeded under --coverage (v8

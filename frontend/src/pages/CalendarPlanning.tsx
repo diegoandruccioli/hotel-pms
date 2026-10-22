@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Calendar, dateFnsLocalizer, type Event, type View } from 'react-big-calendar';
-import { format, parse, startOfWeek, getDay, addMonths, subMonths, startOfMonth } from 'date-fns';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Calendar, dateFnsLocalizer, type Event, type SlotInfo, type View } from 'react-big-calendar';
+import { format, parse, startOfWeek, getDay, addMonths, subMonths, startOfMonth, startOfToday, isBefore, addDays, isValid } from 'date-fns';
 import { enUS, it } from 'date-fns/locale';
 import { reservationService } from '../services';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useToastStore } from '../store';
 import type { ReservationResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
@@ -17,6 +19,7 @@ import type { M3SegmentOption } from '../components/m3';
 import PlanningBoard from '@/pages/PlanningBoard';
 import { fetchAllRooms } from '../lib';
 import type { RoomResponse } from '../types';
+import { canMoveReservation, getStatusLabel } from './Reservations/reservationStatus';
 import { getErrorMessage, resolveDesignToken, dateFnsLocale, reservationStatusTone, toneSolidTokens } from '../utils';
 
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -28,8 +31,8 @@ interface ReservationEvent extends Event {
   resource: ReservationResponse;
 }
 
-const mapToEvent = (reservation: ReservationResponse): ReservationEvent => ({
-  title: `${reservation.guestFullName || `Guest ${reservation.guestId.slice(0, 8)}`} (${reservation.status})`,
+const mapToEvent = (reservation: ReservationResponse, t: TFunction): ReservationEvent => ({
+  title: `${reservation.guestFullName || t('guest_fallback', { id: reservation.guestId.slice(0, 8) })} (${getStatusLabel(reservation.status, t)})`,
   start: new Date(reservation.checkInDate),
   end: new Date(reservation.checkOutDate),
   resource: reservation,
@@ -54,14 +57,41 @@ const VIEW_OPTIONS: M3SegmentOption<CalendarViewMode>[] = [
 ];
 const CALENDAR_STYLE = { height: 600 };
 
+const isStaleVersionError = (err: unknown): boolean =>
+  (err as { response?: { data?: { errorCode?: string } } })?.response?.data?.errorCode === 'RESERVATION_STALE_VERSION';
+
+const parseMonth = (value: string | null): Date | null => {
+  if (!value || !/^\d{4}-\d{2}$/.test(value)) return null;
+  const date = new Date(`${value}-01T00:00:00`);
+  return isValid(date) ? date : null;
+};
+
 export const CalendarPlanning = () => {
   const { t, i18n } = useTranslation(['calendar', 'common']);
   const [reservations, setReservations] = useState<ReservationResponse[]>([]);
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<CalendarViewMode>('planning');
   const [error, setError] = useState<string | null>(null);
-  const [currentDate, setCurrentDate] = useState(new Date());
+  // The visible month and view live in the URL (?month=2026-11&view=month) so that going back from
+  // a reservation, a reload or a shared link reopens the same screen; anything unreadable falls
+  // back to the current month / planning board.
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view: CalendarViewMode = searchParams.get('view') === 'month' ? 'month' : 'planning';
+  const monthParam = searchParams.get('month');
+  const currentDate = useMemo(() => parseMonth(monthParam) ?? startOfMonth(new Date()), [monthParam]);
+
+  const updateParams = useCallback((changes: { month?: Date; view?: CalendarViewMode }) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (changes.month) next.set('month', format(changes.month, 'yyyy-MM'));
+      if (changes.view) next.set('view', changes.view);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const setCurrentDate = useCallback((date: Date) => updateParams({ month: date }), [updateParams]);
+  const setView = useCallback((next: CalendarViewMode) => updateParams({ view: next }), [updateParams]);
   const addToast = useToastStore((s) => s.addToast);
 
   const loadData = useCallback(async () => {
@@ -89,7 +119,9 @@ export const CalendarPlanning = () => {
   const handlePlanningBoardDrop = useCallback(
     async (reservationId: string, oldRoomId: string, newRoomId: string) => {
       const reservation = reservations.find(r => r.id === reservationId);
-      if (!reservation) return;
+      // Guests already in house keep the room of their stay (changed from Stays) and closed
+      // bookings are history: neither can be moved from here.
+      if (!reservation || !canMoveReservation(reservation.status)) return;
 
       const hasOverlap = reservations.some(r => {
         if (r.id === reservationId || r.active === false || r.status === 'CANCELLED') return false;
@@ -127,7 +159,7 @@ export const CalendarPlanning = () => {
       );
 
       try {
-        await reservationService.updateReservation(reservationId, {
+        const saved = await reservationService.updateReservation(reservationId, {
           guestId: updatedReservation.guestId,
           checkInDate: updatedReservation.checkInDate,
           checkOutDate: updatedReservation.checkOutDate,
@@ -136,41 +168,73 @@ export const CalendarPlanning = () => {
           // price is resolved server-side (RatePricingService) on every update —
           // moving a reservation to a different room now correctly re-prices it,
           // instead of carrying the old room's price along.
-          lineItems: updatedReservation.lineItems.map(li => ({ roomId: li.roomId }))
+          lineItems: updatedReservation.lineItems.map(li => ({ roomId: li.roomId })),
+          version: reservation.version,
         });
-        addToast(t('room_moved_success', { name: updatedReservation.guestFullName || `Guest ${reservation.guestId.substring(0, 8)}` }), 'success');
-      } catch {
+        // Keep the server's answer (new version, re-priced rooms) so a second move isn't stale.
+        setReservations((prev) =>
+          prev.map((r) => (r.id === reservationId ? { ...updatedReservation, ...saved } : r)),
+        );
+        addToast(t('room_moved_success', { name: updatedReservation.guestFullName || t('guest_fallback', { id: reservation.guestId.substring(0, 8) }) }), 'success');
+      } catch (err: unknown) {
         setReservations((prev) =>
           prev.map((r) => (r.id === reservationId ? reservation : r)),
         );
-        addToast(t('room_move_failed'), 'error');
+        if (isStaleVersionError(err)) {
+          addToast(t('room_move_stale'), 'error');
+          loadData();
+        } else {
+          addToast(t('room_move_failed'), 'error');
+        }
       }
     },
-    [reservations, addToast, t],
+    [reservations, addToast, t, loadData],
   );
 
-  const handleSelectSlot = useCallback(() => {
-    // Future: open a "New Reservation" modal
-  }, []);
+  const handleOpenReservation = useCallback((reservationId: string) => {
+    navigate(`/reservations/${reservationId}`);
+  }, [navigate]);
+
+  // An empty day (and room, on the planning board) starts a new booking with those already set.
+  const handleNewReservation = useCallback((date: Date, roomId?: string, checkOut?: Date) => {
+    if (isBefore(date, startOfToday())) return;
+    navigate('/reservations/new', {
+      state: {
+        checkInDate: format(date, 'yyyy-MM-dd'),
+        checkOutDate: checkOut ? format(checkOut, 'yyyy-MM-dd') : undefined,
+        roomId,
+      },
+    });
+  }, [navigate]);
+
+  // Dragging over several days books them all: the departure is the day after the last one picked.
+  const handleSelectSlot = useCallback((slot: SlotInfo) => {
+    const lastDay = slot.slots.length > 0 ? slot.slots[slot.slots.length - 1] : slot.start;
+    handleNewReservation(slot.start, undefined, addDays(lastDay, 1));
+  }, [handleNewReservation]);
+
+  const handleSelectEvent = useCallback((event: object) => {
+    handleOpenReservation((event as ReservationEvent).resource.id);
+  }, [handleOpenReservation]);
 
   const handlePrevMonth = useCallback(() => {
-    setCurrentDate(prev => startOfMonth(subMonths(prev, 1)));
-  }, []);
+    setCurrentDate(startOfMonth(subMonths(currentDate, 1)));
+  }, [currentDate, setCurrentDate]);
 
   const handleNextMonth = useCallback(() => {
-    setCurrentDate(prev => startOfMonth(addMonths(prev, 1)));
-  }, []);
+    setCurrentDate(startOfMonth(addMonths(currentDate, 1)));
+  }, [currentDate, setCurrentDate]);
 
   const handleMonthChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.value) {
       const [year, month] = e.target.value.split('-').map(Number);
       setCurrentDate(new Date(year, month - 1, 1));
     }
-  }, []);
+  }, [setCurrentDate]);
 
   const events: ReservationEvent[] = useMemo(
-    () => reservations.filter(r => r.active !== false).map(mapToEvent),
-    [reservations]
+    () => reservations.filter(r => r.active !== false).map(r => mapToEvent(r, t)),
+    [reservations, t]
   );
 
   const eventPropGetter = useCallback((event: ReservationEvent) => {
@@ -274,6 +338,8 @@ export const CalendarPlanning = () => {
           currentDate={currentDate}
           onNavigate={setCurrentDate}
           onReservationMove={handlePlanningBoardDrop}
+          onReservationOpen={handleOpenReservation}
+          onSlotSelect={handleNewReservation}
         />
       ) : (
         <M3Card variant="solid" className="p-4">
@@ -289,6 +355,7 @@ export const CalendarPlanning = () => {
             style={CALENDAR_STYLE}
             selectable
             onSelectSlot={handleSelectSlot}
+            onSelectEvent={handleSelectEvent}
             eventPropGetter={eventPropGetter as (event: object) => object}
             popup
           />

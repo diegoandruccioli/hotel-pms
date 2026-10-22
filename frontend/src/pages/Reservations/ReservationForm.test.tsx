@@ -60,11 +60,13 @@ vi.mock('./GuestSearchAndCreate', () => ({
 
 interface DatesMockProps {
   readOnly?: boolean;
+  checkInDate?: string;
+  checkOutDate?: string;
   onCheckInChange: (v: string) => void;
   onCheckOutChange: (v: string) => void;
 }
 
-function StayDatesFieldsMock({ readOnly, onCheckInChange, onCheckOutChange }: DatesMockProps) {
+function StayDatesFieldsMock({ readOnly, checkInDate, checkOutDate, onCheckInChange, onCheckOutChange }: DatesMockProps) {
   const handleCheckIn = (e: ChangeEvent<HTMLInputElement>) => onCheckInChange(e.target.value);
   const handleCheckOut = (e: ChangeEvent<HTMLInputElement>) => onCheckOutChange(e.target.value);
   return (
@@ -73,9 +75,9 @@ function StayDatesFieldsMock({ readOnly, onCheckInChange, onCheckOutChange }: Da
       {!readOnly && (
         <>
           <label htmlFor="mock-checkin">Mock Check-in</label>
-          <input id="mock-checkin" onChange={handleCheckIn} />
+          <input id="mock-checkin" defaultValue={checkInDate} onChange={handleCheckIn} />
           <label htmlFor="mock-checkout">Mock Check-out</label>
-          <input id="mock-checkout" onChange={handleCheckOut} />
+          <input id="mock-checkout" defaultValue={checkOutDate} onChange={handleCheckOut} />
         </>
       )}
     </div>
@@ -537,6 +539,33 @@ describe('ReservationForm', () => {
       completeNewFlow();
       expect(stepHeading('summary_title')).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  describe('preselected slot', () => {
+    it('starts on the arrival day picked on the calendar, leaving the next day as departure', async () => {
+      renderNewWithState({ checkInDate: '2026-11-30', roomId: 'r1' });
+      await waitForTitle('new_reservation');
+      expect(screen.getByLabelText('Mock Check-in')).toHaveValue('2026-11-30');
+      expect(screen.getByLabelText('Mock Check-out')).toHaveValue('2026-12-01');
+    });
+
+    it('keeps the departure picked on the calendar when it follows the arrival', async () => {
+      renderNewWithState({ checkInDate: '2026-11-09', checkOutDate: '2026-11-12' });
+      await waitForTitle('new_reservation');
+      expect(screen.getByLabelText('Mock Check-out')).toHaveValue('2026-11-12');
+    });
+
+    it('falls back to the next day when the departure does not follow the arrival', async () => {
+      renderNewWithState({ checkInDate: '2026-11-09', checkOutDate: '2026-11-09' });
+      await waitForTitle('new_reservation');
+      expect(screen.getByLabelText('Mock Check-out')).toHaveValue('2026-11-10');
+    });
+
+    it('ignores a malformed date in the router state', async () => {
+      renderNewWithState({ checkInDate: 'tomorrow' });
+      await waitForTitle('new_reservation');
+      expect(screen.getByLabelText('Mock Check-in')).toHaveValue('');
     });
   });
 

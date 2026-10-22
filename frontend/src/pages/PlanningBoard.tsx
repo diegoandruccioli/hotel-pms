@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useRef, useEffect, memo, useCallback } from 'react';
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, differenceInCalendarDays, addMonths } from 'date-fns';
+import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, differenceInCalendarDays, addMonths, addDays } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { M3Card } from '../components/m3';
 import type { RoomResponse } from '../types';
 import type { ReservationResponse } from '../types';
 import { CELL_STYLE, CELL_WIDTH, ROW_STYLE, SIDEBAR_STYLE, SIDEBAR_WIDTH } from './planningGrid';
+import { canMoveReservation, getStatusLabel } from './Reservations/reservationStatus';
 import { cn, dateFnsLocale, reservationStatusTone, roomStatusTone, toneDotClasses, toneSolidClasses } from '../utils';
 
 interface PlanningBoardProps {
@@ -13,6 +14,8 @@ interface PlanningBoardProps {
   currentDate: Date;
   onNavigate: (date: Date) => void;
   onReservationMove?: (reservationId: string, oldRoomId: string, newRoomId: string) => void;
+  onReservationOpen?: (reservationId: string) => void;
+  onSlotSelect?: (date: Date, roomId: string) => void;
 }
 
 const ReservationBar = memo(({ 
@@ -22,6 +25,7 @@ const ReservationBar = memo(({
   nextMonthStart, 
   CELL_WIDTH,
   roomId,
+  onOpen,
 }: {
   reservation: ReservationResponse;
   monthStart: Date;
@@ -29,7 +33,10 @@ const ReservationBar = memo(({
   nextMonthStart: Date;
   CELL_WIDTH: number;
   roomId: string;
+  onOpen?: (reservationId: string) => void;
 }) => {
+  const { t } = useTranslation('common');
+  const movable = canMoveReservation(reservation.status);
   const [isDragging, setIsDragging] = useState(false);
   const startRaw = new Date(reservation.checkInDate);
   const endRaw = new Date(reservation.checkOutDate);
@@ -70,24 +77,43 @@ const ReservationBar = memo(({
     setIsDragging(false);
   }, []);
 
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    // The click belongs to the booking, not to the empty day underneath it.
+    e.stopPropagation();
+    onOpen?.(reservation.id);
+  }, [onOpen, reservation.id]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    e.stopPropagation();
+    onOpen?.(reservation.id);
+  }, [onOpen, reservation.id]);
+
+  const guestName = reservation.guestFullName || t('guest');
+
   if (startRaw > monthEnd || endRaw < monthStart) return null;
 
   return (
     <div
       role="button"
       tabIndex={0}
-      draggable
+      draggable={movable}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       className={cn(
-        'absolute top-2 h-12 rounded-shape-sm shadow-elevation-1 p-2 flex flex-col justify-center cursor-grab hover:shadow-elevation-2 transition-all z-0 overflow-hidden',
+        'absolute top-2 h-12 rounded-shape-sm shadow-elevation-1 p-2 flex flex-col justify-center hover:shadow-elevation-2 transition-all z-0 overflow-hidden',
+        movable ? 'cursor-grab' : 'cursor-pointer',
         toneSolidClasses[reservationStatusTone[reservation.status] ?? 'neutral']
       )}
       style={style}
-      title={`${reservation.guestFullName} (${reservation.status})`}
+      title={`${guestName} (${getStatusLabel(reservation.status, t)})`}
+      aria-label={`${guestName}, ${format(startRaw, 'dd/MM')} - ${format(endRaw, 'dd/MM')}, ${getStatusLabel(reservation.status, t)}`}
     >
       <span className="text-xs font-bold truncate leading-tight">
-        {reservation.guestFullName || 'Guest'}
+        {guestName}
       </span>
       <span className="text-2xs opacity-80 truncate">
         {format(startRaw, 'dd/MM')} - {format(endRaw, 'dd/MM')}
@@ -107,9 +133,11 @@ interface RoomRowProps {
   monthEnd: Date;
   nextMonthStart: Date;
   CELL_WIDTH: number;
+  onOpen?: (reservationId: string) => void;
+  onSlotSelect?: (date: Date, roomId: string) => void;
 }
 
-const RoomRow = memo(({ room, allocations, onDragOver, onDrop, monthStart, monthEnd, nextMonthStart, CELL_WIDTH }: RoomRowProps) => {
+const RoomRow = memo(({ room, allocations, onDragOver, onDrop, monthStart, monthEnd, nextMonthStart, CELL_WIDTH, onOpen, onSlotSelect }: RoomRowProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -131,8 +159,18 @@ const RoomRow = memo(({ room, allocations, onDragOver, onDrop, monthStart, month
     [onDrop, room.id]
   );
 
+  // Pointer shortcut only: the same action is reachable by keyboard from "New reservation".
+  // A night spans noon to noon (bars start and end at mid-cell), so the left half of a cell is the
+  // tail of the previous night: the arrival day is read from the cell shifted by half a day.
+  const handleRowClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!onSlotSelect) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const dayIndex = Math.floor((e.clientX - rect.left) / CELL_WIDTH - 0.5);
+    onSlotSelect(addDays(monthStart, dayIndex), room.id);
+  }, [onSlotSelect, CELL_WIDTH, monthStart, room.id]);
+
   return (
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div
       style={ROW_STYLE}
       className={cn(
@@ -142,6 +180,7 @@ const RoomRow = memo(({ room, allocations, onDragOver, onDrop, monthStart, month
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onClick={handleRowClick}
     >
       {allocations.map(({ reservation }) => (
         <ReservationBar
@@ -152,6 +191,7 @@ const RoomRow = memo(({ room, allocations, onDragOver, onDrop, monthStart, month
           nextMonthStart={nextMonthStart}
           CELL_WIDTH={CELL_WIDTH}
           roomId={room.id}
+          onOpen={onOpen}
         />
       ))}
     </div>
@@ -165,6 +205,8 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
   reservations,
   currentDate,
   onReservationMove,
+  onReservationOpen,
+  onSlotSelect,
 }) => {
   const { t, i18n } = useTranslation('common');
   const locale = dateFnsLocale(i18n.language);
@@ -320,6 +362,8 @@ const PlanningBoard: React.FC<PlanningBoardProps> = memo(({
                     monthEnd={monthEnd}
                     nextMonthStart={nextMonthStart}
                     CELL_WIDTH={CELL_WIDTH}
+                    onOpen={onReservationOpen}
+                    onSlotSelect={onSlotSelect}
                   />
                 ))}
               </div>

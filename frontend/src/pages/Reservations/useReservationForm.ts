@@ -6,6 +6,7 @@ import { inventoryService, reservationService, guestService, stayService } from 
 import { fetchAllRooms } from '../../lib';
 import type { GuestResponseDTO, RoomResponse } from '../../types';
 import type { ReservationRequest, ReservationResponse, ReservationStatus } from '../../types';
+import { addDays, format, isValid } from 'date-fns';
 import { isReservationEditable } from './reservationStatus';
 
 export const STEP_DATES = 0;
@@ -25,6 +26,24 @@ const guestFromState = (state: unknown): GuestResponseDTO | null => {
   return typeof id === 'string' && typeof firstName === 'string' && typeof lastName === 'string'
     ? (guest as GuestResponseDTO)
     : null;
+};
+
+/** Day (and room) picked on the calendar, handed over through router state; anything malformed is ignored. */
+const slotFromState = (state: unknown): { checkInDate: string; checkOutDate: string; roomId: string | null } | null => {
+  if (typeof state !== 'object' || state === null) return null;
+  const { checkInDate, checkOutDate, roomId } = state as Record<string, unknown>;
+  if (typeof checkInDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(checkInDate)) return null;
+  const arrival = new Date(`${checkInDate}T00:00:00`);
+  if (!isValid(arrival)) return null;
+  const departure = typeof checkOutDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(checkOutDate)
+    && new Date(`${checkOutDate}T00:00:00`) > arrival
+    ? checkOutDate
+    : format(addDays(arrival, 1), 'yyyy-MM-dd');
+  return {
+    checkInDate,
+    checkOutDate: departure,
+    roomId: typeof roomId === 'string' ? roomId : null,
+  };
 };
 
 const overlapsExisting = (
@@ -83,10 +102,11 @@ export const useReservationForm = () => {
   const [selectedGuest, setSelectedGuest] = useState<GuestResponseDTO | null>(
     () => (id ? null : guestFromState(location.state)),
   );
-  const [checkInDate, setCheckInDate] = useState('');
-  const [checkOutDate, setCheckOutDate] = useState('');
+  const slot = useMemo(() => (id ? null : slotFromState(location.state)), [id, location.state]);
+  const [checkInDate, setCheckInDate] = useState(() => slot?.checkInDate ?? '');
+  const [checkOutDate, setCheckOutDate] = useState(() => slot?.checkOutDate ?? '');
   const [expectedGuests, setExpectedGuests] = useState<number | string>(1);
-  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
+  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>(() => (slot?.roomId ? [slot.roomId] : []));
   const [status, setStatus] = useState<ReservationStatus>('CONFIRMED');
   // Optimistic-lock version last read from the server; echoed back on update so a
   // stale save (someone else changed this reservation while this tab sat open) is
