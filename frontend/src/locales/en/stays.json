@@ -57,6 +57,7 @@
   "prefill_field_documentPlaceOfIssue": "Document Place of Issue",
   "prefill_field_travellerType": "Traveller Type",
   "walkin_title": "Walk-in Check-in",
+  "stay_details": "Stay details",
   "walkin_subtitle": "Guest arriving without a reservation",
   "walkin_label_room": "Room",
   "walkin_label_checkout_date": "Expected Check-out Date",

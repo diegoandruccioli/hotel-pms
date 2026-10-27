@@ -140,6 +140,8 @@ export const NESTED_ROUTES: readonly NestedRoute[] = [
   { id: 'quotation-view', pattern: '/quotations/:id', parent: 'quotations', labelKey: 'quotation_details', ns: 'quotations' },
   { id: 'check-in', pattern: '/stays/check-in/:reservationId', parent: 'stays', labelKey: 'checkin_title', ns: 'stays' },
   { id: 'walk-in', pattern: '/stays/walk-in', parent: 'stays', labelKey: 'walkin_title', ns: 'stays' },
+  // After check-in and walk-in: the first matching pattern wins, and `:id` would swallow `walk-in`.
+  { id: 'stay-detail', pattern: '/stays/:id', parent: 'stays', labelKey: 'stay_details', ns: 'stays' },
 ];
 
 /** Whole-path match of a router-style pattern; no router import, so the

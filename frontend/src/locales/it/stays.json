@@ -57,6 +57,7 @@
   "prefill_field_documentPlaceOfIssue": "Luogo rilascio documento",
   "prefill_field_travellerType": "Tipo alloggiato",
   "walkin_title": "Check-in Walk-in",
+  "stay_details": "Dettaglio soggiorno",
   "walkin_subtitle": "Ospite senza prenotazione",
   "walkin_label_room": "Camera",
   "walkin_label_checkout_date": "Data prevista di check-out",

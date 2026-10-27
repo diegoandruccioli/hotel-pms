@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { TodayTasksCard } from './TodayTasksCard';
 import type { DaySheetResponse } from '../../types';
@@ -14,14 +14,28 @@ const DAY_SHEET: DaySheetResponse = {
   availableRooms: 4, roomStatusCounts: { CLEAN: 5, DIRTY: 2, MAINTENANCE: 1, OCCUPIED: 5 },
 };
 
-const renderCard = (daySheet: DaySheetResponse, role: Parameters<typeof TodayTasksCard>[0]['role']) =>
-  render(<MemoryRouter><TodayTasksCard daySheet={daySheet} role={role} /></MemoryRouter>);
+const StateProbe = () => <span data-testid="state">{JSON.stringify(useLocation().state)}</span>;
+
+const renderCard = (
+  daySheet: DaySheetResponse,
+  role: Parameters<typeof TodayTasksCard>[0]['role'],
+  withProbe = false,
+) =>
+  render(<MemoryRouter><TodayTasksCard daySheet={daySheet} role={role} />{withProbe && <StateProbe />}</MemoryRouter>);
 
 describe('TodayTasksCard', () => {
   it('lists every task for a receptionist when the day-sheet has work', () => {
     renderCard(DAY_SHEET, 'RECEPTIONIST');
     expect(screen.getAllByRole('link').map((l) => l.getAttribute('href')))
       .toEqual(['/housekeeping', '/housekeeping', '/stays', '/night-audit']);
+  });
+
+  it('links the departures task to the stays due out today', () => {
+    renderCard(DAY_SHEET, 'RECEPTIONIST', true);
+    fireEvent.click(screen.getByText('dashboard_task_departures'));
+    expect(JSON.parse(screen.getByTestId('state').textContent ?? '{}')).toEqual({
+      statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc', departingToday: true,
+    });
   });
 
   it('drops tasks with nothing to do', () => {

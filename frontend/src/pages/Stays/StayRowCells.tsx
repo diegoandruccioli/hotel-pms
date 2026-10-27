@@ -4,10 +4,10 @@ import type { StayResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button, M3RowActionsMenu, M3StatusChip, M3TableActionLink, type RowAction } from '../../components/m3';
 
-export const GuestCell = ({ stay, onGuestClick }: { stay: StayResponse; onGuestClick: (name: string) => void }) => {
+export const GuestCell = ({ stay, onGuestClick }: { stay: StayResponse; onGuestClick: (guestId: string) => void }) => {
   const handleClick = useCallback(() => {
-    onGuestClick(stay.guestDisplayName ?? stay.guestId);
-  }, [onGuestClick, stay.guestDisplayName, stay.guestId]);
+    onGuestClick(stay.guestId);
+  }, [onGuestClick, stay.guestId]);
 
   return (
     <M3TableActionLink onClick={handleClick} className="truncate block max-w-[120px] text-left" title={stay.guestId}>
@@ -100,38 +100,61 @@ export const GuestsCountCell = ({ stay, onManageGuests }: { stay: StayResponse; 
   );
 };
 
-export const ActionsCell = ({ stay, onCheckOut, checkingOut, onExtend, onChangeRoom, t }: {
+export const ActionsCell = ({ stay, onCheckOut, checkingOut, onExtend, onChangeRoom, onOpenReservation, onOpenDetail, t }: {
   stay: StayResponse;
   onCheckOut: (s: StayResponse) => void;
   checkingOut: string | null;
   onExtend: (s: StayResponse) => void;
   onChangeRoom: (s: StayResponse) => void;
+  onOpenReservation: (reservationId: string) => void;
+  onOpenDetail: (stayId: string) => void;
   t: TFunction;
 }) => {
   const handleCheckOut = useCallback(() => onCheckOut(stay), [onCheckOut, stay]);
   const handleExtend = useCallback(() => onExtend(stay), [onExtend, stay]);
   const handleChangeRoom = useCallback(() => onChangeRoom(stay), [onChangeRoom, stay]);
+  const handleOpenReservation = useCallback(
+    () => onOpenReservation(stay.reservationId),
+    [onOpenReservation, stay.reservationId],
+  );
+  const handleOpenDetail = useCallback(() => onOpenDetail(stay.id), [onOpenDetail, stay.id]);
+  const checkedIn = stay.status === 'CHECKED_IN';
 
-  const items = useMemo<RowAction[]>(() => [
-    { id: 'extend', label: t('action_extend_stay'), icon: 'event_repeat', onSelect: handleExtend, testId: `extend-btn-${stay.id}` },
-    { id: 'change-room', label: t('action_change_room'), icon: 'meeting_room', onSelect: handleChangeRoom, testId: `change-room-btn-${stay.id}` },
-  ], [t, handleExtend, handleChangeRoom, stay.id]);
-
-  if (stay.status !== 'CHECKED_IN') return null;
+  const items = useMemo<RowAction[]>(() => {
+    const list: RowAction[] = [
+      { id: 'detail', label: t('stays_open_detail'), icon: 'hotel', onSelect: handleOpenDetail, testId: `detail-btn-${stay.id}` },
+    ];
+    // A walk-in stay has no reservation to open.
+    if (stay.reservationId) {
+      list.push({
+        id: 'reservation', label: t('stays_open_reservation'), icon: 'event',
+        onSelect: handleOpenReservation, testId: `reservation-btn-${stay.id}`,
+      });
+    }
+    if (checkedIn) {
+      list.push(
+        { id: 'extend', label: t('action_extend_stay'), icon: 'event_repeat', onSelect: handleExtend, testId: `extend-btn-${stay.id}` },
+        { id: 'change-room', label: t('action_change_room'), icon: 'meeting_room', onSelect: handleChangeRoom, testId: `change-room-btn-${stay.id}` },
+      );
+    }
+    return list;
+  }, [t, checkedIn, stay.reservationId, stay.id, handleOpenDetail, handleOpenReservation, handleExtend, handleChangeRoom]);
 
   return (
     <div className="flex items-center justify-end gap-2">
-      <M3Button
-        variant="tonal"
-        icon={checkingOut === stay.id ? 'progress_activity' : 'logout'}
-        loading={checkingOut === stay.id}
-        disabled={checkingOut === stay.id}
-        onClick={handleCheckOut}
-        id={`checkout-btn-${stay.id}`}
-        className="text-xs h-10 px-3"
-      >
-        {t('action_checkout')}
-      </M3Button>
+      {checkedIn && (
+        <M3Button
+          variant="tonal"
+          icon={checkingOut === stay.id ? 'progress_activity' : 'logout'}
+          loading={checkingOut === stay.id}
+          disabled={checkingOut === stay.id}
+          onClick={handleCheckOut}
+          id={`checkout-btn-${stay.id}`}
+          className="text-xs h-10 px-3"
+        >
+          {t('action_checkout')}
+        </M3Button>
+      )}
       <M3RowActionsMenu
         label={t('row_actions_for', { name: stay.guestDisplayName ?? stay.guestId })}
         items={items}

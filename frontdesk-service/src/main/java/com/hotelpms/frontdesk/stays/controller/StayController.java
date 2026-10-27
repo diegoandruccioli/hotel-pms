@@ -139,6 +139,8 @@ public class StayController {
      * @param dateFrom      optional lower bound (inclusive) on actual check-in date
      * @param dateTo        optional upper bound (inclusive) on actual check-in date
      * @param status        optional stay status filter
+     * @param departingOn   optional exact expected check-out date
+     * @param alloggiatiFailed when {@code true}, only stays whose last Alloggiati send failed
      * @param pageable      the pagination and sorting parameters
      * @return a page of stay responses
      */
@@ -148,6 +150,8 @@ public class StayController {
             @RequestParam(required = false) final LocalDate dateFrom,
             @RequestParam(required = false) final LocalDate dateTo,
             @RequestParam(required = false) final StayStatus status,
+            @RequestParam(required = false) final LocalDate departingOn,
+            @RequestParam(defaultValue = "false") final boolean alloggiatiFailed,
             @PageableDefault(size = DEFAULT_PAGE_SIZE,
                     sort = "actualCheckInTime",
                     direction = Sort.Direction.DESC)
@@ -155,6 +159,10 @@ public class StayController {
         final UUID hotelId = Objects.requireNonNull(TenantContext.resolveHotelId());
         if (reservationId != null) {
             return ResponseEntity.ok(stayService.getStaysByReservationId(reservationId, hotelId, pageable));
+        }
+        if (departingOn != null || alloggiatiFailed) {
+            return ResponseEntity.ok(stayService.getAllStays(
+                    pageable, hotelId, dateFrom, dateTo, status, departingOn, alloggiatiFailed));
         }
         if (dateFrom != null || dateTo != null || status != null) {
             return ResponseEntity.ok(stayService.getAllStays(pageable, hotelId, dateFrom, dateTo, status));

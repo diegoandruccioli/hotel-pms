@@ -63,7 +63,7 @@ export const queryKeys = {
   },
   stays: {
     all: ['stays'] as const,
-    list: (page: number) => ['stays', 'list', page] as const,
+    list: (page: number, filters?: object) => ['stays', 'list', page, filters ?? null] as const,
     detail: (id: string) => ['stays', 'detail', id] as const,
     lookupStati: ['stays', 'lookup', 'stati'] as const,
     lookupTipdoc: ['stays', 'lookup', 'tipdoc'] as const,

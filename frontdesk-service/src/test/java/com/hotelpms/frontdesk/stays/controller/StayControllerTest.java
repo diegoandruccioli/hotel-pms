@@ -55,6 +55,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -252,6 +253,24 @@ class StayControllerTest {
                         .param("dateTo", "2026-08-31")
                         .param("status", "CHECKED_IN"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldGetAllStaysDepartingOnAndAlloggiatiFailedReturn200() throws Exception {
+        final Page<StayResponse> page = new PageImpl<>(
+                List.of(stayResponse), PageRequest.of(0, 20), 1L);
+        when(stayService.getAllStays(any(Pageable.class), eq(hotelId),
+                eq(null), eq(null), eq(StayStatus.CHECKED_IN), eq(FILTER_DATE_FROM), eq(true)))
+                .thenReturn(page);
+
+        mockMvc.perform(get(BASE_URL)
+                        .param("status", "CHECKED_IN")
+                        .param("departingOn", "2026-08-01")
+                        .param("alloggiatiFailed", "true"))
+                .andExpect(status().isOk());
+
+        verify(stayService).getAllStays(any(Pageable.class), eq(hotelId),
+                eq(null), eq(null), eq(StayStatus.CHECKED_IN), eq(FILTER_DATE_FROM), eq(true));
     }
 
     @Test
