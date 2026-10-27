@@ -2,6 +2,8 @@ package com.hotelpms.frontdesk.stays.mapper;
 
 import com.hotelpms.frontdesk.citytax.domain.CityTaxUnassessedReason;
 import com.hotelpms.frontdesk.stays.domain.Stay;
+import com.hotelpms.frontdesk.stays.domain.StayGuest;
+import com.hotelpms.frontdesk.stays.dto.StayGuestResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
 import org.mapstruct.Mapper;
@@ -40,6 +42,20 @@ public interface StayMapper {
      */
     @Mapping(target = "cityTaxWarning", source = "cityTaxWarning")
     StayResponse toDto(Stay stay, CityTaxUnassessedReason cityTaxWarning);
+
+    /**
+     * Converts one stay guest for the nested {@code guests} of {@link #toDto(Stay)}. Declared
+     * explicitly because the inline sub-mapping MapStruct would generate cannot see that the
+     * entity property {@code primaryGuest} (Lombok accessor of the {@code isPrimaryGuest}
+     * field) feeds the record component {@code isPrimaryGuest}, and leaves it {@code false}.
+     * Not {@code uses = StayGuestMapper}: that would also route the check-in payload through
+     * {@code StayGuestMapper.toEntity}, which deliberately ignores the primary flag.
+     *
+     * @param guest the stay guest entity
+     * @return the StayGuestResponse DTO
+     */
+    @Mapping(target = "isPrimaryGuest", source = "primaryGuest")
+    StayGuestResponse toGuestResponse(StayGuest guest);
 
     /**
      * Converts a StayRequest DTO to a Stay entity.
