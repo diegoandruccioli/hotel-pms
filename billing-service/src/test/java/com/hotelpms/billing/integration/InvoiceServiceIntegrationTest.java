@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -89,6 +90,9 @@ class InvoiceServiceIntegrationTest {
 
     private static final UUID HOTEL_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final String PARAM_ID = "id";
+    private static final String ACTIVE_AND_VERSION_QUERY =
+            "SELECT active, version FROM invoices WHERE id = :id";
 
     @Autowired
     private InvoiceService invoiceService;
@@ -198,7 +202,7 @@ class InvoiceServiceIntegrationTest {
         // this entity manager's persistence context entirely.
         testEntityManager.getEntityManager()
                 .createNativeQuery("UPDATE invoices SET version = version + 1 WHERE id = :id")
-                .setParameter("id", created.id())
+                .setParameter(PARAM_ID, created.id())
                 .executeUpdate();
         testEntityManager.flush();
 
@@ -242,6 +246,55 @@ class InvoiceServiceIntegrationTest {
         assertEquals(0, statusExcluded.getTotalElements(),
                 "A status filter must still apply even when the free-text query matches — "
                         + "guestId matches must not bypass status/date filters");
+    }
+
+    private UUID createInvoiceId() {
+        final UUID id = invoiceService.createInvoiceForStay(
+                new StayInvoiceRequest(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID())).id();
+        testEntityManager.flush();
+        testEntityManager.clear();
+        return id;
+    }
+
+    @Test
+    @DisplayName("Invoice delete soft-deletes the row and bumps its version "
+            + "(Hibernate 7 binds both id and version; a one-placeholder @SQLDelete cannot be executed)")
+    void invoiceSoftDeleteBumpsItsVersion() {
+        final UUID id = createInvoiceId();
+        final Invoice loaded = invoiceRepository.findById(id).orElseThrow();
+        final long versionBefore = loaded.getVersion();
+
+        invoiceRepository.delete(loaded);
+        invoiceRepository.flush();
+        testEntityManager.clear();
+
+        final Object[] row = (Object[]) testEntityManager.getEntityManager()
+                .createNativeQuery(ACTIVE_AND_VERSION_QUERY)
+                .setParameter(PARAM_ID, id)
+                .getSingleResult();
+        assertFalse((Boolean) row[0], "The deleted invoice must be soft-deleted, not kept active");
+        assertEquals(versionBefore + 1, ((Number) row[1]).longValue(), "Soft delete must bump the version");
+    }
+
+    @Test
+    @DisplayName("Invoice delete with a stale version raises an optimistic-locking failure, "
+            + "not a silent no-op")
+    void invoiceDeleteFailsWhenVersionIsStale() {
+        final UUID id = createInvoiceId();
+        final Invoice stale = invoiceRepository.findById(id).orElseThrow();
+        testEntityManager.getEntityManager()
+                .createNativeQuery("UPDATE invoices SET version = version + 1 WHERE id = :id")
+                .setParameter(PARAM_ID, id)
+                .executeUpdate();
+
+        assertThrows(ObjectOptimisticLockingFailureException.class, () -> {
+            invoiceRepository.delete(stale);
+            invoiceRepository.flush();
+        }, "A delete bound to a stale version must be rejected, not silently succeed");
+
+        testEntityManager.clear();
+        assertTrue(invoiceRepository.findById(id).isPresent(),
+                "The row must still be active — the rejected delete must not have taken effect");
     }
 
 }
