@@ -404,6 +404,24 @@ describe('Dashboard Component', () => {
     expect(JSON.parse(probe.getAttribute('data-state') ?? '{}')).toEqual({ preset: 'arrivalsToday', sortField: 'checkInDate', sortDir: 'asc' });
   });
 
+  it('opens the stays list on the guests due out today from the departures card', async () => {
+    renderWithQuery(
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="*" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const grid = await screen.findByTestId('stats-grid');
+    fireEvent.click(within(grid).getAllByRole('link')[2]);
+    const probe = await screen.findByTestId('location');
+    expect(probe).toHaveTextContent('/stays');
+    expect(JSON.parse(probe.getAttribute('data-state') ?? '{}')).toEqual({
+      statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc', departingToday: true,
+    });
+  });
+
   it('leaves out a zero delta', async () => {
     vi.mocked(dashboardService.getDaySheetTrend).mockResolvedValue(trendOf([1, 200]));
     renderDashboard();

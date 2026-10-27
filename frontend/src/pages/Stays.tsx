@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, memo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
@@ -20,7 +20,7 @@ import { StayGuestManagerDialog } from './Stays/StayGuestManagerDialog';
 import { StayExtensionDialog } from './Stays/StayExtensionDialog';
 import { StayRoomChangeDialog } from './Stays/StayRoomChangeDialog';
 import { ActionsCell, AlloggiatiCell, GuestCell, GuestsCountCell } from './Stays/StayRowCells';
-import { getErrorMessage, stayStatusTone } from '../utils';
+import { getErrorMessage, stayStatusTone, todayIsoDate } from '../utils';
 import {
   useStaysList,
   useCheckOutStay,
@@ -28,6 +28,7 @@ import {
   useRetryCheckoutEmail,
 } from '../hooks/queries';
 import { useDebounce, useFormatters, useListRangeSummary } from '../hooks';
+import type { StayListFilters } from '../services/stayService';
 
 type StaySortField = 'actualCheckInTime' | 'expectedCheckOutDate' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -36,10 +37,50 @@ interface StaysNavState {
   statusFilter?: StayStatus | 'ALL';
   sortField?: StaySortField;
   sortDir?: SortDir;
+  departingToday?: boolean;
+}
+
+interface StaysFilters {
+  statusFilter: StayStatus | 'ALL';
+  sortField: StaySortField;
+  sortDir: SortDir;
+  /** Exact expected check-out day, yyyy-MM-dd. */
+  departingOn: string | null;
+  alloggiatiFailed: boolean;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const SORT_FIELDS: readonly StaySortField[] = ['actualCheckInTime', 'expectedCheckOutDate', 'status'];
+const STATUS_FILTERS = ['ALL', 'EXPECTED', 'CHECKED_IN', 'CHECKED_OUT'] as const;
+
+/**
+ * The URL is the source of truth once any filter has been set (`status` is always written with the
+ * others). Until then the dashboard's router state seeds the first render, so a card click lands on the
+ * right list and a refresh keeps it.
+ */
+function readFilters(params: URLSearchParams, nav: StaysNavState | null): StaysFilters {
+  if (!params.has('status')) {
+    return {
+      statusFilter: nav?.statusFilter ?? 'ALL',
+      sortField: nav?.sortField ?? 'actualCheckInTime',
+      sortDir: nav?.sortDir ?? 'desc',
+      departingOn: nav?.departingToday ? todayIsoDate() : null,
+      alloggiatiFailed: false,
+    };
+  }
+  const status = params.get('status');
+  const sort = params.get('sort');
+  const departingOn = params.get('departingOn');
+  return {
+    statusFilter: STATUS_FILTERS.find((s) => s === status) ?? 'ALL',
+    sortField: SORT_FIELDS.find((f) => f === sort) ?? 'actualCheckInTime',
+    sortDir: params.get('dir') === 'asc' ? 'asc' : 'desc',
+    departingOn: departingOn && ISO_DATE.test(departingOn) ? departingOn : null,
+    alloggiatiFailed: params.get('alloggiatiFailed') === 'true',
+  };
 }
 
 const EMPTY_STAYS: StayResponse[] = [];
-const STATUS_FILTERS = ['ALL', 'EXPECTED', 'CHECKED_IN', 'CHECKED_OUT'] as const;
 const STATUS_FILTER_LABEL_KEYS: Record<(typeof STATUS_FILTERS)[number], string> = {
   ALL: 'filter_all',
   EXPECTED: 'status_expected',
@@ -52,12 +93,11 @@ export const Stays = memo(() => {
   const navigate = useNavigate();
   const location = useLocation();
   const navState = location.state as StaysNavState | null;
+  const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery);
-  const [statusFilter, setStatusFilter] = useState<StayStatus | 'ALL'>(() => navState?.statusFilter ?? 'ALL');
-  const [sortField, setSortField] = useState<StaySortField>(() => navState?.sortField ?? 'actualCheckInTime');
-  const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? 'desc');
+  const { statusFilter, sortField, sortDir, departingOn, alloggiatiFailed } = readFilters(searchParams, navState);
   const addToast = useToastStore((s) => s.addToast);
   const role = useAuthStore((s) => s.user?.role);
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
@@ -66,44 +106,69 @@ export const Stays = memo(() => {
     setSearchQuery(e.target.value);
   }, []);
 
+  const current = useMemo<StaysFilters>(
+    () => ({ statusFilter, sortField, sortDir, departingOn, alloggiatiFailed }),
+    [statusFilter, sortField, sortDir, departingOn, alloggiatiFailed],
+  );
+
+  // Every filter lives in the URL and is applied by the server, so a count on the dashboard matches the list.
+  const updateFilters = useCallback((patch: Partial<StaysFilters>) => {
+    const next = { ...current, ...patch };
+    const params = new URLSearchParams({ status: next.statusFilter, sort: next.sortField, dir: next.sortDir });
+    if (next.departingOn) params.set('departingOn', next.departingOn);
+    if (next.alloggiatiFailed) params.set('alloggiatiFailed', 'true');
+    setSearchParams(params, { replace: true });
+    setPage(0);
+  }, [current, setSearchParams]);
+
   const sorting = useMemo<SortingState>(
     () => [{ id: sortField, desc: sortDir === 'desc' }],
     [sortField, sortDir],
   );
 
   const handleSortingChange = useCallback((next: SortingState) => {
-    setSortField(next[0].id as StaySortField);
-    setSortDir(next[0].desc ? 'desc' : 'asc');
-  }, []);
+    updateFilters({ sortField: next[0].id as StaySortField, sortDir: next[0].desc ? 'desc' : 'asc' });
+  }, [updateFilters]);
 
-  const { data: staysPage, isLoading: loading, error: queryError, refetch } = useStaysList(page);
+  const handleStatusSelect = useCallback((value: StayStatus | 'ALL') => {
+    updateFilters({ statusFilter: value });
+  }, [updateFilters]);
+
+  const today = todayIsoDate();
+  const handleToggleDepartingToday = useCallback(() => {
+    updateFilters({ departingOn: departingOn === today ? null : today });
+  }, [updateFilters, departingOn, today]);
+  const handleToggleAlloggiatiFailed = useCallback(() => {
+    updateFilters({ alloggiatiFailed: !alloggiatiFailed });
+  }, [updateFilters, alloggiatiFailed]);
+
+  const listFilters = useMemo<StayListFilters>(() => ({
+    status: statusFilter === 'ALL' ? undefined : statusFilter,
+    sortField,
+    sortDir,
+    departingOn: departingOn ?? undefined,
+    alloggiatiFailed: alloggiatiFailed || undefined,
+  }), [statusFilter, sortField, sortDir, departingOn, alloggiatiFailed]);
+
+  const { data: staysPage, isLoading: loading, error: queryError, refetch } = useStaysList(page, listFilters);
   const stays = staysPage?.content ?? EMPTY_STAYS;
   const totalPages = staysPage?.totalPages ?? 1;
   const error = queryError ? getErrorMessage(queryError, t('failed_load_stays')) : null;
   const handleRetry = useCallback(() => { refetch(); }, [refetch]);
 
+  // The backend has no free-text filter, so the search box narrows only the loaded page.
   const filteredStays = useMemo(() => {
-    let result = stays;
-    if (statusFilter !== 'ALL') {
-      result = result.filter((s) => s.status === statusFilter);
-    }
-    if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase();
-      result = result.filter(
-        (s) =>
-          s.roomNumber?.toLowerCase().includes(q) ||
-          s.guestDisplayName?.toLowerCase().includes(q),
-      );
-    }
-    const sorted = [...result].sort((a, b) => {
-      const cmp = (a[sortField] ?? '').localeCompare(b[sortField] ?? '');
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-    return sorted;
-  }, [stays, statusFilter, debouncedSearch, sortField, sortDir]);
+    if (!debouncedSearch.trim()) return stays;
+    const q = debouncedSearch.toLowerCase();
+    return stays.filter(
+      (s) =>
+        s.roomNumber?.toLowerCase().includes(q) ||
+        s.guestDisplayName?.toLowerCase().includes(q),
+    );
+  }, [stays, debouncedSearch]);
 
-  // Search and status chips narrow only the loaded page, so a server-wide range would mislead while they are on.
-  const filtersActive = statusFilter !== 'ALL' || debouncedSearch.trim() !== '';
+  // Search narrows only the loaded page, so a server-wide range would mislead while it is on.
+  const filtersActive = debouncedSearch.trim() !== '';
   // Position comes from the response, not local state: the previous page's rows stay visible while the next one loads.
   const summary = useListRangeSummary(
     staysPage?.number ?? 0,
@@ -145,10 +210,18 @@ export const Stays = memo(() => {
     }
   }, [addToast, t, retryCheckoutEmailMutation]);
 
-  const handleNewCheckIn = useCallback(() => navigate('/reservations'), [navigate]);
+  const handleNewCheckIn = useCallback(() => navigate('/reservations', {
+    state: { preset: 'arrivalsToday', sortField: 'checkInDate', sortDir: 'asc' },
+  }), [navigate]);
   const handleWalkIn = useCallback(() => navigate('/stays/walk-in'), [navigate]);
-  const handleGuestNavigate = useCallback((guestDisplayName: string) => {
-    navigate('/guests?search=' + encodeURIComponent(guestDisplayName));
+  const handleGuestNavigate = useCallback((guestId: string) => {
+    navigate('/guests', { state: { guestId } });
+  }, [navigate]);
+  const handleOpenReservation = useCallback((id: string) => {
+    navigate(`/reservations/${id}`);
+  }, [navigate]);
+  const handleOpenDetail = useCallback((stayId: string) => {
+    navigate(`/stays/${stayId}`);
   }, [navigate]);
 
   const [manageGuestsStayId, setManageGuestsStayId] = useState<string | null>(null);
@@ -259,12 +332,15 @@ export const Stays = memo(() => {
           checkingOut={checkingOut}
           onExtend={handleExtendStay}
           onChangeRoom={handleChangeRoom}
+          onOpenReservation={handleOpenReservation}
+          onOpenDetail={handleOpenDetail}
           t={t}
         />
       ),
     },
   ], [t, formatDate, handleGuestNavigate, handleRetryInvoice, retryingInvoice, handleRetryCheckoutEmail,
-      retryingEmail, handleCheckOut, checkingOut, handleManageGuests, handleExtendStay, handleChangeRoom]);
+      retryingEmail, handleCheckOut, checkingOut, handleManageGuests, handleExtendStay, handleChangeRoom,
+      handleOpenReservation, handleOpenDetail]);
 
   return (
     <div className="space-y-6">
@@ -297,10 +373,23 @@ export const Stays = memo(() => {
             value={s}
             selected={statusFilter === s}
             label={t(STATUS_FILTER_LABEL_KEYS[s])}
-            onValueSelect={setStatusFilter}
+            onValueSelect={handleStatusSelect}
           />
         ))}
+        <M3FilterChip
+          value="departingToday"
+          selected={departingOn === today}
+          label={t('stays_filter_departing_today')}
+          onValueSelect={handleToggleDepartingToday}
+        />
+        <M3FilterChip
+          value="alloggiatiFailed"
+          selected={alloggiatiFailed}
+          label={t('stays_filter_alloggiati_failed')}
+          onValueSelect={handleToggleAlloggiatiFailed}
+        />
       </ListToolbar>
+
 
       {loading ? (
         <M3LoadingState label={t('loading')} />

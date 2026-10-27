@@ -509,6 +509,10 @@ describe('ReservationForm', () => {
       });
       expect(screen.getByRole('button', { name: 'reservation_go_to_stay' })).toBeInTheDocument();
 
+      // The link opens that stay directly, not the generic in-house list.
+      fireEvent.click(screen.getByRole('button', { name: 'reservation_go_to_stay' }));
+      expect(mockNavigate).toHaveBeenCalledWith('/stays/stay1');
+
       fireEvent.click(screen.getByRole('button', { name: 'reservation_step_rooms' }));
       expect(screen.getByText('Read Only')).toBeInTheDocument();
     });
