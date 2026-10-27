@@ -21,17 +21,31 @@ import type {
   StayGuestResponse,
   StayRequest,
   StayResponse,
+  StayStatus,
 } from '../types';
 import type { SpringPage } from '../types';
+
+/** Server-side filters and sort of the stays list; every field is optional. */
+export interface StayListFilters {
+  status?: StayStatus;
+  sortField?: 'actualCheckInTime' | 'expectedCheckOutDate' | 'status';
+  sortDir?: 'asc' | 'desc';
+  /** Exact expected check-out day, yyyy-MM-dd. */
+  departingOn?: string;
+  alloggiatiFailed?: boolean;
+}
 
 const BASE_PATH = '/api/v1/stays';
 const IFRAME_CLEANUP_DELAY_MS = 10000;
 
 export const stayService = {
-  getAllStays: async (page = 0, size = 20): Promise<SpringPage<StayResponse>> => {
-    const response = await api.get<SpringPage<StayResponse>>(
-      `${BASE_PATH}?page=${page}&size=${size}&sort=actualCheckInTime,desc`,
-    );
+  getAllStays: async (page = 0, size = 20, filters: StayListFilters = {}): Promise<SpringPage<StayResponse>> => {
+    const sort = `${filters.sortField ?? 'actualCheckInTime'},${filters.sortDir ?? 'desc'}`;
+    let url = `${BASE_PATH}?page=${page}&size=${size}&sort=${sort}`;
+    if (filters.status) url += `&status=${filters.status}`;
+    if (filters.departingOn) url += `&departingOn=${filters.departingOn}`;
+    if (filters.alloggiatiFailed) url += '&alloggiatiFailed=true';
+    const response = await api.get<SpringPage<StayResponse>>(url);
     return response.data;
   },
 

@@ -135,6 +135,7 @@ describe('resolveAnnouncement', () => {
     ['/quotations/q1/edit', 'edit_quotation', 'quotations'],
     ['/stays/check-in/r1', 'checkin_title', 'stays'],
     ['/stays/walk-in', 'walkin_title', 'stays'],
+    ['/stays/s1', 'stay_details', 'stays'],
     ['/night-audit', 'nav_night_audit', 'common'],
     ['/owner-dashboard', 'nav_owner_dashboard', 'common'],
     ['/admin/users', 'page_title', 'admin'],
@@ -230,6 +231,9 @@ describe('resolveCrumbs', () => {
       'nav_group_front_office', 'nav_stays', 'checkin_title',
     ]);
     expect(resolveCrumbs('/stays/walk-in').at(-1)).toMatchObject({ labelKey: 'walkin_title', ns: 'stays' });
+    expect(resolveCrumbs('/stays/s1').map((c) => c.labelKey)).toEqual([
+      'nav_group_front_office', 'nav_stays', 'stay_details',
+    ]);
   });
 
   it('nests settings sub-pages under Settings, which has no group', () => {

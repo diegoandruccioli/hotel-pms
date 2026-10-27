@@ -94,7 +94,7 @@ export const Dashboard = () => {
       icon: 'logout',
       tone: 'warning',
       to: '/stays',
-      state: { statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc' },
+      state: { statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc', departingToday: true },
       trend: { field: 'departures', today: daySheet?.todayDepartures ?? 0 },
     },
     {

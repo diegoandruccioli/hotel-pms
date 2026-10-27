@@ -50,7 +50,7 @@ export const TodayTasksCard = ({ daySheet, role }: TodayTasksCardProps) => {
     if (daySheet.todayDepartures > 0) {
       list.push({
         key: 'departures', icon: 'logout', to: '/stays',
-        state: { statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc' },
+        state: { statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc', departingToday: true },
         title: t('dashboard_task_departures', { count: daySheet.todayDepartures }),
         subtitle: t('dashboard_task_departures_sub'),
       });

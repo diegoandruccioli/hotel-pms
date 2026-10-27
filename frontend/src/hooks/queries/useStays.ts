@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { stayService } from '../../services';
+import type { StayListFilters } from '../../services/stayService';
 import type { StayResponse } from '../../types';
 import type { SpringPage } from '../../types';
 import { queryKeys } from '../../lib';
 
-export function useStaysList(page: number) {
+export function useStaysList(page: number, filters: StayListFilters) {
   return useQuery({
-    queryKey: queryKeys.stays.list(page),
-    queryFn: () => stayService.getAllStays(page),
+    queryKey: queryKeys.stays.list(page, filters),
+    queryFn: () => stayService.getAllStays(page, 20, filters),
     placeholderData: (previousData) => previousData,
   });
 }
@@ -32,10 +33,14 @@ function useStayPatchMutation(action: (id: string) => Promise<StayResponse>) {
   return useMutation({
     mutationFn: (id: string) => action(id),
     onSuccess: (updated) => {
+      // `stays.all` also prefixes the single-stay detail entries, which have no `content` to patch.
       queryClient.setQueriesData<SpringPage<StayResponse>>(
         { queryKey: queryKeys.stays.all },
-        (old) => old && { ...old, content: old.content.map((s) => (s.id === updated.id ? updated : s)) },
+        (old) => old && 'content' in old
+          ? { ...old, content: old.content.map((s) => (s.id === updated.id ? updated : s)) }
+          : old,
       );
+      queryClient.setQueryData(queryKeys.stays.detail(updated.id), updated);
     },
   });
 }

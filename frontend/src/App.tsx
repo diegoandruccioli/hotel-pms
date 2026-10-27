@@ -21,6 +21,7 @@ const Quotations = lazy(() => import('./pages/Quotations').then((m) => ({ defaul
 const QuotationForm = lazy(() => import('./pages/Quotations/QuotationForm').then((m) => ({ default: m.QuotationForm })));
 const QuotationDetail = lazy(() => import('./pages/Quotations/QuotationDetail').then((m) => ({ default: m.QuotationDetail })));
 const CheckInForm = lazy(() => import('./pages/Stays/CheckInForm').then((m) => ({ default: m.CheckInForm })));
+const StayDetail = lazy(() => import('./pages/StayDetail').then((m) => ({ default: m.StayDetail })));
 const WalkInCheckInForm = lazy(() => import('./pages/Stays/WalkInCheckInForm').then((m) => ({ default: m.WalkInCheckInForm })));
 const AdminUsers = lazy(() => import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })));
 const HotelProfile = lazy(() => import('./pages/HotelProfile').then((m) => ({ default: m.HotelProfile })));
@@ -104,6 +105,7 @@ function App() {
               <Route path="/stays" element={<Stays />} />
               <Route path="/stays/check-in/:reservationId" element={<CheckInForm />} />
               <Route path="/stays/walk-in" element={<WalkInCheckInForm />} />
+              <Route path="/stays/:id" element={<StayDetail />} />
               <Route path="/billing" element={<Billing />} />
               <Route path="/restaurant" element={<Restaurant />} />
               <Route path="/calendar" element={<CalendarPlanning />} />

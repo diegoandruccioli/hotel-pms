@@ -5,6 +5,8 @@ import { Alert } from '../../components/Alert';
 import { useStaysSearch } from '../../hooks/queries';
 
 const PRE_CHECK_STAYS_SAMPLE_SIZE = 100;
+/** In-house guests, soonest check-out first, so the overdue ones the warning counts head the list. */
+const OVERDUE_DEPARTURES_STATE = { statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc' };
 
 /**
  * Departures still open on the selected business date, per the OPERA End of Day
@@ -30,7 +32,7 @@ export const NightAuditPreCheck = ({ businessDate }: { businessDate: string }) =
     <Alert tone="warning" icon="info">
       <div className="flex items-center gap-2">
         <span>{t('night_audit_precheck_pending_departures', { count: pendingDeparturesCount })}</span>
-        <Link to="/stays" className="underline hover:no-underline font-medium">{t('view_all')}</Link>
+        <Link to="/stays" state={OVERDUE_DEPARTURES_STATE} className="underline hover:no-underline font-medium">{t('view_all')}</Link>
       </div>
     </Alert>
   );

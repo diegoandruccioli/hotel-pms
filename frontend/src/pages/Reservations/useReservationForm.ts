@@ -415,8 +415,8 @@ export const useReservationForm = () => {
   const clearGuest = useCallback(() => setSelectedGuest(null), []);
 
   const goToStay = useCallback(() => {
-    navigate('/stays', { state: { statusFilter: 'CHECKED_IN' } });
-  }, [navigate]);
+    if (checkedInStayId) navigate(`/stays/${checkedInStayId}`);
+  }, [navigate, checkedInStayId]);
 
   const goToCheckIn = useCallback(() => {
     if (!id || !selectedGuest) return;

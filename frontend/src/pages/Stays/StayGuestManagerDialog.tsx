@@ -61,10 +61,10 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
     setFormError(null);
     setConfirmRemoveId(null);
     setDepartureTargetId(null);
-    if (stayId) queryClient.removeQueries({ queryKey: queryKeys.stays.detail(stayId) });
+    // Invalidate rather than remove the detail entry: the stay detail page reads the same cache key.
     queryClient.invalidateQueries({ queryKey: queryKeys.stays.all });
     onClose();
-  }, [onClose, queryClient, stayId]);
+  }, [onClose, queryClient]);
 
   const handleOpenAdd = useCallback(() => {
     setFormGuest(emptyGuest(false));

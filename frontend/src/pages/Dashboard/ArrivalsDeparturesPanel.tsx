@@ -23,7 +23,7 @@ const TAB_OPTIONS: M3SegmentOption<PanelTab>[] = [
 
 const VIEW_ALL_TARGET: Record<PanelTab, { to: string; state: Record<string, unknown> }> = {
   arrivals: { to: '/reservations', state: { preset: 'arrivalsToday', sortField: 'checkInDate', sortDir: 'asc' } },
-  departures: { to: '/stays', state: { statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc' } },
+  departures: { to: '/stays', state: { statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc', departingToday: true } },
 };
 
 const ArrivalRow = ({ reservation }: { reservation: ReservationResponse }) => {
