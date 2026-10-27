@@ -2,16 +2,20 @@ package com.hotelpms.billing.integration;
 
 import com.hotelpms.billing.client.GuestClient;
 import com.hotelpms.billing.client.dto.GuestSearchPageResponse;
+import com.hotelpms.billing.domain.ChargeType;
 import com.hotelpms.billing.domain.DocumentType;
 import com.hotelpms.billing.domain.Invoice;
 import com.hotelpms.billing.domain.InvoiceStatus;
 import com.hotelpms.billing.domain.SdiStatus;
+import com.hotelpms.billing.dto.ChargeRequest;
+import com.hotelpms.billing.dto.ChargeResponse;
 import com.hotelpms.billing.dto.InvoiceResponse;
 import com.hotelpms.billing.dto.InvoiceSearchResultResponse;
 import com.hotelpms.billing.dto.StayInvoiceRequest;
 import com.hotelpms.billing.mapper.InvoiceChargeMapperImpl;
 import com.hotelpms.billing.mapper.InvoiceMapperImpl;
 import com.hotelpms.billing.mapper.PaymentMapperImpl;
+import com.hotelpms.billing.repository.InvoiceChargeRepository;
 import com.hotelpms.billing.repository.InvoiceRepository;
 import com.hotelpms.billing.service.InvoiceService;
 import com.hotelpms.billing.service.impl.InvoiceServiceImpl;
@@ -37,6 +41,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -99,6 +104,9 @@ class InvoiceServiceIntegrationTest {
 
     @Autowired
     private InvoiceRepository invoiceRepository;
+
+    @Autowired
+    private InvoiceChargeRepository invoiceChargeRepository;
 
     @Autowired
     private TestEntityManager testEntityManager;
@@ -295,6 +303,33 @@ class InvoiceServiceIntegrationTest {
         testEntityManager.clear();
         assertTrue(invoiceRepository.findById(id).isPresent(),
                 "The row must still be active — the rejected delete must not have taken effect");
+    }
+
+    @Test
+    @DisplayName("Removing a charge soft-deletes the invoice_charges row (fiscal data is never physically "
+            + "deleted), hides it from reads and takes its amount off the invoice total")
+    void removeChargeSoftDeletesTheRow() {
+        final UUID stayId = UUID.randomUUID();
+        invoiceService.createInvoiceForStay(new StayInvoiceRequest(stayId, UUID.randomUUID(), UUID.randomUUID()));
+        final ChargeResponse charge = invoiceService.addCharge(stayId, new ChargeRequest(
+                ChargeType.EXTRA, "Minibar", new BigDecimal("12.50"), null, null, null));
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        invoiceService.removeCharge(stayId, charge.id());
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        final Object active = testEntityManager.getEntityManager()
+                .createNativeQuery("SELECT active FROM invoice_charges WHERE id = :id")
+                .setParameter(PARAM_ID, charge.id())
+                .getSingleResult();
+        assertFalse((Boolean) active, "The removed charge row must be kept with active = false");
+        assertTrue(invoiceChargeRepository.findByInvoiceId(charge.invoiceId()).isEmpty(),
+                "A soft-deleted charge must not be returned by reads");
+        assertEquals(0, BigDecimal.ZERO.compareTo(
+                invoiceRepository.findById(charge.invoiceId()).orElseThrow().getTotalAmount()),
+                "The removed charge's amount must come off the invoice total");
     }
 
 }
