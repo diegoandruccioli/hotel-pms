@@ -278,6 +278,28 @@ public class StayServiceImpl implements StayService {
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
+    public Page<StayResponse> getAllStays(final Pageable pageable, @NonNull final UUID hotelId,
+            final LocalDate dateFrom, final LocalDate dateTo, final StayStatus status,
+            final LocalDate departingOn, final boolean alloggiatiFailed) {
+        if (departingOn == null && !alloggiatiFailed) {
+            return getAllStays(pageable, hotelId, dateFrom, dateTo, status);
+        }
+        log.debug("Fetching stays, departingOn={}, alloggiatiFailed={}", departingOn, alloggiatiFailed);
+        final LocalDateTime start = (dateFrom != null ? dateFrom : EARLIEST_FILTER_DATE).atStartOfDay();
+        final LocalDateTime end = (dateTo != null ? dateTo.plusDays(1) : LATEST_FILTER_DATE).atStartOfDay();
+        final Set<StayStatus> statuses = status != null ? Set.of(status) : EnumSet.allOf(StayStatus.class);
+        final LocalDate departureFrom = departingOn != null ? departingOn : EARLIEST_FILTER_DATE;
+        final LocalDate departureTo = departingOn != null ? departingOn : LATEST_FILTER_DATE;
+        final List<Boolean> failedFlags = alloggiatiFailed ? List.of(Boolean.TRUE) : List.of(Boolean.TRUE, Boolean.FALSE);
+        return stayRepository
+                .findByHotelIdAndActualCheckInTimeBetweenAndStatusInAndExpectedCheckOutDateBetweenAndAlloggiatiSendFailedIn(
+                        hotelId, start, end, statuses, departureFrom, departureTo, failedFlags, pageable)
+                .map(stayMapper::toDto);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
     public Page<StayResponse> getStaysByReservationId(
             @NonNull final UUID reservationId, @NonNull final UUID hotelId, final Pageable pageable) {
         log.debug("Fetching stays for reservationId: {}", reservationId);
