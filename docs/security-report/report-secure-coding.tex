@@ -7903,7 +7903,72 @@ sull'asserzione (nessuna eccezione sollevata, la delete stale ``riesce''
 silenziosamente, esattamente il sintomo descritto sopra); ripristinato il
 fix e rieseguito --- tutti e 3 tornano verdi, insieme all'intera build
 (\texttt{checkstyle}/\texttt{PMD}/\texttt{SpotBugs}/\texttt{jacoco}).
-Commit: \commitref{5f5a698}{fix(security): version-check soft-deletes on Quotation/RateSeason, enforce it on all three (GAP-18)}, \commitref{83dfda4}{test(security): repository-level stale-delete race test for GAP-18}
+\textbf{Estensione 2026-10-27}: trovata dalla prova dal vivo della pagina
+Soggiorni. L'allineamento di GAP-18 aveva coperto solo le entità versionate
+presenti in quel giro; \texttt{StayGuest} (V20), \texttt{Stay} (V22) e
+\texttt{Invoice} (billing V3) hanno ricevuto \texttt{@Version} dopo o fuori
+da quel giro e conservavano un \texttt{@SQLDelete} a un solo segnaposto,
+senza controllo di versione. Il sintomo visibile era funzionale: con
+Hibernate~7 (Spring Boot~4, \#177) il flush della \texttt{DELETE} di
+un'entità versionata lega anche la versione come secondo parametro e
+fallisce con \texttt{Unable to bind parameter \#2 \ldots{} number of
+columns: 1}, quindi \texttt{DELETE /api/v1/stays/\{id\}/guests/\{guestId\}}
+rispondeva \texttt{409 RESOURCE\_ALREADY\_EXISTS} (il fallback
+\texttt{DataIntegrityViolationException} di \texttt{GlobalExceptionHandler}
+lo presentava come conflitto generico) e un ospite non principale non
+poteva essere rimosso. Sul piano della sicurezza lo stesso statement non
+avrebbe comunque avuto il controllo ottimistico sulla cancellazione stale,
+cioè la race \texttt{UPDATE}-vs-\texttt{DELETE} descritta sopra.
+
+\begin{insecurebox}[title={StayGuest.java --- un solo segnaposto, nessun controllo versione (baseline)}]
+\begin{lstlisting}[style=java]
+@Version
+private Long version;
+...
+@SQLDelete(sql = "UPDATE stay_guests SET active = false WHERE id = ?")
+// Hibernate 7 lega (id, version): il secondo parametro non esiste
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={StayGuest.java --- stesso pattern di Reservation (main)}]
+\begin{lstlisting}[style=java]
+@SQLDelete(
+        sql = "UPDATE stay_guests SET active = false, "
+                + "version = version + 1 WHERE id = ? AND version = ?",
+        verify = Expectation.RowCount.class)
+\end{lstlisting}
+\end{securebox}
+
+Fix: i tre \texttt{@SQLDelete} (\texttt{StayGuest}, \texttt{Stay},
+\texttt{Invoice}) sono allineati al pattern già in uso, con
+\texttt{verify = Expectation.RowCount.class}, l'equivalente Hibernate~7 del
+\texttt{check = ResultCheckStyle.COUNT} descritto sopra: una \texttt{DELETE}
+stale a zero righe solleva ora la \texttt{StaleStateException} che
+\texttt{GlobalExceptionHandler} mappa a \texttt{409 CONCURRENT\_MODIFICATION}.
+Test su PostgreSQL reale (Testcontainers), sei nuovi: quattro in
+\texttt{SoftDeleteVersionCheckIntegrationTest} (soft delete di
+\texttt{StayGuest} dal percorso reale \texttt{getGuests().remove} più
+\texttt{save}, con \texttt{version} incrementata; delete stale rifiutata;
+soft delete di \texttt{Stay} con cascata sugli ospiti; delete stale
+rifiutata) e due in \texttt{InvoiceServiceIntegrationTest} (soft delete e
+delete stale). Tolto il fix tutti e sei falliscono; con il fix passano,
+insieme all'intera build (\texttt{checkstyle}/\texttt{PMD}/\texttt{SpotBugs}/
+\texttt{jacoco}). Verificato anche dal vivo da browser: la rimozione di un
+ospite non principale risponde \texttt{204}, la riga resta con
+\texttt{active = false} e \texttt{version = 1}, nessun errore di binding nel
+log.
+
+\textbf{Residui noti, non risolti}: \texttt{InvoiceCharge}
+(\texttt{cascade ALL} e \texttt{orphanRemoval} da \texttt{Invoice.charges})
+non ha \texttt{@SQLDelete}, quindi una futura cancellazione di fattura
+eliminerebbe fisicamente le righe di costo, che sono dato fiscale; oggi
+nessun percorso di produzione cancella fatture. Inoltre
+\texttt{StayGuestServiceImpl.removeGuest} non confronta una \texttt{version}
+inviata dal client (a differenza di \texttt{updateGuest}): il nuovo SQL
+intercetta solo le gare dentro la transazione, non una scheda rimasta
+aperta.
+
+Commit: \commitref{5f5a698}{fix(security): version-check soft-deletes on Quotation/RateSeason, enforce it on all three (GAP-18)}, \commitref{83dfda4}{test(security): repository-level stale-delete race test for GAP-18}, \commitref{351ff5a5}{fix(stays): version-check the soft delete of stay guests, stays and invoices}
 
 \paragraph{T-QUOT-02 --- Invio email dei preventivi senza gate di stato né limite di frequenza}
 Trovato durante l'audit dei link della schermata Preventivi (2026-10-20).
