@@ -270,8 +270,10 @@ export const stayService = {
     return response.data;
   },
 
-  removeGuest: async (stayId: string, guestId: string): Promise<void> => {
-    await api.delete(`${BASE_PATH}/${stayId}/guests/${guestId}`);
+  removeGuest: async (stayId: string, guestId: string, version?: number | null): Promise<void> => {
+    await api.delete(`${BASE_PATH}/${stayId}/guests/${guestId}`, {
+      params: version == null ? undefined : { version },
+    });
   },
 
   recordGuestDeparture: async (stayId: string, guestId: string, departureDate: string): Promise<StayGuestResponse> => {

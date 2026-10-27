@@ -81,9 +81,10 @@ public class StayGuestServiceImpl implements StayGuestService {
     /** {@inheritDoc} */
     @Override
     @Transactional
-    public void removeGuest(final UUID stayId, final UUID guestId, final UUID hotelId) {
+    public void removeGuest(final UUID stayId, final UUID guestId, final UUID hotelId, final Long clientVersion) {
         final Stay stay = stayGuestValidator.validateStayForGuestMutation(stayId, hotelId);
         final StayGuest guest = stayGuestValidator.findGuestOnStay(stay, guestId);
+        verifyNotStale(guest, clientVersion);
         if (guest.isAlloggiatiSent()) {
             throw new ConflictException(ALREADY_SENT_MSG);
         }
