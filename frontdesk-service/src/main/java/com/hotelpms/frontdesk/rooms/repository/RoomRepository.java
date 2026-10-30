@@ -146,6 +146,17 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
     Page<Room> findAllByActiveTrueAndHotelIdAndRoomTypeId(UUID hotelId, UUID roomTypeId, Pageable pageable);
 
     /**
+     * Whether the given room type still has at least one active room in the hotel. Guards the
+     * deletion of a room type: its soft delete would leave those rooms pointing at a type that
+     * {@code @SQLRestriction} hides, and every later read of such a room would fail.
+     *
+     * @param hotelId    the hotel UUID extracted from the authenticated user's JWT
+     * @param roomTypeId the room type UUID to check
+     * @return {@code true} if an active room of that type exists
+     */
+    boolean existsByActiveTrueAndHotelIdAndRoomTypeId(UUID hotelId, UUID roomTypeId);
+
+    /**
      * Returns a page of active rooms scoped to the given hotel, filtered by
      * both housekeeping status and room type. Backs the combined-filter case
      * of {@code getAllRooms}'s room-listing filters.

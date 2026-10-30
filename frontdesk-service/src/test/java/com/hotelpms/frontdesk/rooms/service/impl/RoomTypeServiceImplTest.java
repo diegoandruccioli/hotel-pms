@@ -3,8 +3,10 @@ package com.hotelpms.frontdesk.rooms.service.impl;
 import com.hotelpms.frontdesk.rooms.domain.RoomType;
 import com.hotelpms.frontdesk.rooms.dto.RoomTypeRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomTypeResponse;
+import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.rooms.mapper.RoomTypeMapper;
+import com.hotelpms.frontdesk.rooms.repository.RoomRepository;
 import com.hotelpms.frontdesk.rooms.repository.RoomTypeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,8 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -37,6 +41,9 @@ class RoomTypeServiceImplTest {
 
     @Mock
     private RoomTypeRepository roomTypeRepository;
+
+    @Mock
+    private RoomRepository roomRepository;
 
     @Mock
     private RoomTypeMapper roomTypeMapper;
@@ -185,5 +192,18 @@ class RoomTypeServiceImplTest {
                 .thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class, () -> roomTypeService.deleteRoomType(id, hotelId));
+    }
+
+    @Test
+    void testDeleteRoomTypeRejectedWhileItHasActiveRooms() {
+        when(roomTypeRepository.findByIdAndHotelId(Objects.requireNonNull(id), Objects.requireNonNull(hotelId)))
+                .thenReturn(Optional.of(roomType));
+        when(roomRepository.existsByActiveTrueAndHotelIdAndRoomTypeId(hotelId, id)).thenReturn(true);
+
+        final ConflictException ex = assertThrows(ConflictException.class,
+                () -> roomTypeService.deleteRoomType(id, hotelId));
+
+        assertEquals("ROOM_TYPE_HAS_ACTIVE_ROOMS", ex.getMessage());
+        verify(roomTypeRepository, never()).delete(any(RoomType.class));
     }
 }

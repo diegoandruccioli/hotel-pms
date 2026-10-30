@@ -3,8 +3,10 @@ package com.hotelpms.frontdesk.rooms.service.impl;
 import com.hotelpms.frontdesk.rooms.domain.RoomType;
 import com.hotelpms.frontdesk.rooms.dto.RoomTypeRequest;
 import com.hotelpms.frontdesk.rooms.dto.RoomTypeResponse;
+import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.rooms.mapper.RoomTypeMapper;
+import com.hotelpms.frontdesk.rooms.repository.RoomRepository;
 import com.hotelpms.frontdesk.rooms.repository.RoomTypeRepository;
 import com.hotelpms.frontdesk.rooms.service.RoomTypeService;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,7 @@ public class RoomTypeServiceImpl implements RoomTypeService {
     private static final String HOTEL_ID_NULL_MSG = "Hotel ID cannot be null";
 
     private final RoomTypeRepository roomTypeRepository;
+    private final RoomRepository roomRepository;
     private final RoomTypeMapper roomTypeMapper;
 
     /**
@@ -144,6 +147,10 @@ public class RoomTypeServiceImpl implements RoomTypeService {
         final RoomType roomType = roomTypeRepository.findByIdAndHotelId(id, hotelId)
                 .filter((@NonNull RoomType rt) -> rt.isActive())
                 .orElseThrow(() -> new NotFoundException(NOT_FOUND_MSG + id));
+
+        if (roomRepository.existsByActiveTrueAndHotelIdAndRoomTypeId(hotelId, id)) {
+            throw new ConflictException("ROOM_TYPE_HAS_ACTIVE_ROOMS");
+        }
 
         roomTypeRepository.delete(Objects.requireNonNull(roomType)); // Triggers the @SQLDelete soft delete
     }
