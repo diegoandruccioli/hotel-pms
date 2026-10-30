@@ -12,6 +12,7 @@ import com.hotelpms.frontdesk.stays.dto.StayGuestRequest;
 import com.hotelpms.frontdesk.stays.dto.StayGuestResponse;
 import com.hotelpms.frontdesk.stays.mapper.StayGuestMapper;
 import com.hotelpms.frontdesk.stays.mapper.StayGuestMapperImpl;
+import com.hotelpms.frontdesk.stays.repository.StayGuestRepository;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,9 @@ class StayGuestServiceImplTest {
     private StayRepository stayRepository;
 
     @Mock
+    private StayGuestRepository stayGuestRepository;
+
+    @Mock
     private CityTaxAssessmentService cityTaxAssessmentService;
 
     private final StayGuestMapper stayGuestMapper = new StayGuestMapperImpl();
@@ -70,7 +74,7 @@ class StayGuestServiceImplTest {
 
         final StayGuestValidator validator = new StayGuestValidator(stayRepository);
         stayGuestService = new StayGuestServiceImpl(
-                stayRepository, validator, stayGuestMapper, cityTaxAssessmentService);
+                stayRepository, stayGuestRepository, validator, stayGuestMapper, cityTaxAssessmentService);
     }
 
     private StayGuestRequest request(final boolean primary) {
@@ -101,7 +105,8 @@ class StayGuestServiceImplTest {
     @Test
     void addGuestStampsArrivalDateAndTriggersRectification() {
         when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
-        when(stayRepository.save(stay)).thenReturn(stay);
+        when(stayGuestRepository.save(any(StayGuest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(stayRepository.saveAndFlush(stay)).thenReturn(stay);
 
         final StayGuestResponse response = stayGuestService.addGuest(stayId, hotelId, request(false));
 
@@ -131,7 +136,7 @@ class StayGuestServiceImplTest {
     void updateGuestFlagsNeedsResubmitWhenAlreadySent() {
         final StayGuest guest = existingGuest(false, true);
         when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
-        when(stayRepository.save(stay)).thenReturn(stay);
+        when(stayRepository.saveAndFlush(stay)).thenReturn(stay);
 
         final StayGuestResponse response = stayGuestService.updateGuest(stayId, guest.getId(), hotelId, request(false));
 
@@ -143,7 +148,7 @@ class StayGuestServiceImplTest {
     void updateGuestDoesNotFlagResubmitWhenNeverSent() {
         final StayGuest guest = existingGuest(false, false);
         when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
-        when(stayRepository.save(stay)).thenReturn(stay);
+        when(stayRepository.saveAndFlush(stay)).thenReturn(stay);
 
         stayGuestService.updateGuest(stayId, guest.getId(), hotelId, request(false));
 
@@ -190,7 +195,7 @@ class StayGuestServiceImplTest {
     void recordDepartureSetsDepartureDate() {
         final StayGuest guest = existingGuest(false, false);
         when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
-        when(stayRepository.save(stay)).thenReturn(stay);
+        when(stayRepository.saveAndFlush(stay)).thenReturn(stay);
         final LocalDate departure = LocalDate.now().plusDays(1);
 
         final StayGuestResponse response = stayGuestService.recordDeparture(stayId, guest.getId(), hotelId, departure);
@@ -213,7 +218,7 @@ class StayGuestServiceImplTest {
         final StayGuest oldPrimary = existingGuest(true, false);
         final StayGuest newPrimary = existingGuest(false, false);
         when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
-        when(stayRepository.save(stay)).thenReturn(stay);
+        when(stayRepository.saveAndFlush(stay)).thenReturn(stay);
 
         stayGuestService.promotePrimary(stayId, newPrimary.getId(), hotelId);
 

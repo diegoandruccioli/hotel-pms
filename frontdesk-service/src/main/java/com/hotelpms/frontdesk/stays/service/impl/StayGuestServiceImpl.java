@@ -8,6 +8,7 @@ import com.hotelpms.frontdesk.stays.domain.StayGuest;
 import com.hotelpms.frontdesk.stays.dto.StayGuestRequest;
 import com.hotelpms.frontdesk.stays.dto.StayGuestResponse;
 import com.hotelpms.frontdesk.stays.mapper.StayGuestMapper;
+import com.hotelpms.frontdesk.stays.repository.StayGuestRepository;
 import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import com.hotelpms.frontdesk.stays.service.StayGuestService;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class StayGuestServiceImpl implements StayGuestService {
     private static final String STAY_GUEST_STALE_VERSION_MSG = "STAY_GUEST_STALE_VERSION";
 
     private final StayRepository stayRepository;
+    private final StayGuestRepository stayGuestRepository;
     private final StayGuestValidator stayGuestValidator;
     private final StayGuestMapper stayGuestMapper;
     private final CityTaxAssessmentService cityTaxAssessmentService;
@@ -41,18 +43,22 @@ public class StayGuestServiceImpl implements StayGuestService {
     @Transactional
     public StayGuestResponse addGuest(final UUID stayId, final UUID hotelId, final StayGuestRequest request) {
         final Stay stay = stayGuestValidator.validateStayForGuestMutation(stayId, hotelId);
-        final StayGuest guest = stayGuestMapper.toEntity(request);
-        guest.setStay(stay);
-        guest.setArrivalDate(LocalDate.now());
+        final StayGuest newGuest = stayGuestMapper.toEntity(request);
+        newGuest.setStay(stay);
+        newGuest.setArrivalDate(LocalDate.now());
+        // Persisted on its own, not through stayRepository.save(stay): the stay is already
+        // managed, so that save is a merge, which copies a new child into the collection and
+        // leaves this instance detached — no id, no version, and the city-tax stamp below
+        // would land on an object that is never written.
+        final StayGuest guest = stayGuestRepository.save(newGuest);
         stay.getGuests().add(guest);
-        stayRepository.save(stay);
         log.info("[STAY] GUEST_ADDED | stayId={} | hotelId={}", stayId, hotelId);
 
         // Stamps guest.cityTaxChargeId/cityTaxChargeAmount in place when a charge was
-        // actually posted — persisted by the save below so a later removeGuest can
+        // actually posted — flushed by the save below so a later removeGuest can
         // void exactly this charge.
         cityTaxAssessmentService.rectifyForGuestAdded(stay, guest);
-        stayRepository.save(stay);
+        stayRepository.saveAndFlush(stay);
 
         return stayGuestMapper.toResponse(guest);
     }
@@ -72,7 +78,8 @@ public class StayGuestServiceImpl implements StayGuestService {
             // send is never silent, it must go out again on the next report run.
             guest.setNeedsResubmit(true);
         }
-        stayRepository.save(stay);
+        // Flushed so the response carries the version this save produced, not the one before it.
+        stayRepository.saveAndFlush(stay);
         log.info("[STAY] GUEST_UPDATED | stayId={} | guestId={} | needsResubmit={}",
                 stayId, guestId, guest.isNeedsResubmit());
         return stayGuestMapper.toResponse(guest);
@@ -108,7 +115,7 @@ public class StayGuestServiceImpl implements StayGuestService {
             throw new BadRequestException(DEPARTURE_BEFORE_ARRIVAL_MSG);
         }
         guest.setDepartureDate(departureDate);
-        stayRepository.save(stay);
+        stayRepository.saveAndFlush(stay);
         log.info("[STAY] GUEST_DEPARTED | stayId={} | guestId={} | departureDate={}", stayId, guestId, departureDate);
         return stayGuestMapper.toResponse(guest);
     }
@@ -120,7 +127,7 @@ public class StayGuestServiceImpl implements StayGuestService {
         final Stay stay = stayGuestValidator.validateStayForGuestMutation(stayId, hotelId);
         final StayGuest newPrimary = stayGuestValidator.findGuestOnStay(stay, guestId);
         stay.getGuests().forEach(g -> g.setPrimaryGuest(g.getId().equals(guestId)));
-        stayRepository.save(stay);
+        stayRepository.saveAndFlush(stay);
         log.info("[STAY] GUEST_PROMOTED_PRIMARY | stayId={} | guestId={}", stayId, guestId);
         return stayGuestMapper.toResponse(newPrimary);
     }
