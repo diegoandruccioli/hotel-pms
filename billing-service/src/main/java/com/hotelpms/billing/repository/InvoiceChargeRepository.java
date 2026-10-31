@@ -75,7 +75,7 @@ public interface InvoiceChargeRepository extends JpaRepository<InvoiceCharge, UU
             + "  FROM invoice_charges c "
             + "  JOIN invoices i ON c.invoice_id = i.id "
             + "  CROSS JOIN LATERAL generate_series(0, GREATEST(COALESCE(c.nights, 1), 1) - 1) AS gs(n) "
-            + "  WHERE i.hotel_id = :hotelId AND c.type = 'ROOM_NIGHT'"
+            + "  WHERE i.hotel_id = :hotelId AND c.type = 'ROOM_NIGHT' AND c.active = TRUE"
             + ") "
             + "SELECT date_trunc(:granularity, night)::date AS periodStart, "
             + "COALESCE(SUM(nightly_amount), 0) AS totalRevenue "
