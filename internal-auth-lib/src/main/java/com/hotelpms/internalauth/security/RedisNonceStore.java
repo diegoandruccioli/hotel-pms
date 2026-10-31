@@ -1,5 +1,6 @@
 package com.hotelpms.internalauth.security;
 
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.time.Duration;
@@ -28,8 +29,15 @@ public final class RedisNonceStore implements NonceStore {
 
     @Override
     public boolean claim(final String nonce, final long ttlSeconds) {
-        final Boolean claimed = redisTemplate.opsForValue()
-                .setIfAbsent(KEY_PREFIX + nonce, "1", Objects.requireNonNull(Duration.ofSeconds(ttlSeconds)));
-        return Boolean.TRUE.equals(claimed);
+        try {
+            final Boolean claimed = redisTemplate.opsForValue()
+                    .setIfAbsent(KEY_PREFIX + nonce, "1", Objects.requireNonNull(Duration.ofSeconds(ttlSeconds)));
+            return Boolean.TRUE.equals(claimed);
+        } catch (final DataAccessException | IllegalStateException e) {
+            // Connection refused/lost, command timeout, or a connection factory that was stopped (Spring
+            // does not translate that last one): the check did not run. Say so, so the filter can fail
+            // closed with a 503 instead of letting the exception escape and reach the client as a bare 403.
+            throw new NonceStoreUnavailableException("Redis nonce store unavailable", e);
+        }
     }
 }
