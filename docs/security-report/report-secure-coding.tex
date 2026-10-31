@@ -5731,6 +5731,115 @@ il contenuto generato direttamente dentro il container.
 
 \paragraph{Riferimento} Commit: \commitref{ae9121d7}{fix(security): render alertmanager SMTP secrets at runtime, never in git}
 
+% ──────────────────────────────────────────────────────────────────
+\subsection{Anti-replay: il guasto del nonce store restava un errore opaco \threat{GAP-31}}
+% ──────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato in una prova dal vivo (2026-10-31), non da una scansione. Il container
+\texttt{hotel\_redis} era stato ricreato da \texttt{docker compose up} (nuovo
+indirizzo IP) mentre \texttt{notification-service}, non ricreato, restava
+collegato al vecchio. Il controllo anti-replay di \threat{T-GW-08}
+(\texttt{InternalAuthFilter}, nonce reclamato con \texttt{SETNX} su Redis) non
+poteva più essere eseguito: ogni richiesta interna restava appesa 60 secondi
+--- il timeout predefinito di Lettuce, identico a quello di nginx, quindi il
+client vedeva un \texttt{504} --- e quando usciva era un \texttt{403}
+generico, indistinguibile da una firma rifiutata.
+
+La causa era l'assenza di gestione dell'errore attorno a
+\texttt{nonceStore.claim()}. L'eccezione Spring Data usciva dal filtro,
+nessun \texttt{@ControllerAdvice} poteva gestirla (il filtro viene prima dei
+controller) e il successivo dispatch di \texttt{/error} veniva rifiutato da
+Spring Security, che lo vedeva come richiesta anonima: da qui il \texttt{403}.
+Il comportamento era già \emph{fail-closed} --- nessuna richiesta senza claim
+veniva ammessa --- ma era opaco: un'interruzione dell'infrastruttura appariva
+come un problema di autenticazione, e l'unico segnale per l'operatore era il
+timeout. Classificato OWASP A04 --- Insecure Design (gestione delle condizioni
+eccezionali), estensione di \threat{T-GW-08}.
+
+\begin{insecurebox}[title={InternalAuthFilter.java --- errore dello store non gestito (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO (opaco): claim() puo' lanciare se Redis non risponde
+if (!nonceStore.claim(nonce, NONCE_TTL_SECONDS)) {
+    rejectRequest(response, "Request signature already used");   // 401
+    return;
+}
+// ...se claim() lancia, l'eccezione esce dal filtro: nessun advice la
+// gestisce, il dispatch di /error viene rifiutato -> 403 generico dopo 60 s
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Una nuova \texttt{NonceStoreUnavailableException} distingue ``il controllo non
+ha potuto girare'' da ``replay'' (che resta \texttt{claim() == false} e
+\texttt{401}). \texttt{RedisNonceStore.claim()} la lancia su
+\texttt{DataAccessException} e su \texttt{IllegalStateException} (connection
+factory fermata, che Spring non traduce). \texttt{InternalAuthFilter} la
+cattura e risponde \textbf{503} con un corpo esplicito, senza invocare la
+catena di filtri e senza popolare il \texttt{SecurityContext}: la richiesta
+non viene ammessa. Nel log finisce una sola riga con il nome della classe
+della causa, senza stack trace (durante un'interruzione ogni richiesta passa di
+qui) e senza dati della richiesta, quindi senza possibilit\`a di log injection.
+
+\begin{securebox}[title={InternalAuthFilter.java / RedisNonceStore.java --- fail-closed con 503 (fix)}]
+\begin{lstlisting}[style=java]
+final boolean fresh;
+try {
+    fresh = nonceStore.claim(nonce, NONCE_TTL_SECONDS);
+} catch (final NonceStoreUnavailableException e) {
+    LOG.error("[InternalAuthFilter] Replay check unavailable ({}), "
+            + "rejecting request with 503",
+            e.getCause() == null ? e.getMessage()
+                    : e.getCause().getClass().getSimpleName());
+    rejectUnavailable(response,
+            "Internal authentication temporarily unavailable");   // 503
+    return;                      // la chain NON viene invocata
+}
+// RedisNonceStore.claim():
+//   catch (DataAccessException | IllegalStateException e) {
+//       throw new NonceStoreUnavailableException(
+//               "Redis nonce store unavailable", e);
+//   }
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Superficie d'attacco invariata}
+L'ordine dei controlli non cambia: intestazioni, firma HMAC e timestamp
+vengono verificati \emph{prima} del claim. Una firma non valida resta quindi
+\texttt{401}; il \texttt{503} richiede una firma HMAC valida, che solo il
+gateway (o chi possiede il segreto) pu\`o produrre, e non offre a un chiamante
+non autenticato alcun modo di distinguere ``Redis gi\`u'' da altro. La revisione
+dell'agente \texttt{security-auditor} non ha rilevato finding critici o alti.
+Ha segnalato che eccezioni diverse da quelle tradotte avrebbero potuto
+ancora uscire dal filtro; il fix \`e un catch mirato (compreso
+\texttt{IllegalStateException}) e non \texttt{catch (RuntimeException)}, che
+checkstyle e PMD del progetto vietano. Un'eccezione imprevista continua a
+uscire dal filtro: fail-closed, ma come errore generico.
+
+\paragraph{Verifica dal vivo}
+Con \texttt{docker stop hotel\_redis}, \texttt{billing-service} con il nuovo
+filtro risponde \texttt{503} con il corpo
+\texttt{\{"error":"Internal authentication temporarily unavailable"\}} in circa
+6 secondi (con il timeout Redis a 2 secondi introdotto a parte), mentre
+\texttt{frontdesk-service}, ancora col vecchio filtro, risponde il
+\texttt{403} generico nello stesso tempo. Il log di billing contiene una riga
+\texttt{Replay check unavailable (QueryTimeoutException)}. Dopo
+\texttt{docker start hotel\_redis} billing torna a rispondere \texttt{200} da
+solo. Test automatici: \texttt{RedisNonceStoreTest} (connessione persa,
+timeout, connection factory fermata, errore non legato ai dati che non viene
+mascherato) e \texttt{InternalAuthFilterTest} (503, catena non invocata,
+nessuna autenticazione).
+
+\begin{notebox}[title={Residuo noto --- riconnessione dopo un cambio di IP di Redis}]
+Riproducendo il problema spostando Redis su un altro indirizzo, nessuno dei 7
+servizi si \`e riconnesso in oltre 11 minuti, pur raggiungendo il nuovo IP: il
+client Lettuce continua a riprovare l'indirizzo vecchio. Il fix qui sopra
+rende il guasto veloce, esplicito e visibile, ma non lo fa rientrare da solo.
+\`E un intervento separato (risoluzione DNS del client Redis).
+\end{notebox}
+
+\paragraph{Riferimento} Commit: \commitref{e633a72e}{fix(internal-auth): fail closed with 503 when the replay-check store is unavailable}
+
 % ─────────────────────────────────────────────────────────────────────────────
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Analisi SAST con CodeQL e Supply Chain Security \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
