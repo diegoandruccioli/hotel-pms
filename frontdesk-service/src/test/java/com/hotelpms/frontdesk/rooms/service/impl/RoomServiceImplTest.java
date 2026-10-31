@@ -524,7 +524,7 @@ class RoomServiceImplTest {
 
     @Test
     void testDeleteRoomSuccess() {
-        when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.of(room));
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.of(room));
 
         roomService.deleteRoom(roomId, hotelId);
 
@@ -533,9 +533,21 @@ class RoomServiceImplTest {
 
     @Test
     void testDeleteRoomNotFound() {
-        when(roomRepository.findByIdAndActiveTrueAndHotelId(roomId, hotelId)).thenReturn(Optional.empty());
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class, () -> roomService.deleteRoom(roomId, hotelId));
+    }
+
+    @Test
+    void testDeleteRoomRejectedWhileOccupied() {
+        room.setStatus(RoomStatus.OCCUPIED);
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.of(room));
+
+        final ConflictException ex = assertThrows(ConflictException.class,
+                () -> roomService.deleteRoom(roomId, hotelId));
+
+        assertEquals("ROOM_OCCUPIED_CANNOT_BE_DELETED", ex.getMessage());
+        verify(roomRepository, never()).delete(org.mockito.ArgumentMatchers.any(Room.class));
     }
 
     @Test

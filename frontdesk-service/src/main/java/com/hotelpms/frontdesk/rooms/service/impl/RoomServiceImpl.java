@@ -303,14 +303,21 @@ public class RoomServiceImpl implements RoomService {
      * @param id      the room UUID; must not be {@code null}
      * @param hotelId the hotel UUID; must not be {@code null}
      * @throws NotFoundException if no active room exists with the given {@code id} and {@code hotelId}
+     * @throws ConflictException if the room is currently {@code OCCUPIED}: only the check-out Saga frees it
      */
     @Override
     @Transactional
     public void deleteRoom(final UUID id, final UUID hotelId) {
         Objects.requireNonNull(id, ROOM_ID_NULL_MSG);
         Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
-        final Room room = roomRepository.findByIdAndActiveTrueAndHotelId(id, hotelId)
+        // Locked like the other status-sensitive paths, so a check-in cannot occupy the room
+        // between this check and the delete.
+        final Room room = roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(id, hotelId)
                 .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
+        if (room.getStatus() == RoomStatus.OCCUPIED) {
+            // A deleted room cannot be found by the check-out, which would leave the stay stuck.
+            throw new ConflictException("ROOM_OCCUPIED_CANNOT_BE_DELETED");
+        }
 
         roomRepository.delete(Objects.requireNonNull(room));
     }
