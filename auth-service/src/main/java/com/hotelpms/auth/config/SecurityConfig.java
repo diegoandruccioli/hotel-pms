@@ -1,9 +1,11 @@
 package com.hotelpms.auth.config;
 
+import com.hotelpms.internalauth.redis.RedisDnsResolution;
 import com.hotelpms.internalauth.security.InternalAuthFilter;
 import com.hotelpms.internalauth.security.NonceStore;
 import com.hotelpms.internalauth.security.RedisNonceStore;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.data.redis.autoconfigure.ClientResourcesBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -82,6 +84,17 @@ public class SecurityConfig {
     @Bean
     public NonceStore nonceStore(final StringRedisTemplate redisTemplate) {
         return new RedisNonceStore(redisTemplate);
+    }
+
+    /**
+     * Makes the Redis client resolve the Redis host again on every reconnect, so a Redis that comes back on another
+     * address is picked up instead of retried at the old one for minutes (see {@link RedisDnsResolution}).
+     *
+     * @return the customizer Spring Boot applies to the Lettuce client resources
+     */
+    @Bean
+    public static ClientResourcesBuilderCustomizer redisDnsResolutionCustomizer() {
+        return RedisDnsResolution::apply;
     }
 
     /**
