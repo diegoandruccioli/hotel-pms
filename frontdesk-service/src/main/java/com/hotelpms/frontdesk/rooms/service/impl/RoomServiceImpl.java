@@ -11,6 +11,7 @@ import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
+import com.hotelpms.frontdesk.reservations.repository.ReservationRepository;
 import com.hotelpms.frontdesk.rooms.mapper.RoomMapper;
 import com.hotelpms.frontdesk.rooms.repository.RoomRepository;
 import com.hotelpms.frontdesk.rooms.repository.RoomTypeRepository;
@@ -22,6 +23,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -49,6 +51,7 @@ public class RoomServiceImpl implements RoomService {
 
     private final RoomRepository roomRepository;
     private final RoomTypeRepository roomTypeRepository;
+    private final ReservationRepository reservationRepository;
     private final RoomMapper roomMapper;
     private final GatewayEventsClient gatewayEventsClient;
 
@@ -303,7 +306,8 @@ public class RoomServiceImpl implements RoomService {
      * @param id      the room UUID; must not be {@code null}
      * @param hotelId the hotel UUID; must not be {@code null}
      * @throws NotFoundException if no active room exists with the given {@code id} and {@code hotelId}
-     * @throws ConflictException if the room is currently {@code OCCUPIED}: only the check-out Saga frees it
+     * @throws ConflictException if the room is currently {@code OCCUPIED} (only the check-out Saga frees it) or a
+     *                           non-terminal reservation that has not ended still holds it
      */
     @Override
     @Transactional
@@ -317,6 +321,10 @@ public class RoomServiceImpl implements RoomService {
         if (room.getStatus() == RoomStatus.OCCUPIED) {
             // A deleted room cannot be found by the check-out, which would leave the stay stuck.
             throw new ConflictException("ROOM_OCCUPIED_CANNOT_BE_DELETED");
+        }
+        if (reservationRepository.existsUpcomingReservationByHotelIdAndRoomId(hotelId, id, LocalDate.now())) {
+            // A reservation still ahead would be left pointing at a room that no longer exists.
+            throw new ConflictException("ROOM_HAS_UPCOMING_RESERVATIONS");
         }
 
         roomRepository.delete(Objects.requireNonNull(room));
