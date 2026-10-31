@@ -17,6 +17,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -36,6 +38,8 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
+@SQLDelete(sql = "UPDATE invoice_charges SET active = false WHERE id = ?")
+@SQLRestriction("active = true")
 public class InvoiceCharge {
 
     @Id
@@ -96,4 +100,8 @@ public class InvoiceCharge {
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean active = true;
 }

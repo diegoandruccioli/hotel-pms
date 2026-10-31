@@ -453,12 +453,15 @@ public class StayController {
      *
      * @param id      the stay ID
      * @param guestId the guest ID
+     * @param version the guest version the client last read, for optimistic-lock conflict
+     *                detection; omitted by a client that doesn't send one yet
      */
     @DeleteMapping("/{id}/guests/{guestId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeGuest(
-            @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId) {
-        stayGuestService.removeGuest(id, guestId, Objects.requireNonNull(TenantContext.resolveHotelId()));
+            @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId,
+            @RequestParam(name = "version", required = false) final Long version) {
+        stayGuestService.removeGuest(id, guestId, Objects.requireNonNull(TenantContext.resolveHotelId()), version);
     }
 
     /**

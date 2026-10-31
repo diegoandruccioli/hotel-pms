@@ -164,9 +164,36 @@ class StayGuestServiceImplTest {
         when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
         when(stayRepository.save(stay)).thenReturn(stay);
 
-        stayGuestService.removeGuest(stayId, guest.getId(), hotelId);
+        stayGuestService.removeGuest(stayId, guest.getId(), hotelId, null);
 
         assertTrue(stay.getGuests().isEmpty());
+    }
+
+    @Test
+    void removeGuestWithMatchingVersionDeletes() {
+        final StayGuest guest = existingGuest(false, false);
+        guest.setVersion(3L);
+        when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
+        when(stayRepository.save(stay)).thenReturn(stay);
+
+        stayGuestService.removeGuest(stayId, guest.getId(), hotelId, 3L);
+
+        assertTrue(stay.getGuests().isEmpty());
+    }
+
+    @Test
+    void removeGuestWithStaleVersionThrowsConflictAndKeepsGuest() {
+        final StayGuest guest = existingGuest(false, false);
+        guest.setVersion(3L);
+        when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
+
+        final ConflictException ex = assertThrows(ConflictException.class,
+                () -> stayGuestService.removeGuest(stayId, guest.getId(), hotelId, 2L));
+
+        assertEquals("STAY_GUEST_STALE_VERSION", ex.getMessage());
+        assertEquals(1, stay.getGuests().size());
+        verify(stayRepository, never()).save(any());
+        verify(cityTaxAssessmentService, never()).rectifyForGuestRemoved(any(), any());
     }
 
     @Test
@@ -174,7 +201,7 @@ class StayGuestServiceImplTest {
         final StayGuest guest = existingGuest(false, true);
         when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
 
-        assertThrows(ConflictException.class, () -> stayGuestService.removeGuest(stayId, guest.getId(), hotelId));
+        assertThrows(ConflictException.class, () -> stayGuestService.removeGuest(stayId, guest.getId(), hotelId, null));
         verify(stayRepository, never()).save(any());
     }
 
@@ -183,7 +210,7 @@ class StayGuestServiceImplTest {
         final StayGuest guest = existingGuest(true, false);
         when(stayRepository.findByIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(stay));
 
-        assertThrows(ConflictException.class, () -> stayGuestService.removeGuest(stayId, guest.getId(), hotelId));
+        assertThrows(ConflictException.class, () -> stayGuestService.removeGuest(stayId, guest.getId(), hotelId, null));
     }
 
     @Test
