@@ -24,6 +24,9 @@ import java.util.UUID;
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, UUID> {
 
+    /** Query-parameter name for the tenant hotelId, reused across the queries below. */
+    String HOTEL_ID_PARAM = "hotelId";
+
     /**
      * Finds a reservation by ID scoped to a specific hotel (IDOR-safe).
      *
@@ -141,6 +144,37 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
     );
 
     /**
+     * Whether a reservation that has not ended still holds the given room: a non-terminal status
+     * ({@code PENDING}, {@code CONFIRMED}, {@code PARTIALLY_CHECKED_IN}, {@code CHECKED_IN}) and a check-out
+     * date after {@code today}. Guards the deletion of a room — a deleted room would leave those reservations
+     * pointing at a room that no longer exists. A reservation that is over, cancelled or a no-show does not
+     * hold it, nor does a soft-deleted line item.
+     *
+     * @param hotelId the hotel UUID (tenant scope)
+     * @param roomId  the room UUID
+     * @param today   the reference date; a reservation checking out on or before it no longer holds the room
+     * @return {@code true} if such a reservation exists
+     */
+    @Query("""
+            SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END FROM Reservation r
+            JOIN r.lineItems li
+            WHERE r.hotelId = :hotelId
+            AND r.active = true
+            AND r.status IN (com.hotelpms.frontdesk.reservations.domain.ReservationStatus.PENDING,
+                             com.hotelpms.frontdesk.reservations.domain.ReservationStatus.CONFIRMED,
+                             com.hotelpms.frontdesk.reservations.domain.ReservationStatus.PARTIALLY_CHECKED_IN,
+                             com.hotelpms.frontdesk.reservations.domain.ReservationStatus.CHECKED_IN)
+            AND li.roomId = :roomId
+            AND li.active = true
+            AND r.checkOutDate > :today
+            """)
+    boolean existsUpcomingReservationByHotelIdAndRoomId(
+            @Param(HOTEL_ID_PARAM) UUID hotelId,
+            @Param("roomId") UUID roomId,
+            @Param("today") LocalDate today
+    );
+
+    /**
      * Checks whether a guest has any reservation in this hotel whose status is not
      * in the given (terminal) set. Used by the guest-service GDPR Art. 17 erasure
      * legal-hold guard (T-GST-05) to block deletion while a booking is still live.
@@ -172,7 +206,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
     @Query("SELECT r FROM Reservation r WHERE r.hotelId = :hotelId "
             + "AND (:query IS NULL OR r.guestId IN :guestIds)")
     Page<Reservation> searchReservationsByHotelId(
-            @Param("hotelId") UUID hotelId,
+            @Param(HOTEL_ID_PARAM) UUID hotelId,
             @Param("query") String query,
             @Param("guestIds") List<UUID> guestIds,
             Pageable pageable);
@@ -207,7 +241,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
             + "AND r.checkInDate >= :checkInFrom "
             + "AND (:query IS NULL OR r.guestId IN :guestIds)")
     Page<Reservation> searchUpcomingReservationsByHotelId(
-            @Param("hotelId") UUID hotelId,
+            @Param(HOTEL_ID_PARAM) UUID hotelId,
             @Param("checkInFrom") LocalDate checkInFrom,
             @Param("query") String query,
             @Param("guestIds") List<UUID> guestIds,
@@ -238,7 +272,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
             + "AND r.status IN :statuses "
             + "AND (:query IS NULL OR r.guestId IN :guestIds)")
     Page<Reservation> filterReservationsByHotelId(
-            @Param("hotelId") UUID hotelId,
+            @Param(HOTEL_ID_PARAM) UUID hotelId,
             @Param("dateFrom") LocalDate dateFrom,
             @Param("dateTo") LocalDate dateTo,
             @Param("statuses") Collection<ReservationStatus> statuses,
