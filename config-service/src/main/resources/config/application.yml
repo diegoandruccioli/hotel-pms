@@ -11,6 +11,12 @@ spring:
       # without INTERNAL_REDIS_PASSWORD fails the same way POSTGRES_PASSWORD
       # already does — no silent fallback to an unauthenticated connection.
       password: ${INTERNAL_REDIS_PASSWORD:}
+      # Bound every Redis call. Lettuce's own default is 60 s, which is also nginx's proxy
+      # timeout: with Redis unreachable each request (the nonce claim on every internal call
+      # included) hung for a minute and the client saw a 504 instead of a fast, explicit
+      # failure (found in a live check, 2026-10-31).
+      timeout: 2s
+      connect-timeout: 2s
 
 logging:
   pattern:

@@ -462,7 +462,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -518,7 +518,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -572,7 +572,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -637,7 +637,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -693,7 +693,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -745,7 +745,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -803,7 +803,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s

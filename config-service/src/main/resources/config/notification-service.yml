@@ -44,6 +44,12 @@ management:
       probes:
         enabled: true
       show-details: when-authorized
+      group:
+        readiness:
+          # Redis is a hard dependency (rate limiter / nonce store / token blacklist): a lost
+          # connection must show in readiness. Liveness stays Redis-free on purpose, so an
+          # outage never makes a service look like it needs a restart.
+          include: readinessState,redis
   health:
     livenessstate:
       enabled: true
