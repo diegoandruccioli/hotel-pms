@@ -14,6 +14,8 @@ public interface NonceStore {
      * @param ttlSeconds how long the claim is remembered, in seconds
      * @return {@code true} if the nonce had not been claimed before (fresh),
      *         {@code false} if it was already claimed (replay)
+     * @throws NonceStoreUnavailableException if the backing store cannot be reached or does not answer in time,
+     *         so the claim could not be made — distinct from a replay
      */
     boolean claim(String nonce, long ttlSeconds);
 }

@@ -49,6 +49,7 @@ class InternalAuthFilterTest {
     private static final List<String> EXCLUDED_PATH_PREFIXES = List.of("/actuator", "/api/v1/public");
 
     private static final int UNAUTHORIZED = HttpServletResponse.SC_UNAUTHORIZED;
+    private static final int SERVICE_UNAVAILABLE = HttpServletResponse.SC_SERVICE_UNAVAILABLE;
     private static final int OK = HttpServletResponse.SC_OK;
 
     private static final long REPLAY_WINDOW_SECONDS = 60;
@@ -124,6 +125,13 @@ class InternalAuthFilterTest {
         @Override
         public boolean claim(final String nonce, final long ttlSeconds) {
             return claimed.add(nonce);
+        }
+    }
+
+    private static final class UnavailableNonceStore implements NonceStore {
+        @Override
+        public boolean claim(final String nonce, final long ttlSeconds) {
+            throw new NonceStoreUnavailableException("nonce store down", new IllegalStateException("redis down"));
         }
     }
 
@@ -419,6 +427,30 @@ class InternalAuthFilterTest {
             filter.doFilter(replayedRequest, replayedResponse, new MockFilterChain());
 
             assertThat(replayedResponse.getStatus()).isEqualTo(UNAUTHORIZED);
+        }
+
+        @Test
+        @DisplayName("Nonce store unavailable → 503, fail-closed: chain not run, nothing authenticated")
+        void shouldFailClosedWith503WhenTheNonceStoreIsUnavailable()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            final InternalAuthFilter unavailable = new InternalAuthFilter(
+                    filterHmacMaterial(), new UnavailableNonceStore(), EXCLUDED_PATH_PREFIXES);
+            final String timestamp = String.valueOf(System.currentTimeMillis());
+            final String nonce = freshNonce();
+            final String sig = computeHmac(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce);
+            final MockHttpServletRequest request =
+                    buildRequest(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce, sig);
+            final MockHttpServletResponse response = new MockHttpServletResponse();
+            final MockFilterChain chain = new MockFilterChain();
+
+            unavailable.doFilter(request, response, chain);
+
+            assertThat(response.getStatus()).isEqualTo(SERVICE_UNAVAILABLE);
+            assertThat(response.getContentAsString()).contains("\"error\"");
+            assertThat(chain.getRequest())
+                    .as("a request whose replay check could not run must never reach the controller")
+                    .isNull();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         }
 
         @Test
