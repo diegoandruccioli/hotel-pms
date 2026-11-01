@@ -12,6 +12,7 @@ import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
 import com.hotelpms.frontdesk.rooms.mapper.RoomMapper;
+import com.hotelpms.frontdesk.reservations.repository.ReservationRepository;
 import com.hotelpms.frontdesk.rooms.repository.RoomRepository;
 import com.hotelpms.frontdesk.rooms.repository.RoomTypeRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +26,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -51,6 +53,9 @@ class RoomServiceImplTest {
 
     @Mock
     private RoomTypeRepository roomTypeRepository;
+
+    @Mock
+    private ReservationRepository reservationRepository;
 
     @Mock
     private RoomMapper roomMapper;
@@ -547,6 +552,20 @@ class RoomServiceImplTest {
                 () -> roomService.deleteRoom(roomId, hotelId));
 
         assertEquals("ROOM_OCCUPIED_CANNOT_BE_DELETED", ex.getMessage());
+        verify(roomRepository, never()).delete(org.mockito.ArgumentMatchers.any(Room.class));
+    }
+
+    @Test
+    void testDeleteRoomRejectedWhileItHasUpcomingReservations() {
+        when(roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(roomId, hotelId)).thenReturn(Optional.of(room));
+        when(reservationRepository.existsUpcomingReservationByHotelIdAndRoomId(
+                org.mockito.ArgumentMatchers.eq(hotelId), org.mockito.ArgumentMatchers.eq(roomId),
+                org.mockito.ArgumentMatchers.any(LocalDate.class))).thenReturn(true);
+
+        final ConflictException ex = assertThrows(ConflictException.class,
+                () -> roomService.deleteRoom(roomId, hotelId));
+
+        assertEquals("ROOM_HAS_UPCOMING_RESERVATIONS", ex.getMessage());
         verify(roomRepository, never()).delete(org.mockito.ArgumentMatchers.any(Room.class));
     }
 

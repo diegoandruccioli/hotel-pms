@@ -174,7 +174,19 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (!nonceStore.claim(nonce, NONCE_TTL_SECONDS)) {
+        final boolean fresh;
+        try {
+            fresh = nonceStore.claim(nonce, NONCE_TTL_SECONDS);
+        } catch (final NonceStoreUnavailableException e) {
+            // Fail closed: without the replay check the request is not admitted. 503, not 401/403 — the
+            // signature may well be valid, and the caller must be able to tell an outage from a rejection.
+            // One line, no stack trace: during an outage every request lands here.
+            LOG.error("[InternalAuthFilter] Replay check unavailable ({}), rejecting request with 503",
+                    e.getCause() == null ? e.getMessage() : e.getCause().getClass().getSimpleName());
+            rejectUnavailable(response, "Internal authentication temporarily unavailable");
+            return;
+        }
+        if (!fresh) {
             // codeql[java/log-injection]: see sanitizeForLog note above.
             LOG.warn("[InternalAuthFilter] Replayed nonce detected for user={}", sanitizeForLog(username));
             rejectRequest(response, "Request signature already used");
@@ -304,6 +316,12 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
 
     private void rejectRequest(final HttpServletResponse response, final String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"error\":\"" + message + "\"}");
+    }
+
+    private void rejectUnavailable(final HttpServletResponse response, final String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
         response.setContentType("application/json");
         response.getWriter().write("{\"error\":\"" + message + "\"}");
     }
