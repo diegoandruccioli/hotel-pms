@@ -102,17 +102,21 @@ jobs:
       # persist or rotate. Real third-party integrations (Alloggiati, SMTP)
       # are intentionally NOT configured — docker-compose.yml already
       # defaults them to CI-safe placeholders / mailpit.
+      #
+      # The secrets come from the project's own idempotent bootstrap script, not
+      # a hand-written list: the list used to miss the per-service PostgreSQL
+      # passwords and the encryption key/salt pairs, so the services started
+      # without a DB password (SCRAM auth failure) and never became healthy. The
+      # script is what a local first start runs, so it cannot drift from
+      # docker-compose.yml. It only appends to application*.yml in the working
+      # tree, and the images are already built at this point.
       - name: Generate ephemeral .env for the stack
         run: |
+          bash setup-hmac-secret.sh
           {
-            echo "INTERNAL_HMAC_SECRET=$(openssl rand -hex 32)"
-            echo "JWT_SECRET=$(openssl rand -base64 48)"
-            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
-            echo "REDIS_PASSWORD=$(openssl rand -hex 16)"
-            echo "CONFIG_SERVER_PASSWORD=$(openssl rand -hex 24)"
             echo "SMTP_HOST=mailpit"
             echo "SMTP_PORT=1025"
-          } > .env
+          } >> .env
 
       - name: Install Playwright system dependencies
         working-directory: frontend
