@@ -12,8 +12,11 @@ name: E2E Live Nightly
 #
 # Branching model (docs/BRANCH_STRATEGY.md, 2026-10-31): the nightly tests
 # `develop` (scheduled workflows only run from the default branch, so the
-# checkout below pins the ref explicitly), and the suite also gates every PR
-# into `main` — the develop -> main promotion and hotfixes — not feature PRs.
+# checkout below pins the ref explicitly). Once the suite has been proven green
+# in CI it is meant to also gate PRs into `main` (the develop -> main promotion
+# and hotfixes, not feature PRs): re-add the `pull_request` trigger and make the
+# job a required check at that point. It has not been run in CI before, so for
+# now it is nightly + on demand only.
 #
 # No real third-party credentials are used: Alloggiati runs in its CI
 # placeholder/dry-run mode and email goes to mailpit, both via
@@ -23,8 +26,6 @@ name: E2E Live Nightly
 on:
   schedule:
     - cron: "30 2 * * *" # 02:30 UTC nightly
-  pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
       grep:
@@ -118,9 +119,12 @@ jobs:
             echo "SMTP_PORT=1025"
           } >> .env
 
-      - name: Install Playwright system dependencies
+      # Unlike the mocked suite (playwright.config.ts uses the runner's Chrome via
+      # `channel: 'chrome'` in CI), playwright-live.config.ts launches the bundled
+      # Chromium, so the browser itself must be installed, not just its system libs.
+      - name: Install Playwright browser and system dependencies
         working-directory: frontend
-        run: npx playwright install-deps chromium
+        run: npx playwright install --with-deps chromium
 
       # --wait blocks until every service with a healthcheck (or its
       # dependents, via depends_on: service_healthy) reports healthy, or

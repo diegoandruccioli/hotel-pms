@@ -82,13 +82,14 @@ hotfix/<slug> (da main)            --PR-->  main, poi main riportato in develop
   lunghi per servizio divergono e l'integrazione si romperebbe tutta al merge).
 - Tutto passa da PR. `develop` e `main` sono protetti, senza bypass nemmeno per l'admin, con la CI
   completa (nessun filtro per percorso).
-- **Promozione `develop` → `main`**: PR di rilascio con E2E live (`e2e-live-nightly.yml` gira anche
-  sulle PR verso `main`), gate Trivy e checklist di rilascio. Tag `rcN` su `develop` prima del
-  merge, `vX.Y.Z` su `main` dopo.
+- **Promozione `develop` → `main`**: PR di rilascio con CI completa, gate Trivy e checklist di
+  rilascio. L'E2E live (`e2e-live-nightly.yml`, oggi nightly su `develop` e su richiesta) diventerà
+  anche cancello sulle PR verso `main` quando la suite sarà provata verde in CI. Tag `rcN` su
+  `develop` prima del merge, `vX.Y.Z` su `main` dopo.
 - **`epic/<nome>`**: solo per sforzi lunghi e trasversali (precedenti: `ui-redesign`,
   `frontdesk-consolidation`). Le PR figlie hanno base l'epic, una sola PR finale verso `develop`,
   poi il branch viene eliminato.
-- **Hotfix**: da `main`, PR verso `main` con CI e E2E live, poi `main` riportato in `develop`.
+- **Hotfix**: da `main`, PR verso `main` con CI completa, poi `main` riportato in `develop`.
 - **Sicurezza**: `feature/secure-coding-hardening` resta permanente (storico dell'esame); i suoi
   commit entrano in `develop` e arrivano a `main` con il rilascio. L'hook `security-branch-guard`
   non cambia.
