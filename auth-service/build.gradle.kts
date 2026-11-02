@@ -40,6 +40,10 @@ dependencies {
     implementation(project(":common-web-lib"))
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    // Native transport so Lettuce can apply TCP_USER_TIMEOUT (RedisSocketOptions); without it Lettuce falls back to
+    // NIO, keeps only the keepalive and logs a warning. Version managed by the Spring Boot / Netty BOM.
+    runtimeOnly("io.netty:netty-transport-native-epoll::linux-x86_64")
+    runtimeOnly("io.netty:netty-transport-native-epoll::linux-aarch_64")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-security")

@@ -43,6 +43,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     // Redis-backed nonce store for internal HMAC anti-replay (T-GW-08)
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    // Native transport so Lettuce can apply TCP_USER_TIMEOUT (RedisSocketOptions); without it Lettuce falls back to
+    // NIO, keeps only the keepalive and logs a warning. Version managed by the Spring Boot / Netty BOM.
+    runtimeOnly("io.netty:netty-transport-native-epoll::linux-x86_64")
+    runtimeOnly("io.netty:netty-transport-native-epoll::linux-aarch_64")
     implementation("org.springframework.cloud:spring-cloud-starter-config")
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign") {
         exclude(group = "org.springframework.cloud", module = "spring-cloud-starter-netflix-eureka-client")
