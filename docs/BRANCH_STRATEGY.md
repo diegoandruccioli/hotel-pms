@@ -126,7 +126,11 @@ hotfix/<slug> (da main)            --PR-->  main, poi main riportato in develop
 `.github/dependabot.yml` apre branch/PR automatici (`dependabot/gradle/...`, `dependabot/npm_and_yarn/...`,
 `dependabot/docker/<servizio>/...`, `dependabot/github_actions/...`) — **non fanno parte della
 topologia sopra**, non richiedono governance dedicata, e vengono chiusi/mergiati per PR review
-ordinaria. Un'eccezione da tenere presente:
+ordinaria. Dal 2026-11-02 le PR di **aggiornamento versioni** hanno base `develop`
+(`target-branch: "develop"` in `dependabot.yml`, letto dal branch predefinito `main`, quindi attivo
+dopo la promozione). Le PR di **aggiornamento di sicurezza** vanno sempre sul branch predefinito
+(`main`) indipendentemente da `target-branch`: si trattano come hotfix, con `main` poi riportato in
+`develop`. Un'eccezione da tenere presente:
 
 - **Java 21 → 25**: esistono 8 PR Dependabot separate (una per servizio) che bumpano *solo* il
   Dockerfile (`eclipse-temurin:21-jre-alpine` → `25-jre-alpine`), lasciando toolchain Gradle e CI

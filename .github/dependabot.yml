@@ -1,8 +1,13 @@
+# Version-update PRs target develop (docs/BRANCH_STRATEGY.md, 2026-11-02). Dependabot reads this
+# file from the default branch (main), so it only takes effect once develop is promoted.
+# Security-update PRs always target the default branch regardless of target-branch: treat them
+# as hotfixes (PR into main, then bring main back into develop).
 version: 2
 updates:
   # ── Backend: Gradle (root build covers all subprojects via settings.gradle.kts) ──
   - package-ecosystem: "gradle"
     directory: "/"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -22,6 +27,7 @@ updates:
   # ── Frontend: npm ────────────────────────────────────────────────────────────
   - package-ecosystem: "npm"
     directory: "/frontend"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -34,6 +40,7 @@ updates:
   # ── GitHub Actions workflows ─────────────────────────────────────────────────
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -49,6 +56,7 @@ updates:
   # a per-service runtime-only bump. See docs/BRANCH_STRATEGY.md "Branch automatici (Dependabot)".
   - package-ecosystem: "docker"
     directory: "/api-gateway"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -60,6 +68,7 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/auth-service"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -71,6 +80,7 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/billing-service"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -82,6 +92,7 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/config-service"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -93,6 +104,7 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/fb-service"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -104,6 +116,7 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/frontdesk-service"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -115,6 +128,7 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/guest-service"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -126,6 +140,7 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/notification-service"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -137,6 +152,7 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/frontend"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -151,6 +167,7 @@ updates:
   # `image:` reference here, redis/loki/grafana/zipkin/prometheus/alertmanager still are.
   - package-ecosystem: "docker"
     directory: "/"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
@@ -162,6 +179,7 @@ updates:
   # covered either — found during the same backup-hardening pass).
   - package-ecosystem: "docker"
     directory: "/docker/postgres"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
     cooldown:
