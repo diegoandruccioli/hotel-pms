@@ -133,6 +133,27 @@ jobs:
       - name: Start full Docker stack
         run: docker compose --env-file .env up -d --wait --wait-timeout 300
 
+      # A fresh stack seeds admin/password with must_change_password=true, but
+      # the suite logs in as the seed admin with E2E_ADMIN_PASSWORD (default: a
+      # password rotated on the maintainer's local stack). Rotate the seed
+      # password through the real change-password endpoint to an ephemeral
+      # value so setup can log in; the stack is torn down at the end of the job.
+      - name: Rotate seed admin password
+        run: |
+          E2E_ADMIN_PASSWORD="Ci$(openssl rand -hex 12)!!A1B2"
+          echo "::add-mask::$E2E_ADMIN_PASSWORD"
+          jar="$(mktemp)"
+          curl -fsS -c "$jar" -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"password"}' \
+            http://localhost/api/v1/auth/login > /dev/null
+          csrf="$(awk '$6=="csrf_token"{print $7}' "$jar")"
+          curl -fsS -b "$jar" -c "$jar" -H 'Content-Type: application/json' \
+            -H "X-CSRF-Token: $csrf" \
+            -d "{\"currentPassword\":\"password\",\"newPassword\":\"$E2E_ADMIN_PASSWORD\"}" \
+            http://localhost/api/v1/auth/change-password
+          rm -f "$jar"
+          echo "E2E_ADMIN_PASSWORD=$E2E_ADMIN_PASSWORD" >> "$GITHUB_ENV"
+
       - name: Run Playwright e2e-live suite
         working-directory: frontend
         env:
