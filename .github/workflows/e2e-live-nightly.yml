@@ -1,0 +1,191 @@
+name: E2E Live Nightly
+
+# ── Purpose ─────────────────────────────────────────────────────────────────
+# Runs the frontend/e2e-live suite (37 specs / 158 tests) against the FULL
+# real Docker stack — every backend service, Postgres, Redis, mailpit — not
+# the page.route()-mocked suite that already gates every push (ci.yml `e2e`
+# job, which boots only the frontend container). This is the suite that
+# catches backend-contract bugs a mock can't (see playwright-live.config.ts
+# header comment). It was deliberately left out of per-push CI (2026-07-30,
+# Fase 7 scoping) because a full-stack boot + ~10-15 min run is too slow for
+# a merge gate — it runs nightly instead, plus on demand.
+#
+# Branching model (docs/BRANCH_STRATEGY.md, 2026-10-31): the nightly tests
+# `develop` (scheduled workflows only run from the default branch, so the
+# checkout below pins the ref explicitly). Once the suite has been proven green
+# in CI it is meant to also gate PRs into `main` (the develop -> main promotion
+# and hotfixes, not feature PRs): re-add the `pull_request` trigger and make the
+# job a required check at that point. It has not been run in CI before, so for
+# now it is nightly + on demand only.
+#
+# No real third-party credentials are used: Alloggiati runs in its CI
+# placeholder/dry-run mode and email goes to mailpit, both via
+# docker-compose.yml's built-in defaults. All secrets below are generated
+# fresh for the run (ephemeral single-run stack, nothing to persist or leak).
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  schedule:
+    - cron: "30 2 * * *" # 02:30 UTC nightly
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: "Optional Playwright --grep pattern to limit which specs run (e.g. a filename fragment)"
+        required: false
+        default: ""
+
+jobs:
+  e2e-live:
+    name: "E2E Live — Full Docker Stack + Playwright"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # One nightly run at a time; a manual dispatch never cancels the nightly
+    # (or another manual run) mid-flight — same reasoning as the mocked `e2e`
+    # job in ci.yml.
+    concurrency:
+      group: e2e-live-nightly
+      cancel-in-progress: false
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Empty string = the triggering ref (PR merge ref, or the branch picked
+          # for workflow_dispatch); the nightly schedule is pinned to develop.
+          ref: ${{ github.event_name == 'schedule' && 'develop' || '' }}
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: "21"
+          distribution: temurin
+
+      - name: Cache Gradle packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      # Only the bootable jars are needed (docker build COPYs
+      # */build/libs/*-SNAPSHOT.jar) — skip tests/PMD/Checkstyle, ci.yml's
+      # `backend` job already gates those on every push.
+      - name: Build backend jars
+        run: ./gradlew bootJar --no-daemon
+
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Build all Docker images (with layer cache)
+        run: |
+          docker buildx bake \
+            --file docker-compose.yml \
+            --load \
+            --set "*.cache-from=type=gha" \
+            --set "*.cache-to=type=gha,mode=max"
+
+      # Ephemeral secrets: this stack lives only for the duration of this job
+      # and is torn down (with volumes) at the end, so there is nothing to
+      # persist or rotate. Real third-party integrations (Alloggiati, SMTP)
+      # are intentionally NOT configured — docker-compose.yml already
+      # defaults them to CI-safe placeholders / mailpit.
+      #
+      # The secrets come from the project's own idempotent bootstrap script, not
+      # a hand-written list: the list used to miss the per-service PostgreSQL
+      # passwords and the encryption key/salt pairs, so the services started
+      # without a DB password (SCRAM auth failure) and never became healthy. The
+      # script is what a local first start runs, so it cannot drift from
+      # docker-compose.yml. It only appends to application*.yml in the working
+      # tree, and the images are already built at this point.
+      - name: Generate ephemeral .env for the stack
+        run: |
+          bash setup-hmac-secret.sh
+          {
+            echo "SMTP_HOST=mailpit"
+            echo "SMTP_PORT=1025"
+          } >> .env
+
+      # Unlike the mocked suite (playwright.config.ts uses the runner's Chrome via
+      # `channel: 'chrome'` in CI), playwright-live.config.ts launches the bundled
+      # Chromium, so the browser itself must be installed, not just its system libs.
+      - name: Install Playwright browser and system dependencies
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # --wait blocks until every service with a healthcheck (or its
+      # dependents, via depends_on: service_healthy) reports healthy, or
+      # fails the step — api-gateway depends on all 5 domain services plus
+      # postgres/redis/config-server, so this alone proves the stack is up.
+      - name: Start full Docker stack
+        run: docker compose --env-file .env up -d --wait --wait-timeout 300
+
+      - name: Run Playwright e2e-live suite
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_LIVE_BASE_URL: http://localhost
+          # Passed as an env var, never interpolated into the script via
+          # ${{ }} — a workflow_dispatch input is attacker-controlled text
+          # and direct ${{ inputs.grep }} interpolation into `run:` would be
+          # a template-injection into the shell (GitHub Actions script
+          # injection), not just a quoting bug.
+          GREP_PATTERN: ${{ inputs.grep }}
+        run: |
+          if [ -n "$GREP_PATTERN" ]; then
+            npm run test:e2e:live -- --grep "$GREP_PATTERN"
+          else
+            npm run test:e2e:live
+          fi
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: playwright-live-report
+          path: frontend/playwright-report/
+          retention-days: 30
+
+      - name: Upload QA artifacts (chaos logs, snapshots)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: qa-artifacts
+          path: qa-artifacts/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: |
+          {
+            echo "=== CONTAINER STATUS ==="
+            docker compose ps --all
+            echo ""
+            echo "=== CONTAINER LOGS ==="
+            docker compose logs --tail=1000
+          } > /tmp/docker-logs.txt 2>&1 || true
+
+      - name: Upload container logs on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: docker-container-logs
+          path: /tmp/docker-logs.txt
+          retention-days: 3
+
+      - name: Tear down Docker stack and volumes
+        if: always()
+        run: docker compose down -v
