@@ -5845,17 +5845,30 @@ loro TTL. Impostando \texttt{DnsResolvers.JVM\_DEFAULT} tramite un
 \`e rimasto bloccato per tutti i 300 secondi.
 \end{notebox}
 
-\begin{notebox}[title={Residuo noto --- connessioni mezze aperte}]
-Il fix DNS non copre il caso in cui il peer scompaia senza chiudere la
+\begin{notebox}[title={Seguito --- connessioni mezze aperte (risolto)}]
+Il fix DNS non copriva il caso in cui il peer scompaia senza chiudere la
 connessione (per esempio un \texttt{docker network disconnect} a caldo): il
-socket resta \texttt{ESTABLISHED}, i comandi scadono dopo 2 secondi ma Lettuce
-non riconnette, perch\'e il TCP keepalive \`e spento di default (2 ore a livello
-di sistema). Serve \texttt{KeepAliveOptions}, da progettare a parte perch\'e
-sostituirebbe le \texttt{SocketOptions} impostate da Spring Boot, compreso il
-\texttt{connect-timeout} di 2 secondi.
+socket restava \texttt{ESTABLISHED}, i comandi scadevano dopo 2 secondi ma
+Lettuce non riconnetteva mai (0 servizi su 7 in oltre 8 minuti, senza alcun
+warning). Il keepalive TCP \`e spento di default in Lettuce e quello del kernel
+parte dopo 2 ore; inoltre Linux non invia probe di keepalive finch\'e ci sono
+dati in volo, e questi servizi mandano comandi di continuo (readiness, claim del
+nonce), quindi il kernel abbandonava la connessione solo dopo
+\texttt{tcp\_retries2}, circa 15 minuti. Per questo il solo keepalive non
+sarebbe bastato: \texttt{RedisSocketOptions} imposta keepalive (10 secondi di
+inattivit\`a, 3 probe a 5 secondi) e \texttt{TCP\_USER\_TIMEOUT} a 30 secondi,
+che chiude il socket quando i dati inviati restano senza conferma. Il
+\texttt{connect-timeout} di Spring Boot viene riletto e riapplicato, perch\'e
+Boot applica i customizer dopo le proprie \texttt{SocketOptions} e le
+sostituirebbero. \texttt{TCP\_USER\_TIMEOUT} richiede il trasporto nativo,
+quindi ai 6 servizi servlet (prima su NIO) \`e stato aggiunto
+\texttt{netty-transport-native-epoll}; il gateway lo aveva gi\`a. Nella prova
+con disconnessione a caldo e traffico in corso, 7 servizi su 7 si sono
+riconnessi da soli in 31--56 secondi, contro 0 su 7 in 300 secondi con il solo
+fix DNS.
 \end{notebox}
 
-\paragraph{Riferimento} Commit: \commitref{e633a72e}{fix(internal-auth): fail closed with 503 when the replay-check store is unavailable}, \commitref{4eef1747}{fix(redis): resolve the Redis host again on every reconnect so a moved Redis is picked up}
+\paragraph{Riferimento} Commit: \commitref{e633a72e}{fix(internal-auth): fail closed with 503 when the replay-check store is unavailable}, \commitref{4eef1747}{fix(redis): resolve the Redis host again on every reconnect so a moved Redis is picked up}, \commitref{f62d9081}{fix(redis): close half-open Redis connections with TCP keepalive and user timeout}
 
 % ─────────────────────────────────────────────────────────────────────────────
 % ═════════════════════════════════════════════════════════════════════════════
