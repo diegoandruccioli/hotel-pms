@@ -50,10 +50,14 @@ dependencies {
     api("io.github.openfeign:feign-core")
     implementation("org.springframework.data:spring-data-redis")
     implementation("org.slf4j:slf4j-api")
+    // Only com.hotelpms.internalauth.redis touches Lettuce; every consuming service already has it at runtime
+    // through spring-boot-starter-data-redis, so it is not forced onto them from here.
+    compileOnly("io.lettuce:lettuce-core")
 
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core")
     testImplementation("org.springframework:spring-test")
+    testImplementation("io.lettuce:lettuce-core")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     // ADR-004: the shared ArchUnit rule builder (TenantIsolationRules) consumed
