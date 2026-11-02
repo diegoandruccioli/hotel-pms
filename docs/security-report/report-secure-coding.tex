@@ -5830,15 +5830,45 @@ timeout, connection factory fermata, errore non legato ai dati che non viene
 mascherato) e \texttt{InternalAuthFilterTest} (503, catena non invocata,
 nessuna autenticazione).
 
-\begin{notebox}[title={Residuo noto --- riconnessione dopo un cambio di IP di Redis}]
-Riproducendo il problema spostando Redis su un altro indirizzo, nessuno dei 7
-servizi si \`e riconnesso in oltre 11 minuti, pur raggiungendo il nuovo IP: il
-client Lettuce continua a riprovare l'indirizzo vecchio. Il fix qui sopra
-rende il guasto veloce, esplicito e visibile, ma non lo fa rientrare da solo.
-\`E un intervento separato (risoluzione DNS del client Redis).
+\begin{notebox}[title={Seguito --- riconnessione dopo un cambio di IP di Redis (risolto)}]
+Il fix qui sopra rende il guasto veloce, esplicito e visibile, ma non lo faceva
+rientrare da solo. Fermando Redis e riavviandolo su un altro indirizzo, nessuno
+dei 7 servizi si riconnetteva in oltre 11 minuti, pur con il nome gi\`a risolto
+al nuovo IP e la porta raggiungibile. La causa \`e nel client: dalla versione
+4.4 Lettuce usa \texttt{DnsResolvers.UNRESOLVED} e, con
+\texttt{netty-resolver-dns} nel classpath (c'\`e su ogni servizio), la
+risoluzione passa dal resolver di Netty, che tiene i record in cache per il
+loro TTL. Impostando \texttt{DnsResolvers.JVM\_DEFAULT} tramite un
+\texttt{ClientResourcesBuilderCustomizer} resta solo la cache breve della JVM
+(30 secondi). Nella stessa prova, i servizi con il fix si sono riconnessi in
+32--33 secondi mentre \texttt{notification-service} costruito da \texttt{main}
+\`e rimasto bloccato per tutti i 300 secondi.
 \end{notebox}
 
-\paragraph{Riferimento} Commit: \commitref{e633a72e}{fix(internal-auth): fail closed with 503 when the replay-check store is unavailable}
+\begin{notebox}[title={Seguito --- connessioni mezze aperte (risolto)}]
+Il fix DNS non copriva il caso in cui il peer scompaia senza chiudere la
+connessione (per esempio un \texttt{docker network disconnect} a caldo): il
+socket restava \texttt{ESTABLISHED}, i comandi scadevano dopo 2 secondi ma
+Lettuce non riconnetteva mai (0 servizi su 7 in oltre 8 minuti, senza alcun
+warning). Il keepalive TCP \`e spento di default in Lettuce e quello del kernel
+parte dopo 2 ore; inoltre Linux non invia probe di keepalive finch\'e ci sono
+dati in volo, e questi servizi mandano comandi di continuo (readiness, claim del
+nonce), quindi il kernel abbandonava la connessione solo dopo
+\texttt{tcp\_retries2}, circa 15 minuti. Per questo il solo keepalive non
+sarebbe bastato: \texttt{RedisSocketOptions} imposta keepalive (10 secondi di
+inattivit\`a, 3 probe a 5 secondi) e \texttt{TCP\_USER\_TIMEOUT} a 30 secondi,
+che chiude il socket quando i dati inviati restano senza conferma. Il
+\texttt{connect-timeout} di Spring Boot viene riletto e riapplicato, perch\'e
+Boot applica i customizer dopo le proprie \texttt{SocketOptions} e le
+sostituirebbero. \texttt{TCP\_USER\_TIMEOUT} richiede il trasporto nativo,
+quindi ai 6 servizi servlet (prima su NIO) \`e stato aggiunto
+\texttt{netty-transport-native-epoll}; il gateway lo aveva gi\`a. Nella prova
+con disconnessione a caldo e traffico in corso, 7 servizi su 7 si sono
+riconnessi da soli in 31--56 secondi, contro 0 su 7 in 300 secondi con il solo
+fix DNS.
+\end{notebox}
+
+\paragraph{Riferimento} Commit: \commitref{e633a72e}{fix(internal-auth): fail closed with 503 when the replay-check store is unavailable}, \commitref{4eef1747}{fix(redis): resolve the Redis host again on every reconnect so a moved Redis is picked up}, \commitref{f62d9081}{fix(redis): close half-open Redis connections with TCP keepalive and user timeout}
 
 % ─────────────────────────────────────────────────────────────────────────────
 % ═════════════════════════════════════════════════════════════════════════════
