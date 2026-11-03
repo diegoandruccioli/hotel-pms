@@ -117,6 +117,8 @@ jobs:
           {
             echo "SMTP_HOST=mailpit"
             echo "SMTP_PORT=1025"
+            # second-tenant admin used by the cross-tenant IDOR specs
+            echo "AUTH_SEED_E2E_FIXTURES=true"
           } >> .env
 
       # Unlike the mocked suite (playwright.config.ts uses the runner's Chrome via
