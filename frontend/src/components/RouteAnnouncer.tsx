@@ -15,6 +15,7 @@ export const RouteAnnouncer = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const liveRef = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
     const entry = resolveAnnouncement(location.pathname);
@@ -29,6 +30,12 @@ export const RouteAnnouncer = () => {
     // land somewhere meaningful after navigating, instead of focus staying
     // on the (now stale) nav link/button that triggered the navigation.
     // The skip link already targets this same element (MainLayout.tsx).
+    // Not on the first render: a fresh page load must leave focus on the
+    // document so the skip link is the first Tab stop (WCAG 2.4.1).
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     document.getElementById('main-content')?.focus();
   }, [location.pathname, t]);
 

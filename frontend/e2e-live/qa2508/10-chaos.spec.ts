@@ -31,6 +31,10 @@ const ROLES = [
 // click/navigate/back/forward/refresh/resize/palette/escape/random-type.
 const STEPS_PER_SESSION = Number(process.env.CHAOS_STEPS ?? 60);
 
+// A single slow navigation can cost up to 30 s; stopping the walk well inside the 180 s test timeout
+// keeps a slow runner from turning a clean walk into a timeout (steps skipped are logged).
+const WALK_BUDGET_MS = 120_000;
+
 test.describe('Blocco 8 — chaos (deterministic random walk)', () => {
   for (const role of ROLES) {
     test(`random walk: ${role.role} (seed logged for replay)`, async ({ page }) => {
@@ -51,7 +55,7 @@ test.describe('Blocco 8 — chaos (deterministic random walk)', () => {
         .filter((r) => !r.path.includes('__')) // skip parametric placeholders — Blocco 2 already covers real/missing/malformed ids explicitly
         .map((r) => r.path);
 
-      const result = await runChaosWalk(page, guard, { routes, steps: STEPS_PER_SESSION });
+      const result = await runChaosWalk(page, guard, { routes, steps: STEPS_PER_SESSION, deadlineMs: WALK_BUDGET_MS });
 
       const logPath = path.join(ARTIFACT_DIR, `chaos-${role.role.toLowerCase()}-seed-${result.seed}.json`);
       writeFileSync(logPath, JSON.stringify(result, null, 2), 'utf-8');

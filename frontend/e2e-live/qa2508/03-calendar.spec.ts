@@ -15,11 +15,11 @@ test.describe('Blocco 3 — Calendar', () => {
     await page.getByRole('heading', { name: /calendario|calendar/i }).waitFor();
     guard.checkpoint('calendar loaded (planning view by default)');
 
-    await page.getByRole('button', { name: /vista a mese|month view/i }).click();
+    await page.getByRole('radio', { name: /vista a mese|month view/i }).click();
     await page.waitForTimeout(500);
     guard.checkpoint('switched to month view');
 
-    await page.getByRole('button', { name: /tabellone planning|planning board/i }).click();
+    await page.getByRole('radio', { name: /tabellone planning|planning board/i }).click();
     await page.waitForTimeout(500);
     guard.checkpoint('switched back to planning view');
 
