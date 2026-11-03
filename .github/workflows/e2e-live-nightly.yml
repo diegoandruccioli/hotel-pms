@@ -57,7 +57,7 @@ jobs:
           ref: ${{ github.event_name == 'schedule' && 'develop' || '' }}
 
       - name: Set up JDK 21 (Temurin)
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           java-version: "21"
           distribution: temurin
@@ -176,7 +176,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-live-report
           path: frontend/playwright-report/
@@ -184,7 +184,7 @@ jobs:
 
       - name: Upload QA artifacts (chaos logs, snapshots)
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: qa-artifacts
           path: qa-artifacts/
@@ -204,7 +204,7 @@ jobs:
 
       - name: Upload container logs on failure
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: docker-container-logs
           path: /tmp/docker-logs.txt
