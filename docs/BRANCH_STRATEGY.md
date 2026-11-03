@@ -83,8 +83,8 @@ hotfix/<slug> (da main)            --PR-->  main, poi main riportato in develop
 - Tutto passa da PR. `develop` e `main` sono protetti, senza bypass nemmeno per l'admin, con la CI
   completa (nessun filtro per percorso).
 - **Promozione `develop` → `main`**: PR di rilascio con CI completa, gate Trivy e checklist di
-  rilascio. L'E2E live (`e2e-live-nightly.yml`, oggi nightly su `develop` e su richiesta) diventerà
-  anche cancello sulle PR verso `main` quando la suite sarà provata verde in CI. Tag `rcN` su
+  rilascio. L'E2E live (`e2e-live-nightly.yml`: nightly su `develop`, su richiesta e sulle PR verso
+  `main`) è anche cancello obbligatorio sulle PR verso `main`, non sulle feature PR. Tag `rcN` su
   `develop` prima del merge, `vX.Y.Z` su `main` dopo.
 - **`epic/<nome>`**: solo per sforzi lunghi e trasversali (precedenti: `ui-redesign`,
   `frontdesk-consolidation`). Le PR figlie hanno base l'epic, una sola PR finale verso `develop`,
