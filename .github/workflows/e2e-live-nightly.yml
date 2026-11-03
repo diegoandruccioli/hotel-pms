@@ -12,11 +12,11 @@ name: E2E Live Nightly
 #
 # Branching model (docs/BRANCH_STRATEGY.md, 2026-10-31): the nightly tests
 # `develop` (scheduled workflows only run from the default branch, so the
-# checkout below pins the ref explicitly). Once the suite has been proven green
-# in CI it is meant to also gate PRs into `main` (the develop -> main promotion
-# and hotfixes, not feature PRs): re-add the `pull_request` trigger and make the
-# job a required check at that point. It has not been run in CI before, so for
-# now it is nightly + on demand only.
+# checkout below pins the ref explicitly). The suite has been proven green in CI
+# (run 41619391898, 183 passed), so it also gates PRs into `main` (the
+# develop -> main promotion and hotfixes, not feature PRs) and is a required
+# check there. No path filter on purpose: a required check that is skipped
+# leaves the PR unmergeable.
 #
 # No real third-party credentials are used: Alloggiati runs in its CI
 # placeholder/dry-run mode and email goes to mailpit, both via
@@ -24,6 +24,8 @@ name: E2E Live Nightly
 # fresh for the run (ephemeral single-run stack, nothing to persist or leak).
 # ─────────────────────────────────────────────────────────────────────────────
 on:
+  pull_request:
+    branches: [main]
   schedule:
     - cron: "30 2 * * *" # 02:30 UTC nightly
   workflow_dispatch:
@@ -38,11 +40,10 @@ jobs:
     name: "E2E Live — Full Docker Stack + Playwright"
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    # One nightly run at a time; a manual dispatch never cancels the nightly
-    # (or another manual run) mid-flight — same reasoning as the mocked `e2e`
-    # job in ci.yml.
+    # One run at a time per trigger and ref; a new run never cancels one
+    # mid-flight — same reasoning as the mocked `e2e` job in ci.yml.
     concurrency:
-      group: e2e-live-nightly
+      group: e2e-live-${{ github.event_name }}-${{ github.ref }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -117,6 +118,8 @@ jobs:
           {
             echo "SMTP_HOST=mailpit"
             echo "SMTP_PORT=1025"
+            # second-tenant admin used by the cross-tenant IDOR specs
+            echo "AUTH_SEED_E2E_FIXTURES=true"
           } >> .env
 
       # Unlike the mocked suite (playwright.config.ts uses the runner's Chrome via
@@ -132,6 +135,27 @@ jobs:
       # postgres/redis/config-server, so this alone proves the stack is up.
       - name: Start full Docker stack
         run: docker compose --env-file .env up -d --wait --wait-timeout 300
+
+      # A fresh stack seeds admin/password with must_change_password=true, but
+      # the suite logs in as the seed admin with E2E_ADMIN_PASSWORD (default: a
+      # password rotated on the maintainer's local stack). Rotate the seed
+      # password through the real change-password endpoint to an ephemeral
+      # value so setup can log in; the stack is torn down at the end of the job.
+      - name: Rotate seed admin password
+        run: |
+          E2E_ADMIN_PASSWORD="Ci$(openssl rand -hex 12)!!A1B2"
+          echo "::add-mask::$E2E_ADMIN_PASSWORD"
+          jar="$(mktemp)"
+          curl -fsS -c "$jar" -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"password"}' \
+            http://localhost/api/v1/auth/login > /dev/null
+          csrf="$(awk '$6=="csrf_token"{print $7}' "$jar")"
+          curl -fsS -b "$jar" -c "$jar" -H 'Content-Type: application/json' \
+            -H "X-CSRF-Token: $csrf" \
+            -d "{\"currentPassword\":\"password\",\"newPassword\":\"$E2E_ADMIN_PASSWORD\"}" \
+            http://localhost/api/v1/auth/change-password
+          rm -f "$jar"
+          echo "E2E_ADMIN_PASSWORD=$E2E_ADMIN_PASSWORD" >> "$GITHUB_ENV"
 
       - name: Run Playwright e2e-live suite
         working-directory: frontend
