@@ -391,9 +391,6 @@ services:
       - CONFIG_SERVER_PASSWORD=${CONFIG_SERVER_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
-      # Opt-in e2e fixture seed (auth-service.yml resolves ${AUTH_SEED_E2E_FIXTURES} here,
-      # on the config server). Stays false unless .env sets it; never set for production.
-      - AUTH_SEED_E2E_FIXTURES=${AUTH_SEED_E2E_FIXTURES:-false}
       - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
     healthcheck:
       test:
@@ -509,6 +506,8 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${AUTH_DB_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - JWT_SECRET=${JWT_SECRET}
+      # Opt-in e2e fixture seed. Stays false unless .env sets it; never set for production.
+      - AUTH_SEED_E2E_FIXTURES=${AUTH_SEED_E2E_FIXTURES:-false}
       - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
