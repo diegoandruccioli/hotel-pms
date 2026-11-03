@@ -34,7 +34,7 @@ test.describe('Blocco 3 — Guests', () => {
     guard.checkpoint('guest saved, modal closed');
 
     // Search
-    const search = page.getByPlaceholder(/cerca|search/i).first();
+    const search = page.getByLabel(/^cerca$|^search$/i).first();
     await search.fill(uniqueEmail);
     await page.waitForTimeout(500); // 300ms debounce
     await expect(page.getByText('Qa Round')).toBeVisible({ timeout: 5000 });

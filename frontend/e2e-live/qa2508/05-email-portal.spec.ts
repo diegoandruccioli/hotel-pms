@@ -67,7 +67,7 @@ test.describe('Blocco 5 (D4) — Email notifications', () => {
     await page.goto('/settings/system');
     await page.getByRole('heading', { name: /sistema|system/i }).waitFor();
 
-    const greeting = page.locator('#email-greeting-text');
+    const greeting = page.getByLabel(/testo di saluto|greeting/i);
     await expect(greeting).toBeVisible();
     await greeting.fill('QA25 greeting test');
     await greeting.blur();

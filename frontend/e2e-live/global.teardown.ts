@@ -14,6 +14,9 @@ import { LIVE_ADMIN, OTHER_HOTEL_ADMIN } from './fixtures/hotel';
 //   teardown closes the fixture stay first, the same real path checkout-live.spec.ts exercises
 //   (pay the invoice in full, then check out), and deletes the room only after that. A stay that
 //   cannot be closed keeps its room, and is listed at the end.
+// - A room with a PENDING/CONFIRMED reservation still ahead is refused with 409
+//   ROOM_HAS_UPCOMING_RESERVATIONS, so the fixture reservations are deleted before the rooms (the
+//   same DELETE the reservations page offers for those two statuses).
 // - It scans by prefix, so it also cleans what an interrupted earlier run left behind.
 // - Cleans both tenants the suite writes to: the live-suite hotel (E2E-LIVE-*) and the second
 //   tenant used by the cross-tenant specs (QA-OTHER-*, qa-fiscal-settings-matrix).
@@ -22,12 +25,15 @@ const FIXTURE_PREFIX = 'E2E-LIVE-';
 const OTHER_HOTEL_PREFIX = 'QA-OTHER-';
 const PAGE_SIZE = 200;
 const CENTS = 100;
+// Statuses the reservations page lets you delete, and the ones that block deleting a room.
+const DELETABLE_RESERVATION_STATUSES = new Set(['PENDING', 'CONFIRMED']);
 
 interface Page<T> {
     content: T[];
     last?: boolean;
 }
 interface RoomRow { id: string; roomNumber: string; status: string }
+interface ReservationRow { id: string; status: string; lineItems?: { roomId?: string | null }[] }
 interface StayRow { id: string; roomId: string; invoiceId?: string | null }
 interface InvoiceRow { totalAmount: number; status: string; payments: { amount: number }[] }
 
@@ -102,17 +108,28 @@ async function cleanTenant(
         }
     }
 
+    // Reservations still ahead on a fixture room make its delete answer 409: remove them first.
+    const reservations = (await listAll<ReservationRow>(request, '/api/v1/reservations')).filter(
+        (r) => DELETABLE_RESERVATION_STATUSES.has(r.status) && (r.lineItems ?? []).some((li) => li.roomId && deletable.has(li.roomId)),
+    );
+    for (const reservation of reservations) {
+        const response = await request.delete(`/api/v1/reservations/${reservation.id}`, { headers });
+        if (response.status() !== 204) unclosed.push(`reservation ${reservation.id}: ${response.status()} ${await response.text()}`);
+    }
+
     const statuses = new Map<number, number>();
+    const refusals: string[] = [];
     for (const id of deletable) {
-        const status = (await request.delete(`/api/v1/rooms/${id}`, { headers })).status();
-        statuses.set(status, (statuses.get(status) ?? 0) + 1);
+        const response = await request.delete(`/api/v1/rooms/${id}`, { headers });
+        statuses.set(response.status(), (statuses.get(response.status()) ?? 0) + 1);
+        if (response.status() !== 204) refusals.push(`room ${id}: ${response.status()} ${await response.text()}`);
     }
     const removed = statuses.get(204) ?? 0;
     console.log(
         `[teardown] ${label}: removed ${removed} of ${deletable.size} ${prefix}* rooms`
             + ` (${occupiedIds.size} were occupied, ${unclosed.length} problem(s) closing their stays)`,
     );
-    for (const problem of unclosed) console.warn(`[teardown] ${label}: left in place: ${problem}`);
+    for (const problem of [...unclosed, ...refusals]) console.warn(`[teardown] ${label}: left in place: ${problem}`);
     if (removed < deletable.size) {
         throw new Error(`[teardown] ${label}: some deletes failed, status counts: ${JSON.stringify([...statuses])}`);
     }
