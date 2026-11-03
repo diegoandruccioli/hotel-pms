@@ -50,7 +50,7 @@ test.describe('Blocco 1 — shell & global navigation', () => {
     guard.checkpoint('palette opened');
 
     await paletteInput.fill('camere');
-    await expect(page.getByText(/^camere$|^rooms$/i)).toBeVisible();
+    await expect(page.getByRole('option', { name: /camere|rooms/i })).toBeVisible();
     guard.checkpoint('palette filters nav by query');
 
     await page.keyboard.press('Escape');
