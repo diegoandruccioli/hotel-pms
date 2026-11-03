@@ -1,4 +1,5 @@
 import { request } from '@playwright/test';
+import { LIVE_ADMIN } from './fixtures/hotel';
 import { renameSync, statSync, writeFileSync } from 'node:fs';
 
 // The access-token cookie lives 15 minutes (AuthController.ACCESS_COOKIE_MAX_AGE)
@@ -11,7 +12,7 @@ import { renameSync, statSync, writeFileSync } from 'node:fs';
 // Runs in the runner process (Playwright `globalSetup`), which outlives the
 // worker. Once the setup project has written the file, it is refreshed
 // through POST /api/v1/auth/refresh (CSRF-exempt, rotates all three cookies)
-// before the access cookie can expire.
+// before the access cookie can expire, falling back to a fresh login.
 
 const STORAGE_STATE = 'e2e-live/.auth/admin.json';
 const CHECK_EVERY_MS = 60_000;
@@ -20,10 +21,20 @@ const REFRESH_AFTER_MS = 8 * 60_000;
 async function refreshStorageState(baseURL: string): Promise<void> {
     const context = await request.newContext({ baseURL, storageState: STORAGE_STATE });
     try {
-        const response = await context.post('/api/v1/auth/refresh');
-        if (response.status() !== 200) {
-            console.warn(`[keepalive] session refresh failed: ${response.status()}`);
-            return;
+        const refresh = await context.post('/api/v1/auth/refresh');
+        if (refresh.status() !== 200) {
+            // A refresh that timed out while auth-service was being stopped by a
+            // resilience spec has already rotated the token server-side without us
+            // seeing the new cookies, so the stored one is blacklisted for good.
+            // A full login recovers from that.
+            console.warn(`[keepalive] refresh failed (${refresh.status()}), logging in again`);
+            const login = await context.post('/api/v1/auth/login', {
+                data: { username: LIVE_ADMIN.username, password: LIVE_ADMIN.password },
+            });
+            if (login.status() !== 200) {
+                console.warn(`[keepalive] login failed: ${login.status()}`);
+                return;
+            }
         }
         const state = await context.storageState();
         // Write-then-rename so a test starting right now never reads a half-written file.
