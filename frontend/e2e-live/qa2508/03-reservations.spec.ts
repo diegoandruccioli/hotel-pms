@@ -70,8 +70,14 @@ test.describe('Blocco 3 — Reservations', () => {
     await page.getByRole('searchbox').fill('Qa Round');
     await page.waitForTimeout(500);
     // Delete sits in the row's "Actions for <guest>" menu, not as a standalone button.
-    await expect(page.locator('tbody tr')).toHaveCount(1, { timeout: 10000 });
-    const actionsButton = page.getByRole('button', { name: /^(Azioni per|Actions for) / });
+    // Other fixture reservations of the same guest may be listed too: pick ours by its check-in date
+    // (the cell reads M/D/YYYY or D/M/YYYY, padded or not, depending on the UI language).
+    const [y, m, d] = fmt(inDate).split('-').map(Number);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dateText = new RegExp(`^(${m}/${d}/${y}|${d}/${m}/${y}|${pad(d)}/${pad(m)}/${y})$`);
+    const ourRow = page.locator('tbody tr').filter({ has: page.getByRole('cell', { name: dateText }) });
+    await expect(ourRow).toHaveCount(1, { timeout: 10000 });
+    const actionsButton = ourRow.getByRole('button', { name: /^(Azioni per|Actions for) / });
     await expect(actionsButton).toBeVisible({ timeout: 5000 });
     await actionsButton.click();
     await page.getByRole('menuitem', { name: /^(Elimina|Delete)$/ }).click();

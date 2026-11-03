@@ -49,7 +49,13 @@ test.describe('Blocco 1 — shell & global navigation', () => {
     await expect(paletteInput).toBeVisible();
     guard.checkpoint('palette opened');
 
-    await paletteInput.fill('camere');
+    // Query with the label of the Rooms nav link as rendered, so it holds in any UI language
+    // (CI renders English whatever locale the test asks for).
+    // The link's text also carries its icon ligature ("meeting_room"), so take the trailing label.
+    const linkText = (await page.getByRole('link', { name: /^(camere|rooms)$/i }).first().textContent()) ?? '';
+    const roomsLabel = /(camere|rooms)s*$/i.exec(linkText)?.[1] ?? '';
+    expect(roomsLabel).not.toBe('');
+    await paletteInput.fill(roomsLabel.toLowerCase());
     await expect(page.getByRole('option', { name: /camere|rooms/i })).toBeVisible();
     guard.checkpoint('palette filters nav by query');
 

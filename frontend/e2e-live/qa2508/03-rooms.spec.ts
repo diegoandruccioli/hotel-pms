@@ -35,8 +35,9 @@ test.describe('Blocco 3 — Rooms & Room Types', () => {
     await expect(page.getByText(uniqueName)).toBeVisible();
 
     // Clean up via edit modal's inline delete-confirm footer.
-    const row = page.locator('tr').filter({ hasText: uniqueName });
-    await row.getByRole('button', { name: /^modifica$|^edit$/i }).click();
+    // Edit sits in the row's "Actions for <type>" menu.
+    await page.getByRole('button', { name: new RegExp('^(Azioni per|Actions for) ' + uniqueName + '$') }).click();
+    await page.getByRole('menuitem', { name: /^modifica$|^edit$/i }).click();
     const editDialog = page.getByRole('dialog');
     await expect(editDialog).toBeVisible();
     await editDialog.getByRole('button', { name: /^elimina$|^delete$/i }).click();
