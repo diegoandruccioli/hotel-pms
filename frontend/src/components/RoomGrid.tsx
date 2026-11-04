@@ -1,10 +1,10 @@
 import { useCallback, useMemo, memo } from 'react';
-import { MaterialIcon } from '../../components/MaterialIcon';
-import { M3EmptyState } from '../../components/m3';
+import { MaterialIcon } from './MaterialIcon';
+import { M3EmptyState } from './m3';
 import { useTranslation } from 'react-i18next';
-import type { RoomResponse } from '../../types';
-import type { ReservationResponse } from '../../types';
-import { cn } from '../../utils';
+import type { RoomResponse } from '../types';
+import type { ReservationResponse } from '../types';
+import { cn } from '../utils';
 
 interface RoomButtonProps {
   room: RoomResponse;

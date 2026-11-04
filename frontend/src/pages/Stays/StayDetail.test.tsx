@@ -3,9 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../test-utils';
+import { renderWithQuery as render } from '../../test-utils';
 import { StayDetail } from './StayDetail';
-import { stayService } from '../services';
+import { stayService } from '../../services';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -15,7 +15,7 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
-vi.mock('../services/stayService', () => ({
+vi.mock('../../services/stayService', () => ({
   stayService: {
     getStayById: vi.fn(),
     checkOut: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock('focus-trap-react', () => ({
 }));
 
 const addToast = vi.hoisted(() => vi.fn());
-vi.mock('../store/toastStore', () => ({
+vi.mock('../../store/toastStore', () => ({
   useToastStore: (sel: unknown) => (sel as (s: { addToast: typeof addToast }) => unknown)({ addToast }),
 }));
 

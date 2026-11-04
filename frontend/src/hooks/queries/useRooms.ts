@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { todayIsoDate, addDaysIso } from '../../utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { inventoryService } from '../../services';
+import { fetchAllRooms, inventoryService } from '../../services';
 import type { RoomResponse, RoomStatus } from '../../types';
-import { fetchAllRooms, queryKeys } from '../../lib';
+import { queryKeys } from '../../lib';
 
 /** `availableOnly` switches between the whole room list (every page, see
  * `fetchAllRooms`) and today's availability search. */

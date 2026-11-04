@@ -12,7 +12,7 @@ import { M3Card } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { quotationService } from '../../services';
 import type { QuotationOptionRequest, QuotationRequest } from '../../types';
-import { RoomSelection } from '../Reservations/RoomSelection';
+import { RoomSelection } from '../../components/RoomSelection';
 import { getErrorMessage } from '../../utils';
 import { useToastStore } from '../../store';
 import { MAX_OPTIONS, defaultOptionLabel } from './quotationDraft';

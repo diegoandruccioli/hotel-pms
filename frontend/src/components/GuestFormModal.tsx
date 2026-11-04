@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { guestService } from '../services';
 import type { GuestResponseDTO, GuestRequestDTO } from '../types';
-import { MaterialIcon } from '../components/MaterialIcon';
-import { M3Button } from '../components/m3';
-import { M3Dialog } from '../components/m3';
-import { M3TextField } from '../components/m3';
-import { M3Select } from '../components/m3';
-import { StructuredAddressFields } from '../components/StructuredAddressFields';
+import { MaterialIcon } from './MaterialIcon';
+import { M3Button } from './m3';
+import { M3Dialog } from './m3';
+import { M3TextField } from './m3';
+import { M3Select } from './m3';
+import { StructuredAddressFields } from './StructuredAddressFields';
 import { useToastStore } from '../store';
 
 const COUNTRY_CODES = [

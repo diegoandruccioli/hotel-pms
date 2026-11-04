@@ -19,7 +19,7 @@ import { useDebounce, useListRangeSummary } from '../hooks';
 import { queryKeys } from '../lib';
 import { getErrorMessage } from '../utils';
 import { guestService } from '../services';
-import { GuestFormModal } from './GuestFormModal';
+import { GuestFormModal } from '../components/GuestFormModal';
 import { GuestDetailSheet } from './Guests/GuestDetailSheet';
 import { useGuestColumns } from './Guests/useGuestColumns';
 
