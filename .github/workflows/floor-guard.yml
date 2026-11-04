@@ -24,4 +24,4 @@ jobs:
           fetch-depth: 0
 
       - name: Check the PR diff against the floor
-        run: .github/scripts/floor-guard-diff.sh "origin/${{ github.base_ref }}"
+        run: bash .github/scripts/floor-guard-diff.sh "origin/${{ github.base_ref }}"
