@@ -3,6 +3,9 @@ package com.hotelpms.frontdesk.stays.service.impl;
 import com.hotelpms.frontdesk.stays.domain.AlloggiatiComune;
 import com.hotelpms.frontdesk.stays.domain.AlloggiatiStato;
 import com.hotelpms.frontdesk.stays.domain.AlloggiatiTipdoc;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiComuneResponse;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiStatoResponse;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiTipdocResponse;
 import com.hotelpms.frontdesk.stays.repository.AlloggiatiComuneRepository;
 import com.hotelpms.frontdesk.stays.repository.AlloggiatiStatoRepository;
 import com.hotelpms.frontdesk.stays.repository.AlloggiatiTipdocRepository;
@@ -62,10 +65,10 @@ class AlloggiatiLookupServiceImplTest {
         when(statoRepository.findByDataFineValIsNullOrDataFineValAfter(any(LocalDate.class)))
                 .thenReturn(List.of(stato));
 
-        final List<AlloggiatiStato> result = service.findAllStati();
+        final List<AlloggiatiStatoResponse> result = service.findAllStati();
 
         assertEquals(1, result.size());
-        assertEquals(CODICE_ITALIA, result.get(0).getCodice());
+        assertEquals(CODICE_ITALIA, result.get(0).codice());
         verify(statoRepository).findByDataFineValIsNullOrDataFineValAfter(any(LocalDate.class));
     }
 
@@ -79,10 +82,10 @@ class AlloggiatiLookupServiceImplTest {
                 .codice(CODICE_ROMA).descrizione(DESC_ROMA).provincia(PROVINCIA_RM).build();
         when(comuneRepository.findActive(any(LocalDate.class))).thenReturn(List.of(comune));
 
-        final List<AlloggiatiComune> result = service.findAllComuni();
+        final List<AlloggiatiComuneResponse> result = service.findAllComuni();
 
         assertEquals(1, result.size());
-        assertEquals(CODICE_ROMA, result.get(0).getCodice());
+        assertEquals(CODICE_ROMA, result.get(0).codice());
     }
 
     @Test
@@ -92,10 +95,10 @@ class AlloggiatiLookupServiceImplTest {
         when(comuneRepository.findActiveByProvincia(eq(PROVINCIA_RM), any(LocalDate.class)))
                 .thenReturn(List.of(comune));
 
-        final List<AlloggiatiComune> result = service.findComuniByProvincia(PROVINCIA_RM);
+        final List<AlloggiatiComuneResponse> result = service.findComuniByProvincia(PROVINCIA_RM);
 
         assertEquals(1, result.size());
-        assertEquals(PROVINCIA_RM, result.get(0).getProvincia());
+        assertEquals(PROVINCIA_RM, result.get(0).provincia());
     }
 
     // -----------------------------------------------------------------------
@@ -150,10 +153,10 @@ class AlloggiatiLookupServiceImplTest {
                 .codice(CODICE_PASOR).descrizione("PASSAPORTO ORDINARIO").build();
         when(tipdocRepository.findAll()).thenReturn(List.of(tipdoc));
 
-        final List<AlloggiatiTipdoc> result = service.findAllTipdoc();
+        final List<AlloggiatiTipdocResponse> result = service.findAllTipdoc();
 
         assertEquals(1, result.size());
-        assertEquals(CODICE_PASOR, result.get(0).getCodice());
+        assertEquals(CODICE_PASOR, result.get(0).codice());
     }
 
     // -----------------------------------------------------------------------
@@ -167,7 +170,7 @@ class AlloggiatiLookupServiceImplTest {
         when(comuneRepository.searchActive(eq(SEARCH_TERM), isNull(), any(LocalDate.class), any(Pageable.class)))
                 .thenReturn(List.of(comune));
 
-        final List<AlloggiatiComune> result = service.searchComuni(SEARCH_TERM, null);
+        final List<AlloggiatiComuneResponse> result = service.searchComuni(SEARCH_TERM, null);
 
         assertEquals(1, result.size());
         verify(comuneRepository).searchActive(eq(SEARCH_TERM), isNull(), any(LocalDate.class), any(Pageable.class));
