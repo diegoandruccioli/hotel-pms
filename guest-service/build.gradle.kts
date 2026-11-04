@@ -1,8 +1,12 @@
+import java.math.BigDecimal
+
 plugins {
     java
     id("org.springframework.boot") version "4.0.8"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.danilopianini.gradle-java-qa") version "1.165.0"
+    // Mutation testing, report only: adds the `pitest` task, not wired into `build`/`check`.
+    id("info.solidsoft.pitest") version "1.19.0"
 }
 
 group = "com.hotelpms"
@@ -84,6 +88,19 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+// PIT finds tests through the junit-platform-launcher on the test classpath. A rule in the dependency management
+// pins it to 1.10.2, which does not match the JUnit 6 engine ("OutputDirectoryCreator not available"). Align it
+// only when a pitest task is requested, so the regular build classpath stays untouched.
+if (gradle.startParameter.taskNames.any { it.contains("pitest") }) {
+    configurations.matching { it.name == "testRuntimeClasspath" }.configureEach {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.junit.platform" && requested.name == "junit-platform-launcher") {
+                useVersion("6.0.3")
+            }
+        }
+    }
+}
+
 dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
@@ -105,4 +122,18 @@ dependencyManagement {
 tasks.withType<Test> {
     useJUnitPlatform()
     systemProperty("net.bytebuddy.experimental", "true")
+}
+
+// Pilot module for mutation testing (docs/ROADMAP, Phase 4). Report only: no mutationThreshold,
+// run on demand or by .github/workflows/mutation.yml, never part of ./gradlew build.
+pitest {
+    pitestVersion.set("1.30.1")
+    junit5PluginVersion.set("1.2.3")
+    targetClasses.set(listOf("com.hotelpms.guest.*"))
+    excludedClasses.set(listOf("com.hotelpms.guest.GuestServiceApplication", "*.config.*", "*.dto.*", "*.model.*", "*.mapper.*Impl"))
+    threads.set(2)
+    timeoutFactor.set(BigDecimal("2.0"))
+    outputFormats.set(listOf("HTML", "XML"))
+    timestampedReports.set(false)
+    mutators.set(listOf("DEFAULTS"))
 }
