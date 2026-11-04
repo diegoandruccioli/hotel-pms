@@ -88,15 +88,13 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-// PIT finds tests through the junit-platform-launcher on the test classpath. A rule in the dependency management
-// pins it to 1.10.2, which does not match the JUnit 6 engine ("OutputDirectoryCreator not available"). Align it
-// only when a pitest task is requested, so the regular build classpath stays untouched.
-if (gradle.startParameter.taskNames.any { it.contains("pitest") }) {
-    configurations.matching { it.name == "testRuntimeClasspath" }.configureEach {
-        resolutionStrategy.eachDependency {
-            if (requested.group == "org.junit.platform" && requested.name == "junit-platform-launcher") {
-                useVersion("6.0.3")
-            }
+// The pitest Gradle plugin constrains junit-platform-launcher to 1.10.2, which does not match the JUnit 6 engine
+// (tests are not discovered, PIT fails with "OutputDirectoryCreator not available"). Keep the launcher at the
+// version of the engine, i.e. what the Spring Boot BOM resolved before the plugin was added.
+configurations.matching { it.name == "testRuntimeClasspath" || it.name == "testCompileClasspath" }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.junit.platform" && requested.name == "junit-platform-launcher") {
+            useVersion("6.0.3")
         }
     }
 }
