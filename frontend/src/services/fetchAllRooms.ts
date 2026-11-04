@@ -1,4 +1,4 @@
-import { inventoryService } from '../services/inventoryService';
+import { inventoryService } from './inventoryService';
 import type { RoomResponse } from '../types';
 
 /** Rooms per request when loading the whole hotel; the backend returns them sorted by room number. */

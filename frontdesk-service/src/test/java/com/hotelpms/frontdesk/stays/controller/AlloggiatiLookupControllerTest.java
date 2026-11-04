@@ -1,8 +1,8 @@
 package com.hotelpms.frontdesk.stays.controller;
 
-import com.hotelpms.frontdesk.stays.domain.AlloggiatiComune;
-import com.hotelpms.frontdesk.stays.domain.AlloggiatiStato;
-import com.hotelpms.frontdesk.stays.domain.AlloggiatiTipdoc;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiComuneResponse;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiStatoResponse;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiTipdocResponse;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiLookupService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,7 +64,7 @@ class AlloggiatiLookupControllerTest {
     @Test
     void statiReturnsAllActiveStati() throws Exception {
         when(lookupService.findAllStati()).thenReturn(List.of(
-                AlloggiatiStato.builder().codice(CODICE_ITALIA).descrizione("ITALIA").build()));
+                new AlloggiatiStatoResponse(CODICE_ITALIA, "ITALIA", null)));
 
         mockMvc.perform(get(PATH_STATI))
                 .andExpect(status().isOk())
@@ -88,7 +88,7 @@ class AlloggiatiLookupControllerTest {
     @Test
     void comuniWithQueryParamDelegatesToSearchComuni() throws Exception {
         when(lookupService.searchComuni(eq(SEARCH_TERM), isNull())).thenReturn(List.of(
-                AlloggiatiComune.builder().codice(CODICE_ROMA).descrizione(DESC_ROMA).provincia(PROVINCIA_RM).build()));
+                new AlloggiatiComuneResponse(CODICE_ROMA, DESC_ROMA, PROVINCIA_RM, null)));
 
         mockMvc.perform(get(PATH_COMUNI).param(PARAM_Q, SEARCH_TERM))
                 .andExpect(status().isOk())
@@ -113,7 +113,7 @@ class AlloggiatiLookupControllerTest {
     @Test
     void comuniWithOnlyProvinciaDelegatesToFindByProvincia() throws Exception {
         when(lookupService.findComuniByProvincia(PROVINCIA_RM)).thenReturn(List.of(
-                AlloggiatiComune.builder().codice(CODICE_ROMA).descrizione(DESC_ROMA).provincia(PROVINCIA_RM).build()));
+                new AlloggiatiComuneResponse(CODICE_ROMA, DESC_ROMA, PROVINCIA_RM, null)));
 
         mockMvc.perform(get(PATH_COMUNI).param(PARAM_PROV, PROVINCIA_RM))
                 .andExpect(status().isOk())
@@ -150,7 +150,7 @@ class AlloggiatiLookupControllerTest {
     @Test
     void tipdocReturnsAllTipdoc() throws Exception {
         when(lookupService.findAllTipdoc()).thenReturn(List.of(
-                AlloggiatiTipdoc.builder().codice(CODICE_PASOR).descrizione("PASSAPORTO ORDINARIO").build()));
+                new AlloggiatiTipdocResponse(CODICE_PASOR, "PASSAPORTO ORDINARIO")));
 
         mockMvc.perform(get(PATH_TIPDOC))
                 .andExpect(status().isOk())

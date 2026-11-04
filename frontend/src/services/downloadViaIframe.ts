@@ -1,4 +1,4 @@
-import api from '../services/api';
+import api from './api';
 
 const IFRAME_CLEANUP_DELAY_MS = 10000;
 

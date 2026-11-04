@@ -54,7 +54,7 @@ vi.mock('./ReservationGroupLink', () => ({
   ReservationGroupLink: ({ groupId }: { groupId: string }) => <a href={`/reservations/groups/${groupId}`}>group_link_mock</a>,
 }));
 
-vi.mock('./GuestSearchAndCreate', () => ({
+vi.mock('../../components/GuestSearchAndCreate', () => ({
   GuestSearchAndCreate: (props: GuestMockProps) => GuestSearchAndCreateMock(props),
 }));
 
@@ -84,7 +84,7 @@ function StayDatesFieldsMock({ readOnly, checkInDate, checkOutDate, onCheckInCha
   );
 }
 
-vi.mock('./StayDatesFields', () => ({
+vi.mock('../../components/StayDatesFields', () => ({
   StayDatesFields: (props: DatesMockProps) => StayDatesFieldsMock(props),
 }));
 
@@ -109,7 +109,7 @@ function RoomGridMock({ readOnly, onToggleRoom, selectedRoomIds }: RoomGridMockP
   );
 }
 
-vi.mock('./RoomGrid', () => ({
+vi.mock('../../components/RoomGrid', () => ({
   RoomGrid: (props: RoomGridMockProps) => RoomGridMock(props),
 }));
 

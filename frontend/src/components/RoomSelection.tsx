@@ -1,6 +1,6 @@
 import { memo } from 'react';
-import type { RoomResponse } from '../../types';
-import type { ReservationResponse } from '../../types';
+import type { RoomResponse } from '../types';
+import type { ReservationResponse } from '../types';
 import { StayDatesFields } from './StayDatesFields';
 import { RoomGrid } from './RoomGrid';
 

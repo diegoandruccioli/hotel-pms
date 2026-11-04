@@ -2,7 +2,7 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button, M3Select, M3TextField, M3Checkbox } from '../../components/m3';
-import { GuestSearchAndCreate } from '../Reservations/GuestSearchAndCreate';
+import { GuestSearchAndCreate } from '../../components/GuestSearchAndCreate';
 import type { GuestResponseDTO, RoomResponse } from '../../types';
 
 export interface RoomingListRowState {

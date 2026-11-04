@@ -3,6 +3,9 @@ package com.hotelpms.frontdesk.stays.service;
 import com.hotelpms.frontdesk.stays.domain.AlloggiatiComune;
 import com.hotelpms.frontdesk.stays.domain.AlloggiatiStato;
 import com.hotelpms.frontdesk.stays.domain.AlloggiatiTipdoc;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiComuneResponse;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiStatoResponse;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiTipdocResponse;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,14 +21,14 @@ public interface AlloggiatiLookupService {
      *
      * @return list of active stati
      */
-    List<AlloggiatiStato> findAllStati();
+    List<AlloggiatiStatoResponse> findAllStati();
 
     /**
      * Returns all active comuni (municipalities).
      *
      * @return list of active comuni
      */
-    List<AlloggiatiComune> findAllComuni();
+    List<AlloggiatiComuneResponse> findAllComuni();
 
     /**
      * Returns all active comuni for the given province.
@@ -33,14 +36,14 @@ public interface AlloggiatiLookupService {
      * @param provincia 2-character province code
      * @return list of active comuni in that province
      */
-    List<AlloggiatiComune> findComuniByProvincia(String provincia);
+    List<AlloggiatiComuneResponse> findComuniByProvincia(String provincia);
 
     /**
      * Returns all tipdoc entries (document-type codes).
      *
      * @return list of all tipdoc
      */
-    List<AlloggiatiTipdoc> findAllTipdoc();
+    List<AlloggiatiTipdocResponse> findAllTipdoc();
 
     /**
      * Finds a stato by its 9-character code.
@@ -75,5 +78,5 @@ public interface AlloggiatiLookupService {
      * @param provincia optional province filter (may be {@code null})
      * @return ordered list of matching comuni (max 20)
      */
-    List<AlloggiatiComune> searchComuni(String query, String provincia);
+    List<AlloggiatiComuneResponse> searchComuni(String query, String provincia);
 }

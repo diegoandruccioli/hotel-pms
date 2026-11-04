@@ -1,6 +1,6 @@
 import api from './api';
 import type { BusinessDateResponse, HousekeepingWorksheetResponse } from '../types';
-import { downloadViaIframe } from '../utils/downloadViaIframe';
+import { downloadViaIframe } from './downloadViaIframe';
 
 const BASE_PATH = '/api/v1/frontdesk/housekeeping';
 
