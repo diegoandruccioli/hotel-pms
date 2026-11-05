@@ -1,0 +1,170 @@
+name: Release
+
+# ── Purpose ─────────────────────────────────────────────────────────────────
+# Runs when the maintainer pushes a release tag (vX.Y.Z) on a `main` commit.
+# Nothing here deploys: deploy stays manual (docs/RELEASE_PROCESS.md §4).
+#
+#   verify    tag format + commit is reachable from main
+#   rc-gate   the latest rc tag vX.Y.Z-rc.N has a green release-rc.yml run
+#             (hotfix, i.e. Z > 0 with no rc tag, is allowed: §6)
+#   release   GitHub Release with generated notes and a link to the rc run
+#
+# Tags are created by hand. workflow_dispatch takes an existing tag name to
+# re-run (GitHub only accepts a dispatch for workflows present on main).
+# No container images are published: they are built from source (RELEASE_PROCESS.md).
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    tags:
+      # Filter patterns match the whole tag: vX.Y.Z-rc.N and v1.0.0-secure do not match.
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to (re)run, e.g. v0.1.0"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  # Never interpolate the tag into scripts via ${{ }}: always read it from here.
+  REL_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  verify:
+    name: "Verify tag"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Check tag format and branch
+        id: resolve
+        run: |
+          if ! [[ "$REL_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$REL_TAG' is not vX.Y.Z"
+            exit 1
+          fi
+          sha="$(git rev-parse HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          if git merge-base --is-ancestor "$sha" origin/main; then
+            echo "### Tag $REL_TAG -> ${sha:0:8}, reachable from main" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::$sha is not reachable from origin/main; release tags belong on main"
+            exit 1
+          fi
+
+  rc-gate:
+    name: "Release candidate is green"
+    needs: [verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      rc_tag: ${{ steps.gate.outputs.rc_tag }}
+      rc_url: ${{ steps.gate.outputs.rc_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHA: ${{ needs.verify.outputs.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.verify.outputs.sha }}
+
+      - name: Check the latest rc run
+        id: gate
+        run: |
+          version="${REL_TAG#v}"
+          patch="${version##*.}"
+          # highest rc.N for this exact version
+          rc_tag="$(git tag -l "${REL_TAG}-rc.*" | sort -t. -k4,4n | tail -n 1)"
+          if [ -z "$rc_tag" ]; then
+            if [ "$patch" -gt 0 ]; then
+              echo "::notice::No rc tag for $REL_TAG; accepted as hotfix (docs/RELEASE_PROCESS.md §6)"
+              echo "### No rc for $REL_TAG, treated as hotfix" >> "$GITHUB_STEP_SUMMARY"
+              echo "rc_tag=" >> "$GITHUB_OUTPUT"
+              echo "rc_url=" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::No tag ${REL_TAG}-rc.N found: cut a release candidate first"
+            exit 1
+          fi
+          # for a tag push, the run's head branch is the tag name
+          row="$(gh run list -R "$GITHUB_REPOSITORY" --workflow release-rc.yml --branch "$rc_tag" \
+            --limit 1 --json status,conclusion,url \
+            --jq 'if length == 0 then "" else .[0] | "\(.status)/\(.conclusion)|\(.url)" end')"
+          if [ -z "$row" ]; then
+            echo "::error::No release-rc.yml run found for $rc_tag"
+            exit 1
+          fi
+          state="${row%%|*}"; url="${row#*|}"
+          {
+            echo "### rc gate"
+            echo "- latest rc: \`$rc_tag\` -> $state ($url)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$state" != "completed/success" ]; then
+            echo "::error::release-rc.yml for $rc_tag is $state, not completed/success"
+            exit 1
+          fi
+          # Released code should be the tested code. Warning only: a CHANGELOG
+          # or merge-only commit is legitimate, but it must be a conscious choice.
+          if ! git diff --quiet "$rc_tag" "$SHA"; then
+            echo "::warning::tree of $REL_TAG differs from $rc_tag"
+            {
+              echo "- WARNING: tree differs from $rc_tag:"
+              git diff --stat "$rc_tag" "$SHA" | tail -n 15 | sed 's/^/    /'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- tree identical to $rc_tag" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "rc_tag=$rc_tag" >> "$GITHUB_OUTPUT"
+          echo "rc_url=$url" >> "$GITHUB_OUTPUT"
+
+  release:
+    name: "GitHub Release"
+    needs: [verify, rc-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHA: ${{ needs.verify.outputs.sha }}
+      RC_TAG: ${{ needs.rc-gate.outputs.rc_tag }}
+      RC_URL: ${{ needs.rc-gate.outputs.rc_url }}
+    steps:
+      - name: Create or update the release
+        run: |
+          {
+            echo "Release \`$REL_TAG\` on \`${SHA:0:8}\`. Nothing is deployed by this workflow:"
+            echo "follow \`docs/RELEASE_PROCESS.md\` §4 (backup first) to update the host."
+            echo ""
+            if [ -n "$RC_TAG" ]; then
+              echo "Validated by \`$RC_TAG\`: $RC_URL"
+            else
+              echo "Hotfix: no release candidate, gated by the PR checks and E2E Live."
+            fi
+            echo ""
+            echo "Rollback: \`docs/RELEASE_PROCESS.md\` §5."
+          } > notes.md
+          if gh release view "$REL_TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$REL_TAG" -R "$GITHUB_REPOSITORY" --latest --notes-file notes.md
+          else
+            gh release create "$REL_TAG" -R "$GITHUB_REPOSITORY" --verify-tag --latest \
+              --title "$REL_TAG" --generate-notes --notes-file notes.md
+          fi
