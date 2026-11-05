@@ -79,7 +79,7 @@ public class AlloggiatiLookupServiceImpl implements AlloggiatiLookupService {
     @Transactional(readOnly = true)
     @Cacheable(cacheNames = AlloggiatiCacheConfig.CACHE_STATI, cacheManager = "alloggiatiCacheManager")
     public Optional<AlloggiatiStato> findStatoByCodice(final String codice) {
-        log.debug("Fetching stato by codice: {}", codice);
+        log.debug("Fetching stato by codice: {}", sanitizeForLog(codice));
         return statoRepository.findById(codice);
     }
 
@@ -88,7 +88,7 @@ public class AlloggiatiLookupServiceImpl implements AlloggiatiLookupService {
     @Transactional(readOnly = true)
     @Cacheable(cacheNames = AlloggiatiCacheConfig.CACHE_COMUNI, cacheManager = "alloggiatiCacheManager")
     public Optional<AlloggiatiComune> findComuneByCodice(final String codice) {
-        log.debug("Fetching comune by codice: {}", codice);
+        log.debug("Fetching comune by codice: {}", sanitizeForLog(codice));
         return comuneRepository.findById(codice);
     }
 
@@ -97,7 +97,7 @@ public class AlloggiatiLookupServiceImpl implements AlloggiatiLookupService {
     @Transactional(readOnly = true)
     @Cacheable(cacheNames = AlloggiatiCacheConfig.CACHE_TIPDOC, cacheManager = "alloggiatiCacheManager")
     public Optional<AlloggiatiTipdoc> findTipdocByCodice(final String codice) {
-        log.debug("Fetching tipdoc by codice: {}", codice);
+        log.debug("Fetching tipdoc by codice: {}", sanitizeForLog(codice));
         return tipdocRepository.findById(codice);
     }
 
@@ -131,6 +131,6 @@ public class AlloggiatiLookupServiceImpl implements AlloggiatiLookupService {
     }
 
     private static String sanitizeForLog(final String value) {
-        return value == null ? null : value.replaceAll("[\r\n]", "_");
+        return value == null ? null : value.replace("\r", "_").replace("\n", "_");
     }
 }
