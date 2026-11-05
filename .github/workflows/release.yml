@@ -83,8 +83,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          # Default ref on purpose: this job only runs git tag/diff and needs the
+          # full history, so it never checks out a ref derived from the dispatch
+          # input (CodeQL actions/untrusted-checkout). SHA is verified upstream.
           fetch-depth: 0
-          ref: ${{ needs.verify.outputs.sha }}
 
       - name: Check the latest rc run
         id: gate
