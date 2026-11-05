@@ -75,6 +75,10 @@ percorso funzionale; lo smoke test serve a vedere la configurazione prod
 2. PR `develop` → `main`: CI completa e E2E Live obbligatori (già required su `main`),
    checklist §2 compilata nella descrizione della PR.
 3. Merge. Poi tag `vX.Y.Z` sul commit di merge su `main` e push del tag.
+   `release.yml` parte dal tag: verifica che il commit sia su `main`, che l'ultimo
+   `vX.Y.Z-rc.N` abbia un run di `release-rc.yml` verde (un hotfix `Z > 0` senza rc passa) e
+   crea la GitHub Release. Segnala se l'albero del rilascio differisce dall'rc. Non
+   pubblica immagini e non fa deploy.
 4. Deploy manuale come da `docs/OPERATIONS_RUNBOOK.md` §8, **dopo** un backup:
 
 ```bash
