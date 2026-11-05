@@ -34,9 +34,9 @@ Tutte le voci vanno verificate sul commit che riceverà il tag.
 2. **E2E Live verde** (`e2e-live-nightly.yml`) sullo stesso commit: lanciarlo con
    `gh workflow run e2e-live-nightly.yml --ref develop` se l'ultimo run notturno è su un
    commit diverso. Durata circa 25-28 minuti.
-3. **Gate Trivy**: nessuna vulnerabilità CRITICAL/HIGH con fix disponibile
-   (`trivy.yaml`: `ignore-unfixed: true`). Le eccezioni accettate stanno solo in
-   `.trivyignore`, con motivo e scadenza.
+3. **Gate Trivy**: i job `Trivy — <servizio>` di `ci.yml` verdi sul commit. Il gate
+   bloccante è CRITICAL con fix disponibile; HIGH resta solo in report (tab Security,
+   SARIF). Le eccezioni accettate stanno solo in `.trivyignore`, con motivo e scadenza.
 4. **Backup drill recente**: ultimo run di `backup-restore-drill.yml` verde, non più vecchio
    di 7 giorni (gira ogni lunedì). Se è rosso o vecchio, lanciarlo a mano prima del tag.
 5. **Migration Flyway**: elencare le migration nuove rispetto all'ultimo rilascio
@@ -48,7 +48,7 @@ Tutte le voci vanno verificate sul commit che riceverà il tag.
 8. **Dependabot di sicurezza**: nessun alert aperto sulle dipendenze di produzione (quelli
    solo dev-only si annotano nelle note di rilascio).
 
-I controlli 1-4 sono informativi finché non sono automatizzati in `release-rc.yml`; dopo
+I controlli 1-4 sono raccolti da `release-rc.yml` (informativo, non bloccante); dopo
 alcuni rc senza falsi positivi si valuta se renderli bloccanti per la promozione.
 
 ## 3. Smoke test dello stack completo
