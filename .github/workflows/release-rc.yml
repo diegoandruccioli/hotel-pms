@@ -132,15 +132,9 @@ jobs:
           java-version: "21"
           distribution: temurin
 
-      - name: Cache Gradle packages
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
-          restore-keys: gradle-${{ runner.os }}-
-
+      # No actions/cache here on purpose: this job checks out a tag-selected ref
+      # (workflow_dispatch input) and then runs build steps, so a shared cache
+      # entry could be poisoned (CodeQL actions/cache-poisoning). Cold build only.
       - name: Build backend jars
         run: ./gradlew bootJar --no-daemon
 
