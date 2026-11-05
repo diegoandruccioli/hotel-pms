@@ -80,6 +80,22 @@ CVE-2026-56858
 CVE-2026-56859
 CVE-2026-56860
 CVE-2026-56862
+# ── gosu Go stdlib CVEs, batch 3 (code-scanning alerts #633, #634, #642, #651;
+#   found 2026-10-09/21, same usr/local/bin/gosu, bundled Go 1.24.6 stdlib, copied
+#   from the upstream postgres:15-alpine image — `apk upgrade` does not touch it).
+#   Same reachability argument as batch 2: gosu only parses UID/GID, calls
+#   setuid/setgid and execve — no network, TLS, HTTP or cert handling.
+#   REMOVE when postgres:15-alpine ships a gosu built with Go >= 1.26.10.
+# CVE-2026-78667 — net/http: DoS via crafted Range headers. gosu serves no HTTP.
+CVE-2026-78667
+# CVE-2026-78669 — net/http HTTP/2: excessive SETTINGS frames. gosu uses no HTTP/2.
+CVE-2026-78669
+# CVE-2026-97031 — crypto/tls: DoS via multiple ECH outer extension references.
+#   gosu does no TLS handshake.
+CVE-2026-97031
+# CVE-2026-111943 — crypto/x509: untrusted intermediate certs (MITM). gosu builds
+#   no certificate chains.
+CVE-2026-111943
 # ── postgres:15-alpine / redis:alpine — native library CVEs ─────────────────
 # These are CVEs in Alpine OS packages bundled with the official upstream
 # images, not in our application code. Both docker/postgres/Dockerfile and
