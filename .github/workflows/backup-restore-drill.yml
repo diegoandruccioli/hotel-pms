@@ -9,6 +9,8 @@ on:
   schedule:
     - cron: "0 4 * * 1" # every Monday 04:00 UTC
   workflow_dispatch: {}
+  # Called by release-rc.yml so a release candidate carries a fresh drill result.
+  workflow_call: {}
 
 jobs:
   restore-drill:
