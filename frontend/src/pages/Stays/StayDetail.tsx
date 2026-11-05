@@ -2,23 +2,23 @@ import { useState, useCallback, memo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import type { StayResponse } from '../types';
-import { PageHeader } from '../components/PageHeader';
-import { M3Button, M3Card, M3ErrorState, M3LoadingState, M3StatusChip } from '../components/m3';
-import { AlloggiatiCell } from './Stays/StayRowCells';
-import { StayGuestManagerDialog } from './Stays/StayGuestManagerDialog';
-import { StayExtensionDialog } from './Stays/StayExtensionDialog';
-import { StayRoomChangeDialog } from './Stays/StayRoomChangeDialog';
-import { getErrorMessage, stayStatusTone } from '../utils';
-import { queryKeys } from '../lib';
-import { useToastStore } from '../store';
-import { useFormatters } from '../hooks';
+import type { StayResponse } from '../../types';
+import { PageHeader } from '../../components/PageHeader';
+import { M3Button, M3Card, M3ErrorState, M3LoadingState, M3StatusChip } from '../../components/m3';
+import { AlloggiatiCell } from './StayRowCells';
+import { StayGuestManagerDialog } from './StayGuestManagerDialog';
+import { StayExtensionDialog } from './StayExtensionDialog';
+import { StayRoomChangeDialog } from './StayRoomChangeDialog';
+import { getErrorMessage, stayStatusTone } from '../../utils';
+import { queryKeys } from '../../lib';
+import { useToastStore } from '../../store';
+import { useFormatters } from '../../hooks';
 import {
   useStayDetail,
   useCheckOutStay,
   useRetryInvoiceCreation,
   useRetryCheckoutEmail,
-} from '../hooks/queries';
+} from '../../hooks/queries';
 
 const LINK_CLASS =
   'text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs';

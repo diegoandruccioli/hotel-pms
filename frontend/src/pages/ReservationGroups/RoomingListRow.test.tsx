@@ -7,7 +7,7 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
-vi.mock('../Reservations/GuestSearchAndCreate', () => ({
+vi.mock('../../components/GuestSearchAndCreate', () => ({
   GuestSearchAndCreate: () => <div>guest-search-mock</div>,
 }));
 

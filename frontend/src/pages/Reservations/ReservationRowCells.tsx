@@ -6,7 +6,7 @@ import type { ReservationResponse, RoomResponse } from '../../types';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Avatar, M3RowActionsMenu, M3StatusChip, M3TableActionLink, type RowAction } from '../../components/m3';
 import { cn, todayIsoDate, reservationStatusTone } from '../../utils';
-import { getStatusLabel, isReservationEditable } from './reservationStatus';
+import { getStatusLabel, isReservationEditable } from '../../lib/reservationStatus';
 
 const DELETABLE_STATUSES = new Set(['CONFIRMED', 'PENDING']);
 // Mirrors ReservationServiceImpl.ALLOWED_TRANSITIONS's NO_SHOW edges — a

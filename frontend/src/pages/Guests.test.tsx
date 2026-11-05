@@ -47,7 +47,7 @@ vi.mock('focus-trap-react', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock('./GuestFormModal', () => ({
+vi.mock('../components/GuestFormModal', () => ({
   GuestFormModal: ({ onSaved }: { onSaved: () => void }) => (
     <button type="button" onClick={onSaved}>trigger-saved</button>
   ),

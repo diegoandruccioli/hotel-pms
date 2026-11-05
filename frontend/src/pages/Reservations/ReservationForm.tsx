@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/Alert';
 import { M3LoadingState, M3Button, M3Card, M3Dialog, M3Stepper, M3StatusChip, M3ErrorState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
-import { GuestSearchAndCreate } from './GuestSearchAndCreate';
-import { StayDatesFields } from './StayDatesFields';
-import { RoomGrid } from './RoomGrid';
+import { GuestSearchAndCreate } from '../../components/GuestSearchAndCreate';
+import { StayDatesFields } from '../../components/StayDatesFields';
+import { RoomGrid } from '../../components/RoomGrid';
 import { ReservationGroupLink } from './ReservationGroupLink';
 import { ReservationSummary } from './ReservationSummary';
-import { getStatusLabel, isReservationEditable } from './reservationStatus';
+import { getStatusLabel, isReservationEditable } from '../../lib/reservationStatus';
 import { reservationStatusTone } from '../../utils';
 import {
   useReservationForm,

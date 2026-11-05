@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchAllRooms } from './fetchAllRooms';
-import { inventoryService } from '../services/inventoryService';
+import { inventoryService } from './inventoryService';
 
-vi.mock('../services/inventoryService', () => ({
+vi.mock('./inventoryService', () => ({
   inventoryService: { getAllRooms: vi.fn() },
 }));
 

@@ -64,4 +64,13 @@ public interface AuthService {
      * @return a fresh {@link AuthResponse} with new access and refresh tokens
      */
     AuthResponse changePassword(String username, ChangePasswordRequest request);
+
+    /**
+     * Reports whether the user must change the password before using the app.
+     *
+     * @param username the authenticated username
+     * @return {@code true} if the account is flagged for a mandatory password change;
+     *         {@code false} if not, or if no such account exists
+     */
+    boolean mustChangePassword(String username);
 }

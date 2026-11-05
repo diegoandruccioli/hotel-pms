@@ -1,23 +1,23 @@
-import { useFormatters } from '../hooks';
+import { useFormatters } from '../../hooks';
 import { useState, useCallback, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import type { GroupCheckoutOutcome } from '../types';
-import { MaterialIcon } from '../components/MaterialIcon';
-import { PageHeader } from '../components/PageHeader';
-import { M3Button } from '../components/m3';
-import { M3Card } from '../components/m3';
-import { M3StatusChip } from '../components/m3';
-import { M3Dialog } from '../components/m3';
-import { M3ConfirmDialog } from '../components/m3';
-import { M3LoadingState } from '../components/m3';
-import { M3ErrorState } from '../components/m3';
+import type { GroupCheckoutOutcome } from '../../types';
+import { MaterialIcon } from '../../components/MaterialIcon';
+import { PageHeader } from '../../components/PageHeader';
+import { M3Button } from '../../components/m3';
+import { M3Card } from '../../components/m3';
+import { M3StatusChip } from '../../components/m3';
+import { M3Dialog } from '../../components/m3';
+import { M3ConfirmDialog } from '../../components/m3';
+import { M3LoadingState } from '../../components/m3';
+import { M3ErrorState } from '../../components/m3';
 import { useTranslation } from 'react-i18next';
-import { getErrorMessage, groupStatusTone } from '../utils';
-import { useToastStore } from '../store';
+import { getErrorMessage, groupStatusTone } from '../../utils';
+import { useToastStore } from '../../store';
 import {
   useReservationGroup, useCancelReservationGroup, useCheckoutReservationGroup, useRoomsLookup,
-} from '../hooks/queries';
-import { RoomingListCard } from './ReservationGroups/RoomingListCard';
+} from '../../hooks/queries';
+import { RoomingListCard } from './RoomingListCard';
 
 const LINK_CLASS =
   'text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs';

@@ -284,6 +284,15 @@ public class AuthServiceImpl implements AuthService {
         return hash;
     }
 
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public boolean mustChangePassword(final String username) {
+        return userRepository.findByUsername(username)
+                .map(UserAccount::isMustChangePassword)
+                .orElse(false);
+    }
+
     /**
      * Strips CR/LF from a value before it is written to the log, to prevent an
      * attacker-controlled username or client IP from forging log entries (CWE-117).

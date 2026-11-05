@@ -8,7 +8,7 @@ import {
 } from '../../components/m3';
 import { reservationStatusTone } from '../../utils';
 import type { GroupMemberResponse, ReservationStatus, RoomResponse } from '../../types';
-import { isReservationEditable } from '../Reservations/reservationStatus';
+import { isReservationEditable } from '../../lib/reservationStatus';
 import { summarizeRoomingList } from './roomingListReadiness';
 
 interface RoomingListCardProps {

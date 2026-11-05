@@ -15,13 +15,13 @@ const Guests = lazy(() => import('./pages/Guests').then((m) => ({ default: m.Gue
 const Reservations = lazy(() => import('./pages/Reservations').then((m) => ({ default: m.Reservations })));
 const ReservationForm = lazy(() => import('./pages/Reservations/ReservationForm').then((m) => ({ default: m.ReservationForm })));
 const ReservationGroups = lazy(() => import('./pages/ReservationGroups').then((m) => ({ default: m.ReservationGroups })));
-const ReservationGroupDetail = lazy(() => import('./pages/ReservationGroupDetail').then((m) => ({ default: m.ReservationGroupDetail })));
+const ReservationGroupDetail = lazy(() => import('./pages/ReservationGroups/ReservationGroupDetail').then((m) => ({ default: m.ReservationGroupDetail })));
 const ReservationGroupForm = lazy(() => import('./pages/ReservationGroups/ReservationGroupForm').then((m) => ({ default: m.ReservationGroupForm })));
 const Quotations = lazy(() => import('./pages/Quotations').then((m) => ({ default: m.Quotations })));
 const QuotationForm = lazy(() => import('./pages/Quotations/QuotationForm').then((m) => ({ default: m.QuotationForm })));
 const QuotationDetail = lazy(() => import('./pages/Quotations/QuotationDetail').then((m) => ({ default: m.QuotationDetail })));
 const CheckInForm = lazy(() => import('./pages/Stays/CheckInForm').then((m) => ({ default: m.CheckInForm })));
-const StayDetail = lazy(() => import('./pages/StayDetail').then((m) => ({ default: m.StayDetail })));
+const StayDetail = lazy(() => import('./pages/Stays/StayDetail').then((m) => ({ default: m.StayDetail })));
 const WalkInCheckInForm = lazy(() => import('./pages/Stays/WalkInCheckInForm').then((m) => ({ default: m.WalkInCheckInForm })));
 const AdminUsers = lazy(() => import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })));
 const HotelProfile = lazy(() => import('./pages/HotelProfile').then((m) => ({ default: m.HotelProfile })));
