@@ -113,28 +113,20 @@ CVE-2026-41002
 #   grafana binary for its Tempo datasource client. Both advisories concern the
 #   Tempo *server* (DoS via large queries, S3 key leak via status endpoint);
 #   we run no Tempo server and the Tempo datasource is not provisioned. Fix only
-#   ships upstream (grafana 13.2.3 is not clean either: other bundled plugins).
-#   Re-check on the next grafana patch bump.
+#   ships upstream: still present in 13.1.9 (2026-11-05 scan); 13.2.5 and 13.3.0 are
+#   worse (Go stdlib CVEs again). Re-check on the next grafana patch bump.
 CVE-2026-21728
 CVE-2026-28377
-# CVE-2026-97031, CVE-2026-78667 — Go stdlib (published 2026-10), fixed in Go 1.26.9 / 1.27.2+.
-#   Found in the grafana binary (go1.26.6) and its bundled datasource plugins (go1.26.7).
-#   No grafana image carries the fix yet: checked 2026-10-09, 13.1.7 and 13.2.3 (latest stable,
-#   2026-09-29) are still on go1.26.6/1.26.7 and `nightly` (13.3.0) is on go1.27.1 with plugins
-#   on 1.26.7. Only a grafana rebuild can fix them, so a tag bump does not help.
-#   CVE-2026-97031 — crypto/tls: a crafted ClientHello with several ECH outer-extension
-#     references exhausts server memory. Only a TLS *server* with Encrypted Client Hello keys
-#     configured is affected; grafana here serves plain HTTP (no TLS, no ECH).
-#   CVE-2026-78667 — net/http: Range header with many small ranges makes FileServer/ServeContent
-#     burn CPU. Grafana's static assets go through that path, so this one is reachable, but the
-#     impact is a CPU DoS of the monitoring UI only (no data access): grafana runs in the opt-in
-#     `observability` profile, needs a login for everything but static files, and
-#     docker-compose.prod.yml unpublishes its port (only :80/:8080 are exposed).
-#   Tracked as DEP-CVE-15 in THREAT_MODEL.md.
-#   REMOVE BOTH when a grafana/grafana release built with Go >= 1.26.9 exists (check tags newer
-#   than 13.2.3) and docker-compose.yml is bumped to it.
-CVE-2026-97031
-CVE-2026-78667
+# CVE-2026-116587 — go-jose/v4 4.1.4 in the grafana binary (fix 4.1.6, no grafana image has it
+#   yet: 13.1.9 scanned 2026-11-05). DoS: crafted RSA parameters in a JWK make crypto/rsa key
+#   validation burn CPU, only where JWKs are parsed from an untrusted source. Grafana's JWK
+#   parsing is behind JWT auth / JWKS URL settings (GF_AUTH_JWT_*), which docker-compose.yml
+#   does not enable (anonymous auth is off too), so no attacker-controlled JWK reaches it;
+#   impact would be CPU on the monitoring UI only, a service in the opt-in `observability`
+#   profile whose port docker-compose.prod.yml unpublishes. Tracked as DEP-CVE-16 in
+#   THREAT_MODEL.md. REMOVE when a grafana release bundles go-jose >= 4.1.6 and
+#   docker-compose.yml is bumped to it.
+CVE-2026-116587
 # Format: one CVE-ID per line, with a comment explaining the
 # justification — mirrors the approach used in
 # config/dependency-check/suppressions.xml for OWASP DC.
