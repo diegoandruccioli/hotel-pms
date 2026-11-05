@@ -71,7 +71,7 @@ consolidamento prima del merge).
 ## Modello di sviluppo (dal 2026-10-31)
 
 ```
-feat|fix|chore/<verticale>/<slug>  --PR-->  develop  --PR + tag rcN-->  main (+ tag vX.Y.Z)
+feat|fix|chore/<verticale>/<slug>  --PR-->  develop  --PR + tag -rc.N-->  main (+ tag vX.Y.Z)
 epic/<nome> (temporaneo)           --PR-->  develop
 hotfix/<slug> (da main)            --PR-->  main, poi main riportato in develop
 ```
@@ -84,8 +84,9 @@ hotfix/<slug> (da main)            --PR-->  main, poi main riportato in develop
   completa (nessun filtro per percorso).
 - **Promozione `develop` → `main`**: PR di rilascio con CI completa, gate Trivy e checklist di
   rilascio. L'E2E live (`e2e-live-nightly.yml`: nightly su `develop`, su richiesta e sulle PR verso
-  `main`) è anche cancello obbligatorio sulle PR verso `main`, non sulle feature PR. Tag `rcN` su
-  `develop` prima del merge, `vX.Y.Z` su `main` dopo.
+  `main`) è anche cancello obbligatorio sulle PR verso `main`, non sulle feature PR. Tag `vX.Y.Z-rc.N` su
+  `develop` prima del merge, `vX.Y.Z` su `main` dopo. Checklist, smoke test e rollback in
+  `docs/RELEASE_PROCESS.md`.
 - **`epic/<nome>`**: solo per sforzi lunghi e trasversali (precedenti: `ui-redesign`,
   `frontdesk-consolidation`). Le PR figlie hanno base l'epic, una sola PR finale verso `develop`,
   poi il branch viene eliminato.
