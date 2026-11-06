@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 const apiGetMock = vi.hoisted(() => vi.fn());
-vi.mock('../services/api', () => ({
+vi.mock('./api', () => ({
   default: { get: apiGetMock },
 }));
 

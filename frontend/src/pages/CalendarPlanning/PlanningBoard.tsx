@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect, memo, useCallback } from 'react';
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, differenceInCalendarDays, addMonths, addDays } from 'date-fns';
 import { useTranslation } from 'react-i18next';
-import { M3Card } from '../components/m3';
-import type { RoomResponse } from '../types';
-import type { ReservationResponse } from '../types';
-import { CELL_STYLE, CELL_WIDTH, ROW_STYLE, SIDEBAR_STYLE, SIDEBAR_WIDTH } from './planningGrid';
-import { canMoveReservation, getStatusLabel } from './Reservations/reservationStatus';
-import { cn, dateFnsLocale, reservationStatusTone, roomStatusTone, toneDotClasses, toneSolidClasses } from '../utils';
+import { M3Card } from '../../components/m3';
+import type { RoomResponse } from '../../types';
+import type { ReservationResponse } from '../../types';
+import { CELL_STYLE, CELL_WIDTH, ROW_STYLE, SIDEBAR_STYLE, SIDEBAR_WIDTH } from '../../lib/planningGrid';
+import { canMoveReservation, getStatusLabel } from '../../lib/reservationStatus';
+import { cn, dateFnsLocale, reservationStatusTone, roomStatusTone, toneDotClasses, toneSolidClasses } from '../../utils';
 
 interface PlanningBoardProps {
   rooms: RoomResponse[];

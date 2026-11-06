@@ -1,5 +1,5 @@
 import api from './api';
-import { downloadViaIframe } from '../utils/downloadViaIframe';
+import { downloadViaIframe } from './downloadViaIframe';
 import type { QuotationRequest, QuotationResponse } from '../types';
 import type { ReservationResponse } from '../types';
 import type { SpringPage } from '../types';

@@ -26,6 +26,7 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   timeout: 30_000,
+  globalSetup: './e2e-live/session-keepalive.ts',
   reporter: 'html',
   use: {
     baseURL,

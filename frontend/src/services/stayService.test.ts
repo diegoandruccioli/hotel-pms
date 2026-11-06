@@ -344,7 +344,15 @@ describe('stayService — guest lifecycle, extension, city tax', () => {
 
     await stayService.removeGuest('stay1', 'g1');
 
-    expect(api.delete).toHaveBeenCalledWith('/api/v1/stays/stay1/guests/g1');
+    expect(api.delete).toHaveBeenCalledWith('/api/v1/stays/stay1/guests/g1', { params: undefined });
+  });
+
+  it('should send the guest version when removing a guest, for optimistic-lock detection', async () => {
+    vi.mocked(api.delete).mockResolvedValueOnce({ data: undefined });
+
+    await stayService.removeGuest('stay1', 'g1', 3);
+
+    expect(api.delete).toHaveBeenCalledWith('/api/v1/stays/stay1/guests/g1', { params: { version: 3 } });
   });
 
   it('should record an early departure for a guest', async () => {

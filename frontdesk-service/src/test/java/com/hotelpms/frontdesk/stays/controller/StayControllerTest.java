@@ -516,13 +516,37 @@ class StayControllerTest {
 
         mockMvc.perform(delete(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID, stayId, stayGuestId))
                 .andExpect(status().isNoContent());
+
+        verify(stayGuestService).removeGuest(stayId, stayGuestId, hotelId, null);
+    }
+
+    @Test
+    void shouldForwardTheClientVersionWhenRemovingAGuest() throws Exception {
+        final UUID stayGuestId = UUID.randomUUID();
+
+        mockMvc.perform(delete(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID, stayId, stayGuestId)
+                        .param("version", "4"))
+                .andExpect(status().isNoContent());
+
+        verify(stayGuestService).removeGuest(stayId, stayGuestId, hotelId, 4L);
+    }
+
+    @Test
+    void shouldRejectRemovingAGuestWithAStaleVersion() throws Exception {
+        final UUID stayGuestId = UUID.randomUUID();
+        doThrow(new ConflictException("STAY_GUEST_STALE_VERSION"))
+                .when(stayGuestService).removeGuest(stayId, stayGuestId, hotelId, 1L);
+
+        mockMvc.perform(delete(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID, stayId, stayGuestId)
+                        .param("version", "1"))
+                .andExpect(status().isConflict());
     }
 
     @Test
     void shouldRejectRemovingAnAlreadySentGuest() throws Exception {
         final UUID stayGuestId = UUID.randomUUID();
         doThrow(new ConflictException("STAY_GUEST_ALREADY_SENT"))
-                .when(stayGuestService).removeGuest(stayId, stayGuestId, hotelId);
+                .when(stayGuestService).removeGuest(stayId, stayGuestId, hotelId, null);
 
         mockMvc.perform(delete(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID, stayId, stayGuestId))
                 .andExpect(status().isConflict());

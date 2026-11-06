@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { renderWithQuery as render } from '../test-utils';
+import { renderWithQuery as render } from '../../test-utils';
 import { ReservationGroupDetail } from './ReservationGroupDetail';
-import { reservationGroupService } from '../services';
+import { reservationGroupService } from '../../services';
 
-vi.mock('../services/reservationGroupService', () => ({
+vi.mock('../../services/reservationGroupService', () => ({
   reservationGroupService: {
     getGroup: vi.fn(),
     cancelGroup: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('../services/reservationGroupService', () => ({
   },
 }));
 
-vi.mock('../services/inventoryService', () => ({
+vi.mock('../../services/inventoryService', () => ({
   inventoryService: { getAllRooms: vi.fn().mockResolvedValue({ content: [] }) },
 }));
 
@@ -25,7 +25,7 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
-vi.mock('../store/toastStore', () => ({
+vi.mock('../../store/toastStore', () => ({
   useToastStore: (sel: unknown) =>
     (sel as (s: { addToast: () => void }) => unknown)({ addToast: vi.fn() }),
 }));

@@ -138,8 +138,42 @@ describe('StayGuestManagerDialog', () => {
     fireEvent.click(removeButtons[removeButtons.length - 1]);
     fireEvent.click(screen.getByRole('button', { name: 'btn_confirm' }));
 
-    await waitFor(() => expect(stayService.removeGuest).toHaveBeenCalledWith(STAY_ID, 'guest-secondary'));
+    await waitFor(() => expect(stayService.removeGuest).toHaveBeenCalledWith(STAY_ID, 'guest-secondary', undefined));
     await waitFor(() => expect(screen.queryByText('Verdi Anna')).not.toBeInTheDocument());
+  });
+
+  it('sends the version it last read when removing a guest', async () => {
+    vi.mocked(stayService.getStayById)
+      .mockResolvedValueOnce(stayWith([primaryGuest, { ...secondaryGuest, version: 4 }]))
+      .mockResolvedValueOnce(stayWith([primaryGuest]));
+    vi.mocked(stayService.removeGuest).mockResolvedValue(undefined);
+
+    render(<StayGuestManagerDialog stayId={STAY_ID} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText('Verdi Anna')).toBeInTheDocument());
+    const removeButtons = screen.getAllByRole('button', { name: 'btn_remove' });
+    fireEvent.click(removeButtons[removeButtons.length - 1]);
+    fireEvent.click(screen.getByRole('button', { name: 'btn_confirm' }));
+
+    await waitFor(() => expect(stayService.removeGuest).toHaveBeenCalledWith(STAY_ID, 'guest-secondary', 4));
+  });
+
+  it('keeps the dialog usable and reloads the list when the removal is rejected', async () => {
+    vi.mocked(stayService.getStayById)
+      .mockResolvedValueOnce(stayWith([primaryGuest, { ...secondaryGuest, version: 1 }]))
+      .mockResolvedValueOnce(stayWith([primaryGuest, { ...secondaryGuest, version: 2 }]));
+    vi.mocked(stayService.removeGuest).mockRejectedValue(new Error('STAY_GUEST_STALE_VERSION'));
+
+    render(<StayGuestManagerDialog stayId={STAY_ID} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText('Verdi Anna')).toBeInTheDocument());
+    const removeButtons = screen.getAllByRole('button', { name: 'btn_remove' });
+    fireEvent.click(removeButtons[removeButtons.length - 1]);
+    fireEvent.click(screen.getByRole('button', { name: 'btn_confirm' }));
+
+    await waitFor(() => expect(addToastMock).toHaveBeenCalledWith(expect.any(String), 'error'));
+    await waitFor(() => expect(stayService.getStayById).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Verdi Anna')).toBeInTheDocument();
   });
 
   it('asks for the removal in its own dialog on top of the guest list', async () => {

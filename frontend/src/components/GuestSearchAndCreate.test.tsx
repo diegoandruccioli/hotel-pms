@@ -2,18 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { GuestSearchAndCreate } from './GuestSearchAndCreate';
-import { guestService } from '../../services';
+import { guestService } from '../services';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
-vi.mock('../../services/guestService', () => ({
+vi.mock('../services/guestService', () => ({
   guestService: { searchGuests: vi.fn(), createGuest: vi.fn() },
 }));
 
-vi.mock('../../components/m3/M3TextField', () => ({
+vi.mock('./m3/M3TextField', () => ({
   M3TextField: ({ label, name, value, onChange, onKeyDown, required }: {
     label: string; name?: string; value: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void; required?: boolean;

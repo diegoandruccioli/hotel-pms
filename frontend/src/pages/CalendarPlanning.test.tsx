@@ -30,7 +30,7 @@ vi.mock('react-big-calendar', () => ({
   dateFnsLocalizer: () => ({}),
 }));
 
-vi.mock('@/pages/PlanningBoard', () => ({
+vi.mock('@/pages/CalendarPlanning/PlanningBoard', () => ({
   default: (props: Record<string, unknown>) => {
     lastPlanningBoardProps.current = props;
     return <div data-testid="planning-board">PlanningBoard</div>;

@@ -1,7 +1,7 @@
 import api from './api';
 import type { ReservationRequest, ReservationResponse, ReservationStatus } from '../types';
 import type { SpringPage } from '../types';
-import { downloadViaIframe } from '../utils/downloadViaIframe';
+import { downloadViaIframe } from './downloadViaIframe';
 
 const BASE_PATH = '/api/v1/reservations';
 

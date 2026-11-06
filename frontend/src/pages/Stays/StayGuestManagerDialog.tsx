@@ -119,16 +119,20 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
     if (!stayId) return;
     setBusyGuestId(guestId);
     try {
-      await stayService.removeGuest(stayId, guestId);
+      // The version this dialog last read: a guest changed elsewhere since then is rejected (409), not removed blindly.
+      const version = stay?.guests?.find((g) => g.id === guestId)?.version;
+      await stayService.removeGuest(stayId, guestId, version);
       addToast(t('guest_removed_success'), 'success');
       await refreshStay();
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('err_remove_guest')), 'error');
+      // A rejected removal (stale version, already sent) means the list on screen is out of date.
+      await refreshStay();
     } finally {
       setBusyGuestId(null);
       setConfirmRemoveId(null);
     }
-  }, [stayId, t, addToast, refreshStay]);
+  }, [stayId, stay, t, addToast, refreshStay]);
 
   const handleConfirmRemove = useCallback(() => {
     if (confirmRemoveId) void handleRemove(confirmRemoveId);

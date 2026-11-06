@@ -39,7 +39,7 @@ function RoomSelectionMock({ onCheckInChange, onCheckOutChange, onToggleRoom, se
   );
 }
 
-vi.mock('../Reservations/RoomSelection', () => ({
+vi.mock('../../components/RoomSelection', () => ({
   RoomSelection: (props: RoomMockProps) => RoomSelectionMock(props),
 }));
 

@@ -32,6 +32,8 @@ export interface ChaosOptions {
   seed?: number;
   steps?: number;
   routes: string[];
+  /** Wall-clock budget: the walk stops early, between two steps, once it is spent. */
+  deadlineMs?: number;
 }
 
 export interface ChaosResult {
@@ -39,6 +41,8 @@ export interface ChaosResult {
   stepsTaken: ChaosStep[];
   failedAt: ChaosStep | null;
   error: string | null;
+  /** Index of the first step skipped because the deadline was spent, or null when all ran. */
+  stoppedAtStep: number | null;
 }
 
 const KINDS: ChaosStep['kind'][] = ['click', 'navigate', 'back', 'forward', 'refresh', 'resize', 'palette', 'escape', 'random-type'];
@@ -57,6 +61,8 @@ export async function runChaosWalk(page: Page, guard: ConsoleGuard, opts: ChaosO
   const stepsTaken: ChaosStep[] = [];
   let failedAt: ChaosStep | null = null;
   let error: string | null = null;
+  let stoppedAtStep: number | null = null;
+  const startedAt = Date.now();
 
   const pick = <T,>(arr: T[]): T => arr[Math.floor(rand() * arr.length)];
 
@@ -65,6 +71,10 @@ export async function runChaosWalk(page: Page, guard: ConsoleGuard, opts: ChaosO
   guard.setRoute(startRoute);
 
   for (let i = 0; i < steps; i++) {
+    if (opts.deadlineMs !== undefined && Date.now() - startedAt > opts.deadlineMs) {
+      stoppedAtStep = i;
+      break;
+    }
     const kind = pick(KINDS);
     const step: ChaosStep = { index: i, kind, detail: '' };
     try {
@@ -128,5 +138,5 @@ export async function runChaosWalk(page: Page, guard: ConsoleGuard, opts: ChaosO
     }
   }
 
-  return { seed, stepsTaken, failedAt, error };
+  return { seed, stepsTaken, failedAt, error, stoppedAtStep };
 }

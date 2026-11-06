@@ -1,7 +1,8 @@
 /* eslint-disable react-perf/jsx-no-new-array-as-prop */
+import { useCallback } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { RouteAnnouncer } from './RouteAnnouncer';
 
@@ -92,8 +93,27 @@ describe('RouteAnnouncer', () => {
     });
   });
 
-  it('moves focus to #main-content', async () => {
+  it('leaves focus alone on the first render so the skip link stays the first Tab stop', async () => {
     renderAt('/rooms');
+    await waitFor(() => expect(screen.getByText('nav_rooms')).toBeInTheDocument());
+    expect(document.getElementById('main-content')).not.toHaveFocus();
+  });
+
+  it('moves focus to #main-content after a client-side navigation', async () => {
+    const GoToGuests = () => {
+      const navigate = useNavigate();
+      const handleClick = useCallback(() => navigate('/guests'), [navigate]);
+      return <button onClick={handleClick}>go</button>;
+    };
+    render(
+      <MemoryRouter initialEntries={['/rooms']}>
+        <div id="main-content" tabIndex={-1} />
+        <GoToGuests />
+        <RouteAnnouncer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('nav_rooms')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('go'));
     await waitFor(() => {
       expect(document.getElementById('main-content')).toHaveFocus();
     });

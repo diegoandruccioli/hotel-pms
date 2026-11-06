@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { reservationService } from '../../services';
+import { fetchAllRooms, reservationService } from '../../services';
 import type { ReservationResponse, ReservationStatus } from '../../types';
 import type { SpringPage } from '../../types';
-import { fetchAllRooms, queryKeys } from '../../lib';
+import { queryKeys } from '../../lib';
 
 interface SearchParams {
   query: string;

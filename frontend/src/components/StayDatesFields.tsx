@@ -1,6 +1,6 @@
 import { useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { M3TextField } from '../../components/m3';
+import { M3TextField } from './m3';
 
 interface StayDatesFieldsProps {
   checkInDate: string;

@@ -45,10 +45,11 @@ test.describe('Planning board renders a real reservation against the real backen
 
         await expect(page.getByText(roomNumber, { exact: true })).toBeVisible({ timeout: 15000 });
 
-        // ReservationBar renders `${guestFullName} (${status})` as its title
-        // and visible text — guestFullName is denormalized by the real
-        // backend from the real guest record, not supplied by this test.
-        const bar = page.locator(`[title*="CONFIRMED"]`).filter({ hasText: 'Suite Guest' });
+        // ReservationBar renders `${guestFullName} (${localised status label})`
+        // as its title and visible text — guestFullName is denormalized by the
+        // real backend from the real guest record, not supplied by this test.
+        // The status label follows the UI language, so match on the guest only.
+        const bar = page.locator(`[title*="Suite Guest"]`).filter({ hasText: 'Suite Guest' });
         await expect(bar.first()).toBeVisible({ timeout: 10000 });
     });
 });

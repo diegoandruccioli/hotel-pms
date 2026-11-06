@@ -10,7 +10,7 @@ import { M3ErrorState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
-import { CELL_STYLE, CELL_WIDTH, ROW_STYLE, SIDEBAR_STYLE, SIDEBAR_WIDTH } from '../planningGrid';
+import { CELL_STYLE, CELL_WIDTH, ROW_STYLE, SIDEBAR_STYLE, SIDEBAR_WIDTH } from '../../lib/planningGrid';
 import { RateCalendarCell } from './RateCalendarCell';
 import { RateBulkApplyDialog } from './RateBulkApplyDialog';
 import { useAuthStore } from '../../store';

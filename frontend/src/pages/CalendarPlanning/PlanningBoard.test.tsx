@@ -3,16 +3,16 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import PlanningBoard from './PlanningBoard';
-import { CELL_WIDTH } from './planningGrid';
-import type { RoomResponse } from '../types';
-import type { ReservationResponse } from '../types';
+import { CELL_WIDTH } from '../../lib/planningGrid';
+import type { RoomResponse } from '../../types';
+import type { ReservationResponse } from '../../types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
-vi.mock('../components/m3/M3Card', () => ({
+vi.mock('../../components/m3/M3Card', () => ({
   M3Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 

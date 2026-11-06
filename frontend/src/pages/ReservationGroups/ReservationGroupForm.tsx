@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/Alert';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button, M3Card, M3TextField, M3Textarea, M3Checkbox } from '../../components/m3';
-import { GuestSearchAndCreate } from '../Reservations/GuestSearchAndCreate';
+import { GuestSearchAndCreate } from '../../components/GuestSearchAndCreate';
 import { RoomingListRow, type RoomingListRowState } from './RoomingListRow';
 import { useCreateReservationGroup } from '../../hooks/queries';
 import { inventoryService } from '../../services';
