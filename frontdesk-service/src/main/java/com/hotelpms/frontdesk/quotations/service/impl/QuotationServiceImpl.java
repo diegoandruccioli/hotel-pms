@@ -41,7 +41,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -64,12 +67,18 @@ public class QuotationServiceImpl implements QuotationService {
     private static final String HOTEL_ID_NULL_MSG = "Hotel ID cannot be null";
     private static final String ID_NULL_MSG = "Quotation ID cannot be null";
     private static final String DEFAULT_CURRENCY = "EUR";
+    /** Shown in place of the number and type of a room that was removed after it was quoted. */
+    private static final String REMOVED_ROOM_PLACEHOLDER = "—";
     private static final String DEFAULT_LOCALE = "it";
     private static final String NOTIFICATION_SERVICE_UNAVAILABLE_REASON = "NOTIFICATION_SERVICE_UNAVAILABLE";
     private static final String PDF_TEMPLATE = "quotation";
     private static final String PDF_FILE_PREFIX = "preventivo-";
     private static final String PDF_FILE_EXTENSION = ".pdf";
     private static final int DUPLICATE_VALID_DAYS = 7;
+    private static final String NOT_SENDABLE_MSG = "QUOTATION_NOT_SENDABLE";
+    private static final String RESEND_TOO_SOON_MSG = "QUOTATION_RESEND_TOO_SOON";
+    /** Minimum gap between two successful sends of the same quotation. */
+    private static final Duration RESEND_COOLDOWN = Duration.ofMinutes(10);
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final QuotationRepository quotationRepository;
@@ -80,6 +89,7 @@ public class QuotationServiceImpl implements QuotationService {
     private final NotificationClient notificationClient;
     private final ReservationService reservationService;
     private final PdfTemplateRenderer pdfTemplateRenderer;
+    private final Clock clock;
 
     /** {@inheritDoc} */
     @Override
@@ -195,7 +205,7 @@ public class QuotationServiceImpl implements QuotationService {
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        return toResponse(quotation, guest, resolveRoomsForQuotation(quotation, hotelId));
+        return toResponse(quotation, guest, resolveRoomsLenient(List.of(quotation), hotelId));
     }
 
     /** {@inheritDoc} */
@@ -216,10 +226,11 @@ public class QuotationServiceImpl implements QuotationService {
                 : guestClient.getGuestsBatch(guestIds).stream()
                         .collect(java.util.stream.Collectors.toMap(GuestResponse::id, g -> g));
 
+        final Map<UUID, RoomResponse> roomsById = resolveRoomsLenient(page.getContent(), hotelId);
         return page.map(quotation -> toResponse(
                 quotation,
                 quotation.getGuestId() == null ? null : guestsById.get(quotation.getGuestId()),
-                resolveRoomsForQuotation(quotation, hotelId)));
+                roomsById));
     }
 
     /** {@inheritDoc} */
@@ -230,7 +241,7 @@ public class QuotationServiceImpl implements QuotationService {
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        return renderPdf(quotation, guest, resolveRoomsForQuotation(quotation, hotelId));
+        return renderPdf(quotation, guest, resolveRoomsLenient(List.of(quotation), hotelId));
     }
 
     /** {@inheritDoc} */
@@ -239,9 +250,8 @@ public class QuotationServiceImpl implements QuotationService {
     public QuotationResponse sendQuotationEmail(final UUID id) {
         final UUID hotelId = TenantContext.resolveHotelId();
         final Quotation quotation = findByIdAndHotelOrThrow(id, hotelId);
-        if (quotation.getStatus() == QuotationStatus.DECLINED) {
-            throw new ConflictException("QUOTATION_DECLINED");
-        }
+        final LocalDateTime now = LocalDateTime.now(clock);
+        requireSendable(quotation, hotelId, now);
 
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
@@ -253,6 +263,7 @@ public class QuotationServiceImpl implements QuotationService {
 
         final byte[] pdf = renderPdf(quotation, guest, roomsById);
         final HotelSettingsResponse settings = hotelSettingsService.getOrCreate(hotelId);
+        claimSend(quotation, now);
         final boolean sent = notificationClient.sendQuotation(new NotificationQuotationRequest(
                 recipientEmail,
                 recipientName,
@@ -272,11 +283,54 @@ public class QuotationServiceImpl implements QuotationService {
 
         quotation.setSendFailed(!sent);
         quotation.setSendFailureReason(sent ? null : NOTIFICATION_SERVICE_UNAVAILABLE_REASON);
+        // A failed send keeps the cooldown stamp: the notification fallback also returns false on a
+        // timeout, where the mail may already have been delivered, so an instant retry could mail twice.
         if (sent && quotation.getStatus() == QuotationStatus.DRAFT) {
             quotation.setStatus(QuotationStatus.SENT);
         }
         final Quotation saved = quotationRepository.save(quotation);
         return toResponse(saved, guest, roomsById);
+    }
+
+    /**
+     * Only a live {@code DRAFT}/{@code SENT} quotation may be mailed, and a resend
+     * must wait out {@link #RESEND_COOLDOWN} since the last send attempt to the same recipient
+     * (any quotation of the hotel, so duplicating a quotation does not reset it).
+     *
+     * @param quotation the quotation about to be mailed
+     * @param hotelId   the hotel UUID
+     * @param now       the current UTC time
+     */
+    private void requireSendable(final Quotation quotation, final UUID hotelId, final LocalDateTime now) {
+        final QuotationStatus status = quotation.getStatus();
+        if (status != QuotationStatus.DRAFT && status != QuotationStatus.SENT || quotation.isExpired()) {
+            throw new ConflictException(NOT_SENDABLE_MSG);
+        }
+        final LocalDateTime since = now.minus(RESEND_COOLDOWN);
+        final boolean recentlySent = quotation.getGuestId() != null
+                ? quotationRepository.existsByHotelIdAndGuestIdAndLastSentAtAfter(hotelId, quotation.getGuestId(), since)
+                : quotationRepository.existsByHotelIdAndProspectEmailIgnoreCaseAndLastSentAtAfter(
+                        hotelId, quotation.getProspectEmail(), since);
+        if (recentlySent) {
+            throw new ConflictException(RESEND_TOO_SOON_MSG);
+        }
+    }
+
+    /**
+     * Stamps and flushes the send time <em>before</em> the email goes out: the
+     * {@code @Version} check makes the loser of two concurrent sends fail here,
+     * so the recipient is mailed once, not twice.
+     *
+     * @param quotation the quotation about to be mailed
+     * @param now       the current UTC time
+     */
+    private void claimSend(final Quotation quotation, final LocalDateTime now) {
+        quotation.setLastSentAt(now);
+        try {
+            quotationRepository.saveAndFlush(quotation);
+        } catch (final ObjectOptimisticLockingFailureException ex) {
+            throw new ConflictException(RESEND_TOO_SOON_MSG, ex);
+        }
     }
 
     /** {@inheritDoc} */
@@ -312,6 +366,7 @@ public class QuotationServiceImpl implements QuotationService {
                 quotation.getExpectedGuests(), roomPrices);
 
         quotation.setAcceptedOptionId(chosen.getId());
+        quotation.setReservationId(reservation.id());
         quotation.setStatus(QuotationStatus.ACCEPTED);
         try {
             quotationRepository.saveAndFlush(quotation);
@@ -357,7 +412,7 @@ public class QuotationServiceImpl implements QuotationService {
         final Quotation saved = quotationRepository.save(quotation);
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        return toResponse(saved, guest, resolveRoomsForQuotation(quotation, hotelId));
+        return toResponse(saved, guest, resolveRoomsLenient(List.of(quotation), hotelId));
     }
 
     /** {@inheritDoc} */
@@ -447,6 +502,29 @@ public class QuotationServiceImpl implements QuotationService {
         for (final UUID roomId : roomIds) {
             roomsById.computeIfAbsent(roomId, id -> roomService.getRoomById(id, hotelId));
         }
+        return roomsById;
+    }
+
+    /**
+     * Same as {@link #resolveRoomsForQuotation} for read-only views: a room that was removed after it
+     * was quoted is simply absent from the map instead of failing the whole response (and, in the
+     * list, the whole page). {@link #toLineItemResponses} and the PDF rows then show a placeholder.
+     * Uses one non-throwing lookup: a caught {@code NotFoundException} from the room service would
+     * still mark this read-only transaction rollback-only and fail the commit.
+     *
+     * @param quotations the quotations whose rooms to resolve
+     * @param hotelId    the caller's hotel
+     * @return the rooms that still exist, by id
+     */
+    private Map<UUID, RoomResponse> resolveRoomsLenient(final List<Quotation> quotations, final UUID hotelId) {
+        final List<UUID> roomIds = quotations.stream()
+                .flatMap(quotation -> quotation.getOptions().stream())
+                .flatMap(option -> option.getLineItems().stream())
+                .map(QuotationLineItem::getRoomId)
+                .distinct()
+                .toList();
+        final Map<UUID, RoomResponse> roomsById = new HashMap<>();
+        roomService.getActiveRoomsByIds(roomIds, hotelId).forEach(room -> roomsById.put(room.id(), room));
         return roomsById;
     }
 
@@ -549,7 +627,9 @@ public class QuotationServiceImpl implements QuotationService {
         for (final QuotationLineItem lineItem : lineItems) {
             final RoomResponse room = roomsById.get(lineItem.getRoomId());
             final Map<String, String> row = new HashMap<>();
-            row.put("label", room.roomNumber() + " — " + room.roomType().name());
+            row.put("label", room == null
+                    ? REMOVED_ROOM_PLACEHOLDER
+                    : room.roomNumber() + " — " + room.roomType().name());
             row.put("priceFormatted", formatAmount(lineItem.getPrice()));
             rows.add(row);
         }
@@ -597,6 +677,7 @@ public class QuotationServiceImpl implements QuotationService {
                 quotation.getTotalPrice(),
                 options,
                 quotation.getAcceptedOptionId(),
+                quotation.getReservationId(),
                 quotation.isSendFailed(),
                 quotation.getSendFailureReason(),
                 quotation.getCreatedAt(),
@@ -609,7 +690,9 @@ public class QuotationServiceImpl implements QuotationService {
                 .map(lineItem -> {
                     final RoomResponse room = roomsById.get(lineItem.getRoomId());
                     return new QuotationLineItemResponse(
-                            lineItem.getId(), lineItem.getRoomId(), room.roomNumber(), room.roomType().name(),
+                            lineItem.getId(), lineItem.getRoomId(),
+                            room == null ? REMOVED_ROOM_PLACEHOLDER : room.roomNumber(),
+                            room == null ? REMOVED_ROOM_PLACEHOLDER : room.roomType().name(),
                             lineItem.getPrice());
                 })
                 .toList();

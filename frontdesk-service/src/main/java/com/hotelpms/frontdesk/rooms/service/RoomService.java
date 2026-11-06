@@ -6,6 +6,7 @@ import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,6 +38,19 @@ public interface RoomService {
      * @return the response
      */
     RoomResponse getRoomById(UUID id, UUID hotelId);
+
+    /**
+     * Gets the active rooms among {@code ids}, scoped to the authenticated hotel, in one query.
+     * Unlike {@link #getRoomById} this never throws for a missing room: ids that are removed, or not
+     * the hotel's, are just absent from the result. Use it for read-only views that must keep
+     * working when a referenced room was removed (a thrown {@code NotFoundException} would mark the
+     * caller's transaction rollback-only even if caught).
+     *
+     * @param ids     the room UUIDs to look up; must not be {@code null}
+     * @param hotelId the hotel UUID (from the authenticated user's JWT)
+     * @return the active rooms found, in no particular order
+     */
+    List<RoomResponse> getActiveRoomsByIds(Collection<UUID> ids, UUID hotelId);
 
     /**
      * Gets a paginated list of all active rooms belonging to the

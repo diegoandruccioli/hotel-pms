@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockAuthMe, mockDaySheet } from './fixtures/mockApi';
+import { mockUnhandledApi, mockServerEvents, mockAuthMe, mockDaySheet } from './fixtures/mockApi';
 
 const MOCK_ROOMS = [
   {
@@ -46,6 +46,8 @@ const roomsPage = {
 
 test.describe('Housekeeping', () => {
   test.beforeEach(async ({ page }) => {
+    await mockUnhandledApi(page);
+    await mockServerEvents(page);
     await mockAuthMe(page);
     // Housekeeping's filter-badge counts come from the day-sheet aggregate,
     // not from re-counting the fetched room list — unmocked, the query 401s
@@ -121,6 +123,32 @@ test.describe('Housekeeping', () => {
 
     // After status change API call, no error toast should appear
     await expect(page.getByRole('alert')).not.toBeVisible({ timeout: 2000 }).catch(() => { /* no error = pass */ });
+  });
+
+  test('groups the rooms into one column per status', async ({ page }) => {
+    await page.goto('/housekeeping');
+    await expect(page.getByRole('heading', { name: 'Room 101' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('group', { name: 'Dirty' }).getByRole('heading', { name: 'Room 101' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Clean' }).getByRole('heading', { name: 'Room 102' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Maintenance' }).getByRole('heading', { name: 'Room 201' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Occupied' }).getByRole('heading', { name: 'Room 202' })).toBeVisible();
+  });
+
+  test('drags a dirty room onto the Clean column to mark it clean', async ({ page }) => {
+    await page.goto('/housekeeping');
+    const card = page.getByRole('group', { name: 'Dirty' }).getByRole('heading', { name: 'Room 101' });
+    await expect(card).toBeVisible({ timeout: 10000 });
+
+    const patch = page.waitForRequest((req) => req.method() === 'PATCH' && req.url().includes('/rooms/rm-101/status'));
+    await card.dragTo(page.getByRole('group', { name: 'Clean' }));
+
+    expect((await patch).postDataJSON()).toMatchObject({ status: 'CLEAN' });
+  });
+
+  test('does not let an occupied room be dragged', async ({ page }) => {
+    await page.goto('/housekeeping');
+    const card = page.getByRole('group', { name: 'Occupied' }).locator('[draggable]').first();
+    await expect(card).toHaveAttribute('draggable', 'false', { timeout: 10000 });
   });
 
   test('shows correct room count', async ({ page }) => {

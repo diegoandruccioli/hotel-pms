@@ -12,7 +12,7 @@ vi.mock('react-router-dom', async () => {
 });
 import { Reservations } from './Reservations';
 import { reservationService } from '../services';
-import { mockAxiosErrorWithDetail } from '../test-utils';
+import { mockAxiosErrorWithDetail, openRowMenu } from '../test-utils';
 import { inventoryService } from '../services';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
@@ -202,7 +202,8 @@ describe('Reservations', () => {
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /delete_reservation res-1/ })).not.toBeInTheDocument();
+    openRowMenu();
+    expect(screen.queryByRole('menuitem', { name: /delete_reservation/ })).not.toBeInTheDocument();
   });
 
   it('should show delete button for ADMIN on CONFIRMED reservation', async () => {
@@ -210,7 +211,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /delete_reservation res-1/ })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    expect(screen.getByRole('menuitem', { name: /delete_reservation/ })).toBeInTheDocument();
   });
 
   it('should not show delete button on CANCELLED reservation', async () => {
@@ -219,7 +222,7 @@ describe('Reservations', () => {
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /delete_reservation res-2/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /delete_reservation/ })).not.toBeInTheDocument();
   });
 
   it('should open confirmation dialog when delete button is clicked', async () => {
@@ -227,8 +230,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /delete_reservation res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete_reservation res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /delete_reservation/ }));
 
     expect(screen.getByText('delete_reservation_confirm')).toBeInTheDocument();
   });
@@ -241,8 +245,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.deleteReservation).mockResolvedValueOnce(undefined as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /delete_reservation res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete_reservation res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /delete_reservation/ }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => {
@@ -260,8 +265,9 @@ describe('Reservations', () => {
     );
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /delete_reservation res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete_reservation res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /delete_reservation/ }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('RESERVATION_HAS_INVOICE', 'error'));
@@ -272,8 +278,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmed]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    expect(screen.getByRole('menuitem', { name: /mark_no_show/ })).toBeInTheDocument();
   });
 
   it('should not show mark-no-show button when check-in date is still in the future', async () => {
@@ -282,7 +289,8 @@ describe('Reservations', () => {
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /mark_no_show res-1/ })).not.toBeInTheDocument();
+    openRowMenu();
+    expect(screen.queryByRole('menuitem', { name: /mark_no_show/ })).not.toBeInTheDocument();
   });
 
   it('should not show mark-no-show button on a CANCELLED reservation', async () => {
@@ -291,7 +299,7 @@ describe('Reservations', () => {
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /mark_no_show res-2/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /mark_no_show/ })).not.toBeInTheDocument();
   });
 
   it('should open confirmation dialog when mark-no-show button is clicked', async () => {
@@ -299,9 +307,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmed]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /mark_no_show/ }));
 
     expect(screen.getByText('mark_no_show_confirm')).toBeInTheDocument();
   });
@@ -311,9 +319,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmed]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /mark_no_show/ }));
     fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
 
     expect(screen.queryByText('mark_no_show_confirm')).not.toBeInTheDocument();
@@ -325,9 +333,9 @@ describe('Reservations', () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValue(page([pastConfirmedNoVersion]) as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /mark_no_show/ }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('mark_no_show_failed', 'error'));
@@ -344,9 +352,9 @@ describe('Reservations', () => {
     } as never);
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /mark_no_show/ }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => {
@@ -363,9 +371,9 @@ describe('Reservations', () => {
     );
     render(<MemoryRouter><Reservations /></MemoryRouter>);
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /mark_no_show res-1/ })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /mark_no_show res-1/ }));
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /mark_no_show/ }));
     fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('RESERVATION_NO_SHOW_HAS_STAY', 'error'));
@@ -472,12 +480,27 @@ describe('Reservations', () => {
     });
   });
 
-  it('applies upcomingOnly, sortField and sortDir from navigation state on the first request', async () => {
+  it('opens on the arrivals-today preset when the navigation state asks for it', async () => {
+    vi.mocked(reservationService.searchReservations).mockResolvedValueOnce(page([CONFIRMED_RESERVATION]) as never);
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/reservations', state: { preset: 'arrivalsToday' } }]}>
+        <Reservations />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'reservations_filter_arrivals_today' })).toHaveAttribute('aria-pressed', 'true');
+    expect(reservationService.searchReservations).toHaveBeenCalledWith(
+      expect.objectContaining({ dateFrom: expect.any(String), dateTo: expect.any(String) }),
+    );
+  });
+
+  it('applies preset, sortField and sortDir from navigation state on the first request', async () => {
     vi.mocked(reservationService.searchReservations).mockResolvedValueOnce(page([
       { ...CONFIRMED_RESERVATION, id: 'res-future', guestFullName: 'Future Guest' },
     ]) as never);
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/reservations', state: { upcomingOnly: true, sortField: 'checkInDate', sortDir: 'asc' } }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/reservations', state: { preset: 'upcoming', sortField: 'checkInDate', sortDir: 'asc' } }]}>
         <Reservations />
       </MemoryRouter>
     );
@@ -502,6 +525,128 @@ describe('Reservations', () => {
         expect.objectContaining({ page: 1 }),
       );
       expect(screen.getByText('Page Two Guest')).toBeInTheDocument();
+    });
+  });
+
+  describe('quick filters', () => {
+    const renderLoaded = async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
+      render(<MemoryRouter><Reservations /></MemoryRouter>);
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    };
+
+    it('starts on "all", pressed, with no extra search params', async () => {
+      await renderLoaded();
+      expect(screen.getByRole('button', { name: 'reservations_filter_all' })).toHaveAttribute('aria-pressed', 'true');
+      expect(reservationService.searchReservations).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ status: expect.anything() }),
+      );
+    });
+
+    it.each([
+      ['reservations_filter_pending', { status: 'PENDING', upcomingOnly: false }],
+      ['reservations_filter_in_house', { status: 'CHECKED_IN', upcomingOnly: false }],
+      ['reservations_filter_cancelled', { status: 'CANCELLED', upcomingOnly: false }],
+    ])('"%s" requests %j and is the only chip pressed', async (label, expected) => {
+      await renderLoaded();
+      fireEvent.click(screen.getByRole('button', { name: label }));
+      await waitFor(() => expect(reservationService.searchReservations).toHaveBeenLastCalledWith(
+        expect.objectContaining(expected),
+      ));
+      expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'reservations_filter_all' })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('"arrivals today" requests today as both ends of the check-in range', async () => {
+      await renderLoaded();
+      fireEvent.click(screen.getByRole('button', { name: 'reservations_filter_arrivals_today' }));
+      await waitFor(() => {
+        const last = vi.mocked(reservationService.searchReservations).mock.calls.at(-1)?.[0];
+        expect(last?.dateFrom).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(last?.dateTo).toBe(last?.dateFrom);
+      });
+    });
+
+    it('goes back to the first page when a filter changes', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION], 3) as never);
+      render(<MemoryRouter><Reservations /></MemoryRouter>);
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+      fireEvent.click(screen.getByRole('button', { name: 'next_page' }));
+      await waitFor(() => expect(reservationService.searchReservations).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 1 }),
+      ));
+
+      fireEvent.click(screen.getByRole('button', { name: 'reservations_filter_pending' }));
+
+      await waitFor(() => expect(reservationService.searchReservations).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 0, status: 'PENDING' }),
+      ));
+    });
+
+    it('exports with the same filters as the list', async () => {
+      await renderLoaded();
+      fireEvent.click(screen.getByRole('button', { name: 'reservations_filter_in_house' }));
+      await waitFor(() => expect(reservationService.searchReservations).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'CHECKED_IN' }),
+      ));
+
+      fireEvent.click(screen.getByText('export_csv'));
+
+      expect(reservationService.exportReservationsCsv).toHaveBeenCalledWith({
+        query: '', upcomingOnly: false, status: 'CHECKED_IN',
+      });
+    });
+
+    it('marks "upcoming" as pressed when arriving from the dashboard link', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
+      render(
+        <MemoryRouter initialEntries={[{ pathname: '/reservations', state: { preset: 'upcoming' } }]}>
+          <Reservations />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+      expect(screen.getByRole('button', { name: 'reservations_upcoming_filter' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('explains an empty result for a status filter', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValue(page([]) as never);
+      render(<MemoryRouter><Reservations /></MemoryRouter>);
+      await waitFor(() => expect(screen.getByText('no_reservations_found')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: 'reservations_filter_cancelled' }));
+
+      await waitFor(() => expect(screen.getByText('no_reservations_match_filter')).toBeInTheDocument());
+    });
+  });
+
+  describe('list presentation', () => {
+    it('shows the guest avatar initial, the nights between the dates and the result range', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValueOnce(
+        { content: [CONFIRMED_RESERVATION], totalPages: 1, totalElements: 1 } as never,
+      );
+      render(<MemoryRouter><Reservations /></MemoryRouter>);
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      expect(screen.getByText('J')).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'nights' })).toBeInTheDocument();
+      expect(screen.getByText('2')).toBeInTheDocument();
+      expect(screen.getByText('list_range_summary')).toBeInTheDocument();
+    });
+
+    it('shows a dash for nights when a date is missing', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValueOnce(
+        page([{ ...CONFIRMED_RESERVATION, checkOutDate: undefined }]) as never,
+      );
+      render(<MemoryRouter><Reservations /></MemoryRouter>);
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+      expect(screen.getByTestId('nights-res-1')).toHaveTextContent('—');
+    });
+
+    it('has no range summary for an empty list', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValueOnce(page([]) as never);
+      render(<MemoryRouter><Reservations /></MemoryRouter>);
+      await waitFor(() => expect(screen.getByText('no_reservations_found')).toBeInTheDocument());
+      expect(screen.queryByText('list_range_summary')).not.toBeInTheDocument();
     });
   });
 });

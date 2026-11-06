@@ -1,13 +1,23 @@
+import { useFormatters } from '../../hooks';
 import { useCallback, memo, useState } from 'react';
 import { billingService } from '../../services';
 import { useToastStore } from '../../store';
 import { useTranslation } from 'react-i18next';
+import { M3Button } from '../../components/m3';
+import { M3ConfirmDialog } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
+import { M3TableActionLink } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { AddChargeModal } from './AddChargeModal';
-import { getErrorMessage } from '../../utils';
-import type { BillingDocumentType as DocumentType, InvoiceResponse, InvoiceStatus, PaymentMethod, ChargeType, SdiStatus } from '../../types';
+import { ChargeRow, InfoStrip, PaymentRow } from './InvoiceDetailRows';
+import { getErrorMessage, invoiceStatusTone, sdiStatusTone } from '../../utils';
+import type { BillingDocumentType as DocumentType, InvoiceResponse } from '../../types';
+
+interface ChargeToRemove {
+  id: string;
+  amount: number;
+}
 
 interface Props {
   invoice: InvoiceResponse;
@@ -15,93 +25,14 @@ interface Props {
   onUpdated?: (updated: InvoiceResponse) => void;
 }
 
-const statusTone = (s: InvoiceStatus) => {
-  if (s === 'PAID') return 'success' as const;
-  if (s === 'CANCELLED') return 'error' as const;
-  return 'warning' as const;
-};
-
-const methodIcon: Record<PaymentMethod, string> = {
-  CASH: 'payments',
-  CREDIT_CARD: 'credit_card',
-  DEBIT_CARD: 'credit_card',
-  BANK_TRANSFER: 'account_balance',
-  CHECK: 'receipt',
-};
-
-const chargeTypeIcon: Record<ChargeType, string> = {
-  FB_ORDER: 'restaurant',
-  ROOM_NIGHT: 'bed',
-  EXTRA: 'add_circle',
-  CITY_TAX: 'account_balance',
-};
-
-const sdiStatusTone = (s: SdiStatus) => {
-  if (s === 'ACCEPTED') return 'success' as const;
-  if (s === 'REJECTED') return 'error' as const;
-  if (s === 'SENT') return 'warning' as const;
-  return 'neutral' as const;
-};
-
-interface ChargeRowProps {
-  charge: NonNullable<InvoiceResponse['charges']>[number];
-  removable: boolean;
-  removing: boolean;
-  formatCurrency: (val: number) => string;
-  onRemove: (chargeId: string, amount: number) => void;
-}
-
-/** Extracted so the per-row remove handler can close over this row's own
- * charge id/amount via useCallback, instead of an inline arrow created fresh
- * on every render of the parent's .map() (react-perf/jsx-no-new-function-as-prop). */
-const ChargeRow = memo(({ charge, removable, removing, formatCurrency, onRemove }: ChargeRowProps) => {
-  const { t } = useTranslation('billing');
-  const handleRemoveClick = useCallback(
-    () => onRemove(charge.id, charge.amount),
-    [onRemove, charge.id, charge.amount],
-  );
-
-  return (
-    <li className="flex items-center justify-between py-2">
-      <div className="flex items-center gap-2 min-w-0">
-        <MaterialIcon
-          name={chargeTypeIcon[charge.type] ?? 'receipt'}
-          size={18}
-          className="text-on-surface-variant shrink-0"
-        />
-        <span className="truncate text-on-surface">
-          {charge.description || t(`charge_type_${charge.type.toLowerCase()}`)}
-        </span>
-      </div>
-      <div className="flex items-center gap-2 shrink-0 ml-4">
-        <span className="font-medium text-on-surface">
-          {formatCurrency(charge.amount)}
-        </span>
-        {removable && (
-          <button
-            type="button"
-            aria-label={t('remove_charge')}
-            disabled={removing}
-            onClick={handleRemoveClick}
-            className="text-on-surface-variant hover:text-error disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm min-h-10 min-w-10 flex items-center justify-center"
-          >
-            <MaterialIcon name="delete" size={18} />
-          </button>
-        )}
-      </div>
-    </li>
-  );
-});
-
-ChargeRow.displayName = 'ChargeRow';
-
 export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) => {
-  const { t, i18n } = useTranslation(['billing', 'common']);
+  const { t } = useTranslation(['billing', 'common']);
   const addToast = useToastStore((s) => s.addToast);
   const [switchingType, setSwitchingType] = useState(false);
   const [validatingXml, setValidatingXml] = useState(false);
   const [addingCharge, setAddingCharge] = useState(false);
   const [removingChargeId, setRemovingChargeId] = useState<string | null>(null);
+  const [chargeToRemove, setChargeToRemove] = useState<ChargeToRemove | null>(null);
 
   const handleDownloadPdf = useCallback(async () => {
     try {
@@ -162,9 +93,6 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
   );
 
   const handleRemoveChargeAsync = useCallback(async (chargeId: string, amount: number) => {
-    if (!window.confirm(t('confirm_remove_charge', { ns: 'billing' }))) {
-      return;
-    }
     if (!invoice.stayId) {
       return;
     }
@@ -185,29 +113,21 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
   }, [invoice, onUpdated, addToast, t]);
 
   // Stable reference passed to every ChargeRow as `onRemove` — ChargeRow itself
-  // closes over its own charge id/amount, this wrapper just adapts the async
-  // handler above to the sync (id, amount) => void signature ChargeRow expects.
+  // closes over its own charge id/amount; this only opens the confirmation.
   const handleRemoveCharge = useCallback(
-    (chargeId: string, amount: number) => { void handleRemoveChargeAsync(chargeId, amount); },
-    [handleRemoveChargeAsync],
+    (chargeId: string, amount: number) => setChargeToRemove({ id: chargeId, amount }),
+    [],
   );
 
-  const formatCurrency = useCallback(
-    (val: number) =>
-      new Intl.NumberFormat(i18n.language, {
-        style: 'currency',
-        currency: 'EUR',
-      }).format(val),
-    [i18n.language],
-  );
+  const handleCancelRemoveCharge = useCallback(() => setChargeToRemove(null), []);
+  const handleConfirmRemoveCharge = useCallback(() => {
+    if (chargeToRemove) {
+      void handleRemoveChargeAsync(chargeToRemove.id, chargeToRemove.amount);
+    }
+    setChargeToRemove(null);
+  }, [chargeToRemove, handleRemoveChargeAsync]);
 
-  const formatDateTime = useCallback(
-    (dateStr?: string) => {
-      if (!dateStr) return '—';
-      return new Date(dateStr).toLocaleString(i18n.language);
-    },
-    [i18n.language],
-  );
+  const { formatCurrency, formatDateTime } = useFormatters();
 
   const totalPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -221,44 +141,38 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
       <div className="space-y-6 text-sm font-body">
         {/* Document type toggle */}
         {invoice.status !== 'CANCELLED' && (
-          <div className="flex items-center justify-between px-3 py-2 rounded-shape-xs bg-surface-container border border-outline-variant/40">
+          <InfoStrip
+            action={
+              <M3TableActionLink onClick={handleToggleDocumentTypeVoid} disabled={switchingType} className="text-xs">
+                {invoice.documentType === 'FATTURA'
+                  ? t('switch_to_ricevuta', { ns: 'billing' })
+                  : t('switch_to_fattura', { ns: 'billing' })}
+              </M3TableActionLink>
+            }
+          >
             <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
               {t(`document_type_${invoice.documentType?.toLowerCase() ?? 'fattura'}`, { ns: 'billing' })}
             </span>
-            <button
-              type="button"
-              onClick={handleToggleDocumentTypeVoid}
-              disabled={switchingType}
-              className="text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm min-h-10 px-2"
-            >
-              {invoice.documentType === 'FATTURA'
-                ? t('switch_to_ricevuta', { ns: 'billing' })
-                : t('switch_to_fattura', { ns: 'billing' })}
-            </button>
-          </div>
+          </InfoStrip>
         )}
         {/* SDI status + XML download (FATTURA only, non-CANCELLED) */}
         {invoice.status !== 'CANCELLED' && invoice.documentType === 'FATTURA' && (
-          <div className="flex items-center justify-between px-3 py-2 rounded-shape-xs bg-surface-container border border-outline-variant/40">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
-                {t('sdi_status_label', { ns: 'billing' })}
-              </span>
-              <M3StatusChip
-                label={t(`sdi_status_${invoice.sdiStatus.toLowerCase()}`, { ns: 'billing' })}
-                tone={sdiStatusTone(invoice.sdiStatus)}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleDownloadFatturaPAXmlVoid}
-              disabled={validatingXml}
-              className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm min-h-10 px-2"
-            >
-              <MaterialIcon name="download" size={18} />
-              {t('download_fattura_pa', { ns: 'billing' })}
-            </button>
-          </div>
+          <InfoStrip
+            action={
+              <M3TableActionLink onClick={handleDownloadFatturaPAXmlVoid} disabled={validatingXml} className="gap-1 text-xs">
+                <MaterialIcon name="download" size={18} />
+                {t('download_fattura_pa', { ns: 'billing' })}
+              </M3TableActionLink>
+            }
+          >
+            <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
+              {t('sdi_status_label', { ns: 'billing' })}
+            </span>
+            <M3StatusChip
+              label={t(`sdi_status_${invoice.sdiStatus.toLowerCase()}`, { ns: 'billing' })}
+              tone={sdiStatusTone[invoice.sdiStatus]}
+            />
+          </InfoStrip>
         )}
         {/* Header summary */}
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
@@ -281,7 +195,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
             <dd className="mt-0.5">
               <M3StatusChip
                 label={t(`invoice_status_${invoice.status}`, { ns: 'common', defaultValue: invoice.status })}
-                tone={statusTone(invoice.status)}
+                tone={invoiceStatusTone[invoice.status]}
               />
             </dd>
           </div>
@@ -295,14 +209,10 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
                 {t('charges', { ns: 'billing' })}
               </h3>
               {invoice.stayId && invoice.status === 'ISSUED' && (
-                <button
-                  type="button"
-                  onClick={handleOpenAddCharge}
-                  className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm min-h-10 px-2"
-                >
+                <M3TableActionLink onClick={handleOpenAddCharge} className="gap-1 text-xs">
                   <MaterialIcon name="add_circle" size={18} />
                   {t('add_charge_button', { ns: 'billing' })}
-                </button>
+                </M3TableActionLink>
               )}
             </div>
             {invoice.charges && invoice.charges.length > 0 ? (
@@ -335,27 +245,7 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
             <>
               <ul className="divide-y divide-outline-variant">
                 {invoice.payments.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between py-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <MaterialIcon
-                        name={methodIcon[p.paymentMethod] ?? 'payments'}
-                        size={18}
-                        className="text-on-surface-variant shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-on-surface">
-                          {t(`payment_method_${p.paymentMethod.toLowerCase()}`, { ns: 'billing' })}
-                        </p>
-                        <p className="text-xs text-on-surface-variant">
-                          {formatDateTime(p.paymentDate)}
-                          {p.transactionReference && ` · ${p.transactionReference}`}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="font-medium text-success shrink-0 ml-4">
-                      {formatCurrency(p.amount)}
-                    </span>
-                  </li>
+                  <PaymentRow key={p.id} payment={p} formatCurrency={formatCurrency} formatDateTime={formatDateTime} />
                 ))}
               </ul>
               <div className="flex justify-between pt-3 border-t border-outline-variant font-medium">
@@ -369,15 +259,19 @@ export const InvoiceDetailModal = memo(({ invoice, onClose, onUpdated }: Props) 
 
       {/* PDF download action */}
       <div className="flex justify-end pt-2 border-t border-outline-variant mt-4">
-        <button
-          type="button"
-          onClick={handleDownloadPdf}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-medium hover:opacity-90 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary min-h-10"
-        >
-          <MaterialIcon name="download" size={18} />
+        <M3Button type="button" icon="download" onClick={handleDownloadPdf}>
           {t('download_pdf', { ns: 'billing' })}
-        </button>
+        </M3Button>
       </div>
+
+      {chargeToRemove && (
+        <M3ConfirmDialog
+          title={t('remove_charge', { ns: 'billing' })}
+          message={t('confirm_remove_charge', { ns: 'billing' })}
+          onConfirm={handleConfirmRemoveCharge}
+          onCancel={handleCancelRemoveCharge}
+        />
+      )}
 
       {addingCharge && invoice.stayId && (
         <AddChargeModal

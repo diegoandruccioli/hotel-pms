@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -488,5 +489,20 @@ class AuthServiceImplTest {
         assertDoesNotThrow(() -> authService.invalidateRefreshToken(MOCK_REFRESH_TOKEN),
                 "invalidateRefreshToken must not propagate JwtException");
         verify(refreshTokenService, never()).blacklist(anyString(), any(Instant.class));
+    }
+
+    @Test
+    void mustChangePasswordReflectsTheAccountFlag() {
+        testUser.setMustChangePassword(true);
+        when(userRepository.findByUsername(TEST_USER)).thenReturn(Optional.of(testUser));
+
+        assertTrue(authService.mustChangePassword(TEST_USER), "flagged account must report true");
+    }
+
+    @Test
+    void mustChangePasswordIsFalseForUnknownUser() {
+        when(userRepository.findByUsername(TEST_USER)).thenReturn(Optional.empty());
+
+        assertFalse(authService.mustChangePassword(TEST_USER), "unknown user must not be forced to change password");
     }
 }

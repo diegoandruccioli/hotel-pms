@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from './MaterialIcon';
+import { M3Avatar } from './m3';
+import { useEscapeKey } from '../hooks';
 import { cn } from '../utils';
 
 interface UserMenuProps {
@@ -69,7 +71,6 @@ export const UserMenu = ({
   const { t } = useTranslation('settings');
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const userInitial = username.charAt(0).toUpperCase();
 
   // Close on outside click
   useEffect(() => {
@@ -83,18 +84,12 @@ export const UserMenu = ({
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, [open, onClose]);
 
-  // Close on Escape, while open
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-        triggerRef.current?.focus();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
+  // Close on Escape, while open, and give focus back to the trigger
+  const handleEscape = useCallback(() => {
+    onClose();
+    triggerRef.current?.focus();
+  }, [onClose]);
+  useEscapeKey(open, handleEscape);
 
   // Stable handlers for sub-components
   const handleSettingsClick = useCallback(() => {
@@ -139,9 +134,7 @@ export const UserMenu = ({
         aria-expanded={open}
         aria-controls="user-menu-list"
         className={cn(
-          'flex items-center justify-center w-10 h-10',
-          'rounded-shape-full bg-primary text-on-primary',
-          'text-sm font-display font-bold',
+          'flex rounded-shape-full',
           'focus-visible:outline-hidden focus-visible:ring-2',
           'focus-visible:ring-primary focus-visible:ring-offset-2',
           'hover:brightness-110 transition-all cursor-pointer',
@@ -149,7 +142,7 @@ export const UserMenu = ({
         )}
         aria-label={t('user_menu_label', { name: username })}
       >
-        {userInitial}
+        <M3Avatar name={username} size="md" />
       </button>
 
       {/* ── Dropdown Menu Surface ──────────────────── */}

@@ -9,10 +9,10 @@ import java.util.List;
  *
  * @param startDate     the start of the reporting period
  * @param endDate       the end of the reporting period
- * @param totalRevenue  sum of all invoice amounts in the period
- * @param totalInvoices total number of invoices in the period
+ * @param totalRevenue  sum of the invoice amounts in the period, cancelled invoices excluded
+ * @param totalInvoices number of invoices in the period, cancelled invoices excluded
  * @param paidInvoices  number of invoices with status PAID
- * @param invoices      list of all invoices in the period
+ * @param invoices      list of every invoice in the period, cancelled ones included
  */
 public record OwnerFinancialReportDto(
                 LocalDate startDate,
@@ -28,10 +28,10 @@ public record OwnerFinancialReportDto(
          *
          * @param startDate     the start of the reporting period
          * @param endDate       the end of the reporting period
-         * @param totalRevenue  sum of all invoice amounts in the period
-         * @param totalInvoices total number of invoices in the period
+         * @param totalRevenue  sum of the invoice amounts in the period, cancelled invoices excluded
+         * @param totalInvoices number of invoices in the period, cancelled invoices excluded
          * @param paidInvoices  number of invoices with status PAID
-         * @param invoices      list of all invoices in the period
+         * @param invoices      list of every invoice in the period, cancelled ones included
          */
         public OwnerFinancialReportDto {
                 invoices = List.copyOf(invoices);

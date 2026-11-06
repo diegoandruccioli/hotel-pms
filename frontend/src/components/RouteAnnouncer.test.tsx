@@ -1,7 +1,8 @@
 /* eslint-disable react-perf/jsx-no-new-array-as-prop */
+import { useCallback } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { RouteAnnouncer } from './RouteAnnouncer';
 
@@ -43,10 +44,38 @@ describe('RouteAnnouncer', () => {
     });
   });
 
-  it('resolves a sub-route to its section label (e.g. a reservation form)', async () => {
+  it('announces a nested route by its own title (e.g. a reservation form)', async () => {
     renderAt('/reservations/new');
     await waitFor(() => {
-      expect(screen.getByText('nav_reservations')).toBeInTheDocument();
+      expect(screen.getByText('new_reservation')).toBeInTheDocument();
+    });
+  });
+
+  it('titles a dynamic detail route with its static label, not the page data', async () => {
+    renderAt('/quotations/q1');
+    await waitFor(() => {
+      expect(document.title).toContain('quotation_details');
+    });
+  });
+
+  it('falls back to the section label for an unmapped sub-route', async () => {
+    renderAt('/reservations/groups/g1/unmapped');
+    await waitFor(() => {
+      expect(screen.getByText('nav_reservation_groups')).toBeInTheDocument();
+    });
+  });
+
+  it('announces night audit instead of falling back to the dashboard', async () => {
+    renderAt('/night-audit');
+    await waitFor(() => {
+      expect(screen.getByText('nav_night_audit')).toBeInTheDocument();
+    });
+  });
+
+  it('announces reservation groups, not the parent reservations section', async () => {
+    renderAt('/reservations/groups');
+    await waitFor(() => {
+      expect(screen.getByText('nav_reservation_groups')).toBeInTheDocument();
     });
   });
 
@@ -64,8 +93,27 @@ describe('RouteAnnouncer', () => {
     });
   });
 
-  it('moves focus to #main-content', async () => {
+  it('leaves focus alone on the first render so the skip link stays the first Tab stop', async () => {
     renderAt('/rooms');
+    await waitFor(() => expect(screen.getByText('nav_rooms')).toBeInTheDocument());
+    expect(document.getElementById('main-content')).not.toHaveFocus();
+  });
+
+  it('moves focus to #main-content after a client-side navigation', async () => {
+    const GoToGuests = () => {
+      const navigate = useNavigate();
+      const handleClick = useCallback(() => navigate('/guests'), [navigate]);
+      return <button onClick={handleClick}>go</button>;
+    };
+    render(
+      <MemoryRouter initialEntries={['/rooms']}>
+        <div id="main-content" tabIndex={-1} />
+        <GoToGuests />
+        <RouteAnnouncer />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('nav_rooms')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('go'));
     await waitFor(() => {
       expect(document.getElementById('main-content')).toHaveFocus();
     });

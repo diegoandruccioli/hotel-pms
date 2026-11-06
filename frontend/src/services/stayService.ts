@@ -16,21 +16,36 @@ import type {
   HotelCategoryHistoryResponse,
   HotelSettingsRequest,
   HotelSettingsResponse,
+  GuestStaySummary,
   StayGuestRequest,
   StayGuestResponse,
   StayRequest,
   StayResponse,
+  StayStatus,
 } from '../types';
 import type { SpringPage } from '../types';
+
+/** Server-side filters and sort of the stays list; every field is optional. */
+export interface StayListFilters {
+  status?: StayStatus;
+  sortField?: 'actualCheckInTime' | 'expectedCheckOutDate' | 'status';
+  sortDir?: 'asc' | 'desc';
+  /** Exact expected check-out day, yyyy-MM-dd. */
+  departingOn?: string;
+  alloggiatiFailed?: boolean;
+}
 
 const BASE_PATH = '/api/v1/stays';
 const IFRAME_CLEANUP_DELAY_MS = 10000;
 
 export const stayService = {
-  getAllStays: async (page = 0, size = 20): Promise<SpringPage<StayResponse>> => {
-    const response = await api.get<SpringPage<StayResponse>>(
-      `${BASE_PATH}?page=${page}&size=${size}&sort=actualCheckInTime,desc`,
-    );
+  getAllStays: async (page = 0, size = 20, filters: StayListFilters = {}): Promise<SpringPage<StayResponse>> => {
+    const sort = `${filters.sortField ?? 'actualCheckInTime'},${filters.sortDir ?? 'desc'}`;
+    let url = `${BASE_PATH}?page=${page}&size=${size}&sort=${sort}`;
+    if (filters.status) url += `&status=${filters.status}`;
+    if (filters.departingOn) url += `&departingOn=${filters.departingOn}`;
+    if (filters.alloggiatiFailed) url += '&alloggiatiFailed=true';
+    const response = await api.get<SpringPage<StayResponse>>(url);
     return response.data;
   },
 
@@ -132,6 +147,11 @@ export const stayService = {
     setTimeout(() => document.body.removeChild(iframe), IFRAME_CLEANUP_DELAY_MS);
   },
 
+  getGuestStayHistory: async (guestId: string): Promise<GuestStaySummary[]> => {
+    const response = await api.get<GuestStaySummary[]>(`${BASE_PATH}/guest/${guestId}/history`);
+    return response.data;
+  },
+
   getLastCompletedStayForGuest: async (guestId: string): Promise<StayResponse | null> => {
     const response = await api.get<StayResponse>(`${BASE_PATH}/guest/${guestId}/latest`, {
       validateStatus: (s) => s === 200 || s === 204,
@@ -178,8 +198,10 @@ export const stayService = {
   },
 
   getAvailableRooms: async (): Promise<AvailableRoom[]> => {
+    // Filtered by the server: filtering the first 200 rooms client-side would drop the clean ones
+    // beyond that for a hotel with more rooms. The client filter stays as a guard.
     const response = await api.get<{ content: AvailableRoom[] }>('/api/v1/rooms', {
-      params: { size: 200 },
+      params: { size: 200, status: 'CLEAN' },
     });
     return (response.data.content ?? []).filter((r) => r.status === 'CLEAN');
   },
@@ -248,8 +270,10 @@ export const stayService = {
     return response.data;
   },
 
-  removeGuest: async (stayId: string, guestId: string): Promise<void> => {
-    await api.delete(`${BASE_PATH}/${stayId}/guests/${guestId}`);
+  removeGuest: async (stayId: string, guestId: string, version?: number | null): Promise<void> => {
+    await api.delete(`${BASE_PATH}/${stayId}/guests/${guestId}`, {
+      params: version == null ? undefined : { version },
+    });
   },
 
   recordGuestDeparture: async (stayId: string, guestId: string, departureDate: string): Promise<StayGuestResponse> => {

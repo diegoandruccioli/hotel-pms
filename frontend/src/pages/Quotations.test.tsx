@@ -11,6 +11,7 @@ vi.mock('react-router-dom', async () => {
 import { Quotations } from './Quotations';
 import { quotationService } from '../services';
 import { useToastStore } from '../store';
+import { openRowMenu } from '../test-utils';
 
 vi.mock('react-i18next', () => {
   const t = (key: string, opts?: Record<string, unknown>) => {
@@ -59,6 +60,7 @@ const DRAFT_QUOTATION = {
     { id: 'opt1', label: 'Opzione 1', position: 0, totalPrice: 200, lineItems: [] },
   ],
   acceptedOptionId: null,
+  reservationId: null,
   sendFailed: false,
   sendFailureReason: null,
   createdAt: '2026-08-01T00:00:00',
@@ -97,7 +99,7 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     renderPage();
     await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
-    expect(screen.getByText('€ 200.00')).toBeInTheDocument();
+    expect(screen.getByText('€200.00')).toBeInTheDocument();
   });
 
   it('renders empty state when no quotations', async () => {
@@ -148,34 +150,56 @@ describe('Quotations', () => {
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_send_failed', 'error'));
   });
 
-  it('action_convert on a single-option quotation converts directly and reloads', async () => {
+  it('action_convert on a single-option quotation converts directly and opens the new reservation', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.convertToReservation).mockResolvedValue({ id: 'res1' } as never);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_convert'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_convert' }));
     await waitFor(() => expect(quotationService.convertToReservation).toHaveBeenCalledWith('q1'));
     expect(mockAddToast).toHaveBeenCalledWith('toast_converted', 'success');
+    expect(mockNavigate).toHaveBeenCalledWith('/reservations/res1');
     expect(mockNavigate).not.toHaveBeenCalledWith('/quotations/q1');
+  });
+
+  it('offers a link to the reservation only for a converted quotation that recorded it', async () => {
+    const converted = { ...DRAFT_QUOTATION, status: 'ACCEPTED', reservationId: 'res9' };
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([converted]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_open_reservation' }));
+    expect(mockNavigate).toHaveBeenCalledWith('/reservations/res9');
+  });
+
+  it('hides the reservation link when the quotation has none', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    expect(screen.queryByRole('menuitem', { name: 'action_open_reservation' })).not.toBeInTheDocument();
   });
 
   it('action_convert on a single-option quotation shows an error toast when conversion fails', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.convertToReservation).mockRejectedValue(new Error('boom'));
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_convert'));
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_converted', 'error'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_convert' }));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_convert', 'error'));
   });
 
   it('action_decline shows confirmation dialog then declines', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.declineQuotation).mockResolvedValue({ ...DRAFT_QUOTATION, status: 'DECLINED' } as never);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_decline'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_decline' }));
     expect(screen.getByText('confirm_decline')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(quotationService.declineQuotation).toHaveBeenCalledWith('q1'));
     expect(mockAddToast).toHaveBeenCalledWith('toast_declined', 'success');
   });
@@ -184,20 +208,22 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.declineQuotation).mockRejectedValue(new Error('boom'));
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_decline'));
-    fireEvent.click(screen.getByText('common:confirm'));
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_declined', 'error'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_decline' }));
+    fireEvent.click(screen.getByText('confirm'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_decline', 'error'));
   });
 
   it('action_delete shows an error toast when deleteQuotation rejects', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.deleteQuotation).mockRejectedValue(new Error('boom'));
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_delete'));
-    fireEvent.click(screen.getByText('common:confirm'));
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_deleted', 'error'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_delete' }));
+    fireEvent.click(screen.getByText('confirm'));
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_delete', 'error'));
   });
 
   it('shows a single price (not a range) when all options happen to total the same amount', async () => {
@@ -213,15 +239,16 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([equalOptionsQuotation]) as never);
     renderPage();
     await waitFor(() => expect(screen.getByText('Anna Neri')).toBeInTheDocument());
-    expect(screen.getByText('€ 90.00')).toBeInTheDocument();
+    expect(screen.getByText('€90.00')).toBeInTheDocument();
     expect(screen.queryByText('price_range')).not.toBeInTheDocument();
   });
 
   it('action_download_pdf calls quotationService.downloadPdf', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_download_pdf')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_download_pdf'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_download_pdf' }));
     expect(quotationService.downloadPdf).toHaveBeenCalledWith('q1');
   });
 
@@ -240,10 +267,11 @@ describe('Quotations', () => {
   it('cancelling the decline dialog closes it without declining', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_decline'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_decline' }));
     expect(screen.getByText('confirm_decline')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:cancel'));
+    fireEvent.click(screen.getByText('cancel'));
     expect(screen.queryByText('confirm_decline')).not.toBeInTheDocument();
     expect(quotationService.declineQuotation).not.toHaveBeenCalled();
   });
@@ -251,10 +279,11 @@ describe('Quotations', () => {
   it('cancelling the delete dialog closes it without deleting', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_delete'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_delete' }));
     expect(screen.getByText('confirm_delete')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:cancel'));
+    fireEvent.click(screen.getByText('cancel'));
     expect(screen.queryByText('confirm_delete')).not.toBeInTheDocument();
     expect(quotationService.deleteQuotation).not.toHaveBeenCalled();
   });
@@ -263,10 +292,11 @@ describe('Quotations', () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
     vi.mocked(quotationService.deleteQuotation).mockResolvedValue(undefined);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_delete')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_delete'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_delete' }));
     expect(screen.getByText('confirm_delete')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(quotationService.deleteQuotation).toHaveBeenCalledWith('q1'));
   });
 
@@ -280,9 +310,10 @@ describe('Quotations', () => {
   it('action_convert on a multi-option quotation navigates to detail instead of converting directly', async () => {
     vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([MULTI_OPTION_QUOTATION]) as never);
     renderPage();
-    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('action_convert'));
-    expect(mockNavigate).toHaveBeenCalledWith('/quotations/q2');
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'action_convert' }));
+    expect(mockNavigate).toHaveBeenCalledWith('/quotations/q2', { state: { openConvert: true } });
     expect(quotationService.convertToReservation).not.toHaveBeenCalled();
   });
 
@@ -291,5 +322,15 @@ describe('Quotations', () => {
     const { container } = renderPage();
     await waitFor(() => screen.getByText('Mario Rossi'));
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('shows locale-formatted dates and the result range', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+    expect(screen.getByText('9/1/2026')).toBeInTheDocument();
+    expect(screen.getByText('9/3/2026')).toBeInTheDocument();
+    expect(screen.getByText('8/20/2026')).toBeInTheDocument();
+    expect(screen.getByText('list_range_summary')).toBeInTheDocument();
   });
 });

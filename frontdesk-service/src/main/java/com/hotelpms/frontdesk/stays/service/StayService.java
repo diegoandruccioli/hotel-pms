@@ -73,6 +73,24 @@ public interface StayService {
             LocalDate dateFrom, LocalDate dateTo, StayStatus status);
 
     /**
+     * Same as the filtered overload, plus an exact expected-check-out day
+     * ("departing on") and an Alloggiati-failed-only switch. Either extra filter
+     * excludes legacy stays that have no expected check-out date.
+     *
+     * @param pageable        the pagination and sorting parameters
+     * @param hotelId         the authenticated hotel UUID (T-STAY-04)
+     * @param dateFrom        optional lower bound (inclusive) on actual check-in date
+     * @param dateTo          optional upper bound (inclusive) on actual check-in date
+     * @param status          optional stay status filter
+     * @param departingOn     optional exact expected check-out date
+     * @param alloggiatiFailed when {@code true}, only stays whose last Alloggiati send failed
+     * @return a page of matching stay responses
+     */
+    Page<StayResponse> getAllStays(Pageable pageable, @NonNull UUID hotelId,
+            LocalDate dateFrom, LocalDate dateTo, StayStatus status,
+            LocalDate departingOn, boolean alloggiatiFailed);
+
+    /**
      * Retrieves all stays for a given reservation, scoped to the authenticated hotel.
      *
      * @param reservationId the reservation ID

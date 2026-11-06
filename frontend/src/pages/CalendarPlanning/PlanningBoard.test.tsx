@@ -1,0 +1,380 @@
+/* eslint-disable react-perf/jsx-no-new-array-as-prop -- test-only inline fixtures, not the real render path */
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { axe } from 'vitest-axe';
+import PlanningBoard from './PlanningBoard';
+import { CELL_WIDTH } from '../../lib/planningGrid';
+import type { RoomResponse } from '../../types';
+import type { ReservationResponse } from '../../types';
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+  initReactI18next: { type: '3rdParty', init: vi.fn() },
+}));
+
+vi.mock('../../components/m3/M3Card', () => ({
+  M3Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
+const ROOM_TYPE = {
+  id: 'rt1', name: 'Single', maxOccupancy: 1, basePrice: 50,
+  description: '', active: true, createdAt: '', updatedAt: '',
+};
+
+const ROOMS: RoomResponse[] = [
+  { id: 'r1', hotelId: 'h1', roomNumber: '101', roomType: ROOM_TYPE, status: 'CLEAN', active: true, createdAt: '', updatedAt: '' },
+  { id: 'r2', hotelId: 'h1', roomNumber: '202', roomType: ROOM_TYPE, status: 'DIRTY', active: true, createdAt: '', updatedAt: '' },
+];
+
+const RESERVATION: ReservationResponse = {
+  id: 'res1', guestId: 'g1', guestFullName: 'John Doe', expectedGuests: 2, actualGuests: 0,
+  checkInDate: '2026-05-01', checkOutDate: '2026-05-05', status: 'CONFIRMED',
+  lineItems: [{ id: 'li1', roomId: 'r1', price: 50, active: true, createdAt: '', updatedAt: '' }],
+  active: true, createdAt: '', updatedAt: '', confirmationEmailFailed: false,
+};
+
+const CURRENT_DATE = new Date('2026-05-07');
+const ON_NAVIGATE = vi.fn();
+const EMPTY_RESERVATIONS: ReservationResponse[] = [];
+const EMPTY_ROOMS: RoomResponse[] = [];
+const SINGLE_RESERVATION = [RESERVATION];
+
+describe('PlanningBoard', () => {
+  it('renders room numbers in the sidebar', () => {
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={EMPTY_RESERVATIONS}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.getByText('101')).toBeInTheDocument();
+    expect(screen.getByText('202')).toBeInTheDocument();
+  });
+
+  it('renders room type names under each room number', () => {
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={EMPTY_RESERVATIONS}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.getAllByText('Single').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders reservation guest name when reservation is present', () => {
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={SINGLE_RESERVATION}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.getByText('John Doe')).toBeInTheDocument();
+  });
+
+  it('renders the nav_rooms label in the header', () => {
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={EMPTY_RESERVATIONS}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.getByText('nav_rooms')).toBeInTheDocument();
+  });
+
+  it('renders with empty rooms array without crashing', () => {
+    render(
+      <PlanningBoard
+        rooms={EMPTY_ROOMS}
+        reservations={EMPTY_RESERVATIONS}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.getByText('nav_rooms')).toBeInTheDocument();
+  });
+
+  function makeDataTransfer(store: Record<string, string> = {}) {
+    return {
+      setData: (type: string, val: string) => { store[type] = val; },
+      getData: (type: string) => store[type] ?? '',
+      effectAllowed: '',
+      dropEffect: '',
+    };
+  }
+
+  it('renders the MAINTENANCE/OCCUPIED room status dot color (neither CLEAN nor DIRTY)', () => {
+    const maintenanceRoom = { ...ROOMS[0], id: 'r3', roomNumber: '303', status: 'MAINTENANCE' as const };
+    render(
+      <PlanningBoard
+        rooms={[maintenanceRoom]}
+        reservations={EMPTY_RESERVATIONS}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.getByText('303')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['CLEAN', 'bg-tertiary'],
+    ['DIRTY', 'bg-secondary'],
+    ['MAINTENANCE', 'bg-error'],
+    ['OCCUPIED', 'bg-primary'],
+    ['UNKNOWN_STATUS' as never, 'bg-outline'],
+  ] as const)('colours the %s room dot with %s (canonical room tones)', (status, expectedClass) => {
+    render(
+      <PlanningBoard
+        rooms={[{ ...ROOMS[0], id: 'rx', roomNumber: '404', status }]}
+        reservations={EMPTY_RESERVATIONS}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.getByText('404').nextElementSibling?.className).toContain(expectedClass);
+  });
+
+  it.each([
+    ['CONFIRMED', 'bg-primary text-on-primary'],
+    ['PENDING', 'bg-secondary text-on-secondary'],
+    ['PARTIALLY_CHECKED_IN', 'bg-secondary text-on-secondary'],
+    ['CHECKED_IN', 'bg-tertiary text-on-tertiary'],
+    ['CANCELLED', 'bg-error text-on-error'],
+    ['NO_SHOW', 'bg-error text-on-error'],
+    ['CHECKED_OUT', 'bg-surface-container-highest text-on-surface'],
+    ['UNKNOWN_STATUS' as never, 'bg-surface-container-highest text-on-surface'],
+  ] as const)('colours a %s reservation bar with "%s"', (status, expectedClasses) => {
+    const reservation = {
+      ...RESERVATION, id: `bar-${status}`, guestFullName: 'Bar Guest', status,
+      lineItems: [{ id: 'li-bar', roomId: 'r1', price: 50, active: true, createdAt: '', updatedAt: '' }],
+    };
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={[reservation]}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.getByTitle(`Bar Guest (status_${status.toLowerCase()})`).className).toContain(expectedClasses);
+  });
+
+  it('does not render a reservation bar entirely outside the visible month', () => {
+    const outsideReservation: ReservationResponse = {
+      ...RESERVATION, id: 'res-outside',
+      checkInDate: '2026-01-01', checkOutDate: '2026-01-05',
+    };
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={[outsideReservation]}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+  });
+
+  it('clamps a reservation that starts before and ends after the visible month', () => {
+    const spanningReservation: ReservationResponse = {
+      ...RESERVATION, id: 'res-span',
+      checkInDate: '2026-04-15', checkOutDate: '2026-06-15',
+    };
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={[spanningReservation]}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.getByText('John Doe')).toBeInTheDocument();
+  });
+
+  it('renders CANCELLED, PENDING and CHECKED_OUT status colors', () => {
+    const statuses: ReservationResponse['status'][] = ['CANCELLED', 'PENDING', 'CHECKED_OUT'];
+    const reservations = statuses.map((status, i) => ({
+      ...RESERVATION, id: `res-${status}`, guestFullName: `Guest ${i}`, status,
+      lineItems: [{ id: `li-${status}`, roomId: 'r1', price: 50, active: true, createdAt: '', updatedAt: '' }],
+    }));
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={reservations}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(screen.getByText('Guest 0')).toBeInTheDocument();
+    expect(screen.getByText('Guest 1')).toBeInTheDocument();
+    expect(screen.getByText('Guest 2')).toBeInTheDocument();
+  });
+
+  it('drags a reservation bar and drops it on a different room, calling onReservationMove', () => {
+    const onMove = vi.fn();
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={SINGLE_RESERVATION}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+        onReservationMove={onMove}
+      />
+    );
+    const bar = screen.getByTitle(/John Doe/);
+    const dataTransfer = makeDataTransfer();
+    fireEvent.dragStart(bar, { dataTransfer });
+    expect(dataTransfer.getData('application/json')).toContain('"reservationId":"res1"');
+
+    // Drop directly on the row element that owns room r2's allocations area.
+    const rows = document.querySelectorAll('.border-b.border-outline-variant.relative');
+    fireEvent.dragOver(rows[1], { dataTransfer });
+    fireEvent.drop(rows[1], { dataTransfer });
+
+    expect(onMove).toHaveBeenCalledWith('res1', 'r1', 'r2');
+    fireEvent.dragEnd(bar);
+  });
+
+  it('does not call onReservationMove when dropped back on the same room', () => {
+    const onMove = vi.fn();
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={SINGLE_RESERVATION}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+        onReservationMove={onMove}
+      />
+    );
+    const bar = screen.getByTitle(/John Doe/);
+    const dataTransfer = makeDataTransfer();
+    fireEvent.dragStart(bar, { dataTransfer });
+
+    const rows = document.querySelectorAll('.border-b.border-outline-variant.relative');
+    fireEvent.drop(rows[0], { dataTransfer });
+
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it('ignores a drop with no drag payload', () => {
+    const onMove = vi.fn();
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={EMPTY_RESERVATIONS}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+        onReservationMove={onMove}
+      />
+    );
+    const rows = document.querySelectorAll('.border-b.border-outline-variant.relative');
+    fireEvent.drop(rows[0], { dataTransfer: makeDataTransfer() });
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it('toggles drag-over styling on dragOver/dragLeave without throwing', () => {
+    render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={EMPTY_RESERVATIONS}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    const rows = document.querySelectorAll('.border-b.border-outline-variant.relative');
+    const row = rows[0];
+    fireEvent.dragOver(row, { dataTransfer: makeDataTransfer() });
+    expect(row.className).toContain('bg-primary-container/30');
+    fireEvent.dragLeave(row, { relatedTarget: document.body });
+    expect(row.className).not.toContain('bg-primary-container/30');
+  });
+
+  describe('links and moves', () => {
+    const barFor = (status: ReservationResponse['status']) => ({ ...RESERVATION, status });
+    const renderBoard = (reservations: ReservationResponse[], handlers: Record<string, unknown> = {}) => render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={reservations}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+        {...handlers}
+      />
+    );
+
+    it('opens the reservation when its bar is clicked, without starting a new booking', () => {
+      const onOpen = vi.fn();
+      const onSlot = vi.fn();
+      renderBoard([RESERVATION], { onReservationOpen: onOpen, onSlotSelect: onSlot });
+      fireEvent.click(screen.getByRole('button', { name: /John Doe/ }));
+      expect(onOpen).toHaveBeenCalledWith('res1');
+      expect(onSlot).not.toHaveBeenCalled();
+    });
+
+    it.each(['Enter', ' '])('opens the reservation with the "%s" key', (key) => {
+      const onOpen = vi.fn();
+      renderBoard([RESERVATION], { onReservationOpen: onOpen });
+      fireEvent.keyDown(screen.getByRole('button', { name: /John Doe/ }), { key });
+      expect(onOpen).toHaveBeenCalledWith('res1');
+    });
+
+    it('ignores other keys on the bar', () => {
+      const onOpen = vi.fn();
+      renderBoard([RESERVATION], { onReservationOpen: onOpen });
+      fireEvent.keyDown(screen.getByRole('button', { name: /John Doe/ }), { key: 'a' });
+      expect(onOpen).not.toHaveBeenCalled();
+    });
+
+    it.each(['PENDING', 'CONFIRMED'] as const)('lets a %s bar be dragged', (status) => {
+      renderBoard([barFor(status)]);
+      expect(screen.getByRole('button', { name: /John Doe/ })).toHaveAttribute('draggable', 'true');
+    });
+
+    it.each(['PARTIALLY_CHECKED_IN', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED', 'NO_SHOW'] as const)(
+      'keeps a %s bar in place',
+      (status) => {
+        renderBoard([barFor(status)]);
+        expect(screen.getByRole('button', { name: /John Doe/ })).toHaveAttribute('draggable', 'false');
+      },
+    );
+
+    it('starts a new booking on the clicked day and room of an empty row', () => {
+      const onSlot = vi.fn();
+      renderBoard([], { onSlotSelect: onSlot });
+      const row = document.querySelectorAll('.border-b.border-outline-variant.relative')[1];
+      fireEvent.click(row, { clientX: CELL_WIDTH * 2.7 });
+      expect(onSlot).toHaveBeenCalledTimes(1);
+      const [date, roomId] = onSlot.mock.calls[0];
+      expect(roomId).toBe('r2');
+      expect((date as Date).getDate()).toBe(3);
+    });
+
+    it('reads the morning half of a day as the tail of the previous night', () => {
+      const onSlot = vi.fn();
+      renderBoard([], { onSlotSelect: onSlot });
+      const row = document.querySelectorAll('.border-b.border-outline-variant.relative')[0];
+      fireEvent.click(row, { clientX: CELL_WIDTH * 2.2 });
+      expect((onSlot.mock.calls[0][0] as Date).getDate()).toBe(2);
+    });
+  });
+
+  // Default 5000ms timeout is occasionally exceeded under --coverage (v8
+  // instrumentation overhead on top of axe's full DOM tree walk).
+  it('passes axe accessibility check', async () => {
+    const { container } = render(
+      <PlanningBoard
+        rooms={ROOMS}
+        reservations={EMPTY_RESERVATIONS}
+        currentDate={CURRENT_DATE}
+        onNavigate={ON_NAVIGATE}
+      />
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  }, 15000);
+});

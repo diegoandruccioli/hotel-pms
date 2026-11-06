@@ -33,7 +33,7 @@ test.beforeAll(async ({ baseURL }) => {
   otherHotelHeaders = await csrfHeader(otherHotelContext);
 
   // OTHER_HOTEL_ID has zero room types seeded (verified via psql) — fixtures/api.ts's
-  // createCleanRoom() hardcodes hotel A's ROOM_TYPE_ID, which 404s under this tenant.
+  // createCleanRoom() resolves hotel A's room type, which 404s under this tenant.
   // Create a throwaway room type here so this tenant can hold real room/stay fixtures.
   const roomTypeResponse = await otherHotelContext.post('/api/v1/room-types', {
     headers: otherHotelHeaders,

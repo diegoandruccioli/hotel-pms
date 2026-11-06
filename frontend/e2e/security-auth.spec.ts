@@ -148,8 +148,8 @@ test.describe('Security – Authentication Attack Paths', () => {
     await page.locator('[data-testid="login-submit"]').click();
 
     // A generic error must be shown — no wording that reveals lock/attempt details
-    // Target specifically the error container paragraph (not the field labels or button)
-    const errorParagraph = page.locator('[data-testid="login-form"] .bg-error-container p');
+    // Target specifically the error alert (not the field labels or button)
+    const errorParagraph = page.locator('[data-testid="login-form"]').getByRole('alert');
     await expect(errorParagraph).toBeVisible({ timeout: 5_000 });
 
     const errorContent = await errorParagraph.textContent();

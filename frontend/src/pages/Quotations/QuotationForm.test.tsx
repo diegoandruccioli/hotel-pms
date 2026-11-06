@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 /* eslint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop -- test-only mock components, not the real perf-sensitive render path */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -9,6 +9,7 @@ import { inventoryService } from '../../services';
 import { reservationService } from '../../services';
 import { quotationService } from '../../services';
 import { guestService } from '../../services';
+import { renderWithQuery } from '../../test-utils';
 
 vi.mock('../../services/inventoryService');
 vi.mock('../../services/reservationService');
@@ -38,7 +39,7 @@ function RoomSelectionMock({ onCheckInChange, onCheckOutChange, onToggleRoom, se
   );
 }
 
-vi.mock('../Reservations/RoomSelection', () => ({
+vi.mock('../../components/RoomSelection', () => ({
   RoomSelection: (props: RoomMockProps) => RoomSelectionMock(props),
 }));
 
@@ -72,7 +73,7 @@ describe('QuotationForm', () => {
     vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue([]);
   });
 
-  const renderForm = () => render(
+  const renderForm = () => renderWithQuery(
     <MemoryRouter initialEntries={['/quotations/new']}>
       <Routes>
         <Route path="/quotations/new" element={<QuotationForm />} />
@@ -80,7 +81,7 @@ describe('QuotationForm', () => {
     </MemoryRouter>
   );
 
-  const renderEditForm = () => render(
+  const renderEditForm = () => renderWithQuery(
     <MemoryRouter initialEntries={['/quotations/q1/edit']}>
       <Routes>
         <Route path="/quotations/:id/edit" element={<QuotationForm />} />
@@ -91,7 +92,7 @@ describe('QuotationForm', () => {
   it('renders heading and room mock after data loads', async () => {
     renderForm();
     await waitFor(() => {
-      expect(screen.getByText('new_quotation')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'new_quotation' })).toBeInTheDocument();
       expect(screen.getByTestId('room-mock')).toBeInTheDocument();
     });
   });
@@ -163,7 +164,7 @@ describe('QuotationForm', () => {
     fireEvent.click(screen.getByText('Toggle Room r1'));
 
     fireEvent.click(screen.getByText('common:save'));
-    await waitFor(() => expect(screen.getByText('toast_created')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('err_create')).toBeInTheDocument());
     expect(mockNavigate).not.toHaveBeenCalledWith('/quotations');
   });
 
@@ -214,7 +215,7 @@ describe('QuotationForm', () => {
     await waitFor(() => expect(inventoryService.getAvailableRooms).toHaveBeenCalledWith('2026-09-01', '2026-09-03'));
 
     fireEvent.click(screen.getByText('Toggle Room r1'));
-    await waitFor(() => expect(screen.getByText('quotation_total:€ 200.00')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('quotation_total:€200.00')).toBeInTheDocument());
   });
 
   it('resets resolved prices when getAvailableRooms rejects', async () => {
@@ -227,7 +228,7 @@ describe('QuotationForm', () => {
     await waitFor(() => expect(inventoryService.getAvailableRooms).toHaveBeenCalled());
 
     fireEvent.click(screen.getByText('Toggle Room r1'));
-    await waitFor(() => expect(screen.getByText('quotation_total:€ 0.00')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('quotation_total:€0.00')).toBeInTheDocument());
   });
 
   it('shows an error banner when the initial data fails to load', async () => {
@@ -385,7 +386,7 @@ describe('QuotationForm', () => {
     fireEvent.change(screen.getByLabelText('Mock Check-out'), { target: { value: '2026-09-04' } });
     fireEvent.click(screen.getByText('Toggle Room r1'));
 
-    await waitFor(() => expect(screen.getByText('quotation_total:€ 300.00')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('quotation_total:€300.00')).toBeInTheDocument());
   });
 
   it('passes axe accessibility check', async () => {
@@ -414,6 +415,7 @@ describe('QuotationForm', () => {
         lineItems: [{ id: 'li1', roomId: 'r1', roomNumber: '101', roomTypeName: 'Standard', price: 200 }],
       }],
       acceptedOptionId: null,
+      reservationId: null,
       sendFailed: false,
       sendFailureReason: null,
       createdAt: '2026-08-01T00:00:00',
@@ -430,7 +432,7 @@ describe('QuotationForm', () => {
     it('shows the edit title and pre-fills the selected room from the existing quotation', async () => {
       renderEditForm();
       await waitFor(() => {
-        expect(screen.getByText('edit_quotation')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { level: 1, name: 'edit_quotation' })).toBeInTheDocument();
         expect(screen.getByText('Selected: r1')).toBeInTheDocument();
       });
     });
@@ -450,6 +452,32 @@ describe('QuotationForm', () => {
       })));
       expect(quotationService.createQuotation).not.toHaveBeenCalled();
       expect(mockNavigate).toHaveBeenCalledWith('/quotations/q1');
+    });
+
+    it('redirects to the detail page when the quotation is no longer a draft', async () => {
+      vi.mocked(quotationService.getQuotationById).mockResolvedValue({ ...existingQuotation, status: 'SENT' } as never);
+      renderWithQuery(
+        <MemoryRouter initialEntries={['/quotations/q1/edit']}>
+          <Routes>
+            <Route path="/quotations/:id/edit" element={<QuotationForm />} />
+            <Route path="/quotations/:id" element={<div>detail-page</div>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(screen.getByText('detail-page')).toBeInTheDocument());
+    });
+
+    it('cancel goes back in history when the user came from inside the app', async () => {
+      renderWithQuery(
+        <MemoryRouter initialEntries={['/quotations/q1', '/quotations/q1/edit']} initialIndex={1}>
+          <Routes>
+            <Route path="/quotations/:id/edit" element={<QuotationForm />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(screen.getByText('common:cancel')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('common:cancel'));
+      expect(mockNavigate).toHaveBeenCalledWith(-1);
     });
 
     it('cancel in edit mode navigates back to the quotation detail page', async () => {

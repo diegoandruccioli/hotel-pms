@@ -1,42 +1,22 @@
-import { memo, useCallback, useMemo } from 'react';
+import { useFormatters } from '../../hooks';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { M3Dialog } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
-import type { RestaurantOrderResponse, OrderStatus } from '../../types';
+import type { RestaurantOrderResponse } from '../../types';
+import { orderStatusTone } from '../../utils';
 
 interface Props {
   order: RestaurantOrderResponse;
   onClose: () => void;
 }
 
-const getStatusTone = (status: OrderStatus | string) => {
-  switch (status) {
-    case 'PENDING': return 'warning' as const;
-    case 'PREPARED': return 'info' as const;
-    case 'DELIVERED': return 'neutral' as const;
-    case 'BILLED_TO_ROOM': return 'info' as const;
-    default: return 'neutral' as const;
-  }
-};
-
 export const OrderDetailModal = memo(({ order, onClose }: Props) => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
 
-  const formatCurrency = useCallback(
-    (val: number) =>
-      new Intl.NumberFormat(i18n.language, { style: 'currency', currency: 'EUR' }).format(val),
-    [i18n.language],
-  );
-
-  const formatDate = useCallback(
-    (dateStr?: string) => {
-      if (!dateStr) return '-';
-      return new Date(dateStr).toLocaleString(i18n.language);
-    },
-    [i18n.language],
-  );
+  const { formatCurrency, formatDate } = useFormatters();
 
   const itemHeaders = useMemo(() => [
     t('item_name'),
@@ -74,7 +54,7 @@ export const OrderDetailModal = memo(({ order, onClose }: Props) => {
             <span className="text-on-surface-variant">{t('status')}</span>
             <M3StatusChip
               label={order.status.replace('_', ' ')}
-              tone={getStatusTone(order.status)}
+              tone={orderStatusTone[order.status]}
             />
           </div>
         </div>

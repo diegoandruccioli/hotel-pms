@@ -1,4 +1,4 @@
-// The full 30-route table from App.tsx:81-123, mirrored here for Blocco 2's
+// The route table from App.tsx, mirrored here for Blocco 2's
 // exhaustive sweep. `roles` lists who the sidebar/route guard allows in;
 // ADMIN and OWNER are allowed everywhere a RECEPTIONIST isn't explicitly
 // excluded from (RBAC specifics are re-verified per-action in Blocco 9 —
@@ -27,6 +27,8 @@ export const ROUTES: RouteSpec[] = [
   { path: '/reservations/new', roles: ALL, headingPattern: /nuova prenotazione|new reservation/i },
   { path: `/reservations/${PARAMETRIC_PLACEHOLDERS.reservationId}`, roles: ALL, headingPattern: /prenotazione|reservation/i },
   { path: `/reservations/edit/${PARAMETRIC_PLACEHOLDERS.reservationId}`, roles: ALL, headingPattern: /prenotazione|reservation/i },
+  { path: '/reservations/groups', roles: ALL, headingPattern: /^gruppi$|^groups$/i },
+  { path: '/reservations/groups/new', roles: ALL, headingPattern: /nuovo gruppo|new group/i },
   { path: '/quotations', roles: ALL, headingPattern: /preventivi|quotations/i },
   { path: '/quotations/new', roles: ALL, headingPattern: /nuovo preventivo|new quotation/i },
   // QuotationDetail.tsx:249-252 renders the guest's full name as the h1 (plus
@@ -53,7 +55,8 @@ export const ROUTES: RouteSpec[] = [
   { path: '/profile/hotel', roles: ADMIN_OWNER, headingPattern: /struttura|hotel/i },
   { path: '/settings/system', roles: ADMIN_OWNER, headingPattern: /sistema|system/i },
   { path: '/settings/city-tax', roles: ADMIN_OWNER, headingPattern: /imposta di soggiorno|tourist tax/i }, // settings_section_city_tax EN = "Tourist Tax"
-  { path: '/night-audit', roles: ADMIN_OWNER, headingPattern: /chiusura giornaliera|night audit/i },
+  { path: '/settings/privacy', roles: ADMIN_OWNER, headingPattern: /^privacy$/i },
+  { path: '/night-audit', roles: ALL, headingPattern: /chiusura giornaliera|night audit/i },
 ];
 
 // /stays/check-in/:reservationId needs a CONFIRMED reservation without an

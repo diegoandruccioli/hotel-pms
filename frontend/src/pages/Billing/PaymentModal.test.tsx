@@ -71,6 +71,25 @@ describe('PaymentModal', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('marks the invoice PAID when the payment settles the balance', async () => {
+    vi.mocked(billingService.processPayment).mockResolvedValue(PAYMENT_RESPONSE as never);
+    render(<PaymentModal invoice={INVOICE} onClose={onClose} onPaid={onPaid} />);
+    fireEvent.submit(document.querySelector('form')!);
+    await waitFor(() => expect(onPaid).toHaveBeenCalledOnce());
+    expect(onPaid.mock.calls[0][0]).toMatchObject({ status: 'PAID' });
+  });
+
+  it('keeps the invoice ISSUED after a partial payment (backend only flips to PAID at the full amount)', async () => {
+    vi.mocked(billingService.processPayment).mockResolvedValue({ ...PAYMENT_RESPONSE, amount: 50 } as never);
+    render(<PaymentModal invoice={INVOICE} onClose={onClose} onPaid={onPaid} />);
+    fireEvent.change(screen.getByDisplayValue('150'), { target: { value: '50' } });
+    fireEvent.submit(document.querySelector('form')!);
+    await waitFor(() => expect(onPaid).toHaveBeenCalledOnce());
+    const updated = onPaid.mock.calls[0][0];
+    expect(updated.status).toBe('ISSUED');
+    expect(updated.payments).toHaveLength(1);
+  });
+
   it('calls onClose when cancel clicked', () => {
     render(<PaymentModal invoice={INVOICE} onClose={onClose} onPaid={onPaid} />);
     fireEvent.click(screen.getByText('cancel'));

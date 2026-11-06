@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,6 +54,16 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
      * @return the optional room
      */
     Optional<Room> findByIdAndActiveTrueAndHotelId(UUID id, UUID hotelId);
+
+    /**
+     * Finds the active rooms among {@code ids}, scoped to the given hotel, in one query. Ids that
+     * match no active room (removed, or another hotel's) are simply absent from the result.
+     *
+     * @param ids     the room UUIDs to look up
+     * @param hotelId the hotel UUID extracted from the authenticated user's JWT
+     * @return the active rooms found, in no particular order
+     */
+    List<Room> findAllByIdInAndActiveTrueAndHotelId(Collection<UUID> ids, UUID hotelId);
 
     /**
      * Same lookup as {@link #findByIdAndActiveTrueAndHotelId}, but takes a
@@ -133,6 +144,17 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
      * @return a page of matching active rooms for that hotel
      */
     Page<Room> findAllByActiveTrueAndHotelIdAndRoomTypeId(UUID hotelId, UUID roomTypeId, Pageable pageable);
+
+    /**
+     * Whether the given room type still has at least one active room in the hotel. Guards the
+     * deletion of a room type: its soft delete would leave those rooms pointing at a type that
+     * {@code @SQLRestriction} hides, and every later read of such a room would fail.
+     *
+     * @param hotelId    the hotel UUID extracted from the authenticated user's JWT
+     * @param roomTypeId the room type UUID to check
+     * @return {@code true} if an active room of that type exists
+     */
+    boolean existsByActiveTrueAndHotelIdAndRoomTypeId(UUID hotelId, UUID roomTypeId);
 
     /**
      * Returns a page of active rooms scoped to the given hotel, filtered by

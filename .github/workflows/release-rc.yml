@@ -1,0 +1,221 @@
+name: Release Candidate
+
+# ── Purpose ─────────────────────────────────────────────────────────────────
+# Runs when the maintainer pushes a release-candidate tag (vX.Y.Z-rc.N) on a
+# `develop` commit. Informational only: nothing here deploys and nothing is a
+# required check. It collects the evidence listed in docs/RELEASE_PROCESS.md §2
+# and publishes a GitHub pre-release carrying the report.
+#
+#   verify       tag format + commit is reachable from develop
+#   ci-status    results of ci.yml (incl. the Trivy jobs) and E2E Live on the
+#                same commit — reused, not re-run
+#   smoke        full prod-override stack boots from the tagged sources
+#   backup-drill off-site restore drill (backup-restore-drill.yml, workflow_call)
+#   prerelease   GitHub pre-release with the table of results
+#
+# Tags are created by hand. workflow_dispatch takes an existing tag name to
+# re-run (GitHub only accepts a dispatch for workflows present on main).
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing rc tag to (re)run, e.g. v0.1.0-rc.1"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-rc-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  # Never interpolate the tag into scripts via ${{ }}: always read it from here.
+  RC_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  verify:
+    name: "Verify tag"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Check tag format and branch
+        id: resolve
+        run: |
+          if ! [[ "$RC_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
+            echo "::error::'$RC_TAG' is not vX.Y.Z-rc.N"
+            exit 1
+          fi
+          sha="$(git rev-parse HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          if git merge-base --is-ancestor "$sha" origin/develop; then
+            echo "### Tag $RC_TAG -> ${sha:0:8}, reachable from develop" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::$sha is not reachable from origin/develop; rc tags belong on develop"
+            exit 1
+          fi
+
+  ci-status:
+    name: "CI and E2E Live on the same commit"
+    needs: [verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHA: ${{ needs.verify.outputs.sha }}
+    steps:
+      # Reads the latest run of each workflow for the tagged commit. A missing
+      # run counts as a failure: that commit was never gated.
+      - name: Collect results
+        run: |
+          fail=0
+          {
+            echo "### Gates on ${SHA:0:8}"
+            echo "| Workflow | Result | Run |"
+            echo "|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for wf in ci.yml e2e-live-nightly.yml; do
+            row="$(gh run list -R "$GITHUB_REPOSITORY" --workflow "$wf" --commit "$SHA" \
+              --limit 1 --json status,conclusion,url \
+              --jq 'if length == 0 then "" else .[0] | "\(.status)/\(.conclusion)|\(.url)" end' 2>/dev/null || true)"
+            if [ -z "$row" ]; then
+              echo "| $wf | no run for this commit | |" >> "$GITHUB_STEP_SUMMARY"
+              fail=1
+              continue
+            fi
+            state="${row%%|*}"; url="${row#*|}"
+            echo "| $wf | $state | $url |" >> "$GITHUB_STEP_SUMMARY"
+            [ "$state" = "completed/success" ] || fail=1
+          done
+          # Trivy jobs live inside ci.yml; list them so a red one is visible by name.
+          run_id="$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$SHA" \
+            --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true)"
+          if [ -n "$run_id" ] && [ "$run_id" != "null" ]; then
+            {
+              echo ""
+              echo "Trivy jobs in ci.yml run $run_id:"
+              gh run view "$run_id" -R "$GITHUB_REPOSITORY" --json jobs \
+                --jq '.jobs[] | select(.name | startswith("Trivy")) | "- \(.name): \(.conclusion)"'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$fail"
+
+  smoke:
+    name: "Smoke — full stack, production override"
+    needs: [verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          java-version: "21"
+          distribution: temurin
+
+      # No actions/cache here on purpose: this job checks out a tag-selected ref
+      # (workflow_dispatch input) and then runs build steps, so a shared cache
+      # entry could be poisoned (CodeQL actions/cache-poisoning). Cold build only.
+      - name: Build backend jars
+        run: ./gradlew bootJar --no-daemon
+
+      - name: Generate ephemeral .env
+        run: |
+          bash setup-hmac-secret.sh
+          {
+            echo "SMTP_HOST=mailpit"
+            echo "SMTP_PORT=1025"
+            echo "GW_CORS_ALLOWED_ORIGINS=http://localhost"
+          } >> .env
+
+      # Same command as docs/RELEASE_PROCESS.md §3. --wait blocks until every
+      # healthcheck passes, so a green step already proves the stack is up.
+      - name: Start stack with docker-compose.prod.yml
+        run: |
+          docker compose --env-file .env \
+            -f docker-compose.yml -f docker-compose.prod.yml \
+            --profile observability up -d --build --wait --wait-timeout 420
+
+      - name: Check gateway health and published ports
+        run: |
+          docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml --profile observability ps
+          docker exec api-gateway wget -qO- http://localhost:8090/actuator/health | grep '"status":"UP"'
+          curl -fsS -o /dev/null http://localhost/healthz
+          # the prod override must leave only the frontend on the host
+          if curl -sS -m 3 -o /dev/null http://localhost:8080/ 2>/dev/null; then
+            echo "::error::api-gateway :8080 is reachable from the host in the prod override"
+            exit 1
+          fi
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml --profile observability logs --no-color --tail=200
+
+      - name: Tear down
+        if: always()
+        run: docker compose --env-file .env -f docker-compose.yml -f docker-compose.prod.yml --profile observability down -v
+
+  backup-drill:
+    name: "Backup restore drill (off-site)"
+    needs: [verify]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/backup-restore-drill.yml
+    secrets: inherit
+
+  prerelease:
+    name: "GitHub pre-release"
+    needs: [verify, ci-status, smoke, backup-drill]
+    if: ${{ always() && needs.verify.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHA: ${{ needs.verify.outputs.sha }}
+      CI_STATUS: ${{ needs.ci-status.result }}
+      SMOKE: ${{ needs.smoke.result }}
+      DRILL: ${{ needs.backup-drill.result }}
+    steps:
+      - name: Create or update the pre-release
+        run: |
+          {
+            echo "Release candidate \`$RC_TAG\` on \`${SHA:0:8}\`. Evidence collected by \`release-rc.yml\`"
+            echo "(informational, nothing deployed). Checklist: \`docs/RELEASE_PROCESS.md\` §2."
+            echo ""
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| CI + Trivy + E2E Live on this commit | $CI_STATUS |"
+            echo "| Smoke, full stack with prod override | $SMOKE |"
+            echo "| Backup restore drill (off-site) | $DRILL |"
+            echo ""
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo ""
+            echo "Still manual: migration review, new env vars, CHANGELOG, Dependabot alerts."
+          } > notes.md
+          if gh release view "$RC_TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$RC_TAG" -R "$GITHUB_REPOSITORY" --prerelease --notes-file notes.md
+          else
+            gh release create "$RC_TAG" -R "$GITHUB_REPOSITORY" --verify-tag --prerelease \
+              --title "$RC_TAG" --notes-file notes.md
+          fi

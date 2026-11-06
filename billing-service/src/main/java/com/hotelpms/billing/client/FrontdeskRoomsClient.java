@@ -5,6 +5,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -36,8 +37,8 @@ public interface FrontdeskRoomsClient {
     @GetMapping("/api/v1/frontdesk/occupancy-summary")
     @CircuitBreaker(name = "frontdeskOccupancy", fallbackMethod = "getOccupancySummaryFallback")
     OccupancySummaryResponse getOccupancySummary(
-            @RequestParam("dateFrom") LocalDate dateFrom,
-            @RequestParam("dateTo") LocalDate dateTo,
+            @RequestParam("dateFrom") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam("dateTo") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam("granularity") String granularity);
 
     /**

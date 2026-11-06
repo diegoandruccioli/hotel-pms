@@ -86,7 +86,7 @@ class QuotationControllerTest {
         quotationId = UUID.randomUUID();
         quotationResponse = new QuotationResponse(quotationId, GUEST_ID, "Mario Rossi", null,
                 CHECK_IN, CHECK_OUT, 2, QuotationStatus.DRAFT, VALID_UNTIL, TOTAL_PRICE,
-                List.of(), null, false, null, null, null);
+                List.of(), null, null, false, null, null, null);
     }
 
     private static QuotationRequest validRequest() {
@@ -194,7 +194,7 @@ class QuotationControllerTest {
     @Test
     void shouldConvertToReservationWithNoBodyReturn200() throws Exception {
         final ReservationResponse reservationResponse = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null,
-                2, 0, CHECK_IN, CHECK_OUT, ReservationStatus.CONFIRMED, null, true, null, null, false, null, null);
+                2, 0, CHECK_IN, CHECK_OUT, ReservationStatus.CONFIRMED, null, true, null, null, false, null, null, null);
         when(quotationService.convertToReservation(eq(quotationId), isNull())).thenReturn(reservationResponse);
 
         mockMvc.perform(post(BASE_URL + CONVERT_PATH, quotationId))
@@ -205,7 +205,7 @@ class QuotationControllerTest {
     void shouldConvertToReservationWithExplicitOptionIdReturn200() throws Exception {
         final UUID optionId = UUID.randomUUID();
         final ReservationResponse reservationResponse = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null,
-                2, 0, CHECK_IN, CHECK_OUT, ReservationStatus.CONFIRMED, null, true, null, null, false, null, null);
+                2, 0, CHECK_IN, CHECK_OUT, ReservationStatus.CONFIRMED, null, true, null, null, false, null, null, null);
         when(quotationService.convertToReservation(quotationId, optionId)).thenReturn(reservationResponse);
 
         mockMvc.perform(post(BASE_URL + CONVERT_PATH, quotationId)

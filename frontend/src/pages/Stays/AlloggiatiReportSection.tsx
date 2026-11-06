@@ -6,12 +6,7 @@ import { M3Card } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
-import { getErrorMessage } from '../../utils';
-
-const getTodayString = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
+import { getErrorMessage, todayIsoDate } from '../../utils';
 
 interface AlloggiatiReportSectionProps {
   isAdminOrOwner: boolean;
@@ -20,7 +15,7 @@ interface AlloggiatiReportSectionProps {
 export const AlloggiatiReportSection = memo(({ isAdminOrOwner }: AlloggiatiReportSectionProps) => {
   const { t } = useTranslation('common');
   const addToast = useToastStore((s) => s.addToast);
-  const [alloggiatiDate, setAlloggiatiDate] = useState(getTodayString());
+  const [alloggiatiDate, setAlloggiatiDate] = useState(todayIsoDate());
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [downloadingJson, setDownloadingJson] = useState(false);
   const [submitting, setSubmitting] = useState(false);

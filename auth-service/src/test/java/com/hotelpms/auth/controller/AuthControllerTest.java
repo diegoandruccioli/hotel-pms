@@ -8,7 +8,6 @@ import com.hotelpms.auth.dto.ChangePasswordRequest;
 import com.hotelpms.auth.dto.LoginRequest;
 import com.hotelpms.auth.exception.BadCredentialsException;
 import com.hotelpms.auth.exception.GlobalExceptionHandler;
-import com.hotelpms.auth.repository.UserAccountRepository;
 import com.hotelpms.auth.service.AuthService;
 import com.hotelpms.auth.service.JwtService;
 import jakarta.servlet.http.Cookie;
@@ -23,8 +22,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
-
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -59,9 +56,6 @@ class AuthControllerTest {
 
     @Mock
     private JwtService jwtService;
-
-    @Mock
-    private UserAccountRepository userRepository;
 
     @InjectMocks
     private AuthController authController;
@@ -178,7 +172,7 @@ class AuthControllerTest {
         when(jwtService.extractUsername(TEST_TOKEN)).thenReturn(TEST_USERNAME);
         when(jwtService.extractClaim(eq(TEST_TOKEN), any())).thenReturn(ROLE_ADMIN);
         when(jwtService.isTokenValid(TEST_TOKEN)).thenReturn(true);
-        when(userRepository.findByUsername(TEST_USERNAME)).thenReturn(Optional.empty());
+        when(authService.mustChangePassword(TEST_USERNAME)).thenReturn(false);
 
         mockMvc.perform(get(BASE_URL + PATH_ME)
                         .cookie(new Cookie(COOKIE_JWT, TEST_TOKEN)))

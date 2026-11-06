@@ -13,6 +13,11 @@
   "ORDER_NOT_FOUND": "The restaurant order could not be found.",
   "INTERNAL_SERVER_ERROR": "An unexpected error occurred. Please try again later.",
   "ROOM_TYPE_NOT_FOUND": "The specified room type could not be found.",
+  "ROOM_OCCUPIED_CANNOT_BE_DELETED": "The room cannot be deleted: it is occupied by a stay in progress. Check the guest out first.",
+  "ROOM_HAS_UPCOMING_RESERVATIONS": "The room cannot be deleted: it has upcoming or ongoing reservations. Cancel or move them first.",
+  "ROOM_OCCUPIED_CLEARED_BY_CHECKOUT_SAGA_ONLY": "The room is occupied: its status only changes when the stay is checked out.",
+  "OCCUPIED_SET_BY_CHECKIN_SAGA_ONLY": "The \"Occupied\" status is only set by checking a stay in.",
+  "ROOM_TYPE_HAS_ACTIVE_ROOMS": "The room type cannot be deleted: it still has active rooms. Delete or move those rooms first.",
   "DOCUMENT_NOT_FOUND": "The specified identity document could not be found.",
   "RESOURCE_ALREADY_EXISTS": "An item with this name or identifier already exists.",
   "VALIDATION_FAILED": "The provided data is invalid or incomplete.",
@@ -92,5 +97,12 @@
   "ROOM_NOT_AVAILABLE_FOR_ROOM_CHANGE": "The selected room isn't available for the stay's remaining nights.",
   "STAY_ROOM_CHANGE_INVOICE_NOT_OPEN": "Can't change rooms: this stay's invoice is no longer open.",
   "ROOM_CHARGE_SNAPSHOT_MISSING": "Can't recalculate the charge for this stay — contact technical support.",
-  "STAY_ROOM_CHANGE_CHECKOUT_IN_PAST": "This stay's expected check-out date has already passed — extend the stay first, then change rooms."
+  "STAY_ROOM_CHANGE_CHECKOUT_IN_PAST": "This stay's expected check-out date has already passed — extend the stay first, then change rooms.",
+  "RESERVATION_NOT_EDITABLE": "This reservation is closed (checked out, cancelled or no-show) and can no longer be edited.",
+  "RESERVATION_INVALID_TRANSITION": "This status change is not allowed for the reservation in its current state.",
+  "GROUP_NOT_FOUND": "The specified group could not be found.",
+  "GROUP_STALE_VERSION": "This group was changed by someone else. Reload it and try again.",
+  "MASTER_FOLIO_CREATION_FAILED": "The group's master folio could not be created. Try again.",
+  "QUOTATION_NOT_SENDABLE": "This quotation can't be sent: it is already accepted, declined or expired.",
+  "QUOTATION_RESEND_TOO_SOON": "This quotation was sent a moment ago. Wait a few minutes before resending it."
 }

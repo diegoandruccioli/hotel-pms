@@ -26,13 +26,25 @@ test.describe('Blocco 5 (D2) — FatturaPA portal', () => {
     guard.checkpoint('invoice detail opened');
 
     // A freshly created walk-in invoice is a RICEVUTA by default — switch to
-    // FATTURA first (D2.6: switching before payment/export must be allowed).
-    const switchBtn = dialog.getByRole('button', { name: /passa a fattura|switch to invoice|fattura/i });
+    // FATTURA first (D2.6: switching before payment/export must be allowed). The label must be
+    // exact: a loose /fattura/ also matches "Scarica FatturaPA XML", which this step used to click
+    // by mistake when the invoice was already a FATTURA — an export before the payment below.
+    const switchBtn = dialog.getByRole('button', { name: /converti in fattura|convert to invoice/i });
     if (await switchBtn.isVisible().catch(() => false)) {
       await switchBtn.click();
       await page.waitForTimeout(500);
       guard.checkpoint('switched RICEVUTA -> FATTURA');
     }
+
+    // Pay in full BEFORE the export: once a FatturaPA export exists the invoice is locked
+    // (INVOICE_LOCKED_AFTER_EXPORT), so a stay exported unpaid could never be checked out and its
+    // fixture room would stay occupied forever. The switch above had to come first (a PAID invoice
+    // rejects the document-type change), the download only needs the invoice to exist.
+    const { totalAmount } = (await (await request.get(`/api/v1/invoices/${stay.invoiceId}`)).json()) as { totalAmount: number };
+    const payment = await request.post(`/api/v1/invoices/${stay.invoiceId}/payments`, {
+      headers, data: { amount: totalAmount, paymentMethod: 'CASH' },
+    });
+    expect(payment.status(), await payment.text()).toBe(201);
 
     const downloadBtn = dialog.getByRole('button', { name: /scarica fatturapa xml|download fattura ?pa/i });
     await expect(downloadBtn).toBeVisible({ timeout: 5000 });
@@ -43,7 +55,6 @@ test.describe('Blocco 5 (D2) — FatturaPA portal', () => {
     // incomplete guest (see the D2.4 test below).
     await expect(page.getByText(/incompleti|incomplete/i)).not.toBeVisible();
     guard.checkpoint('FatturaPA XML download did not error — complete identity accepted');
-    void stay;
   });
 
   test('D2.4: incomplete guest fiscal address is rejected before download, translated message shown', async ({ request, page }) => {

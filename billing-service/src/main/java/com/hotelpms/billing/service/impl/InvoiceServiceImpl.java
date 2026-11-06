@@ -1,5 +1,6 @@
 package com.hotelpms.billing.service.impl;
 
+import com.hotelpms.internalauth.security.CallerContext;
 import com.hotelpms.internalauth.security.TenantContext;
 
 import com.hotelpms.commonweb.csv.CsvWriter;
@@ -41,6 +42,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -164,13 +166,29 @@ public class InvoiceServiceImpl implements InvoiceService {
         return invoiceMapper.toResponse(savedInvoice);
     }
 
+    /**
+     * A request forwarded by the API gateway comes from a public client (the front-desk UI), which
+     * only ever adds and removes manual {@code EXTRA} charges. Room, F&B and tourist-tax charges are
+     * posted and reversed by other services over Feign (no gateway hop, so not affected), and are
+     * revenue the API must not let a front-desk user alter directly.
+     *
+     * @param type the charge type being added or removed
+     * @throws AccessDeniedException if the caller is public and the type is not {@code EXTRA}
+     */
+    private static void assertPublicCallerHandlesExtraOnly(final ChargeType type) {
+        if (CallerContext.isViaGateway() && type != ChargeType.EXTRA) {
+            log.warn("Refused {} charge change from public caller user={}", type, CallerContext.username());
+            throw new AccessDeniedException("PUBLIC_CALLER_EXTRA_CHARGES_ONLY");
+        }
+    }
+
     /** {@inheritDoc} */
     @Override
     @Transactional
     public ChargeResponse addChargeToGroupFolio(
             @NonNull final UUID groupId, @NonNull final GroupChargeRequest request) {
-        log.info("Adding charge type={} amount={} to master folio of group {}",
-                request.type(), request.amount(), groupId);
+        log.info("Adding charge type={} amount={} to master folio of group {} by user={}",
+                request.type(), request.amount(), groupId, CallerContext.username());
         final UUID hotelId = TenantContext.resolveHotelId();
 
         final Invoice invoice = invoiceRepository
@@ -210,7 +228,9 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Override
     @Transactional
     public ChargeResponse addCharge(@NonNull final UUID stayId, @NonNull final ChargeRequest request) {
-        log.info("Adding charge type={} amount={} to stay {}", request.type(), request.amount(), stayId);
+        log.info("Adding charge type={} amount={} to stay {} by user={}",
+                request.type(), request.amount(), stayId, CallerContext.username());
+        assertPublicCallerHandlesExtraOnly(request.type());
         final UUID hotelId = TenantContext.resolveHotelId();
 
         final Invoice invoice = invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)
@@ -239,8 +259,9 @@ public class InvoiceServiceImpl implements InvoiceService {
         invoice.setTotalAmount(invoice.getTotalAmount().add(request.amount()));
         invoiceRepository.save(Objects.requireNonNull(invoice));
 
-        log.info("Added {} charge of {} to invoice {} (new total: {})",
-                request.type(), request.amount(), invoice.getInvoiceNumber(), invoice.getTotalAmount());
+        log.info("Added {} charge of {} to invoice {} (new total: {}) by user={}",
+                request.type(), request.amount(), invoice.getInvoiceNumber(), invoice.getTotalAmount(),
+                CallerContext.username());
 
         return invoiceChargeMapper.toResponse(savedCharge);
     }
@@ -249,7 +270,7 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Override
     @Transactional
     public void removeCharge(@NonNull final UUID stayId, @NonNull final UUID chargeId) {
-        log.info("Removing charge {} from stay {}", chargeId, stayId);
+        log.info("Removing charge {} from stay {} by user={}", chargeId, stayId, CallerContext.username());
         final UUID hotelId = TenantContext.resolveHotelId();
 
         final Invoice invoice = invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)
@@ -267,14 +288,16 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .filter(c -> c.getInvoice().getId().equals(invoice.getId()))
                 .orElseThrow(() -> new NotFoundException("CHARGE_NOT_FOUND"));
 
+        assertPublicCallerHandlesExtraOnly(charge.getType());
         invoice.removeCharge(charge);
         invoiceChargeRepository.delete(charge);
 
         invoice.setTotalAmount(invoice.getTotalAmount().subtract(charge.getAmount()));
         invoiceRepository.save(Objects.requireNonNull(invoice));
 
-        log.info("Removed {} charge of {} from invoice {} (new total: {})",
-                charge.getType(), charge.getAmount(), invoice.getInvoiceNumber(), invoice.getTotalAmount());
+        log.info("Removed {} charge of {} from invoice {} (new total: {}) by user={}",
+                charge.getType(), charge.getAmount(), invoice.getInvoiceNumber(), invoice.getTotalAmount(),
+                CallerContext.username());
     }
 
     /** {@inheritDoc} */

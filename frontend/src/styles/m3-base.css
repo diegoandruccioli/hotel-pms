@@ -64,12 +64,6 @@
   --md-elevation-4: 0px 6px 10px 4px rgba(0,0,0,0.15), 0px 2px 3px 0px rgba(0,0,0,0.30);
   --md-elevation-5: 0px 8px 12px 6px rgba(0,0,0,0.15), 0px 4px 4px 0px rgba(0,0,0,0.30);
 
-  /* Glass */
-  --md-glass-bg: rgba(255, 255, 255, 0.72);
-  --md-glass-border: rgba(255, 255, 255, 0.3);
-  --md-glass-bg-elevated: rgba(255, 255, 255, 0.82);
-  --md-glass-border-elevated: rgba(255, 255, 255, 0.4);
-
   /* Scrollbar */
   --md-scrollbar-thumb: #C3C7CF;
   --md-scrollbar-thumb-hover: #73777F;
@@ -132,12 +126,6 @@
   --md-elevation-4: 0px 6px 10px 4px rgba(0,0,0,0.30), 0px 2px 3px 0px rgba(0,0,0,0.50);
   --md-elevation-5: 0px 8px 12px 6px rgba(0,0,0,0.30), 0px 4px 4px 0px rgba(0,0,0,0.50);
 
-  /* Glass — dark */
-  --md-glass-bg: rgba(30, 32, 35, 0.75);
-  --md-glass-border: rgba(255, 255, 255, 0.08);
-  --md-glass-bg-elevated: rgba(40, 42, 45, 0.82);
-  --md-glass-border-elevated: rgba(255, 255, 255, 0.12);
-
   /* Scrollbar — dark */
   --md-scrollbar-thumb: #43474E;
   --md-scrollbar-thumb-hover: #8D9199;
@@ -165,6 +153,11 @@
   --md-error-container: #FFDAD6;
   --md-on-error-container: #000000;
 
+  --md-tertiary: #0B3229;
+  --md-on-tertiary: #FFFFFF;
+  --md-tertiary-container: #D7F0EA;
+  --md-on-tertiary-container: #000000;
+
   --md-surface: #FFFFFF;
   --md-on-surface: #000000;
   --md-surface-variant: #E0E3E8;
@@ -180,6 +173,10 @@
   --md-outline: #000000;
   --md-outline-variant: #43474E;
 
+  --md-inverse-surface: #000000;
+  --md-inverse-on-surface: #FFFFFF;
+  --md-inverse-primary: #C8DFFF;
+
   /* Season/category accent palette — light high-contrast: same hues pushed
      darker/more saturated so each stays distinguishable against a pure-white
      HC surface (decorative accents, not text — see :root's comment). */
@@ -189,11 +186,6 @@
   --md-season-4: #003940;
   --md-season-5: #4A2600;
   --md-season-6: #263238;
-
-  --md-glass-bg: rgba(255, 255, 255, 0.95);
-  --md-glass-border: rgba(0, 0, 0, 0.5);
-  --md-glass-bg-elevated: rgba(255, 255, 255, 0.98);
-  --md-glass-border-elevated: rgba(0, 0, 0, 0.6);
 }
 
 .dark[data-contrast="high"] {
@@ -212,6 +204,11 @@
   --md-error-container: #7A0000;
   --md-on-error-container: #FFFFFF;
 
+  --md-tertiary: #B8EFDC;
+  --md-on-tertiary: #000000;
+  --md-tertiary-container: #0B5240;
+  --md-on-tertiary-container: #FFFFFF;
+
   --md-surface: #000000;
   --md-on-surface: #FFFFFF;
   --md-surface-variant: #2A2D34;
@@ -227,6 +224,10 @@
   --md-outline: #FFFFFF;
   --md-outline-variant: #C3C7CF;
 
+  --md-inverse-surface: #FFFFFF;
+  --md-inverse-on-surface: #000000;
+  --md-inverse-primary: #003070;
+
   /* Season/category accent palette — dark high-contrast: same hues pushed
      lighter/more saturated so each stays distinguishable against a pure-black
      HC surface (decorative accents, not text — see :root's comment). */
@@ -236,11 +237,6 @@
   --md-season-4: #C2ECF2;
   --md-season-5: #FFDCC0;
   --md-season-6: #DCEAF0;
-
-  --md-glass-bg: rgba(0, 0, 0, 0.95);
-  --md-glass-border: rgba(255, 255, 255, 0.5);
-  --md-glass-bg-elevated: rgba(10, 12, 15, 0.98);
-  --md-glass-border-elevated: rgba(255, 255, 255, 0.6);
 }
 
 /* ── Typography Scale ───────────────────────────────── */
@@ -283,11 +279,9 @@ html {
   body {
     font-family: "Inter", system-ui, sans-serif;
     color: var(--md-on-surface);
-    background-color: var(--md-surface);
+    background-color: var(--md-surface-container-low);
   }
 }
-
-/* ── Glassmorphism Utilities ───────────────────────── */
 
 /* ── Scrollbar ─────────────────────────────────────── */
 
@@ -323,8 +317,6 @@ html {
     transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   }
 
-  [data-no-transition],
-  [data-no-transition] *,
   .animate-spin,
   .animate-pulse {
     transition: none !important;
@@ -356,11 +348,10 @@ html {
 }
 
 /* ── Reduced Motion (WCAG 2.3.3) ───────────────────── */
-/* The global transition rule above and the 4 keyframe animations in
-   tailwind.config.js (fade-in, slide-in-right, slide-out-left, scale-in)
-   otherwise run unconditionally. `[data-no-transition]` is an explicit
-   per-element opt-out; this is the system-level one, honoring the OS/browser
-   "reduce motion" preference for every element and animation at once. */
+/* The global transition rule above and the keyframe animations in
+   index.css (fade-in, slide-in-right) otherwise run unconditionally. This
+   honors the OS/browser "reduce motion" preference for every element and
+   animation at once. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

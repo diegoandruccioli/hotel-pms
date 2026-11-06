@@ -139,6 +139,8 @@ public class StayController {
      * @param dateFrom      optional lower bound (inclusive) on actual check-in date
      * @param dateTo        optional upper bound (inclusive) on actual check-in date
      * @param status        optional stay status filter
+     * @param departingOn   optional exact expected check-out date
+     * @param alloggiatiFailed when {@code true}, only stays whose last Alloggiati send failed
      * @param pageable      the pagination and sorting parameters
      * @return a page of stay responses
      */
@@ -148,6 +150,8 @@ public class StayController {
             @RequestParam(required = false) final LocalDate dateFrom,
             @RequestParam(required = false) final LocalDate dateTo,
             @RequestParam(required = false) final StayStatus status,
+            @RequestParam(required = false) final LocalDate departingOn,
+            @RequestParam(defaultValue = "false") final boolean alloggiatiFailed,
             @PageableDefault(size = DEFAULT_PAGE_SIZE,
                     sort = "actualCheckInTime",
                     direction = Sort.Direction.DESC)
@@ -155,6 +159,10 @@ public class StayController {
         final UUID hotelId = Objects.requireNonNull(TenantContext.resolveHotelId());
         if (reservationId != null) {
             return ResponseEntity.ok(stayService.getStaysByReservationId(reservationId, hotelId, pageable));
+        }
+        if (departingOn != null || alloggiatiFailed) {
+            return ResponseEntity.ok(stayService.getAllStays(
+                    pageable, hotelId, dateFrom, dateTo, status, departingOn, alloggiatiFailed));
         }
         if (dateFrom != null || dateTo != null || status != null) {
             return ResponseEntity.ok(stayService.getAllStays(pageable, hotelId, dateFrom, dateTo, status));
@@ -275,11 +283,15 @@ public class StayController {
 
     /**
      * Returns the full stay history for a guest within the caller's hotel.
-     * Called by guest-service GDPR Art. 20 data-export endpoint.
+     * Called by guest-service GDPR Art. 20 data-export endpoint (which forwards the caller's
+     * ADMIN/OWNER role) and shown by the guest detail sheet to the front desk, so the three
+     * operational roles are allowed. The gateway already refuses GUEST; this makes it explicit
+     * at method level too.
      *
      * @param guestId the guest UUID
      * @return list of stay summaries, most recent first
      */
+    @PreAuthorize(ROLE_ADMIN_OWNER_OR_RECEPTIONIST)
     @GetMapping("/guest/{guestId}/history")
     public ResponseEntity<List<StaySummaryResponse>> getStayHistoryForGuest(
             @NonNull @PathVariable final UUID guestId) {
@@ -441,12 +453,15 @@ public class StayController {
      *
      * @param id      the stay ID
      * @param guestId the guest ID
+     * @param version the guest version the client last read, for optimistic-lock conflict
+     *                detection; omitted by a client that doesn't send one yet
      */
     @DeleteMapping("/{id}/guests/{guestId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeGuest(
-            @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId) {
-        stayGuestService.removeGuest(id, guestId, Objects.requireNonNull(TenantContext.resolveHotelId()));
+            @NonNull @PathVariable("id") final UUID id, @NonNull @PathVariable(PATH_VAR_GUEST_ID) final UUID guestId,
+            @RequestParam(name = "version", required = false) final Long version) {
+        stayGuestService.removeGuest(id, guestId, Objects.requireNonNull(TenantContext.resolveHotelId()), version);
     }
 
     /**

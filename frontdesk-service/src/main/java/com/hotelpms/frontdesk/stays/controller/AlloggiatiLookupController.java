@@ -1,8 +1,8 @@
 package com.hotelpms.frontdesk.stays.controller;
 
-import com.hotelpms.frontdesk.stays.domain.AlloggiatiComune;
-import com.hotelpms.frontdesk.stays.domain.AlloggiatiStato;
-import com.hotelpms.frontdesk.stays.domain.AlloggiatiTipdoc;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiComuneResponse;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiStatoResponse;
+import com.hotelpms.frontdesk.stays.dto.AlloggiatiTipdocResponse;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiLookupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -32,7 +32,7 @@ public class AlloggiatiLookupController {
      * @return HTTP 200 with list of active stati
      */
     @GetMapping("/stati")
-    public ResponseEntity<List<AlloggiatiStato>> getStati() {
+    public ResponseEntity<List<AlloggiatiStatoResponse>> getStati() {
         return ResponseEntity.ok(lookupService.findAllStati());
     }
 
@@ -47,7 +47,7 @@ public class AlloggiatiLookupController {
      * @return HTTP 200 with list of matching active comuni
      */
     @GetMapping("/comuni")
-    public ResponseEntity<List<AlloggiatiComune>> getComuni(
+    public ResponseEntity<List<AlloggiatiComuneResponse>> getComuni(
             @RequestParam(name = "q", required = false) final String q,
             @RequestParam(name = "provincia", required = false) final String provincia) {
         if (q != null && !q.isBlank()) {
@@ -65,7 +65,7 @@ public class AlloggiatiLookupController {
      * @return HTTP 200 with list of all tipdoc
      */
     @GetMapping("/tipdoc")
-    public ResponseEntity<List<AlloggiatiTipdoc>> getTipdoc() {
+    public ResponseEntity<List<AlloggiatiTipdocResponse>> getTipdoc() {
         return ResponseEntity.ok(lookupService.findAllTipdoc());
     }
 }

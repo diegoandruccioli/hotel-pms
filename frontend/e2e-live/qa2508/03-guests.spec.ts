@@ -34,7 +34,7 @@ test.describe('Blocco 3 — Guests', () => {
     guard.checkpoint('guest saved, modal closed');
 
     // Search
-    const search = page.getByPlaceholder(/cerca|search/i).first();
+    const search = page.getByLabel(/^cerca$|^search$/i).first();
     await search.fill(uniqueEmail);
     await page.waitForTimeout(500); // 300ms debounce
     await expect(page.getByText('Qa Round')).toBeVisible({ timeout: 5000 });
@@ -50,7 +50,9 @@ test.describe('Blocco 3 — Guests', () => {
     guard.checkpoint('guest edited');
 
     // Delete (ADMIN-only action)
-    await page.getByRole('button', { name: new RegExp(`elimina|delete`, 'i') }).first().click();
+    // Delete sits in the row's "Actions for <guest>" menu (the search left a single row).
+    await page.getByRole('button', { name: /^(Azioni per|Actions for) / }).first().click();
+    await page.getByRole('menuitem', { name: /^elimina$|^delete$/i }).click();
     const confirmDialog = page.getByRole('dialog').filter({ hasText: /elimina|delete/i });
     await expect(confirmDialog).toBeVisible();
     await confirmDialog.getByRole('button', { name: /^elimina$|^delete$/i }).click();

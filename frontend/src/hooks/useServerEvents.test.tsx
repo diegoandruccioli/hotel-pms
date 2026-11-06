@@ -36,13 +36,13 @@ describe('useServerEvents', () => {
     vi.unstubAllGlobals();
   });
 
-  const renderWithClient = () => {
+  const renderWithClient = (enabled?: boolean) => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const wrapper = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
-    const result = renderHook(() => useServerEvents(), { wrapper });
+    const result = renderHook(() => useServerEvents(enabled), { wrapper });
     return { ...result, invalidateSpy };
   };
 
@@ -51,6 +51,27 @@ describe('useServerEvents', () => {
 
     expect(MockEventSource.instances).toHaveLength(1);
     expect(MockEventSource.instances[0].url).toBe('/api/v1/events/stream');
+  });
+
+  it('opens no stream while disabled (the gateway refuses it until the password is changed)', () => {
+    renderWithClient(false);
+
+    expect(MockEventSource.instances).toHaveLength(0);
+  });
+
+  it('opens the stream once it gets enabled, and closes it when disabled again', () => {
+    const queryClient = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { rerender } = renderHook(({ on }) => useServerEvents(on), { wrapper, initialProps: { on: false } });
+    expect(MockEventSource.instances).toHaveLength(0);
+
+    rerender({ on: true });
+    expect(MockEventSource.instances).toHaveLength(1);
+
+    rerender({ on: false });
+    expect(MockEventSource.instances[0].close).toHaveBeenCalledTimes(1);
   });
 
   it('invalidates only the rooms cache on ROOM_STATUS_CHANGED', () => {

@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
 import { axe } from 'vitest-axe';
 import { SettingsPageHeader } from './SettingsPageHeader';
 
@@ -7,6 +9,9 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
+
+// PageHeader derives its breadcrumbs from the router location.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 
 describe('SettingsPageHeader', () => {
   it('renders the title and icon', () => {

@@ -1,218 +1,125 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useCallback, useMemo, memo } from 'react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import type { TFunction } from 'i18next';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 import type { StayResponse, StayStatus } from '../types';
-import { MaterialIcon } from '../components/MaterialIcon';
+import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3Pagination } from '../components/m3';
-import { M3TextField } from '../components/m3';
 import { useTranslation } from 'react-i18next';
 
-import { StayStatusChip } from './Stays/StayStatusChip';
+import { M3FilterChip } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
-import { M3TableActionLink } from '../components/m3';
-import { getStatusTone } from './Stays/stayStatusTone';
+import { ListToolbar } from '../components/ListToolbar';
 import { AlloggiatiReportSection } from './Stays/AlloggiatiReportSection';
 import { StayGuestManagerDialog } from './Stays/StayGuestManagerDialog';
 import { StayExtensionDialog } from './Stays/StayExtensionDialog';
 import { StayRoomChangeDialog } from './Stays/StayRoomChangeDialog';
-import { getErrorMessage } from '../utils';
+import { ActionsCell, AlloggiatiCell, GuestCell, GuestsCountCell } from './Stays/StayRowCells';
+import { getErrorMessage, stayStatusTone, todayIsoDate } from '../utils';
 import {
   useStaysList,
   useCheckOutStay,
   useRetryInvoiceCreation,
   useRetryCheckoutEmail,
 } from '../hooks/queries';
+import { useDebounce, useFormatters, useListRangeSummary } from '../hooks';
+import type { StayListFilters } from '../services/stayService';
 
 type StaySortField = 'actualCheckInTime' | 'expectedCheckOutDate' | 'status';
 type SortDir = 'asc' | 'desc';
-
-const GuestCell = ({ stay, onGuestClick }: { stay: StayResponse; onGuestClick: (name: string) => void }) => {
-  const handleClick = useCallback(() => {
-    onGuestClick(stay.guestDisplayName ?? stay.guestId);
-  }, [onGuestClick, stay.guestDisplayName, stay.guestId]);
-
-  return (
-    <M3TableActionLink onClick={handleClick} className="truncate block max-w-[120px] text-left" title={stay.guestId}>
-      {stay.guestDisplayName ?? `${stay.guestId.substring(0, 8)}…`}
-    </M3TableActionLink>
-  );
-};
-
-interface AlloggiatiCellProps {
-  stay: StayResponse;
-  onRetryInvoice: (s: StayResponse) => void;
-  retryingInvoice: string | null;
-  onRetryCheckoutEmail: (s: StayResponse) => void;
-  retryingEmail: string | null;
-  t: TFunction;
-}
-
-const AlloggiatiCell = ({ stay, onRetryInvoice, retryingInvoice, onRetryCheckoutEmail, retryingEmail, t }: AlloggiatiCellProps) => {
-  const handleRetryInvoice = useCallback(() => onRetryInvoice(stay), [onRetryInvoice, stay]);
-  const handleRetryCheckoutEmail = useCallback(() => onRetryCheckoutEmail(stay), [onRetryCheckoutEmail, stay]);
-
-  return (
-    <div className="flex flex-col items-start gap-1">
-      <span title={stay.alloggiatiSendFailed ? stay.alloggiatiFailureReason ?? undefined : undefined}>
-        <M3StatusChip
-          label={
-            stay.alloggiatiSent
-              ? t('alloggiati_sent')
-              : stay.alloggiatiSendFailed
-                ? t('alloggiati_failed')
-                : t('alloggiati_not_sent')
-          }
-          tone={stay.alloggiatiSent ? 'success' : stay.alloggiatiSendFailed ? 'error' : 'neutral'}
-        />
-      </span>
-      {stay.invoiceCreationFailed && (
-        <span className="inline-flex items-center gap-1" title={stay.invoiceCreationFailureReason ?? undefined}>
-          <M3StatusChip label={t('invoice_creation_failed')} tone="error" />
-          <button
-            type="button"
-            onClick={handleRetryInvoice}
-            disabled={retryingInvoice === stay.id}
-            aria-label={t('retry_invoice_creation')}
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/12 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
-          >
-            <MaterialIcon name={retryingInvoice === stay.id ? 'progress_activity' : 'refresh'} size={16} />
-          </button>
-        </span>
-      )}
-      {stay.checkoutEmailFailed && (
-        <span className="inline-flex items-center gap-1" title={stay.checkoutEmailFailureReason ?? undefined}>
-          <M3StatusChip label={t('checkout_email_failed')} tone="error" />
-          <button
-            type="button"
-            onClick={handleRetryCheckoutEmail}
-            disabled={retryingEmail === stay.id}
-            aria-label={t('retry_checkout_email')}
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/12 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
-          >
-            <MaterialIcon name={retryingEmail === stay.id ? 'progress_activity' : 'refresh'} size={16} />
-          </button>
-        </span>
-      )}
-    </div>
-  );
-};
-
-const GuestsCountCell = ({ stay, onManageGuests }: { stay: StayResponse; onManageGuests: (stayId: string) => void }) => {
-  const handleClick = useCallback(() => onManageGuests(stay.id), [onManageGuests, stay.id]);
-  const count = stay.guests?.length || 0;
-
-  if (stay.status !== 'CHECKED_IN') {
-    return (
-      <div className="font-medium flex items-center gap-1.5 text-on-surface">
-        <MaterialIcon name="group" size={18} />
-        <span>{count}</span>
-      </div>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className="font-medium flex items-center gap-1.5 text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs"
-    >
-      <MaterialIcon name="group" size={18} />
-      <span>{count}</span>
-    </button>
-  );
-};
-
-const ActionsCell = ({ stay, onCheckOut, checkingOut, onExtend, onChangeRoom, t }: {
-  stay: StayResponse;
-  onCheckOut: (s: StayResponse) => void;
-  checkingOut: string | null;
-  onExtend: (s: StayResponse) => void;
-  onChangeRoom: (s: StayResponse) => void;
-  t: TFunction;
-}) => {
-  const handleCheckOut = useCallback(() => onCheckOut(stay), [onCheckOut, stay]);
-  const handleExtend = useCallback(() => onExtend(stay), [onExtend, stay]);
-  const handleChangeRoom = useCallback(() => onChangeRoom(stay), [onChangeRoom, stay]);
-
-  if (stay.status !== 'CHECKED_IN') return null;
-
-  return (
-    <div className="flex justify-end gap-2">
-      <M3Button
-        variant="outlined"
-        icon="event_repeat"
-        onClick={handleExtend}
-        id={`extend-btn-${stay.id}`}
-        className="text-xs h-10 px-3"
-      >
-        {t('action_extend_stay')}
-      </M3Button>
-      <M3Button
-        variant="outlined"
-        icon="meeting_room"
-        onClick={handleChangeRoom}
-        id={`change-room-btn-${stay.id}`}
-        className="text-xs h-10 px-3"
-      >
-        {t('action_change_room')}
-      </M3Button>
-      <M3Button
-        variant="tonal"
-        icon={checkingOut === stay.id ? 'progress_activity' : 'logout'}
-        loading={checkingOut === stay.id}
-        disabled={checkingOut === stay.id}
-        onClick={handleCheckOut}
-        id={`checkout-btn-${stay.id}`}
-        className="text-xs h-10 px-3"
-      >
-        {t('action_checkout')}
-      </M3Button>
-    </div>
-  );
-};
 
 interface StaysNavState {
   statusFilter?: StayStatus | 'ALL';
   sortField?: StaySortField;
   sortDir?: SortDir;
+  departingToday?: boolean;
+}
+
+interface StaysFilters {
+  statusFilter: StayStatus | 'ALL';
+  sortField: StaySortField;
+  sortDir: SortDir;
+  /** Exact expected check-out day, yyyy-MM-dd. */
+  departingOn: string | null;
+  alloggiatiFailed: boolean;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const SORT_FIELDS: readonly StaySortField[] = ['actualCheckInTime', 'expectedCheckOutDate', 'status'];
+const STATUS_FILTERS = ['ALL', 'EXPECTED', 'CHECKED_IN', 'CHECKED_OUT'] as const;
+
+/**
+ * The URL is the source of truth once any filter has been set (`status` is always written with the
+ * others). Until then the dashboard's router state seeds the first render, so a card click lands on the
+ * right list and a refresh keeps it.
+ */
+function readFilters(params: URLSearchParams, nav: StaysNavState | null): StaysFilters {
+  if (!params.has('status')) {
+    return {
+      statusFilter: nav?.statusFilter ?? 'ALL',
+      sortField: nav?.sortField ?? 'actualCheckInTime',
+      sortDir: nav?.sortDir ?? 'desc',
+      departingOn: nav?.departingToday ? todayIsoDate() : null,
+      alloggiatiFailed: false,
+    };
+  }
+  const status = params.get('status');
+  const sort = params.get('sort');
+  const departingOn = params.get('departingOn');
+  return {
+    statusFilter: STATUS_FILTERS.find((s) => s === status) ?? 'ALL',
+    sortField: SORT_FIELDS.find((f) => f === sort) ?? 'actualCheckInTime',
+    sortDir: params.get('dir') === 'asc' ? 'asc' : 'desc',
+    departingOn: departingOn && ISO_DATE.test(departingOn) ? departingOn : null,
+    alloggiatiFailed: params.get('alloggiatiFailed') === 'true',
+  };
 }
 
 const EMPTY_STAYS: StayResponse[] = [];
+const STATUS_FILTER_LABEL_KEYS: Record<(typeof STATUS_FILTERS)[number], string> = {
+  ALL: 'filter_all',
+  EXPECTED: 'status_expected',
+  CHECKED_IN: 'status_checked_in',
+  CHECKED_OUT: 'status_checked_out',
+};
 
 export const Stays = memo(() => {
-  const { t, i18n } = useTranslation('common');
+  const { t } = useTranslation('common');
   const navigate = useNavigate();
   const location = useLocation();
   const navState = location.state as StaysNavState | null;
+  const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StayStatus | 'ALL'>(() => navState?.statusFilter ?? 'ALL');
-  const [sortField, setSortField] = useState<StaySortField>(() => navState?.sortField ?? 'actualCheckInTime');
-  const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? 'desc');
+  const debouncedSearch = useDebounce(searchQuery);
+  const { statusFilter, sortField, sortDir, departingOn, alloggiatiFailed } = readFilters(searchParams, navState);
   const addToast = useToastStore((s) => s.addToast);
   const role = useAuthStore((s) => s.user?.role);
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
-
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(searchQuery), 300);
-    return () => clearTimeout(id);
-  }, [searchQuery]);
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   }, []);
 
-  const handleStatusFilterClick = useCallback((s: StayStatus | 'ALL') => {
-    setStatusFilter(s);
-  }, []);
+  const current = useMemo<StaysFilters>(
+    () => ({ statusFilter, sortField, sortDir, departingOn, alloggiatiFailed }),
+    [statusFilter, sortField, sortDir, departingOn, alloggiatiFailed],
+  );
+
+  // Every filter lives in the URL and is applied by the server, so a count on the dashboard matches the list.
+  const updateFilters = useCallback((patch: Partial<StaysFilters>) => {
+    const next = { ...current, ...patch };
+    const params = new URLSearchParams({ status: next.statusFilter, sort: next.sortField, dir: next.sortDir });
+    if (next.departingOn) params.set('departingOn', next.departingOn);
+    if (next.alloggiatiFailed) params.set('alloggiatiFailed', 'true');
+    setSearchParams(params, { replace: true });
+    setPage(0);
+  }, [current, setSearchParams]);
 
   const sorting = useMemo<SortingState>(
     () => [{ id: sortField, desc: sortDir === 'desc' }],
@@ -220,35 +127,55 @@ export const Stays = memo(() => {
   );
 
   const handleSortingChange = useCallback((next: SortingState) => {
-    setSortField(next[0].id as StaySortField);
-    setSortDir(next[0].desc ? 'desc' : 'asc');
-  }, []);
+    updateFilters({ sortField: next[0].id as StaySortField, sortDir: next[0].desc ? 'desc' : 'asc' });
+  }, [updateFilters]);
 
-  const { data: staysPage, isLoading: loading, error: queryError, refetch } = useStaysList(page);
+  const handleStatusSelect = useCallback((value: StayStatus | 'ALL') => {
+    updateFilters({ statusFilter: value });
+  }, [updateFilters]);
+
+  const today = todayIsoDate();
+  const handleToggleDepartingToday = useCallback(() => {
+    updateFilters({ departingOn: departingOn === today ? null : today });
+  }, [updateFilters, departingOn, today]);
+  const handleToggleAlloggiatiFailed = useCallback(() => {
+    updateFilters({ alloggiatiFailed: !alloggiatiFailed });
+  }, [updateFilters, alloggiatiFailed]);
+
+  const listFilters = useMemo<StayListFilters>(() => ({
+    status: statusFilter === 'ALL' ? undefined : statusFilter,
+    sortField,
+    sortDir,
+    departingOn: departingOn ?? undefined,
+    alloggiatiFailed: alloggiatiFailed || undefined,
+  }), [statusFilter, sortField, sortDir, departingOn, alloggiatiFailed]);
+
+  const { data: staysPage, isLoading: loading, error: queryError, refetch } = useStaysList(page, listFilters);
   const stays = staysPage?.content ?? EMPTY_STAYS;
   const totalPages = staysPage?.totalPages ?? 1;
   const error = queryError ? getErrorMessage(queryError, t('failed_load_stays')) : null;
   const handleRetry = useCallback(() => { refetch(); }, [refetch]);
 
+  // The backend has no free-text filter, so the search box narrows only the loaded page.
   const filteredStays = useMemo(() => {
-    let result = stays;
-    if (statusFilter !== 'ALL') {
-      result = result.filter((s) => s.status === statusFilter);
-    }
-    if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase();
-      result = result.filter(
-        (s) =>
-          s.roomNumber?.toLowerCase().includes(q) ||
-          s.guestDisplayName?.toLowerCase().includes(q),
-      );
-    }
-    const sorted = [...result].sort((a, b) => {
-      const cmp = (a[sortField] ?? '').localeCompare(b[sortField] ?? '');
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-    return sorted;
-  }, [stays, statusFilter, debouncedSearch, sortField, sortDir]);
+    if (!debouncedSearch.trim()) return stays;
+    const q = debouncedSearch.toLowerCase();
+    return stays.filter(
+      (s) =>
+        s.roomNumber?.toLowerCase().includes(q) ||
+        s.guestDisplayName?.toLowerCase().includes(q),
+    );
+  }, [stays, debouncedSearch]);
+
+  // Search narrows only the loaded page, so a server-wide range would mislead while it is on.
+  const filtersActive = debouncedSearch.trim() !== '';
+  // Position comes from the response, not local state: the previous page's rows stay visible while the next one loads.
+  const summary = useListRangeSummary(
+    staysPage?.number ?? 0,
+    staysPage?.size ?? stays.length,
+    filtersActive ? 0 : stays.length,
+    staysPage?.totalElements ?? 0,
+  );
 
   const checkOutMutation = useCheckOutStay();
   const checkingOut = checkOutMutation.isPending ? (checkOutMutation.variables ?? null) : null;
@@ -283,10 +210,18 @@ export const Stays = memo(() => {
     }
   }, [addToast, t, retryCheckoutEmailMutation]);
 
-  const handleNewCheckIn = useCallback(() => navigate('/reservations'), [navigate]);
+  const handleNewCheckIn = useCallback(() => navigate('/reservations', {
+    state: { preset: 'arrivalsToday', sortField: 'checkInDate', sortDir: 'asc' },
+  }), [navigate]);
   const handleWalkIn = useCallback(() => navigate('/stays/walk-in'), [navigate]);
-  const handleGuestNavigate = useCallback((guestDisplayName: string) => {
-    navigate('/guests?search=' + encodeURIComponent(guestDisplayName));
+  const handleGuestNavigate = useCallback((guestId: string) => {
+    navigate('/guests', { state: { guestId } });
+  }, [navigate]);
+  const handleOpenReservation = useCallback((id: string) => {
+    navigate(`/reservations/${id}`);
+  }, [navigate]);
+  const handleOpenDetail = useCallback((stayId: string) => {
+    navigate(`/stays/${stayId}`);
   }, [navigate]);
 
   const [manageGuestsStayId, setManageGuestsStayId] = useState<string | null>(null);
@@ -309,10 +244,7 @@ export const Stays = memo(() => {
     [t],
   );
   
-  const formatDate = useCallback((dateStr?: string) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleString(i18n.language);
-  }, [i18n.language]);
+  const { formatDate } = useFormatters();
 
   const getStayRowId = useCallback((s: StayResponse) => s.id, []);
 
@@ -354,7 +286,7 @@ export const Stays = memo(() => {
       accessorKey: 'expectedCheckOutDate',
       header: t('expected_checkout_col'),
       cell: ({ row }) => (
-        <span className="text-on-surface-variant">{row.original.expectedCheckOutDate ?? '-'}</span>
+        <span className="text-on-surface-variant">{formatDate(row.original.expectedCheckOutDate)}</span>
       ),
     },
     {
@@ -370,7 +302,7 @@ export const Stays = memo(() => {
       cell: ({ row }) => (
         <M3StatusChip
           label={t(`status_${row.original.status.toLowerCase()}`, row.original.status.replace('_', ' '))}
-          tone={getStatusTone(row.original.status)}
+          tone={stayStatusTone[row.original.status]}
         />
       ),
     },
@@ -400,55 +332,64 @@ export const Stays = memo(() => {
           checkingOut={checkingOut}
           onExtend={handleExtendStay}
           onChangeRoom={handleChangeRoom}
+          onOpenReservation={handleOpenReservation}
+          onOpenDetail={handleOpenDetail}
           t={t}
         />
       ),
     },
   ], [t, formatDate, handleGuestNavigate, handleRetryInvoice, retryingInvoice, handleRetryCheckoutEmail,
-      retryingEmail, handleCheckOut, checkingOut, handleManageGuests, handleExtendStay, handleChangeRoom]);
+      retryingEmail, handleCheckOut, checkingOut, handleManageGuests, handleExtendStay, handleChangeRoom,
+      handleOpenReservation, handleOpenDetail]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight text-on-surface flex items-center">
-            <MaterialIcon name="hotel" className="mr-2 text-primary" />
-            {t('nav_stays')}
-          </h1>
-          <p className="text-sm font-body text-on-surface-variant mt-1">{t('stays_subtitle')}</p>
-        </div>
-        <div className="flex gap-2">
-          <M3Button icon="add" onClick={handleNewCheckIn}>
-            {t('new_checkin', 'New Check-in')}
-          </M3Button>
-          <M3Button icon="person_add" variant="outlined" onClick={handleWalkIn}>
-            {t('walkin_title', 'Walk-in')}
-          </M3Button>
-        </div>
-      </div>
+      <PageHeader
+        icon="hotel"
+        title={t('nav_stays')}
+        subtitle={t('stays_subtitle')}
+        actions={
+          <>
+            <M3Button icon="add" onClick={handleNewCheckIn}>
+              {t('new_checkin', 'New Check-in')}
+            </M3Button>
+            <M3Button icon="person_add" variant="outlined" onClick={handleWalkIn}>
+              {t('walkin_title', 'Walk-in')}
+            </M3Button>
+          </>
+        }
+      />
 
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <M3TextField
-          label={t('search_placeholder')}
-          hideLabel
-          leadingIcon="search"
-          type="search"
-          value={searchQuery}
-          onChange={handleSearchChange}
-          className="w-full sm:w-56"
+      <ListToolbar
+        searchLabel={t('search_placeholder')}
+        searchPlaceholder={t('stays_search_hint')}
+        filtersLabel={t('filter_status')}
+        searchValue={searchQuery}
+        onSearchChange={handleSearchChange}
+      >
+        {STATUS_FILTERS.map((s) => (
+          <M3FilterChip
+            key={s}
+            value={s}
+            selected={statusFilter === s}
+            label={t(STATUS_FILTER_LABEL_KEYS[s])}
+            onValueSelect={handleStatusSelect}
+          />
+        ))}
+        <M3FilterChip
+          value="departingToday"
+          selected={departingOn === today}
+          label={t('stays_filter_departing_today')}
+          onValueSelect={handleToggleDepartingToday}
         />
-        <div className="flex flex-wrap gap-2" role="group" aria-label={t('filter_status')}>
-          {(['ALL', 'EXPECTED', 'CHECKED_IN', 'CHECKED_OUT'] as const).map((s) => (
-            <StayStatusChip
-              key={s}
-              value={s}
-              active={statusFilter === s}
-              label={s === 'ALL' ? t('filter_all') : s === 'EXPECTED' ? t('status_expected') : s === 'CHECKED_IN' ? t('status_checked_in') : t('status_checked_out')}
-              onClick={handleStatusFilterClick}
-            />
-          ))}
-        </div>
-      </div>
+        <M3FilterChip
+          value="alloggiatiFailed"
+          selected={alloggiatiFailed}
+          label={t('stays_filter_alloggiati_failed')}
+          onValueSelect={handleToggleAlloggiatiFailed}
+        />
+      </ListToolbar>
+
 
       {loading ? (
         <M3LoadingState label={t('loading')} />
@@ -481,6 +422,7 @@ export const Stays = memo(() => {
           prevLabel={t('prev_page')}
           nextLabel={t('next_page')}
           pageOfLabel={pageOfLabel}
+          summary={summary}
         />
       )}
 

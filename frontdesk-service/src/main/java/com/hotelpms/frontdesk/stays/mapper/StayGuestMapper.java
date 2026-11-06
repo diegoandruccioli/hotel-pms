@@ -21,9 +21,15 @@ public interface StayGuestMapper {
     /**
      * Converts a StayGuest entity into a StayGuestResponse DTO.
      *
+     * <p>The entity's {@code boolean isPrimaryGuest} field gets the Lombok accessor
+     * {@code isPrimaryGuest()}, which MapStruct reads as the property {@code primaryGuest},
+     * while the record component is {@code isPrimaryGuest}: without the explicit source the
+     * flag is silently left at {@code false} ({@code unmappedTargetPolicy = IGNORE}).
+     *
      * @param guest the stay guest entity
      * @return the StayGuestResponse DTO
      */
+    @Mapping(target = "isPrimaryGuest", source = "primaryGuest")
     StayGuestResponse toResponse(StayGuest guest);
 
     /**

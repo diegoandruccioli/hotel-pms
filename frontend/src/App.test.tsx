@@ -39,7 +39,10 @@ const mockStore = (state: MockAuthState) => {
 
 const ADMIN: UserPayload = { sub: '1', username: 'admin', role: 'ADMIN' };
 
-describe('App', () => {
+// The first render of an authenticated route pulls in the lazy Dashboard + MainLayout chunks; under a
+// loaded full-suite run that cold import alone can pass vitest's 5 s default, before the 8 s waitFor
+// budgets below ever expire. Keep the per-test cap above them.
+describe('App', { timeout: 15_000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.pushState({}, '', '/');
@@ -75,8 +78,28 @@ describe('App', () => {
     mockStore({ isAuthenticated: true, isLoading: false, user: ADMIN, checkAuth: vi.fn() });
 
     render(<App />);
-    await waitFor(() => expect(screen.getByText('skip_to_main')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('skip_to_main')).toBeInTheDocument(), { timeout: 8000 });
     expect(window.location.pathname).toBe('/');
+  });
+
+  it('opens the settings area on the profile section', async () => {
+    vi.mocked(authService.fetchMe).mockResolvedValue(ADMIN);
+    mockStore({ isAuthenticated: true, isLoading: false, user: ADMIN, checkAuth: vi.fn() });
+    window.history.pushState({}, '', '/settings');
+
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/settings/profile'), { timeout: 8000 });
+    expect(await screen.findByRole('navigation', { name: 'settings_nav_label' }, { timeout: 8000 })).toBeInTheDocument();
+  });
+
+  it('keeps the admin-only settings sections away from front-desk staff', async () => {
+    const receptionist: UserPayload = { sub: '2', username: 'desk', role: 'RECEPTIONIST' };
+    vi.mocked(authService.fetchMe).mockResolvedValue(receptionist);
+    mockStore({ isAuthenticated: true, isLoading: false, user: receptionist, checkAuth: vi.fn() });
+    window.history.pushState({}, '', '/settings/system');
+
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/'), { timeout: 8000 });
   });
 
   it('loading state has no accessibility violations', async () => {

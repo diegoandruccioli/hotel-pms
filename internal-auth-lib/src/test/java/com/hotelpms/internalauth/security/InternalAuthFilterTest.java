@@ -11,6 +11,7 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -48,6 +49,7 @@ class InternalAuthFilterTest {
     private static final List<String> EXCLUDED_PATH_PREFIXES = List.of("/actuator", "/api/v1/public");
 
     private static final int UNAUTHORIZED = HttpServletResponse.SC_UNAUTHORIZED;
+    private static final int SERVICE_UNAVAILABLE = HttpServletResponse.SC_SERVICE_UNAVAILABLE;
     private static final int OK = HttpServletResponse.SC_OK;
 
     private static final long REPLAY_WINDOW_SECONDS = 60;
@@ -123,6 +125,13 @@ class InternalAuthFilterTest {
         @Override
         public boolean claim(final String nonce, final long ttlSeconds) {
             return claimed.add(nonce);
+        }
+    }
+
+    private static final class UnavailableNonceStore implements NonceStore {
+        @Override
+        public boolean claim(final String nonce, final long ttlSeconds) {
+            throw new NonceStoreUnavailableException("nonce store down", new IllegalStateException("redis down"));
         }
     }
 
@@ -339,6 +348,25 @@ class InternalAuthFilterTest {
             assertThat(auth.getAuthorities())
                     .anyMatch(a -> ("ROLE_" + TEST_ROLE).equals(a.getAuthority()));
         }
+
+        @Test
+        @DisplayName("Valid headers → context saved on the request, so ASYNC dispatches stay authenticated")
+        void shouldKeepContextOnRequestForAsyncDispatch()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            final String timestamp = String.valueOf(System.currentTimeMillis());
+            final String nonce = freshNonce();
+            final String sig = computeHmac(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce);
+            final MockHttpServletRequest request =
+                    buildRequest(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce, sig);
+
+            filter.doFilter(request, new MockHttpServletResponse(), new MockFilterChain());
+
+            SecurityContextHolder.clearContext();
+            final var saved = new RequestAttributeSecurityContextRepository()
+                    .loadDeferredContext(request).get().getAuthentication();
+            assertThat(saved).isNotNull();
+            assertThat(saved.getName()).isEqualTo(TEST_USER);
+        }
     }
 
     @Nested
@@ -402,6 +430,30 @@ class InternalAuthFilterTest {
         }
 
         @Test
+        @DisplayName("Nonce store unavailable → 503, fail-closed: chain not run, nothing authenticated")
+        void shouldFailClosedWith503WhenTheNonceStoreIsUnavailable()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            final InternalAuthFilter unavailable = new InternalAuthFilter(
+                    filterHmacMaterial(), new UnavailableNonceStore(), EXCLUDED_PATH_PREFIXES);
+            final String timestamp = String.valueOf(System.currentTimeMillis());
+            final String nonce = freshNonce();
+            final String sig = computeHmac(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce);
+            final MockHttpServletRequest request =
+                    buildRequest(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce, sig);
+            final MockHttpServletResponse response = new MockHttpServletResponse();
+            final MockFilterChain chain = new MockFilterChain();
+
+            unavailable.doFilter(request, response, chain);
+
+            assertThat(response.getStatus()).isEqualTo(SERVICE_UNAVAILABLE);
+            assertThat(response.getContentAsString()).contains("\"error\"");
+            assertThat(chain.getRequest())
+                    .as("a request whose replay check could not run must never reach the controller")
+                    .isNull();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        }
+
+        @Test
         @DisplayName("Same payload signed with two different nonces → both accepted")
         void shouldAcceptTwoDifferentNoncesForSamePayload()
                 throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
@@ -420,6 +472,75 @@ class InternalAuthFilterTest {
             filter.doFilter(buildRequest(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonceB, sigB),
                     responseB, new MockFilterChain());
             assertThat(responseB.getStatus()).isEqualTo(OK);
+        }
+    }
+
+    @Nested
+    @DisplayName("X-Gateway-Origin marker")
+    class GatewayOriginMarker {
+
+        private MockHttpServletRequest signedRequest(final String marker)
+                throws NoSuchAlgorithmException, InvalidKeyException {
+            final String timestamp = String.valueOf(System.currentTimeMillis());
+            final String nonce = freshNonce();
+            final String sig = computeHmac(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce);
+            final MockHttpServletRequest request =
+                    buildRequest(TEST_USER, TEST_ROLE, TEST_HOTEL_ID, timestamp, nonce, sig);
+            if (marker != null) {
+                request.addHeader("X-Gateway-Origin", marker);
+            }
+            return request;
+        }
+
+        @Test
+        @DisplayName("Marker present → GATEWAY_CALLER authority added, role and hotelId details unchanged")
+        void shouldGrantGatewayCallerAuthorityWhenMarkerPresent()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            final MockHttpServletResponse response = new MockHttpServletResponse();
+
+            filter.doFilter(signedRequest("true"), response, new MockFilterChain());
+
+            assertThat(response.getStatus()).isEqualTo(OK);
+            final var auth = SecurityContextHolder.getContext().getAuthentication();
+            assertThat(auth.getAuthorities())
+                    .anyMatch(a -> "GATEWAY_CALLER".equals(a.getAuthority()))
+                    .anyMatch(a -> ("ROLE_" + TEST_ROLE).equals(a.getAuthority()));
+            assertThat(auth.getDetails()).isEqualTo(TEST_HOTEL_ID);
+            assertThat(CallerContext.isViaGateway()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Marker absent (internal service-to-service call) → no GATEWAY_CALLER authority")
+        void shouldNotGrantGatewayCallerAuthorityWhenMarkerAbsent()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            final MockHttpServletResponse response = new MockHttpServletResponse();
+
+            filter.doFilter(signedRequest(null), response, new MockFilterChain());
+
+            assertThat(response.getStatus()).isEqualTo(OK);
+            final var auth = SecurityContextHolder.getContext().getAuthentication();
+            assertThat(auth.getAuthorities()).noneMatch(a -> "GATEWAY_CALLER".equals(a.getAuthority()));
+            assertThat(CallerContext.isViaGateway()).isFalse();
+        }
+
+        @Test
+        @DisplayName("Blank marker is ignored, so an empty header cannot flip the caller type")
+        void shouldIgnoreBlankMarker()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            filter.doFilter(signedRequest(" "), new MockHttpServletResponse(), new MockFilterChain());
+
+            assertThat(CallerContext.isViaGateway()).isFalse();
+        }
+
+        @Test
+        @DisplayName("The marker is not part of the signature: a valid signature still authenticates with it")
+        void shouldKeepSignatureFormatUnchanged()
+                throws NoSuchAlgorithmException, InvalidKeyException, IOException, ServletException {
+            final MockHttpServletResponse response = new MockHttpServletResponse();
+
+            filter.doFilter(signedRequest("true"), response, new MockFilterChain());
+
+            assertThat(response.getStatus()).isEqualTo(OK);
         }
     }
 }

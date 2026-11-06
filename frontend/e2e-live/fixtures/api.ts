@@ -1,7 +1,39 @@
 import type { APIRequestContext } from '@playwright/test';
 import { SEED_HOTEL_ID } from './hotel';
 
-export const ROOM_TYPE_ID = '8aec8f5c-c19d-4e0f-a63a-27674726bd4b'; // "Doppia Standard", basePrice 90.00 — seeded, see backup/SUMMARY.md
+let cachedRoomTypeId: string | undefined;
+
+/**
+ * Room type used by every fixture room of the seed hotel. No migration seeds
+ * one (the id this used to hardcode only existed on the maintainer's local
+ * DB), so reuse the first existing type and create one on a fresh stack.
+ */
+export async function resolveRoomTypeId(
+    request: APIRequestContext,
+    headers: Record<string, string>,
+): Promise<string> {
+    if (cachedRoomTypeId) {
+        return cachedRoomTypeId;
+    }
+    const list = await request.get('/api/v1/room-types');
+    if (list.status() !== 200) {
+        throw new Error(`Failed to list room types: ${list.status()} ${await list.text()}`);
+    }
+    const existing = (await list.json()) as Array<{ id: string }>;
+    if (existing.length > 0) {
+        cachedRoomTypeId = existing[0].id;
+        return cachedRoomTypeId;
+    }
+    const created = await request.post('/api/v1/room-types', {
+        headers,
+        data: { name: 'Doppia Standard', maxOccupancy: 2, basePrice: 90 },
+    });
+    if (created.status() !== 201) {
+        throw new Error(`Failed to create fixture room type: ${created.status()} ${await created.text()}`);
+    }
+    cachedRoomTypeId = ((await created.json()) as { id: string }).id;
+    return cachedRoomTypeId;
+}
 
 /**
  * Reads the csrf_token cookie from the context's storageState and returns it
@@ -74,9 +106,10 @@ export interface CreatedRoom {
 
 export async function createCleanRoom(request: APIRequestContext, headers: Record<string, string>): Promise<CreatedRoom> {
     const roomNumber = `E2E-LIVE-${Date.now()}`;
+    const roomTypeId = await resolveRoomTypeId(request, headers);
     const response = await request.post('/api/v1/rooms', {
         headers,
-        data: { hotelId: SEED_HOTEL_ID, roomNumber, roomTypeId: ROOM_TYPE_ID, status: 'CLEAN' },
+        data: { hotelId: SEED_HOTEL_ID, roomNumber, roomTypeId, status: 'CLEAN' },
     });
     if (response.status() !== 201) {
         throw new Error(`Failed to create fixture room: ${response.status()} ${await response.text()}`);

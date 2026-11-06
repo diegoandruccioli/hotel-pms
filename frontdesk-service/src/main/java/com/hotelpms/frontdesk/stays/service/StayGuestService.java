@@ -50,11 +50,16 @@ public interface StayGuestService {
      * #recordDeparture} instead: Alloggiati Web has no cancellation, only an
      * accurate departure date.
      *
-     * @param stayId  the stay the guest belongs to
-     * @param guestId the guest to remove
-     * @param hotelId the caller's hotel UUID
+     * <p>Rejects a stale removal: a {@code clientVersion} that doesn't match the guest's
+     * current version means someone else already changed this guest since the client
+     * read it, so the removal would act on outdated data.
+     *
+     * @param stayId        the stay the guest belongs to
+     * @param guestId       the guest to remove
+     * @param hotelId       the caller's hotel UUID
+     * @param clientVersion the version the client last read, or {@code null} to skip the check
      */
-    void removeGuest(UUID stayId, UUID guestId, UUID hotelId);
+    void removeGuest(UUID stayId, UUID guestId, UUID hotelId, Long clientVersion);
 
     /**
      * Records an early departure for one guest of a multi-guest stay, without

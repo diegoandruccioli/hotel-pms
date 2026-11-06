@@ -21,6 +21,27 @@ describe('stayService', () => {
     expect(result).toEqual(mockPage);
   });
 
+  it('sends status, sort, departure day and Alloggiati failure to the server', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { content: [] } });
+
+    await stayService.getAllStays(2, 20, {
+      status: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc',
+      departingOn: '2026-10-27', alloggiatiFailed: true,
+    });
+
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/v1/stays?page=2&size=20&sort=expectedCheckOutDate,asc&status=CHECKED_IN&departingOn=2026-10-27&alloggiatiFailed=true',
+    );
+  });
+
+  it('omits an unset Alloggiati flag', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { content: [] } });
+
+    await stayService.getAllStays(0, 20, { alloggiatiFailed: false });
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/stays?page=0&size=20&sort=actualCheckInTime,desc');
+  });
+
   it('should fetch stay by id', async () => {
     const mockStay = { id: '1', status: 'CHECKED_IN' };
     vi.mocked(api.get).mockResolvedValueOnce({ data: mockStay });
@@ -211,7 +232,7 @@ describe('stayService — settings, lookups, downloads', () => {
 
     const result = await stayService.getAvailableRooms();
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/rooms', { params: { size: 200 } });
+    expect(api.get).toHaveBeenCalledWith('/api/v1/rooms', { params: { size: 200, status: 'CLEAN' } });
     expect(result).toEqual([mockRooms[0]]);
   });
 
@@ -323,7 +344,15 @@ describe('stayService — guest lifecycle, extension, city tax', () => {
 
     await stayService.removeGuest('stay1', 'g1');
 
-    expect(api.delete).toHaveBeenCalledWith('/api/v1/stays/stay1/guests/g1');
+    expect(api.delete).toHaveBeenCalledWith('/api/v1/stays/stay1/guests/g1', { params: undefined });
+  });
+
+  it('should send the guest version when removing a guest, for optimistic-lock detection', async () => {
+    vi.mocked(api.delete).mockResolvedValueOnce({ data: undefined });
+
+    await stayService.removeGuest('stay1', 'g1', 3);
+
+    expect(api.delete).toHaveBeenCalledWith('/api/v1/stays/stay1/guests/g1', { params: { version: 3 } });
   });
 
   it('should record an early departure for a guest', async () => {

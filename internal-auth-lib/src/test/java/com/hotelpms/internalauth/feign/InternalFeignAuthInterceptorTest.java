@@ -104,6 +104,26 @@ class InternalFeignAuthInterceptorTest {
     }
 
     @Test
+    void shouldNeverPropagateTheGatewayOriginMarker() {
+        // A call that reached this service through the gateway must not make the next
+        // service-to-service hop look like a public call: the marker stays on the first hop.
+        final MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HEADER_USER, USER);
+        request.addHeader(HEADER_ROLE, ROLE);
+        request.addHeader(HEADER_HOTEL, HOTEL_ID);
+        request.addHeader("X-Gateway-Origin", "true");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        final InternalFeignAuthInterceptor interceptor =
+                new InternalFeignAuthInterceptor(hmacSecret(), Optional::empty);
+
+        final RequestTemplate template = new RequestTemplate();
+        interceptor.apply(template);
+
+        assertThat(template.headers()).doesNotContainKey("X-Gateway-Origin");
+        assertThat(template.headers()).containsKey(HEADER_SIGNATURE);
+    }
+
+    @Test
     void shouldGenerateDifferentNonceOnEachCall() {
         setInboundHeaders(USER, ROLE, HOTEL_ID);
         final InternalFeignAuthInterceptor interceptor =

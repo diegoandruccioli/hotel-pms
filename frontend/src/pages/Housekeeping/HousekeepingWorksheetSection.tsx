@@ -5,6 +5,7 @@ import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
 import { MaterialIcon } from '../../components/MaterialIcon';
+import { Alert } from '../../components/Alert';
 import { housekeepingService } from '../../services';
 import { useBusinessDate, useHousekeepingWorksheet } from '../../hooks/queries';
 import { getErrorMessage } from '../../utils';
@@ -78,13 +79,9 @@ export const HousekeepingWorksheetSection = memo(() => {
       </div>
 
       {dateMismatch && (
-        <div
-          role="alert"
-          className="mt-3 flex items-center gap-2 px-3 py-2 rounded-shape-sm bg-secondary-container text-on-secondary-container text-xs font-body"
-        >
-          <MaterialIcon name="warning" size={16} className="shrink-0" />
+        <Alert tone="warning" compact role="alert" className="mt-3">
           {t('worksheet_date_mismatch_warning', { businessDate: businessDate?.businessDate })}
-        </div>
+        </Alert>
       )}
 
       {error && <p className="mt-3 text-xs font-body text-error">{error}</p>}

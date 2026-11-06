@@ -1,14 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../test-utils';
+import { openRowMenu, renderWithQuery as render } from '../test-utils';
 import { Guests } from './Guests';
 
 const mockUseSearchParams = vi.hoisted(() => vi.fn(() => [new URLSearchParams()] as [URLSearchParams]));
+const mockNavigate = vi.hoisted(() => vi.fn());
+const mockUseLocation = vi.hoisted(() => vi.fn((): { pathname: string; state?: unknown } => ({ pathname: '/guests' })));
 vi.mock('react-router-dom', () => ({
   useSearchParams: mockUseSearchParams,
+  useNavigate: () => mockNavigate,
+  useLocation: mockUseLocation,
 }));
-import { guestService } from '../services';
+import { guestService, stayService, billingService, inventoryService } from '../services';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 
@@ -20,11 +24,16 @@ vi.mock('react-i18next', () => ({
 vi.mock('../services/guestService', () => ({
   guestService: {
     searchGuestsPaged: vi.fn(),
+    getGuestById: vi.fn(),
     deleteGuest: vi.fn(),
-    exportGuestData: vi.fn(),
+    downloadGuestDataExport: vi.fn(),
     exportGuestsCsv: vi.fn(),
   },
 }));
+
+vi.mock('../services/stayService', () => ({ stayService: { getGuestStayHistory: vi.fn() } }));
+vi.mock('../services/billingService', () => ({ billingService: { getGuestInvoiceHistory: vi.fn() } }));
+vi.mock('../services/inventoryService', () => ({ inventoryService: { getAllRooms: vi.fn() } }));
 
 vi.mock('../store/authStore', () => ({
   useAuthStore: vi.fn(),
@@ -38,7 +47,7 @@ vi.mock('focus-trap-react', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock('./GuestFormModal', () => ({
+vi.mock('../components/GuestFormModal', () => ({
   GuestFormModal: ({ onSaved }: { onSaved: () => void }) => (
     <button type="button" onClick={onSaved}>trigger-saved</button>
   ),
@@ -80,8 +89,12 @@ const mockAuthNull = (selector: unknown) =>
 describe('Guests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseLocation.mockReturnValue({ pathname: '/guests' });
     vi.mocked(useAuthStore).mockImplementation(mockAuthNull);
     vi.mocked(useToastStore).mockReturnValue(mockAddToast);
+    vi.mocked(stayService.getGuestStayHistory).mockResolvedValue([]);
+    vi.mocked(billingService.getGuestInvoiceHistory).mockResolvedValue([]);
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue({ content: [] } as never);
   });
 
   it('should show loading spinner initially', () => {
@@ -124,7 +137,7 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => {
-      expect(screen.getByText('nav_guests')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'nav_guests' })).toBeInTheDocument();
     });
   });
 
@@ -155,7 +168,7 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /delete John Doe/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'delete' })).not.toBeInTheDocument();
   });
 
   it('should show delete button for ADMIN', async () => {
@@ -164,7 +177,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /delete John Doe/ })).toBeInTheDocument();
+    openRowMenu();
+    expect(screen.getByRole('menuitem', { name: 'delete' })).toBeInTheDocument();
   });
 
   it('should not show the export CSV button for RECEPTIONIST', async () => {
@@ -193,7 +207,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
 
     expect(screen.getByText('delete_guest_confirm')).toBeInTheDocument();
   });
@@ -207,7 +222,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^delete$/ })[0]);
 
     await waitFor(() => {
@@ -223,7 +239,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     expect(screen.getByText('delete_guest_confirm')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
@@ -239,7 +256,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^delete$/ })[0]);
 
     await waitFor(() => {
@@ -270,7 +288,8 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /delete John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     fireEvent.click(screen.getAllByRole('button', { name: /^delete$/ })[0]);
 
     await waitFor(() => {
@@ -327,7 +346,7 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /export_guest_data John Doe/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'export_guest_data' })).not.toBeInTheDocument();
   });
 
   it('should show export button for ADMIN and open a confirmation dialog', async () => {
@@ -336,46 +355,39 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /export_guest_data John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'export_guest_data' }));
 
     expect(screen.getByText('export_guest_data_confirm_body')).toBeInTheDocument();
-    expect(guestService.exportGuestData).not.toHaveBeenCalled();
+    expect(guestService.downloadGuestDataExport).not.toHaveBeenCalled();
   });
 
-  it('should download the export as JSON on confirm', async () => {
+  it('should trigger the export download on confirm and close the dialog', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
-    vi.mocked(guestService.exportGuestData).mockResolvedValueOnce({ guestId: 'guest-1' } as never);
-    const createObjectURL = vi.fn(() => 'blob:mock');
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.mocked(guestService.downloadGuestDataExport).mockResolvedValueOnce(undefined);
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /export_guest_data John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'export_guest_data' }));
     fireEvent.click(screen.getByRole('button', { name: 'export_guest_data_confirm_action' }));
 
     await waitFor(() => {
-      expect(guestService.exportGuestData).toHaveBeenCalledWith('guest-1');
-      expect(createObjectURL).toHaveBeenCalled();
-      expect(clickSpy).toHaveBeenCalled();
-      expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock');
+      expect(guestService.downloadGuestDataExport).toHaveBeenCalledWith('guest-1');
       expect(screen.queryByText('export_guest_data_confirm_body')).not.toBeInTheDocument();
     });
-
-    clickSpy.mockRestore();
-    vi.unstubAllGlobals();
   });
 
   it('should show an error toast when the export fails', async () => {
     vi.mocked(useAuthStore).mockImplementation(mockAuthAdmin);
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
-    vi.mocked(guestService.exportGuestData).mockRejectedValueOnce(new Error('network'));
+    vi.mocked(guestService.downloadGuestDataExport).mockRejectedValueOnce(new Error('network'));
     render(<Guests />);
 
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
-    fireEvent.click(screen.getByRole('button', { name: /export_guest_data John Doe/ }));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'export_guest_data' }));
     fireEvent.click(screen.getByRole('button', { name: 'export_guest_data_confirm_action' }));
 
     await waitFor(() => {
@@ -391,5 +403,98 @@ describe('Guests', () => {
     await waitFor(() => expect(screen.getByText('no_guests_found')).toBeInTheDocument());
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+
+  describe('list presentation', () => {
+    it('shows the avatar initial and the email under the name', async () => {
+      vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+      render(<Guests />);
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      expect(screen.getByText('J')).toBeInTheDocument();
+      const nameCell = screen.getByText('John Doe').closest('div') as HTMLElement;
+      expect(within(nameCell).getByText('john@test.com')).toBeInTheDocument();
+    });
+
+    it('keeps phone and city columns and drops the separate email column', async () => {
+      vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+      render(<Guests />);
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      expect(screen.getByRole('columnheader', { name: 'phone' })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'city' })).toBeInTheDocument();
+      expect(screen.queryByRole('columnheader', { name: 'email' })).not.toBeInTheDocument();
+    });
+
+    it('shows the result range, also with a single page', async () => {
+      vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST, JANE]) as never);
+      render(<Guests />);
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+      expect(screen.getByText('list_range_summary')).toBeInTheDocument();
+    });
+
+    it('puts the search in the toolbar and still searches as you type', async () => {
+      vi.mocked(guestService.searchGuestsPaged).mockResolvedValue(page([GUEST]) as never);
+      render(<Guests />);
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'doe' } });
+
+      await waitFor(() => expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('doe', 0, 20, 'lastName,asc'));
+    });
+  });
+
+  it('opens the detail sheet from the guest name', async () => {
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    render(<Guests />);
+    fireEvent.click(await screen.findByRole('button', { name: /John Doe/ }));
+    expect(screen.getByRole('dialog', { name: 'detail_title' })).toBeInTheDocument();
+    await waitFor(() => expect(stayService.getGuestStayHistory).toHaveBeenCalledWith('guest-1'));
+  });
+
+  it('opens the detail sheet of the guest named in the navigation state', async () => {
+    mockUseLocation.mockReturnValue({ pathname: '/guests', state: { guestId: 'guest-1' } });
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValue(page([JANE]) as never);
+    vi.mocked(guestService.getGuestById).mockResolvedValue(GUEST as never);
+    render(<Guests />);
+    expect(await screen.findByRole('dialog', { name: 'detail_title' })).toBeInTheDocument();
+    expect(guestService.getGuestById).toHaveBeenCalledWith('guest-1');
+    expect(within(screen.getByRole('dialog', { name: 'detail_title' })).getByText(/John Doe/)).toBeInTheDocument();
+  });
+
+  it('shows an error toast when the linked guest cannot be loaded', async () => {
+    mockUseLocation.mockReturnValue({ pathname: '/guests', state: { guestId: 'gone' } });
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValue(page([JANE]) as never);
+    vi.mocked(guestService.getGuestById).mockRejectedValue(new Error('boom'));
+    render(<Guests />);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('error_unexpected_fallback', 'error'));
+    expect(screen.queryByRole('dialog', { name: 'detail_title' })).not.toBeInTheDocument();
+  });
+
+  it('closes the detail sheet and opens the form when Edit is pressed in the sheet', async () => {
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    render(<Guests />);
+    fireEvent.click(await screen.findByRole('button', { name: /John Doe/ }));
+    const sheet = screen.getByRole('dialog', { name: 'detail_title' });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'common:edit' }));
+    expect(screen.queryByRole('dialog', { name: 'detail_title' })).not.toBeInTheDocument();
+    expect(screen.getByText('trigger-saved')).toBeInTheDocument();
+  });
+
+  it('starts a reservation for the guest from the sheet', async () => {
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    render(<Guests />);
+    fireEvent.click(await screen.findByRole('button', { name: /John Doe/ }));
+    const sheet = screen.getByRole('dialog', { name: 'detail_title' });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'common:new_reservation' }));
+    expect(mockNavigate).toHaveBeenCalledWith('/reservations/new', { state: { guest: GUEST } });
+  });
+
+  it('closes the detail sheet with its close button', async () => {
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
+    render(<Guests />);
+    fireEvent.click(await screen.findByRole('button', { name: /John Doe/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'close' }));
+    expect(screen.queryByRole('dialog', { name: 'detail_title' })).not.toBeInTheDocument();
   });
 });

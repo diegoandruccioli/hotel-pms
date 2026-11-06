@@ -30,13 +30,6 @@ test.describe('Blocco 3 — Reservations', () => {
     await page.getByRole('heading', { name: /nuova prenotazione|new reservation/i }).waitFor();
     guard.checkpoint('reservation form loaded');
 
-    await page.getByPlaceholder(/cerca ospite|search guest/i).fill('Qa Round');
-    await page.waitForTimeout(500);
-    const suggestion = page.getByRole('button', { name: /qa round/i }).first();
-    await expect(suggestion).toBeVisible({ timeout: 5000 });
-    await suggestion.click();
-    guard.checkpoint('guest selected');
-
     const dateInputs = page.locator('input[type=date]');
     const inDate = new Date();
     inDate.setMonth(inDate.getMonth() + 4);
@@ -45,6 +38,8 @@ test.describe('Blocco 3 — Reservations', () => {
     const fmt = (d: Date) => d.toISOString().split('T')[0];
     await dateInputs.nth(0).fill(fmt(inDate));
     await dateInputs.nth(1).fill(fmt(outDate));
+    const nextBtn = page.getByRole('button', { name: /^(avanti|next)$/i });
+    await nextBtn.click();
 
     // Any AVAILABLE room, not a hardcoded "101" — RoomButton disables the
     // tile via the `disabled` attribute exactly when occupied
@@ -55,6 +50,15 @@ test.describe('Blocco 3 — Reservations', () => {
     await expect(roomTile).toBeVisible({ timeout: 8000 });
     await roomTile.click();
     guard.checkpoint('room selected');
+    await nextBtn.click();
+
+    await page.getByPlaceholder(/cerca ospite|search guest/i).fill('Qa Round');
+    await page.waitForTimeout(500);
+    const suggestion = page.getByRole('button', { name: /qa round/i }).first();
+    await expect(suggestion).toBeVisible({ timeout: 5000 });
+    await suggestion.click();
+    guard.checkpoint('guest selected');
+    await nextBtn.click();
 
     const confirmBtn = page.getByRole('button', { name: /conferma prenotazione|confirm reservation/i });
     await expect(confirmBtn).toBeEnabled({ timeout: 5000 });
@@ -65,9 +69,18 @@ test.describe('Blocco 3 — Reservations', () => {
     // Clean up: delete the reservation we just created (CONFIRMED is deletable).
     await page.getByRole('searchbox').fill('Qa Round');
     await page.waitForTimeout(500);
-    const deleteBtn = page.getByRole('button', { name: /^delete |^elimina /i }).first();
-    await expect(deleteBtn).toBeVisible({ timeout: 5000 });
-    await deleteBtn.click();
+    // Delete sits in the row's "Actions for <guest>" menu, not as a standalone button.
+    // Other fixture reservations of the same guest may be listed too: pick ours by its check-in date
+    // (the cell reads M/D/YYYY or D/M/YYYY, padded or not, depending on the UI language).
+    const [y, m, d] = fmt(inDate).split('-').map(Number);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dateText = new RegExp(`^(${m}/${d}/${y}|${d}/${m}/${y}|${pad(d)}/${pad(m)}/${y})$`);
+    const ourRow = page.locator('tbody tr').filter({ has: page.getByRole('cell', { name: dateText }) });
+    await expect(ourRow).toHaveCount(1, { timeout: 10000 });
+    const actionsButton = ourRow.getByRole('button', { name: /^(Azioni per|Actions for) / });
+    await expect(actionsButton).toBeVisible({ timeout: 5000 });
+    await actionsButton.click();
+    await page.getByRole('menuitem', { name: /^(Elimina|Delete)$/ }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: /^conferma$|^confirm$/i }).click();

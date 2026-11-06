@@ -138,8 +138,86 @@ describe('StayGuestManagerDialog', () => {
     fireEvent.click(removeButtons[removeButtons.length - 1]);
     fireEvent.click(screen.getByRole('button', { name: 'btn_confirm' }));
 
-    await waitFor(() => expect(stayService.removeGuest).toHaveBeenCalledWith(STAY_ID, 'guest-secondary'));
+    await waitFor(() => expect(stayService.removeGuest).toHaveBeenCalledWith(STAY_ID, 'guest-secondary', undefined));
     await waitFor(() => expect(screen.queryByText('Verdi Anna')).not.toBeInTheDocument());
+  });
+
+  it('sends the version it last read when removing a guest', async () => {
+    vi.mocked(stayService.getStayById)
+      .mockResolvedValueOnce(stayWith([primaryGuest, { ...secondaryGuest, version: 4 }]))
+      .mockResolvedValueOnce(stayWith([primaryGuest]));
+    vi.mocked(stayService.removeGuest).mockResolvedValue(undefined);
+
+    render(<StayGuestManagerDialog stayId={STAY_ID} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText('Verdi Anna')).toBeInTheDocument());
+    const removeButtons = screen.getAllByRole('button', { name: 'btn_remove' });
+    fireEvent.click(removeButtons[removeButtons.length - 1]);
+    fireEvent.click(screen.getByRole('button', { name: 'btn_confirm' }));
+
+    await waitFor(() => expect(stayService.removeGuest).toHaveBeenCalledWith(STAY_ID, 'guest-secondary', 4));
+  });
+
+  it('keeps the dialog usable and reloads the list when the removal is rejected', async () => {
+    vi.mocked(stayService.getStayById)
+      .mockResolvedValueOnce(stayWith([primaryGuest, { ...secondaryGuest, version: 1 }]))
+      .mockResolvedValueOnce(stayWith([primaryGuest, { ...secondaryGuest, version: 2 }]));
+    vi.mocked(stayService.removeGuest).mockRejectedValue(new Error('STAY_GUEST_STALE_VERSION'));
+
+    render(<StayGuestManagerDialog stayId={STAY_ID} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText('Verdi Anna')).toBeInTheDocument());
+    const removeButtons = screen.getAllByRole('button', { name: 'btn_remove' });
+    fireEvent.click(removeButtons[removeButtons.length - 1]);
+    fireEvent.click(screen.getByRole('button', { name: 'btn_confirm' }));
+
+    await waitFor(() => expect(addToastMock).toHaveBeenCalledWith(expect.any(String), 'error'));
+    await waitFor(() => expect(stayService.getStayById).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Verdi Anna')).toBeInTheDocument();
+  });
+
+  it('asks for the removal in its own dialog on top of the guest list', async () => {
+    vi.mocked(stayService.getStayById).mockResolvedValue(stayWith([primaryGuest, secondaryGuest]));
+    render(<StayGuestManagerDialog stayId={STAY_ID} onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Verdi Anna')).toBeInTheDocument());
+
+    const removeButtons = screen.getAllByRole('button', { name: 'btn_remove' });
+    fireEvent.click(removeButtons[removeButtons.length - 1]);
+
+    expect(await screen.findAllByRole('dialog')).toHaveLength(2);
+    expect(screen.getByText('confirm_remove_guest')).toBeInTheDocument();
+    expect(screen.getByText('Verdi Anna')).toBeInTheDocument();
+  });
+
+  it('Escape on the removal confirmation closes only the confirmation', async () => {
+    const onClose = vi.fn();
+    vi.mocked(stayService.getStayById).mockResolvedValue(stayWith([primaryGuest, secondaryGuest]));
+    render(<StayGuestManagerDialog stayId={STAY_ID} onClose={onClose} />);
+    await waitFor(() => expect(screen.getByText('Verdi Anna')).toBeInTheDocument());
+    const removeButtons = screen.getAllByRole('button', { name: 'btn_remove' });
+    fireEvent.click(removeButtons[removeButtons.length - 1]);
+    await screen.findByText('confirm_remove_guest');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByText('confirm_remove_guest')).not.toBeInTheDocument());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(stayService.removeGuest).not.toHaveBeenCalled();
+    expect(screen.getByText('Verdi Anna')).toBeInTheDocument();
+  });
+
+  it('keeps the guest when the removal is cancelled', async () => {
+    vi.mocked(stayService.getStayById).mockResolvedValue(stayWith([primaryGuest, secondaryGuest]));
+    render(<StayGuestManagerDialog stayId={STAY_ID} onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Verdi Anna')).toBeInTheDocument());
+    const removeButtons = screen.getAllByRole('button', { name: 'btn_remove' });
+    fireEvent.click(removeButtons[removeButtons.length - 1]);
+    await screen.findByText('confirm_remove_guest');
+
+    fireEvent.click(screen.getByRole('button', { name: 'btn_cancel' }));
+
+    await waitFor(() => expect(screen.queryByText('confirm_remove_guest')).not.toBeInTheDocument());
+    expect(stayService.removeGuest).not.toHaveBeenCalled();
   });
 
   it('promotes a non-primary guest to primary', async () => {

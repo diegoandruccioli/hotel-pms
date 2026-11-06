@@ -26,6 +26,7 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   timeout: 30_000,
+  globalSetup: './e2e-live/session-keepalive.ts',
   reporter: 'html',
   use: {
     baseURL,
@@ -35,6 +36,12 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: /global\.setup\.ts/,
+      // Runs after every project that depends on this one, whatever their result.
+      teardown: 'cleanup',
+    },
+    {
+      name: 'cleanup',
+      testMatch: /global\.teardown\.ts/,
     },
     {
       name: 'live',

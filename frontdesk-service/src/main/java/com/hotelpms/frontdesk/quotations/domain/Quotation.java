@@ -111,9 +111,17 @@ public class Quotation {
     @Column(name = "send_failure_reason", length = MAX_FAILURE_REASON_LENGTH)
     private String sendFailureReason;
 
+    /** UTC time of the last send attempt; unset until then. Drives the per-recipient resend cooldown. */
+    @Column(name = "last_sent_at")
+    private LocalDateTime lastSentAt;
+
     /** The option the guest accepted at conversion time; unset until then. */
     @Column(name = "accepted_option_id")
     private UUID acceptedOptionId;
+
+    /** The reservation created at conversion time; unset until then and for conversions made before V28. */
+    @Column(name = "reservation_id")
+    private UUID reservationId;
 
     @OneToMany(mappedBy = "quotation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt ASC, id ASC")

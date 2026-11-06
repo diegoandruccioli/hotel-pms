@@ -39,5 +39,7 @@ export function usePatchInvoiceInCache() {
         content: old.content.map((r) => (r.invoice.id === updated.id ? { ...r, invoice: updated } : r)),
       },
     );
+    // Billing's KPI cards (billed / to collect) come from the owner summary, which this change affects.
+    queryClient.invalidateQueries({ queryKey: queryKeys.ownerReport.all });
   };
 }

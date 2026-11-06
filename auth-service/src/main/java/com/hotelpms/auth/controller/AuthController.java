@@ -61,7 +61,6 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtService jwtService;
-    private final com.hotelpms.auth.repository.UserAccountRepository userRepository;
 
     /**
      * Endpoint for user login.
@@ -235,9 +234,7 @@ public class AuthController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
 
-            final boolean mustChange = userRepository.findByUsername(username)
-                    .map((@NonNull com.hotelpms.auth.domain.UserAccount u) -> u.isMustChangePassword())
-                    .orElse(false);
+            final boolean mustChange = authService.mustChangePassword(username);
             final Map<String, Object> meBody = new LinkedHashMap<>();
             meBody.put("sub", username);
             meBody.put("username", username);

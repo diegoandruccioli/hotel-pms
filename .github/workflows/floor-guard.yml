@@ -1,0 +1,27 @@
+name: Floor Guard
+
+# Fails a PR that weakens the quality floor: new suppressions, skipped tests, stubs,
+# deleted test files. Non-required check until it proves free of false positives.
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+      - feature/ui-redesign
+      - "epic/**"
+
+permissions:
+  contents: read
+
+jobs:
+  floor-guard:
+    name: "Floor guard — diff against base"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Check the PR diff against the floor
+        run: bash .github/scripts/floor-guard-diff.sh "origin/${{ github.base_ref }}"

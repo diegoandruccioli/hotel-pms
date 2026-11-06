@@ -1,6 +1,6 @@
 import { cn } from '../../utils';
 
-type ActionTone = 'primary' | 'error';
+type ActionTone = 'primary' | 'tertiary' | 'error';
 
 interface M3TableActionLinkProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   tone?: ActionTone;
@@ -8,6 +8,7 @@ interface M3TableActionLinkProps extends React.ButtonHTMLAttributes<HTMLButtonEl
 
 const toneClasses: Record<ActionTone, string> = {
   primary: 'text-primary hover:text-primary/80 focus-visible:ring-primary',
+  tertiary: 'text-tertiary hover:text-tertiary/80 focus-visible:ring-tertiary',
   error: 'text-error hover:text-error/80 focus-visible:ring-error',
 };
 

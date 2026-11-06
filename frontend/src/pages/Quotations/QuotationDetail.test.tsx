@@ -1,9 +1,10 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { QuotationDetail } from './QuotationDetail';
 import { quotationService } from '../../services';
+import { renderWithQuery } from '../../test-utils';
 
 vi.mock('../../services/quotationService');
 
@@ -60,6 +61,7 @@ const DRAFT_QUOTATION = {
     },
   ],
   acceptedOptionId: null,
+  reservationId: null,
   sendFailed: false,
   sendFailureReason: null,
   createdAt: '2026-08-01T00:00:00',
@@ -89,8 +91,8 @@ const MULTI_OPTION_QUOTATION = {
 
 const INITIAL_ENTRIES = ['/quotations/q1'];
 
-const renderDetail = () => render(
-  <MemoryRouter initialEntries={INITIAL_ENTRIES}>
+const renderDetail = (entries: Parameters<typeof MemoryRouter>[0]['initialEntries'] = INITIAL_ENTRIES, initialIndex?: number) => renderWithQuery(
+  <MemoryRouter initialEntries={entries} initialIndex={initialIndex}>
     <Routes>
       <Route path="/quotations/:id" element={<QuotationDetail />} />
     </Routes>
@@ -104,10 +106,19 @@ describe('QuotationDetail', () => {
     vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
     renderDetail();
 
-    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Mario Rossi/ })).toBeInTheDocument());
     expect(screen.getByText('status_draft')).toBeInTheDocument();
     expect(screen.getByText('101')).toBeInTheDocument();
     expect(screen.getByText('Standard')).toBeInTheDocument();
+  });
+
+  it('ends the breadcrumb with the guest name under the quotations list', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail();
+
+    const nav = await screen.findByRole('navigation', { name: 'breadcrumb_label' });
+    expect(within(nav).getByRole('link', { name: 'nav_quotations' })).toHaveAttribute('href', '/quotations');
+    expect(within(nav).getByText('Mario Rossi')).toHaveAttribute('aria-current', 'page');
   });
 
   it('shows an error state with retry on load failure', async () => {
@@ -117,7 +128,7 @@ describe('QuotationDetail', () => {
 
     await waitFor(() => expect(screen.getAllByText('error_loading_quotation').length).toBeGreaterThan(0));
     fireEvent.click(screen.getByText('common:try_again'));
-    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Mario Rossi/ })).toBeInTheDocument());
   });
 
   it('shows the send-failed banner when sendFailed is true', async () => {
@@ -133,7 +144,7 @@ describe('QuotationDetail', () => {
       { ...DRAFT_QUOTATION, status: 'ACCEPTED' } as never,
     );
     renderDetail();
-    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Mario Rossi/ })).toBeInTheDocument());
     expect(screen.queryByText('common:edit')).not.toBeInTheDocument();
   });
 
@@ -212,10 +223,70 @@ describe('QuotationDetail', () => {
   it('back arrow navigates to the quotations list', async () => {
     vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
     renderDetail();
-    await waitFor(() => expect(screen.getByText('Mario Rossi')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Mario Rossi/ })).toBeInTheDocument());
 
-    fireEvent.click(screen.getByLabelText('common:back'));
+    fireEvent.click(screen.getByLabelText('back'));
     expect(mockNavigate).toHaveBeenCalledWith('/quotations');
+  });
+
+  it('back arrow returns to the previous page when the user came from inside the app', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail(['/reservations', '/quotations/q1'], 1);
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /Mario Rossi/ })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText('back'));
+    expect(mockNavigate).toHaveBeenCalledWith(-1);
+  });
+
+  it('links the guest name to the guest profile', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail();
+    const link = await screen.findByRole('link', { name: 'Mario Rossi' });
+    expect(link).toHaveAttribute('href', '/guests');
+  });
+
+  it('shows a prospect name as plain text with no profile link', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(
+      { ...DRAFT_QUOTATION, guestId: null, guestFullName: 'Luigi Verdi', prospectEmail: 'l@x.it' } as never,
+    );
+    renderDetail();
+    await waitFor(() => expect(screen.getAllByText('Luigi Verdi').length).toBeGreaterThan(0));
+    expect(screen.queryByRole('link', { name: 'Luigi Verdi' })).not.toBeInTheDocument();
+  });
+
+  it('links an accepted quotation to the reservation it created', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(
+      { ...DRAFT_QUOTATION, status: 'ACCEPTED', reservationId: 'res7' } as never,
+    );
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_open_reservation')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_open_reservation'));
+    expect(mockNavigate).toHaveBeenCalledWith('/reservations/res7');
+  });
+
+  it('shows no reservation link when none was recorded', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(
+      { ...DRAFT_QUOTATION, status: 'ACCEPTED' } as never,
+    );
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_duplicate')).toBeInTheDocument());
+    expect(screen.queryByText('action_open_reservation')).not.toBeInTheDocument();
+  });
+
+  it('opens the option chooser when the list asks to convert a multi-option quotation', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(MULTI_OPTION_QUOTATION as never);
+    renderDetail([{ pathname: '/quotations/q1', state: { openConvert: true } }]);
+
+    await waitFor(() => expect(screen.getByText('label_choose_option_to_convert')).toBeInTheDocument());
+    expect(mockNavigate).toHaveBeenCalledWith('/quotations/q1', { replace: true, state: null });
+  });
+
+  it('does not open the chooser on a plain visit', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(MULTI_OPTION_QUOTATION as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_convert')).toBeInTheDocument());
+    expect(screen.queryByText('label_choose_option_to_convert')).not.toBeInTheDocument();
   });
 
   it('edit button navigates to the edit form for a DRAFT quotation', async () => {
@@ -247,7 +318,7 @@ describe('QuotationDetail', () => {
 
     fireEvent.click(screen.getByText('action_decline'));
     expect(screen.getByText('confirm_decline')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:cancel'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByText('cancel'));
 
     expect(screen.queryByText('confirm_decline')).not.toBeInTheDocument();
     expect(quotationService.declineQuotation).not.toHaveBeenCalled();
@@ -260,7 +331,7 @@ describe('QuotationDetail', () => {
 
     fireEvent.click(screen.getByText('action_delete'));
     expect(screen.getByText('confirm_delete')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('common:cancel'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByText('cancel'));
 
     expect(screen.queryByText('confirm_delete')).not.toBeInTheDocument();
     expect(quotationService.deleteQuotation).not.toHaveBeenCalled();
@@ -276,7 +347,7 @@ describe('QuotationDetail', () => {
 
     fireEvent.click(screen.getByText('action_decline'));
     await waitFor(() => expect(screen.getByText('confirm_decline')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
 
     await waitFor(() => expect(quotationService.declineQuotation).toHaveBeenCalledWith('q1'));
   });
@@ -292,7 +363,7 @@ describe('QuotationDetail', () => {
     await waitFor(() => expect(screen.getByText('action_decline')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('action_decline'));
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
 
     await waitFor(() => expect(quotationService.declineQuotation).toHaveBeenCalledWith('q1'));
   });
@@ -305,7 +376,7 @@ describe('QuotationDetail', () => {
 
     fireEvent.click(screen.getByText('action_delete'));
     await waitFor(() => expect(screen.getByText('confirm_delete')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/quotations'));
   });
@@ -318,7 +389,7 @@ describe('QuotationDetail', () => {
 
     fireEvent.click(screen.getByText('action_delete'));
     await waitFor(() => expect(screen.getByText('confirm_delete')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('common:confirm'));
+    fireEvent.click(screen.getByText('confirm'));
 
     await waitFor(() => expect(quotationService.deleteQuotation).toHaveBeenCalledWith('q1'));
     expect(mockNavigate).not.toHaveBeenCalledWith('/quotations');
@@ -356,7 +427,15 @@ describe('QuotationDetail', () => {
   it('passes axe accessibility check', async () => {
     vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
     const { container } = renderDetail();
-    await waitFor(() => screen.getByText('Mario Rossi'));
+    await waitFor(() => screen.getByRole('heading', { level: 1, name: /Mario Rossi/ }));
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('shows the stay dates and validity in the locale format', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('9/1/2026')).toBeInTheDocument());
+    expect(screen.getByText('9/3/2026')).toBeInTheDocument();
+    expect(screen.getByText('8/25/2026')).toBeInTheDocument();
   });
 });

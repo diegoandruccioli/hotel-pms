@@ -2,7 +2,9 @@ package com.hotelpms.guest.client;
 
 import com.hotelpms.guest.client.dto.GuestInvoiceClientResponse;
 import com.hotelpms.guest.client.dto.InvoiceSummaryClientResponse;
+import com.hotelpms.guest.exception.ExportSourceUnavailableException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import org.slf4j.LoggerFactory;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -54,14 +56,19 @@ public interface BillingServiceClient {
     List<InvoiceSummaryClientResponse> getInvoiceHistory(@PathVariable("guestId") UUID guestId);
 
     /**
-     * Fallback: returns an empty list so the export completes with a partial result.
+     * Fail-closed fallback: an empty list would be indistinguishable from "no invoices" and
+     * produce a silently incomplete GDPR export, so the export fails instead.
      *
      * @param guestId   the guest UUID
      * @param throwable the cause of the failure
-     * @return empty list
+     * @return never returns normally
+     * @throws ExportSourceUnavailableException always
      */
     default List<InvoiceSummaryClientResponse> invoiceHistoryFallback(
             final UUID guestId, final Throwable throwable) {
-        return List.of();
+        LoggerFactory.getLogger(BillingServiceClient.class).warn(
+                "[BillingServiceClient] invoice history unavailable for GDPR export guestId={} cause={}",
+                guestId, throwable.getClass().getSimpleName());
+        throw new ExportSourceUnavailableException("invoices", throwable);
     }
 }

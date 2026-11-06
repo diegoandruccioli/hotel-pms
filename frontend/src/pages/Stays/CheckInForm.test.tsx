@@ -57,9 +57,24 @@ const mockStayResponse = (overrides: Partial<StayResponse> = {}): StayResponse =
   ...overrides,
 });
 
+const baseReservation: ReservationResponse = {
+  id: 'res123',
+  guestId: 'g1',
+  checkInDate: '2999-06-01',
+  checkOutDate: '2999-06-04',
+  status: 'CONFIRMED',
+  expectedGuests: 1,
+  lineItems: [{ id: 'li1', roomId: 'r1', price: 90, active: true, createdAt: '', updatedAt: '' }],
+  active: true,
+  createdAt: '2026-01-01T00:00:00',
+  updatedAt: '2026-01-01T00:00:00',
+  confirmationEmailFailed: false,
+};
+
 describe('CheckInForm', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(reservationService.getReservationById).mockResolvedValue(baseReservation);
     // Lookup tables return empty arrays (non-blocking; form still renders)
     vi.mocked(stayService.getLookupStati).mockResolvedValue([]);
     vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([]);
@@ -125,17 +140,9 @@ describe('CheckInForm', () => {
     // direct navigation, bookmark, or page refresh lost them entirely. Now falls back to
     // fetching the reservation itself.
     const mockReservation = (overrides: Partial<ReservationResponse> = {}): ReservationResponse => ({
-      id: 'res123',
-      guestId: 'g1',
+      ...baseReservation,
       checkInDate: '2026-06-01',
       checkOutDate: '2026-06-02',
-      status: 'CONFIRMED',
-      expectedGuests: 1,
-      lineItems: [{ id: 'li1', roomId: 'r1', price: 90, active: true, createdAt: '', updatedAt: '' }],
-      active: true,
-      createdAt: '2026-01-01T00:00:00',
-      updatedAt: '2026-01-01T00:00:00',
-      confirmationEmailFailed: false,
       ...overrides,
     });
 
@@ -276,25 +283,18 @@ describe('CheckInForm', () => {
       expect(stayService.createStay).not.toHaveBeenCalled();
     });
 
-    it('submits successfully once all required Alloggiati fields are filled, then navigates to /stays', async () => {
+    /** Renders the form with the given router state and fills every required Alloggiati field. */
+    const fillRequiredFieldsAndSubmit = async (state: Record<string, unknown>) => {
       vi.mocked(stayService.getLookupStati).mockResolvedValue([ITALIA_STATO, FRANCIA_STATO]);
       vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([PASOR_TIPDOC]);
       vi.mocked(stayService.searchLookupComuni).mockResolvedValue([FIANO_COMUNE]);
-      // cityTaxWarning on the response exercises the post-checkin warning toast
-      // (Parte 5.3) as part of this same full-flow test, rather than duplicating
-      // the whole fill sequence in a second test just to reach the same call.
-      vi.mocked(stayService.createStay).mockResolvedValue(mockStayResponse({ cityTaxWarning: 'NO_RATE_FOR_DATE' }));
 
       render(
-        <MemoryRouter
-          initialEntries={[{
-            pathname: '/stays/checkin/res123',
-            state: { guestId: 'g1', roomId: 'r1', expectedGuests: 1 },
-          }]}
-        >
+        <MemoryRouter initialEntries={[{ pathname: '/stays/checkin/res123', state }]}>
           <Routes>
             <Route path="/stays/checkin/:reservationId" element={<CheckInForm />} />
             <Route path="/stays" element={<div>stays_page</div>} />
+            <Route path="/reservations/groups/:id" element={<div>group_page</div>} />
           </Routes>
         </MemoryRouter>,
       );
@@ -313,6 +313,15 @@ describe('CheckInForm', () => {
       await selectComune('label_comune_rilascio_doc');
 
       fireEvent.submit(document.querySelector('form')!);
+    };
+
+    it('submits successfully once all required Alloggiati fields are filled, then navigates to /stays', async () => {
+      // cityTaxWarning on the response exercises the post-checkin warning toast
+      // (Parte 5.3) as part of this same full-flow test, rather than duplicating
+      // the whole fill sequence in a second test just to reach the same call.
+      vi.mocked(stayService.createStay).mockResolvedValue(mockStayResponse({ cityTaxWarning: 'NO_RATE_FOR_DATE' }));
+
+      await fillRequiredFieldsAndSubmit({ guestId: 'g1', roomId: 'r1', expectedGuests: 1 });
 
       await waitFor(() => {
         expect(stayService.createStay).toHaveBeenCalledWith(expect.objectContaining({
@@ -335,6 +344,17 @@ describe('CheckInForm', () => {
       expect(mockAddToast).toHaveBeenCalledWith('city_tax_post_checkin_warning_no_rate_for_date', 'info');
     }, 15000); // multi-field form fill + several async lookups — tight under --coverage instrumentation overhead
 
+    it('returns to the page named by returnTo (a group) instead of /stays after a successful check-in', async () => {
+      vi.mocked(stayService.createStay).mockResolvedValue(mockStayResponse());
+
+      await fillRequiredFieldsAndSubmit({
+        guestId: 'g1', roomId: 'r1', expectedGuests: 1, returnTo: '/reservations/groups/grp1',
+      });
+
+      await waitFor(() => expect(screen.getByText('group_page')).toBeInTheDocument());
+      expect(screen.queryByText('stays_page')).not.toBeInTheDocument();
+    }, 15000);
+
     it('shows the API error detail when the check-in request fails', async () => {
       vi.mocked(stayService.getLookupStati).mockResolvedValue([FRANCIA_STATO]);
       vi.mocked(stayService.createStay).mockRejectedValue({
@@ -345,7 +365,11 @@ describe('CheckInForm', () => {
 
       // Switch the primary guest to FAMILIARE so no document is required, simplifying the path to submit.
       fireEvent.change(screen.getByLabelText(/^label_guest_type/, { selector: 'select' }), { target: { value: 'FAMILIARE' } });
+      fireEvent.change(screen.getByLabelText('label_first_name'), { target: { value: 'Mario' } });
+      fireEvent.change(screen.getByLabelText('label_last_name'), { target: { value: 'Rossi' } });
+      fireEvent.change(screen.getByLabelText(/^label_gender/, { selector: 'select' }), { target: { value: '1' } });
       fireEvent.change(screen.getByLabelText('label_date_of_birth'), { target: { value: '1990-01-01' } });
+      await selectStato('label_citizenship', 'FRANCIA');
       await selectStato('label_stato_nascita', 'FRANCIA');
 
       fireEvent.submit(container.querySelector('form')!);
@@ -353,6 +377,75 @@ describe('CheckInForm', () => {
       await waitFor(() => {
         expect(screen.getByText('ROOM_ALREADY_OCCUPIED')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('strict submit and checklist', () => {
+    // The mocked translator returns bare keys, so these assert on keys, not interpolated values.
+    async function selectStato(label: string, statoLabel: string) {
+      const combo = screen.getByLabelText(new RegExp(`^${label}`), { selector: 'input' });
+      fireEvent.change(combo, { target: { value: statoLabel.slice(0, 3) } });
+      fireEvent.mouseDown(await screen.findByRole('option', { name: new RegExp(statoLabel) }));
+    }
+
+    it('blocks submit with the required-fields error once the place data is filled', async () => {
+      vi.mocked(stayService.getLookupStati).mockResolvedValue([FRANCIA_STATO]);
+      const { container } = renderComponent(1);
+      await waitFor(() => expect(screen.getByText('checkin_title')).toBeInTheDocument());
+
+      fireEvent.change(screen.getByLabelText(/^label_guest_type/, { selector: 'select' }), { target: { value: 'FAMILIARE' } });
+      fireEvent.change(screen.getByLabelText('label_date_of_birth'), { target: { value: '1990-01-01' } });
+      await selectStato('label_stato_nascita', 'FRANCIA');
+      fireEvent.submit(container.querySelector('form')!);
+
+      expect(await screen.findByText('err_guest_fields_required')).toBeInTheDocument();
+      expect(stayService.createStay).not.toHaveBeenCalled();
+    });
+
+    it('shows the checklist and flips the guest to complete once every field is filled', async () => {
+      vi.mocked(stayService.getLookupStati).mockResolvedValue([FRANCIA_STATO]);
+      renderComponent(1);
+      await waitFor(() => expect(screen.getByText('checklist_title', { selector: 'h2' })).toBeInTheDocument());
+
+      // header chip + checklist detail
+      expect(screen.getAllByText('checklist_status_missing')).toHaveLength(2);
+      expect(screen.getByText('checklist_progress')).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText(/^label_guest_type/, { selector: 'select' }), { target: { value: 'FAMILIARE' } });
+      fireEvent.change(screen.getByLabelText('label_first_name'), { target: { value: 'Mario' } });
+      fireEvent.change(screen.getByLabelText('label_last_name'), { target: { value: 'Rossi' } });
+      fireEvent.change(screen.getByLabelText(/^label_gender/, { selector: 'select' }), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText('label_date_of_birth'), { target: { value: '1990-01-01' } });
+      await selectStato('label_citizenship', 'FRANCIA');
+      await selectStato('label_stato_nascita', 'FRANCIA');
+
+      await waitFor(() => expect(screen.getAllByText('checklist_status_complete')).toHaveLength(2));
+      expect(screen.queryByText('checklist_status_missing')).not.toBeInTheDocument();
+    });
+
+    it('shows the reservation dates in the header subtitle', async () => {
+      renderComponent(1);
+      expect(await screen.findByText('checkin_subtitle')).toBeInTheDocument();
+    });
+
+    it('reports the tourist tax as configured once the check resolves', async () => {
+      renderComponent(1);
+      expect(await screen.findByText('checklist_city_tax_configured')).toBeInTheDocument();
+    });
+
+    it('prefills the document expiry from the profile and blocks submit when it has passed', async () => {
+      vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([{ codice: 'CARTE', descrizione: 'CARTA' }]);
+      vi.mocked(guestService.getGuestById).mockResolvedValue({
+        id: 'g1', firstName: 'Anna', lastName: 'Bianchi', createdAt: '', updatedAt: '', active: true,
+        identityDocuments: [{
+          id: 'd', documentType: 'NATIONAL_ID', documentNumber: 'CA1', issueDate: '1990-01-01',
+          expiryDate: '2000-01-01', createdAt: '', updatedAt: '', active: true,
+        }],
+      } as GuestResponseDTO);
+      renderComponent(1);
+
+      await waitFor(() => expect(screen.getByLabelText('label_doc_expiry')).toHaveValue('2000-01-01'));
+      expect(await screen.findByText('checklist_doc_expired')).toBeInTheDocument();
     });
   });
 
@@ -416,6 +509,24 @@ describe('CheckInForm', () => {
       });
       expect(screen.getByLabelText('label_first_name')).toHaveValue('Anna');
       expect(screen.getByLabelText('label_last_name')).toHaveValue('Bianchi');
+    });
+
+    it('pre-fills the Alloggiati document type from a national ID in the guest profile', async () => {
+      vi.mocked(stayService.getLookupTipdoc).mockResolvedValue([
+        { codice: 'CARTE', descrizione: "CARTA D'IDENTITA'" },
+      ]);
+      vi.mocked(stayService.getLastCompletedStayForGuest).mockResolvedValue(null);
+      vi.mocked(guestService.getGuestById).mockResolvedValue(mockProfile({
+        identityDocuments: [{
+          id: 'doc2', documentType: 'NATIONAL_ID', documentNumber: 'CA00001', issueDate: '2020-01-01',
+          expiryDate: '2030-01-01', createdAt: '2020-01-01T00:00:00', updatedAt: '2020-01-01T00:00:00', active: true,
+        }],
+      }));
+      renderComponent(1);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/^label_doc_type/, { selector: 'select' })).toHaveValue('CARTE');
+      });
     });
 
     it('does not show a prefill banner when the profile lookup fails and there is no prior stay', async () => {

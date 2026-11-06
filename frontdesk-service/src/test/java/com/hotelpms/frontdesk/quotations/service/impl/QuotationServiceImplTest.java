@@ -36,17 +36,23 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -85,6 +91,13 @@ class QuotationServiceImplTest {
     private static final LocalDate CHECK_OUT = LocalDate.now().plusDays(13);
     private static final LocalDate VALID_UNTIL = LocalDate.now().plusDays(5);
     private static final byte[] PDF_BYTES = {1, 2, 3};
+    private static final String REMOVED_ROOM_PLACEHOLDER = "—";
+    private static final String NOT_SENDABLE = "QUOTATION_NOT_SENDABLE";
+    private static final String RESEND_TOO_SOON = "QUOTATION_RESEND_TOO_SOON";
+    private static final String PROSPECT_EMAIL = "prospect@example.com";
+    private static final LocalDateTime COOLDOWN_START = LocalDateTime.ofInstant(
+            Instant.parse("2026-10-20T11:50:00Z"), ZoneOffset.UTC);
+    private static final Instant NOW = Instant.parse("2026-10-20T12:00:00Z");
 
     @Mock
     private QuotationRepository quotationRepository;
@@ -102,6 +115,8 @@ class QuotationServiceImplTest {
     private ReservationService reservationService;
     @Mock
     private PdfTemplateRenderer pdfTemplateRenderer;
+    @Mock
+    private Clock clock;
 
     @InjectMocks
     private QuotationServiceImpl quotationService;
@@ -113,6 +128,8 @@ class QuotationServiceImplTest {
         auth.setDetails(HOTEL_ID.toString());
         SecurityContextHolder.getContext().setAuthentication(auth);
 
+        lenient().when(clock.instant()).thenReturn(NOW);
+        lenient().when(clock.getZone()).thenReturn(ZoneOffset.UTC);
         lenient().when(hotelSettingsService.getOrCreate(HOTEL_ID)).thenReturn(
                 new HotelSettingsResponse(HOTEL_ID, false, HOTEL_NAME, null, null, null, null, null, false,
                         true, true, null, null, null, null, null, null, null, "Europe/Rome", 4));
@@ -120,6 +137,7 @@ class QuotationServiceImplTest {
                 .thenReturn(PDF_BYTES);
         lenient().when(roomService.getRoomById(ROOM_ID, HOTEL_ID)).thenReturn(room());
         lenient().when(roomService.getRoomById(ROOM_ID_2, HOTEL_ID)).thenReturn(room2());
+        lenient().when(roomService.getActiveRoomsByIds(any(), eq(HOTEL_ID))).thenReturn(List.of(room(), room2()));
     }
 
     @AfterEach
@@ -357,10 +375,106 @@ class QuotationServiceImplTest {
 
     @Test
     void sendQuotationEmailOnDeclinedQuotationThrowsConflict() {
-        final Quotation quotation = quotationEntity(QuotationStatus.DECLINED, VALID_UNTIL);
+        assertSendRefused(QuotationStatus.DECLINED, VALID_UNTIL, NOT_SENDABLE);
+    }
+
+    @Test
+    void sendQuotationEmailOnAcceptedQuotationThrowsConflict() {
+        assertSendRefused(QuotationStatus.ACCEPTED, VALID_UNTIL, NOT_SENDABLE);
+    }
+
+    @Test
+    void sendQuotationEmailOnExpiredQuotationThrowsConflict() {
+        assertSendRefused(QuotationStatus.SENT, LocalDate.now().minusDays(1), NOT_SENDABLE);
+    }
+
+    private void assertSendRefused(final QuotationStatus status, final LocalDate validUntil, final String code) {
+        final Quotation quotation = quotationEntity(status, validUntil);
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
 
-        assertThrows(ConflictException.class, () -> quotationService.sendQuotationEmail(QUOTATION_ID));
+        final ConflictException ex = assertThrows(
+                ConflictException.class, () -> quotationService.sendQuotationEmail(QUOTATION_ID));
+
+        assertEquals(code, ex.getMessage());
+        verify(notificationClient, never()).sendQuotation(any());
+    }
+
+    @Test
+    void sendQuotationEmailToAGuestMailedInsideTheCooldownThrowsConflict() {
+        final Quotation quotation = quotationEntity(QuotationStatus.SENT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(quotationRepository.existsByHotelIdAndGuestIdAndLastSentAtAfter(
+                HOTEL_ID, GUEST_ID, COOLDOWN_START)).thenReturn(true);
+
+        final ConflictException ex = assertThrows(
+                ConflictException.class, () -> quotationService.sendQuotationEmail(QUOTATION_ID));
+
+        assertEquals(RESEND_TOO_SOON, ex.getMessage());
+        verify(notificationClient, never()).sendQuotation(any());
+    }
+
+    @Test
+    void sendQuotationEmailToAProspectMailedInsideTheCooldownThrowsConflict() {
+        // e.g. a duplicate of an already-sent quotation: same prospect, fresh row, no lastSentAt of its own.
+        final Quotation quotation = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        quotation.setGuestId(null);
+        quotation.setProspectEmail(PROSPECT_EMAIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(quotationRepository.existsByHotelIdAndProspectEmailIgnoreCaseAndLastSentAtAfter(
+                HOTEL_ID, PROSPECT_EMAIL, COOLDOWN_START)).thenReturn(true);
+
+        final ConflictException ex = assertThrows(
+                ConflictException.class, () -> quotationService.sendQuotationEmail(QUOTATION_ID));
+
+        assertEquals(RESEND_TOO_SOON, ex.getMessage());
+        verify(notificationClient, never()).sendQuotation(any());
+    }
+
+    @Test
+    void sendQuotationEmailOutsideTheCooldownStampsTheSendTime() {
+        final Quotation quotation = quotationEntity(QuotationStatus.SENT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(notificationClient.sendQuotation(any())).thenReturn(true);
+        when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        quotationService.sendQuotationEmail(QUOTATION_ID);
+
+        assertEquals(LocalDateTime.ofInstant(NOW, ZoneOffset.UTC), quotation.getLastSentAt());
+        verify(quotationRepository).saveAndFlush(quotation);
+        verify(notificationClient).sendQuotation(any());
+    }
+
+    @Test
+    void sendQuotationEmailThatFailsStillConsumesTheCooldown() {
+        // The fallback also returns false on a timeout, where the mail may have gone out anyway.
+        final Quotation quotation = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(notificationClient.sendQuotation(any())).thenReturn(false);
+        when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        quotationService.sendQuotationEmail(QUOTATION_ID);
+
+        assertEquals(LocalDateTime.ofInstant(NOW, ZoneOffset.UTC), quotation.getLastSentAt());
+    }
+
+    @Test
+    void sendQuotationEmailLosingAConcurrentSendThrowsConflictWithoutMailing() {
+        final Quotation quotation = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        when(quotationRepository.saveAndFlush(any(Quotation.class)))
+                .thenThrow(new ObjectOptimisticLockingFailureException(Quotation.class, QUOTATION_ID));
+
+        final ConflictException ex = assertThrows(
+                ConflictException.class, () -> quotationService.sendQuotationEmail(QUOTATION_ID));
+
+        assertEquals(RESEND_TOO_SOON, ex.getMessage());
+        verify(notificationClient, never()).sendQuotation(any());
     }
 
     @Test
@@ -369,7 +483,7 @@ class QuotationServiceImplTest {
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
         final ReservationResponse reservationResponse = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null,
                 2, 0, CHECK_IN, CHECK_OUT, com.hotelpms.frontdesk.reservations.domain.ReservationStatus.CONFIRMED,
-                null, true, null, null, false, null, null);
+                null, true, null, null, false, null, null, null);
         when(reservationService.createReservationFromPricedRooms(
                 eq(GUEST_ID), eq(CHECK_IN), eq(CHECK_OUT), eq(2), any()))
                 .thenReturn(reservationResponse);
@@ -380,6 +494,7 @@ class QuotationServiceImplTest {
         assertNotNull(result);
         assertEquals(QuotationStatus.ACCEPTED, quotation.getStatus());
         assertEquals(OPTION_ID, quotation.getAcceptedOptionId());
+        assertEquals(result.id(), quotation.getReservationId());
         verify(guestClient, never()).createGuest(any());
     }
 
@@ -410,7 +525,7 @@ class QuotationServiceImplTest {
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
         final ReservationResponse reservationResponse = new ReservationResponse(UUID.randomUUID(), GUEST_ID, null,
                 2, 0, CHECK_IN, CHECK_OUT, com.hotelpms.frontdesk.reservations.domain.ReservationStatus.CONFIRMED,
-                null, true, null, null, false, null, null);
+                null, true, null, null, false, null, null, null);
         when(reservationService.createReservationFromPricedRooms(
                 eq(GUEST_ID), eq(CHECK_IN), eq(CHECK_OUT), eq(2), any()))
                 .thenReturn(reservationResponse);
@@ -453,7 +568,7 @@ class QuotationServiceImplTest {
                 .thenReturn(new GuestResponse(newGuestId, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
         final ReservationResponse reservationResponse = new ReservationResponse(UUID.randomUUID(), newGuestId, null,
                 2, 0, CHECK_IN, CHECK_OUT, com.hotelpms.frontdesk.reservations.domain.ReservationStatus.CONFIRMED,
-                null, true, null, null, false, null, null);
+                null, true, null, null, false, null, null, null);
         when(reservationService.createReservationFromPricedRooms(
                 eq(newGuestId), eq(CHECK_IN), eq(CHECK_OUT), eq(2), any()))
                 .thenReturn(reservationResponse);
@@ -553,5 +668,96 @@ class QuotationServiceImplTest {
         assertEquals(1, result.getTotalElements());
         assertEquals(GUEST_FIRST_NAME + " " + GUEST_LAST_NAME, result.getContent().get(0).guestFullName());
         verify(guestClient, never()).getGuestsBatch(any());
+    }
+
+    // A room soft-deleted after it was quoted must not break reading the quotation (or the whole list page).
+
+    private void roomWasRemoved() {
+        // The lenient lookup never throws: a removed room is just absent from the result.
+        lenient().when(roomService.getActiveRoomsByIds(any(), eq(HOTEL_ID))).thenReturn(List.of(room2()));
+        // Strict paths still hit the throwing lookup.
+        lenient().when(roomService.getRoomById(ROOM_ID, HOTEL_ID)).thenThrow(new NotFoundException("ROOM_NOT_FOUND" + ROOM_ID));
+    }
+
+    @Test
+    void allQuotationsWithARemovedRoomShowsPlaceholdersInsteadOfFailing() {
+        final Quotation quotation = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        when(quotationRepository.findAllByHotelId(eq(HOTEL_ID), any())).thenReturn(new PageImpl<>(List.of(quotation)));
+        when(guestClient.getGuestsBatch(List.of(GUEST_ID)))
+                .thenReturn(List.of(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL)));
+        roomWasRemoved();
+
+        final Page<QuotationResponse> result = quotationService.getAllQuotations(PageRequest.of(0, 10));
+
+        final var lineItem = result.getContent().get(0).options().get(0).lineItems().get(0);
+        assertEquals(REMOVED_ROOM_PLACEHOLDER, lineItem.roomNumber());
+        assertEquals(REMOVED_ROOM_PLACEHOLDER, lineItem.roomTypeName());
+        assertEquals(ROOM_ID, lineItem.roomId());
+        assertEquals(NIGHTLY_PRICE.multiply(BigDecimal.valueOf(3)), lineItem.price());
+    }
+
+    @Test
+    void allQuotationsKeepsTheRoomsThatStillExistNextToARemovedOne() {
+        final Quotation removed = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        final Quotation intact = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        intact.getOptions().get(0).getLineItems().get(0).setRoomId(ROOM_ID_2);
+        when(quotationRepository.findAllByHotelId(eq(HOTEL_ID), any())).thenReturn(new PageImpl<>(List.of(removed, intact)));
+        when(guestClient.getGuestsBatch(List.of(GUEST_ID)))
+                .thenReturn(List.of(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL)));
+        roomWasRemoved();
+
+        final Page<QuotationResponse> result = quotationService.getAllQuotations(PageRequest.of(0, 10));
+
+        assertEquals(REMOVED_ROOM_PLACEHOLDER, result.getContent().get(0).options().get(0).lineItems().get(0).roomNumber());
+        assertEquals(ROOM_NUMBER_2, result.getContent().get(1).options().get(0).lineItems().get(0).roomNumber());
+    }
+
+    @Test
+    void quotationByIdWithARemovedRoomShowsPlaceholders() {
+        final Quotation quotation = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        roomWasRemoved();
+
+        final QuotationResponse response = quotationService.getQuotationById(QUOTATION_ID);
+
+        assertEquals(REMOVED_ROOM_PLACEHOLDER, response.options().get(0).lineItems().get(0).roomNumber());
+    }
+
+    @Test
+    void quotationPdfWithARemovedRoomStillRenders() {
+        final Quotation quotation = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        roomWasRemoved();
+
+        assertArrayEquals(PDF_BYTES, quotationService.getQuotationPdf(QUOTATION_ID));
+    }
+
+    @Test
+    void declineQuotationWithARemovedRoomStillDeclines() {
+        final Quotation quotation = quotationEntity(QuotationStatus.SENT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(quotationRepository.save(any(Quotation.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        roomWasRemoved();
+
+        assertEquals(QuotationStatus.DECLINED, quotationService.declineQuotation(QUOTATION_ID).status());
+    }
+
+    @Test
+    void sendQuotationEmailWithARemovedRoomStillFails() {
+        // Sending is not a read: never mail a quote for a room that no longer exists.
+        final Quotation quotation = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
+        roomWasRemoved();
+
+        assertThrows(NotFoundException.class, () -> quotationService.sendQuotationEmail(QUOTATION_ID));
+        verify(notificationClient, never()).sendQuotation(any());
     }
 }

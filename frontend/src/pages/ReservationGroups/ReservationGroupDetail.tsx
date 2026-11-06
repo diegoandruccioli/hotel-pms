@@ -1,0 +1,219 @@
+import { useFormatters } from '../../hooks';
+import { useState, useCallback, useMemo } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import type { GroupCheckoutOutcome } from '../../types';
+import { MaterialIcon } from '../../components/MaterialIcon';
+import { PageHeader } from '../../components/PageHeader';
+import { M3Button } from '../../components/m3';
+import { M3Card } from '../../components/m3';
+import { M3StatusChip } from '../../components/m3';
+import { M3Dialog } from '../../components/m3';
+import { M3ConfirmDialog } from '../../components/m3';
+import { M3LoadingState } from '../../components/m3';
+import { M3ErrorState } from '../../components/m3';
+import { useTranslation } from 'react-i18next';
+import { getErrorMessage, groupStatusTone } from '../../utils';
+import { useToastStore } from '../../store';
+import {
+  useReservationGroup, useCancelReservationGroup, useCheckoutReservationGroup, useRoomsLookup,
+} from '../../hooks/queries';
+import { RoomingListCard } from './RoomingListCard';
+
+const LINK_CLASS =
+  'text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs';
+
+export const ReservationGroupDetail = () => {
+  const { t } = useTranslation('common');
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const addToast = useToastStore((s) => s.addToast);
+
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [confirmingCheckout, setConfirmingCheckout] = useState(false);
+  const [checkoutOutcomes, setCheckoutOutcomes] = useState<GroupCheckoutOutcome[] | null>(null);
+
+  const { data: group, isLoading, error: queryError, refetch } = useReservationGroup(id);
+  const { data: rooms } = useRoomsLookup();
+  const cancelGroup = useCancelReservationGroup();
+  const checkoutGroup = useCheckoutReservationGroup();
+  const error = queryError ? getErrorMessage(queryError, t('group_load_failed')) : null;
+
+  const { formatCurrency, formatDate } = useFormatters();
+
+  const handleCancelRequest = useCallback(() => setConfirmingCancel(true), []);
+  const handleCancelDialogClose = useCallback(() => setConfirmingCancel(false), []);
+  const handleCancelConfirm = useCallback(async () => {
+    if (!id || !group) return;
+    try {
+      await cancelGroup.mutateAsync({ id, version: group.version });
+      addToast(t('group_cancelled_success'), 'success');
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('group_cancel_failed')), 'error');
+    } finally {
+      setConfirmingCancel(false);
+    }
+  }, [id, group, cancelGroup, addToast, t]);
+
+  const handleCheckoutRequest = useCallback(() => setConfirmingCheckout(true), []);
+  const handleCheckoutDialogClose = useCallback(() => {
+    setConfirmingCheckout(false);
+    setCheckoutOutcomes(null);
+  }, []);
+  const handleCheckoutConfirm = useCallback(async () => {
+    if (!id) return;
+    try {
+      const outcomes = await checkoutGroup.mutateAsync(id);
+      setCheckoutOutcomes(outcomes);
+      const failures = outcomes.filter((o) => !o.success).length;
+      if (failures === 0) {
+        addToast(t('group_checkout_success'), 'success');
+      } else {
+        addToast(t('group_checkout_partial', { count: failures }), 'error');
+      }
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, t('group_checkout_failed')), 'error');
+      setConfirmingCheckout(false);
+    }
+  }, [id, checkoutGroup, addToast, t]);
+
+  const handleBackToList = useCallback(() => navigate('/reservations/groups'), [navigate]);
+
+  const masterFolioState = useMemo(() => ({ invoiceId: group?.masterFolioInvoiceId }), [group?.masterFolioInvoiceId]);
+  const contactGuestHref = `/guests?search=${encodeURIComponent(group?.contactGuestName ?? '')}`;
+
+  const canCancel = useMemo(
+    () => !!group && group.status !== 'CANCELLED' && group.status !== 'CHECKED_OUT', [group]);
+  const canCheckout = useMemo(
+    () => !!group && group.members.some((m) => m.status === 'CHECKED_IN'), [group]);
+
+  if (isLoading) return <M3LoadingState label={t('loading')} />;
+  if (error || !group) {
+    return (
+      <M3ErrorState
+        title={t('group_load_failed')}
+        message={error ?? t('group_not_found')}
+        retryLabel={t('try_again')}
+        onRetry={refetch}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        icon="groups"
+        title={group.name}
+        crumbLabel={group.name}
+        titleAdornment={
+          <M3StatusChip
+            label={t(`group_status_${group.status.toLowerCase()}`)}
+            tone={groupStatusTone[group.status]}
+          />
+        }
+        onBack={handleBackToList}
+        actions={
+          <>
+            {canCheckout && (
+              <M3Button variant="tonal" icon="logout" onClick={handleCheckoutRequest}>
+                {t('checkout_group')}
+              </M3Button>
+            )}
+            {canCancel && (
+              <M3Button variant="outlined" icon="cancel" onClick={handleCancelRequest}>
+                {t('cancel_group')}
+              </M3Button>
+            )}
+          </>
+        }
+      />
+
+      <M3Card variant="solid" className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+        <div>
+          <p className="text-on-surface-variant">{t('company_name')}</p>
+          <p className="font-medium">{group.companyName ?? '—'}</p>
+        </div>
+        <div>
+          <p className="text-on-surface-variant">{t('contact_guest')}</p>
+          <Link to={contactGuestHref} className={LINK_CLASS}>{group.contactGuestName}</Link>
+        </div>
+        <div>
+          <p className="text-on-surface-variant">{t('label_checkin_date')} / {t('label_checkout_date')}</p>
+          <p className="font-medium">{formatDate(group.checkInDate)} — {formatDate(group.checkOutDate)}</p>
+        </div>
+        <div>
+          <p className="text-on-surface-variant">{t('group_rate_per_night')}</p>
+          <p className="font-medium">{formatCurrency(group.groupRatePerNight)}</p>
+        </div>
+        <div>
+          <p className="text-on-surface-variant">{t('master_folio')}</p>
+          {group.masterFolioInvoiceId ? (
+            <p className="font-medium">
+              <span>{t('master_folio_open')}</span>
+              {' · '}
+              <Link to="/billing" state={masterFolioState} className={LINK_CLASS}>
+                {t('master_folio_open_invoice')}
+              </Link>
+            </p>
+          ) : (
+            <p className="font-medium">{t('master_folio_none')}</p>
+          )}
+        </div>
+        {group.notes && (
+          <div className="sm:col-span-2 md:col-span-3">
+            <p className="text-on-surface-variant">{t('notes')}</p>
+            <p className="font-medium whitespace-pre-wrap">{group.notes}</p>
+          </div>
+        )}
+      </M3Card>
+
+      <RoomingListCard groupId={group.id} members={group.members} rooms={rooms} />
+
+      {confirmingCancel && (
+        <M3ConfirmDialog
+          title={t('cancel_group')}
+          titleId="confirm-cancel-group-dialog"
+          message={t('cancel_group_confirm')}
+          onConfirm={handleCancelConfirm}
+          onCancel={handleCancelDialogClose}
+          loading={cancelGroup.isPending}
+        />
+      )}
+
+      {confirmingCheckout && (
+        <M3Dialog open title={t('checkout_group')} titleId="confirm-checkout-group-dialog" onClose={handleCheckoutDialogClose}>
+          {checkoutOutcomes ? (
+            <div className="space-y-3">
+              <ul className="space-y-1 text-sm">
+                {checkoutOutcomes.map((outcome) => (
+                  <li key={outcome.reservationId} className="flex items-center gap-2">
+                    <MaterialIcon
+                      name={outcome.success ? 'check_circle' : 'error'}
+                      size={16}
+                      className={outcome.success ? 'text-tertiary' : 'text-error'}
+                    />
+                    <span>{outcome.success ? t('checkout_room_success') : (outcome.errorCode ? t(outcome.errorCode, { ns: 'errors', defaultValue: outcome.errorCode }) : t('checkout_room_failed'))}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex justify-end pt-2">
+                <M3Button type="button" onClick={handleCheckoutDialogClose}>{t('close')}</M3Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm font-body text-on-surface">{t('checkout_group_confirm')}</p>
+              <div className="flex justify-end gap-3 pt-4">
+                <M3Button type="button" variant="outlined" onClick={handleCheckoutDialogClose} disabled={checkoutGroup.isPending}>
+                  {t('cancel')}
+                </M3Button>
+                <M3Button type="button" onClick={handleCheckoutConfirm} loading={checkoutGroup.isPending}>
+                  {t('confirm')}
+                </M3Button>
+              </div>
+            </>
+          )}
+        </M3Dialog>
+      )}
+    </div>
+  );
+};
