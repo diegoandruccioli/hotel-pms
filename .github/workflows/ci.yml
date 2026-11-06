@@ -196,7 +196,7 @@ jobs:
       # can COPY them without running Gradle (avoids Maven Central calls).
       # Frontend matrix entry ignores the JARs; its Dockerfile uses context ./frontend.
       - name: Download Spring Boot JARs
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: spring-boot-jars
           path: .
@@ -213,7 +213,7 @@ jobs:
       # Skipped when the secrets are absent (forks, fresh clones), so CI still runs there.
       - name: Log in to Docker Hub
         if: env.DOCKERHUB_TOKEN != ''
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -243,7 +243,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security
         if: always()
-        uses: github/codeql-action/upload-sarif@24c7eb380a2dc368f2d129e4c65e51d172983a1e # v4
+        uses: github/codeql-action/upload-sarif@0911ee96d2d6c8def97122c36c5cadd93829a4b4 # v4
         with:
           sarif_file: "trivy-${{ matrix.service }}.sarif"
           category: "trivy-${{ matrix.service }}"
@@ -331,7 +331,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security
         if: always()
-        uses: github/codeql-action/upload-sarif@24c7eb380a2dc368f2d129e4c65e51d172983a1e # v4
+        uses: github/codeql-action/upload-sarif@0911ee96d2d6c8def97122c36c5cadd93829a4b4 # v4
         with:
           sarif_file: "trivy-thirdparty-2.sarif"
           # Category kept as the literal "trivy-thirdparty-2" (grafana's slot index
@@ -389,7 +389,7 @@ jobs:
       # Skipped when the secrets are absent (forks, fresh clones), so CI still runs there.
       - name: Log in to Docker Hub
         if: env.DOCKERHUB_TOKEN != ''
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
