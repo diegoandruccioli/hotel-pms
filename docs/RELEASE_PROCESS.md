@@ -79,6 +79,15 @@ percorso funzionale; lo smoke test serve a vedere la configurazione prod
    `vX.Y.Z-rc.N` abbia un run di `release-rc.yml` verde (un hotfix `Z > 0` senza rc passa) e
    crea la GitHub Release. Segnala se l'albero del rilascio differisce dall'rc. Non
    pubblica immagini e non fa deploy.
+
+   > **Attenzione al gate rc.** `release.yml` cerca il run di `release-rc.yml` filtrando per
+   > `--branch <rc_tag>`. Un run lanciato con `gh workflow run release-rc.yml --ref develop`
+   > **non conta**: il gate resta rosso anche se il codice è identico. Per sbloccarlo:
+   > - rieseguire il run originale del tag (`gh run rerun <run-id>`), oppure
+   > - lanciare il dispatch sul tag: `gh workflow run release-rc.yml --ref vX.Y.Z-rc.N`.
+   >
+   > Se il tag rc è su un commit senza E2E Live, il primo run è rosso: è atteso. Si lancia
+   > l'E2E Live su quel commit e poi si fa il rerun.
 4. Deploy manuale come da `docs/OPERATIONS_RUNBOOK.md` §8, **dopo** un backup:
 
 ```bash
