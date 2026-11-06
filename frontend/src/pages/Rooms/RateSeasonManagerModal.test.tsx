@@ -147,7 +147,7 @@ describe('RateSeasonManagerModal', () => {
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
     openRowMenu();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'edit' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'edit' }));
     expect((screen.getByLabelText(/rate_season_nightly_price/i) as HTMLInputElement).value).toBe('150');
   });
 
@@ -157,7 +157,7 @@ describe('RateSeasonManagerModal', () => {
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
     openRowMenu();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'delete' }));
     await waitFor(() => expect(screen.getByText('confirm_delete_rate_season')).toBeInTheDocument());
     fireEvent.click(screen.getByText('btn_confirm'));
     await waitFor(() => expect(rateSeasonService.deleteSeason).toHaveBeenCalledWith('rt1', 's1'));
@@ -170,7 +170,7 @@ describe('RateSeasonManagerModal', () => {
 
     openRowMenu();
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'delete' }));
 
     expect(await screen.findAllByRole('dialog')).toHaveLength(2);
     // The list stays behind the confirmation instead of being replaced by it.
@@ -182,7 +182,7 @@ describe('RateSeasonManagerModal', () => {
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
     openRowMenu();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'delete' }));
     await screen.findByText('confirm_delete_rate_season');
 
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -198,7 +198,7 @@ describe('RateSeasonManagerModal', () => {
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
     openRowMenu();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'delete' }));
     await screen.findByText('confirm_delete_rate_season');
 
     fireEvent.click(screen.getByText('cancel'));
