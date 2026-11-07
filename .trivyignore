@@ -143,6 +143,16 @@ CVE-2026-28377
 #   THREAT_MODEL.md. REMOVE when a grafana release bundles go-jose >= 4.1.6 and
 #   docker-compose.yml is bumped to it.
 CVE-2026-116587
+# CVE-2026-78661 — golang.org/x/net 0.60.0 (fix 0.62.0) in the grafana binary and its bundled
+#   Zipkin/Elasticsearch datasource plugins (alerts #661-#663, Trivy DB update 2026-11-06; still
+#   present in grafana 13.1.9). html parser: O(n^2) allocations when coalescing many short text
+#   runs, i.e. CPU/memory DoS only where HTML from an untrusted source is parsed. Grafana serves
+#   no attacker-supplied HTML to that parser in our setup (anonymous auth off, datasources are
+#   only the provisioned Loki datasource), and the service is in the opt-in `observability` profile whose port
+#   docker-compose.prod.yml unpublishes. Tracked as DEP-CVE-17 in THREAT_MODEL.md.
+#   REMOVE when a grafana release bundles golang.org/x/net >= 0.62.0 and docker-compose.yml is
+#   bumped to it.
+CVE-2026-78661
 # Format: one CVE-ID per line, with a comment explaining the
 # justification — mirrors the approach used in
 # config/dependency-check/suppressions.xml for OWASP DC.
