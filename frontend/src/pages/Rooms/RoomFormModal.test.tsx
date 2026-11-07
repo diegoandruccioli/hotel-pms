@@ -13,9 +13,10 @@ vi.mock('../../services/inventoryService', () => ({
   inventoryService: { createRoom: vi.fn(), updateRoom: vi.fn(), deleteRoom: vi.fn() },
 }));
 
+const mockAddToast = vi.hoisted(() => vi.fn());
 vi.mock('../../store/toastStore', () => ({
   useToastStore: (sel: unknown) =>
-    (sel as (s: { addToast: () => void }) => unknown)({ addToast: vi.fn() }),
+    (sel as (s: { addToast: typeof mockAddToast }) => unknown)({ addToast: mockAddToast }),
 }));
 
 vi.mock('focus-trap-react', () => ({
@@ -113,9 +114,23 @@ describe('RoomFormModal', () => {
     expect(inventoryService.updateRoom).not.toHaveBeenCalled();
   });
 
+  it('toasts "room_saved" after editing and "room_created" after creating (not a status/saving message)', async () => {
+    vi.mocked(inventoryService.updateRoom).mockResolvedValue(ROOM as never);
+    vi.mocked(inventoryService.createRoom).mockResolvedValue(ROOM as never);
+    const { unmount } = render(<RoomFormModal room={ROOM} roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
+    fireEvent.submit(document.querySelector('form')!);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('room_saved', 'success'));
+    unmount();
+
+    render(<RoomFormModal roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
+    fireEvent.change(screen.getByLabelText(/room_number/i), { target: { value: '102' } });
+    fireEvent.submit(document.querySelector('form')!);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('room_created', 'success'));
+  });
+
   it('renders room type options in select', () => {
     render(<RoomFormModal roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
-    expect(screen.getByText('Single (Max 1 pax)')).toBeInTheDocument();
+    expect(screen.getByText('room_type_option')).toBeInTheDocument();
   });
 
   it('passes axe accessibility check', async () => {

@@ -12,10 +12,11 @@ import java.time.LocalDate;
  *
  * @param startDate      the start of the reporting period
  * @param endDate        the end of the reporting period
- * @param totalRevenue   sum of all invoice amounts in the period, regardless of status
- * @param totalInvoices  total number of invoices in the period
+ * @param totalRevenue   sum of the invoice amounts in the period, cancelled invoices excluded
+ * @param totalInvoices  number of invoices in the period, cancelled invoices excluded
  * @param paidInvoices   number of invoices with status PAID
- * @param pendingRevenue sum of invoice amounts with status ISSUED — owed but not yet collected
+ * @param pendingRevenue what ISSUED invoices still owe: their totals minus the payments received so far
+ *                       (a partial payment leaves the invoice ISSUED) — owed but not yet collected
  */
 public record OwnerFinancialSummaryDto(
         LocalDate startDate,

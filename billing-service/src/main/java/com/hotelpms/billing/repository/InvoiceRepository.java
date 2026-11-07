@@ -78,8 +78,9 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     /**
      * Computes the same three totals {@link #findByHotelIdAndIssueDateBetween}
-     * feeds into {@code OwnerFinancialReportDto} (revenue, invoice count, paid
-     * count), plus pending (issued, unpaid) revenue, entirely in SQL — no
+     * feeds into {@code OwnerFinancialReportDto} (revenue and invoice count without
+     * {@code CANCELLED} invoices, paid count), plus the pending balance of
+     * {@code ISSUED} invoices (total minus payments received), entirely in SQL — no
      * {@code Invoice} entity is loaded. Backs the Dashboard's revenue summary,
      * which only ever needed these numbers, not the full unpaginated invoice
      * list the {@code /reports/owner} endpoint returns.
@@ -89,12 +90,15 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
      * @param end     end of the time window (exclusive)
      * @return the aggregated totals for that hotel and window
      */
-    @Query("SELECT COALESCE(SUM(i.totalAmount), 0) AS totalRevenue, "
-            + "COUNT(i) AS totalInvoices, "
+    @Query("SELECT COALESCE(SUM(CASE WHEN i.status <> com.hotelpms.billing.domain.InvoiceStatus.CANCELLED "
+            + "THEN i.totalAmount ELSE 0 END), 0) AS totalRevenue, "
+            + "COALESCE(SUM(CASE WHEN i.status <> com.hotelpms.billing.domain.InvoiceStatus.CANCELLED "
+            + "THEN 1L ELSE 0L END), 0) AS totalInvoices, "
             + "COALESCE(SUM(CASE WHEN i.status = com.hotelpms.billing.domain.InvoiceStatus.PAID THEN 1L ELSE 0L END), 0) "
             + "AS paidInvoices, "
             + "COALESCE(SUM(CASE WHEN i.status = com.hotelpms.billing.domain.InvoiceStatus.ISSUED "
-            + "THEN i.totalAmount ELSE 0 END), 0) AS pendingRevenue "
+            + "THEN i.totalAmount - COALESCE((SELECT SUM(p.amount) FROM Payment p WHERE p.invoice = i), 0) "
+            + "ELSE 0 END), 0) AS pendingRevenue "
             + "FROM Invoice i WHERE i.hotelId = :hotelId AND i.issueDate BETWEEN :start AND :end")
     OwnerFinancialSummaryAggregates getFinancialSummaryAggregatesByHotelId(
             @Param("hotelId") UUID hotelId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);

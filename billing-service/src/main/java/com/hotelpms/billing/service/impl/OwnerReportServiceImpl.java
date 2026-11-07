@@ -47,12 +47,17 @@ public class OwnerReportServiceImpl implements OwnerReportService {
 
                 final List<Invoice> invoices = invoiceRepository.findByHotelIdAndIssueDateBetween(hotelId, start, end);
 
-                final BigDecimal totalRevenue = invoices.stream()
+                // A cancelled invoice is neither revenue nor an issued invoice; the list below keeps it.
+                final List<Invoice> billed = invoices.stream()
+                                .filter(inv -> inv.getStatus() != InvoiceStatus.CANCELLED)
+                                .toList();
+
+                final BigDecimal totalRevenue = billed.stream()
                                 .map((@NonNull Invoice inv) -> inv.getTotalAmount())
                                 .reduce(BigDecimal.ZERO, (@NonNull BigDecimal a, @NonNull BigDecimal b) -> a.add(b));
 
-                final long totalInvoices = invoices.size();
-                final long paidInvoices = invoices.stream()
+                final long totalInvoices = billed.size();
+                final long paidInvoices = billed.stream()
                                 .filter(inv -> inv.getStatus() == InvoiceStatus.PAID)
                                 .count();
 

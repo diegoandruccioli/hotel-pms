@@ -26,6 +26,14 @@ describe('M3TableActionLink', () => {
     expect(btn.className).toContain('focus-visible:ring-error');
   });
 
+  it('applies tertiary tone for actions that move money', () => {
+    render(<M3TableActionLink tone="tertiary">Pay</M3TableActionLink>);
+    const btn = screen.getByRole('button');
+    expect(btn.className).toContain('text-tertiary');
+    expect(btn.className).toContain('focus-visible:ring-tertiary');
+    expect(btn.className).not.toContain('text-primary');
+  });
+
   it('fires onClick', () => {
     const onClick = vi.fn();
     render(<M3TableActionLink onClick={onClick}>View</M3TableActionLink>);

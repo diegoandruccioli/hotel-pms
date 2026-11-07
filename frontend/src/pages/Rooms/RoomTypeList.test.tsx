@@ -1,12 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../../test-utils';
+import { openRowMenu, renderWithQuery as render } from '../../test-utils';
 import { RoomTypeList } from './RoomTypeList';
 import { inventoryService } from '../../services';
 
+let mockLanguage = 'en';
+
+// Stable reference (see RateSeasonManagerModal.test.tsx); `language` stays live via the getter.
+const i18nMock = vi.hoisted(() => ({
+  t: (key: string) => key,
+  i18n: { get language() { return mockLanguage; } },
+}));
+
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+  useTranslation: () => i18nMock,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
@@ -38,17 +46,30 @@ const ROOM_TYPE = {
 describe('RoomTypeList', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('renders heading', async () => {
+  it('has no heading of its own, only the add action', async () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     render(<RoomTypeList />);
-    await waitFor(() => expect(screen.getByText('tab_room_types')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('add_room_type')).toBeInTheDocument());
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
   });
 
   it('renders room type row after data loads', async () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     render(<RoomTypeList />);
     await waitFor(() => expect(screen.getByText('Single')).toBeInTheDocument());
-    expect(screen.getByText('€ 50.00')).toBeInTheDocument();
+    expect(screen.getByText('€50.00')).toBeInTheDocument();
+  });
+
+  it('formats the base price in Italian locale', async () => {
+    mockLanguage = 'it';
+    try {
+      vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
+      render(<RoomTypeList />);
+      await waitFor(() => expect(screen.getByText('Single')).toBeInTheDocument());
+      expect(screen.getByText(/^50,00\s€$/)).toBeInTheDocument();
+    } finally {
+      mockLanguage = 'en';
+    }
   });
 
   it('renders empty state when no room types', async () => {
@@ -73,15 +94,17 @@ describe('RoomTypeList', () => {
   it('edit button opens modal for existing type', async () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     render(<RoomTypeList />);
-    await waitFor(() => expect(screen.getByText('edit')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('edit'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'edit' }));
   });
 
   it('rate_seasons action opens the seasons modal for the row', async () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     render(<RoomTypeList />);
-    await waitFor(() => expect(screen.getByText('rate_seasons')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('rate_seasons'));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /row_actions_for/ }).length).toBeGreaterThan(0));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'rate_seasons' }));
     expect(await screen.findByTestId('rate-season-modal')).toHaveTextContent('Single');
   });
 

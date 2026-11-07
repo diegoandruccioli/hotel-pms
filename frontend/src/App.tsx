@@ -7,6 +7,7 @@ import { MaterialIcon } from './components/MaterialIcon';
 import { useAuthStore } from './store';
 import { authService } from './services';
 import { useTranslation } from 'react-i18next';
+import { OWNER_ADMIN_ROLES, NIGHT_AUDIT_ROLES } from './config/navigation';
 
 const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
@@ -14,12 +15,13 @@ const Guests = lazy(() => import('./pages/Guests').then((m) => ({ default: m.Gue
 const Reservations = lazy(() => import('./pages/Reservations').then((m) => ({ default: m.Reservations })));
 const ReservationForm = lazy(() => import('./pages/Reservations/ReservationForm').then((m) => ({ default: m.ReservationForm })));
 const ReservationGroups = lazy(() => import('./pages/ReservationGroups').then((m) => ({ default: m.ReservationGroups })));
-const ReservationGroupDetail = lazy(() => import('./pages/ReservationGroupDetail').then((m) => ({ default: m.ReservationGroupDetail })));
+const ReservationGroupDetail = lazy(() => import('./pages/ReservationGroups/ReservationGroupDetail').then((m) => ({ default: m.ReservationGroupDetail })));
 const ReservationGroupForm = lazy(() => import('./pages/ReservationGroups/ReservationGroupForm').then((m) => ({ default: m.ReservationGroupForm })));
 const Quotations = lazy(() => import('./pages/Quotations').then((m) => ({ default: m.Quotations })));
 const QuotationForm = lazy(() => import('./pages/Quotations/QuotationForm').then((m) => ({ default: m.QuotationForm })));
 const QuotationDetail = lazy(() => import('./pages/Quotations/QuotationDetail').then((m) => ({ default: m.QuotationDetail })));
 const CheckInForm = lazy(() => import('./pages/Stays/CheckInForm').then((m) => ({ default: m.CheckInForm })));
+const StayDetail = lazy(() => import('./pages/Stays/StayDetail').then((m) => ({ default: m.StayDetail })));
 const WalkInCheckInForm = lazy(() => import('./pages/Stays/WalkInCheckInForm').then((m) => ({ default: m.WalkInCheckInForm })));
 const AdminUsers = lazy(() => import('./pages/AdminUsers').then((m) => ({ default: m.AdminUsers })));
 const HotelProfile = lazy(() => import('./pages/HotelProfile').then((m) => ({ default: m.HotelProfile })));
@@ -32,7 +34,7 @@ const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard').then((m) => (
 const NightAudit = lazy(() => import('./pages/NightAudit').then((m) => ({ default: m.NightAudit })));
 const Rooms = lazy(() => import('./pages/Rooms').then((m) => ({ default: m.Rooms })));
 const RateCalendar = lazy(() => import('./pages/Rates/RateCalendar').then((m) => ({ default: m.RateCalendar })));
-const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
+const SettingsLayout = lazy(() => import('./pages/Settings/SettingsLayout').then((m) => ({ default: m.SettingsLayout })));
 const SettingsProfile = lazy(() => import('./pages/Settings/SettingsProfile').then((m) => ({ default: m.SettingsProfile })));
 const SettingsPassword = lazy(() => import('./pages/Settings/SettingsPassword').then((m) => ({ default: m.SettingsPassword })));
 const SettingsAccessibility = lazy(() => import('./pages/Settings/SettingsAccessibility').then((m) => ({ default: m.SettingsAccessibility })));
@@ -40,12 +42,6 @@ const SettingsAppearance = lazy(() => import('./pages/Settings/SettingsAppearanc
 const SettingsSystem = lazy(() => import('./pages/Settings/SettingsSystem').then((m) => ({ default: m.SettingsSystem })));
 const SettingsCityTax = lazy(() => import('./pages/Settings/SettingsCityTax').then((m) => ({ default: m.SettingsCityTax })));
 const SettingsPrivacy = lazy(() => import('./pages/Settings/SettingsPrivacy').then((m) => ({ default: m.SettingsPrivacy })));
-
-const OWNER_ADMIN_ROLES = ['OWNER', 'ADMIN'] as const;
-/** Night audit is night-shift front-desk work in practice, not ownership —
- * open to RECEPTIONIST too, unlike the rest of the owner-only routes below
- * (GAP-26 in THREAT_MODEL.md; backend @PreAuthorize widened to match). */
-const NIGHT_AUDIT_ROLES = ['OWNER', 'ADMIN', 'RECEPTIONIST'] as const;
 
 function App() {
   const { t } = useTranslation('common');
@@ -109,17 +105,25 @@ function App() {
               <Route path="/stays" element={<Stays />} />
               <Route path="/stays/check-in/:reservationId" element={<CheckInForm />} />
               <Route path="/stays/walk-in" element={<WalkInCheckInForm />} />
+              <Route path="/stays/:id" element={<StayDetail />} />
               <Route path="/billing" element={<Billing />} />
               <Route path="/restaurant" element={<Restaurant />} />
               <Route path="/calendar" element={<CalendarPlanning />} />
               <Route path="/housekeeping" element={<Housekeeping />} />
               <Route path="/rooms" element={<Rooms />} />
               <Route path="/rates" element={<RateCalendar />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/settings/profile" element={<SettingsProfile />} />
-              <Route path="/settings/password" element={<SettingsPassword />} />
-              <Route path="/settings/accessibility" element={<SettingsAccessibility />} />
-              <Route path="/settings/appearance" element={<SettingsAppearance />} />
+              <Route path="/settings" element={<SettingsLayout />}>
+                <Route index element={<Navigate to="profile" replace />} />
+                <Route path="profile" element={<SettingsProfile />} />
+                <Route path="password" element={<SettingsPassword />} />
+                <Route path="accessibility" element={<SettingsAccessibility />} />
+                <Route path="appearance" element={<SettingsAppearance />} />
+                <Route element={<ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />}>
+                  <Route path="system" element={<SettingsSystem />} />
+                  <Route path="city-tax" element={<SettingsCityTax />} />
+                  <Route path="privacy" element={<SettingsPrivacy />} />
+                </Route>
+              </Route>
               <Route element={<ProtectedRoute allowedRoles={NIGHT_AUDIT_ROLES} />}>
                 <Route path="/night-audit" element={<NightAudit />} />
               </Route>
@@ -127,9 +131,6 @@ function App() {
                 <Route path="/owner-dashboard" element={<OwnerDashboard />} />
                 <Route path="/admin/users" element={<AdminUsers />} />
                 <Route path="/profile/hotel" element={<HotelProfile />} />
-                <Route path="/settings/system" element={<SettingsSystem />} />
-                <Route path="/settings/city-tax" element={<SettingsCityTax />} />
-                <Route path="/settings/privacy" element={<SettingsPrivacy />} />
               </Route>
             </Route>
           </Route>

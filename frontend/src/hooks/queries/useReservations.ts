@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { reservationService } from '../../services';
-import { inventoryService } from '../../services';
-import type { ReservationResponse } from '../../types';
+import { fetchAllRooms, reservationService } from '../../services';
+import type { ReservationResponse, ReservationStatus } from '../../types';
 import type { SpringPage } from '../../types';
 import { queryKeys } from '../../lib';
 
@@ -16,8 +15,9 @@ interface SearchParams {
   status?: string;
 }
 
-export function useReservationsSearch(params: SearchParams) {
+export function useReservationsSearch(params: SearchParams, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: queryKeys.reservations.search(params),
     queryFn: () => reservationService.searchReservations(params),
     placeholderData: (previousData) => previousData,
@@ -29,7 +29,7 @@ export function useReservationsSearch(params: SearchParams) {
 export function useRoomsLookup() {
   return useQuery({
     queryKey: queryKeys.rooms.lookup,
-    queryFn: () => inventoryService.getAllRooms(0, 500).then((page) => page.content),
+    queryFn: fetchAllRooms,
   });
 }
 
@@ -45,7 +45,7 @@ export function useDeleteReservation() {
 
 interface UpdateReservationStatusVariables {
   id: string;
-  status: string;
+  status: ReservationStatus;
   version: number;
 }
 
@@ -79,5 +79,13 @@ export function useRetryConfirmationEmail() {
         (old) => old && { ...old, content: old.content.map((r) => (r.id === updated.id ? updated : r)) },
       );
     },
+  });
+}
+
+/** Unpaged reservation snapshot, used to mark rooms already booked in a date window. */
+export function useReservationsSnapshot() {
+  return useQuery({
+    queryKey: queryKeys.reservations.snapshot,
+    queryFn: () => reservationService.getAllReservations(),
   });
 }

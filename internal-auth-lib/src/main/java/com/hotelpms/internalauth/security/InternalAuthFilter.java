@@ -10,7 +10,10 @@ import org.slf4j.MDC;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -66,12 +69,21 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(InternalAuthFilter.class);
 
+    /**
+     * Keeps the authenticated context on the request so the ASYNC dispatch of a
+     * {@code StreamingResponseBody} (CSV/PDF export) re-authorizes against it instead of an empty
+     * context — this filter does not run again on that dispatch.
+     */
+    private static final SecurityContextRepository CONTEXT_REPOSITORY = new RequestAttributeSecurityContextRepository();
+
     private static final String HEADER_USER = "X-Auth-User";
     private static final String HEADER_ROLE = "X-Auth-Role";
     private static final String HEADER_HOTEL = "X-Auth-Hotel";
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
     private static final String HEADER_TIMESTAMP = "X-Auth-Timestamp";
     private static final String HEADER_NONCE = "X-Auth-Nonce";
+    /** Set by the API gateway on every forwarded request; see {@link CallerContext}. Not signed. */
+    private static final String HEADER_GATEWAY_ORIGIN = "X-Gateway-Origin";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final String CORRELATION_ID_HEADER = "X-Correlation-ID";
 
@@ -162,20 +174,38 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (!nonceStore.claim(nonce, NONCE_TTL_SECONDS)) {
+        final boolean fresh;
+        try {
+            fresh = nonceStore.claim(nonce, NONCE_TTL_SECONDS);
+        } catch (final NonceStoreUnavailableException e) {
+            // Fail closed: without the replay check the request is not admitted. 503, not 401/403 — the
+            // signature may well be valid, and the caller must be able to tell an outage from a rejection.
+            // One line, no stack trace: during an outage every request lands here.
+            LOG.error("[InternalAuthFilter] Replay check unavailable ({}), rejecting request with 503",
+                    e.getCause() == null ? e.getMessage() : e.getCause().getClass().getSimpleName());
+            rejectUnavailable(response, "Internal authentication temporarily unavailable");
+            return;
+        }
+        if (!fresh) {
             // codeql[java/log-injection]: see sanitizeForLog note above.
             LOG.warn("[InternalAuthFilter] Replayed nonce detected for user={}", sanitizeForLog(username));
             rejectRequest(response, "Request signature already used");
             return;
         }
 
+        final List<SimpleGrantedAuthority> authorities = StringUtils.hasText(request.getHeader(HEADER_GATEWAY_ORIGIN))
+                ? List.of(new SimpleGrantedAuthority("ROLE_" + role),
+                        new SimpleGrantedAuthority(CallerContext.GATEWAY_CALLER_AUTHORITY))
+                : List.of(new SimpleGrantedAuthority("ROLE_" + role));
         final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                username, "", List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                username, "", authorities);
         // Store hotelId as details so the service layer can extract tenant context
         // without coupling the controller to the security mechanism.
         auth.setDetails(hotelId);
 
-        SecurityContextHolder.getContext().setAuthentication(auth);
+        final SecurityContext context = SecurityContextHolder.getContext();
+        context.setAuthentication(auth);
+        CONTEXT_REPOSITORY.saveContext(context, request, response);
         final String correlationId = request.getHeader(CORRELATION_ID_HEADER);
         if (correlationId != null) {
             MDC.put("correlationId", correlationId);
@@ -286,6 +316,12 @@ public final class InternalAuthFilter extends OncePerRequestFilter {
 
     private void rejectRequest(final HttpServletResponse response, final String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"error\":\"" + message + "\"}");
+    }
+
+    private void rejectUnavailable(final HttpServletResponse response, final String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
         response.setContentType("application/json");
         response.getWriter().write("{\"error\":\"" + message + "\"}");
     }

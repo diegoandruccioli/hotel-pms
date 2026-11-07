@@ -50,6 +50,10 @@ dependencies {
     // Security — InternalAuthFilter + HMAC anti-replay (T-GW-08)
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    // Native transport so Lettuce can apply TCP_USER_TIMEOUT (RedisSocketOptions); without it Lettuce falls back to
+    // NIO, keeps only the keepalive and logs a warning. Version managed by the Spring Boot / Netty BOM.
+    runtimeOnly("io.netty:netty-transport-native-epoll::linux-x86_64")
+    runtimeOnly("io.netty:netty-transport-native-epoll::linux-aarch_64")
 
     // Config Server
     implementation("org.springframework.cloud:spring-cloud-starter-config")

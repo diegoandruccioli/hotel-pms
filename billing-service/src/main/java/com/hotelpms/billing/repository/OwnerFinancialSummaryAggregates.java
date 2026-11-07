@@ -5,19 +5,20 @@ import java.math.BigDecimal;
 /**
  * Spring Data interface projection backing {@link
  * InvoiceRepository#getFinancialSummaryAggregates}: the three aggregates
- * computed in SQL, without loading a single {@code Invoice} entity.
+ * computed in SQL, without loading a single {@code Invoice} entity. Cancelled invoices
+ * are not revenue and not issued invoices, so they count in neither.
  */
 public interface OwnerFinancialSummaryAggregates {
 
     /**
-     * Returns the sum of all matching invoice amounts.
+     * Returns the sum of the matching invoice amounts, {@code CANCELLED} invoices excluded.
      *
      * @return the total revenue for the window
      */
     BigDecimal getTotalRevenue();
 
     /**
-     * Returns the total number of matching invoices.
+     * Returns the number of matching invoices, {@code CANCELLED} invoices excluded.
      *
      * @return the total invoice count for the window
      */
@@ -31,11 +32,11 @@ public interface OwnerFinancialSummaryAggregates {
     long getPaidInvoices();
 
     /**
-     * Returns the sum of invoice amounts with status {@code ISSUED} — money
-     * owed but not yet collected, as opposed to {@link #getTotalRevenue}
-     * which sums every matching invoice regardless of status.
+     * Returns what invoices with status {@code ISSUED} still owe: each one's total
+     * minus the payments received so far (a partial payment leaves the invoice
+     * {@code ISSUED}) — money owed but not yet collected.
      *
-     * @return the pending (issued, unpaid) revenue for the window
+     * @return the pending (issued, unpaid) balance for the window
      */
     BigDecimal getPendingRevenue();
 }

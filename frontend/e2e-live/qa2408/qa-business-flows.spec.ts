@@ -73,6 +73,12 @@ test.describe('QA 2026-08-24 — reservation to check-in via the real UI', () =>
       await expect(page.getByRole('option', { name: /FRANCIA/i })).toBeVisible({ timeout: 5_000 });
       await page.getByRole('option', { name: /FRANCIA/i }).click();
       await page.locator('input[name="dateOfBirth"]').first().fill('1990-01-01');
+      // Submit also requires gender and citizenship (names filled explicitly: the profile prefill can land after the form is submitted).
+      await page.locator('input[name="firstName"]').first().fill('Mario');
+      await page.locator('input[name="lastName"]').first().fill('Rossi');
+      await page.locator('#gender-0').selectOption({ value: '1' });
+      await page.locator('#citizenship-0').fill('FRANC');
+      await page.getByRole('option', { name: /FRANCIA/i }).last().click();
     }
 
     const [checkinResponse] = await Promise.all([
@@ -168,6 +174,12 @@ test.describe('QA 2026-08-24 — imposta di soggiorno is charged at check-in onc
       await expect(page.getByRole('option', { name: /FRANCIA/i })).toBeVisible({ timeout: 5_000 });
       await page.getByRole('option', { name: /FRANCIA/i }).click();
       await page.locator('input[name="dateOfBirth"]').first().fill('1990-01-01');
+      // Submit also requires gender and citizenship (names filled explicitly: the profile prefill can land after the form is submitted).
+      await page.locator('input[name="firstName"]').first().fill('Mario');
+      await page.locator('input[name="lastName"]').first().fill('Rossi');
+      await page.locator('#gender-0').selectOption({ value: '1' });
+      await page.locator('#citizenship-0').fill('FRANC');
+      await page.getByRole('option', { name: /FRANCIA/i }).last().click();
     }
     const [checkinResponse] = await Promise.all([
       page.waitForResponse((r) => r.url().includes('/api/v1/stays') && r.request().method() === 'POST'),
@@ -269,6 +281,12 @@ test.describe('QA 2026-08-24 — grey path: check-in form deep-link/refresh supp
       await expect(page.getByRole('option', { name: /FRANCIA/i })).toBeVisible({ timeout: 5_000 });
       await page.getByRole('option', { name: /FRANCIA/i }).click();
       await page.locator('input[name="dateOfBirth"]').first().fill('1990-01-01');
+      // Submit also requires gender and citizenship (names filled explicitly: the profile prefill can land after the form is submitted).
+      await page.locator('input[name="firstName"]').first().fill('Mario');
+      await page.locator('input[name="lastName"]').first().fill('Rossi');
+      await page.locator('#gender-0').selectOption({ value: '1' });
+      await page.locator('#citizenship-0').fill('FRANC');
+      await page.getByRole('option', { name: /FRANCIA/i }).last().click();
     }
 
     const [checkinResponse] = await Promise.all([

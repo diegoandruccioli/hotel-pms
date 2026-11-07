@@ -1,7 +1,7 @@
 # Branch Strategy — Hotel PMS
 
 **Data:** 2026-07-25 (aggiornato — vedi `backup/PROJECT_ANALYSIS.md` §4 per l'analisi completa)  
-**Stato:** Attivo — sviluppo continuo su `main`, non più "finale post-integrazione"
+**Stato:** Attivo — dal 2026-10-31 sviluppo su `develop` con promozione a `main` (vedi «Modello di sviluppo»)
 
 > Il progetto ha superato l'esame di Secure Coding il 2026-06-18. Da allora lo sviluppo è
 > proseguito con obiettivo prodotto (SaaS commerciale), non più esame — questo file descrive la
@@ -42,6 +42,7 @@ consolidamento prima del merge).
 | `feature/secure-coding-hardening` | **Storico hardening** — tutti i commit di sicurezza con SHA referenziati nel report LaTeX (`docs/security-report/report-secure-coding.tex`). Include: account lockout, BCrypt cost=12, token versioning, GDPR retention (T-GST-05), audit logging, HMAC fixes. | Congelato — non eliminare mai |
 | `feature/frontdesk-consolidation` | **ADR-001** — consolida gli ex `inventory-service`/`reservation-service`/`stay-service` in `frontdesk-service` (bounded context reale: Room↔Reservation↔Stay condiviso su 3 DB senza FK). Merge il 2026-06-20. | Mergiato, congelato — conservabile come storico o eliminabile |
 | `feature/frontend-development` | Branch di sviluppo usato fino all'integrazione iniziale (2026-05-08). **Non più una base valida**: è oggi ~257 commit dietro `main`, ripartire da lì significherebbe perdere tutto il lavoro successivo (hardening ADR-004, consolidamento frontdesk, notification-service, verticale fiscale, ecc.). | Mergiato, stale — **non usare come base per nuovi sviluppi** |
+| `feature/ui-redesign` | **Redesign UI/UX (Direzione A, ADR-009)** — branch di integrazione: ogni passo arriva con una PR piccola `ui/<sigla>-<slug>` (base `feature/ui-redesign`), CI attiva anche qui, merge commit. `main` resta presentabile; i hotfix su `main` entrano qui con `git merge origin/main` (mai rebase). Al termine un'unica PR verso `develop`. | Attivo — **non eliminare**, destino a fine lavori da decidere |
 | `main` | **Branch di sviluppo attivo e di riferimento produzione.** Build verde, tutti i test passano. Riceve sia il lavoro regolare (commit diretti) sia i merge dei branch dedicati (sicurezza, consolidamenti architetturali). | Branch di riferimento — HEAD del progetto |
 
 ---
@@ -67,17 +68,52 @@ consolidamento prima del merge).
 
 ---
 
+## Modello di sviluppo (dal 2026-10-31)
+
+```
+feat|fix|chore/<verticale>/<slug>  --PR-->  develop  --PR + tag -rc.N-->  main (+ tag vX.Y.Z)
+epic/<nome> (temporaneo)           --PR-->  develop
+hotfix/<slug> (da main)            --PR-->  main, poi main riportato in develop
+```
+
+- **Verticale** = servizio o modulo: `api-gateway`, `auth`, `guest`, `frontdesk`, `billing`, `fb`,
+  `notification`, `config`, `frontend`, `libs`, `infra`. Lo esprimono il nome del branch e le label,
+  non un branch di integrazione per servizio (monorepo con librerie e contratti condivisi: branch
+  lunghi per servizio divergono e l'integrazione si romperebbe tutta al merge).
+- Tutto passa da PR. `develop` e `main` sono protetti, senza bypass nemmeno per l'admin, con la CI
+  completa (nessun filtro per percorso).
+- **Promozione `develop` → `main`**: PR di rilascio con CI completa, gate Trivy e checklist di
+  rilascio. L'E2E live (`e2e-live-nightly.yml`: nightly su `develop`, su richiesta e sulle PR verso
+  `main`) è anche cancello obbligatorio sulle PR verso `main`, non sulle feature PR. Tag `vX.Y.Z-rc.N` su
+  `develop` prima del merge, `vX.Y.Z` su `main` dopo. Checklist, smoke test e rollback in
+  `docs/RELEASE_PROCESS.md`.
+- **`epic/<nome>`**: solo per sforzi lunghi e trasversali (precedenti: `ui-redesign`,
+  `frontdesk-consolidation`). Le PR figlie hanno base l'epic, una sola PR finale verso `develop`,
+  poi il branch viene eliminato.
+- **Hotfix**: da `main`, PR verso `main` con CI completa, poi `main` riportato in `develop`.
+- **Sicurezza**: `feature/secure-coding-hardening` resta permanente (storico dell'esame); i suoi
+  commit entrano in `develop` e arrivano a `main` con il rilascio. L'hook `security-branch-guard`
+  non cambia.
+- Commit Conventional, senza `Co-Authored-By`.
+
+---
+
 ## Regole di governance
 
 - `pre-secure-coding` e `feature/secure-coding-hardening` non vanno mai eliminati.
   Sono le evidenze storiche per l'esame di Secure Coding.
 - Il report LaTeX (`docs/security-report/report-secure-coding.tex`) cita commit SHA
   del branch `feature/secure-coding-hardening`. Quei commit devono rimanere accessibili.
-- **Sviluppi futuri partono da `main`.** `feature/frontend-development` non è più una base valida
+- **Sviluppi futuri partono da `develop`** (da `main` solo gli hotfix). `feature/frontend-development` non è più una base valida
   (257 commit indietro) — non ripartire da lì.
 - Lavoro di sicurezza (auth/JWT/RBAC/CSRF/XSS/injection/secret management/rate limiting/audit
   log/IDOR) va **sempre** su `feature/secure-coding-hardening`, mai direttamente su `main`
-  (regola MANDATORY, `CLAUDE.md`). Merge con fast-forward quando pronto.
+  (regola MANDATORY, `CLAUDE.md`). Merge in `develop` con PR quando pronto, poi
+  promosso a `main` con il rilascio.
+- **Redesign UI (`feature/ui-redesign`)**: le PR di redesign hanno base `feature/ui-redesign`, non
+  `main`; i branch `ui/*` sono effimeri (eliminati dopo il merge). Lavoro di sicurezza scoperto
+  durante il redesign resta su `feature/secure-coding-hardening`. Le regole di design sono in
+  `frontend/DESIGN.md` (fonte unica).
 - Ristrutturazioni architetturali maggiori (tipo il consolidamento ADR-001) vanno isolate su un
   branch `feature/<nome-adr>` dedicato finché non sono verificate end-to-end, poi mergiate — non
   vanno fatte con commit diretti su `main` data l'ampiezza del diff.
@@ -91,7 +127,11 @@ consolidamento prima del merge).
 `.github/dependabot.yml` apre branch/PR automatici (`dependabot/gradle/...`, `dependabot/npm_and_yarn/...`,
 `dependabot/docker/<servizio>/...`, `dependabot/github_actions/...`) — **non fanno parte della
 topologia sopra**, non richiedono governance dedicata, e vengono chiusi/mergiati per PR review
-ordinaria. Un'eccezione da tenere presente:
+ordinaria. Dal 2026-11-02 le PR di **aggiornamento versioni** hanno base `develop`
+(`target-branch: "develop"` in `dependabot.yml`, letto dal branch predefinito `main`, quindi attivo
+dopo la promozione). Le PR di **aggiornamento di sicurezza** vanno sempre sul branch predefinito
+(`main`) indipendentemente da `target-branch`: si trattano come hotfix, con `main` poi riportato in
+`develop`. Un'eccezione da tenere presente:
 
 - **Java 21 → 25**: esistono 8 PR Dependabot separate (una per servizio) che bumpano *solo* il
   Dockerfile (`eclipse-temurin:21-jre-alpine` → `25-jre-alpine`), lasciando toolchain Gradle e CI

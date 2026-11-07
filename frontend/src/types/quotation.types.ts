@@ -51,6 +51,8 @@ export interface QuotationResponse {
   totalPrice: number;
   options: QuotationOptionResponse[];
   acceptedOptionId: string | null;
+  /** Reservation created at conversion; null until then and for conversions made before it was recorded. */
+  reservationId: string | null;
   sendFailed: boolean;
   sendFailureReason: string | null;
   createdAt: string;

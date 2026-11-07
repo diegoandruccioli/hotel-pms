@@ -114,6 +114,17 @@ describe('CommandPalette', () => {
     expect(screen.getByText('nav_night_audit')).toBeInTheDocument();
   });
 
+  it('lists the privacy settings entry for an ADMIN only', () => {
+    mockAuthStore(ADMIN);
+    const { unmount } = renderWithQuery(<CommandPalette open onClose={vi.fn()} />);
+    expect(screen.getByText('settings_section_privacy')).toBeInTheDocument();
+    unmount();
+
+    mockAuthStore(RECEPTIONIST);
+    renderWithQuery(<CommandPalette open onClose={vi.fn()} />);
+    expect(screen.queryByText('settings_section_privacy')).not.toBeInTheDocument();
+  });
+
   it('navigates when a nav item is selected', () => {
     const onClose = vi.fn();
     renderWithQuery(<CommandPalette open onClose={onClose} />);
@@ -186,6 +197,17 @@ describe('CommandPalette', () => {
     rerender(<CommandPalette open onClose={vi.fn()} />);
 
     expect(screen.getByRole('combobox')).toHaveValue('');
+  });
+
+  it('drops the search results immediately when the input is cleared, without waiting for the debounce', async () => {
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValue(page([GUEST]) as never);
+    renderWithQuery(<CommandPalette open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'John' } });
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument(), { timeout: 2000 });
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } });
+
+    expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
   });
 
   it('has no accessibility violations while open', async () => {

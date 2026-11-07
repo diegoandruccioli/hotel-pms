@@ -15,6 +15,7 @@ import com.hotelpms.frontdesk.stays.dto.StayGuestRequest;
 import com.hotelpms.frontdesk.stays.dto.StayGuestResponse;
 import com.hotelpms.frontdesk.stays.dto.StayRequest;
 import com.hotelpms.frontdesk.stays.dto.StayResponse;
+import com.hotelpms.frontdesk.stays.dto.StaySummaryResponse;
 import com.hotelpms.frontdesk.exception.BillingNotPaidException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.GlobalExceptionHandler;
@@ -44,6 +45,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,6 +55,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -71,6 +74,7 @@ class StayControllerTest {
     private static final String PATH_BY_ID = "/{id}";
     private static final String PATH_CHECKOUT = "/{id}/check-out";
     private static final String PATH_GUEST_LATEST = "/guest/{guestId}/latest";
+    private static final String PATH_GUEST_HISTORY = "/guest/{guestId}/history";
     private static final String PATH_REPORT_TXT = "/reports/alloggiati";
     private static final String PATH_REPORT_JSON = "/reports/alloggiati/json";
     private static final String PATH_REPORT_SUBMIT = "/reports/alloggiati/submit";
@@ -252,6 +256,24 @@ class StayControllerTest {
     }
 
     @Test
+    void shouldGetAllStaysDepartingOnAndAlloggiatiFailedReturn200() throws Exception {
+        final Page<StayResponse> page = new PageImpl<>(
+                List.of(stayResponse), PageRequest.of(0, 20), 1L);
+        when(stayService.getAllStays(any(Pageable.class), eq(hotelId),
+                eq(null), eq(null), eq(StayStatus.CHECKED_IN), eq(FILTER_DATE_FROM), eq(true)))
+                .thenReturn(page);
+
+        mockMvc.perform(get(BASE_URL)
+                        .param("status", "CHECKED_IN")
+                        .param("departingOn", "2026-08-01")
+                        .param("alloggiatiFailed", "true"))
+                .andExpect(status().isOk());
+
+        verify(stayService).getAllStays(any(Pageable.class), eq(hotelId),
+                eq(null), eq(null), eq(StayStatus.CHECKED_IN), eq(FILTER_DATE_FROM), eq(true));
+    }
+
+    @Test
     void shouldGetAllStaysByReservationReturn200() throws Exception {
         final UUID reservationId = UUID.randomUUID();
         final Page<StayResponse> page = new PageImpl<>(
@@ -280,6 +302,26 @@ class StayControllerTest {
 
         mockMvc.perform(get(BASE_URL + PATH_GUEST_LATEST, guestId))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldGetStayHistoryPutTheReservationIdOnTheWire() throws Exception {
+        final UUID reservationId = UUID.randomUUID();
+        final LocalDateTime checkIn = LocalDateTime.now().minusDays(3);
+        when(stayService.getStayHistoryForGuest(guestId, hotelId))
+                .thenReturn(List.of(
+                        new StaySummaryResponse(stayId, checkIn, checkIn.plusDays(2), UUID.randomUUID(),
+                                StayStatus.CHECKED_OUT, reservationId),
+                        new StaySummaryResponse(UUID.randomUUID(), checkIn, null, UUID.randomUUID(),
+                                StayStatus.CHECKED_IN, null)));
+
+        mockMvc.perform(get(BASE_URL + PATH_GUEST_HISTORY, guestId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].stayId").value(stayId.toString()))
+                .andExpect(jsonPath("$[0].reservationId").value(reservationId.toString()))
+                // A walk-in stay has no reservation: the key is present and null, not missing.
+                .andExpect(jsonPath("$[1].reservationId").hasJsonPath())
+                .andExpect(jsonPath("$[1].reservationId").value((Object) null));
     }
 
     @Test
@@ -474,13 +516,37 @@ class StayControllerTest {
 
         mockMvc.perform(delete(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID, stayId, stayGuestId))
                 .andExpect(status().isNoContent());
+
+        verify(stayGuestService).removeGuest(stayId, stayGuestId, hotelId, null);
+    }
+
+    @Test
+    void shouldForwardTheClientVersionWhenRemovingAGuest() throws Exception {
+        final UUID stayGuestId = UUID.randomUUID();
+
+        mockMvc.perform(delete(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID, stayId, stayGuestId)
+                        .param("version", "4"))
+                .andExpect(status().isNoContent());
+
+        verify(stayGuestService).removeGuest(stayId, stayGuestId, hotelId, 4L);
+    }
+
+    @Test
+    void shouldRejectRemovingAGuestWithAStaleVersion() throws Exception {
+        final UUID stayGuestId = UUID.randomUUID();
+        doThrow(new ConflictException("STAY_GUEST_STALE_VERSION"))
+                .when(stayGuestService).removeGuest(stayId, stayGuestId, hotelId, 1L);
+
+        mockMvc.perform(delete(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID, stayId, stayGuestId)
+                        .param("version", "1"))
+                .andExpect(status().isConflict());
     }
 
     @Test
     void shouldRejectRemovingAnAlreadySentGuest() throws Exception {
         final UUID stayGuestId = UUID.randomUUID();
         doThrow(new ConflictException("STAY_GUEST_ALREADY_SENT"))
-                .when(stayGuestService).removeGuest(stayId, stayGuestId, hotelId);
+                .when(stayGuestService).removeGuest(stayId, stayGuestId, hotelId, null);
 
         mockMvc.perform(delete(BASE_URL + PATH_BY_ID + PATH_GUEST_BY_ID, stayId, stayGuestId))
                 .andExpect(status().isConflict());

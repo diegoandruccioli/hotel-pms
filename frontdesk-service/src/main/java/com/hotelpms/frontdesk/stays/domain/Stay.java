@@ -16,6 +16,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.jdbc.Expectation;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -41,7 +42,9 @@ import jakarta.persistence.OrderBy;
 @AllArgsConstructor
 @Builder
 @EntityListeners(AuditingEntityListener.class)
-@SQLDelete(sql = "UPDATE stays SET active = false WHERE id = ?")
+@SQLDelete(
+        sql = "UPDATE stays SET active = false, version = version + 1 WHERE id = ? AND version = ?",
+        verify = Expectation.RowCount.class)
 @SQLRestriction("active = true")
 public class Stay {
 

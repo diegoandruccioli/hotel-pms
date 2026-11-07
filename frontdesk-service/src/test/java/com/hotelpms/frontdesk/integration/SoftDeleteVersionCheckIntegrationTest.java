@@ -10,8 +10,17 @@ import com.hotelpms.frontdesk.quotations.repository.QuotationRepository;
 import com.hotelpms.frontdesk.reservations.domain.Reservation;
 import com.hotelpms.frontdesk.reservations.domain.ReservationStatus;
 import com.hotelpms.frontdesk.reservations.repository.ReservationRepository;
+import com.hotelpms.frontdesk.rooms.domain.Room;
+import com.hotelpms.frontdesk.rooms.domain.RoomStatus;
 import com.hotelpms.frontdesk.rooms.domain.RoomType;
+import com.hotelpms.frontdesk.rooms.repository.RoomRepository;
 import com.hotelpms.frontdesk.rooms.repository.RoomTypeRepository;
+import com.hotelpms.frontdesk.stays.domain.Stay;
+import com.hotelpms.frontdesk.stays.domain.StayGuest;
+import com.hotelpms.frontdesk.stays.domain.StayStatus;
+import com.hotelpms.frontdesk.stays.domain.TravellerType;
+import com.hotelpms.frontdesk.stays.repository.StayGuestRepository;
+import com.hotelpms.frontdesk.stays.repository.StayRepository;
 import com.hotelpms.frontdesk.stays.security.AlloggiatiCredentialEncryptor;
 import com.hotelpms.frontdesk.stays.security.StayGuestDocumentEncryptor;
 import com.hotelpms.frontdesk.stays.service.AlloggiatiWebSenderService;
@@ -34,16 +43,22 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Repository-level regression test for GAP-18 (THREAT_MODEL.md): the
- * {@code @SQLDelete} override on {@link Reservation}, {@link Quotation} and
- * {@link RateSeason} must actually enforce the {@code version} predicate it
- * declares, not just carry it as inert SQL text.
+ * {@code @SQLDelete} override on {@link Reservation}, {@link Quotation},
+ * {@link RateSeason}, {@link Stay} and {@link StayGuest} must actually enforce the
+ * {@code version} predicate it declares, not just carry it as inert SQL text. For
+ * {@code Stay} and {@code StayGuest} it must also bind both parameters at all: Hibernate 7
+ * adds the version to the delete of a versioned entity, so a one-placeholder statement
+ * failed with "Unable to bind parameter #2" and the removal of a stay guest returned 409.
  *
  * <p>Exercises the real {@code @SQLDelete} statement against a real
  * PostgreSQL database (Testcontainers, same setup as
@@ -97,6 +112,19 @@ class SoftDeleteVersionCheckIntegrationTest {
             "A delete bound to a stale version must be rejected, not silently succeed";
     private static final String ROW_MUST_STILL_BE_ACTIVE =
             "The row must still be active — the rejected delete must not have taken effect";
+    private static final String PARAM_ID = "id";
+    private static final String TABLE_STAYS = "stays";
+    private static final String TABLE_STAY_GUESTS = "stay_guests";
+    private static final String GUEST_SURNAME = "Rossi";
+    private static final String GENDER_MALE = "1";
+    private static final String ISTAT_ITALY = "100000100";
+    private static final LocalDate BIRTH_DATE = LocalDate.of(1980, 1, 1);
+    private static final int ROOM_CAPACITY = 2;
+    private static final BigDecimal ROOM_PRICE = new BigDecimal("100.00");
+    private static final int STAY_NIGHTS = 2;
+    private static final int ROOM_SUFFIX_LENGTH = 8;
+    private static final String PRIMARY_NAME = "Marco";
+    private static final String SECOND_NAME = "Anna";
 
     @MockitoBean
     private RedisConnectionFactory redisConnectionFactory;
@@ -131,6 +159,15 @@ class SoftDeleteVersionCheckIntegrationTest {
     @Autowired
     private RoomTypeRepository roomTypeRepository;
 
+    @Autowired
+    private RoomRepository roomRepository;
+
+    @Autowired
+    private StayRepository stayRepository;
+
+    @Autowired
+    private StayGuestRepository stayGuestRepository;
+
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -153,7 +190,7 @@ class SoftDeleteVersionCheckIntegrationTest {
      */
     private void simulateConcurrentVersionBump(final String table, final UUID id) {
         entityManager.createNativeQuery("UPDATE " + table + " SET version = version + 1 WHERE id = :id")
-                .setParameter("id", id)
+                .setParameter(PARAM_ID, id)
                 .executeUpdate();
     }
 
@@ -254,5 +291,166 @@ class SoftDeleteVersionCheckIntegrationTest {
         entityManager.clear();
         assertTrue(rateSeasonRepository.findById(id).isPresent(),
                 ROW_MUST_STILL_BE_ACTIVE);
+    }
+
+    private StayGuest stayGuest(final Stay stay, final String firstName, final boolean primary) {
+        return StayGuest.builder()
+                .stay(stay)
+                .firstName(firstName)
+                .lastName(GUEST_SURNAME)
+                .gender(GENDER_MALE)
+                .dateOfBirth(BIRTH_DATE)
+                .placeOfBirth(ISTAT_ITALY)
+                .citizenship(ISTAT_ITALY)
+                .isPrimaryGuest(primary)
+                .arrivalDate(LocalDate.now())
+                .travellerType(primary ? TravellerType.OSPITE_SINGOLO : TravellerType.FAMILIARE)
+                .build();
+    }
+
+    /**
+     * Persists the full chain a stay needs (room type, room, reservation) and a stay with a
+     * primary guest and a second one, flushed. {@code getGuests().get(1)} is the removable one.
+     *
+     * @return the managed stay
+     */
+    private Stay seedStayWithTwoGuests() {
+        final RoomType roomType = roomTypeRepository.save(RoomType.builder()
+                .hotelId(HOTEL_ID)
+                .name("Stay Room " + UUID.randomUUID())
+                .maxOccupancy(ROOM_CAPACITY)
+                .basePrice(ROOM_PRICE)
+                .build());
+        final Room room = roomRepository.save(Room.builder()
+                .hotelId(HOTEL_ID)
+                .roomNumber("S-" + UUID.randomUUID().toString().substring(0, ROOM_SUFFIX_LENGTH))
+                .roomType(roomType)
+                .status(RoomStatus.OCCUPIED)
+                .build());
+        final Reservation reservation = reservationRepository.save(Reservation.builder()
+                .hotelId(HOTEL_ID)
+                .guestId(UUID.randomUUID())
+                .expectedGuests(ROOM_CAPACITY)
+                .checkInDate(LocalDate.now())
+                .checkOutDate(LocalDate.now().plusDays(STAY_NIGHTS))
+                .status(ReservationStatus.CHECKED_IN)
+                .build());
+        final Stay stay = stayRepository.save(Stay.builder()
+                .hotelId(HOTEL_ID)
+                .reservationId(reservation.getId())
+                .guestId(UUID.randomUUID())
+                .roomId(room.getId())
+                .status(StayStatus.CHECKED_IN)
+                .actualCheckInTime(LocalDateTime.now())
+                .expectedCheckOutDate(LocalDate.now().plusDays(STAY_NIGHTS))
+                .build());
+        stay.getGuests().add(stayGuest(stay, PRIMARY_NAME, true));
+        stay.getGuests().add(stayGuest(stay, SECOND_NAME, false));
+        stayRepository.saveAndFlush(stay);
+        return stay;
+    }
+
+    /**
+     * Reads the raw {@code active} flag and {@code version} of a row, bypassing the
+     * {@code @SQLRestriction} that hides soft-deleted rows from every JPA query.
+     *
+     * @param table the table to read
+     * @param id    the row's primary key
+     * @return {@code [active, version]}
+     */
+    private Object[] activeAndVersion(final String table, final UUID id) {
+        return (Object[]) entityManager
+                .createNativeQuery("SELECT active, version FROM " + table + " WHERE id = :id")
+                .setParameter(PARAM_ID, id)
+                .getSingleResult();
+    }
+
+    @Test
+    @DisplayName("Removing a stay guest soft-deletes the row and bumps its version "
+            + "(Hibernate 7 binds both id and version; one placeholder made the removal fail with 409)")
+    void stayGuestRemovalSoftDeletesTheRowAndBumpsItsVersion() {
+        final Stay stay = seedStayWithTwoGuests();
+        final StayGuest second = stay.getGuests().get(1);
+        final UUID id = second.getId();
+        final long versionBefore = second.getVersion();
+        entityManager.flush();
+        entityManager.clear();
+
+        // The exact path of StayGuestServiceImpl.removeGuest: drop it from the collection and save.
+        final Stay reloaded = stayRepository.findById(stay.getId()).orElseThrow();
+        final StayGuest target = reloaded.getGuests().stream()
+                .filter(guest -> guest.getId().equals(id)).findFirst().orElseThrow();
+        reloaded.getGuests().remove(target);
+        stayRepository.saveAndFlush(reloaded);
+        entityManager.clear();
+
+        final Object[] row = activeAndVersion(TABLE_STAY_GUESTS, id);
+        assertFalse((Boolean) row[0], "The removed guest must be soft-deleted, not kept active");
+        assertEquals(versionBefore + 1, ((Number) row[1]).longValue(), "Soft delete must bump the version");
+        assertEquals(1, stayRepository.findById(stay.getId()).orElseThrow().getGuests().size(),
+                "Only the primary guest must remain on the stay");
+    }
+
+    @Test
+    @DisplayName("Stay guest delete with a stale version is rejected with CONCURRENT_MODIFICATION")
+    void stayGuestDeleteFailsWhenVersionIsStale() {
+        final Stay stay = seedStayWithTwoGuests();
+        final UUID id = stay.getGuests().get(1).getId();
+        entityManager.flush();
+        entityManager.clear();
+
+        final StayGuest stale = stayGuestRepository.findById(id).orElseThrow();
+        simulateConcurrentVersionBump(TABLE_STAY_GUESTS, id);
+
+        assertThrows(ObjectOptimisticLockingFailureException.class, () -> {
+            stayGuestRepository.delete(stale);
+            stayGuestRepository.flush();
+        }, STALE_DELETE_MUST_BE_REJECTED);
+
+        entityManager.clear();
+        assertTrue(stayGuestRepository.findById(id).isPresent(), ROW_MUST_STILL_BE_ACTIVE);
+    }
+
+    @Test
+    @DisplayName("Stay delete soft-deletes the row, bumps its version and takes its guests with it")
+    void staySoftDeleteBumpsItsVersionAndCascadesToItsGuests() {
+        final Stay stay = seedStayWithTwoGuests();
+        final UUID id = stay.getId();
+        final long versionBefore = stay.getVersion();
+        entityManager.flush();
+        entityManager.clear();
+
+        stayRepository.delete(stayRepository.findById(id).orElseThrow());
+        stayRepository.flush();
+        entityManager.clear();
+
+        final Object[] row = activeAndVersion(TABLE_STAYS, id);
+        assertFalse((Boolean) row[0], "The deleted stay must be soft-deleted");
+        assertEquals(versionBefore + 1, ((Number) row[1]).longValue(), "Soft delete must bump the version");
+        final long activeGuests = ((Number) entityManager
+                .createNativeQuery("SELECT count(*) FROM " + TABLE_STAY_GUESTS
+                        + " WHERE stay_id = :id AND active = true")
+                .setParameter(PARAM_ID, id)
+                .getSingleResult()).longValue();
+        assertEquals(0L, activeGuests, "The guests of a deleted stay must be soft-deleted with it");
+    }
+
+    @Test
+    @DisplayName("Stay delete with a stale version is rejected with CONCURRENT_MODIFICATION")
+    void stayDeleteFailsWhenVersionIsStale() {
+        final UUID id = seedStayWithTwoGuests().getId();
+        entityManager.flush();
+        entityManager.clear();
+
+        final Stay stale = stayRepository.findById(id).orElseThrow();
+        simulateConcurrentVersionBump(TABLE_STAYS, id);
+
+        assertThrows(ObjectOptimisticLockingFailureException.class, () -> {
+            stayRepository.delete(stale);
+            stayRepository.flush();
+        }, STALE_DELETE_MUST_BE_REJECTED);
+
+        entityManager.clear();
+        assertTrue(stayRepository.findById(id).isPresent(), ROW_MUST_STILL_BE_ACTIVE);
     }
 }

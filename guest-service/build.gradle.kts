@@ -1,8 +1,12 @@
+import java.math.BigDecimal
+
 plugins {
     java
     id("org.springframework.boot") version "4.0.8"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.danilopianini.gradle-java-qa") version "1.165.0"
+    // Mutation testing, report only: adds the `pitest` task, not wired into `build`/`check`.
+    id("info.solidsoft.pitest") version "1.19.0"
 }
 
 group = "com.hotelpms"
@@ -43,6 +47,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     // Redis-backed nonce store for internal HMAC anti-replay (T-GW-08)
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    // Native transport so Lettuce can apply TCP_USER_TIMEOUT (RedisSocketOptions); without it Lettuce falls back to
+    // NIO, keeps only the keepalive and logs a warning. Version managed by the Spring Boot / Netty BOM.
+    runtimeOnly("io.netty:netty-transport-native-epoll::linux-x86_64")
+    runtimeOnly("io.netty:netty-transport-native-epoll::linux-aarch_64")
     implementation("org.springframework.cloud:spring-cloud-starter-config")
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign") {
         exclude(group = "org.springframework.cloud", module = "spring-cloud-starter-netflix-eureka-client")
@@ -80,6 +88,17 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+// The pitest Gradle plugin constrains junit-platform-launcher to 1.10.2, which does not match the JUnit 6 engine
+// (tests are not discovered, PIT fails with "OutputDirectoryCreator not available"). Keep the launcher at the
+// version of the engine, i.e. what the Spring Boot BOM resolved before the plugin was added.
+configurations.matching { it.name == "testRuntimeClasspath" || it.name == "testCompileClasspath" }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.junit.platform" && requested.name == "junit-platform-launcher") {
+            useVersion("6.0.3")
+        }
+    }
+}
+
 dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
@@ -101,4 +120,18 @@ dependencyManagement {
 tasks.withType<Test> {
     useJUnitPlatform()
     systemProperty("net.bytebuddy.experimental", "true")
+}
+
+// Pilot module for mutation testing (docs/ROADMAP, Phase 4). Report only: no mutationThreshold,
+// run on demand or by .github/workflows/mutation.yml, never part of ./gradlew build.
+pitest {
+    pitestVersion.set("1.30.1")
+    junit5PluginVersion.set("1.2.3")
+    targetClasses.set(listOf("com.hotelpms.guest.*"))
+    excludedClasses.set(listOf("com.hotelpms.guest.GuestServiceApplication", "*.config.*", "*.dto.*", "*.model.*", "*.mapper.*Impl"))
+    threads.set(2)
+    timeoutFactor.set(BigDecimal("2.0"))
+    outputFormats.set(listOf("HTML", "XML"))
+    timestampedReports.set(false)
+    mutators.set(listOf("DEFAULTS"))
 }

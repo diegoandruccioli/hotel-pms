@@ -11,6 +11,7 @@ import com.hotelpms.frontdesk.rooms.dto.RoomResponse;
 import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
+import com.hotelpms.frontdesk.reservations.repository.ReservationRepository;
 import com.hotelpms.frontdesk.rooms.mapper.RoomMapper;
 import com.hotelpms.frontdesk.rooms.repository.RoomRepository;
 import com.hotelpms.frontdesk.rooms.repository.RoomTypeRepository;
@@ -22,6 +23,8 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -48,6 +51,7 @@ public class RoomServiceImpl implements RoomService {
 
     private final RoomRepository roomRepository;
     private final RoomTypeRepository roomTypeRepository;
+    private final ReservationRepository reservationRepository;
     private final RoomMapper roomMapper;
     private final GatewayEventsClient gatewayEventsClient;
 
@@ -302,16 +306,42 @@ public class RoomServiceImpl implements RoomService {
      * @param id      the room UUID; must not be {@code null}
      * @param hotelId the hotel UUID; must not be {@code null}
      * @throws NotFoundException if no active room exists with the given {@code id} and {@code hotelId}
+     * @throws ConflictException if the room is currently {@code OCCUPIED} (only the check-out Saga frees it) or a
+     *                           non-terminal reservation that has not ended still holds it
      */
     @Override
     @Transactional
     public void deleteRoom(final UUID id, final UUID hotelId) {
         Objects.requireNonNull(id, ROOM_ID_NULL_MSG);
         Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
-        final Room room = roomRepository.findByIdAndActiveTrueAndHotelId(id, hotelId)
+        // Locked like the other status-sensitive paths, so a check-in cannot occupy the room
+        // between this check and the delete.
+        final Room room = roomRepository.findByIdAndActiveTrueAndHotelIdForUpdate(id, hotelId)
                 .orElseThrow(() -> new NotFoundException(ROOM_NOT_FOUND_MSG + id));
+        if (room.getStatus() == RoomStatus.OCCUPIED) {
+            // A deleted room cannot be found by the check-out, which would leave the stay stuck.
+            throw new ConflictException("ROOM_OCCUPIED_CANNOT_BE_DELETED");
+        }
+        if (reservationRepository.existsUpcomingReservationByHotelIdAndRoomId(hotelId, id, LocalDate.now())) {
+            // A reservation still ahead would be left pointing at a room that no longer exists.
+            throw new ConflictException("ROOM_HAS_UPCOMING_RESERVATIONS");
+        }
 
         roomRepository.delete(Objects.requireNonNull(room));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public List<RoomResponse> getActiveRoomsByIds(final Collection<UUID> ids, final UUID hotelId) {
+        Objects.requireNonNull(ids, "Room IDs cannot be null");
+        Objects.requireNonNull(hotelId, HOTEL_ID_NULL_MSG);
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return roomRepository.findAllByIdInAndActiveTrueAndHotelId(ids, hotelId).stream()
+                .map(roomMapper::toResponse)
+                .toList();
     }
 
     /**

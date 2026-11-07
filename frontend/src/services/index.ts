@@ -1,9 +1,10 @@
-export { default as api } from './api';
 export * from './authService';
 export * from './billingReportService';
 export * from './billingService';
 export * from './dashboardService';
+export * from './downloadViaIframe';
 export * from './fbService';
+export * from './fetchAllRooms';
 export * from './guestService';
 export * from './housekeepingService';
 export * from './inventoryService';

@@ -178,7 +178,7 @@ services:
   # Grafana - Dashboard SIEM (GAP-4: visualizzazione audit log)
   # ----------------------------------------------------------
   grafana:
-    image: grafana/grafana:13.1.7
+    image: grafana/grafana:13.1.9
     container_name: hotel_grafana
     restart: unless-stopped
     profiles: ["observability"]
@@ -462,7 +462,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -476,7 +476,9 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
+          # 1.0 (not 0.5) for the two services every request crosses: on a cold start the JVM was throttled in 90%+ of
+          # the CFS periods, which stretched the first minutes after "healthy" (api-gateway and frontdesk-service).
+          cpus: "1.0"
           memory: 512M
         reservations:
           cpus: "0.10"
@@ -504,7 +506,9 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${AUTH_DB_PASSWORD}
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - JWT_SECRET=${JWT_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      # Opt-in e2e fixture seed. Stays false unless .env sets it; never set for production.
+      - AUTH_SEED_E2E_FIXTURES=${AUTH_SEED_E2E_FIXTURES:-false}
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -516,7 +520,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -560,7 +564,7 @@ services:
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
       - GUEST_DOCUMENTS_ENCRYPTION_KEY=${GUEST_DOCUMENTS_ENCRYPTION_KEY:-ci_placeholder_encryption_key}
       - GUEST_DOCUMENTS_ENCRYPTION_SALT=${GUEST_DOCUMENTS_ENCRYPTION_SALT:-deadbeefdeadbeefdeadbeefdeadbeef}
-      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -570,7 +574,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -635,7 +639,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -648,7 +652,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
+          cpus: "1.0"
           memory: 512M
         reservations:
           cpus: "0.10"
@@ -691,7 +695,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -733,7 +737,7 @@ services:
       - APPLICATION_CONFIG_FRONTDESK_SERVICE_URL=http://frontdesk-service:8081
       - APPLICATION_CONFIG_BILLING_SERVICE_URL=http://billing-service:8085
       - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
-      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError
+      - JAVA_TOOL_OPTIONS=-Xmx256m -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError
     depends_on:
       postgres:
         condition: service_healthy
@@ -743,7 +747,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s
@@ -801,7 +805,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/liveness || exit 1",
+          "wget -T5 -q -O /dev/null http://localhost:8090/actuator/health/readiness || exit 1",
         ]
       interval: 15s
       timeout: 5s

@@ -45,7 +45,7 @@ function GuestSearchAndCreateMock({ selectedGuest, onSelectGuest }: GuestMockPro
   );
 }
 
-vi.mock('../Reservations/GuestSearchAndCreate', () => ({
+vi.mock('../../components/GuestSearchAndCreate', () => ({
   GuestSearchAndCreate: (props: GuestMockProps) => GuestSearchAndCreateMock(props),
 }));
 

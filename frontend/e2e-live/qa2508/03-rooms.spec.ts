@@ -11,8 +11,10 @@ test.describe('Blocco 3 — Rooms & Room Types', () => {
     await page.getByRole('heading', { name: /inventario|inventory/i }).waitFor();
     guard.checkpoint('rooms page loaded');
 
-    await page.getByRole('button', { name: /tipologie|room categories/i }).click();
-    await expect(page.getByRole('heading', { name: /^tipologie$|^room categories$/i })).toBeVisible();
+    // The tab has no heading of its own: the segment turning active and the tab's action button prove the switch.
+    const roomTypesTab = page.getByRole('radio', { name: /tipologie|room categories/i });
+    await roomTypesTab.click();
+    await expect(roomTypesTab).toBeChecked();
     guard.checkpoint('switched to room types tab');
 
     await page.getByRole('button', { name: /nuova tipologia|add category/i }).click();
@@ -33,8 +35,9 @@ test.describe('Blocco 3 — Rooms & Room Types', () => {
     await expect(page.getByText(uniqueName)).toBeVisible();
 
     // Clean up via edit modal's inline delete-confirm footer.
-    const row = page.locator('tr').filter({ hasText: uniqueName });
-    await row.getByRole('button', { name: /^modifica$|^edit$/i }).click();
+    // Edit sits in the row's "Actions for <type>" menu.
+    await page.getByRole('button', { name: new RegExp('^(Azioni per|Actions for) ' + uniqueName + '$') }).click();
+    await page.getByRole('menuitem', { name: /^modifica$|^edit$/i }).click();
     const editDialog = page.getByRole('dialog');
     await expect(editDialog).toBeVisible();
     await editDialog.getByRole('button', { name: /^elimina$|^delete$/i }).click();

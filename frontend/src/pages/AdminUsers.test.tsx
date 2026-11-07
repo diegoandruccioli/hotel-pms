@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import type { Role } from '../types';
 import { AdminUsers } from './AdminUsers';
 import { userService } from '../services';
-import { mockAxiosErrorWithDetail } from '../test-utils';
+import { mockAxiosErrorWithDetail, openRowMenu, renderWithQuery } from '../test-utils';
 
 // SettingsPageHeader's back button needs react-router-dom's useNavigate,
 // which throws outside a Router — every render needs this wrapper now.
-const renderAdminUsers = () => render(<MemoryRouter><AdminUsers /></MemoryRouter>);
+const renderAdminUsers = () => renderWithQuery(<MemoryRouter><AdminUsers /></MemoryRouter>);
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -116,8 +116,22 @@ describe('AdminUsers', () => {
     vi.mocked(userService.deactivateUser).mockResolvedValue({ ...USER_ACTIVE, active: false } as never);
     renderAdminUsers();
     await waitFor(() => screen.getByText('alice'));
-    fireEvent.click(screen.getByText('btn_deactivate'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'btn_deactivate' }));
+    expect(userService.deactivateUser).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(userService.deactivateUser).toHaveBeenCalledWith('u1'));
+  });
+
+  it('does not deactivate when the confirmation is cancelled', async () => {
+    vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
+    renderAdminUsers();
+    await waitFor(() => screen.getByText('alice'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'btn_deactivate' }));
+    fireEvent.click(screen.getByText('cancel'));
+    expect(userService.deactivateUser).not.toHaveBeenCalled();
+    expect(screen.queryByText('confirm')).not.toBeInTheDocument();
   });
 
   it('calls activateUser when inactive user toggle clicked', async () => {
@@ -125,8 +139,64 @@ describe('AdminUsers', () => {
     vi.mocked(userService.activateUser).mockResolvedValue({ ...USER_INACTIVE, active: true } as never);
     renderAdminUsers();
     await waitFor(() => screen.getByText('bob'));
-    fireEvent.click(screen.getByText('btn_activate'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'btn_activate' }));
     await waitFor(() => expect(userService.activateUser).toHaveBeenCalledWith('u2'));
+    expect(screen.queryByText('confirm')).not.toBeInTheDocument();
+  });
+
+  describe('search, filters and summary', () => {
+    const ADMIN_USER = { ...USER_ACTIVE, id: 'u3', username: 'carol', email: 'carol@hotel.com', role: 'ADMIN' as Role };
+
+    const renderWithUsers = async () => {
+      vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE, USER_INACTIVE, ADMIN_USER]);
+      renderAdminUsers();
+      await screen.findByText('carol');
+    };
+
+    it('filters rows by username or email as you type', async () => {
+      await renderWithUsers();
+      fireEvent.change(screen.getByRole('searchbox', { name: 'users_search_label' }), { target: { value: 'bob@' } });
+      expect(screen.getByText('bob')).toBeInTheDocument();
+      expect(screen.queryByText('alice')).not.toBeInTheDocument();
+      expect(screen.queryByText('carol')).not.toBeInTheDocument();
+    });
+
+    it('filters by role with one chip at a time and "all" restores the list', async () => {
+      await renderWithUsers();
+      fireEvent.click(screen.getByRole('button', { name: 'users_filter_admin' }));
+      expect(screen.getByRole('button', { name: 'users_filter_admin' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText('carol')).toBeInTheDocument();
+      expect(screen.queryByText('alice')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'filter_all' }));
+      expect(screen.getByText('alice')).toBeInTheDocument();
+      expect(screen.getByText('bob')).toBeInTheDocument();
+    });
+
+    it('has a deactivated-users chip', async () => {
+      await renderWithUsers();
+      fireEvent.click(screen.getByRole('button', { name: 'users_filter_deactivated' }));
+      expect(screen.getByText('bob')).toBeInTheDocument();
+      expect(screen.queryByText('alice')).not.toBeInTheDocument();
+    });
+
+    it('says when no user matches the search or filters', async () => {
+      await renderWithUsers();
+      fireEvent.change(screen.getByRole('searchbox', { name: 'users_search_label' }), { target: { value: 'zzz' } });
+      expect(screen.getByText('users_no_match')).toBeInTheDocument();
+    });
+
+    it('summarises the active users in the subtitle', async () => {
+      await renderWithUsers();
+      expect(screen.getByText('users_active_summary')).toBeInTheDocument();
+    });
+
+    it('lists what each role can do next to the table', async () => {
+      await renderWithUsers();
+      expect(screen.getByRole('heading', { name: 'users_roles_title' })).toBeInTheDocument();
+      expect(screen.getByText('users_role_admin_desc')).toBeInTheDocument();
+    });
   });
 
   it('shows mustChangePassword warning for flagged users', async () => {
@@ -160,7 +230,9 @@ describe('AdminUsers', () => {
     vi.mocked(userService.deactivateUser).mockRejectedValue(new Error('fail'));
     renderAdminUsers();
     await waitFor(() => screen.getByText('alice'));
-    fireEvent.click(screen.getByText('btn_deactivate'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'btn_deactivate' }));
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_toggle_failed', 'error'));
   });
 
@@ -171,7 +243,9 @@ describe('AdminUsers', () => {
     );
     renderAdminUsers();
     await waitFor(() => screen.getByText('alice'));
-    fireEvent.click(screen.getByText('btn_deactivate'));
+    openRowMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'btn_deactivate' }));
+    fireEvent.click(screen.getByText('confirm'));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('CANNOT_DEACTIVATE_LAST_ADMIN', 'error'));
   });
 
@@ -271,7 +345,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
       expect(screen.getByText('modal_reset_title')).toBeInTheDocument();
     });
 
@@ -279,7 +354,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       const newPwInput = screen.getByLabelText('label_new_password');
       const confirmPwInput = screen.getByLabelText('label_confirm_password');
@@ -299,7 +375,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: 'short' } });
       fireEvent.click(screen.getByRole('button', { name: 'btn_reset_password' }));
@@ -312,7 +389,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: 'aaaaaaaaaaaaaaaa' } });
       fireEvent.click(screen.getByRole('button', { name: 'btn_reset_password' }));
@@ -324,7 +402,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: 'Secret123!!ABCDEF' } });
       fireEvent.change(screen.getByLabelText('label_confirm_password'), { target: { value: 'Different123!!ABC' } });
@@ -339,7 +418,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.resetUserPassword).mockResolvedValue(undefined);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       const strongPw = 'Secret123!!ABCDEF';
       fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: strongPw } });
@@ -356,7 +436,8 @@ describe('AdminUsers', () => {
       vi.mocked(userService.resetUserPassword).mockRejectedValue(new Error('fail'));
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       const strongPw = 'Secret123!!ABCDEF';
       fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: strongPw } });
@@ -373,7 +454,8 @@ describe('AdminUsers', () => {
       );
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
 
       const strongPw = 'Secret123!!ABCDEF';
       fireEvent.change(screen.getByLabelText('label_new_password'), { target: { value: strongPw } });
@@ -387,11 +469,14 @@ describe('AdminUsers', () => {
       vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE]);
       renderAdminUsers();
       await waitFor(() => screen.getByText('alice'));
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
       fireEvent.click(screen.getByText('btn_cancel'));
       expect(screen.queryByText('modal_reset_title')).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByLabelText('btn_reset_password alice'));
+      openRowMenu();
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'btn_reset_password' }));
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(screen.queryByText('modal_reset_title')).not.toBeInTheDocument();
     });

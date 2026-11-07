@@ -2,11 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../test-utils';
+import { MemoryRouter } from 'react-router-dom';
+import { format, startOfMonth } from 'date-fns';
+import type { ReactElement } from 'react';
+import { renderWithQuery } from '../test-utils';
 import { Billing } from './Billing';
-import { billingService } from '../services';
+import { billingService, billingReportService } from '../services';
 import { useAuthStore } from '../store';
+import { formatCurrency } from '../utils';
 import type { InvoiceResponse, InvoiceSearchResult } from '../types';
+
+// PageHeader derives its breadcrumbs from the router location.
+const ISSUED_NAV_ENTRIES = [{ pathname: '/billing', state: { statusFilter: 'ISSUED' } }];
+
+const INVOICE_LINK_ENTRIES = [{ pathname: '/billing', state: { invoiceId: 'inv-linked' } }];
+
+const render = (ui: ReactElement) => renderWithQuery(<MemoryRouter>{ui}</MemoryRouter>);
 
 vi.mock('react-i18next', () => {
   const t = vi.fn((key: string) => key);
@@ -21,12 +32,20 @@ vi.mock('../services/billingService', () => ({
     searchInvoices: vi.fn(),
     processPayment: vi.fn(),
     exportInvoicesCsv: vi.fn(),
+    getInvoiceById: vi.fn(),
   },
 }));
 
+vi.mock('../services/billingReportService', () => ({
+  billingReportService: { getOwnerFinancialSummary: vi.fn() },
+}));
+
+// One stable function, like the real zustand action: a fresh vi.fn() per render would make every
+// effect that lists addToast as a dependency run again on each render.
+const mockAddToast = vi.hoisted(() => vi.fn());
 vi.mock('../store/toastStore', () => ({
   useToastStore: (sel: (s: { addToast: () => void }) => unknown) =>
-    sel({ addToast: vi.fn() }),
+    sel({ addToast: mockAddToast }),
 }));
 
 vi.mock('../store/authStore', () => ({
@@ -75,10 +94,15 @@ const page = (results: InvoiceSearchResult[], totalPages = 1) =>
 const result = (invoice: InvoiceResponse, guestName: string | null = null): InvoiceSearchResult =>
   ({ invoice, guestName });
 
+const SUMMARY = {
+  startDate: '2026-04-01', endDate: '2026-04-15', totalRevenue: 1200, totalInvoices: 8, paidInvoices: 5, pendingRevenue: 450,
+};
+
 describe('Billing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useAuthStore).mockReturnValue({ user: { role: 'ADMIN' } } as never);
+    vi.mocked(billingReportService.getOwnerFinancialSummary).mockResolvedValue(SUMMARY);
   });
 
   it('should show loading spinner initially', () => {
@@ -91,6 +115,17 @@ describe('Billing', () => {
     vi.mocked(billingService.searchInvoices).mockReturnValue(new Promise(() => {}));
     render(<Billing />);
     expect(screen.getByText('pilot_mode_fiscal_banner')).toBeInTheDocument();
+  });
+
+  it('opens filtered on the status carried by the navigation state', async () => {
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
+    renderWithQuery(
+      <MemoryRouter initialEntries={ISSUED_NAV_ENTRIES}>
+        <Billing />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+    expect(billingService.searchInvoices).toHaveBeenCalledWith(expect.objectContaining({ status: 'ISSUED' }));
   });
 
   it('should render invoices on success', async () => {
@@ -168,6 +203,19 @@ describe('Billing', () => {
     expect(screen.getByText('invoice_detail_title')).toBeInTheDocument();
   });
 
+  it('opens the detail of the invoice named by the navigation state', async () => {
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([]) as never);
+    vi.mocked(billingService.getInvoiceById).mockResolvedValueOnce(PAID_INVOICE as never);
+    renderWithQuery(
+      <MemoryRouter initialEntries={INVOICE_LINK_ENTRIES}>
+        <Billing />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText('invoice_detail_title')).toBeInTheDocument());
+    expect(billingService.getInvoiceById).toHaveBeenCalledWith('inv-linked');
+  });
+
   it('should close InvoiceDetailModal on close button', async () => {
     vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(PAID_INVOICE)]) as never);
     render(<Billing />);
@@ -208,6 +256,26 @@ describe('Billing', () => {
         paymentMethod: 'CASH',
         transactionReference: undefined,
       }),
+      { timeout: 5000 },
+    );
+  });
+
+  it('should refetch the KPI summary after a payment so "to collect" does not go stale', async () => {
+    const user = userEvent.setup();
+    vi.mocked(billingService.searchInvoices).mockResolvedValue(page([result(ISSUED_INVOICE)]) as never);
+    vi.mocked(billingService.processPayment).mockResolvedValueOnce({
+      id: 'pay-new', paymentDate: '2026-04-01T15:00:00', amount: 150, paymentMethod: 'CASH', invoiceId: 'inv-1',
+    });
+    render(<Billing />);
+    await waitFor(() => screen.getByText('register_payment'));
+    expect(billingReportService.getOwnerFinancialSummary).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByText('register_payment'));
+    await screen.findByText('register_payment_title');
+    await user.click(screen.getByText('confirm_payment'));
+
+    await waitFor(
+      () => expect(billingReportService.getOwnerFinancialSummary).toHaveBeenCalledTimes(2),
       { timeout: 5000 },
     );
   });
@@ -390,6 +458,59 @@ describe('Billing', () => {
     await waitFor(() => expect(screen.getByText('no_invoices')).toBeInTheDocument());
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+
+  describe('KPI cards', () => {
+    const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    it('shows billed and outstanding amounts for the month to ADMIN/OWNER', async () => {
+      vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
+      render(<Billing />);
+
+      expect(await screen.findByText('billing_kpi_billed')).toBeInTheDocument();
+      expect(screen.getByText('billing_kpi_outstanding')).toBeInTheDocument();
+      expect(screen.getByText(formatCurrency(1200, 'en'))).toBeInTheDocument();
+      expect(screen.getByText(formatCurrency(450, 'en'))).toBeInTheDocument();
+      expect(billingReportService.getOwnerFinancialSummary).toHaveBeenCalledWith(monthStart, today);
+    });
+
+    it('does not request or show KPIs for RECEPTIONIST (endpoint is owner/admin only)', async () => {
+      vi.mocked(useAuthStore).mockReturnValue({ user: { role: 'RECEPTIONIST' } } as never);
+      vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
+      render(<Billing />);
+
+      await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+      expect(billingReportService.getOwnerFinancialSummary).not.toHaveBeenCalled();
+      expect(screen.queryByText('billing_kpi_billed')).not.toBeInTheDocument();
+    });
+
+    it('hides the KPI row, leaving the list usable, when the summary fails to load', async () => {
+      vi.mocked(billingReportService.getOwnerFinancialSummary).mockRejectedValue(new Error('403'));
+      vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
+      render(<Billing />);
+
+      await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+      await waitFor(() => expect(billingReportService.getOwnerFinancialSummary).toHaveBeenCalled());
+      expect(screen.queryByText('billing_kpi_billed')).not.toBeInTheDocument();
+    });
+  });
+
+  it('should show the result range summary under the table', async () => {
+    vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
+    render(<Billing />);
+    await waitFor(() => expect(screen.getByText('list_range_summary')).toBeInTheDocument());
+  });
+
+  it('should export with the debounced search text, matching the list on screen', async () => {
+    vi.mocked(billingService.searchInvoices).mockResolvedValue(page([result(ISSUED_INVOICE)]) as never);
+    render(<Billing />);
+    await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('invoice_search_placeholder'), { target: { value: 'rossi' } });
+    fireEvent.click(screen.getByText('export_csv'));
+
+    expect(billingService.exportInvoicesCsv).toHaveBeenCalledWith(expect.objectContaining({ query: '' }));
   });
 
   it('should have no accessibility violations with invoices', async () => {

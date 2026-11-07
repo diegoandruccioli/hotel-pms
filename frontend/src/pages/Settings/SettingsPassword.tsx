@@ -7,17 +7,25 @@ import { authService } from '../../services';
 import { M3Card } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
-import { MaterialIcon } from '../../components/MaterialIcon';
-import { SettingsPageHeader } from '../../components/SettingsPageHeader';
+import { Alert } from '../../components/Alert';
+import { SettingsSectionTitle } from '../../components/SettingsSectionTitle';
 import { PasswordRequirementsChecklist } from '../../components/PasswordRequirementsChecklist';
+import { CHANGE_PASSWORD_PATH } from '../../components/ProtectedRoute';
 import { isPasswordValid } from '../../utils';
+
+/** Where to go after a forced change: the page the user was heading to, if it is a same-app page worth returning to. */
+const returnTarget = (state: unknown): string => {
+  const from = (state as { from?: unknown } | null)?.from;
+  if (typeof from !== 'string' || !from.startsWith('/') || from.startsWith('//')) return '/';
+  return from.startsWith('/login') || from.startsWith(CHANGE_PASSWORD_PATH) ? '/' : from;
+};
 
 export const SettingsPassword = () => {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
   const location = useLocation();
-  const mustChangePassword = (location.state as { mustChangePassword?: boolean } | null)?.mustChangePassword === true;
-  const { checkAuth } = useAuthStore();
+  const { checkAuth, user } = useAuthStore();
+  const mustChangePassword = user?.mustChangePassword === true;
   const { addToast } = useToastStore();
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -26,7 +34,6 @@ export const SettingsPassword = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const handleCurrentPasswordChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => setCurrentPassword(e.target.value),
@@ -71,10 +78,12 @@ export const SettingsPassword = () => {
       } catch {
         // Session refresh failed for some unrelated reason (e.g. network
         // blip) — the password change itself already succeeded, so fall
-        // through to navigation rather than blocking the user here.
+        // through to navigation rather than blocking the user here. Clear the
+        // flag locally: left set, the route guard would bounce the user straight back.
+        if (user) checkAuth({ ...user, mustChangePassword: false });
       }
       if (mustChangePassword) {
-        navigate('/');
+        navigate(returnTarget(location.state));
       } else {
         navigate(-1);
       }
@@ -84,28 +93,21 @@ export const SettingsPassword = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPassword, newPassword, confirmPassword, t, addToast, checkAuth, navigate, mustChangePassword]);
+  }, [currentPassword, newPassword, confirmPassword, t, addToast, checkAuth, navigate, mustChangePassword, user, location.state]);
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto pb-10">
-      <SettingsPageHeader icon="lock" title={t('section_change_password')} onBack={handleBack} />
+    <div className="space-y-6">
+      <SettingsSectionTitle title={t('section_change_password')} />
 
       {mustChangePassword && (
-        <div role="alert" className="flex items-start gap-3 rounded-2xl bg-warning-container text-on-warning-container px-4 py-3 text-sm font-medium">
-          <MaterialIcon name="warning" size={18} className="mt-0.5 shrink-0" />
+        <Alert tone="warning" role="alert" className="font-medium">
           {t('must_change_password_banner', 'You must change your password before continuing.')}
-        </div>
+        </Alert>
       )}
 
-      <M3Card className="p-6">
+      <M3Card variant="solid" className="p-6">
         {error && (
-          <div
-            role="alert"
-            className="mb-4 p-4 bg-error-container text-on-error-container rounded-shape-sm flex items-start gap-3"
-          >
-            <MaterialIcon name="error" />
-            <p className="text-sm font-body mt-0.5">{error}</p>
-          </div>
+          <Alert tone="error" className="mb-4">{error}</Alert>
         )}
 
         <form onSubmit={handleChangePassword} className="space-y-4" noValidate>

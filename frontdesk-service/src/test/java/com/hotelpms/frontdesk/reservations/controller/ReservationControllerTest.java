@@ -92,7 +92,7 @@ class ReservationControllerTest {
         response = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, 2, 0,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.CONFIRMED, null, true, null, null, false, null, null);
+                ReservationStatus.CONFIRMED, null, true, null, null, false, null, null, null);
     }
 
     @Test
@@ -108,6 +108,19 @@ class ReservationControllerTest {
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
 
         verify(reservationService).createReservation(any(ReservationRequest.class));
+    }
+
+    @Test
+    void shouldExposeTheGroupIdOfAGroupMember() throws Exception {
+        final UUID groupId = UUID.randomUUID();
+        when(reservationService.getReservationById(reservationId)).thenReturn(new ReservationResponse(
+                reservationId, GUEST_ID, FULL_NAME, 2, 0,
+                LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
+                ReservationStatus.CONFIRMED, null, true, null, null, false, null, null, groupId));
+
+        mockMvc.perform(get(BASE_URL + PATH_BY_ID, reservationId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupId").value(groupId.toString()));
     }
 
     @Test
@@ -215,7 +228,7 @@ class ReservationControllerTest {
         final ReservationResponse checkedInResponse = new ReservationResponse(
                 reservationId, GUEST_ID, FULL_NAME, 2, 2,
                 LocalDate.now().plusDays(1), LocalDate.now().plusDays(3),
-                ReservationStatus.CHECKED_IN, null, true, null, null, false, null, null);
+                ReservationStatus.CHECKED_IN, null, true, null, null, false, null, null, null);
 
         when(reservationService.updateStatusAndGuests(
                 any(UUID.class), any(ReservationStatus.class), any(Integer.class), any()))

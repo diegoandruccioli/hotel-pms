@@ -1,6 +1,6 @@
 import api from './api';
 import type { OwnerFinancialReportDto, OwnerFinancialSummaryDto } from '../types';
-import { downloadViaIframe } from '../utils/downloadViaIframe';
+import { downloadViaIframe } from './downloadViaIframe';
 
 const REPORT_PATH = '/api/v1/reports/owner';
 const SUMMARY_PATH = '/api/v1/reports/owner/summary';

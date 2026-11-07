@@ -147,7 +147,7 @@ describe('GuestFieldSection', () => {
     );
     fireEvent.change(screen.getByLabelText(/label_guest_type/i), { target: { value: 'FAMILIARE' } });
     expect(onChange).toHaveBeenCalledWith(1, {
-      travellerType: 'FAMILIARE', documentType: '', documentNumber: '', documentPlaceOfIssue: '',
+      travellerType: 'FAMILIARE', documentType: '', documentNumber: '', documentPlaceOfIssue: '', documentExpiryDate: '',
     });
   });
 

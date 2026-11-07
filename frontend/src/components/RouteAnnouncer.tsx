@@ -1,43 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-
-interface RouteEntry {
-  prefix: string;
-  key: string;
-  ns: string;
-}
-
-// Ordered top-level-segment table for the 22 routes under MainLayout
-// (see App.tsx). Sub-routes of a section (e.g. /reservations/new,
-// /reservations/:id) intentionally announce the section name rather than a
-// bespoke per-view title — that matches what the sidebar/nav already calls
-// that area, and keeps this table from having to track every nested form
-// route separately. '/' is handled as an exact match below, not a prefix,
-// since every path starts with '/'.
-const ROUTES: RouteEntry[] = [
-  { prefix: '/guests', key: 'nav_guests', ns: 'common' },
-  { prefix: '/reservations', key: 'nav_reservations', ns: 'common' },
-  { prefix: '/quotations', key: 'nav_quotations', ns: 'common' },
-  { prefix: '/stays', key: 'nav_stays', ns: 'common' },
-  { prefix: '/billing', key: 'nav_billing', ns: 'common' },
-  { prefix: '/restaurant', key: 'nav_restaurant', ns: 'common' },
-  { prefix: '/calendar', key: 'nav_calendar', ns: 'common' },
-  { prefix: '/housekeeping', key: 'nav_housekeeping', ns: 'common' },
-  { prefix: '/rooms', key: 'nav_rooms', ns: 'common' },
-  { prefix: '/rates', key: 'nav_rates', ns: 'common' },
-  { prefix: '/owner-dashboard', key: 'nav_owner_dashboard', ns: 'common' },
-  { prefix: '/admin/users', key: 'page_title', ns: 'admin' },
-  { prefix: '/profile/hotel', key: 'hotel_profile_title', ns: 'admin' },
-  { prefix: '/settings', key: 'settings', ns: 'settings' },
-];
-
-const DASHBOARD_ENTRY: RouteEntry = { prefix: '/', key: 'nav_dashboard', ns: 'common' };
-
-function resolveRouteEntry(pathname: string): RouteEntry {
-  if (pathname === '/') return DASHBOARD_ENTRY;
-  return ROUTES.find((r) => pathname.startsWith(r.prefix)) ?? DASHBOARD_ENTRY;
-}
+import { resolveAnnouncement } from '../config/navigation';
 
 /**
  * Announces navigation to assistive technology. A client-side route change
@@ -51,9 +15,10 @@ export const RouteAnnouncer = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const liveRef = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
-    const entry = resolveRouteEntry(location.pathname);
+    const entry = resolveAnnouncement(location.pathname);
     const label = t(entry.key, { ns: entry.ns });
     document.title = `${label} · Hotel PMS`;
 
@@ -65,6 +30,12 @@ export const RouteAnnouncer = () => {
     // land somewhere meaningful after navigating, instead of focus staying
     // on the (now stale) nav link/button that triggered the navigation.
     // The skip link already targets this same element (MainLayout.tsx).
+    // Not on the first render: a fresh page load must leave focus on the
+    // document so the skip link is the first Tab stop (WCAG 2.4.1).
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     document.getElementById('main-content')?.focus();
   }, [location.pathname, t]);
 

@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -14,6 +15,7 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.util.UriUtils;
 import reactor.core.publisher.Mono;
 
 import javax.crypto.Mac;
@@ -62,6 +64,8 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
     private static final String HEADER_SIGNATURE = "X-Internal-Signature";
     private static final String HEADER_TIMESTAMP = "X-Auth-Timestamp";
     private static final String HEADER_NONCE = "X-Auth-Nonce";
+    /** Tells downstream services the request came through the gateway (a public client), not from another service. */
+    private static final String HEADER_GATEWAY_ORIGIN = "X-Gateway-Origin";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
 
     // -----------------------------------------------------------------------
@@ -73,6 +77,15 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
 
     /** Roles allowed to perform administrative write operations. */
     private static final Set<String> ADMIN_OWNER_ROLES = Set.of("ADMIN", "OWNER");
+
+    /**
+     * Invoice writes that only frontdesk-service performs, over Feign without going through the
+     * gateway. Refused here for every role as defense in depth: billing-service also refuses
+     * them for any request carrying the gateway marker, but a marker is only as strong as the
+     * header handling between the two hops.
+     */
+    private static final String INTERNAL_ONLY_STAY_INVOICE_PATH = "/api/v1/invoices/stay";
+    private static final String INTERNAL_ONLY_GROUPS_PREFIX = "/api/v1/invoices/groups/";
 
     /**
      * Path prefixes whose write operations (POST/PUT/PATCH/DELETE) are restricted to
@@ -197,6 +210,12 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                                 headers.remove(HEADER_SIGNATURE);
                                 headers.remove(HEADER_TIMESTAMP);
                                 headers.remove(HEADER_NONCE);
+                                headers.remove(HEADER_GATEWAY_ORIGIN);
+                                // A client-supplied Connection header lists headers the next hop must drop
+                                // (RFC 9110 7.6.1): 'Connection: X-Gateway-Origin' made the proxy strip the
+                                // marker, so billing saw a public call as an internal one. Verified live.
+                                headers.remove(HttpHeaders.CONNECTION);
+                                headers.remove("Keep-Alive");
                             })
                             .header(HEADER_USER, username)
                             .header(HEADER_ROLE, role)
@@ -204,6 +223,7 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                             .header(HEADER_SIGNATURE, signature)
                             .header(HEADER_TIMESTAMP, timestamp)
                             .header(HEADER_NONCE, nonce)
+                            .header(HEADER_GATEWAY_ORIGIN, "true")
                             .build())
                     .build());
         };
@@ -279,6 +299,9 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
         if (role == null || !OPERATIONAL_ROLES.contains(role)) {
             return false;
         }
+        if (isInternalOnlyInvoiceWrite(path, method)) {
+            return false;
+        }
         if (ADMIN_OWNER_ROLES.contains(role)) {
             return true;
         }
@@ -300,6 +323,14 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
             }
         }
         return true;
+    }
+
+    private static boolean isInternalOnlyInvoiceWrite(final String rawPath, final HttpMethod method) {
+        if (method != HttpMethod.POST) {
+            return false;
+        }
+        final String path = UriUtils.decode(rawPath, StandardCharsets.UTF_8);
+        return INTERNAL_ONLY_STAY_INVOICE_PATH.equals(path) || path.startsWith(INTERNAL_ONLY_GROUPS_PREFIX);
     }
 
     /**

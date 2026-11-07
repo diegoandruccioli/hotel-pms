@@ -1,0 +1,98 @@
+name: Mutation Testing
+
+# Report only. Weekly + on demand, never on PRs, so it can never become a required check.
+# Results are uploaded as artifacts and summarised in the job summary; nothing fails on a score.
+on:
+  schedule:
+    - cron: "0 3 * * 0" # Sundays 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation
+  cancel-in-progress: true
+
+jobs:
+  pit-guest-service:
+    name: "PIT — guest-service (pilot)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: develop
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          java-version: "21"
+          distribution: temurin
+
+      - name: Cache Gradle packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Run PIT on guest-service
+        run: ./gradlew :guest-service:pitest --no-daemon
+
+      - name: Summarise
+        if: always()
+        run: |
+          f=guest-service/build/reports/pitest/mutations.xml
+          if [ -f "$f" ]; then
+            total=$(grep -c '<mutation ' "$f" || true)
+            killed=$(grep -c 'status=.KILLED.' "$f" || true)
+            echo "### PIT guest-service" >> "$GITHUB_STEP_SUMMARY"
+            echo "Mutations: $total, killed: $killed" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload PIT report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: pit-guest-service
+          path: guest-service/build/reports/pitest/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  stryker-frontend:
+    name: "Stryker — frontend src/lib + src/services"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: develop
+
+      - name: Set up Node 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Stryker
+        working-directory: frontend
+        run: npx stryker run
+
+      - name: Upload Stryker report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: stryker-frontend
+          path: frontend/reports/mutation/
+          if-no-files-found: ignore
+          retention-days: 30

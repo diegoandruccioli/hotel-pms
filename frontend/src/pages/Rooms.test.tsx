@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
 import { renderWithQuery as render } from '../test-utils';
 import { Rooms } from './Rooms';
@@ -44,34 +45,35 @@ describe('Rooms', () => {
     });
   });
 
-  it('renders both tab buttons', () => {
+  it('renders both tabs as radios in a labelled group', () => {
     render(<Rooms />);
-    // Use getAllByText because sub-components share translation keys
-    expect(screen.getAllByText('tab_rooms').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('tab_room_types').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('radiogroup', { name: 'rooms_tabs_label' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'tab_rooms' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'tab_room_types' })).toBeInTheDocument();
   });
 
-  it('Rooms tab is active by default (has bg-primary class)', () => {
+  it('Rooms tab is active by default', () => {
     render(<Rooms />);
-    const activeBtn = screen
-      .getAllByText('tab_rooms')
-      .find((el) => el.closest('button')?.className.includes('bg-primary'));
-    expect(activeBtn).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'tab_rooms' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'tab_room_types' })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('Room Types tab becomes active after click', async () => {
     render(<Rooms />);
-    const typeBtn = screen
-      .getAllByText('tab_room_types')
-      .find((el) => el.closest('button') !== null);
-    expect(typeBtn).toBeTruthy();
-    fireEvent.click(typeBtn!.closest('button')!);
+    fireEvent.click(screen.getByRole('radio', { name: 'tab_room_types' }));
     await waitFor(() => {
-      const nowActive = screen
-        .getAllByText('tab_room_types')
-        .find((el) => el.closest('button')?.className.includes('bg-primary'));
-      expect(nowActive).toBeTruthy();
+      expect(screen.getByRole('radio', { name: 'tab_room_types' })).toHaveAttribute('aria-checked', 'true');
     });
+    expect(screen.getByRole('radio', { name: 'tab_rooms' })).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('switches tab with the arrow keys', async () => {
+    const user = userEvent.setup();
+    render(<Rooms />);
+    screen.getByRole('radio', { name: 'tab_rooms' }).focus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('radio', { name: 'tab_room_types' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'tab_room_types' })).toHaveFocus();
   });
 
   it('shows rooms subtitle text', async () => {
@@ -79,6 +81,31 @@ describe('Rooms', () => {
     await waitFor(() => {
       expect(screen.getByText('rooms_subtitle')).toBeInTheDocument();
     });
+  });
+
+  it('summarises the counts in the subtitle once rooms and room types are loaded', async () => {
+    const { inventoryService } = await import('../services/inventoryService');
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValueOnce({
+      content: [{ id: 'r1', roomNumber: '101', status: 'CLEAN', roomType: { id: 't1', name: 'Single' } }, { id: 'r2', roomNumber: '102', status: 'CLEAN', roomType: { id: 't1', name: 'Single' } }], totalElements: 2, totalPages: 1, number: 0, size: 100,
+    } as never);
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValueOnce([{ id: 't1', name: 'Single', maxOccupancy: 1, basePrice: 50 }] as never);
+    render(<Rooms />);
+    expect(await screen.findByText('rooms_count_summary')).toBeInTheDocument();
+    expect(screen.queryByText('rooms_subtitle')).not.toBeInTheDocument();
+  });
+
+  it('counts every room of the hotel even when it needs more than one page', async () => {
+    const { inventoryService } = await import('../services/inventoryService');
+    const type = { id: 't1', name: 'Single', maxOccupancy: 1, basePrice: 50 };
+    const make = (from: number, count: number) => Array.from({ length: count }, (_, i) => ({
+      id: 'r' + (from + i), roomNumber: String(from + i), status: 'CLEAN', roomType: type,
+    }));
+    vi.mocked(inventoryService.getAllRooms).mockImplementation(((p: number) =>
+      Promise.resolve({ content: p === 0 ? make(1, 200) : make(201, 50), totalElements: 250, totalPages: 2, number: p, size: 200 })) as never);
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([type] as never);
+    render(<Rooms />);
+    expect(await screen.findByText('rooms_count_summary')).toBeInTheDocument();
+    expect(screen.queryByText('rooms_subtitle')).not.toBeInTheDocument();
   });
 
   it('has no critical accessibility violations', async () => {

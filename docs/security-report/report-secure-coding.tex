@@ -5731,6 +5731,145 @@ il contenuto generato direttamente dentro il container.
 
 \paragraph{Riferimento} Commit: \commitref{ae9121d7}{fix(security): render alertmanager SMTP secrets at runtime, never in git}
 
+% ──────────────────────────────────────────────────────────────────
+\subsection{Anti-replay: il guasto del nonce store restava un errore opaco \threat{GAP-31}}
+% ──────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato in una prova dal vivo (2026-10-31), non da una scansione. Il container
+\texttt{hotel\_redis} era stato ricreato da \texttt{docker compose up} (nuovo
+indirizzo IP) mentre \texttt{notification-service}, non ricreato, restava
+collegato al vecchio. Il controllo anti-replay di \threat{T-GW-08}
+(\texttt{InternalAuthFilter}, nonce reclamato con \texttt{SETNX} su Redis) non
+poteva più essere eseguito: ogni richiesta interna restava appesa 60 secondi
+--- il timeout predefinito di Lettuce, identico a quello di nginx, quindi il
+client vedeva un \texttt{504} --- e quando usciva era un \texttt{403}
+generico, indistinguibile da una firma rifiutata.
+
+La causa era l'assenza di gestione dell'errore attorno a
+\texttt{nonceStore.claim()}. L'eccezione Spring Data usciva dal filtro,
+nessun \texttt{@ControllerAdvice} poteva gestirla (il filtro viene prima dei
+controller) e il successivo dispatch di \texttt{/error} veniva rifiutato da
+Spring Security, che lo vedeva come richiesta anonima: da qui il \texttt{403}.
+Il comportamento era già \emph{fail-closed} --- nessuna richiesta senza claim
+veniva ammessa --- ma era opaco: un'interruzione dell'infrastruttura appariva
+come un problema di autenticazione, e l'unico segnale per l'operatore era il
+timeout. Classificato OWASP A04 --- Insecure Design (gestione delle condizioni
+eccezionali), estensione di \threat{T-GW-08}.
+
+\begin{insecurebox}[title={InternalAuthFilter.java --- errore dello store non gestito (baseline)}]
+\begin{lstlisting}[style=java]
+// INSICURO (opaco): claim() puo' lanciare se Redis non risponde
+if (!nonceStore.claim(nonce, NONCE_TTL_SECONDS)) {
+    rejectRequest(response, "Request signature already used");   // 401
+    return;
+}
+// ...se claim() lancia, l'eccezione esce dal filtro: nessun advice la
+// gestisce, il dispatch di /error viene rifiutato -> 403 generico dopo 60 s
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Una nuova \texttt{NonceStoreUnavailableException} distingue ``il controllo non
+ha potuto girare'' da ``replay'' (che resta \texttt{claim() == false} e
+\texttt{401}). \texttt{RedisNonceStore.claim()} la lancia su
+\texttt{DataAccessException} e su \texttt{IllegalStateException} (connection
+factory fermata, che Spring non traduce). \texttt{InternalAuthFilter} la
+cattura e risponde \textbf{503} con un corpo esplicito, senza invocare la
+catena di filtri e senza popolare il \texttt{SecurityContext}: la richiesta
+non viene ammessa. Nel log finisce una sola riga con il nome della classe
+della causa, senza stack trace (durante un'interruzione ogni richiesta passa di
+qui) e senza dati della richiesta, quindi senza possibilit\`a di log injection.
+
+\begin{securebox}[title={InternalAuthFilter.java / RedisNonceStore.java --- fail-closed con 503 (fix)}]
+\begin{lstlisting}[style=java]
+final boolean fresh;
+try {
+    fresh = nonceStore.claim(nonce, NONCE_TTL_SECONDS);
+} catch (final NonceStoreUnavailableException e) {
+    LOG.error("[InternalAuthFilter] Replay check unavailable ({}), "
+            + "rejecting request with 503",
+            e.getCause() == null ? e.getMessage()
+                    : e.getCause().getClass().getSimpleName());
+    rejectUnavailable(response,
+            "Internal authentication temporarily unavailable");   // 503
+    return;                      // la chain NON viene invocata
+}
+// RedisNonceStore.claim():
+//   catch (DataAccessException | IllegalStateException e) {
+//       throw new NonceStoreUnavailableException(
+//               "Redis nonce store unavailable", e);
+//   }
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Superficie d'attacco invariata}
+L'ordine dei controlli non cambia: intestazioni, firma HMAC e timestamp
+vengono verificati \emph{prima} del claim. Una firma non valida resta quindi
+\texttt{401}; il \texttt{503} richiede una firma HMAC valida, che solo il
+gateway (o chi possiede il segreto) pu\`o produrre, e non offre a un chiamante
+non autenticato alcun modo di distinguere ``Redis gi\`u'' da altro. La revisione
+dell'agente \texttt{security-auditor} non ha rilevato finding critici o alti.
+Ha segnalato che eccezioni diverse da quelle tradotte avrebbero potuto
+ancora uscire dal filtro; il fix \`e un catch mirato (compreso
+\texttt{IllegalStateException}) e non \texttt{catch (RuntimeException)}, che
+checkstyle e PMD del progetto vietano. Un'eccezione imprevista continua a
+uscire dal filtro: fail-closed, ma come errore generico.
+
+\paragraph{Verifica dal vivo}
+Con \texttt{docker stop hotel\_redis}, \texttt{billing-service} con il nuovo
+filtro risponde \texttt{503} con il corpo
+\texttt{\{"error":"Internal authentication temporarily unavailable"\}} in circa
+6 secondi (con il timeout Redis a 2 secondi introdotto a parte), mentre
+\texttt{frontdesk-service}, ancora col vecchio filtro, risponde il
+\texttt{403} generico nello stesso tempo. Il log di billing contiene una riga
+\texttt{Replay check unavailable (QueryTimeoutException)}. Dopo
+\texttt{docker start hotel\_redis} billing torna a rispondere \texttt{200} da
+solo. Test automatici: \texttt{RedisNonceStoreTest} (connessione persa,
+timeout, connection factory fermata, errore non legato ai dati che non viene
+mascherato) e \texttt{InternalAuthFilterTest} (503, catena non invocata,
+nessuna autenticazione).
+
+\begin{notebox}[title={Seguito --- riconnessione dopo un cambio di IP di Redis (risolto)}]
+Il fix qui sopra rende il guasto veloce, esplicito e visibile, ma non lo faceva
+rientrare da solo. Fermando Redis e riavviandolo su un altro indirizzo, nessuno
+dei 7 servizi si riconnetteva in oltre 11 minuti, pur con il nome gi\`a risolto
+al nuovo IP e la porta raggiungibile. La causa \`e nel client: dalla versione
+4.4 Lettuce usa \texttt{DnsResolvers.UNRESOLVED} e, con
+\texttt{netty-resolver-dns} nel classpath (c'\`e su ogni servizio), la
+risoluzione passa dal resolver di Netty, che tiene i record in cache per il
+loro TTL. Impostando \texttt{DnsResolvers.JVM\_DEFAULT} tramite un
+\texttt{ClientResourcesBuilderCustomizer} resta solo la cache breve della JVM
+(30 secondi). Nella stessa prova, i servizi con il fix si sono riconnessi in
+32--33 secondi mentre \texttt{notification-service} costruito da \texttt{main}
+\`e rimasto bloccato per tutti i 300 secondi.
+\end{notebox}
+
+\begin{notebox}[title={Seguito --- connessioni mezze aperte (risolto)}]
+Il fix DNS non copriva il caso in cui il peer scompaia senza chiudere la
+connessione (per esempio un \texttt{docker network disconnect} a caldo): il
+socket restava \texttt{ESTABLISHED}, i comandi scadevano dopo 2 secondi ma
+Lettuce non riconnetteva mai (0 servizi su 7 in oltre 8 minuti, senza alcun
+warning). Il keepalive TCP \`e spento di default in Lettuce e quello del kernel
+parte dopo 2 ore; inoltre Linux non invia probe di keepalive finch\'e ci sono
+dati in volo, e questi servizi mandano comandi di continuo (readiness, claim del
+nonce), quindi il kernel abbandonava la connessione solo dopo
+\texttt{tcp\_retries2}, circa 15 minuti. Per questo il solo keepalive non
+sarebbe bastato: \texttt{RedisSocketOptions} imposta keepalive (10 secondi di
+inattivit\`a, 3 probe a 5 secondi) e \texttt{TCP\_USER\_TIMEOUT} a 30 secondi,
+che chiude il socket quando i dati inviati restano senza conferma. Il
+\texttt{connect-timeout} di Spring Boot viene riletto e riapplicato, perch\'e
+Boot applica i customizer dopo le proprie \texttt{SocketOptions} e le
+sostituirebbero. \texttt{TCP\_USER\_TIMEOUT} richiede il trasporto nativo,
+quindi ai 6 servizi servlet (prima su NIO) \`e stato aggiunto
+\texttt{netty-transport-native-epoll}; il gateway lo aveva gi\`a. Nella prova
+con disconnessione a caldo e traffico in corso, 7 servizi su 7 si sono
+riconnessi da soli in 31--56 secondi, contro 0 su 7 in 300 secondi con il solo
+fix DNS.
+\end{notebox}
+
+\paragraph{Riferimento} Commit: \commitref{e633a72e}{fix(internal-auth): fail closed with 503 when the replay-check store is unavailable}, \commitref{4eef1747}{fix(redis): resolve the Redis host again on every reconnect so a moved Redis is picked up}, \commitref{f62d9081}{fix(redis): close half-open Redis connections with TCP keepalive and user timeout}
+
 % ─────────────────────────────────────────────────────────────────────────────
 % ═════════════════════════════════════════════════════════════════════════════
 \section{Analisi SAST con CodeQL e Supply Chain Security \textnormal{\small\textcolor{warnyellow}{[Appendice A]}}}
@@ -6725,6 +6864,87 @@ multi-riga.
 
 \paragraph{Riferimento} Commit: \commitref{3b62006}{fix(security): harden CWE-117 log injection across auth-service and gateway}
 
+\subsection{Riapertura di prenotazioni chiuse tramite PUT \threat{T-RES-04}}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Descrizione}
+Trovato durante la verifica dal vivo dell'audit dei collegamenti dell'interfaccia
+(2026-10-17) e confermato nel codice: il \texttt{PUT /api/v1/reservations/\{id\}} del
+\texttt{frontdesk-service} applicava la macchina a stati delle prenotazioni
+(\texttt{ALLOWED\_TRANSITIONS}) soltanto sull'endpoint dedicato al cambio di stato.
+\texttt{ReservationServiceImpl.updateReservation} non chiamava \texttt{verifyValidTransition}
+e non guardava lo stato persistito, mentre \texttt{ReservationMapper.updateEntityFromRequest}
+copia sull'entità tutti i campi del body tranne \texttt{lineItems} e \texttt{version},
+compreso \texttt{status} (\texttt{@NotNull} in \texttt{ReservationRequest}). L'unica difesa
+presente, \texttt{verifyNoActiveStayConflict}, riguarda i soli stay \texttt{CHECKED\_IN}.
+
+Un chiamante autenticato che usasse l'API direttamente poteva quindi riaprire una
+prenotazione chiusa (\texttt{CHECKED\_OUT}, \texttt{CANCELLED}, \texttt{NO\_SHOW}) e
+modificarne date e camere. Riprodotto: un \texttt{PUT} con \texttt{status=CONFIRMED} su una
+prenotazione \texttt{CHECKED\_OUT} ha risposto \texttt{200} e lo stato è tornato
+\texttt{CONFIRMED}. Le conseguenze sono storico falsato, camere che tornano prenotate e
+fatture o stay già chiusi non più allineati alla prenotazione. L'interfaccia non esponeva il
+percorso (il form non cambia lo stato), ma la regola di business non può dipendere dal client.
+Classificato \textbf{OWASP A04 --- Insecure Design} (regola di stato imposta su uno solo dei due
+percorsi di scrittura), con attinenza ad A01.
+
+\begin{insecurebox}[title={ReservationServiceImpl.java --- updateReservation senza controllo di stato (baseline)}]
+\begin{lstlisting}[style=java]
+final Reservation existingReservation = findReservationByIdAndHotelOrThrow(id, hotelId);
+verifyNotStale(existingReservation, request.version());
+verifyNoActiveStayConflict(id, hotelId, existingReservation, request);
+...
+// copia anche request.status() sull'entita': nessuna verifyValidTransition
+reservationMapper.updateEntityFromRequest(request, existingReservation);
+\end{lstlisting}
+\end{insecurebox}
+
+\paragraph{Mitigazione applicata}
+Nuovo \texttt{verifyUpdateAllowed(existing, request)}, eseguito subito dopo il lookup con
+scope sul tenant e prima di qualsiasi altro lavoro (nessuna chiamata a guest-service, camere
+o repository di scrittura per una richiesta rifiutata). Una prenotazione in
+\texttt{TERMINAL\_STATUSES} risponde \texttt{409 RESERVATION\_NOT\_EDITABLE}; per le altre,
+uno stato diverso da quello persistito deve essere una transizione ammessa, altrimenti
+\texttt{409 RESERVATION\_INVALID\_TRANSITION}, come sull'endpoint dedicato. Lo stato
+invariato che una normale modifica rinvia resta sempre ammesso. I due codici sono tradotti in
+italiano e inglese nel dizionario degli errori del frontend.
+
+\begin{securebox}[title={ReservationServiceImpl.java --- guard su stato chiuso e transizioni (fix)}]
+\begin{lstlisting}[style=java]
+private static void verifyUpdateAllowed(final Reservation existing, final ReservationRequest request) {
+    if (TERMINAL_STATUSES.contains(existing.getStatus())) {
+        throw new ConflictException("RESERVATION_NOT_EDITABLE");
+    }
+    if (request.status() != existing.getStatus()) {
+        verifyValidTransition(existing.getStatus(), request.status());
+    }
+}
+\end{lstlisting}
+\end{securebox}
+
+\paragraph{Test introdotti}
+Quattro scenari in \texttt{ReservationServiceImplTest}, scritti prima del fix e falliti prima
+di esso (tranne l'ultimo, che documenta il comportamento che deve restare):
+\begin{itemize}
+  \item \texttt{testUpdateReservationOfAClosedReservationIsRejected} --- parametrizzato su
+        \texttt{CHECKED\_OUT}, \texttt{CANCELLED}, \texttt{NO\_SHOW}; nessuna scrittura
+  \item \texttt{testUpdateReservationCannotReopenAClosedReservationByChangingItsStatus} ---
+        \texttt{CANCELLED} $\to$ \texttt{CONFIRMED} rifiutato, stato invariato
+  \item \texttt{testUpdateReservationRejectsAStatusChangeTheTransitionTableForbids} ---
+        \texttt{CONFIRMED} $\to$ \texttt{PENDING} rifiutato
+  \item \texttt{testUpdateReservationStillAllowsAPermittedStatusChange} --- \texttt{PENDING}
+        $\to$ \texttt{CONFIRMED} resta ammesso
+\end{itemize}
+
+\begin{notebox}[title={Residuo noto}]
+\texttt{PARTIALLY\_CHECKED\_IN} non è uno stato terminale e resta modificabile lato server, e la
+tabella delle transizioni consente ancora \texttt{CONFIRMED} $\to$ \texttt{CHECKED\_IN} anche
+tramite \texttt{PUT}, senza che venga creato uno Stay, esattamente come sull'endpoint dedicato.
+Va valutato separatamente: richiede una scelta di prodotto sul flusso di check-in.
+\end{notebox}
+
+\paragraph{Riferimento} Commit: \commitref{1345919}{fix(frontdesk): validate status and closed state on full reservation update}
+
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Gestione Autenticazione e Autorizzazione}
 % ═════════════════════════════════════════════════════════════════════════════
@@ -7554,6 +7774,164 @@ su fattura \texttt{PAID} resta \texttt{409} per un guard di business
 preesistente, non \texttt{403} --- nessuna regressione introdotta da questo fix).
 Commit: \commitref{a87d329}{fix(security): T-GST-07/T-BILL-07 --- missing RBAC on guest/invoice controllers}
 
+\paragraph{T-BILL-08 --- Storico fatture per ospite senza controllo di ruolo}
+Scoperto dalla revisione del pannello di dettaglio ospite del redesign UI:
+\texttt{GET /api/v1/invoices/guest/\{guestId\}/history} (numero, data,
+importo totale e stato di ogni fattura di un ospite) era nato come feed
+interno per l'export GDPR di guest-service, ma non aveva alcuna
+\texttt{@PreAuthorize} e il gateway non filtra \texttt{/api/v1/invoices/**}:
+un RECEPTIONIST poteva interrogarlo direttamente per qualunque ospite del
+proprio hotel. L'interfaccia nascondeva la sezione ai non amministratori,
+ma era solo una scelta di presentazione. Lo scoping per \texttt{hotelId}
+era già corretto, quindi non esiste un IDOR cross-tenant.
+
+\begin{insecurebox}[title={InvoiceController.java --- nessun controllo di ruolo (baseline)}]
+\begin{lstlisting}[style=java]
+@GetMapping("/guest/{guestId}/history")
+public ResponseEntity<List<InvoiceSummaryResponse>> getInvoiceHistoryForGuest(
+        @NonNull @PathVariable final UUID guestId) {
+    // raggiungibile da qualunque ruolo autenticato (anche RECEPTIONIST)
+    ...
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={InvoiceController.java --- riservato ad ADMIN/OWNER (main)}]
+\begin{lstlisting}[style=java]
+@PreAuthorize(ROLE_ADMIN_OR_OWNER)
+@GetMapping("/guest/{guestId}/history")
+public ResponseEntity<List<InvoiceSummaryResponse>> getInvoiceHistoryForGuest(
+        @NonNull @PathVariable final UUID guestId) {
+    ...
+}
+\end{lstlisting}
+\end{securebox}
+
+L'export GDPR continua a funzionare: \texttt{GuestController.exportGuestData}
+è già riservato ad ADMIN/OWNER e \texttt{InternalFeignAuthInterceptor} rifirma
+gli header con il ruolo reale dell'utente, senza un principal di sistema,
+quindi billing-service riceve sempre ADMIN o OWNER. Gli endpoint
+\texttt{/last-date} sono rimasti aperti di proposito: sono la sonda di
+legal hold usata dal job di retention e dalla guardia di cancellazione.
+Tre test in \texttt{InvoiceControllerSecurityTest} (RECEPTIONIST →
+\texttt{403}, ADMIN e OWNER → \texttt{200}).
+
+\begin{notebox}[title={Residui emersi dall'audit}]
+L'audit ha segnalato tre residui oltre a questo fix: il fallback Feign
+dell'export GDPR che nascondeva un \texttt{403}/\texttt{5xx}
+(T-GST-08), le scritture sulle fatture raggiungibili dal front desk via
+gateway (T-BILL-09) e \texttt{GET /invoices} aperto a tutti i ruoli. Sono
+chiusi dai paragrafi seguenti; restano aperti per scelta di policy
+\texttt{GET /invoices/search}, \texttt{/\{id\}} e \texttt{/pdf}.
+\end{notebox}
+
+Commit: \commitref{c6899b9}{fix(billing): restrict guest invoice history to ADMIN/OWNER}
+
+\paragraph{T-BILL-09 --- Scritture sulle fatture raggiungibili dal front desk via gateway}
+Il secondo giro dell'audit su T-BILL-08 ha mostrato che le operazioni di
+scrittura di \texttt{InvoiceController} nate come chiamate interne
+(\texttt{POST /stay}, \texttt{POST /groups/\{id\}/master-folio},
+\texttt{POST /groups/\{id\}/charges}) e l'aggiunta/rimozione di addebiti
+erano raggiungibili da un RECEPTIONIST attraverso il gateway, che non
+filtra \texttt{/api/v1/invoices/**}. Un RECEPTIONIST poteva creare fatture
+arbitrarie consumando la numerazione fiscale e, soprattutto, rimuovere un
+addebito \texttt{ROOM\_NIGHT} o \texttt{CITY\_TAX} di un soggiorno aperto.
+Un controllo per ruolo non era praticabile: gli storni interni (cambio
+camera, rimozione ospite) rimuovono gli stessi addebiti con il ruolo del
+RECEPTIONIST inoltrato da \texttt{InternalFeignAuthInterceptor}.
+
+La distinzione necessaria è \emph{da dove} arriva la chiamata. Tutti i
+client Feign contattano billing-service direttamente, senza passare dal
+gateway. Il gateway aggiunge quindi l'header \texttt{X-Gateway-Origin},
+rimuovendo prima ogni copia inviata dal client; \texttt{InternalAuthFilter}
+lo traduce nell'autorità \texttt{GATEWAY\_CALLER}; l'interceptor Feign non
+lo propaga mai. Il marcatore non fa parte del payload HMAC: cambiare il
+formato della firma sarebbe stato un rilascio in lockstep di quattro
+firmatari/verificatori, e chi raggiunge un servizio direttamente possiede
+già il segreto condiviso.
+
+\begin{insecurebox}[title={InvoiceServiceImpl.java --- qualunque tipo di addebito, da chiunque (baseline)}]
+\begin{lstlisting}[style=java]
+public void removeCharge(UUID stayId, UUID chargeId) {
+    ...
+    invoice.removeCharge(charge);          // ROOM_NIGHT / CITY_TAX inclusi
+    invoiceChargeRepository.delete(charge);
+}
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={InvoiceServiceImpl.java --- un chiamante pubblico gestisce solo EXTRA (main)}]
+\begin{lstlisting}[style=java]
+private static void assertPublicCallerHandlesExtraOnly(ChargeType type) {
+    if (CallerContext.isViaGateway() && type != ChargeType.EXTRA) {
+        throw new AccessDeniedException("PUBLIC_CALLER_EXTRA_CHARGES_ONLY");
+    }
+}
+// InvoiceController: @PreAuthorize("!hasAuthority('GATEWAY_CALLER')")
+// su POST /stay, /groups/{id}/master-folio, /groups/{id}/charges
+\end{lstlisting}
+\end{securebox}
+
+\begin{notebox}[title={Bypass trovato dalla verifica live}]
+La verifica su stack Docker ha mostrato che il marcatore, da solo, non
+bastava: con l'header \texttt{Connection: X-Gateway-Origin} il proxy lo
+tratta come hop-by-hop e lo elimina (RFC~9110, \S7.6.1), quindi billing
+vedeva come interna una richiesta pubblica e \texttt{POST /invoices/stay}
+rispondeva \texttt{201} creando una fattura. L'audit statico l'aveva
+segnalato come ipotesi non verificata; la prova dal vivo l'ha confermato.
+Il gateway ora rimuove \texttt{Connection} e \texttt{Keep-Alive} dalla
+richiesta in ingresso e, come difesa in profondità indipendente dal
+marcatore, rifiuta con \texttt{403} per qualunque ruolo
+\texttt{POST /api/v1/invoices/stay} e \texttt{POST /api/v1/invoices/groups/**}.
+Dopo la correzione 22 richieste via gateway, inclusi cinque tentativi di
+spoofing o rimozione del marcatore, danno l'esito atteso, mentre le
+chiamate interne firmate senza marcatore restano accettate.
+Residuo di design: il marcatore non è firmato ed è \emph{fail-open}
+(assenza = chiamata interna), quindi una futura rotta verso billing senza
+\texttt{AuthenticationFilter} o un nuovo endpoint senza regola sarebbero
+considerati fidati. Due test di guardia, verificati per mutazione, lo
+rendono una decisione esplicita: \texttt{EndpointAuthorizationArchTest}
+fa fallire la build se un endpoint di scrittura di billing non ha
+\texttt{@PreAuthorize} e non è in un elenco motivato, e
+\texttt{BillingRoutesAuthenticationTest} se una rotta verso billing
+salta \texttt{AuthenticationFilter}.
+\end{notebox}
+
+Il rilascio non richiede lockstep: con billing aggiornato prima del
+gateway nessuna richiesta porta il marcatore e il comportamento resta
+quello precedente. Lo username (con CR/LF sostituiti) compare ora nei log
+di aggiunta, rimozione e rifiuto degli addebiti.
+\begin{notebox}[title={Residuo dichiarato}]
+Non esiste una traccia persistente di chi ha aggiunto o rimosso un
+addebito \texttt{EXTRA} oltre al log applicativo: servirebbero colonne
+\texttt{created\_by}/soft delete e una migrazione Flyway, da decidere
+insieme a T-BILL-06.
+\end{notebox}
+Commit: \commitref{6d62971}{feat(security): mark gateway-originated requests},
+\commitref{1d9e7a0}{fix(billing): restrict public invoice writes to EXTRA charges},
+\commitref{ad3a732}{fix(security): close the hop-by-hop bypass of the gateway marker}
+
+\paragraph{T-GST-08 --- Export GDPR silenziosamente incompleto}
+I fallback Feign di \texttt{BillingServiceClient.getInvoiceHistory} e
+\texttt{StayServiceClient.getStayHistory} restituivano una lista vuota
+senza log: un guasto di billing, un circuito aperto o un \texttt{403}
+producevano un file di export valido in apparenza ma privo di sezioni,
+indistinguibile da un ospite senza soggiorni né fatture (Art.~15/20
+GDPR). I fallback ora registrano la causa a livello WARN e lanciano
+\texttt{ExportSourceUnavailableException}, mappata a \texttt{503} con
+\texttt{EXTERNAL\_SERVICE\_UNAVAILABLE}. I fallback di \texttt{last-date},
+già fail-closed con un sentinel che diventa \texttt{451}, restano
+invariati; non è stato aggiunto \texttt{ignoreExceptions} perché un 4xx non
+deve saltare quel fail-closed.
+Commit: \commitref{bdb22dd}{fix(guest): fail the GDPR export when history sources are unavailable}
+
+\paragraph{T-BILL-08 --- residui}
+Chiusi i tre residui dell'audit: T-GST-08, T-BILL-09 e la restrizione di
+\texttt{GET /invoices} a ADMIN/OWNER (\commitref{ce2552e}{fix(billing): restrict list-all invoices to ADMIN/OWNER}).
+Restano aperti per scelta di policy \texttt{GET /invoices/search},
+\texttt{GET /invoices/\{id\}} e \texttt{/pdf}, necessari al front desk per il
+pagamento e il checkout.
+
 \paragraph{GAP-17 --- Trust boundary IP rotto dalla topologia reale nginx→gateway}
 Trovato durante la ri-verifica post-hardening del 2026-08-16 da due
 sotto-agenti indipendenti (categorie \emph{auth-jwt} e \emph{access-control}),
@@ -7664,7 +8042,125 @@ sull'asserzione (nessuna eccezione sollevata, la delete stale ``riesce''
 silenziosamente, esattamente il sintomo descritto sopra); ripristinato il
 fix e rieseguito --- tutti e 3 tornano verdi, insieme all'intera build
 (\texttt{checkstyle}/\texttt{PMD}/\texttt{SpotBugs}/\texttt{jacoco}).
-Commit: \commitref{5f5a698}{fix(security): version-check soft-deletes on Quotation/RateSeason, enforce it on all three (GAP-18)}, \commitref{83dfda4}{test(security): repository-level stale-delete race test for GAP-18}
+\textbf{Estensione 2026-10-27}: trovata dalla prova dal vivo della pagina
+Soggiorni. L'allineamento di GAP-18 aveva coperto solo le entità versionate
+presenti in quel giro; \texttt{StayGuest} (V20), \texttt{Stay} (V22) e
+\texttt{Invoice} (billing V3) hanno ricevuto \texttt{@Version} dopo o fuori
+da quel giro e conservavano un \texttt{@SQLDelete} a un solo segnaposto,
+senza controllo di versione. Il sintomo visibile era funzionale: con
+Hibernate~7 (Spring Boot~4, \#177) il flush della \texttt{DELETE} di
+un'entità versionata lega anche la versione come secondo parametro e
+fallisce con \texttt{Unable to bind parameter \#2 \ldots{} number of
+columns: 1}, quindi \texttt{DELETE /api/v1/stays/\{id\}/guests/\{guestId\}}
+rispondeva \texttt{409 RESOURCE\_ALREADY\_EXISTS} (il fallback
+\texttt{DataIntegrityViolationException} di \texttt{GlobalExceptionHandler}
+lo presentava come conflitto generico) e un ospite non principale non
+poteva essere rimosso. Sul piano della sicurezza lo stesso statement non
+avrebbe comunque avuto il controllo ottimistico sulla cancellazione stale,
+cioè la race \texttt{UPDATE}-vs-\texttt{DELETE} descritta sopra.
+
+\begin{insecurebox}[title={StayGuest.java --- un solo segnaposto, nessun controllo versione (baseline)}]
+\begin{lstlisting}[style=java]
+@Version
+private Long version;
+...
+@SQLDelete(sql = "UPDATE stay_guests SET active = false WHERE id = ?")
+// Hibernate 7 lega (id, version): il secondo parametro non esiste
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={StayGuest.java --- stesso pattern di Reservation (main)}]
+\begin{lstlisting}[style=java]
+@SQLDelete(
+        sql = "UPDATE stay_guests SET active = false, "
+                + "version = version + 1 WHERE id = ? AND version = ?",
+        verify = Expectation.RowCount.class)
+\end{lstlisting}
+\end{securebox}
+
+Fix: i tre \texttt{@SQLDelete} (\texttt{StayGuest}, \texttt{Stay},
+\texttt{Invoice}) sono allineati al pattern già in uso, con
+\texttt{verify = Expectation.RowCount.class}, l'equivalente Hibernate~7 del
+\texttt{check = ResultCheckStyle.COUNT} descritto sopra: una \texttt{DELETE}
+stale a zero righe solleva ora la \texttt{StaleStateException} che
+\texttt{GlobalExceptionHandler} mappa a \texttt{409 CONCURRENT\_MODIFICATION}.
+Test su PostgreSQL reale (Testcontainers), sei nuovi: quattro in
+\texttt{SoftDeleteVersionCheckIntegrationTest} (soft delete di
+\texttt{StayGuest} dal percorso reale \texttt{getGuests().remove} più
+\texttt{save}, con \texttt{version} incrementata; delete stale rifiutata;
+soft delete di \texttt{Stay} con cascata sugli ospiti; delete stale
+rifiutata) e due in \texttt{InvoiceServiceIntegrationTest} (soft delete e
+delete stale). Tolto il fix tutti e sei falliscono; con il fix passano,
+insieme all'intera build (\texttt{checkstyle}/\texttt{PMD}/\texttt{SpotBugs}/
+\texttt{jacoco}). Verificato anche dal vivo da browser: la rimozione di un
+ospite non principale risponde \texttt{204}, la riga resta con
+\texttt{active = false} e \texttt{version = 1}, nessun errore di binding nel
+log.
+
+\textbf{Residui noti, non risolti}: \texttt{InvoiceCharge}
+(\texttt{cascade ALL} e \texttt{orphanRemoval} da \texttt{Invoice.charges})
+non ha \texttt{@SQLDelete}, quindi una futura cancellazione di fattura
+eliminerebbe fisicamente le righe di costo, che sono dato fiscale; oggi
+nessun percorso di produzione cancella fatture. Inoltre
+\texttt{StayGuestServiceImpl.removeGuest} non confronta una \texttt{version}
+inviata dal client (a differenza di \texttt{updateGuest}): il nuovo SQL
+intercetta solo le gare dentro la transazione, non una scheda rimasta
+aperta.
+
+Commit: \commitref{5f5a698}{fix(security): version-check soft-deletes on Quotation/RateSeason, enforce it on all three (GAP-18)}, \commitref{83dfda4}{test(security): repository-level stale-delete race test for GAP-18}, \commitref{351ff5a5}{fix(stays): version-check the soft delete of stay guests, stays and invoices}
+
+\paragraph{T-QUOT-02 --- Invio email dei preventivi senza gate di stato né limite di frequenza}
+Trovato durante l'audit dei link della schermata Preventivi (2026-10-20).
+\texttt{QuotationServiceImpl.sendQuotationEmail} rifiutava soltanto i
+preventivi \texttt{DECLINED}: un preventivo \texttt{ACCEPTED} (già convertito
+in prenotazione) o scaduto poteva essere inviato di nuovo, e lo stesso
+preventivo --- oppure una sua copia creata con \texttt{duplicateQuotation} ---
+poteva essere reinviato senza alcun limite. L'indirizzo di un contatto
+\emph{prospect} è digitato a mano dall'operatore e mai verificato, quindi
+l'endpoint permetteva di bombardare di email (con PDF allegato, dal dominio
+dell'hotel) un destinatario arbitrario.
+
+Fix: (1) l'invio è consentito solo a preventivi \texttt{DRAFT}/\texttt{SENT}
+non scaduti, altrimenti \texttt{409 QUOTATION\_NOT\_SENDABLE}; (2) nuova colonna
+\texttt{quotations.last\_sent\_at} (migrazione \texttt{V29}), timbrata con
+\texttt{saveAndFlush} \emph{prima} di chiamare il notification-service:
+il \texttt{@Version} già introdotto da T-QUOT-01 fa fallire il perdente di due
+invii concorrenti (\texttt{409}) prima che parta una seconda mail;
+(3) cooldown di 10 minuti \emph{per destinatario} --- guest o email prospect,
+su tutti i preventivi dell'hotel --- quindi una copia duplicata non lo
+azzera; \texttt{409 QUOTATION\_RESEND\_TOO\_SOON}. Il timbro viene mantenuto
+anche se l'invio fallisce: il fallback Feign (\texttt{quotationFallback})
+restituisce \texttt{false} anche su timeout, caso in cui la mail può essere
+già partita e un retry immediato la duplicherebbe. Revisione del
+\texttt{security-auditor} sul diff: i due rilievi ad alta gravità (bypass via
+duplicazione, ripristino del timbro su fallimento) sono stati corretti prima
+del commit.
+
+\begin{insecurebox}[title={QuotationServiceImpl.java --- solo DECLINED bloccato (baseline)}]
+\begin{lstlisting}[style=java]
+if (quotation.getStatus() == QuotationStatus.DECLINED) {
+    throw new ConflictException("QUOTATION_DECLINED");
+}
+// ... nessun limite: ACCEPTED/scaduto inviabili, reinvio illimitato
+final boolean sent = notificationClient.sendQuotation(...);
+\end{lstlisting}
+\end{insecurebox}
+
+\begin{securebox}[title={QuotationServiceImpl.java --- gate di stato e cooldown per destinatario (main)}]
+\begin{lstlisting}[style=java]
+if (status != QuotationStatus.DRAFT && status != QuotationStatus.SENT
+        || quotation.isExpired()) {
+    throw new ConflictException("QUOTATION_NOT_SENDABLE");
+}
+if (recentlySent) {  // exists...LastSentAtAfter(hotelId, guest|email, now - 10 min)
+    throw new ConflictException("QUOTATION_RESEND_TOO_SOON");
+}
+claimSend(quotation, now);   // saveAndFlush: @Version serializza i concorrenti
+final boolean sent = notificationClient.sendQuotation(...);
+\end{lstlisting}
+\end{securebox}
+
+Commit: \commitref{fcbe14e6}{fix(quotations): gate quotation emails by status and rate-limit them per recipient}
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Configurazione e SDLC avanzati}
@@ -7856,6 +8352,25 @@ Verificato: \texttt{./gradlew build} verde (test, PMD, Checkstyle, SpotBugs, jac
 stack Docker con tutti i servizi healthy, migrazioni Flyway applicate, tracing
 Zipkin e target Prometheus attivi. Il rescan Trivy delle immagini ha rivelato cinque HIGH su Jackson~3 (3.1.5, \texttt{tools.jackson}), risolti con l'override \texttt{jackson-bom.version} a 3.1.7; dopo la correzione le otto immagini dei servizi risultano senza vulnerabilit\`a CRITICAL/HIGH.
 Commit: \commitref{7256d859}{feat(security): migrate backend to Spring Boot 4.0.8 / Framework 7.0.9}
+
+\paragraph{Go stdlib non ancora corretto in nessuna immagine Grafana (DEP-CVE-15)}
+Due alert HIGH sul binario \texttt{grafana/grafana:13.1.7} e sui plugin Go
+bundled: CVE-2026-97031 (\texttt{crypto/tls}, esaurimento di memoria con più
+riferimenti ECH \emph{outer extension}) e CVE-2026-78667 (\texttt{net/http},
+CPU DoS con header \texttt{Range} a molti intervalli), corrette in Go 1.26.9 e
+1.27.2. A differenza dei casi precedenti il bump del tag non basta: ho ispezionato
+il binario di \texttt{13.1.7}, \texttt{13.2.3} (ultima stabile) e \texttt{nightly}
+e nessuno è compilato con una versione corretta (rispettivamente Go 1.26.6 con
+plugin 1.26.7, e Go 1.27.1 con plugin 1.26.7); non esistono tag più recenti.
+L'opzione rimasta è un'accettazione del rischio motivata in
+\texttt{.trivyignore}: CVE-2026-97031 non è raggiungibile perché Grafana serve
+HTTP in chiaro, senza TLS né chiavi ECH; CVE-2026-78667 è raggiungibile sugli
+asset statici ma comporta solo un DoS di CPU sull'interfaccia di monitoraggio,
+che gira nel solo profilo \texttt{observability} e con porta non pubblicata in
+produzione. Condizione di rimozione: una release Grafana costruita con Go
+$\geq$ 1.26.9. Le descrizioni delle due CVE provengono da fonti secondarie;
+l'advisory ufficiale non è stato consultato.
+Commit: \commitref{7a82202}{chore(security): suppress Go stdlib CVEs with no fixed grafana image}
 
 % ═════════════════════════════════════════════════════════════════════════════
 \chapter{Appendice B --- Utilizzo dell'IA e Revisione Critica}

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { ConsoleGuard } from './support/consoleGuard';
 
 // Blocco 3 (partial) — Calendar / Housekeeping / Rates element sweep.
@@ -6,10 +6,15 @@ import { ConsoleGuard } from './support/consoleGuard';
 // housekeeping status-count bug found via Chrome MCP on 2026-08-27, then
 // grows to cover the rest of this area's interactive elements.
 //
-// FilterBadge (Housekeeping.tsx:327-351) renders each summary count as its
-// OWN <button> (not a <div>) inside `<div className="grid grid-cols-3
-// gap-4">` — scope on that exact structure, not on card-level "-> Pulita"
-// transition buttons which share overlapping text.
+// Housekeeping is a kanban: one `role="group"` column per status, named by its
+// <h2> (Sporca / Pulita / Manutenzione / Occupata), holding one RoomCard each
+// (marked by `data-testid="room-card-tone"`). The column's room count is what
+// the old summary badges used to show, so that is what these tests read.
+const CLEAN = /^pulita$|^clean$/i;
+const DIRTY = /^sporca$|^dirty$/i;
+const column = (page: Page, name: RegExp) => page.getByRole('group', { name });
+const roomsIn = (page: Page, name: RegExp) => column(page, name).getByTestId('room-card-tone');
+
 test.describe('Blocco 3 — Housekeeping', () => {
   test('status-count badges update after a single status change, without a manual page reload', async ({ page }) => {
     const guard = new ConsoleGuard(page, { role: 'admin', locale: 'it' });
@@ -17,37 +22,19 @@ test.describe('Blocco 3 — Housekeeping', () => {
     await page.getByRole('heading', { name: /pulizie|housekeeping/i }).waitFor();
     guard.checkpoint('housekeeping loaded');
 
-    const badges = page.locator('.grid.grid-cols-3.gap-4 > button');
-    await expect(badges).toHaveCount(3);
-    // The badges render 0 until the rooms query resolves — read the baseline only once the
-    // room cards are on screen, otherwise "before" is the loading placeholder, not the count.
-    await expect(page.locator('.lg\\:grid-cols-4 > div').first()).toBeVisible();
-    // The badges come from their own query and can still read 0 with the cards on screen —
-    // wait until they carry real counts before taking the baseline.
-    await expect.poll(() => badges.evaluateAll((els) =>
-      els.reduce((sum, el) => sum + Number(el.querySelector('p')?.textContent?.trim() ?? 0), 0))).toBeGreaterThan(0);
-    const cleanBadge = badges.nth(0); // ALL_STATUSES = ['CLEAN', 'DIRTY', 'MAINTENANCE']
-    const before = Number((await cleanBadge.locator('p').first().textContent())?.trim());
-    expect(Number.isFinite(before)).toBe(true);
+    // Wait for the room cards: the columns render empty placeholders while the query loads.
+    await expect(page.getByTestId('room-card-tone').first()).toBeVisible();
+    const before = await roomsIn(page, CLEAN).count();
 
-    // `.lg\\:grid-cols-4` is the room-card grid's own unique class (the badge
-    // grid above it is `grid-cols-3`, no lg: variant) — direct children (`>
-    // div`) are exactly the RoomCards, so `.filter({has})` can't match an
-    // outer wrapper the way an unscoped `div` locator did.
-    const roomCards = page.locator('.lg\\:grid-cols-4 > div');
-    const dirtyCard = roomCards.filter({ has: page.getByRole('button', { name: /^→ pulita$|^→ clean$/i }) }).first();
-    await expect(dirtyCard).toBeVisible();
-    await dirtyCard.getByRole('button', { name: /^→ pulita$|^→ clean$/i }).click();
+    const toClean = column(page, DIRTY).getByRole('button', { name: /^→ pulita$|^→ clean$/i }).first();
+    await expect(toClean).toBeVisible();
+    await toClean.click();
     await page.getByText(/stato camera|room updated to/i).waitFor({ timeout: 5000 });
     guard.checkpoint('status changed, toast shown');
 
-    // No manual reload — this is the whole point of the regression: the
-    // badge must reflect the mutation on its own via query invalidation.
-    await expect(async () => {
-      const after = Number((await cleanBadge.locator('p').first().textContent())?.trim());
-      expect(after, `CLEAN badge still reads ${after} after marking a room clean (was ${before})`).toBe(before + 1);
-    }).toPass({ timeout: 5000 });
-    guard.checkpoint('CLEAN badge incremented without manual refresh');
+    // No manual reload — the Clean column must reflect the mutation on its own via query invalidation.
+    await expect(roomsIn(page, CLEAN)).toHaveCount(before + 1);
+    guard.checkpoint('Clean column incremented without manual refresh');
   });
 
   test('status-count badges update after the explicit "Aggiorna" button too', async ({ page }) => {
@@ -55,28 +42,16 @@ test.describe('Blocco 3 — Housekeeping', () => {
     await page.goto('/housekeeping');
     await page.getByRole('heading', { name: /pulizie|housekeeping/i }).waitFor();
 
-    const badges = page.locator('.grid.grid-cols-3.gap-4 > button');
-    await expect(badges).toHaveCount(3);
-    await expect(page.locator('.lg\\:grid-cols-4 > div').first()).toBeVisible();
-    // The badges come from their own query and can still read 0 with the cards on screen —
-    // wait until they carry real counts before taking the baseline.
-    await expect.poll(() => badges.evaluateAll((els) =>
-      els.reduce((sum, el) => sum + Number(el.querySelector('p')?.textContent?.trim() ?? 0), 0))).toBeGreaterThan(0);
-    const dirtyBadge = badges.nth(1);
-    const before = Number((await dirtyBadge.locator('p').first().textContent())?.trim());
-    expect(Number.isFinite(before)).toBe(true);
+    await expect(page.getByTestId('room-card-tone').first()).toBeVisible();
+    const before = await roomsIn(page, DIRTY).count();
 
-    const roomCards = page.locator('.lg\\:grid-cols-4 > div');
-    const cleanCard = roomCards.filter({ has: page.getByRole('button', { name: /^→ sporca$|^→ dirty$/i }) }).first();
-    await expect(cleanCard).toBeVisible();
-    await cleanCard.getByRole('button', { name: /^→ sporca$|^→ dirty$/i }).click();
+    const toDirty = column(page, CLEAN).getByRole('button', { name: /^→ sporca$|^→ dirty$/i }).first();
+    await expect(toDirty).toBeVisible();
+    await toDirty.click();
     await page.getByText(/stato camera|room updated to/i).waitFor({ timeout: 5000 });
 
     await page.getByRole('button', { name: /aggiorna|refresh/i }).click();
-    await expect(async () => {
-      const after = Number((await dirtyBadge.locator('p').first().textContent())?.trim());
-      expect(after).toBe(before + 1);
-    }).toPass({ timeout: 5000 });
-    guard.checkpoint('DIRTY badge correct after explicit refresh');
+    await expect(roomsIn(page, DIRTY)).toHaveCount(before + 1);
+    guard.checkpoint('Dirty column correct after explicit refresh');
   });
 });

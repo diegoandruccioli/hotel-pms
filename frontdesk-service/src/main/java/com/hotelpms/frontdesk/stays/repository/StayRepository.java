@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -183,6 +184,26 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
     Page<Stay> findByHotelIdAndActualCheckInTimeBetweenAndStatusIn(
             UUID hotelId, LocalDateTime start, LocalDateTime end,
             Collection<StayStatus> statuses, Pageable pageable);
+
+    /**
+     * Same as {@link #findByHotelIdAndActualCheckInTimeBetweenAndStatusIn} plus an
+     * expected-check-out window and an Alloggiati-failure set. Stays without an
+     * expected check-out date (legacy rows) never match, so callers use this only
+     * when one of the two extra filters is actually requested.
+     *
+     * @param hotelId        the hotel UUID (tenant isolation)
+     * @param start          lower bound (inclusive) on actual check-in time
+     * @param end            upper bound (exclusive) on actual check-in time
+     * @param statuses       stay statuses to include
+     * @param departureFrom  lower bound (inclusive) on expected check-out date
+     * @param departureTo    upper bound (inclusive) on expected check-out date
+     * @param failedFlags    values of the Alloggiati-send-failed flag to include
+     * @param pageable       the pagination and sorting parameters
+     * @return a page of matching stays for that hotel
+     */
+    Page<Stay> findByHotelIdAndActualCheckInTimeBetweenAndStatusInAndExpectedCheckOutDateBetweenAndAlloggiatiSendFailedIn(
+            UUID hotelId, LocalDateTime start, LocalDateTime end, Collection<StayStatus> statuses,
+            LocalDate departureFrom, LocalDate departureTo, Collection<Boolean> failedFlags, Pageable pageable);
 
     /**
      * Checks whether a reservation has a stay in the given status, scoped to a

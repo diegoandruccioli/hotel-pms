@@ -15,6 +15,12 @@ describe('M3StatusChip', () => {
     expect(el?.className).toContain('bg-surface-container-highest');
   });
 
+  it('falls back to neutral when the tone is undefined (status missing from a tone map)', () => {
+    render(<M3StatusChip label="Unknown" tone={undefined} />);
+    const el = screen.getByText('Unknown').closest('span');
+    expect(el?.className).toContain('bg-surface-container-highest');
+  });
+
   it('should apply success tone classes', () => {
     render(<M3StatusChip label="Paid" tone="success" />);
     const el = screen.getByText('Paid').closest('span');

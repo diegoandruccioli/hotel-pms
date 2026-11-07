@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { CalendarPlanning } from './CalendarPlanning';
 
@@ -10,6 +10,18 @@ const lastCalendarProps: { current: Record<string, unknown> } = { current: {} };
 const lastPlanningBoardProps: { current: Record<string, unknown> } = { current: {} };
 
 // Default view is 'planning' → PlanningBoard renders; month view → Calendar renders
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
+
+// PageHeader derives its breadcrumbs from the router location.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router-dom')>()),
+  useNavigate: () => mockNavigate,
+}));
+
 vi.mock('react-big-calendar', () => ({
   Calendar: (props: Record<string, unknown>) => {
     lastCalendarProps.current = props;
@@ -18,7 +30,7 @@ vi.mock('react-big-calendar', () => ({
   dateFnsLocalizer: () => ({}),
 }));
 
-vi.mock('@/pages/PlanningBoard', () => ({
+vi.mock('@/pages/CalendarPlanning/PlanningBoard', () => ({
   default: (props: Record<string, unknown>) => {
     lastPlanningBoardProps.current = props;
     return <div data-testid="planning-board">PlanningBoard</div>;
@@ -94,6 +106,21 @@ describe('CalendarPlanning', () => {
       expect(screen.getByText('view_planning')).toBeInTheDocument();
       expect(screen.getByText('view_month')).toBeInTheDocument();
     });
+  });
+
+  it('offers the views as a named radio group, planning selected first', async () => {
+    render(<CalendarPlanning />);
+    const group = await screen.findByRole('radiogroup', { name: 'calendar_view_label' });
+    expect(within(group).getByRole('radio', { name: 'view_planning' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'view_month' })).not.toBeChecked();
+  });
+
+  it('moves the selection to the month view with the arrow keys', async () => {
+    render(<CalendarPlanning />);
+    const planning = await screen.findByRole('radio', { name: 'view_planning' });
+    fireEvent.keyDown(planning, { key: 'ArrowRight' });
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'view_month' })).toBeChecked());
+    expect(screen.getByTestId('rbc-calendar')).toBeInTheDocument();
   });
 
   it('switches to calendar view when month button clicked', async () => {
@@ -194,8 +221,10 @@ describe('CalendarPlanning', () => {
       ['PENDING', '--md-secondary'],
       ['CANCELLED', '--md-error'],
       ['CHECKED_IN', '--md-tertiary'],
-      ['CHECKED_OUT', '--md-outline'],
-      ['UNKNOWN_STATUS', '--md-primary'],
+      ['PARTIALLY_CHECKED_IN', '--md-secondary'],
+      ['NO_SHOW', '--md-error'],
+      ['CHECKED_OUT', '--md-surface-container-highest'],
+      ['UNKNOWN_STATUS', '--md-surface-container-highest'],
     ])('maps status %s to design token %s', async (status, expectedColor) => {
       vi.mocked(reservationService.getAllReservations).mockResolvedValue([reservation(status)] as never);
       render(<CalendarPlanning />);
@@ -207,6 +236,20 @@ describe('CalendarPlanning', () => {
       const result = getter({ resource: { status } });
 
       expect(result.style.backgroundColor).toBe(expectedColor);
+    });
+
+    it('renders a checked-out block as a tonal bar: readable text and an outline border', async () => {
+      vi.mocked(reservationService.getAllReservations).mockResolvedValue([reservation('CHECKED_OUT')] as never);
+      render(<CalendarPlanning />);
+      await waitFor(() => screen.getByText('view_month'));
+      fireEvent.click(screen.getByText('view_month'));
+      await waitFor(() => screen.getByTestId('rbc-calendar'));
+
+      const getter = lastCalendarProps.current.eventPropGetter as (e: { resource: { status: string } }) => { style: { color: string; borderColor: string } };
+      const { style } = getter({ resource: { status: 'CHECKED_OUT' } });
+
+      expect(style.color).toBe('--md-on-surface');
+      expect(style.borderColor).toBe('--md-outline');
     });
   });
 
@@ -290,5 +333,129 @@ describe('CalendarPlanning', () => {
       await waitFor(() => expect(reservationService.updateReservation).toHaveBeenCalled());
       expect(mockAddToast).toHaveBeenCalledWith('room_moved_success', 'success');
     });
+  });
+  describe('links and URL state', () => {
+    const reservation = {
+      id: 'r1', guestId: 'g1', guestFullName: 'Mario Rossi', version: 3,
+      checkInDate: '2026-06-20', checkOutDate: '2026-06-22', status: 'CONFIRMED',
+      expectedGuests: 2, active: true,
+      lineItems: [{ roomId: 'room-A', active: true, price: 80 }],
+    };
+    type Move = (id: string, oldRoom: string, newRoom: string) => Promise<void>;
+
+    const renderAt = (url: string) => rtlRender(
+      // eslint-disable-next-line react-perf/jsx-no-new-array-as-prop -- test-only router seed
+      <MemoryRouter initialEntries={[url]}><CalendarPlanning /></MemoryRouter>,
+    );
+
+    it('opens the reservation from a planning bar', async () => {
+      render(<CalendarPlanning />);
+      await waitFor(() => screen.getByTestId('planning-board'));
+      (lastPlanningBoardProps.current.onReservationOpen as (id: string) => void)('r1');
+      expect(mockNavigate).toHaveBeenCalledWith('/reservations/r1');
+    });
+
+    it('opens the reservation from a month-view event', async () => {
+      renderAt('/calendar?view=month');
+      await waitFor(() => screen.getByTestId('rbc-calendar'));
+      (lastCalendarProps.current.onSelectEvent as (e: object) => void)({ resource: reservation });
+      expect(mockNavigate).toHaveBeenCalledWith('/reservations/r1');
+    });
+
+    it('starts a new booking with the day and room picked on the planning board', async () => {
+      render(<CalendarPlanning />);
+      await waitFor(() => screen.getByTestId('planning-board'));
+      (lastPlanningBoardProps.current.onSlotSelect as (d: Date, r: string) => void)(new Date(2999, 10, 5), 'room-B');
+      expect(mockNavigate).toHaveBeenCalledWith('/reservations/new', { state: { checkInDate: '2999-11-05', checkOutDate: undefined, roomId: 'room-B' } });
+    });
+
+    it('starts a new booking on the day picked in the month view', async () => {
+      renderAt('/calendar?view=month');
+      await waitFor(() => screen.getByTestId('rbc-calendar'));
+      (lastCalendarProps.current.onSelectSlot as (s: { start: Date; slots: Date[] }) => void)({ start: new Date(2999, 10, 9), slots: [new Date(2999, 10, 9)] });
+      expect(mockNavigate).toHaveBeenCalledWith('/reservations/new', { state: { checkInDate: '2999-11-09', checkOutDate: '2999-11-10', roomId: undefined } });
+    });
+
+    it('books the whole range dragged in the month view', async () => {
+      renderAt('/calendar?view=month');
+      await waitFor(() => screen.getByTestId('rbc-calendar'));
+      const days = [new Date(2999, 10, 9), new Date(2999, 10, 10), new Date(2999, 10, 11)];
+      (lastCalendarProps.current.onSelectSlot as (s: object) => void)({ start: days[0], slots: days });
+      expect(mockNavigate).toHaveBeenCalledWith('/reservations/new', {
+        state: { checkInDate: '2999-11-09', checkOutDate: '2999-11-12', roomId: undefined },
+      });
+    });
+
+    it('ignores a day that is already past', async () => {
+      render(<CalendarPlanning />);
+      await waitFor(() => screen.getByTestId('planning-board'));
+      (lastPlanningBoardProps.current.onSlotSelect as (d: Date, r: string) => void)(new Date(2020, 0, 5), 'room-B');
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it('opens the month and view named in the URL', async () => {
+      renderAt('/calendar?month=2027-03&view=month');
+      await waitFor(() => screen.getByTestId('rbc-calendar'));
+      expect(screen.getByText('2027')).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'view_month' })).toBeChecked();
+    });
+
+    it('falls back to the planning board and current month on an unreadable URL', async () => {
+      renderAt('/calendar?month=banana&view=sideways');
+      await waitFor(() => screen.getByTestId('planning-board'));
+      expect(screen.getByText(String(new Date().getFullYear()))).toBeInTheDocument();
+    });
+
+    it('keeps the chosen view and month in the URL', async () => {
+      renderAt('/calendar?month=2027-03');
+      await waitFor(() => screen.getByTestId('planning-board'));
+      fireEvent.click(screen.getByLabelText('next_month'));
+      expect(screen.getByText('2027')).toBeInTheDocument();
+      fireEvent.click(screen.getByText('view_month'));
+      await waitFor(() => screen.getByTestId('rbc-calendar'));
+      expect(screen.getByText('2027')).toBeInTheDocument();
+    });
+
+    it('sends the version with a move and keeps the server answer', async () => {
+      vi.mocked(reservationService.getAllReservations).mockResolvedValue([reservation] as never);
+      render(<CalendarPlanning />);
+      await waitFor(() => screen.getByTestId('planning-board'));
+      vi.mocked(reservationService.updateReservation).mockResolvedValueOnce({ ...reservation, version: 4 } as never);
+
+      await (lastPlanningBoardProps.current.onReservationMove as Move)('r1', 'room-A', 'room-C');
+
+      expect(reservationService.updateReservation).toHaveBeenCalledWith('r1', expect.objectContaining({ version: 3 }));
+      await waitFor(() => {
+        const rows = lastPlanningBoardProps.current.reservations as { version: number }[];
+        expect(rows[0].version).toBe(4);
+      });
+    });
+
+    it('reloads the data and says so when the reservation changed in the meantime', async () => {
+      vi.mocked(reservationService.getAllReservations).mockResolvedValue([reservation] as never);
+      render(<CalendarPlanning />);
+      await waitFor(() => screen.getByTestId('planning-board'));
+      vi.mocked(reservationService.updateReservation).mockRejectedValueOnce(
+        { response: { data: { errorCode: 'RESERVATION_STALE_VERSION' } } },
+      );
+
+      await (lastPlanningBoardProps.current.onReservationMove as Move)('r1', 'room-A', 'room-C');
+
+      expect(mockAddToast).toHaveBeenCalledWith('room_move_stale', 'error');
+      await waitFor(() => expect(reservationService.getAllReservations).toHaveBeenCalledTimes(2));
+    });
+
+    it.each(['CHECKED_IN', 'PARTIALLY_CHECKED_IN', 'CHECKED_OUT', 'CANCELLED', 'NO_SHOW'])(
+      'does not move a %s reservation',
+      async (status) => {
+        vi.mocked(reservationService.getAllReservations).mockResolvedValue([{ ...reservation, status }] as never);
+        render(<CalendarPlanning />);
+        await waitFor(() => screen.getByTestId('planning-board'));
+
+        await (lastPlanningBoardProps.current.onReservationMove as Move)('r1', 'room-A', 'room-C');
+
+        expect(reservationService.updateReservation).not.toHaveBeenCalled();
+      },
+    );
   });
 });

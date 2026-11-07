@@ -5,6 +5,15 @@ import { axe } from 'vitest-axe';
 import { M3Table, M3TableRow, M3TableCell } from './M3Table';
 
 describe('M3Table', () => {
+  it('uses the solid container (lowest surface, outline-variant border)', () => {
+    const { container } = render(
+      <M3Table headers={['Name']}>
+        <M3TableRow><M3TableCell>John</M3TableCell></M3TableRow>
+      </M3Table>
+    );
+    expect(container.firstChild).toHaveClass('bg-surface-container-lowest', 'border', 'border-outline-variant', 'rounded-shape-lg');
+  });
+
   it('should render headers', () => {
     render(
       <M3Table headers={['Name', 'Status', 'Actions']}>
@@ -53,6 +62,31 @@ describe('M3Table', () => {
 
     const container = screen.getByText('H').closest('div.overflow-x-auto')?.parentElement;
     expect(container?.className).toContain('mt-4');
+  });
+
+  describe('stickyEnd', () => {
+    const scroller = (container: HTMLElement) => container.querySelector('.overflow-x-auto') as HTMLElement;
+
+    it('keeps the last column pinned to the right while the table scrolls sideways', () => {
+      const { container } = render(
+        <M3Table headers={['Name', 'Actions']} stickyEnd>
+          <M3TableRow><M3TableCell>John</M3TableCell><M3TableCell>Edit</M3TableCell></M3TableRow>
+        </M3Table>
+      );
+      expect(scroller(container)).toHaveClass(
+        '[&_th:last-child]:sticky', '[&_th:last-child]:right-0',
+        '[&_td:last-child:not([colspan])]:sticky', '[&_td:last-child:not([colspan])]:right-0', 'scroll-pe-32',
+      );
+    });
+
+    it('is opt-in: a table without it scrolls every column', () => {
+      const { container } = render(
+        <M3Table headers={['Name']}>
+          <M3TableRow><M3TableCell>John</M3TableCell></M3TableRow>
+        </M3Table>
+      );
+      expect(scroller(container).className).not.toContain('sticky');
+    });
   });
 
   it('should have no accessibility violations', async () => {

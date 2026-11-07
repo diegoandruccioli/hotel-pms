@@ -8,7 +8,5 @@ export * from './StatoSelect';
 export * from './StayExtensionDialog';
 export * from './StayGuestManagerDialog';
 export * from './StayRoomChangeDialog';
-export * from './StayStatusChip';
 export * from './WalkInCheckInForm';
 export * from './stayGuestFieldHelpers';
-export * from './stayStatusTone';

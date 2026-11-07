@@ -44,6 +44,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -141,6 +143,112 @@ class InvoiceServiceImplTest {
         @AfterEach
         void tearDown() {
                 SecurityContextHolder.clearContext();
+        }
+
+        /** Makes the current request look like it was forwarded by the API gateway (a public client). */
+        private void simulateGatewayCaller() {
+                final UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                                "recept1", "", List.of(new SimpleGrantedAuthority("ROLE_RECEPTIONIST"),
+                                                new SimpleGrantedAuthority("GATEWAY_CALLER")));
+                auth.setDetails(hotelId.toString());
+                SecurityContextHolder.getContext().setAuthentication(auth);
+        }
+
+        private Invoice openInvoice(final UUID stayId) {
+                final Invoice invoice = Invoice.builder()
+                                .id(UUID.randomUUID())
+                                .stayId(stayId)
+                                .hotelId(hotelId)
+                                .totalAmount(BigDecimal.TEN)
+                                .status(InvoiceStatus.ISSUED)
+                                .invoiceNumber("INV-AUDIT0001")
+                                .build();
+                when(invoiceRepository.findByStayIdAndHotelId(stayId, hotelId)).thenReturn(Optional.of(invoice));
+                return invoice;
+        }
+
+        private void givenCharge(final Invoice invoice, final UUID chargeId, final ChargeType type) {
+                when(invoiceChargeRepository.findById(chargeId)).thenReturn(Optional.of(InvoiceCharge.builder()
+                                .id(chargeId)
+                                .invoice(invoice)
+                                .type(type)
+                                .amount(BigDecimal.ONE)
+                                .build()));
+        }
+
+        @Test
+        @DisplayName("A public (gateway) caller cannot add a non-EXTRA charge")
+        void publicCallerCannotAddNonExtraCharge() {
+                simulateGatewayCaller();
+                final UUID stayId = UUID.randomUUID();
+                final ChargeRequest request = new ChargeRequest(
+                                ChargeType.ROOM_NIGHT, "Room", BigDecimal.ONE, null, null, null);
+
+                assertThrows(AccessDeniedException.class, () -> invoiceService.addCharge(stayId, request));
+
+                verify(invoiceChargeRepository, never()).save(any(InvoiceCharge.class));
+        }
+
+        @Test
+        @DisplayName("A public (gateway) caller can still add an EXTRA charge, as the front-desk UI does")
+        void publicCallerCanAddExtraCharge() {
+                simulateGatewayCaller();
+                final UUID stayId = UUID.randomUUID();
+                final Invoice invoice = openInvoice(stayId);
+                when(invoiceRepository.save(invoice)).thenReturn(invoice);
+                when(invoiceChargeRepository.save(any(InvoiceCharge.class)))
+                                .thenAnswer(invocation -> invocation.getArgument(0));
+
+                invoiceService.addCharge(stayId, new ChargeRequest(
+                                ChargeType.EXTRA, "Minibar", BigDecimal.ONE, null, null, null));
+
+                verify(invoiceChargeRepository).save(any(InvoiceCharge.class));
+        }
+
+        @Test
+        @DisplayName("A public (gateway) caller cannot remove a ROOM_NIGHT or CITY_TAX charge")
+        void publicCallerCannotRemoveRevenueCharges() {
+                simulateGatewayCaller();
+                final UUID stayId = UUID.randomUUID();
+                final UUID roomChargeId = UUID.randomUUID();
+                final UUID taxChargeId = UUID.randomUUID();
+                final Invoice invoice = openInvoice(stayId);
+                givenCharge(invoice, roomChargeId, ChargeType.ROOM_NIGHT);
+                givenCharge(invoice, taxChargeId, ChargeType.CITY_TAX);
+
+                assertThrows(AccessDeniedException.class, () -> invoiceService.removeCharge(stayId, roomChargeId));
+                assertThrows(AccessDeniedException.class, () -> invoiceService.removeCharge(stayId, taxChargeId));
+
+                verify(invoiceChargeRepository, never()).delete(any(InvoiceCharge.class));
+        }
+
+        @Test
+        @DisplayName("A public (gateway) caller can remove an EXTRA charge, as the front-desk UI does")
+        void publicCallerCanRemoveExtraCharge() {
+                simulateGatewayCaller();
+                final UUID stayId = UUID.randomUUID();
+                final UUID chargeId = UUID.randomUUID();
+                final Invoice invoice = openInvoice(stayId);
+                givenCharge(invoice, chargeId, ChargeType.EXTRA);
+                when(invoiceRepository.save(invoice)).thenReturn(invoice);
+
+                invoiceService.removeCharge(stayId, chargeId);
+
+                verify(invoiceChargeRepository).delete(any(InvoiceCharge.class));
+        }
+
+        @Test
+        @DisplayName("An internal caller keeps reversing ROOM_NIGHT charges (room change, guest removal)")
+        void internalCallerCanRemoveRoomNightCharge() {
+                final UUID stayId = UUID.randomUUID();
+                final UUID chargeId = UUID.randomUUID();
+                final Invoice invoice = openInvoice(stayId);
+                givenCharge(invoice, chargeId, ChargeType.ROOM_NIGHT);
+                when(invoiceRepository.save(invoice)).thenReturn(invoice);
+
+                invoiceService.removeCharge(stayId, chargeId);
+
+                verify(invoiceChargeRepository).delete(any(InvoiceCharge.class));
         }
 
         @Test

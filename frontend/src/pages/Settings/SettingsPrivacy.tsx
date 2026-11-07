@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback, type ChangeEvent, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { guestService } from '../../services';
 import type { GuestPrivacySettingsResponse } from '../../types';
-import { MaterialIcon } from '../../components/MaterialIcon';
+import { M3LoadingState } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
-import { SettingsPageHeader } from '../../components/SettingsPageHeader';
+import { SettingsSectionTitle } from '../../components/SettingsSectionTitle';
 import { useToastStore } from '../../store';
 import { getErrorMessage } from '../../utils';
 
@@ -21,9 +20,7 @@ import { getErrorMessage } from '../../utils';
 
 export const SettingsPrivacy = () => {
   const { t } = useTranslation(['settings', 'common']);
-  const navigate = useNavigate();
   const addToast = useToastStore((s) => s.addToast);
-  const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const [settings, setSettings] = useState<GuestPrivacySettingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,24 +77,17 @@ export const SettingsPrivacy = () => {
   }, [settings, retentionYears, addToast, t]);
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto pb-10">
-      <SettingsPageHeader
-        icon="privacy_tip"
-        title={t('settings_section_privacy')}
-        subtitle={t('privacy_page_subtitle')}
-        onBack={handleBack}
-      />
+    <div className="space-y-6">
+      <SettingsSectionTitle title={t('settings_section_privacy')} subtitle={t('privacy_page_subtitle')} />
 
-      <M3Card className="p-6 space-y-4">
+      <M3Card variant="solid" className="p-6 space-y-4">
         <div>
-          <h2 className="text-sm font-semibold text-on-surface">{t('privacy_retention_section_title')}</h2>
+          <h3 className="text-sm font-semibold text-on-surface">{t('privacy_retention_section_title')}</h3>
           <p className="text-xs text-on-surface-variant mt-0.5">{t('privacy_retention_section_desc')}</p>
         </div>
 
         {loading ? (
-          <div className="flex justify-center items-center h-24">
-            <MaterialIcon name="progress_activity" size={28} className="text-primary animate-spin" />
-          </div>
+          <M3LoadingState label={t('common:loading')} plain className="h-24" />
         ) : settings && (
           <>
             <form onSubmit={handleSubmit} noValidate className="grid grid-cols-2 gap-4 items-end">
