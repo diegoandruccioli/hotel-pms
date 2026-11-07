@@ -135,7 +135,14 @@ test.describe('Blocco 1 — shell & global navigation', () => {
     await page.getByRole('heading', { name: /bentornato|welcome back/i }).waitFor();
 
     await page.locator('#user-menu-trigger').click();
+    // The UI fires the logout request without awaiting it and navigates to /login at once, so
+    // the URL alone does not prove the server has seen it. Wait for the response, or the
+    // refresh below can win the race by a millisecond and rotate the token instead of 401.
+    const logoutDone = page.waitForResponse(
+      (r) => r.url().includes('/api/v1/auth/logout') && r.request().method() === 'POST',
+    );
     await page.getByRole('menuitem', { name: /esci|log ?out/i }).click();
+    await logoutDone;
     await expect(page).toHaveURL(/\/login$/);
 
     // The refresh_token cookie is httpOnly and scoped to /api/v1/auth — the
