@@ -6,8 +6,15 @@ import { rateSeasonService } from '../../services';
 import { openRowMenu } from '../../test-utils';
 import { formatDate } from '../../utils';
 
+// Stable reference: a fresh `t` on every render re-fires the component's load effect,
+// reloading the list under the test and unmounting the row menu it just opened.
+const i18nMock = vi.hoisted(() => ({
+  t: (key: string, opts?: Record<string, unknown>) => (opts?.roomType ? `${key}:${opts.roomType}` : key),
+  i18n: { language: 'en' },
+}));
+
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string, opts?: Record<string, unknown>) => (opts?.roomType ? `${key}:${opts.roomType}` : key), i18n: { language: 'en' } }),
+  useTranslation: () => i18nMock,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 

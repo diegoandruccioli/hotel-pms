@@ -16,8 +16,10 @@ import { guestService, stayService, billingService, inventoryService } from '../
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 
+const i18nMock = vi.hoisted(() => ({ t: (key: string) => key, i18n: { language: 'en' } }));
+
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+  useTranslation: () => i18nMock,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
