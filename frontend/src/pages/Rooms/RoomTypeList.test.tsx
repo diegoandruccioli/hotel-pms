@@ -7,8 +7,14 @@ import { inventoryService } from '../../services';
 
 let mockLanguage = 'en';
 
+// Stable reference (see RateSeasonManagerModal.test.tsx); `language` stays live via the getter.
+const i18nMock = vi.hoisted(() => ({
+  t: (key: string) => key,
+  i18n: { get language() { return mockLanguage; } },
+}));
+
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: mockLanguage } }),
+  useTranslation: () => i18nMock,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
