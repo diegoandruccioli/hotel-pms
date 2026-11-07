@@ -6,8 +6,10 @@ import type { ReservationResponse } from '../../types';
 import { openRowMenu } from '../../test-utils';
 import { ActionsCell, GuestNameCell } from './ReservationRowCells';
 
+const i18nMock = vi.hoisted(() => ({ t: (key: string) => key }));
+
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => i18nMock,
 }));
 
 describe('GuestNameCell', () => {
