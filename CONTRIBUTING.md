@@ -207,8 +207,11 @@ Fonte unica: [`frontend/DESIGN.md`](frontend/DESIGN.md) — contrasto, focus/tas
 tema alto-contrasto WCAG AAA, touch target, token di design, convenzioni componenti.
 Leggerlo prima di toccare codice UI; non ripetere le regole qui.
 
-Finché il redesign è in corso (ADR-009), le PR di UI hanno base `feature/ui-redesign`
-(branch `ui/<sigla>-<slug>`), non `main` — vedi `docs/BRANCH_STRATEGY.md`.
+Regole di **comportamento e contenuto** (punto focale, stato nell'URL, errori e stati vuoti,
+annulla/conferma, privacy nelle schermate stampabili): [`docs/UI_GUIDELINES.md`](docs/UI_GUIDELINES.md).
+Obbligatorie per ogni schermata nuova o modificata; la checklist è nel template della PR.
+
+Le PR di UI (branch `ui/<schermata>-<slug>`, da `origin/develop`) hanno base `develop`.
 
 ---
 
