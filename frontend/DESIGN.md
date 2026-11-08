@@ -10,6 +10,12 @@ to: the actual token values, component-authoring pattern, and layout discipline 
 keep every screen looking like it belongs to the same product, whether a human or an
 agent built it.
 
+**Companion file — read both.** This file says how a screen *looks* (tokens, contrast,
+focus, components). [`docs/UI_GUIDELINES.md`](../docs/UI_GUIDELINES.md) says how it
+*behaves and speaks*: one focal point, state in the URL, error/empty-state microcopy,
+undo over confirmation, privacy on printable sheets. Both are mandatory for any new or
+changed screen; the PR template carries the checklist.
+
 Write UI code the way the existing `frontend/src/components/m3/*` components are
 written, not the way a generic React tutorial would. The rules below explain why,
 briefly, then state the rule — read the "why" once, then treat the rule as load-bearing.
