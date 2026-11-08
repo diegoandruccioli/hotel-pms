@@ -42,7 +42,7 @@ consolidamento prima del merge).
 | `feature/secure-coding-hardening` | **Storico hardening** — tutti i commit di sicurezza con SHA referenziati nel report LaTeX (`docs/security-report/report-secure-coding.tex`). Include: account lockout, BCrypt cost=12, token versioning, GDPR retention (T-GST-05), audit logging, HMAC fixes. | Congelato — non eliminare mai |
 | `feature/frontdesk-consolidation` | **ADR-001** — consolida gli ex `inventory-service`/`reservation-service`/`stay-service` in `frontdesk-service` (bounded context reale: Room↔Reservation↔Stay condiviso su 3 DB senza FK). Merge il 2026-06-20. | Mergiato, congelato — conservabile come storico o eliminabile |
 | `feature/frontend-development` | Branch di sviluppo usato fino all'integrazione iniziale (2026-05-08). **Non più una base valida**: è oggi ~257 commit dietro `main`, ripartire da lì significherebbe perdere tutto il lavoro successivo (hardening ADR-004, consolidamento frontdesk, notification-service, verticale fiscale, ecc.). | Mergiato, stale — **non usare come base per nuovi sviluppi** |
-| `feature/ui-redesign` | **Redesign UI/UX (Direzione A, ADR-009)** — branch di integrazione: ogni passo arriva con una PR piccola `ui/<sigla>-<slug>` (base `feature/ui-redesign`), CI attiva anche qui, merge commit. `main` resta presentabile; i hotfix su `main` entrano qui con `git merge origin/main` (mai rebase). Al termine un'unica PR verso `develop`. | Attivo — **non eliminare**, destino a fine lavori da decidere |
+| `feature/ui-redesign` | **Redesign UI/UX (Direzione A, ADR-009)** — era il branch di integrazione del redesign. Dal 2026-11-08 è allineato a `develop` (nessun commit proprio) e **non è più una base**: ogni schermata arriva con una PR piccola da `ui/<schermata>-<slug>` verso `develop`. | Allineato a `develop`, nessuna PR lo usa come base — **non eliminare** |
 | `main` | **Branch di sviluppo attivo e di riferimento produzione.** Build verde, tutti i test passano. Riceve sia il lavoro regolare (commit diretti) sia i merge dei branch dedicati (sicurezza, consolidamenti architetturali). | Branch di riferimento — HEAD del progetto |
 
 ---
@@ -72,6 +72,7 @@ consolidamento prima del merge).
 
 ```
 feat|fix|chore/<verticale>/<slug>  --PR-->  develop  --PR + tag -rc.N-->  main (+ tag vX.Y.Z)
+ui/<schermata>-<slug>              --PR-->  develop   (una schermata per PR, da origin/develop)
 epic/<nome> (temporaneo)           --PR-->  develop
 hotfix/<slug> (da main)            --PR-->  main, poi main riportato in develop
 ```
@@ -110,7 +111,7 @@ hotfix/<slug> (da main)            --PR-->  main, poi main riportato in develop
   log/IDOR) va **sempre** su `feature/secure-coding-hardening`, mai direttamente su `main`
   (regola MANDATORY, `CLAUDE.md`). Merge in `develop` con PR quando pronto, poi
   promosso a `main` con il rilascio.
-- **Redesign UI (`feature/ui-redesign`)**: le PR di redesign hanno base `feature/ui-redesign`, non
+- **Redesign UI (`ui/*`)**: dal 2026-11-08 le PR di UI hanno base `develop` (mai `feature/ui-redesign`), non
   `main`; i branch `ui/*` sono effimeri (eliminati dopo il merge). Lavoro di sicurezza scoperto
   durante il redesign resta su `feature/secure-coding-hardening`. Le regole di design sono in
   `frontend/DESIGN.md` (fonte unica).
