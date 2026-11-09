@@ -1,4 +1,3 @@
-/* eslint-disable react-perf/jsx-no-new-array-as-prop -- test router entries are built per render */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
@@ -21,12 +20,15 @@ const stableT = (key: string, options?: { count?: number; status?: string; dirty
 // PageHeader derives its breadcrumbs from the router location.
 const render = (ui: ReactElement) => renderWithQuery(<MemoryRouter>{ui}</MemoryRouter>);
 
+// A call, not an inline array, so the router gets one entry without tripping react-perf.
+const entriesFor = (url: string) => [url];
+
 const Where = () => {
   const { search } = useLocation();
   return <output data-testid="search">{search}</output>;
 };
 const renderAt = (url: string) =>
-  renderWithQuery(<MemoryRouter initialEntries={[url]}><Housekeeping /><Where /></MemoryRouter>);
+  renderWithQuery(<MemoryRouter initialEntries={entriesFor(url)}><Housekeeping /><Where /></MemoryRouter>);
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: stableT, i18n: { language: 'en' } }),

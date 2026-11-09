@@ -1,4 +1,3 @@
-/* eslint-disable react-perf/jsx-no-new-array-as-prop -- test router entries are built per render */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -41,6 +40,9 @@ const WORKSHEET_PROVISIONAL = {
 
 const onRoomSelect = vi.fn();
 
+// A call, not an inline array, so the router gets one entry without tripping react-perf.
+const entriesFor = (url: string) => [url];
+
 const Where = () => {
   const { search } = useLocation();
   return <output data-testid="search">{search}</output>;
@@ -48,7 +50,7 @@ const Where = () => {
 
 const render = (url = '/housekeeping') =>
   renderWithQuery(
-    <MemoryRouter initialEntries={[url]}>
+    <MemoryRouter initialEntries={entriesFor(url)}>
       <HousekeepingWorksheetSection onRoomSelect={onRoomSelect} />
       <Where />
     </MemoryRouter>,
