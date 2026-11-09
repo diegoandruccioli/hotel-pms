@@ -222,7 +222,7 @@ export const Housekeeping = memo(() => {
             onChange={handleFilterChange}
             ariaLabel={t('housekeeping_filter_label')}
             ns="common"
-            className="max-sm:[&_button]:min-w-0 max-sm:[&_button]:px-1.5 max-sm:[&_button]:text-xs"
+            className="max-sm:[&_button]:flex-auto max-sm:[&_button]:min-w-0 max-sm:[&_button]:px-1.5 max-sm:[&_button]:text-xs"
           />
 
           <p className="text-sm font-body text-on-surface-variant">{t('housekeeping_drag_hint')}</p>
