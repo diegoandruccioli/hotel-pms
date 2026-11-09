@@ -1,7 +1,8 @@
+/* eslint-disable react-perf/jsx-no-new-array-as-prop -- test router entries are built per render */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import { renderWithQuery } from '../test-utils';
 import { Housekeeping } from './Housekeeping';
@@ -19,6 +20,13 @@ const stableT = (key: string, options?: { count?: number; status?: string; dirty
 };
 // PageHeader derives its breadcrumbs from the router location.
 const render = (ui: ReactElement) => renderWithQuery(<MemoryRouter>{ui}</MemoryRouter>);
+
+const Where = () => {
+  const { search } = useLocation();
+  return <output data-testid="search">{search}</output>;
+};
+const renderAt = (url: string) =>
+  renderWithQuery(<MemoryRouter initialEntries={[url]}><Housekeeping /><Where /></MemoryRouter>);
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: stableT, i18n: { language: 'en' } }),
@@ -400,6 +408,101 @@ describe('Housekeeping', () => {
     render(<Housekeeping />);
     await waitFor(() => expect(screen.getAllByText('room_status_occupied').length).toBeGreaterThan(0));
     expect(screen.queryByLabelText('select_all_visible')).not.toBeInTheDocument();
+  });
+
+  describe('status filter and worksheet jump', () => {
+    const column = (status: string) => screen.queryByRole('group', { name: `room_status_${status}` });
+    const filter = (status: string) => screen.getByRole('radio', { name: `housekeeping_filter_${status}` });
+    const loadAt = async (url: string) => {
+      vi.mocked(inventoryService.getAllRooms).mockResolvedValue({ content: BOARD_ROOMS, totalElements: 5 } as never);
+      const utils = renderAt(url);
+      await screen.findByRole('radiogroup', { name: 'housekeeping_filter_label' });
+      return utils;
+    };
+    const withWorksheetRow = (roomNumber: string) =>
+      vi.mocked(housekeepingService.getWorksheet).mockResolvedValue(
+        { date: '2026-08-20', generatedAt: '2026-08-20T04:00:00', provisional: false, hotelName: null,
+          summary: { VACANT_DIRTY: 1 },
+          rows: [{ roomNumber, roomTypeName: 'Standard', taskType: 'VACANT_DIRTY', currentStatus: 'DIRTY', pax: 0,
+            expectedDepartureDate: null, turnover: false, departureDateUnknown: false }] } as never);
+    const focusedIn = (status: string) => within(column(status) as HTMLElement)
+      .getAllByRole('heading', { level: 3 }).some((h) => h === document.activeElement);
+
+    it('shows all four columns when there is no status in the URL', async () => {
+      await loadAt('/housekeeping');
+      for (const status of ['dirty', 'clean', 'maintenance', 'occupied']) expect(column(status)).toBeInTheDocument();
+      expect(filter('all')).toBeChecked();
+    });
+
+    it('shows only the column named by ?status=', async () => {
+      await loadAt('/housekeeping?status=DIRTY');
+      expect(column('dirty')).toBeInTheDocument();
+      expect(column('clean')).not.toBeInTheDocument();
+      expect(filter('dirty')).toBeChecked();
+    });
+
+    it('ignores an unknown status in silence', async () => {
+      await loadAt('/housekeeping?status=bogus');
+      expect(column('clean')).toBeInTheDocument();
+      expect(filter('all')).toBeChecked();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('writes the chosen filter to the URL, keeping other params, and removes it for "all"', async () => {
+      await loadAt('/housekeeping?date=2026-08-20');
+      fireEvent.click(filter('clean'));
+      expect(screen.getByTestId('search')).toHaveTextContent('?date=2026-08-20&status=CLEAN');
+      expect(column('dirty')).not.toBeInTheDocument();
+
+      fireEvent.click(filter('all'));
+      expect(screen.getByTestId('search')).toHaveTextContent(/^\?date=2026-08-20$/);
+    });
+
+    it('limits select-all and the bulk change to the rooms in view', async () => {
+      vi.mocked(inventoryService.updateRoomStatusBulk).mockResolvedValue([] as never);
+      await loadAt('/housekeeping?status=DIRTY');
+
+      fireEvent.click(screen.getByLabelText('select_all_visible'));
+      await waitFor(() => expect(screen.getByText(/n_rooms_selected 2/)).toBeInTheDocument());
+      fireEvent.click(screen.getAllByRole('button', { name: 'room_status_clean' }).find((b) => !b.textContent?.startsWith('→'))!);
+
+      await waitFor(() => expect(inventoryService.updateRoomStatusBulk).toHaveBeenCalledWith(['1', '5'], 'CLEAN'));
+    });
+
+    it('offers a way out when the filter matches no room', async () => {
+      vi.mocked(inventoryService.getAllRooms).mockResolvedValue({ content: [BOARD_ROOMS[1]], totalElements: 1 } as never);
+      renderAt('/housekeeping?status=DIRTY');
+      expect(await screen.findByText('housekeeping_filter_empty')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'housekeeping_filter_show_all' }));
+      expect(screen.getByTestId('search')).toBeEmptyDOMElement();
+      expect(await screen.findByRole('group', { name: 'room_status_clean' })).toBeInTheDocument();
+    });
+
+    it('moves focus to the card when a room number is clicked in the worksheet', async () => {
+      withWorksheetRow('105');
+      await loadAt('/housekeeping');
+      fireEvent.click(await screen.findByRole('button', { name: 'worksheet_go_to_room' }));
+      await waitFor(() => expect(focusedIn('dirty')).toBe(true));
+      expect(mockAddToast).not.toHaveBeenCalled();
+    });
+
+    it('removes a filter that hides the card, and says so', async () => {
+      withWorksheetRow('105');
+      await loadAt('/housekeeping?status=CLEAN');
+      expect(column('dirty')).not.toBeInTheDocument();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'worksheet_go_to_room' }));
+
+      await waitFor(() => expect(focusedIn('dirty')).toBe(true));
+      expect(screen.getByTestId('search')).toBeEmptyDOMElement();
+      expect(mockAddToast).toHaveBeenCalledWith('housekeeping_filter_cleared_for_room', 'info');
+    });
+
+    it('has no accessibility violations with a filter on', async () => {
+      const { container } = await loadAt('/housekeeping?status=DIRTY');
+      expect(await axe(container)).toHaveNoViolations();
+    });
   });
 
   it('should have no accessibility violations', async () => {

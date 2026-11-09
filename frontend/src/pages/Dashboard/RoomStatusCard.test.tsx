@@ -41,6 +41,13 @@ describe('RoomStatusCard', () => {
     expect(screen.getByRole('link', { name: 'dashboard_view_all_rooms' })).toHaveAttribute('href', '/housekeeping');
   });
 
+  it.each(['CLEAN', 'DIRTY', 'MAINTENANCE', 'OCCUPIED'])('links the %s row to the filtered housekeeping board', (status) => {
+    renderCard({ CLEAN: 1, DIRTY: 2, MAINTENANCE: 1, OCCUPIED: 4 });
+    const legend = screen.getByTestId('room-status-summary');
+    const link = within(legend).getByText(`room_status_${status.toLowerCase()}`).closest('a');
+    expect(link).toHaveAttribute('href', `/housekeeping?status=${status}`);
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = renderCard({ CLEAN: 1, DIRTY: 2, MAINTENANCE: 1, OCCUPIED: 4 });
     expect(await axe(container)).toHaveNoViolations();

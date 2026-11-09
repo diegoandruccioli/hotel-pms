@@ -7,6 +7,8 @@ import { M3Card, M3Checkbox, M3StatusChip } from '../../components/m3';
 import { cn, roomStatusTone, toneDotClasses, toneOutlineButtonClasses } from '../../utils';
 import { STATUS_KEYS, ALL_STATUSES } from './roomStatus';
 
+const HIGHLIGHT_MS = 1500;
+
 const StatusButton = memo(({ newStatus, updating, disabled, onClick, t }: {
   newStatus: RoomStatus;
   updating: RoomStatus | null;
@@ -62,14 +64,28 @@ export const RoomCard = memo(({ room, selected, priority = false, busy = false, 
   // OCCUPIED follows the stay, so it cannot be moved by hand.
   const draggable = room.status !== 'OCCUPIED' && !busy;
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const [highlighted, setHighlighted] = useState(false);
 
   // A moved card is unmounted and remounted in its new column, dropping the focus of the
-  // button that triggered the move; the page hands it back here.
+  // button that triggered the move; the page hands it back here. The same request comes from
+  // the worksheet's room numbers: the card is scrolled into view and ringed for a moment so
+  // the jump is not a silent change of context. The ring is a static class (no animation),
+  // so it needs no reduced-motion variant.
   useEffect(() => {
     if (!focusRequested) return;
-    headingRef.current?.focus();
+    headingRef.current?.focus({ preventScroll: true });
+    headingRef.current?.scrollIntoView?.({ block: 'center' });
     onFocusHandled?.();
+    setHighlighted(true);
   }, [focusRequested, onFocusHandled]);
+
+  // Separate from the effect above: the parent clears `focusRequested` right away, which would
+  // cancel a timer owned by that effect and leave the ring on.
+  useEffect(() => {
+    if (!highlighted) return;
+    const timer = setTimeout(() => setHighlighted(false), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [highlighted]);
 
   const { formatCurrency } = useFormatters();
 
@@ -101,7 +117,8 @@ export const RoomCard = memo(({ room, selected, priority = false, busy = false, 
       draggable={draggable}
       onDragStart={draggable ? handleDragStart : undefined}
       onDragEnd={draggable ? handleDragEnd : undefined}
-      className={cn('relative flex flex-col gap-3 overflow-hidden p-4', draggable && 'cursor-grab', isDragging && 'opacity-40')}
+      data-highlighted={highlighted || undefined}
+      className={cn('relative flex flex-col gap-3 overflow-hidden p-4', draggable && 'cursor-grab', isDragging && 'opacity-40', highlighted && 'ring-2 ring-primary')}
     >
       <div
         data-testid="room-card-tone"
