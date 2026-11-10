@@ -7,6 +7,7 @@ import type { OwnerFinancialReportDto, OwnerFinancialSummaryDto } from '../types
 import type { InvoiceResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
 import { Alert } from '../components/Alert';
+import { ExportCsvButton } from '../components/ExportCsvButton';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3TableEmptyRow } from '../components/m3';
@@ -143,9 +144,7 @@ export const OwnerDashboard = memo(() => {
         subtitle={t('owner_dashboard_subtitle')}
         actions={
           report && (
-            <M3Button variant="tonal" icon="download" id="export-csv-btn" onClick={handleExport}>
-              {t('export_csv')}
-            </M3Button>
+            <ExportCsvButton onExport={handleExport} />
           )
         }
       />

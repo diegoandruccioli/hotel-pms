@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { SortingState } from '@tanstack/react-table';
 import type { GuestResponseDTO } from '../types';
+import { ExportCsvButton } from '../components/ExportCsvButton';
 import { PageHeader } from '../components/PageHeader';
 import { ListToolbar } from '../components/ListToolbar';
 import { M3Button, M3EmptyState } from '../components/m3';
@@ -248,9 +249,7 @@ export const Guests = memo(() => {
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}
         trailing={isAdminOrOwner && (
-          <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
-            {t('export_csv')}
-          </M3Button>
+          <ExportCsvButton onExport={handleExportCsv} />
         )}
       />
 
