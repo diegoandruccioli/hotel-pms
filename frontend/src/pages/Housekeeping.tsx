@@ -270,7 +270,7 @@ const BulkStatusButton = memo(({ status, disabled, onClick, t }: {
       disabled={disabled}
       data-testid={`bulk-status-${status}`}
       className={cn(
-        'flex items-center justify-center min-h-10 text-xs font-medium font-body border rounded-shape-sm px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+        'flex items-center justify-center min-h-11 sm:pointer-fine:min-h-10 text-xs font-medium font-body border rounded-shape-sm px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
         toneOutlineButtonClasses[roomStatusTone[status]]
       )}
     >

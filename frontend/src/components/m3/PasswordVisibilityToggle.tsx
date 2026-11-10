@@ -17,7 +17,7 @@ export const PasswordVisibilityToggle = ({ visible, onToggle, className = '' }: 
       onClick={onToggle}
       aria-label={visible ? t('hide_password') : t('show_password')}
       className={cn(
-        'flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant',
+        'flex items-center justify-center size-11 sm:pointer-fine:size-10 rounded-shape-full text-on-surface-variant',
         'hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2',
         'focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors',
         className

@@ -179,7 +179,7 @@ export const Dashboard = () => {
           action={
             <Link
               to="/stays"
-              className="inline-flex items-center min-h-10 text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
+              className="inline-flex items-center min-h-11 sm:pointer-fine:min-h-10 text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
             >
               {t('view_all')}
             </Link>
@@ -199,7 +199,7 @@ export const Dashboard = () => {
             isOwnerOrAdmin ? (
               <Link
                 to="/settings/city-tax"
-                className="inline-flex items-center min-h-10 text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
+                className="inline-flex items-center min-h-11 sm:pointer-fine:min-h-10 text-sm font-medium font-body underline hover:no-underline whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-on-error-container rounded-sm"
               >
                 {t('city_tax_unassessed_banner_action')}
               </Link>

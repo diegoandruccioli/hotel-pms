@@ -108,7 +108,7 @@ export const HousekeepingWorksheetSection = memo(({ onRoomSelect }: Housekeeping
           <button
             type="button"
             onClick={handleBackToCurrentDate}
-            className="inline-flex min-h-10 items-center font-medium underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+            className="inline-flex min-h-11 sm:pointer-fine:min-h-10 items-center font-medium underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
           >
             {t('worksheet_back_to_current_date')}
           </button>
@@ -179,7 +179,7 @@ const WorksheetRows = memo(({ rowsByType, onRoomSelect }: {
         onClick={handleToggle}
         aria-expanded={open}
         aria-controls={panelId}
-        className="inline-flex min-h-10 items-center gap-1 rounded-sm text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+        className="inline-flex min-h-11 sm:pointer-fine:min-h-10 items-center gap-1 rounded-sm text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
       >
         <MaterialIcon name={open ? 'expand_less' : 'expand_more'} size={20} />
         {open ? t('worksheet_rows_hide') : t('worksheet_rows_show', { count: total })}
@@ -213,7 +213,7 @@ const WorksheetRowItem = memo(({ row, onRoomSelect }: {
   const handleClick = useCallback(() => onRoomSelect(row.roomNumber), [onRoomSelect, row.roomNumber]);
 
   return (
-    <li className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 py-1">
+    <li className="flex min-h-11 sm:pointer-fine:min-h-10 flex-wrap items-center gap-x-3 gap-y-1 py-1">
       <button
         type="button"
         onClick={handleClick}

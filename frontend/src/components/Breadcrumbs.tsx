@@ -15,7 +15,7 @@ interface BreadcrumbsProps {
 }
 
 const LINK_CLASSES = cn(
-  'inline-flex items-center min-h-10 px-1 rounded-shape-sm transition-colors',
+  'inline-flex items-center min-h-11 sm:pointer-fine:min-h-10 px-1 rounded-shape-sm transition-colors',
   'hover:text-on-surface hover:underline',
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
 );

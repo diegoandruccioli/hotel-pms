@@ -20,6 +20,13 @@ describe('M3FilterChip', () => {
     expect(chip.className).toContain('border-outline-variant');
   });
 
+  it('grows to a 44 px touch target without changing the desktop chip height', () => {
+    render(<M3FilterChip label="Paid" selected={false} onClick={vi.fn()} />);
+    const chip = screen.getByRole('button', { name: 'Paid' });
+    expect(chip.className).toContain('min-h-11');
+    expect(chip.className).toContain('sm:pointer-fine:min-h-0');
+  });
+
   it('calls onClick when pressed', () => {
     const onClick = vi.fn();
     render(<M3FilterChip label="Paid" selected={false} onClick={onClick} />);

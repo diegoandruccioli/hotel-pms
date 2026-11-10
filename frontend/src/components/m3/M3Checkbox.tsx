@@ -21,7 +21,7 @@ export const M3Checkbox = ({ label, supportingText, className = '', ...rest }: M
         {...rest}
       />
       <div>
-        <label htmlFor={id} className="text-sm font-medium font-body text-on-surface">
+        <label htmlFor={id} className="block py-3 -my-3 sm:pointer-fine:py-0 sm:pointer-fine:my-0 text-sm font-medium font-body text-on-surface">
           {label}
         </label>
         {supportingText && (

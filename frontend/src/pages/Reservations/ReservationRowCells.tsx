@@ -75,7 +75,7 @@ export const StatusCell = ({ reservation, onRetryConfirmationEmail, retryingEmai
             onClick={handleRetry}
             disabled={retryingEmail === reservation.id}
             aria-label={t('retry_confirmation_email')}
-            className="flex items-center justify-center w-10 h-10 rounded-shape-full text-error hover:bg-error/12 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
+            className="flex items-center justify-center size-11 sm:pointer-fine:size-10 rounded-shape-full text-error hover:bg-error/12 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-error disabled:opacity-50"
           >
             <MaterialIcon name={retryingEmail === reservation.id ? 'progress_activity' : 'refresh'} size={16} />
           </button>
@@ -161,7 +161,7 @@ export const GuestNameCell = ({ name, groupId }: { name?: string; groupId?: stri
           to={`/reservations/groups/${groupId}`}
           aria-label={t('reservation_group_link')}
           title={t('reservation_group_link')}
-          className="inline-flex items-center justify-center w-10 h-10 rounded-shape-full text-primary hover:bg-primary/8 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+          className="inline-flex items-center justify-center size-11 sm:pointer-fine:size-10 rounded-shape-full text-primary hover:bg-primary/8 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
         >
           <MaterialIcon name="groups" size={18} />
         </Link>

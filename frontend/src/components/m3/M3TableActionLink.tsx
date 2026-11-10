@@ -30,7 +30,7 @@ export const M3TableActionLink = ({
       type="button"
       disabled={disabled}
       className={cn(
-        'inline-flex items-center justify-center min-h-10 min-w-10 px-2',
+        'inline-flex items-center justify-center min-h-11 min-w-11 sm:pointer-fine:min-h-10 sm:pointer-fine:min-w-10 px-2',
         'font-medium text-sm rounded transition-colors',
         'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2',
         'disabled:opacity-50 disabled:cursor-not-allowed',

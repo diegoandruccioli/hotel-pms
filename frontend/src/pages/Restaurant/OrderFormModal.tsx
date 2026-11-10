@@ -53,7 +53,7 @@ const MenuItemRow = memo(
             onClick={handleDecrement}
             disabled={quantity === 0}
             aria-label={`${t('decrease_quantity')} ${item.name}`}
-            className="w-10 h-10 flex items-center justify-center rounded-full text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-1 transition-colors"
+            className="size-11 sm:pointer-fine:size-10 flex items-center justify-center rounded-full text-primary hover:bg-primary/10 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-1 transition-colors"
           >
             <MaterialIcon name="remove" size={18} aria-hidden="true" />
           </button>
@@ -67,7 +67,7 @@ const MenuItemRow = memo(
             type="button"
             onClick={handleIncrement}
             aria-label={`${t('increase_quantity')} ${item.name}`}
-            className="w-10 h-10 flex items-center justify-center rounded-full text-primary hover:bg-primary/10 focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-1 transition-colors"
+            className="size-11 sm:pointer-fine:size-10 flex items-center justify-center rounded-full text-primary hover:bg-primary/10 focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-1 transition-colors"
           >
             <MaterialIcon name="add" size={18} aria-hidden="true" />
           </button>

@@ -34,7 +34,7 @@ export const M3Button = ({
     <button
       disabled={isDisabled}
       className={cn(
-        'inline-flex items-center justify-center gap-2 px-6 h-10 rounded-shape-full text-sm font-medium font-body transition-all',
+        'inline-flex items-center justify-center gap-2 px-6 min-h-11 sm:pointer-fine:min-h-10 rounded-shape-full text-sm font-medium font-body transition-all',
         variantClasses[variant],
         isDisabled && 'opacity-38 cursor-not-allowed shadow-none',
         className

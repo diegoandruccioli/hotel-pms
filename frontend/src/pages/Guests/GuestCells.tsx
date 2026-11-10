@@ -52,7 +52,7 @@ export const GuestNameCell = ({ guest, onOpen }: NameCellProps) => {
       type="button"
       onClick={handleOpen}
       aria-haspopup="dialog"
-      className="flex items-center gap-3 text-left rounded-shape-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+      className="flex items-center gap-3 min-h-11 sm:pointer-fine:min-h-0 text-left rounded-shape-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
     >
       <M3Avatar name={guest.firstName || guest.lastName} size="md" aria-hidden="true" />
       <span className="min-w-0">

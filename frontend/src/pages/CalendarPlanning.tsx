@@ -264,7 +264,7 @@ export const CalendarPlanning = () => {
         <div className="flex items-center justify-center gap-2 bg-surface-container-low px-4 py-2 rounded-shape-full shadow-elevation-1">
           <button
             onClick={handlePrevMonth}
-            className="flex items-center justify-center min-h-10 min-w-10 rounded-full hover:bg-surface-container transition-colors text-primary"
+            className="flex items-center justify-center min-h-11 min-w-11 sm:pointer-fine:min-h-10 sm:pointer-fine:min-w-10 rounded-full hover:bg-surface-container transition-colors text-primary"
             aria-label={t('prev_month')}
           >
             <MaterialIcon name="chevron_left" size={28} />
@@ -281,14 +281,14 @@ export const CalendarPlanning = () => {
 
           <button
             onClick={handleNextMonth}
-            className="flex items-center justify-center min-h-10 min-w-10 rounded-full hover:bg-surface-container transition-colors text-primary"
+            className="flex items-center justify-center min-h-11 min-w-11 sm:pointer-fine:min-h-10 sm:pointer-fine:min-w-10 rounded-full hover:bg-surface-container transition-colors text-primary"
             aria-label={t('next_month')}
           >
             <MaterialIcon name="chevron_right" size={28} />
           </button>
 
           {/* Hidden input for the native month picker */}
-          <div className="relative ml-2 flex items-center justify-center min-h-10 min-w-10">
+          <div className="relative ml-2 flex items-center justify-center min-h-11 min-w-11 sm:pointer-fine:min-h-10 sm:pointer-fine:min-w-10">
             <input
               type="month"
               value={monthValue}

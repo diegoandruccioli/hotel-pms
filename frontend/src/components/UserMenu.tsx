@@ -134,7 +134,7 @@ export const UserMenu = ({
         aria-expanded={open}
         aria-controls="user-menu-list"
         className={cn(
-          'flex rounded-shape-full',
+          'flex items-center justify-center min-h-11 min-w-11 sm:pointer-fine:min-h-0 sm:pointer-fine:min-w-0 rounded-shape-full',
           'focus-visible:outline-hidden focus-visible:ring-2',
           'focus-visible:ring-primary focus-visible:ring-offset-2',
           'hover:brightness-110 transition-all cursor-pointer',

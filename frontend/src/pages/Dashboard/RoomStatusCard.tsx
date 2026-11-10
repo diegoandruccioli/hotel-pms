@@ -43,7 +43,7 @@ export const RoomStatusCard = ({ counts }: RoomStatusCardProps) => {
         <Link
           to="/housekeeping"
           aria-label={t('dashboard_view_all_rooms')}
-          className="inline-flex items-center min-h-10 text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+          className="inline-flex items-center min-h-11 sm:pointer-fine:min-h-10 text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
         >
           {t('view_all')}
         </Link>
@@ -62,7 +62,7 @@ export const RoomStatusCard = ({ counts }: RoomStatusCardProps) => {
           <li key={row.status}>
             <Link
               to={`/housekeeping?status=${row.status}`}
-              className="group flex min-h-10 items-center gap-2 rounded-sm text-sm font-body text-on-surface hover:bg-surface-container-high focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+              className="group flex min-h-11 sm:pointer-fine:min-h-10 items-center gap-2 rounded-sm text-sm font-body text-on-surface hover:bg-surface-container-high focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
             >
               <span aria-hidden="true" className={cn('h-3 w-3 shrink-0 rounded-full', row.dotClass)} />
               <span className="min-w-0 flex-1 truncate text-on-surface-variant">{t(`room_status_${row.status.toLowerCase()}`)}</span>

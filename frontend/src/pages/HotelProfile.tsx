@@ -316,7 +316,7 @@ export function HotelProfile() {
           <p className="text-xs text-on-surface-variant">{t('hotel_city_tax_hint')}</p>
           <Link
             to="/settings/city-tax"
-            className="inline-flex min-h-10 items-center text-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+            className="inline-flex min-h-11 sm:pointer-fine:min-h-10 items-center text-sm font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
           >
             {t('hotel_city_tax_link')}
           </Link>

@@ -39,7 +39,7 @@ export function M3FilterChip<T extends string = string>({
       aria-pressed={selected}
       onClick={handleClick}
       className={cn(
-        'px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
+        'inline-flex items-center min-h-11 sm:pointer-fine:min-h-0 px-3 py-1.5 rounded-full text-xs font-medium font-body border transition-colors',
         selected
           ? 'bg-primary text-on-primary border-primary'
           : 'bg-transparent text-on-surface-variant border-outline-variant hover:border-outline',
