@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { RoomCard } from './RoomCard';
 import type { RoomResponse } from '../../types';
@@ -19,6 +19,29 @@ const setup = (status: RoomResponse['status'], onStatusChange = vi.fn().mockReso
   );
   return { ...utils, onToggleSelected, onStatusChange };
 };
+
+describe('RoomCard focus request', () => {
+  it('scrolls to the card, focuses its heading and rings it for a moment', () => {
+    vi.useFakeTimers();
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const onFocusHandled = vi.fn();
+    const { container } = render(
+      <RoomCard room={room('DIRTY')} selected={false} focusRequested onFocusHandled={onFocusHandled}
+        onToggleSelected={vi.fn()} onStatusChange={vi.fn()} />,
+    );
+    const card = container.firstElementChild as HTMLElement;
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+    expect(screen.getByRole('heading')).toHaveFocus();
+    expect(onFocusHandled).toHaveBeenCalledTimes(1);
+    expect(card).toHaveAttribute('data-highlighted', 'true');
+
+    act(() => { vi.advanceTimersByTime(1600); });
+    expect(card).not.toHaveAttribute('data-highlighted');
+    vi.useRealTimers();
+  });
+});
 
 describe('RoomCard', () => {
   it('offers the two other statuses as arrow-prefixed buttons', () => {

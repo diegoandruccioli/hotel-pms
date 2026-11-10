@@ -1,9 +1,11 @@
 import { useState, useCallback, memo, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useToastStore } from '../store';
 import type { RoomResponse, RoomStatus } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
 import { M3Card } from '../components/m3';
+import { M3SegmentedRow } from '../components/m3';
 import { M3Checkbox } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
@@ -15,15 +17,29 @@ import { useBusinessDate, useDaySheet, useHousekeepingWorksheet } from '../hooks
 import { HousekeepingWorksheetSection } from './Housekeeping/HousekeepingWorksheetSection';
 import { HousekeepingBoard } from './Housekeeping/HousekeepingBoard';
 import { priorityRoomNumbers } from './Housekeeping/housekeepingPriority';
-import { STATUS_KEYS, ALL_STATUSES } from './Housekeeping/roomStatus';
+import { STATUS_KEYS, ALL_STATUSES, FILTER_OPTIONS, parseStatusFilter, type StatusFilter } from './Housekeeping/roomStatus';
 
 const EMPTY_ROOMS: RoomResponse[] = [];
 const NO_PRIORITY_ROOMS: ReadonlySet<string> = new Set();
+const FILTER_OPTIONS_LIST = [...FILTER_OPTIONS];
 
 export const Housekeeping = memo(() => {
   const { t } = useTranslation('common');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const addToast = useToastStore((s) => s.addToast);
+
+  // The status filter lives in `?status=` (a link from the Dashboard lands here already filtered).
+  // An unknown value is ignored in silence: it simply means "all rooms".
+  const [searchParams, setSearchParams] = useSearchParams();
+  const statusFilter = parseStatusFilter(searchParams.get('status'));
+  const handleFilterChange = useCallback((value: StatusFilter) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value === 'ALL') next.delete('status'); else next.set('status', value);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+  const handleShowAll = useCallback(() => handleFilterChange('ALL'), [handleFilterChange]);
 
   const { data: roomsData, isLoading: loading, error: queryError, refetch } = useRoomsList(false);
   const rooms = roomsData ?? EMPTY_ROOMS;
@@ -67,9 +83,16 @@ export const Housekeeping = memo(() => {
     setFocusRoomId(id);
   }, [handleStatusChange]);
 
+  // Everything below works on the rooms in view: with a filter on, "select all" and the bulk
+  // actions must not reach rooms the user cannot see.
+  const visibleRooms = useMemo(
+    () => (statusFilter === 'ALL' ? rooms : rooms.filter((r) => r.status === statusFilter)),
+    [rooms, statusFilter],
+  );
+  const selectableRooms = useMemo(() => visibleRooms.filter((r) => r.status !== 'OCCUPIED'), [visibleRooms]);
   const bulkUpdateRoomStatus = useBulkUpdateRoomStatus();
   const handleBulkStatusChange = useCallback(async (newStatus: RoomStatus) => {
-    const roomIds = Array.from(selectedIds);
+    const roomIds = visibleRooms.filter((r) => selectedIds.has(r.id)).map((r) => r.id);
     if (roomIds.length === 0) return;
     try {
       await bulkUpdateRoomStatus.mutateAsync({ roomIds, status: newStatus });
@@ -78,7 +101,7 @@ export const Housekeeping = memo(() => {
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('failed_bulk_update_rooms')), 'error');
     }
-  }, [addToast, t, bulkUpdateRoomStatus, selectedIds]);
+  }, [addToast, t, bulkUpdateRoomStatus, selectedIds, visibleRooms]);
 
   const handleToggleSelected = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -88,9 +111,13 @@ export const Housekeeping = memo(() => {
     });
   }, []);
 
-  const selectableRooms = useMemo(() => rooms.filter((r) => r.status !== 'OCCUPIED'), [rooms]);
   const allSelectableSelected = selectableRooms.length > 0 &&
     selectableRooms.every((r) => selectedIds.has(r.id));
+
+  const selectedVisibleCount = useMemo(
+    () => visibleRooms.filter((r) => selectedIds.has(r.id)).length,
+    [visibleRooms, selectedIds],
+  );
 
   const handleToggleSelectAll = useCallback(() => {
     setSelectedIds(allSelectableSelected ? new Set() : new Set(selectableRooms.map((r) => r.id)));
@@ -104,6 +131,18 @@ export const Housekeeping = memo(() => {
     () => (worksheet ? priorityRoomNumbers(worksheet.rows) : NO_PRIORITY_ROOMS),
     [worksheet],
   );
+
+  // A room number clicked in the worksheet: take the user to its card. If the filter hides the
+  // card the filter is removed (and the user told), so the jump never lands on nothing.
+  const handleRoomSelect = useCallback((roomNumber: string) => {
+    const room = rooms.find((r) => r.roomNumber === roomNumber);
+    if (!room) return;
+    if (statusFilter !== 'ALL' && room.status !== statusFilter) {
+      handleFilterChange('ALL');
+      addToast(t('housekeeping_filter_cleared_for_room', { number: roomNumber }), 'info');
+    }
+    setFocusRoomId(room.id);
+  }, [rooms, statusFilter, handleFilterChange, addToast, t]);
 
   const handleDropRoom = useCallback((roomId: string, status: RoomStatus) => {
     const room = rooms.find((r) => r.id === roomId);
@@ -133,7 +172,7 @@ export const Housekeeping = memo(() => {
         }
       />
 
-      <HousekeepingWorksheetSection />
+      <HousekeepingWorksheetSection onRoomSelect={handleRoomSelect} />
 
       {loading ? (
         <M3LoadingState label={t('loading')} />
@@ -157,10 +196,10 @@ export const Housekeeping = memo(() => {
                 checked={allSelectableSelected}
                 onChange={handleToggleSelectAll}
               />
-              {selectedIds.size > 0 && (
+              {selectedVisibleCount > 0 && (
                 <>
                   <span className="text-sm font-body text-on-surface-variant">
-                    {t('n_rooms_selected', { count: selectedIds.size })}
+                    {t('n_rooms_selected', { count: selectedVisibleCount })}
                   </span>
                   <span className="text-sm font-body text-on-surface-variant">{t('apply_status_to_selected')}:</span>
                   {ALL_STATUSES.map((status) => (
@@ -177,18 +216,38 @@ export const Housekeeping = memo(() => {
             </M3Card>
           )}
 
-          <p className="text-sm font-body text-on-surface-variant">{t('housekeeping_drag_hint')}</p>
-          <HousekeepingBoard
-            rooms={rooms}
-            selectedIds={selectedIds}
-            priorityRooms={priorityRooms}
-            busyIds={busyIds}
-            focusRoomId={focusRoomId}
-            onFocusHandled={handleFocusHandled}
-            onToggleSelected={handleToggleSelected}
-            onStatusChange={handleCardStatusChange}
-            onDropRoom={handleDropRoom}
+          <M3SegmentedRow
+            options={FILTER_OPTIONS_LIST}
+            value={statusFilter}
+            onChange={handleFilterChange}
+            ariaLabel={t('housekeeping_filter_label')}
+            ns="common"
+            className="max-sm:[&_button]:flex-auto max-sm:[&_button]:min-w-0 max-sm:[&_button]:px-1.5 max-sm:[&_button]:text-xs"
           />
+
+          <p className="text-sm font-body text-on-surface-variant">{t('housekeeping_drag_hint')}</p>
+          {visibleRooms.length === 0 ? (
+            <M3Card variant="solid">
+              <M3EmptyState
+                icon="cleaning_services"
+                title={t('housekeeping_filter_empty')}
+                action={<M3Button variant="outlined" onClick={handleShowAll}>{t('housekeeping_filter_show_all')}</M3Button>}
+              />
+            </M3Card>
+          ) : (
+            <HousekeepingBoard
+              rooms={rooms}
+              statusFilter={statusFilter}
+              selectedIds={selectedIds}
+              priorityRooms={priorityRooms}
+              busyIds={busyIds}
+              focusRoomId={focusRoomId}
+              onFocusHandled={handleFocusHandled}
+              onToggleSelected={handleToggleSelected}
+              onStatusChange={handleCardStatusChange}
+              onDropRoom={handleDropRoom}
+            />
+          )}
         </>
       )}
     </div>

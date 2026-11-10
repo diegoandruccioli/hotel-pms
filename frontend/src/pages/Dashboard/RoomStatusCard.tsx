@@ -59,10 +59,16 @@ export const RoomStatusCard = ({ counts }: RoomStatusCardProps) => {
       </div>
       <ul data-testid="room-status-summary" className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2">
         {rows.map((row) => (
-          <li key={row.status} className="flex items-center gap-2 text-sm font-body text-on-surface">
-            <span aria-hidden="true" className={cn('h-3 w-3 shrink-0 rounded-full', row.dotClass)} />
-            <span className="min-w-0 flex-1 truncate text-on-surface-variant">{t(`room_status_${row.status.toLowerCase()}`)}</span>
-            <span className="font-display font-bold tabular-nums">{row.count}</span>
+          <li key={row.status}>
+            <Link
+              to={`/housekeeping?status=${row.status}`}
+              className="group flex min-h-10 items-center gap-2 rounded-sm text-sm font-body text-on-surface hover:bg-surface-container-high focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <span aria-hidden="true" className={cn('h-3 w-3 shrink-0 rounded-full', row.dotClass)} />
+              <span className="min-w-0 flex-1 truncate text-on-surface-variant">{t(`room_status_${row.status.toLowerCase()}`)}</span>
+              <span className="font-display font-bold tabular-nums">{row.count}</span>
+              <MaterialIcon name="chevron_right" size={16} className="shrink-0 text-on-surface-variant" />
+            </Link>
           </li>
         ))}
       </ul>
