@@ -503,6 +503,24 @@ describe('Housekeeping', () => {
       expect(mockAddToast).toHaveBeenCalledWith('housekeeping_filter_cleared_for_room', 'info');
     });
 
+    it('shows an occupied room alone, without actions, checkbox or select-all', async () => {
+      await loadAt('/housekeeping?status=OCCUPIED');
+      const occupied = within(column('occupied') as HTMLElement);
+      expect(occupied.getAllByRole('heading', { level: 3 })).toHaveLength(1);
+      expect(occupied.queryByLabelText('select_room')).not.toBeInTheDocument();
+      expect(screen.queryByText(/→/)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('select_all_visible')).not.toBeInTheDocument();
+    });
+
+    it('moves focus to an occupied card when its number is clicked in the worksheet', async () => {
+      withWorksheetRow('104');
+      await loadAt('/housekeeping');
+      fireEvent.click(await screen.findByRole('button', { name: /worksheet_rows_show/ }));
+      fireEvent.click(await screen.findByRole('button', { name: 'worksheet_go_to_room' }));
+      await waitFor(() => expect(focusedIn('occupied')).toBe(true));
+      expect(mockAddToast).not.toHaveBeenCalled();
+    });
+
     it('has no accessibility violations with a filter on', async () => {
       const { container } = await loadAt('/housekeeping?status=DIRTY');
       expect(await axe(container)).toHaveNoViolations();
