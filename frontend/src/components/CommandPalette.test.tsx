@@ -148,7 +148,7 @@ describe('CommandPalette', () => {
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('John Doe'));
-    expect(mockNavigate).toHaveBeenCalledWith(`/guests?search=${encodeURIComponent('John Doe')}`, undefined);
+    expect(mockNavigate).toHaveBeenCalledWith('/guests', { state: { guestId: expect.any(String) } });
     expect(onClose).toHaveBeenCalled();
   });
 

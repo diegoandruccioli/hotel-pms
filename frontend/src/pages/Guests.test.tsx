@@ -4,19 +4,30 @@ import { axe } from 'vitest-axe';
 import { openRowMenu, renderWithQuery as render } from '../test-utils';
 import { Guests } from './Guests';
 
-const mockUseSearchParams = vi.hoisted(() => vi.fn(() => [new URLSearchParams()] as [URLSearchParams]));
+// Stateful stand-in for the router's query string: the page reads sort and page from it and writes them back.
+const router = vi.hoisted(() => ({ initialQuery: '', setSearchParams: vi.fn() }));
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockUseLocation = vi.hoisted(() => vi.fn((): { pathname: string; state?: unknown } => ({ pathname: '/guests' })));
-vi.mock('react-router-dom', () => ({
-  useSearchParams: mockUseSearchParams,
-  useNavigate: () => mockNavigate,
-  useLocation: mockUseLocation,
-}));
+vi.mock('react-router-dom', async () => {
+  const { useState, useCallback } = await import('react');
+  const useSearchParams = () => {
+    const [params, setParams] = useState(() => new URLSearchParams(router.initialQuery));
+    const set = useCallback((next: URLSearchParams, options?: unknown) => {
+      router.setSearchParams(next.toString(), options);
+      setParams(new URLSearchParams(next));
+    }, []);
+    return [params, set] as const;
+  };
+  return { useSearchParams, useNavigate: () => mockNavigate, useLocation: mockUseLocation };
+});
 import { guestService, stayService, billingService, inventoryService } from '../services';
 import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 
-const i18nMock = vi.hoisted(() => ({ t: (key: string) => key, i18n: { language: 'en' } }));
+const i18nMock = vi.hoisted(() => ({
+  t: (key: string, opts?: { name?: string }) => (key === 'delete_guest_title' ? `${key}:${opts?.name}` : key),
+  i18n: { language: 'en' },
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => i18nMock,
@@ -91,6 +102,7 @@ const mockAuthNull = (selector: unknown) =>
 describe('Guests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    router.initialQuery = '';
     mockUseLocation.mockReturnValue({ pathname: '/guests' });
     vi.mocked(useAuthStore).mockImplementation(mockAuthNull);
     vi.mocked(useToastStore).mockReturnValue(mockAddToast);
@@ -213,6 +225,8 @@ describe('Guests', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
 
     expect(screen.getByText('delete_guest_confirm')).toBeInTheDocument();
+    expect(screen.getByText('delete_guest_title:John Doe')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'delete_guest_action' })).toBeInTheDocument();
   });
 
   it('should call deleteGuest and reload the current page on confirm', async () => {
@@ -226,7 +240,7 @@ describe('Guests', () => {
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
-    fireEvent.click(screen.getAllByRole('button', { name: /^delete$/ })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'delete_guest_action' }));
 
     await waitFor(() => {
       expect(guestService.deleteGuest).toHaveBeenCalledWith('guest-1');
@@ -260,7 +274,7 @@ describe('Guests', () => {
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
-    fireEvent.click(screen.getAllByRole('button', { name: /^delete$/ })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'delete_guest_action' }));
 
     await waitFor(() => {
       expect(mockAddToast).toHaveBeenCalledWith('delete_guest_failed', 'error');
@@ -292,7 +306,7 @@ describe('Guests', () => {
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
-    fireEvent.click(screen.getAllByRole('button', { name: /^delete$/ })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'delete_guest_action' }));
 
     await waitFor(() => {
       expect(mockAddToast).toHaveBeenCalledWith('delete_guest_gdpr_hold', 'error');
@@ -317,7 +331,7 @@ describe('Guests', () => {
   });
 
   it('should pre-populate search from URL ?search param and query the server with it', async () => {
-    mockUseSearchParams.mockReturnValueOnce([new URLSearchParams('search=Jane')] as [URLSearchParams]);
+    router.initialQuery = 'search=Jane';
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([JANE]) as never);
     render(<Guests />);
 
@@ -325,6 +339,72 @@ describe('Guests', () => {
       expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('Jane', 0, 20, 'lastName,asc');
       expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     });
+  });
+
+  it('should drop a legacy ?search= from the URL once it has been read', async () => {
+    router.initialQuery = 'search=Jane';
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([JANE]) as never);
+    render(<Guests />);
+
+    await waitFor(() => expect(router.setSearchParams).toHaveBeenCalledWith('', { replace: true }));
+    expect(screen.getByRole('searchbox')).toHaveValue('Jane');
+  });
+
+  it('should read the sort direction and page from the URL', async () => {
+    router.initialQuery = 'dir=desc&page=3';
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST], 5) as never);
+    render(<Guests />);
+
+    await waitFor(() => {
+      expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('', 2, 20, 'lastName,desc');
+    });
+  });
+
+  it('should write the page to the URL (replace, one-based) when moving to the next page', async () => {
+    vi.mocked(guestService.searchGuestsPaged)
+      .mockResolvedValueOnce(page([GUEST], 3) as never)
+      .mockResolvedValueOnce(page([JANE], 3) as never);
+    render(<Guests />);
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'next_page' }));
+
+    expect(router.setSearchParams).toHaveBeenCalledWith('page=2', { replace: true });
+  });
+
+  it('should land on the last page when the URL points past the end', async () => {
+    router.initialQuery = 'page=9';
+    vi.mocked(guestService.searchGuestsPaged)
+      .mockResolvedValueOnce(page([], 2) as never)
+      .mockResolvedValueOnce(page([JANE], 2) as never);
+    render(<Guests />);
+
+    await waitFor(() => expect(router.setSearchParams).toHaveBeenCalledWith('page=2', { replace: true }));
+  });
+
+  it('should offer a way out when a search finds nobody, and clear the search on click', async () => {
+    router.initialQuery = 'search=zzz';
+    vi.mocked(guestService.searchGuestsPaged)
+      .mockResolvedValueOnce(page([]) as never)
+      .mockResolvedValueOnce(page([GUEST]) as never);
+    render(<Guests />);
+
+    await waitFor(() => expect(screen.getByText('guests_no_match_title')).toBeInTheDocument());
+    expect(screen.getByText('guests_no_match_hint')).toBeInTheDocument();
+    expect(screen.queryByText('no_guests_found')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'guests_show_all' }));
+
+    expect(screen.getByRole('searchbox')).toHaveValue('');
+    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+  });
+
+  it('should show a dash, not "- (-)", for a guest with no city and no country', async () => {
+    vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([JANE]) as never);
+    render(<Guests />);
+    await waitFor(() => expect(screen.getByText('Jane Smith')).toBeInTheDocument());
+
+    expect(screen.queryByText('- (-)')).not.toBeInTheDocument();
   });
 
   it('should show pagination controls and request the next page on click', async () => {

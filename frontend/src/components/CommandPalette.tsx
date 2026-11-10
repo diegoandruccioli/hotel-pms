@@ -59,7 +59,7 @@ export const CommandPalette = ({ open, onClose }: CommandPaletteProps) => {
   const handleWalkIn = useCallback(() => goTo('/stays/walk-in'), [goTo]);
 
   const handleGuestSelect = useCallback((guest: GuestResponseDTO) => {
-    goTo(`/guests?search=${encodeURIComponent(`${guest.firstName} ${guest.lastName}`)}`);
+    goTo('/guests', { guestId: guest.id });
   }, [goTo]);
 
   const handleReservationSelect = useCallback((reservation: ReservationResponse) => {
