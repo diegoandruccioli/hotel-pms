@@ -1,4 +1,4 @@
-import { useCallback, useMemo, memo } from 'react';
+import { useCallback, useId, useMemo, useState, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { M3Card } from '../../components/m3';
@@ -160,26 +160,45 @@ const WorksheetRows = memo(({ rowsByType, onRoomSelect }: {
   onRoomSelect: (roomNumber: string) => void;
 }) => {
   const { t } = useTranslation('common');
+  // Closed by default: the counts above already say what is on the sheet, and a long list would
+  // push the board below the fold. A view preference, not content, so it stays out of the URL.
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const handleToggle = useCallback(() => setOpen((prev) => !prev), []);
 
   if (rowsByType.length === 0) {
     return <p className="mt-4 text-sm font-body text-on-surface-variant">{t('worksheet_empty')}</p>;
   }
 
+  const total = rowsByType.reduce((sum, group) => sum + group.rows.length, 0);
+
   return (
-    <div className="mt-5 space-y-4">
-      <h3 className="text-sm font-display font-semibold text-on-surface">{t('worksheet_rows_title')}</h3>
-      {rowsByType.map(({ type, rows }) => (
-        <section key={type} aria-labelledby={`worksheet-group-${type}`}>
-          <h4 id={`worksheet-group-${type}`} className="mb-1 text-xs font-medium font-body uppercase tracking-wide text-on-surface-variant">
-            {t(SUMMARY_KEYS[type])} · {rows.length}
-          </h4>
-          <ul className="grid grid-cols-1 gap-x-6 sm:grid-cols-2 xl:grid-cols-3">
-            {rows.map((row) => (
-              <WorksheetRowItem key={row.roomNumber} row={row} onRoomSelect={onRoomSelect} />
-            ))}
-          </ul>
-        </section>
-      ))}
+    <div className="mt-4">
+      <button
+        type="button"
+        onClick={handleToggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="inline-flex min-h-10 items-center gap-1 rounded-sm text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <MaterialIcon name={open ? 'expand_less' : 'expand_more'} size={20} />
+        {open ? t('worksheet_rows_hide') : t('worksheet_rows_show', { count: total })}
+      </button>
+      <div id={panelId} hidden={!open} className="mt-2 space-y-4">
+        <h3 className="text-sm font-display font-semibold text-on-surface">{t('worksheet_rows_title')}</h3>
+        {rowsByType.map(({ type, rows }) => (
+          <section key={type} aria-labelledby={`worksheet-group-${type}`}>
+            <h4 id={`worksheet-group-${type}`} className="mb-1 text-xs font-medium font-body uppercase tracking-wide text-on-surface-variant">
+              {t(SUMMARY_KEYS[type])} · {rows.length}
+            </h4>
+            <ul className="grid grid-cols-1 gap-x-6 sm:grid-cols-2 xl:grid-cols-3">
+              {rows.map((row) => (
+                <WorksheetRowItem key={row.roomNumber} row={row} onRoomSelect={onRoomSelect} />
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
     </div>
   );
 });

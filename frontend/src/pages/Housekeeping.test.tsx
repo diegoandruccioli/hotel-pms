@@ -484,6 +484,7 @@ describe('Housekeeping', () => {
     it('moves focus to the card when a room number is clicked in the worksheet', async () => {
       withWorksheetRow('105');
       await loadAt('/housekeeping');
+      fireEvent.click(await screen.findByRole('button', { name: /worksheet_rows_show/ }));
       fireEvent.click(await screen.findByRole('button', { name: 'worksheet_go_to_room' }));
       await waitFor(() => expect(focusedIn('dirty')).toBe(true));
       expect(mockAddToast).not.toHaveBeenCalled();
@@ -494,6 +495,7 @@ describe('Housekeeping', () => {
       await loadAt('/housekeeping?status=CLEAN');
       expect(column('dirty')).not.toBeInTheDocument();
 
+      fireEvent.click(await screen.findByRole('button', { name: /worksheet_rows_show/ }));
       fireEvent.click(await screen.findByRole('button', { name: 'worksheet_go_to_room' }));
 
       await waitFor(() => expect(focusedIn('dirty')).toBe(true));
