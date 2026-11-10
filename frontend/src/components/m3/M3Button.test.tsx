@@ -47,6 +47,12 @@ describe('M3Button', () => {
     expect(screen.getByText('add')).toBeInTheDocument();
   });
 
+  it('is 44 px tall on small or touch screens and 40 px with a mouse on wide screens', () => {
+    render(<M3Button>Test</M3Button>);
+    expect(screen.getByRole('button').className).toContain('min-h-11');
+    expect(screen.getByRole('button').className).toContain('sm:pointer-fine:min-h-10');
+  });
+
   it('should have no accessibility violations', async () => {
     const { container } = render(<M3Button>Click me</M3Button>);
     const results = await axe(container);

@@ -85,7 +85,7 @@ export const M3ModalShell = ({
               type="button"
               onClick={onClose}
               className={cn(
-                'flex items-center justify-center w-10 h-10',
+                'flex items-center justify-center size-11 sm:pointer-fine:size-10',
                 'rounded-shape-full text-on-surface-variant',
                 'hover:bg-surface-container-highest',
                 'focus-visible:outline-hidden focus-visible:ring-2',

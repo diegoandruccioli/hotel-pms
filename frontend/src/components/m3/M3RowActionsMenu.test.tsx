@@ -30,6 +30,12 @@ describe('M3RowActionsMenu', () => {
     expect(menu()).not.toBeInTheDocument();
   });
 
+  it('has a 44 px trigger on small or touch screens and 40 px with a mouse on wide screens', () => {
+    render(<M3RowActionsMenu label="Actions for Marco" items={makeItems()} />);
+    expect(trigger().className).toContain('size-11');
+    expect(trigger().className).toContain('sm:pointer-fine:size-10');
+  });
+
   it('opens on click, focuses the first item and links the trigger to the menu', async () => {
     const user = userEvent.setup();
     render(<M3RowActionsMenu label="Actions for Marco" items={makeItems()} />);

@@ -60,7 +60,7 @@ export const M3Select = ({
         aria-invalid={hasError}
         aria-describedby={errorText ? `${id}-error` : supportingText ? `${id}-support` : undefined}
         className={cn(
-          'w-full px-4 py-2.5 rounded-shape-xs border bg-transparent text-sm font-body text-on-surface transition-all focus:outline-hidden',
+          'w-full min-h-11 sm:pointer-fine:min-h-0 px-4 py-2.5 rounded-shape-xs border bg-transparent text-sm font-body text-on-surface transition-all focus:outline-hidden',
           hasError
             ? 'border-error ring-2 ring-error ring-offset-1'
             : 'border-outline hover:border-on-surface focus:border-primary focus:ring-2 focus:ring-primary focus:ring-offset-1'

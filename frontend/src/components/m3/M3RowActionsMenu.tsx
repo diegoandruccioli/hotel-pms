@@ -227,7 +227,7 @@ export const M3RowActionsMenu = memo(({ label, items }: M3RowActionsMenuProps) =
           onClick={handleTriggerClick}
           onKeyDown={handleTriggerKeyDown}
           className={cn(
-            'flex items-center justify-center w-10 h-10 rounded-shape-full cursor-pointer',
+            'flex items-center justify-center size-11 sm:pointer-fine:size-10 rounded-shape-full cursor-pointer',
             'text-on-surface-variant hover:bg-surface-container-highest transition-colors',
             'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
             open && 'bg-surface-container-highest text-on-surface',

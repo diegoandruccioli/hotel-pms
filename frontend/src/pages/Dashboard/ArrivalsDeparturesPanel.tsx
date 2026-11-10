@@ -149,7 +149,7 @@ export const ArrivalsDeparturesPanel = () => {
             to={VIEW_ALL_TARGET[tab].to}
             state={VIEW_ALL_TARGET[tab].state}
             aria-label={t(isArrivals ? 'dashboard_view_all_arrivals' : 'dashboard_view_all_departures')}
-            className="inline-flex items-center min-h-10 text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm whitespace-nowrap"
+            className="inline-flex items-center min-h-11 sm:pointer-fine:min-h-10 text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm whitespace-nowrap"
           >
             {t('view_all')}
           </Link>

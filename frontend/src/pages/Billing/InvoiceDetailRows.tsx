@@ -74,7 +74,7 @@ export const ChargeRow = memo(({ charge, removable, removing, formatCurrency, on
             aria-label={t('remove_charge')}
             disabled={removing}
             onClick={handleRemoveClick}
-            className="text-on-surface-variant hover:text-error disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm min-h-10 min-w-10 flex items-center justify-center"
+            className="text-on-surface-variant hover:text-error disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm min-h-11 min-w-11 sm:pointer-fine:min-h-10 sm:pointer-fine:min-w-10 flex items-center justify-center"
           >
             <MaterialIcon name="delete" size={18} />
           </button>

@@ -45,7 +45,7 @@ const SegmentedButton = memo(function SegmentedButton<T extends string>({
       onKeyDown={onKeyDown}
       className={cn(
         'relative flex items-center justify-center gap-1.5',
-        'flex-1 h-10 px-3 text-sm font-medium font-body',
+        'flex-1 min-h-11 sm:pointer-fine:min-h-10 px-3 text-sm font-medium font-body',
         'focus-visible:outline-hidden focus-visible:z-10',
         'focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
         'transition-colors',

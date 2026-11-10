@@ -32,7 +32,7 @@ export const OwnerSummarySection = () => {
         <Link
           to="/owner-dashboard"
           aria-label={t('dashboard_view_all_owner_report')}
-          className="inline-flex items-center min-h-10 text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+          className="inline-flex items-center min-h-11 sm:pointer-fine:min-h-10 text-sm font-medium font-body text-primary hover:text-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
         >
           {t('view_all')}
         </Link>

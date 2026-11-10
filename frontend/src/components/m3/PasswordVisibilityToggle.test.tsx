@@ -26,6 +26,13 @@ describe('PasswordVisibilityToggle', () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
+  it('is a 44 px square on small or touch screens and 40 px with a mouse on wide screens', () => {
+    render(<PasswordVisibilityToggle visible={false} onToggle={vi.fn()} />);
+    const btn = screen.getByLabelText('show_password');
+    expect(btn.className).toContain('size-11');
+    expect(btn.className).toContain('sm:pointer-fine:size-10');
+  });
+
   it('should have no accessibility violations', async () => {
     const { container } = render(<PasswordVisibilityToggle visible={false} onToggle={vi.fn()} />);
     const results = await axe(container);

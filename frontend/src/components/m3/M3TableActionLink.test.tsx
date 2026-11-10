@@ -51,11 +51,13 @@ describe('M3TableActionLink', () => {
     expect(screen.getByRole('button').className).toContain('ml-3');
   });
 
-  it('meets the 40x40 minimum touch target size', () => {
+  it('is 44x44 on small or touch screens and 40x40 with a mouse on wide screens', () => {
     render(<M3TableActionLink>Edit</M3TableActionLink>);
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('min-h-10');
-    expect(btn.className).toContain('min-w-10');
+    expect(btn.className).toContain('min-h-11');
+    expect(btn.className).toContain('min-w-11');
+    expect(btn.className).toContain('sm:pointer-fine:min-h-10');
+    expect(btn.className).toContain('sm:pointer-fine:min-w-10');
   });
 
   it('has no accessibility violations', async () => {

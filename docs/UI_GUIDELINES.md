@@ -129,6 +129,7 @@ Ogni regola ha: **Regola** · **Perché** · **Come** · **Verifica**.
   - Ogni dettaglio mostrato su hover ha un equivalente a focus/click/tap; i tooltip non portano informazione essenziale.
   - Stato = icona *e* testo oltre al colore (`M3StatusChip`, vedi `DESIGN.md`, "Accessibility").
   - Non disabilitare mai lo zoom (`user-scalable=no`).
+  - Touch target: almeno 44 px (Apple HIG / WCAG 2.5.5) su schermi stretti o touch, 40 px solo con larghezza ≥ 640 px **e** mouse: classi `min-h-11 sm:pointer-fine:min-h-10` (icone quadrate `size-11 sm:pointer-fine:size-10`). Vale per bottoni, azioni di riga, chip, intestazioni ordinabili, voci di dialog.
 - **Verifica.** Funziona con una mano, senza mouse e in bianco e nero?
 
 ### R12 — Dati personali, stampa e URL (privacy by design)

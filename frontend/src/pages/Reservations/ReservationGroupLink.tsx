@@ -12,7 +12,7 @@ export const ReservationGroupLink = ({ groupId }: { groupId: string }) => {
   return (
     <Link
       to={`/reservations/groups/${groupId}`}
-      className="inline-flex items-center gap-2 min-h-10 text-sm font-body text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs"
+      className="inline-flex items-center gap-2 min-h-11 sm:pointer-fine:min-h-10 text-sm font-body text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs"
     >
       <MaterialIcon name="groups" size={18} />
       {group ? t('reservation_part_of_group', { name: group.name }) : t('reservation_group_link')}

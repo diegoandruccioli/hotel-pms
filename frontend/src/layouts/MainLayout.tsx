@@ -144,7 +144,7 @@ export const MainLayout = () => {
                   type="button"
                   onClick={toggleSidebar}
                   aria-label={sidebarCollapsed ? t('sidebar_expand') : t('sidebar_collapse')}
-                  className="flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="flex items-center justify-center size-11 sm:pointer-fine:size-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
                   <MaterialIcon name={sidebarCollapsed ? 'chevron_right' : 'chevron_left'} size={24} />
                 </button>
@@ -162,7 +162,7 @@ export const MainLayout = () => {
           {!passwordChangePending && (
             <button
               type="button"
-              className="flex items-center justify-center w-10 h-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest lg:hidden mr-2"
+              className="flex items-center justify-center size-11 sm:pointer-fine:size-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest lg:hidden mr-2"
               onClick={openDrawer}
               aria-label={t('nav_menu') ?? 'Open menu'}
             >
@@ -178,7 +178,7 @@ export const MainLayout = () => {
               type="button"
               onClick={openPalette}
               aria-label={tCommand('palette_open_button')}
-              className="flex items-center gap-2 h-10 px-3 mr-2 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              className="flex items-center gap-2 min-h-11 sm:pointer-fine:min-h-10 px-3 mr-2 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
               <MaterialIcon name="search" size={20} />
               <kbd className="hidden sm:inline text-xs rounded-sm border border-outline-variant px-1.5 py-0.5">
