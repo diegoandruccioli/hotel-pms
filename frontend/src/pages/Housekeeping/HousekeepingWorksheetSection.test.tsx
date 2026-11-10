@@ -168,6 +168,7 @@ describe('HousekeepingWorksheetSection', () => {
     });
     render();
 
+    fireEvent.click(await screen.findByRole('button', { name: /worksheet_rows_show/ }));
     const group = await screen.findByRole('region', { name: /worksheet_summary_departure/ });
     expect(group).toHaveTextContent('204');
     expect(group).toHaveTextContent('205');
@@ -179,9 +180,35 @@ describe('HousekeepingWorksheetSection', () => {
     vi.mocked(housekeepingService.getWorksheet).mockResolvedValue({ ...WORKSHEET_PROVISIONAL, rows: [ROW] });
     render();
 
+    fireEvent.click(await screen.findByRole('button', { name: /worksheet_rows_show/ }));
     fireEvent.click(await screen.findByRole('button', { name: 'worksheet_go_to_room {"number":"204"}' }));
 
     expect(onRoomSelect).toHaveBeenCalledWith('204');
+  });
+
+  it('keeps the room list closed until asked, and closes it again', async () => {
+    vi.mocked(housekeepingService.getWorksheet).mockResolvedValue({ ...WORKSHEET_PROVISIONAL, rows: [ROW, { ...ROW, roomNumber: '205' }] });
+    render();
+
+    const toggle = await screen.findByRole('button', { name: 'worksheet_rows_show {"count":2}' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /worksheet_go_to_room/ })).not.toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAccessibleName('worksheet_rows_hide');
+    expect(screen.getAllByRole('button', { name: /worksheet_go_to_room/ })).toHaveLength(2);
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /worksheet_go_to_room/ })).not.toBeInTheDocument();
+  });
+
+  it('shows no toggle when the sheet has no rooms', async () => {
+    render();
+    await screen.findByText('worksheet_empty');
+    expect(screen.queryByRole('button', { name: /worksheet_rows_show/ })).not.toBeInTheDocument();
   });
 
   it('says what to do when the date has no cleaning tasks', async () => {
@@ -189,10 +216,13 @@ describe('HousekeepingWorksheetSection', () => {
     expect(await screen.findByText('worksheet_empty')).toBeInTheDocument();
   });
 
-  it('passes axe accessibility check', async () => {
+  it('passes axe accessibility check, with the room list closed and open', async () => {
     vi.mocked(housekeepingService.getWorksheet).mockResolvedValue({ ...WORKSHEET_PROVISIONAL, rows: [ROW] });
     const { container } = render();
     await screen.findByText('worksheet_provisional');
+    expect(await axe(container)).toHaveNoViolations();
+
+    fireEvent.click(screen.getByRole('button', { name: /worksheet_rows_show/ }));
     expect(await axe(container)).toHaveNoViolations();
   });
 });

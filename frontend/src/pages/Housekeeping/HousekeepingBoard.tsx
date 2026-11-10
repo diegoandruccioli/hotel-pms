@@ -34,7 +34,7 @@ export const HousekeepingBoard = memo(({
   const columns = statusFilter === 'ALL' ? COLUMNS : [statusFilter];
 
   return (
-    <div className={cn('grid grid-cols-1 gap-4 lg:items-start', statusFilter === 'ALL' && 'lg:grid-cols-4')}>
+    <div className={cn('grid grid-cols-1 gap-4 sm:items-start', statusFilter === 'ALL' && 'sm:grid-cols-2 lg:grid-cols-4')}>
       {columns.map((status) => (
         <HousekeepingColumn
           key={status}

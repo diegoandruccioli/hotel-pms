@@ -206,6 +206,8 @@
   "housekeeping_filter_show_all": "Show all rooms",
   "housekeeping_filter_cleared_for_room": "Filter removed to show room {{number}}",
   "worksheet_rows_title": "Rooms on this sheet",
+  "worksheet_rows_show": "Show rooms ({{count}})",
+  "worksheet_rows_hide": "Hide rooms",
   "worksheet_go_to_room": "Go to room {{number}}",
   "worksheet_row_pax_one": "{{count}} guest",
   "worksheet_row_pax_other": "{{count}} guests",

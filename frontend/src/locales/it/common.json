@@ -206,6 +206,8 @@
   "housekeeping_filter_show_all": "Mostra tutte le camere",
   "housekeeping_filter_cleared_for_room": "Filtro rimosso per mostrare la camera {{number}}",
   "worksheet_rows_title": "Camere del foglio",
+  "worksheet_rows_show": "Mostra le camere ({{count}})",
+  "worksheet_rows_hide": "Nascondi le camere",
   "worksheet_go_to_room": "Vai alla camera {{number}}",
   "worksheet_row_pax_one": "{{count}} ospite",
   "worksheet_row_pax_other": "{{count}} ospiti",
