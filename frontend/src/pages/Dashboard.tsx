@@ -84,8 +84,7 @@ export const Dashboard = () => {
       value: daySheet ? daySheet.todayArrivals.toString() : '0',
       icon: 'login',
       tone: 'success',
-      to: '/reservations',
-      state: { preset: 'arrivalsToday', sortField: 'checkInDate', sortDir: 'asc' },
+      to: '/reservations?preset=arrivalsToday&sort=checkInDate&dir=asc',
       trend: { field: 'arrivals', today: daySheet?.todayArrivals ?? 0 },
     },
     {

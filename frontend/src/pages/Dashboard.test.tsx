@@ -89,8 +89,8 @@ const trendOf = (...points: [number, number][]): DaySheetTrendResponse => ({
 });
 
 const LocationProbe = () => {
-  const { pathname, state } = useLocation();
-  return <div data-testid="location" data-state={JSON.stringify(state)}>{pathname}</div>;
+  const { pathname, search, state } = useLocation();
+  return <div data-testid="location" data-state={JSON.stringify(state)} data-search={search}>{pathname}</div>;
 };
 
 const openDeparturesTab = async () => fireEvent.click(await screen.findByRole('radio', { name: 'dashboard_tab_departures' }));
@@ -346,7 +346,7 @@ describe('Dashboard Component', () => {
     renderDashboard();
     const grid = await screen.findByTestId('stats-grid');
     const links = within(grid).getAllByRole('link');
-    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/stays', '/reservations', '/stays', '/rooms', '/billing']);
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/stays', '/reservations?preset=arrivalsToday&sort=checkInDate&dir=asc', '/stays', '/rooms', '/billing']);
     expect(within(grid).queryByText('view_all')).not.toBeInTheDocument();
   });
 
@@ -401,7 +401,7 @@ describe('Dashboard Component', () => {
     fireEvent.click(within(grid).getAllByRole('link')[1]);
     const probe = await screen.findByTestId('location');
     expect(probe).toHaveTextContent('/reservations');
-    expect(JSON.parse(probe.getAttribute('data-state') ?? '{}')).toEqual({ preset: 'arrivalsToday', sortField: 'checkInDate', sortDir: 'asc' });
+    expect(probe.getAttribute('data-search')).toBe('?preset=arrivalsToday&sort=checkInDate&dir=asc');
   });
 
   it('opens the stays list on the guests due out today from the departures card', async () => {

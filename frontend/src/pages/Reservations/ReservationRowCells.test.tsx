@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import type { ReservationResponse } from '../../types';
 import { openRowMenu } from '../../test-utils';
-import { ActionsCell, GuestNameCell } from './ReservationRowCells';
+import { ActionsCell, GuestNameCell, GuestsCountCell } from './ReservationRowCells';
 
 const i18nMock = vi.hoisted(() => ({ t: (key: string) => key }));
 
@@ -63,5 +63,26 @@ describe('ActionsCell', () => {
     renderActions(status);
     expect(screen.getByText('view')).toBeInTheDocument();
     expect(screen.queryByText('edit')).not.toBeInTheDocument();
+  });
+});
+
+describe('GuestsCountCell', () => {
+  const reservation = { id: 'r1', expectedGuests: 2, actualGuests: 1 } as ReservationResponse;
+  const withoutActual = { ...reservation, actualGuests: undefined };
+
+  it('shows the count and says in words what it counts', () => {
+    render(<GuestsCountCell reservation={reservation} />);
+    expect(screen.getByText('1 / 2')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('reservation_guests_checked_in')).toHaveClass('sr-only');
+  });
+
+  it('counts a missing actual number as zero', () => {
+    render(<GuestsCountCell reservation={withoutActual} />);
+    expect(screen.getByText('0 / 2')).toBeInTheDocument();
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<GuestsCountCell reservation={reservation} />);
+    expect(await axe(container)).toHaveNoViolations();
   });
 });
