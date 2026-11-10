@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import type { SortingState } from '@tanstack/react-table';
 import type { ReservationResponse, RoomResponse } from '../types';
+import { ExportCsvButton } from '../components/ExportCsvButton';
 import { PageHeader } from '../components/PageHeader';
 import { ListToolbar } from '../components/ListToolbar';
 import { M3Button } from '../components/m3';
@@ -260,9 +261,7 @@ export const Reservations = () => {
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}
         trailing={
-          <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
-            {t('export_csv')}
-          </M3Button>
+          <ExportCsvButton onExport={handleExportCsv} />
         }
       >
         {RESERVATION_PRESETS.map((value) => (

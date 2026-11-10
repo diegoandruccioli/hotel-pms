@@ -5,8 +5,8 @@ import type { SortingState } from '@tanstack/react-table';
 import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types';
 import { Alert } from '../components/Alert';
 import { ListToolbar } from '../components/ListToolbar';
+import { ExportCsvButton } from '../components/ExportCsvButton';
 import { PageHeader } from '../components/PageHeader';
-import { M3Button } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3EmptyState } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
@@ -212,9 +212,7 @@ export const Billing = memo(() => {
               className="w-40"
             />
             {isAdminOrOwner && (
-              <M3Button icon="download" variant="tonal" onClick={handleExportCsv}>
-                {t('export_csv')}
-              </M3Button>
+              <ExportCsvButton onExport={handleExportCsv} />
             )}
           </>
         }
