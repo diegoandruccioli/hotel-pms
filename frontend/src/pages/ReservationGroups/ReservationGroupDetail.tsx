@@ -79,7 +79,8 @@ export const ReservationGroupDetail = () => {
   const handleBackToList = useCallback(() => navigate('/reservations/groups'), [navigate]);
 
   const masterFolioState = useMemo(() => ({ invoiceId: group?.masterFolioInvoiceId }), [group?.masterFolioInvoiceId]);
-  const contactGuestHref = `/guests?search=${encodeURIComponent(group?.contactGuestName ?? '')}`;
+  // The guest opens by id in the router state: a name in the URL would end up in history and logs.
+  const contactGuestState = useMemo(() => ({ guestId: group?.contactGuestId }), [group?.contactGuestId]);
 
   const canCancel = useMemo(
     () => !!group && group.status !== 'CANCELLED' && group.status !== 'CHECKED_OUT', [group]);
@@ -134,7 +135,7 @@ export const ReservationGroupDetail = () => {
         </div>
         <div>
           <p className="text-on-surface-variant">{t('contact_guest')}</p>
-          <Link to={contactGuestHref} className={LINK_CLASS}>{group.contactGuestName}</Link>
+          <Link to="/guests" state={contactGuestState} className={LINK_CLASS}>{group.contactGuestName}</Link>
         </div>
         <div>
           <p className="text-on-surface-variant">{t('label_checkin_date')} / {t('label_checkout_date')}</p>

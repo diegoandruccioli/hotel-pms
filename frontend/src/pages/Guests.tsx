@@ -5,7 +5,7 @@ import type { SortingState } from '@tanstack/react-table';
 import type { GuestResponseDTO } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { ListToolbar } from '../components/ListToolbar';
-import { M3Button } from '../components/m3';
+import { M3Button, M3EmptyState } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3ConfirmDialog } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
@@ -22,10 +22,10 @@ import { guestService } from '../services';
 import { GuestFormModal } from '../components/GuestFormModal';
 import { GuestDetailSheet } from './Guests/GuestDetailSheet';
 import { useGuestColumns } from './Guests/useGuestColumns';
+import { guestListParamsToSearch, readGuestListParams, type GuestListParams } from './Guests/guestListParams';
 
 const PAGE_SIZE = 20;
-const DEFAULT_SORT_FIELD = 'lastName';
-const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'asc';
+const SORT_FIELD = 'lastName';
 
 export const Guests = memo(() => {
   const { t } = useTranslation('common');
@@ -34,7 +34,6 @@ export const Guests = memo(() => {
   const isAdminOrOwner = role === 'ADMIN' || role === 'OWNER';
   const queryClient = useQueryClient();
 
-  const [page, setPage] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGuest, setSelectedGuest] = useState<GuestResponseDTO | undefined>();
   // Where focus goes back to when the form opened from the detail sheet closes: the sheet is
@@ -47,9 +46,11 @@ export const Guests = memo(() => {
   const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
-  const initialSearch = searchParams.get('search') ?? '';
-  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  // Sort direction and page live in the URL (back, refresh and shared links keep them). The search
+  // text does not, because it holds guest names: an old `?search=` link is read once, then dropped.
+  const [urlParams, setUrlParams] = useSearchParams();
+  const { page, dir: sortDir } = readGuestListParams(urlParams);
+  const [searchQuery, setSearchQuery] = useState(() => urlParams.get('search') ?? '');
   const debouncedSearch = useDebounce(searchQuery);
 
   const handleExportCsv = useCallback(async () => {
@@ -60,45 +61,59 @@ export const Guests = memo(() => {
     }
   }, [searchQuery, addToast, t]);
 
-  const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
+  const updateList = useCallback((patch: Partial<GuestListParams>) => {
+    setUrlParams(guestListParamsToSearch({ page, dir: sortDir, ...patch }), { replace: true });
+  }, [page, sortDir, setUrlParams]);
 
-  // A new search query invalidates the current page — always restart from page 0.
+  const hasLegacySearchParam = urlParams.has('search');
   useEffect(() => {
-    setPage(0);
-  }, [debouncedSearch, sortField, sortDir]);
+    if (hasLegacySearchParam) updateList({});
+  }, [hasLegacySearchParam, updateList]);
 
+  // A new search query invalidates the current page: restart from the first one.
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-  }, []);
+    if (page > 0) updateList({ page: 0 });
+  }, [page, updateList]);
 
-  const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
-  const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
+  const handlePrevPage = useCallback(() => updateList({ page: page - 1 }), [updateList, page]);
+  const handleNextPage = useCallback(() => updateList({ page: page + 1 }), [updateList, page]);
   const pageOfLabel = useCallback(
     (current: number, total: number) => t('page_x_of_y', { current, total }),
     [t],
   );
 
   const sorting = useMemo<SortingState>(
-    () => [{ id: sortField, desc: sortDir === 'desc' }],
-    [sortField, sortDir],
+    () => [{ id: SORT_FIELD, desc: sortDir === 'desc' }],
+    [sortDir],
   );
 
   const handleSortingChange = useCallback((next: SortingState) => {
-    setSortField(next[0].id);
-    setSortDir(next[0].desc ? 'desc' : 'asc');
-  }, []);
+    updateList({ dir: next[0].desc ? 'desc' : 'asc', page: 0 });
+  }, [updateList]);
 
   const {
     data,
     isLoading: loading,
     error: queryError,
     refetch,
-  } = useGuestsSearch(debouncedSearch, page, PAGE_SIZE, `${sortField},${sortDir}`);
+  } = useGuestsSearch(debouncedSearch, page, PAGE_SIZE, `${SORT_FIELD},${sortDir}`);
   const guests = data?.content ?? [];
   const totalPages = data?.totalPages ?? 1;
   const summary = useListRangeSummary(page, PAGE_SIZE, guests.length, data?.totalElements ?? 0);
   const error = queryError ? getErrorMessage(queryError, t('error_unexpected_fallback')) : null;
+
+  // A page past the end (hand-edited URL, or the list shrank) lands on the last one in silence.
+  const lastPage = data ? Math.max(data.totalPages - 1, 0) : 0;
+  useEffect(() => {
+    if (data && page > lastPage) updateList({ page: lastPage });
+  }, [data, page, lastPage, updateList]);
+
+  const showSearchEmpty = debouncedSearch !== '' && guests.length === 0;
+  const handleShowAll = useCallback(() => {
+    setSearchQuery('');
+    if (page > 0) updateList({ page: 0 });
+  }, [page, updateList]);
 
   const deleteGuestMutation = useDeleteGuest();
   const deleting = deleteGuestMutation.isPending;
@@ -248,6 +263,17 @@ export const Guests = memo(() => {
           retryLabel={t('try_again')}
           onRetry={handleRetry}
         />
+      ) : showSearchEmpty ? (
+        <M3EmptyState
+          icon="person_search"
+          title={t('guests_no_match_title')}
+          description={t('guests_no_match_hint')}
+          action={
+            <M3Button variant="outlined" onClick={handleShowAll}>
+              {t('guests_show_all')}
+            </M3Button>
+          }
+        />
       ) : (
         <M3DataTable
           data={guests}
@@ -287,10 +313,10 @@ export const Guests = memo(() => {
 
       {guestToDelete && (
         <M3ConfirmDialog
-          title={t('delete')}
+          title={t('delete_guest_title', { name: `${guestToDelete.firstName} ${guestToDelete.lastName}` })}
           titleId="confirm-delete-guest-dialog"
           message={t('delete_guest_confirm')}
-          confirmLabel={t('delete')}
+          confirmLabel={t('delete_guest_action')}
           onConfirm={handleDeleteConfirm}
           onCancel={handleDeleteCancel}
           loading={deleting}

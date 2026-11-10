@@ -171,7 +171,7 @@ const SortableHeaderCell = memo(({ columnId, label, canSort, direction, onToggle
     <th
       scope="col"
       aria-sort={!canSort ? undefined : direction === 'asc' ? 'ascending' : direction === 'desc' ? 'descending' : 'none'}
-      className="py-3.5 px-4 text-left text-xs font-medium font-body text-on-surface-variant uppercase tracking-wider first:pl-6 last:pr-6"
+      className="py-3.5 px-4 text-left text-xs font-medium font-body text-on-surface-variant first:pl-6 last:pr-6"
     >
       {canSort ? (
         <button

@@ -35,7 +35,7 @@ export const M3Table = ({ headers, children, className = '', stickyEnd = false }
               <th
                 key={index}
                 scope="col"
-                className="py-3.5 px-4 text-left text-xs font-medium font-body text-on-surface-variant uppercase tracking-wider first:pl-6 last:pr-6"
+                className="py-3.5 px-4 text-left text-xs font-medium font-body text-on-surface-variant first:pl-6 last:pr-6"
               >
                 {header}
               </th>

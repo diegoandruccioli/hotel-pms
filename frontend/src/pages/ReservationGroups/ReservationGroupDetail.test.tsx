@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent, within } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { renderWithQuery as render } from '../../test-utils';
 import { ReservationGroupDetail } from './ReservationGroupDetail';
 import { reservationGroupService } from '../../services';
@@ -61,10 +61,16 @@ const GROUP = {
 
 const INITIAL_ENTRIES = ['/reservations/groups/group-1'];
 
+const GuestsProbe = () => {
+  const { search, state } = useLocation();
+  return <p data-testid="guests-probe">{`${search}|${JSON.stringify(state)}`}</p>;
+};
+
 const renderDetail = () => render(
   <MemoryRouter initialEntries={INITIAL_ENTRIES}>
     <Routes>
       <Route path="/reservations/groups/:id" element={<ReservationGroupDetail />} />
+      <Route path="/guests" element={<GuestsProbe />} />
     </Routes>
   </MemoryRouter>,
 );
@@ -190,12 +196,15 @@ describe('ReservationGroupDetail', () => {
     expect(screen.queryByRole('link', { name: 'master_folio_open_invoice' })).not.toBeInTheDocument();
   });
 
-  it('should link the contact guest to the guest list search', async () => {
+  it('should open the contact guest by id, without the name in the URL', async () => {
     vi.mocked(reservationGroupService.getGroup).mockResolvedValueOnce(GROUP as never);
     renderDetail();
 
     const link = await screen.findByRole('link', { name: 'Mario Rossi' });
-    expect(link).toHaveAttribute('href', '/guests?search=Mario%20Rossi');
+    expect(link).toHaveAttribute('href', '/guests');
+
+    fireEvent.click(link);
+    expect(screen.getByTestId('guests-probe')).toHaveTextContent('|{"guestId":"g1"}');
   });
 
   it('should check out the group and show per-room outcomes', async () => {

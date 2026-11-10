@@ -12,6 +12,12 @@ interface GuestColumnsOptions {
   onExport: (g: GuestResponseDTO) => void;
 }
 
+/** "Rome (IT)", "Rome", "IT" or a dash: never "- (-)" for a guest with no address on file. */
+const formatPlace = ({ city, country }: GuestResponseDTO) => {
+  if (city && country) return `${city} (${country})`;
+  return city || country || '-';
+};
+
 export function useGuestColumns({ isAdminOrOwner, onOpen, onEdit, onDelete, onExport }: GuestColumnsOptions) {
   const { t } = useTranslation('common');
 
@@ -32,9 +38,7 @@ export function useGuestColumns({ isAdminOrOwner, onOpen, onEdit, onDelete, onEx
       id: 'city',
       header: t('city'),
       enableSorting: false,
-      cell: ({ row }) => (
-        <span className="text-on-surface-variant">{row.original.city || '-'} ({row.original.country || '-'})</span>
-      ),
+      cell: ({ row }) => <span className="text-on-surface-variant">{formatPlace(row.original)}</span>,
     },
     {
       id: 'actions',
