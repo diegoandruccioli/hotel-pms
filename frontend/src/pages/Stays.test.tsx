@@ -461,9 +461,7 @@ describe('Stays', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /new_checkin/ }));
 
-    expect(mockNavigate).toHaveBeenCalledWith('/reservations', {
-      state: { preset: 'arrivalsToday', sortField: 'checkInDate', sortDir: 'asc' },
-    });
+    expect(mockNavigate).toHaveBeenCalledWith('/reservations?preset=arrivalsToday&sort=checkInDate&dir=asc');
   });
 
   describe('toolbar and range', () => {

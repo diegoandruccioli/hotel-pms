@@ -100,7 +100,7 @@ test.describe('Dashboard', () => {
   test('arrivals/departures panel switches tab and its "View all" target', async ({ page }) => {
     await page.goto('/');
     const panelLink = page.getByRole('link', { name: /view all|vedi tutto/i }).first();
-    await expect(panelLink).toHaveAttribute('href', '/reservations', { timeout: 10000 });
+    await expect(panelLink).toHaveAttribute('href', '/reservations?preset=arrivalsToday&sort=checkInDate&dir=asc', { timeout: 10000 });
     await page.getByRole('radio', { name: /departures|partenze/i }).click();
     await expect(panelLink).toHaveAttribute('href', '/stays');
     await expect(page.getByText(/no departures due today|nessuna partenza prevista oggi/i)).toBeVisible();

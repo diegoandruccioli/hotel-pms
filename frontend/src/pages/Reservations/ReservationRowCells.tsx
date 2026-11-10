@@ -27,17 +27,27 @@ export const RoomsCell = ({ reservation, rooms }: { reservation: ReservationResp
   return <span className="text-on-surface-variant font-medium">{roomNumbers}</span>;
 };
 
-export const GuestsCountCell = ({ reservation }: { reservation: ReservationResponse }) => (
-  <div className={cn(
-    'font-medium flex items-center gap-1.5',
-    (reservation.actualGuests || 0) < reservation.expectedGuests ? 'text-secondary' :
-    (reservation.actualGuests || 0) > reservation.expectedGuests ? 'text-error' :
-    'text-on-surface'
-  )}>
-    <MaterialIcon name="group" size={18} />
-    <span>{reservation.actualGuests || 0} / {reservation.expectedGuests}</span>
-  </div>
-);
+export const GuestsCountCell = ({ reservation }: { reservation: ReservationResponse }) => {
+  const { t } = useTranslation('common');
+  const actual = reservation.actualGuests || 0;
+  // The colour only hints at a mismatch; the words say what "0 / 1" counts, for screen readers and on hover.
+  const label = t('reservation_guests_checked_in', { actual, expected: reservation.expectedGuests });
+  return (
+    <div
+      title={label}
+      className={cn(
+        'font-medium flex items-center gap-1.5',
+        actual < reservation.expectedGuests ? 'text-secondary' :
+        actual > reservation.expectedGuests ? 'text-error' :
+        'text-on-surface'
+      )}
+    >
+      <MaterialIcon name="group" size={18} />
+      <span aria-hidden="true">{actual} / {reservation.expectedGuests}</span>
+      <span className="sr-only">{label}</span>
+    </div>
+  );
+};
 
 interface StatusCellProps {
   reservation: ReservationResponse;

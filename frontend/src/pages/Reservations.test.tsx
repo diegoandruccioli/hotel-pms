@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 /* eslint-disable react-perf/jsx-no-new-array-as-prop -- test-only render helper, not the real perf-sensitive render path */
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { renderWithQuery as render } from '../test-utils';
 
 const mockNavigate = vi.hoisted(() => vi.fn());
@@ -234,7 +234,8 @@ describe('Reservations', () => {
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: /delete_reservation/ }));
 
-    expect(screen.getByText('delete_reservation_confirm')).toBeInTheDocument();
+    expect(screen.getByText('delete_reservation_confirm_dates')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'delete_reservation_confirm_action' })).toBeInTheDocument();
   });
 
   it('should call deleteReservation, reload and show toast on confirm', async () => {
@@ -248,7 +249,7 @@ describe('Reservations', () => {
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: /delete_reservation/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
+    fireEvent.click(screen.getByRole('button', { name: 'delete_reservation_confirm_action' }));
 
     await waitFor(() => {
       expect(reservationService.deleteReservation).toHaveBeenCalledWith('res-1');
@@ -268,7 +269,7 @@ describe('Reservations', () => {
     await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: /delete_reservation/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'confirm' }));
+    fireEvent.click(screen.getByRole('button', { name: 'delete_reservation_confirm_action' }));
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('RESERVATION_HAS_INVOICE', 'error'));
   });
@@ -647,6 +648,109 @@ describe('Reservations', () => {
       render(<MemoryRouter><Reservations /></MemoryRouter>);
       await waitFor(() => expect(screen.getByText('no_reservations_found')).toBeInTheDocument());
       expect(screen.queryByText('list_range_summary')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('filters in the URL', () => {
+    const UrlProbe = () => <output data-testid="url-search">{useLocation().search}</output>;
+    const renderAt = (entry: string) => render(
+      <MemoryRouter initialEntries={[entry]}>
+        <Reservations />
+        <UrlProbe />
+      </MemoryRouter>
+    );
+
+    it('reads preset, sort field and direction from the query string', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
+      renderAt('/reservations?preset=pending&sort=status&dir=asc');
+
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+      expect(reservationService.searchReservations).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'PENDING', sort: 'status,asc' }),
+      );
+      expect(screen.getByRole('button', { name: 'reservations_filter_pending' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('ignores unknown values in silence and uses the defaults', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
+      renderAt('/reservations?preset=bogus&sort=nope&dir=sideways');
+
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+      expect(reservationService.searchReservations).toHaveBeenCalledWith(
+        expect.objectContaining({ upcomingOnly: false, sort: 'checkInDate,desc' }),
+      );
+      expect(screen.getByRole('button', { name: 'reservations_filter_all' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('writes the chosen filter to the URL', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
+      renderAt('/reservations');
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: 'reservations_filter_in_house' }));
+
+      await waitFor(() => expect(screen.getByTestId('url-search')).toHaveTextContent('preset=inHouse'));
+      expect(screen.getByTestId('url-search')).toHaveTextContent('sort=checkInDate');
+    });
+
+    it('writes the sort order to the URL', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
+      renderAt('/reservations');
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: 'check_out' }));
+
+      await waitFor(() => expect(screen.getByTestId('url-search')).toHaveTextContent('sort=checkOutDate'));
+    });
+
+    it('keeps the search text out of the URL', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValue(page([CONFIRMED_RESERVATION]) as never);
+      renderAt('/reservations');
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Rossi' } });
+      fireEvent.click(screen.getByRole('button', { name: 'reservations_filter_pending' }));
+
+      await waitFor(() => expect(screen.getByTestId('url-search')).toHaveTextContent('preset=pending'));
+      expect(screen.getByTestId('url-search')).not.toHaveTextContent('Rossi');
+    });
+  });
+
+  describe('empty list', () => {
+    it('offers to show everything when a filter hides all reservations', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValue(page([]) as never);
+      render(
+        <MemoryRouter initialEntries={['/reservations?preset=cancelled']}>
+          <Reservations />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => expect(screen.getByText('no_reservations_match_filter')).toBeInTheDocument());
+      fireEvent.click(screen.getByRole('button', { name: 'reservations_show_all' }));
+
+      await waitFor(() => expect(reservationService.searchReservations).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ status: 'CANCELLED' }),
+      ));
+      expect(screen.getByRole('button', { name: 'reservations_filter_all' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('has no "show all" action when nothing is filtered', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValue(page([]) as never);
+      render(<MemoryRouter><Reservations /></MemoryRouter>);
+
+      await waitFor(() => expect(screen.getByText('no_reservations_found')).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'reservations_show_all' })).not.toBeInTheDocument();
+    });
+
+    it('has no accessibility violations when a filter hides all reservations', async () => {
+      vi.mocked(reservationService.searchReservations).mockResolvedValue(page([]) as never);
+      const { container } = render(
+        <MemoryRouter initialEntries={['/reservations?preset=pending']}>
+          <Reservations />
+        </MemoryRouter>
+      );
+      await waitFor(() => expect(screen.getByText('no_reservations_match_filter')).toBeInTheDocument());
+      expect(await axe(container)).toHaveNoViolations();
     });
   });
 });

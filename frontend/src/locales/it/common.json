@@ -84,6 +84,7 @@
   "reservations_filter_pending": "Da confermare",
   "reservations_filter_arrivals_today": "Check-in oggi",
   "reservations_filters_label": "Filtri prenotazioni",
+  "reservations_show_all": "Mostra tutte le prenotazioni",
   "reservations_filter_in_house": "In casa",
   "reservations_filter_cancelled": "Cancellate",
   "nights": "Notti",
@@ -474,6 +475,9 @@
 
   "delete_reservation": "Elimina",
   "delete_reservation_confirm": "Sei sicuro di voler eliminare questa prenotazione? L'azione non può essere annullata.",
+  "delete_reservation_confirm_dates": "Eliminare la prenotazione dal {{checkIn}} al {{checkOut}}? L'azione non può essere annullata.",
+  "delete_reservation_confirm_action": "Elimina prenotazione",
+  "reservation_guests_checked_in": "{{actual}} di {{expected}} ospiti registrati",
   "reservation_deleted_success": "Prenotazione eliminata con successo.",
   "delete_reservation_failed": "Impossibile eliminare la prenotazione. Riprova.",
 

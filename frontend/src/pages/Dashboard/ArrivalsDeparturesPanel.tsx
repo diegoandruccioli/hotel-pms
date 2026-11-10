@@ -21,8 +21,8 @@ const TAB_OPTIONS: M3SegmentOption<PanelTab>[] = [
   { value: 'departures', labelKey: 'dashboard_tab_departures', icon: 'logout' },
 ];
 
-const VIEW_ALL_TARGET: Record<PanelTab, { to: string; state: Record<string, unknown> }> = {
-  arrivals: { to: '/reservations', state: { preset: 'arrivalsToday', sortField: 'checkInDate', sortDir: 'asc' } },
+const VIEW_ALL_TARGET: Record<PanelTab, { to: string; state?: Record<string, unknown> }> = {
+  arrivals: { to: '/reservations?preset=arrivalsToday&sort=checkInDate&dir=asc' },
   departures: { to: '/stays', state: { statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc', departingToday: true } },
 };
 

@@ -210,9 +210,10 @@ export const Stays = memo(() => {
     }
   }, [addToast, t, retryCheckoutEmailMutation]);
 
-  const handleNewCheckIn = useCallback(() => navigate('/reservations', {
-    state: { preset: 'arrivalsToday', sortField: 'checkInDate', sortDir: 'asc' },
-  }), [navigate]);
+  const handleNewCheckIn = useCallback(
+    () => navigate('/reservations?preset=arrivalsToday&sort=checkInDate&dir=asc'),
+    [navigate],
+  );
   const handleWalkIn = useCallback(() => navigate('/stays/walk-in'), [navigate]);
   const handleGuestNavigate = useCallback((guestId: string) => {
     navigate('/guests', { state: { guestId } });

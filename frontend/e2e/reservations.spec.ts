@@ -167,7 +167,7 @@ test.describe('Reservations', () => {
     // Confirmation dialog opens with a dismiss "Cancel" button and a primary "Confirm" button.
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 3000 });
-    await dialog.getByRole('button', { name: /^Confirm$/ }).click();
+    await dialog.getByRole('button', { name: /^Delete reservation$/ }).click();
     // After deletion the row is removed from the list entirely (hard delete, not a status change)
     await expect(page.getByText('Anna Bianchi')).not.toBeVisible({ timeout: 5000 });
   });

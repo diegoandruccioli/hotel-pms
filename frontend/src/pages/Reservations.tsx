@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import type { SortingState } from '@tanstack/react-table';
 import type { ReservationResponse, RoomResponse } from '../types';
 import { PageHeader } from '../components/PageHeader';
@@ -10,6 +10,7 @@ import { M3ConfirmDialog } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3FilterChip } from '../components/m3';
+import { M3EmptyState } from '../components/m3';
 import { M3Pagination } from '../components/m3';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store';
@@ -21,26 +22,19 @@ import {
   useRoomsLookup,
   useRetryConfirmationEmail,
 } from '../hooks/queries';
-import { useDebounce, useListRangeSummary } from '../hooks';
+import { useDebounce, useFormatters, useListRangeSummary } from '../hooks';
 import { useReservationRowActions } from './Reservations/useReservationRowActions';
 import { useReservationColumns } from './Reservations/useReservationColumns';
-import { RESERVATION_PRESETS, reservationFilterParams } from './Reservations/reservationFilters';
-import type { ReservationPreset } from './Reservations/reservationFilters';
+import {
+  RESERVATION_PRESETS, reservationFilterParams, readReservationFilters, reservationFiltersToParams,
+} from './Reservations/reservationFilters';
+import type {
+  ReservationListFilters, ReservationPreset, ReservationSortField, ReservationsNavState,
+} from './Reservations/reservationFilters';
 
 const PAGE_SIZE = 20;
 const EMPTY_RESERVATIONS: ReservationResponse[] = [];
 const EMPTY_ROOMS: RoomResponse[] = [];
-
-type SortField = 'checkInDate' | 'checkOutDate' | 'status';
-type SortDir = 'asc' | 'desc';
-const DEFAULT_SORT_FIELD: SortField = 'checkInDate';
-const DEFAULT_SORT_DIR: SortDir = 'desc';
-
-interface ReservationsNavState {
-  preset?: ReservationPreset;
-  sortField?: SortField;
-  sortDir?: SortDir;
-}
 
 const PRESET_LABEL_KEYS: Record<ReservationPreset, string> = {
   all: 'reservations_filter_all',
@@ -68,13 +62,20 @@ export const Reservations = () => {
   const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery);
-  const [sortField, setSortField] = useState<SortField>(() => navState?.sortField ?? DEFAULT_SORT_FIELD);
-  const [sortDir, setSortDir] = useState<SortDir>(() => navState?.sortDir ?? DEFAULT_SORT_DIR);
-  const [preset, setPreset] = useState<ReservationPreset>(() => (navState?.preset ?? 'all'));
+  // Preset and sort live in the URL (back, refresh and shared links keep them); the search text
+  // does not, because it holds guest names and emails.
+  const [urlParams, setUrlParams] = useSearchParams();
+  const { preset, sortField, sortDir } = readReservationFilters(urlParams, navState);
+  const currentFilters = useMemo<ReservationListFilters>(
+    () => ({ preset, sortField, sortDir }),
+    [preset, sortField, sortDir],
+  );
+  const updateFilters = useCallback((patch: Partial<ReservationListFilters>) => {
+    setUrlParams(reservationFiltersToParams({ ...currentFilters, ...patch }), { replace: true });
+  }, [currentFilters, setUrlParams]);
   const handlePresetSelect = useCallback((next: ReservationPreset) => {
-    setPage(0);
-    setPreset(next);
-  }, []);
+    updateFilters({ preset: next });
+  }, [updateFilters]);
   const filterParams = useMemo(() => reservationFilterParams(preset, todayIsoDate()), [preset]);
 
   const handleExportCsv = useCallback(async () => {
@@ -122,9 +123,8 @@ export const Reservations = () => {
     // inactive column selects it ascending; clicking the active one toggles
     // asc/desc) — never an empty array, so there's no "unsorted" case to
     // fall back to a default for.
-    setSortField(next[0].id as SortField);
-    setSortDir(next[0].desc ? 'desc' : 'asc');
-  }, []);
+    updateFilters({ sortField: next[0].id as ReservationSortField, sortDir: next[0].desc ? 'desc' : 'asc' });
+  }, [updateFilters]);
 
   const searchParams = useMemo(() => ({
     query: debouncedSearch,
@@ -213,6 +213,23 @@ export const Reservations = () => {
 
   const emptyMessage = EMPTY_MESSAGE_KEYS[preset] ? t(EMPTY_MESSAGE_KEYS[preset]) : t('no_reservations_match_filter');
 
+  // With a filter or a search active, an empty list offers the way out instead of a dead-end line.
+  const hasActiveFilter = preset !== 'all' || debouncedSearch !== '';
+  const showFilteredEmpty = hasActiveFilter && reservations.length === 0;
+  const handleShowAll = useCallback(() => {
+    setSearchQuery('');
+    updateFilters({ preset: 'all' });
+  }, [updateFilters]);
+
+  const { formatDate } = useFormatters();
+  const deleteTarget = reservationToDelete ? reservations.find((r) => r.id === reservationToDelete) : undefined;
+  const deleteMessage = deleteTarget
+    ? t('delete_reservation_confirm_dates', {
+        checkIn: formatDate(deleteTarget.checkInDate),
+        checkOut: formatDate(deleteTarget.checkOutDate),
+      })
+    : t('delete_reservation_confirm');
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -268,6 +285,16 @@ export const Reservations = () => {
           retryLabel={t('try_again')}
           onRetry={handleRetry}
         />
+      ) : showFilteredEmpty ? (
+        <M3EmptyState
+          icon="event_busy"
+          title={emptyMessage}
+          action={
+            <M3Button data-testid="reservations-show-all-btn" variant="outlined" onClick={handleShowAll}>
+              {t('reservations_show_all')}
+            </M3Button>
+          }
+        />
       ) : (
         <M3DataTable
           data={reservations}
@@ -296,7 +323,8 @@ export const Reservations = () => {
         <M3ConfirmDialog
           title={t('delete_reservation')}
           titleId="confirm-delete-reservation-dialog"
-          message={t('delete_reservation_confirm')}
+          message={deleteMessage}
+          confirmLabel={t('delete_reservation_confirm_action')}
           onConfirm={handleDeleteConfirm}
           onCancel={handleDeleteDialogClose}
           loading={deleting}
