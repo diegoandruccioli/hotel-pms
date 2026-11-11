@@ -37,4 +37,18 @@ describe('M3Checkbox', () => {
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
+
+  it('stretches the label over the whole row so the tap area is 44 px on touch without moving the desktop layout', () => {
+    render(<M3Checkbox label="Auto-send" checked={false} onChange={() => {}} />);
+    const label = screen.getByText('Auto-send');
+    expect(label.className).toContain('after:absolute');
+    expect(label.className).toContain('after:inset-0');
+    expect(label.className).not.toContain('block');
+    // the input stays above the overlay so a click on the box itself still reaches the input
+    expect(screen.getByRole('checkbox').className).toContain('z-10');
+    const row = label.closest('div')?.parentElement;
+    expect(row?.className).toContain('relative');
+    expect(row?.className).toContain('min-h-11');
+    expect(row?.className).toContain('sm:pointer-fine:min-h-0');
+  });
 });

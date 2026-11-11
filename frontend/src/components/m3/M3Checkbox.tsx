@@ -12,16 +12,16 @@ export const M3Checkbox = ({ label, supportingText, className = '', ...rest }: M
   const id = useId();
 
   return (
-    <div className={cn('flex items-start gap-3', className)}>
+    <div className={cn('relative flex items-start gap-3 min-h-11 sm:pointer-fine:min-h-0', className)}>
       <input
         id={id}
         type="checkbox"
-        className="mt-0.5 h-4 w-4 shrink-0 rounded-sm border-outline text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+        className="relative z-10 mt-0.5 h-4 w-4 shrink-0 rounded-sm border-outline text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
         aria-describedby={supportingText ? `${id}-support` : undefined}
         {...rest}
       />
       <div>
-        <label htmlFor={id} className="block py-3 -my-3 sm:pointer-fine:py-0 sm:pointer-fine:my-0 text-sm font-medium font-body text-on-surface">
+        <label htmlFor={id} className="text-sm font-medium font-body text-on-surface after:absolute after:inset-0">
           {label}
         </label>
         {supportingText && (
