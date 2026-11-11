@@ -55,7 +55,9 @@ UserMenuItem.displayName = 'UserMenuItem';
 
 /**
  * Avatar button that reveals an M3 "Menu" surface with:
- *  - Keyboard: Enter/Space opens, Escape closes, Tab/ArrowDown navigate items
+ *  - Keyboard (same contract as `M3RowActionsMenu`): Enter/Space/click opens on the first item,
+ *    ArrowDown on the trigger opens on the first, ArrowUp on the last; Arrow/Home/End move,
+ *    Escape and Tab close, and focus returns to the trigger before an action runs
  *  - aria-haspopup="menu" + aria-expanded wired to open state
  *  - Click outside closes the menu
  */
@@ -71,6 +73,17 @@ export const UserMenu = ({
   const { t } = useTranslation('settings');
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const initialFocus = useRef<'first' | 'last'>('first');
+
+  // Move focus into the menu once it is open (the trigger keeps it otherwise, and arrow keys
+  // pressed there would never reach the menu).
+  useEffect(() => {
+    if (!open) return;
+    const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+    if (!items?.length) return;
+    items[initialFocus.current === 'last' ? items.length - 1 : 0]?.focus();
+    initialFocus.current = 'first';
+  }, [open]);
 
   // Close on outside click
   useEffect(() => {
@@ -92,19 +105,45 @@ export const UserMenu = ({
   useEscapeKey(open, handleEscape);
 
   // Stable handlers for sub-components
+  // Focus goes back to the trigger before the action runs, so whatever the action opens has a
+  // live element to hand focus back to.
   const handleSettingsClick = useCallback(() => {
     onClose();
+    triggerRef.current?.focus();
     onOpenSettings();
   }, [onClose, onOpenSettings]);
 
   const handleLogoutClick = useCallback(() => {
     onClose();
+    triggerRef.current?.focus();
     onLogout();
   }, [onClose, onLogout]);
+
+  // ArrowDown/ArrowUp on the trigger open the menu on the first/last item
+  const handleTriggerKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      const last = e.key === 'ArrowUp';
+      if (open) {
+        const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+        items?.[last ? items.length - 1 : 0]?.focus();
+        return;
+      }
+      initialFocus.current = last ? 'last' : 'first';
+      onToggle();
+    },
+    [open, onToggle]
+  );
 
   // Arrow-key navigation inside menu items
   const handleMenuKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === 'Tab') {
+        onClose();
+        triggerRef.current?.focus();
+        return;
+      }
       if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
       e.preventDefault();
       const items = Array.from<HTMLElement>(
@@ -119,7 +158,7 @@ export const UserMenu = ({
       else if (e.key === 'End') next = items.length - 1;
       items[next]?.focus();
     },
-    []
+    [onClose]
   );
 
   return (
@@ -130,6 +169,7 @@ export const UserMenu = ({
         type="button"
         id="user-menu-trigger"
         onClick={onToggle}
+        onKeyDown={handleTriggerKeyDown}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls="user-menu-list"
