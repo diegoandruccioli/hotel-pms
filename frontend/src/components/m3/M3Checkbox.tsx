@@ -16,7 +16,7 @@ export const M3Checkbox = ({ label, supportingText, className = '', ...rest }: M
       <input
         id={id}
         type="checkbox"
-        className="mt-0.5 h-4 w-4 shrink-0 rounded-sm border-outline text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+        className="relative z-10 mt-0.5 h-4 w-4 shrink-0 rounded-sm border-outline text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
         aria-describedby={supportingText ? `${id}-support` : undefined}
         {...rest}
       />

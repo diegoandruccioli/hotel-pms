@@ -44,6 +44,8 @@ describe('M3Checkbox', () => {
     expect(label.className).toContain('after:absolute');
     expect(label.className).toContain('after:inset-0');
     expect(label.className).not.toContain('block');
+    // the input stays above the overlay so a click on the box itself still reaches the input
+    expect(screen.getByRole('checkbox').className).toContain('z-10');
     const row = label.closest('div')?.parentElement;
     expect(row?.className).toContain('relative');
     expect(row?.className).toContain('min-h-11');
