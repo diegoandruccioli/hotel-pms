@@ -179,6 +179,33 @@ class StayOccupancyRepositoryIntegrationTest {
         assertEquals(THREE_NIGHTS, totalNights(periods), "expected 3 occupied nights (Apr 1-3), got: " + periods);
     }
 
+    @Test
+    void excludesTheNightsOfAStayOnADeactivatedRoom() {
+        // Two rooms in the same hotel, each with a stay checked in Jan 1 and still in-house.
+        // One room is then deleted (soft delete: active = false). The occupancy denominator only
+        // counts active rooms, so this numerator must too: only the active room's 3 nights
+        // (Jan 1-3) count, not 6. Without the rooms join, stays left open on rooms that no
+        // longer exist (e.g. leftover test data) inflated the rate far past 100%.
+        final LocalDate checkIn = JAN_CHECK_IN;
+        final LocalDate expectedCheckOut = JAN_EXPECTED_CHECK_OUT;
+        final LocalDate windowEnd = JAN_WINDOW_END;
+        final UUID hotelId = UUID.randomUUID();
+        final UUID activeRoomId = seedRoom(hotelId);
+        final UUID deactivatedRoomId = seedRoom(hotelId);
+        seedStay(hotelId, activeRoomId, StayStatus.CHECKED_IN,
+                checkIn.atTime(AFTERNOON_CHECK_IN), null, expectedCheckOut);
+        seedStay(hotelId, deactivatedRoomId, StayStatus.CHECKED_IN,
+                checkIn.atTime(AFTERNOON_CHECK_IN), null, expectedCheckOut);
+        roomRepository.deleteById(deactivatedRoomId);
+        roomRepository.flush();
+
+        final List<StayOccupancyPeriod> periods = stayRepository.sumOccupiedRoomNightsByHotelIdGroupedByPeriod(
+                hotelId, checkIn.atStartOfDay(), windowEnd.atStartOfDay(), GRANULARITY_DAY);
+
+        assertEquals(THREE_NIGHTS, totalNights(periods),
+                "expected only the active room's 3 nights (Jan 1-3), got: " + periods);
+    }
+
     private static long totalNights(final List<StayOccupancyPeriod> periods) {
         return periods.stream().mapToLong(StayOccupancyPeriod::getOccupiedRoomNights).sum();
     }
