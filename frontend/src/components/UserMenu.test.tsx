@@ -1,18 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
+import { useCallback, useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { UserMenu } from './UserMenu';
 
+const t = vi.hoisted(() => (key: string, opts?: Record<string, unknown>) => {
+  if (opts && typeof opts === 'object') {
+    return Object.entries(opts).reduce((out, [k, v]) => out.replace(`{{${k}}}`, String(v)), key);
+  }
+  return key;
+});
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) => {
-      if (opts && typeof opts === 'object') {
-        return Object.entries(opts).reduce((s, [k, v]) => s.replace(`{{${k}}}`, String(v)), key);
-      }
-      return key;
-    },
-    i18n: { language: 'en' },
-  }),
+  useTranslation: () => ({ t, i18n: { language: 'en' } }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
@@ -24,6 +23,9 @@ const baseProps = {
   onOpenSettings: vi.fn(),
   onLogout: vi.fn(),
 };
+
+const seen: Element[] = [];
+const recordFocus = () => { if (document.activeElement) seen.push(document.activeElement); };
 
 describe('UserMenu', () => {
   it('renders the avatar trigger with the user initial', () => {
@@ -97,5 +99,87 @@ describe('UserMenu', () => {
     const { container } = render(<UserMenu {...baseProps} open />);
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+
+  describe('keyboard', () => {
+    // Real open state, like MainLayout holds it: focus moves only if the component asks for it
+    const Controlled = ({ onOpenSettings = vi.fn(), onLogout = vi.fn() }: { onOpenSettings?: () => void; onLogout?: () => void }) => {
+      const [open, setOpen] = useState(false);
+      const toggle = useCallback(() => setOpen((v) => !v), []);
+      const close = useCallback(() => setOpen(false), []);
+      return (
+        <UserMenu
+          {...baseProps}
+          open={open}
+          onToggle={toggle}
+          onClose={close}
+          onOpenSettings={onOpenSettings}
+          onLogout={onLogout}
+        />
+      );
+    };
+    const trigger = () => screen.getByRole('button', { name: 'user_menu_label' });
+    const item = (name: RegExp) => screen.getByRole('menuitem', { name });
+
+    it('opens on click with focus on the first item', () => {
+      render(<Controlled />);
+      fireEvent.click(trigger());
+      expect(item(/settings/)).toHaveFocus();
+    });
+
+    it('opens on ArrowDown from the trigger with focus on the first item', () => {
+      render(<Controlled />);
+      trigger().focus();
+      fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
+      expect(item(/settings/)).toHaveFocus();
+    });
+
+    it('opens on ArrowUp from the trigger with focus on the last item', () => {
+      render(<Controlled />);
+      trigger().focus();
+      fireEvent.keyDown(trigger(), { key: 'ArrowUp' });
+      expect(item(/log_out/)).toHaveFocus();
+    });
+
+    it('moves with ArrowDown/ArrowUp (wrapping), Home and End', () => {
+      render(<Controlled />);
+      fireEvent.click(trigger());
+      fireEvent.keyDown(item(/settings/), { key: 'ArrowDown' });
+      expect(item(/log_out/)).toHaveFocus();
+      fireEvent.keyDown(item(/log_out/), { key: 'ArrowDown' });
+      expect(item(/settings/)).toHaveFocus();
+      fireEvent.keyDown(item(/settings/), { key: 'ArrowUp' });
+      expect(item(/log_out/)).toHaveFocus();
+      fireEvent.keyDown(item(/log_out/), { key: 'Home' });
+      expect(item(/settings/)).toHaveFocus();
+      fireEvent.keyDown(item(/settings/), { key: 'End' });
+      expect(item(/log_out/)).toHaveFocus();
+    });
+
+    it('closes on Tab and gives focus back to the trigger', () => {
+      render(<Controlled />);
+      fireEvent.click(trigger());
+      fireEvent.keyDown(item(/settings/), { key: 'Tab' });
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      expect(trigger()).toHaveFocus();
+    });
+
+    it('closes on Escape and gives focus back to the trigger', () => {
+      render(<Controlled />);
+      fireEvent.click(trigger());
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      expect(trigger()).toHaveFocus();
+    });
+
+    it('has focus back on the trigger by the time the chosen action runs', () => {
+      seen.length = 0;
+      render(<Controlled onOpenSettings={recordFocus} onLogout={recordFocus} />);
+      fireEvent.click(trigger());
+      fireEvent.click(item(/settings/));
+      fireEvent.click(trigger());
+      fireEvent.click(item(/log_out/));
+      expect(seen).toEqual([trigger(), trigger()]);
+    });
   });
 });
