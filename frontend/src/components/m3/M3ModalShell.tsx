@@ -6,9 +6,22 @@ import { useEscapeKey } from '../../hooks';
 import { cn } from '../../utils';
 
 const FocusTrap = FocusTrapModule.default ?? FocusTrapModule;
+
+/**
+ * Where focus goes when the overlay closes (runs once the overlay is already out of the DOM).
+ * The opener when it is still there; otherwise nowhere if something already took focus (a page
+ * restoring it by hand) or another overlay is still open (its trap owns focus); otherwise the
+ * main landmark, so Tab continues from the content instead of restarting at the skip link.
+ */
+function setReturnFocus(opener: HTMLElement | SVGElement): HTMLElement | false {
+  if (opener.isConnected && 'focus' in opener) return opener as HTMLElement;
+  if (document.activeElement && document.activeElement !== document.body) return false;
+  if (document.querySelector('[role="dialog"][aria-modal="true"]')) return false;
+  return document.getElementById('main-content') ?? false;
+}
 // Escape is owned by useEscapeKey: the trap must not deactivate itself on it, or an overlay
 // dismissed with Escape on top of another would leave focus free in the one underneath.
-const FOCUS_TRAP_OPTIONS = { escapeDeactivates: false };
+const FOCUS_TRAP_OPTIONS = { escapeDeactivates: false, setReturnFocus };
 
 export interface M3ModalShellProps {
   /** Controls visibility */
@@ -34,7 +47,8 @@ export interface M3ModalShellProps {
 /**
  * Behaviour and chrome shared by every modal overlay (`M3Dialog`, `M3SideSheet`): scrim, focus
  * trap, role="dialog" + aria-modal + aria-labelledby, focus on the close button when it opens,
- * Escape closing only the topmost overlay, header, scrolling body and optional footer.
+ * Escape closing only the topmost overlay, focus returning to the opener on close (main landmark
+ * when the opener is gone) and back on the close button if swapped content drops it, header, scrolling body and optional footer.
  * Internal building block: pages use `M3Dialog` or `M3SideSheet`, which only decide where the
  * surface sits and how it looks.
  */
@@ -52,12 +66,25 @@ export const M3ModalShell = ({
   const generatedTitleId = useId();
   const titleId = titleIdProp ?? generatedTitleId;
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const surfaceRef = useRef<HTMLDivElement>(null);
 
   // Move focus to the close button when the overlay opens
   useEffect(() => {
     if (open) {
       closeButtonRef.current?.focus();
     }
+  }, [open]);
+
+  // Swapping the content (list -> form) can remove the focused element together with an ancestor,
+  // which focus-trap does not notice: focus falls to <body> with the overlay still open.
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!open || !surface) return;
+    const observer = new MutationObserver(() => {
+      if (document.activeElement === document.body) closeButtonRef.current?.focus();
+    });
+    observer.observe(surface, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [open]);
 
   // Close on Escape (only the topmost of stacked overlays reacts, see useEscapeKey)
@@ -71,7 +98,7 @@ export const M3ModalShell = ({
         {/* Scrim */}
         <div className="absolute inset-0 bg-scrim/40" onClick={onClose} aria-hidden="true" />
 
-        <div className={surfaceClassName}>
+        <div ref={surfaceRef} className={surfaceClassName}>
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-6 pb-4">
             <h2
