@@ -430,7 +430,10 @@ historical baseline pointer).
   operable (Tab / Enter / Space / Arrow / Escape).
 - **Focus trapped inside open modals/dialogs** (`focus-trap-react`); Escape closes. With dialogs
   stacked, Escape closes **only the topmost** one: `useEscapeKey` keeps a shared stack, so a
-  parent dialog needs no workaround to ignore Escape while a nested one is open.
+  parent dialog needs no workaround to ignore Escape while a nested one is open. On close
+  focus returns to the opener; if it left the DOM, to `#main-content` (nowhere when a page
+  already moved focus or another dialog is still open). If swapped content drops focus to
+  `<body>` while open, it goes back to the close button.
 - **`<html lang>` follows the active language** (WCAG 3.1.1): `i18n.ts` syncs it on every
   `languageChanged`, so language switches (login chips, settings) need no extra code.
 - **Skip-to-main-content link** is the first focusable element on every page.
