@@ -295,6 +295,12 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
      * no checkout yet) and {@code CHECKED_OUT} stays count; only those two
      * statuses represent a room that was physically occupied.
      *
+     * <p>Only stays on <em>active</em> rooms count (the {@code rooms} join): the KPI report divides
+     * by the number of active rooms, and a native query does not get {@code Room}'s
+     * {@code @SQLRestriction}, so stays left open on rooms since deleted (soft delete) used to
+     * inflate the numerator far past 100% (1986% seen in dev with leftover E2E data). A room that
+     * is deactivated therefore also drops out of past periods.
+     *
      * <p>This replaces an earlier version that summed a stay's ENTIRE length
      * into whichever single bucket its arrival date fell in, and ignored
      * in-house ({@code CHECKED_IN}) stays entirely — so a window covering
@@ -327,6 +333,7 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
             + "  AND s.status IN ('CHECKED_IN', 'CHECKED_OUT') "
             + "  AND s.actual_check_in_time::date <= n.night "
             + "  AND (s.actual_check_out_time IS NULL OR s.actual_check_out_time::date > n.night) "
+            + "JOIN rooms r ON r.id = s.room_id AND r.hotel_id = :hotelId AND r.active = true "
             // GROUP BY the output alias, not a second date_trunc(:granularity, ...) —
             // two separate bind-parameter occurrences of the same expression are NOT
             // recognized by Postgres as equal for GROUP BY validity (42803: "column
