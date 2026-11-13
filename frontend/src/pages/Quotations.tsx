@@ -1,11 +1,11 @@
 import { useFormatters, useListRangeSummary } from '../hooks';
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { quotationService } from '../services';
 import type { QuotationResponse } from '../types';
 import { M3LoadingState } from '../components/m3';
-import { M3TableEmptyRow } from '../components/m3';
+import { M3EmptyState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { PageHeader } from '../components/PageHeader';
 import { M3Button } from '../components/m3';
@@ -16,8 +16,14 @@ import { M3StatusChip } from '../components/m3';
 import { M3ConfirmDialog } from '../components/m3';
 import { useToastStore } from '../store';
 import { getErrorMessage, quotationStatusTone } from '../utils';
+import { quotationListParamsToSearch, readQuotationListParams } from './Quotations/quotationListParams';
 
 const PAGE_SIZE = 20;
+
+// Below `md` only the guest and the row actions stay as columns: the dates, the total and the status
+// move under the guest's name (see `QuotationRow`), so nothing needs a sideways scroll on a phone.
+const HIDE_DETAIL_COLUMNS_ON_PHONE =
+  'max-md:[&_th:not(:first-child):not(:last-child)]:hidden max-md:[&_td:not(:first-child):not(:last-child):not([colspan])]:hidden';
 
 const formatTotal = (
   quotation: QuotationResponse,
@@ -35,6 +41,17 @@ const formatTotal = (
   }
   return t('price_range', { min: formatCurrency(min), max: formatCurrency(max) });
 };
+
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
+
+const StatusChips = ({ quotation, t }: { quotation: QuotationResponse; t: TFn }) => (
+  <div className="flex flex-col items-start gap-1">
+    <M3StatusChip label={t(`status_${quotation.status.toLowerCase()}`)} tone={quotationStatusTone[quotation.status]} />
+    {quotation.sendFailed && (
+      <M3StatusChip label={t('send_failed_badge')} tone="error" />
+    )}
+  </div>
+);
 
 interface QuotationRowProps {
   quotation: QuotationResponse;
@@ -66,7 +83,7 @@ const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, 
   const items = useMemo<RowAction[]>(() => {
     const list: RowAction[] = [];
     if (reservationId) list.push({ id: 'open-reservation', label: t('action_open_reservation'), icon: 'event_available', onSelect: handleOpenReservation });
-    if (canConvert) list.push({ id: 'convert', label: t('action_convert'), icon: 'event_available', onSelect: handleConvert });
+    if (canConvert) list.push({ id: 'convert', label: t('action_convert'), icon: 'transform', onSelect: handleConvert });
     list.push({ id: 'download', label: t('action_download_pdf'), icon: 'download', onSelect: handleDownload });
     if (canDecline) list.push({ id: 'decline', label: t('action_decline'), icon: 'block', onSelect: handleDecline });
     list.push({ id: 'delete', label: t('action_delete'), icon: 'delete', tone: 'error', onSelect: handleDelete });
@@ -76,21 +93,21 @@ const QuotationRow = memo(({ quotation, onSend, onConvert, onDecline, onDelete, 
   return (
     <M3TableRow>
       <M3TableCell className="font-medium">
-        <Link to={`/quotations/${quotation.id}`} className="hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs">
+        <Link to={`/quotations/${quotation.id}`} className="inline-flex min-h-11 items-center hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs">
           {quotation.guestFullName}
         </Link>
+        <div className="flex flex-col gap-1.5 pb-1 font-normal whitespace-normal text-on-surface-variant md:hidden">
+          <span>{formatDate(quotation.checkInDate)} – {formatDate(quotation.checkOutDate)}</span>
+          <span className="font-medium">{formatTotal(quotation, t, formatCurrency)}</span>
+          <StatusChips quotation={quotation} t={t} />
+        </div>
       </M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(quotation.checkInDate)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(quotation.checkOutDate)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant font-medium">{formatTotal(quotation, t, formatCurrency)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant">{formatDate(quotation.validUntil)}</M3TableCell>
       <M3TableCell>
-        <div className="flex flex-col items-start gap-1">
-          <M3StatusChip label={t(`status_${quotation.status.toLowerCase()}`)} tone={quotationStatusTone[quotation.status]} />
-          {quotation.sendFailed && (
-            <M3StatusChip label={t('send_failed_badge')} tone="error" />
-          )}
-        </div>
+        <StatusChips quotation={quotation} t={t} />
       </M3TableCell>
       <M3TableCell>
         <div className="flex items-center justify-end gap-1">
@@ -111,9 +128,12 @@ export const Quotations = () => {
   const { t } = useTranslation(['quotations', 'common']);
   const navigate = useNavigate();
   const addToast = useToastStore((s) => s.addToast);
+  const { formatCurrency, formatDate } = useFormatters();
 
+  // The page lives in the URL, so a refresh or Back from a detail comes back to the same place.
+  const [urlParams, setUrlParams] = useSearchParams();
+  const { page } = readQuotationListParams(urlParams);
   const [quotations, setQuotations] = useState<QuotationResponse[]>([]);
-  const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -121,6 +141,7 @@ export const Quotations = () => {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [declineTarget, setDeclineTarget] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [convertTarget, setConvertTarget] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const loadQuotations = useCallback(async () => {
@@ -128,6 +149,11 @@ export const Quotations = () => {
       setLoading(true);
       setError(null);
       const data = await quotationService.getAllQuotations(page, PAGE_SIZE);
+      if (data.content.length === 0 && page > 0) {
+        // The last row of the last page went away (or the URL names a page that does not exist).
+        setUrlParams(quotationListParamsToSearch({ page: Math.max(0, data.totalPages - 1) }), { replace: true });
+        return;
+      }
       setQuotations(data.content);
       setTotalPages(data.totalPages);
       setTotalElements(data.totalElements);
@@ -136,7 +162,7 @@ export const Quotations = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, t]);
+  }, [page, t, setUrlParams]);
 
   useEffect(() => {
     loadQuotations();
@@ -145,8 +171,9 @@ export const Quotations = () => {
   const summary = useListRangeSummary(page, PAGE_SIZE, quotations.length, totalElements);
 
   const handleNew = useCallback(() => navigate('/quotations/new'), [navigate]);
-  const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
-  const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
+  const goToPage = useCallback((next: number) => setUrlParams(quotationListParamsToSearch({ page: next })), [setUrlParams]);
+  const handlePrevPage = useCallback(() => goToPage(page - 1), [goToPage, page]);
+  const handleNextPage = useCallback(() => goToPage(page + 1), [goToPage, page]);
   const pageOfLabel = useCallback(
     (current: number, total: number) => t('common:page_x_of_y', { current, total }),
     [t],
@@ -171,14 +198,25 @@ export const Quotations = () => {
       navigate(`/quotations/${id}`, { state: { openConvert: true } });
       return;
     }
+    // One option: creating a reservation is not undone with a click, so it asks first.
+    setConvertTarget(id);
+  }, [quotations, navigate]);
+
+  const handleConvertClose = useCallback(() => setConvertTarget(null), []);
+  const handleConvertConfirm = useCallback(async () => {
+    if (!convertTarget) return;
+    setBusy(true);
     try {
-      const reservation = await quotationService.convertToReservation(id);
+      const reservation = await quotationService.convertToReservation(convertTarget);
       addToast(t('toast_converted'), 'success');
       navigate(`/reservations/${reservation.id}`);
     } catch (err: unknown) {
       addToast(getErrorMessage(err, t('err_convert')), 'error');
+    } finally {
+      setBusy(false);
+      setConvertTarget(null);
     }
-  }, [addToast, t, quotations, navigate]);
+  }, [convertTarget, addToast, t, navigate]);
 
   const handleDownload = useCallback(async (id: string) => {
     try {
@@ -222,6 +260,15 @@ export const Quotations = () => {
     }
   }, [deleteTarget, addToast, t, loadQuotations]);
 
+  const declineQuotation = declineTarget ? quotations.find((q) => q.id === declineTarget) : undefined;
+  const deleteQuotationTarget = deleteTarget ? quotations.find((q) => q.id === deleteTarget) : undefined;
+  const convertQuotation = convertTarget ? quotations.find((q) => q.id === convertTarget) : undefined;
+  const summaryOpts = (q: QuotationResponse) => ({
+    name: q.guestFullName,
+    from: formatDate(q.checkInDate),
+    to: formatDate(q.checkOutDate),
+  });
+
   const tableHeaders = useMemo(() => [
     t('col_guest'),
     t('col_check_in'),
@@ -252,25 +299,28 @@ export const Quotations = () => {
           retryLabel={t('common:try_again')}
           onRetry={loadQuotations}
         />
+      ) : quotations.length === 0 ? (
+        <M3EmptyState
+          icon="request_quote"
+          title={t('empty_title')}
+          description={t('empty_hint')}
+          action={<M3Button icon="add" onClick={handleNew}>{t('new_quotation')}</M3Button>}
+        />
       ) : (
-        <M3Table headers={tableHeaders} stickyEnd>
-          {quotations.length === 0 ? (
-            <M3TableEmptyRow colSpan={tableHeaders.length} message={t('no_quotations_found')} />
-          ) : (
-            quotations.map((quotation) => (
-              <QuotationRow
-                key={quotation.id}
-                quotation={quotation}
-                onSend={handleSend}
-                onConvert={handleConvert}
-                onDecline={handleDeclineRequest}
-                onDelete={handleDeleteRequest}
-                onDownload={handleDownload}
-                sendingId={sendingId}
-                t={t}
-              />
-            ))
-          )}
+        <M3Table headers={tableHeaders} stickyEnd className={HIDE_DETAIL_COLUMNS_ON_PHONE}>
+          {quotations.map((quotation) => (
+            <QuotationRow
+              key={quotation.id}
+              quotation={quotation}
+              onSend={handleSend}
+              onConvert={handleConvert}
+              onDecline={handleDeclineRequest}
+              onDelete={handleDeleteRequest}
+              onDownload={handleDownload}
+              sendingId={sendingId}
+              t={t}
+            />
+          ))}
         </M3Table>
       )}
 
@@ -288,24 +338,38 @@ export const Quotations = () => {
         />
       )}
 
-      {declineTarget && (
+      {declineQuotation && (
         <M3ConfirmDialog
-          title={t('action_decline')}
+          title={t('list_decline_title')}
           titleId="confirm-decline-quotation-dialog"
-          message={t('confirm_decline')}
+          message={t('list_decline_message', summaryOpts(declineQuotation))}
+          confirmLabel={t('list_decline_confirm')}
           onConfirm={handleDeclineConfirm}
           onCancel={handleDeclineClose}
           loading={busy}
         />
       )}
 
-      {deleteTarget && (
+      {deleteQuotationTarget && (
         <M3ConfirmDialog
-          title={t('action_delete')}
+          title={t('list_delete_title')}
           titleId="confirm-delete-quotation-dialog"
-          message={t('confirm_delete')}
+          message={t('list_delete_message', summaryOpts(deleteQuotationTarget))}
+          confirmLabel={t('list_delete_confirm')}
           onConfirm={handleDeleteConfirm}
           onCancel={handleDeleteClose}
+          loading={busy}
+        />
+      )}
+
+      {convertQuotation && (
+        <M3ConfirmDialog
+          title={t('list_convert_title')}
+          titleId="confirm-convert-quotation-dialog"
+          message={t('list_convert_message', { ...summaryOpts(convertQuotation), total: formatCurrency(convertQuotation.totalPrice) })}
+          confirmLabel={t('list_convert_confirm')}
+          onConfirm={handleConvertConfirm}
+          onCancel={handleConvertClose}
           loading={busy}
         />
       )}
