@@ -13,6 +13,16 @@ const QUOTATIONS = [
   },
 ];
 
+const INVOICES = [
+  {
+    invoice: {
+      id: 'inv-1', invoiceNumber: '2026/0001', issueDate: '2026-11-02T10:00:00', totalAmount: 320, status: 'ISSUED',
+      documentType: 'FATTURA', sdiStatus: 'NOT_SENT', reservationId: 'res-1', guestId: 'g-1', payments: [], charges: [],
+    },
+    guestName: 'Mario Rossi',
+  },
+];
+
 const json = (page: Page, url: string | RegExp, body: unknown) =>
   page.route(url, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }),
@@ -38,6 +48,12 @@ const SCREENS = [
     name: 'Quotations',
     path: '/quotations',
     mock: (page: Page) => json(page, /\/api\/v1\/quotations/, springPage(QUOTATIONS)),
+    wait: 'Mario Rossi',
+  },
+  {
+    name: 'Billing',
+    path: '/billing',
+    mock: (page: Page) => json(page, /\/api\/v1\/invoices/, springPage(INVOICES)),
     wait: 'Mario Rossi',
   },
 ];

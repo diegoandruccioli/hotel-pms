@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { format, startOfMonth } from 'date-fns';
+import { useMemo } from 'react';
 import type { ReactElement } from 'react';
 import { renderWithQuery } from '../test-utils';
 import { Billing } from './Billing';
@@ -16,6 +17,24 @@ import type { InvoiceResponse, InvoiceSearchResult } from '../types';
 const ISSUED_NAV_ENTRIES = [{ pathname: '/billing', state: { statusFilter: 'ISSUED' } }];
 
 const INVOICE_LINK_ENTRIES = [{ pathname: '/billing', state: { invoiceId: 'inv-linked' } }];
+
+const LocationProbe = () => {
+  const loc = useLocation();
+  return <output data-testid="location">{`${loc.pathname}${loc.search}`}</output>;
+};
+
+const RouterAt = ({ entry, children }: { entry: string; children: React.ReactNode }) => {
+  const entries = useMemo(() => [entry], [entry]);
+  return <MemoryRouter initialEntries={entries}>{children}</MemoryRouter>;
+};
+
+const renderAt = (entry: string) =>
+  renderWithQuery(
+    <RouterAt entry={entry}>
+      <Billing />
+      <LocationProbe />
+    </RouterAt>,
+  );
 
 const render = (ui: ReactElement) => renderWithQuery(<MemoryRouter>{ui}</MemoryRouter>);
 
@@ -520,5 +539,91 @@ describe('Billing', () => {
     await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+
+  describe('list state in the URL', () => {
+    it('reads status, sort, page and dates from the query string', async () => {
+      vi.mocked(billingService.searchInvoices).mockResolvedValue(page([result(ISSUED_INVOICE)], 3) as never);
+      renderAt('/billing?status=PAID&sort=totalAmount&dir=asc&page=2&from=2026-08-01&to=2026-08-31');
+      await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+      expect(billingService.searchInvoices).toHaveBeenCalledWith({
+        status: 'PAID', query: '', dateFrom: '2026-08-01', dateTo: '2026-08-31',
+        page: 1, size: 20, sort: 'totalAmount,asc',
+      });
+    });
+
+    it('ignores malformed values in silence', async () => {
+      vi.mocked(billingService.searchInvoices).mockResolvedValue(page([result(ISSUED_INVOICE)]) as never);
+      renderAt('/billing?status=BOGUS&sort=hack&dir=up&page=-4&from=yesterday&to=2026-13');
+      await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+      expect(billingService.searchInvoices).toHaveBeenCalledWith({
+        status: undefined, query: '', dateFrom: undefined, dateTo: undefined,
+        page: 0, size: 20, sort: 'issueDate,desc',
+      });
+    });
+
+    it('writes the status to the URL and drops the page when a chip is picked', async () => {
+      vi.mocked(billingService.searchInvoices).mockResolvedValue(page([result(ISSUED_INVOICE)], 3) as never);
+      renderAt('/billing?page=3');
+      await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: 'invoice_status_PAID' }));
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/billing?status=PAID'));
+      expect(screen.getByTestId('location')).not.toHaveTextContent('page=');
+    });
+
+    it('keeps an explicit status=ALL so the old navigation state cannot bring the filter back', async () => {
+      vi.mocked(billingService.searchInvoices).mockResolvedValue(page([result(ISSUED_INVOICE)]) as never);
+      renderWithQuery(
+        <MemoryRouter initialEntries={ISSUED_NAV_ENTRIES}>
+          <Billing />
+          <LocationProbe />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: 'filter_all' }));
+
+      await waitFor(() => expect(billingService.searchInvoices).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: undefined }),
+      ));
+      expect(screen.getByTestId('location')).toHaveTextContent('/billing?status=ALL');
+    });
+
+    it('never puts the search text in the URL', async () => {
+      vi.mocked(billingService.searchInvoices).mockResolvedValue(page([result(ISSUED_INVOICE)]) as never);
+      renderAt('/billing?page=2');
+      await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+
+      fireEvent.change(screen.getByLabelText('invoice_search_placeholder'), { target: { value: 'rossi' } });
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/billing?status=ALL'));
+      expect(screen.getByTestId('location')).not.toHaveTextContent('rossi');
+      expect(screen.getByTestId('location')).not.toHaveTextContent('page=');
+    });
+
+    it('offers a way out of a filtered empty list that clears every filter', async () => {
+      vi.mocked(billingService.searchInvoices)
+        .mockResolvedValueOnce(page([]) as never)
+        .mockResolvedValue(page([result(ISSUED_INVOICE)]) as never);
+      renderAt('/billing?status=PAID&from=2026-08-01');
+      expect(await screen.findByText('no_invoices_filtered')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'invoices_show_all' }));
+
+      await waitFor(() => expect(screen.getByText('INV-001')).toBeInTheDocument());
+      expect(billingService.searchInvoices).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: undefined, dateFrom: undefined }),
+      );
+      expect(screen.getByTestId('location')).toHaveTextContent('/billing?status=ALL');
+    });
+
+    it('keeps the plain empty message when no filter is active', async () => {
+      vi.mocked(billingService.searchInvoices).mockResolvedValue(page([]) as never);
+      renderAt('/billing');
+      expect(await screen.findByText('no_invoices')).toBeInTheDocument();
+      expect(screen.queryByText('invoices_show_all')).not.toBeInTheDocument();
+    });
   });
 });

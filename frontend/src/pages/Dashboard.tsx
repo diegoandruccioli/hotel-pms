@@ -114,8 +114,7 @@ export const Dashboard = () => {
       value: formatCurrency(ownerSummary.pendingRevenue),
       icon: 'receipt_long',
       tone: 'error',
-      to: '/billing',
-      state: { statusFilter: 'ISSUED' },
+      to: '/billing?status=ISSUED',
     };
   }, [isOwnerOrAdmin, ownerSummary, formatCurrency]);
 

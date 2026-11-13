@@ -79,7 +79,7 @@ test.describe('Dashboard', () => {
     // 4 universal stats + owner pending-revenue stat, each the whole card as one link.
     await expect(grid.getByRole('link')).toHaveCount(5);
     await expect(grid.getByRole('link', { name: /guests in house|ospiti in struttura/i })).toHaveAttribute('href', '/stays');
-    await expect(grid.getByRole('link', { name: /pending revenue|fatturato in attesa/i })).toHaveAttribute('href', '/billing');
+    await expect(grid.getByRole('link', { name: /pending revenue|fatturato in attesa/i })).toHaveAttribute('href', '/billing?status=ISSUED');
     // Left: the work-list panel's single "View all" (it follows the tab) + the room-overview one.
     await expect(page.getByRole('link', { name: /view all|vedi tutto/i })).toHaveCount(2);
   });
