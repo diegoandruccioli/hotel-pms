@@ -346,7 +346,7 @@ describe('Dashboard Component', () => {
     renderDashboard();
     const grid = await screen.findByTestId('stats-grid');
     const links = within(grid).getAllByRole('link');
-    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/stays', '/reservations?preset=arrivalsToday&sort=checkInDate&dir=asc', '/stays', '/rooms', '/billing']);
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/stays', '/reservations?preset=arrivalsToday&sort=checkInDate&dir=asc', '/stays', '/rooms', '/billing?status=ISSUED']);
     expect(within(grid).queryByText('view_all')).not.toBeInTheDocument();
   });
 

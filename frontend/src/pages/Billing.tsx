@@ -1,8 +1,8 @@
 import { useState, useCallback, memo, useMemo, useEffect } from 'react';
 import { format, startOfMonth } from 'date-fns';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import type { SortingState } from '@tanstack/react-table';
-import type { InvoiceResponse, InvoiceSearchResult, InvoiceStatus } from '../types';
+import type { InvoiceResponse, InvoiceSearchResult } from '../types';
 import { Alert } from '../components/Alert';
 import { ListToolbar } from '../components/ListToolbar';
 import { ExportCsvButton } from '../components/ExportCsvButton';
@@ -12,12 +12,19 @@ import { M3EmptyState } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { M3FilterChip } from '../components/m3';
+import { M3Button } from '../components/m3';
 import { M3Pagination } from '../components/m3';
 import { M3TextField } from '../components/m3';
 import { BillingKpiCards } from './Billing/BillingKpiCards';
 import { PaymentModal } from './Billing/PaymentModal';
 import { InvoiceDetailModal } from './Billing/InvoiceDetailModal';
 import { useInvoiceColumns } from './Billing/useInvoiceColumns';
+import {
+  BILLING_STATUS_FILTERS, billingListParamsToSearch, readBillingListParams,
+} from './Billing/billingListParams';
+import type {
+  BillingListParams, BillingNavState, BillingSortField, BillingStatusFilter,
+} from './Billing/billingListParams';
 import { useTranslation } from 'react-i18next';
 import { useInvoicesSearch, useOwnerFinancialSummary, usePatchInvoiceInCache } from '../hooks/queries';
 import { useDebounce, useListRangeSummary } from '../hooks';
@@ -26,8 +33,6 @@ import { billingService } from '../services';
 import { useAuthStore, useToastStore } from '../store';
 
 const PAGE_SIZE = 20;
-const DEFAULT_SORT_FIELD = 'issueDate';
-const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'desc';
 
 /**
  * Punto 5 (piano pilota) guardrail: corrispettivi telematici Horeca are not
@@ -47,17 +52,25 @@ export const Billing = memo(() => {
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
   const isAdminOrOwner = user?.role === 'ADMIN' || user?.role === 'OWNER';
-  const [page, setPage] = useState(0);
   const [paymentTarget, setPaymentTarget] = useState<InvoiceResponse | null>(null);
   const [detailTarget, setDetailTarget]   = useState<InvoiceResponse | null>(null);
   const location = useLocation();
-  const navState = location.state as { statusFilter?: InvoiceStatus | 'ALL'; invoiceId?: string } | null;
-  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>(() => navState?.statusFilter ?? 'ALL');
+  const navState = location.state as (BillingNavState & { invoiceId?: string }) | null;
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
+  // Status, dates, sort and page live in the URL (back, refresh and shared links keep them); the
+  // search text does not, because it holds guest names and emails.
+  const [urlParams, setUrlParams] = useSearchParams();
+  const { status: statusFilter, sortField, sortDir, page, dateFrom, dateTo } = readBillingListParams(urlParams, navState);
+  const currentList = useMemo<BillingListParams>(
+    () => ({ status: statusFilter, sortField, sortDir, page, dateFrom, dateTo }),
+    [statusFilter, sortField, sortDir, page, dateFrom, dateTo],
+  );
+  // Any change other than the page itself invalidates the current page: restart from the first.
+  const updateList = useCallback((patch: Partial<BillingListParams>) => {
+    setUrlParams(billingListParamsToSearch({ ...currentList, page: 0, ...patch }), { replace: true });
+  }, [currentList, setUrlParams]);
+
   const handleExportCsv = useCallback(async () => {
     try {
       await billingService.exportInvoicesCsv({
@@ -70,41 +83,22 @@ export const Billing = memo(() => {
       addToast(getErrorMessage(err, t('csv_export_failed')), 'error');
     }
   }, [statusFilter, debouncedSearch, dateFrom, dateTo, addToast, t]);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
-
-  // Any filter change invalidates the current page — always restart from page 0.
-  // Adjusted during render (React's documented pattern for this — see
-  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes)
-  // rather than in a useEffect, which would run an extra commit after the
-  // filter change instead of resetting in the same render pass.
-  const activeFilters = { debouncedSearch, statusFilter, dateFrom, dateTo, sortField, sortDir };
-  const [prevFilters, setPrevFilters] = useState(activeFilters);
-  if (
-    prevFilters.debouncedSearch !== activeFilters.debouncedSearch ||
-    prevFilters.statusFilter !== activeFilters.statusFilter ||
-    prevFilters.dateFrom !== activeFilters.dateFrom ||
-    prevFilters.dateTo !== activeFilters.dateTo ||
-    prevFilters.sortField !== activeFilters.sortField ||
-    prevFilters.sortDir !== activeFilters.sortDir
-  ) {
-    setPrevFilters(activeFilters);
-    setPage(0);
-  }
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-  }, []);
+    if (currentList.page > 0) updateList({});
+  }, [currentList.page, updateList]);
 
+  const handleStatusSelect = useCallback((next: BillingStatusFilter) => updateList({ status: next }), [updateList]);
   const handleDateFromChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setDateFrom(e.target.value);
-  }, []);
-
+    updateList({ dateFrom: e.target.value });
+  }, [updateList]);
   const handleDateToChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setDateTo(e.target.value);
-  }, []);
+    updateList({ dateTo: e.target.value });
+  }, [updateList]);
 
-  const handlePrevPage = useCallback(() => setPage((p) => p - 1), []);
-  const handleNextPage = useCallback(() => setPage((p) => p + 1), []);
+  const handlePrevPage = useCallback(() => updateList({ page: page - 1 }), [updateList, page]);
+  const handleNextPage = useCallback(() => updateList({ page: page + 1 }), [updateList, page]);
   const pageOfLabel = useCallback(
     (current: number, total: number) => t('page_x_of_y', { current, total }),
     [t],
@@ -116,9 +110,16 @@ export const Billing = memo(() => {
   );
 
   const handleSortingChange = useCallback((next: SortingState) => {
-    setSortField(next[0].id);
-    setSortDir(next[0].desc ? 'desc' : 'asc');
-  }, []);
+    updateList({ sortField: next[0].id as BillingSortField, sortDir: next[0].desc ? 'desc' : 'asc' });
+  }, [updateList]);
+
+  const hasActiveFilters = statusFilter !== 'ALL' || dateFrom !== '' || dateTo !== '' || debouncedSearch !== '';
+  const handleShowAll = useCallback(() => {
+    setSearchQuery('');
+    setUrlParams(billingListParamsToSearch({
+      status: 'ALL', sortField, sortDir, page: 0, dateFrom: '', dateTo: '',
+    }), { replace: true });
+  }, [setUrlParams, sortField, sortDir]);
 
   const searchParams = useMemo(() => ({
     status: statusFilter === 'ALL' ? undefined : statusFilter,
@@ -217,13 +218,13 @@ export const Billing = memo(() => {
           </>
         }
       >
-        {(['ALL', 'ISSUED', 'PAID', 'CANCELLED'] as const).map((s) => (
+        {BILLING_STATUS_FILTERS.map((s) => (
           <M3FilterChip
             key={s}
             value={s}
             selected={statusFilter === s}
             label={s === 'ALL' ? t('filter_all') : t(`invoice_status_${s}`, s)}
-            onValueSelect={setStatusFilter}
+            onValueSelect={handleStatusSelect}
           />
         ))}
       </ListToolbar>
@@ -238,7 +239,19 @@ export const Billing = memo(() => {
           onRetry={handleRetry}
         />
       ) : results.length === 0 ? (
+        hasActiveFilters ? (
+        <M3EmptyState
+          icon="receipt_long"
+          title={t('no_invoices_filtered')}
+          action={
+            <M3Button data-testid="invoices-show-all-btn" variant="outlined" onClick={handleShowAll}>
+              {t('invoices_show_all')}
+            </M3Button>
+          }
+        />
+      ) : (
         <M3EmptyState icon="receipt_long" title={t('no_invoices')} />
+      )
       ) : (
         <M3DataTable
           data={results}
