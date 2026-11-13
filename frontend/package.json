@@ -43,7 +43,7 @@
     "recharts": "^3.10.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.6.7",
-    "zustand": "^5.0.11"
+    "zustand": "^5.0.16"
   },
   "overrides": {
     "esbuild": "^0.28.1",
