@@ -579,7 +579,7 @@
   "invoice_search_hint": "N° fattura, ospite o email",
   "guests_search_hint": "Nome, email o città",
   "reservations_search_hint": "Nome o email ospite",
-  "stays_search_hint": "Camera/ospite in questa pagina",
+  "stays_search_hint": "Camera o ospite",
   "billing_kpi_billed": "Fatturato del mese",
   "billing_kpi_outstanding": "Da incassare questo mese",
   "filter_all": "Tutti",

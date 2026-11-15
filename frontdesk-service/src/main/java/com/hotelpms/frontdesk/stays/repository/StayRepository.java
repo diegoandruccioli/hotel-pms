@@ -206,6 +206,38 @@ public interface StayRepository extends JpaRepository<Stay, UUID> {
             LocalDate departureFrom, LocalDate departureTo, Collection<Boolean> failedFlags, Pageable pageable);
 
     /**
+     * Combinable list search over a hotel's stays: stored statuses, an optional exact expected
+     * check-out day, an Alloggiati-failed-only switch and an optional free-text pattern matched
+     * against the denormalized guest name and room number. Unlike the date-window finders above,
+     * no check-in window is applied, so a stay without an actual check-in time can still match.
+     *
+     * <p>{@code pattern} is a lower-cased {@code LIKE} pattern whose wildcards are already built
+     * and whose literal {@code %}, {@code _} and {@code !} are escaped with {@code !}.
+     *
+     * @param hotelId     the hotel UUID (tenant isolation)
+     * @param statuses    stay statuses to include
+     * @param departingOn when set, only stays expected to check out on that day
+     * @param failedOnly  when {@code true}, only stays whose last Alloggiati send failed
+     * @param pattern     lower-cased {@code LIKE} pattern, or {@code null} to skip the text filter
+     * @param pageable    the pagination and sorting parameters
+     * @return a page of matching stays for that hotel
+     */
+    @Query("SELECT s FROM Stay s WHERE s.hotelId = :hotelId "
+            + "AND s.status IN :statuses "
+            + "AND (CAST(:departingOn AS date) IS NULL OR s.expectedCheckOutDate = :departingOn) "
+            + "AND (:failedOnly = false OR s.alloggiatiSendFailed = true) "
+            + "AND (CAST(:pattern AS string) IS NULL "
+            + "OR LOWER(COALESCE(s.guestDisplayName, '')) LIKE :pattern ESCAPE '!' "
+            + "OR LOWER(COALESCE(s.roomNumber, '')) LIKE :pattern ESCAPE '!')")
+    Page<Stay> searchByHotelId(
+            @Param("hotelId") @NonNull UUID hotelId,
+            @Param("statuses") @NonNull Collection<StayStatus> statuses,
+            @Param("departingOn") LocalDate departingOn,
+            @Param("failedOnly") boolean failedOnly,
+            @Param("pattern") String pattern,
+            @NonNull Pageable pageable);
+
+    /**
      * Checks whether a reservation has a stay in the given status, scoped to a
      * hotel. Used by {@code ReservationServiceImpl.updateReservation} to reject
      * a dates/rooms edit once check-in has already created a stay from this

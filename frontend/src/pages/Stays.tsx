@@ -104,6 +104,7 @@ export const Stays = memo(() => {
 
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
+    setPage(0);
   }, []);
 
   const current = useMemo<StaysFilters>(
@@ -148,7 +149,8 @@ export const Stays = memo(() => {
     sortDir,
     departingOn: departingOn ?? undefined,
     alloggiatiFailed: alloggiatiFailed || undefined,
-  }), [statusFilter, sortField, sortDir, departingOn, alloggiatiFailed]);
+    query: debouncedSearch.trim() || undefined,
+  }), [statusFilter, sortField, sortDir, departingOn, alloggiatiFailed, debouncedSearch]);
 
   const { data: staysPage, isLoading: loading, error: queryError, refetch } = useStaysList(page, listFilters);
   const stays = staysPage?.content ?? EMPTY_STAYS;
@@ -156,24 +158,11 @@ export const Stays = memo(() => {
   const error = queryError ? getErrorMessage(queryError, t('failed_load_stays')) : null;
   const handleRetry = useCallback(() => { refetch(); }, [refetch]);
 
-  // The backend has no free-text filter, so the search box narrows only the loaded page.
-  const filteredStays = useMemo(() => {
-    if (!debouncedSearch.trim()) return stays;
-    const q = debouncedSearch.toLowerCase();
-    return stays.filter(
-      (s) =>
-        s.roomNumber?.toLowerCase().includes(q) ||
-        s.guestDisplayName?.toLowerCase().includes(q),
-    );
-  }, [stays, debouncedSearch]);
-
-  // Search narrows only the loaded page, so a server-wide range would mislead while it is on.
-  const filtersActive = debouncedSearch.trim() !== '';
   // Position comes from the response, not local state: the previous page's rows stay visible while the next one loads.
   const summary = useListRangeSummary(
     staysPage?.number ?? 0,
     staysPage?.size ?? stays.length,
-    filtersActive ? 0 : stays.length,
+    stays.length,
     staysPage?.totalElements ?? 0,
   );
 
@@ -403,7 +392,7 @@ export const Stays = memo(() => {
         />
       ) : (
         <M3DataTable
-          data={filteredStays}
+          data={stays}
           columns={columns}
           getRowId={getStayRowId}
           sorting={sorting}

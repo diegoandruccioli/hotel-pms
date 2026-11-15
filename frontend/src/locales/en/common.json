@@ -579,7 +579,7 @@
   "invoice_search_hint": "Invoice #, guest or email",
   "guests_search_hint": "Name, email or city",
   "reservations_search_hint": "Guest name or email",
-  "stays_search_hint": "Room or guest, in this page",
+  "stays_search_hint": "Room or guest",
   "billing_kpi_billed": "Billed this month",
   "billing_kpi_outstanding": "To collect this month",
   "filter_all": "All",

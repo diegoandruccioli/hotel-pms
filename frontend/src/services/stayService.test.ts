@@ -21,25 +21,34 @@ describe('stayService', () => {
     expect(result).toEqual(mockPage);
   });
 
-  it('sends status, sort, departure day and Alloggiati failure to the server', async () => {
+  it('lists through the search endpoint with the default sort', async () => {
     vi.mocked(api.get).mockResolvedValueOnce({ data: { content: [] } });
 
-    await stayService.getAllStays(2, 20, {
+    await stayService.listStays(0, 20);
+
+    expect(api.get).toHaveBeenCalledWith('/api/v1/stays/search?page=0&size=20&sort=actualCheckInTime%2Cdesc');
+  });
+
+  it('sends status, sort, departure day, Alloggiati failure and the trimmed query to the server', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { content: [] } });
+
+    await stayService.listStays(2, 20, {
       status: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc',
-      departingOn: '2026-10-27', alloggiatiFailed: true,
+      departingOn: '2026-10-27', alloggiatiFailed: true, query: ' 100% ',
     });
 
     expect(api.get).toHaveBeenCalledWith(
-      '/api/v1/stays?page=2&size=20&sort=expectedCheckOutDate,asc&status=CHECKED_IN&departingOn=2026-10-27&alloggiatiFailed=true',
+      '/api/v1/stays/search?page=2&size=20&sort=expectedCheckOutDate%2Casc&status=CHECKED_IN'
+      + '&departingOn=2026-10-27&alloggiatiFailed=true&query=100%25',
     );
   });
 
-  it('omits an unset Alloggiati flag', async () => {
+  it('omits an unset Alloggiati flag and a blank query', async () => {
     vi.mocked(api.get).mockResolvedValueOnce({ data: { content: [] } });
 
-    await stayService.getAllStays(0, 20, { alloggiatiFailed: false });
+    await stayService.listStays(0, 20, { alloggiatiFailed: false, query: '   ' });
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/stays?page=0&size=20&sort=actualCheckInTime,desc');
+    expect(api.get).toHaveBeenCalledWith('/api/v1/stays/search?page=0&size=20&sort=actualCheckInTime%2Cdesc');
   });
 
   it('should fetch stay by id', async () => {

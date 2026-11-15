@@ -92,6 +92,11 @@ class StayControllerTest {
     private static final LocalDate GUEST_DOB = LocalDate.of(1990, 1, 1);
     private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
     private static final LocalDate FILTER_DATE_FROM = LocalDate.of(2026, 8, 1);
+    private static final String FILTER_DATE_FROM_ISO = "2026-08-01";
+    private static final String PARAM_STATUS = "status";
+    private static final String STATUS_CHECKED_IN = "CHECKED_IN";
+    private static final String SEARCH_TEXT = "rossi";
+    private static final String SEARCH_URL = "/api/v1/stays/search";
     private static final LocalDate FILTER_DATE_TO = LocalDate.of(2026, 8, 31);
 
     @Mock
@@ -249,9 +254,9 @@ class StayControllerTest {
                 .thenReturn(page);
 
         mockMvc.perform(get(BASE_URL)
-                        .param("dateFrom", "2026-08-01")
+                        .param("dateFrom", FILTER_DATE_FROM_ISO)
                         .param("dateTo", "2026-08-31")
-                        .param("status", "CHECKED_IN"))
+                        .param(PARAM_STATUS, STATUS_CHECKED_IN))
                 .andExpect(status().isOk());
     }
 
@@ -264,13 +269,48 @@ class StayControllerTest {
                 .thenReturn(page);
 
         mockMvc.perform(get(BASE_URL)
-                        .param("status", "CHECKED_IN")
-                        .param("departingOn", "2026-08-01")
+                        .param(PARAM_STATUS, STATUS_CHECKED_IN)
+                        .param("departingOn", FILTER_DATE_FROM_ISO)
                         .param("alloggiatiFailed", "true"))
                 .andExpect(status().isOk());
 
         verify(stayService).getAllStays(any(Pageable.class), eq(hotelId),
                 eq(null), eq(null), eq(StayStatus.CHECKED_IN), eq(FILTER_DATE_FROM), eq(true));
+    }
+
+    @Test
+    void shouldSearchStaysPassingEveryFilterToTheService() throws Exception {
+        final Page<StayResponse> page = new PageImpl<>(
+                List.of(stayResponse), PageRequest.of(0, 20), 1L);
+        when(stayService.searchStays(any(Pageable.class), eq(hotelId),
+                eq(StayStatus.CHECKED_IN), eq(FILTER_DATE_FROM), eq(true), eq(SEARCH_TEXT)))
+                .thenReturn(page);
+
+        mockMvc.perform(get(SEARCH_URL)
+                        .param(PARAM_STATUS, STATUS_CHECKED_IN)
+                        .param("departingOn", FILTER_DATE_FROM_ISO)
+                        .param("alloggiatiFailed", "true")
+                        .param("query", SEARCH_TEXT))
+                .andExpect(status().isOk());
+
+        verify(stayService).searchStays(any(Pageable.class), eq(hotelId),
+                eq(StayStatus.CHECKED_IN), eq(FILTER_DATE_FROM), eq(true), eq(SEARCH_TEXT));
+    }
+
+    @Test
+    void shouldSearchStaysWithoutAnyFilter() throws Exception {
+        when(stayService.searchStays(any(Pageable.class), eq(hotelId),
+                eq(null), eq(null), eq(false), eq(null)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 1), 0L));
+
+        mockMvc.perform(get(SEARCH_URL))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void shouldRejectAnUnknownStatusOnSearch() throws Exception {
+        mockMvc.perform(get(SEARCH_URL).param(PARAM_STATUS, "NOPE"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

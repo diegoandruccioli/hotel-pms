@@ -33,19 +33,34 @@ export interface StayListFilters {
   /** Exact expected check-out day, yyyy-MM-dd. */
   departingOn?: string;
   alloggiatiFailed?: boolean;
+  /** Free text matched against the primary guest's name and the room number. */
+  query?: string;
 }
 
 const BASE_PATH = '/api/v1/stays';
 const IFRAME_CLEANUP_DELAY_MS = 10000;
 
 export const stayService = {
-  getAllStays: async (page = 0, size = 20, filters: StayListFilters = {}): Promise<SpringPage<StayResponse>> => {
-    const sort = `${filters.sortField ?? 'actualCheckInTime'},${filters.sortDir ?? 'desc'}`;
-    let url = `${BASE_PATH}?page=${page}&size=${size}&sort=${sort}`;
-    if (filters.status) url += `&status=${filters.status}`;
-    if (filters.departingOn) url += `&departingOn=${filters.departingOn}`;
-    if (filters.alloggiatiFailed) url += '&alloggiatiFailed=true';
-    const response = await api.get<SpringPage<StayResponse>>(url);
+  getAllStays: async (page = 0, size = 20): Promise<SpringPage<StayResponse>> => {
+    const response = await api.get<SpringPage<StayResponse>>(
+      `${BASE_PATH}?page=${page}&size=${size}&sort=actualCheckInTime,desc`,
+    );
+    return response.data;
+  },
+
+  /** The stays list screen: every filter, the sort and the free-text query are applied by the server
+   * (`/search`), over the whole history rather than the loaded page. */
+  listStays: async (page = 0, size = 20, filters: StayListFilters = {}): Promise<SpringPage<StayResponse>> => {
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+      sort: `${filters.sortField ?? 'actualCheckInTime'},${filters.sortDir ?? 'desc'}`,
+    });
+    if (filters.status) params.set('status', filters.status);
+    if (filters.departingOn) params.set('departingOn', filters.departingOn);
+    if (filters.alloggiatiFailed) params.set('alloggiatiFailed', 'true');
+    if (filters.query?.trim()) params.set('query', filters.query.trim());
+    const response = await api.get<SpringPage<StayResponse>>(`${BASE_PATH}/search?${params.toString()}`);
     return response.data;
   },
 

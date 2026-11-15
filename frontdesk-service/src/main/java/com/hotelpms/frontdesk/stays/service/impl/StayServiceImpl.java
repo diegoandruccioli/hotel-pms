@@ -46,6 +46,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -79,6 +80,7 @@ public class StayServiceImpl implements StayService {
     private static final String ISSUED_STATUS = "ISSUED";
     private static final String STAY_NOT_FOUND_MSG = "STAY_NOT_FOUND";
     private static final String INVALID_STAY_STATUS_MSG = "INVALID_STAY_STATUS";
+    private static final String LIKE_WILDCARD = "%";
     private static final LocalDate EARLIEST_FILTER_DATE = LocalDate.of(1900, 1, 1);
     private static final LocalDate LATEST_FILTER_DATE = LocalDate.of(2100, 12, 31);
 
@@ -295,6 +297,39 @@ public class StayServiceImpl implements StayService {
                 .findByHotelIdAndActualCheckInTimeBetweenAndStatusInAndExpectedCheckOutDateBetweenAndAlloggiatiSendFailedIn(
                         hotelId, start, end, statuses, departureFrom, departureTo, failedFlags, pageable)
                 .map(stayMapper::toDto);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<StayResponse> searchStays(final Pageable pageable, @NonNull final UUID hotelId,
+            final StayStatus status, final LocalDate departingOn, final boolean alloggiatiFailed,
+            final String query) {
+        final String trimmed = query == null ? "" : query.trim();
+        log.debug("Searching stays, status={}, departingOn={}, alloggiatiFailed={}, hasQuery={}",
+                status, departingOn, alloggiatiFailed, !trimmed.isEmpty());
+        final Set<StayStatus> statuses = status != null ? Set.of(status) : EnumSet.allOf(StayStatus.class);
+        return stayRepository.searchByHotelId(
+                        hotelId, statuses, departingOn, alloggiatiFailed, toLikePattern(trimmed), pageable)
+                .map(stayMapper::toDto);
+    }
+
+    /**
+     * Builds the lower-cased {@code LIKE} pattern for a substring search, escaping the wildcard
+     * characters (and the escape character itself) so a typed {@code %} or {@code _} matches literally.
+     *
+     * @param trimmed the trimmed query
+     * @return the pattern, or {@code null} for an empty query
+     */
+    private static String toLikePattern(final String trimmed) {
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        final String escaped = trimmed.toLowerCase(Locale.ROOT)
+                .replace("!", "!!")
+                .replace(LIKE_WILDCARD, "!" + LIKE_WILDCARD)
+                .replace("_", "!_");
+        return LIKE_WILDCARD + escaped + LIKE_WILDCARD;
     }
 
     /** {@inheritDoc} */
