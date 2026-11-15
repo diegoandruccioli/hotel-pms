@@ -4,6 +4,7 @@ import com.hotelpms.frontdesk.client.GuestClient;
 import com.hotelpms.frontdesk.client.NotificationClient;
 import com.hotelpms.frontdesk.client.dto.GuestCreateRequest;
 import com.hotelpms.frontdesk.client.dto.GuestResponse;
+import com.hotelpms.frontdesk.client.dto.GuestSearchPageResponse;
 import com.hotelpms.frontdesk.exception.BadRequestException;
 import com.hotelpms.frontdesk.exception.ConflictException;
 import com.hotelpms.frontdesk.exception.NotFoundException;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
@@ -39,6 +41,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -50,6 +53,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -60,7 +64,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -92,15 +99,20 @@ class QuotationServiceImplTest {
     private static final String DEFAULT_OPTION_LABEL = "Opzione 1";
     private static final LocalDate CHECK_IN = LocalDate.now().plusDays(10);
     private static final LocalDate CHECK_OUT = LocalDate.now().plusDays(13);
-    private static final LocalDate VALID_UNTIL = LocalDate.now().plusDays(5);
+    private static final Instant NOW = Instant.parse("2026-10-20T12:00:00Z");
+    // "Today" is the injected clock's date, not the machine's: expiry is judged against the clock.
+    private static final LocalDate TODAY = LocalDate.ofInstant(NOW, ZoneOffset.UTC);
+    private static final LocalDate VALID_UNTIL = TODAY.plusDays(5);
     private static final byte[] PDF_BYTES = {1, 2, 3};
     private static final String REMOVED_ROOM_PLACEHOLDER = "—";
     private static final String NOT_SENDABLE = "QUOTATION_NOT_SENDABLE";
     private static final String RESEND_TOO_SOON = "QUOTATION_RESEND_TOO_SOON";
     private static final String PROSPECT_EMAIL = "prospect@example.com";
+    // The cap the service puts on how many guests a free-text search resolves, and a prospect-only query.
+    private static final int GUEST_SEARCH_CAP = 200;
+    private static final String PROSPECT_QUERY = "bianchi";
     private static final LocalDateTime COOLDOWN_START = LocalDateTime.ofInstant(
             Instant.parse("2026-10-20T11:50:00Z"), ZoneOffset.UTC);
-    private static final Instant NOW = Instant.parse("2026-10-20T12:00:00Z");
 
     @Mock
     private QuotationRepository quotationRepository;
@@ -289,7 +301,7 @@ class QuotationServiceImplTest {
 
     @Test
     void quotationByIdPastValidUntilReturnsEffectiveExpiredStatus() {
-        final Quotation quotation = quotationEntity(QuotationStatus.SENT, LocalDate.now().minusDays(1));
+        final Quotation quotation = quotationEntity(QuotationStatus.SENT, TODAY.minusDays(1));
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
         when(guestClient.getGuestById(GUEST_ID))
                 .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL));
@@ -388,7 +400,7 @@ class QuotationServiceImplTest {
 
     @Test
     void sendQuotationEmailOnExpiredQuotationThrowsConflict() {
-        assertSendRefused(QuotationStatus.SENT, LocalDate.now().minusDays(1), NOT_SENDABLE);
+        assertSendRefused(QuotationStatus.SENT, TODAY.minusDays(1), NOT_SENDABLE);
     }
 
     private void assertSendRefused(final QuotationStatus status, final LocalDate validUntil, final String code) {
@@ -605,7 +617,7 @@ class QuotationServiceImplTest {
 
     @Test
     void convertToReservationExpiredThrowsConflict() {
-        final Quotation quotation = quotationEntity(QuotationStatus.SENT, LocalDate.now().minusDays(1));
+        final Quotation quotation = quotationEntity(QuotationStatus.SENT, TODAY.minusDays(1));
         when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
 
         assertThrows(ConflictException.class, () -> quotationService.convertToReservation(QUOTATION_ID, null));
@@ -690,6 +702,120 @@ class QuotationServiceImplTest {
         assertEquals(1, result.getTotalElements());
         assertEquals(GUEST_FIRST_NAME + " " + GUEST_LAST_NAME, result.getContent().get(0).guestFullName());
         verify(guestClient, never()).getGuestsBatch(any());
+    }
+
+    private void stubSearchReturning(final Quotation... rows) {
+        when(quotationRepository.searchByHotelId(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(rows)));
+    }
+
+    @Test
+    void searchWithNoFilterMatchesEveryStoredStatusAndAppliesNoDateBound() {
+        stubSearchReturning();
+
+        quotationService.searchQuotations(null, null, PageRequest.of(0, 10));
+
+        verify(quotationRepository).searchByHotelId(eq(HOTEL_ID), eq(EnumSet.allOf(QuotationStatus.class)),
+                isNull(), isNull(), isNull(), eq(List.of()), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = QuotationStatus.class, names = {"DRAFT", "SENT"})
+    void searchForALiveDraftOrSentLeavesOutTheOnesAlreadyExpired(final QuotationStatus status) {
+        stubSearchReturning();
+
+        quotationService.searchQuotations(status, null, PageRequest.of(0, 10));
+
+        // validUntil >= today: a draft past its date is listed under "expired", not under "draft".
+        verify(quotationRepository).searchByHotelId(eq(HOTEL_ID), eq(EnumSet.of(status)),
+                eq(TODAY), isNull(), isNull(), eq(List.of()), any());
+    }
+
+    @Test
+    void searchForExpiredSelectsDraftAndSentPastTheirValidityDate() {
+        stubSearchReturning();
+
+        quotationService.searchQuotations(QuotationStatus.EXPIRED, null, PageRequest.of(0, 10));
+
+        // EXPIRED is never stored: it is DRAFT or SENT with validUntil < today.
+        verify(quotationRepository).searchByHotelId(eq(HOTEL_ID), eq(EnumSet.of(QuotationStatus.DRAFT, QuotationStatus.SENT)),
+                isNull(), eq(TODAY), isNull(), eq(List.of()), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = QuotationStatus.class, names = {"ACCEPTED", "DECLINED"})
+    void searchForATerminalStatusAppliesNoDateBound(final QuotationStatus status) {
+        stubSearchReturning();
+
+        quotationService.searchQuotations(status, null, PageRequest.of(0, 10));
+
+        verify(quotationRepository).searchByHotelId(eq(HOTEL_ID), eq(EnumSet.of(status)),
+                isNull(), isNull(), isNull(), eq(List.of()), any());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "   "})
+    void searchWithABlankQueryDoesNotAskGuestService(final String blank) {
+        stubSearchReturning();
+
+        quotationService.searchQuotations(null, blank, PageRequest.of(0, 10));
+
+        verify(guestClient, never()).searchGuests(any(), anyInt());
+        verify(quotationRepository).searchByHotelId(eq(HOTEL_ID), any(), isNull(), isNull(), isNull(),
+                eq(List.of()), any());
+    }
+
+    @Test
+    void searchTrimsTheQueryAndMatchesTheGuestsGuestServiceResolves() {
+        stubSearchReturning();
+        when(guestClient.searchGuests("rossi", GUEST_SEARCH_CAP)).thenReturn(new GuestSearchPageResponse(
+                List.of(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL))));
+
+        quotationService.searchQuotations(null, "  rossi ", PageRequest.of(0, 10));
+
+        verify(quotationRepository).searchByHotelId(eq(HOTEL_ID), any(), isNull(), isNull(), eq("rossi"),
+                eq(List.of(GUEST_ID)), any());
+    }
+
+    @Test
+    void searchStillRunsWhenNoGuestMatchesSoProspectsAreFound() {
+        stubSearchReturning();
+        // Also what the guest-service circuit-breaker fallback returns.
+        when(guestClient.searchGuests(PROSPECT_QUERY, GUEST_SEARCH_CAP)).thenReturn(new GuestSearchPageResponse(List.of()));
+
+        quotationService.searchQuotations(null, PROSPECT_QUERY, PageRequest.of(0, 10));
+
+        verify(quotationRepository).searchByHotelId(eq(HOTEL_ID), any(), isNull(), isNull(), eq(PROSPECT_QUERY),
+                eq(List.of()), any());
+    }
+
+    @Test
+    void searchLabelsEveryRowAgainstTheSameTodayItFiltersWith() {
+        final Quotation validToday = quotationEntity(QuotationStatus.DRAFT, TODAY);
+        final Quotation pastDue = quotationEntity(QuotationStatus.DRAFT, TODAY.minusDays(1));
+        stubSearchReturning(validToday, pastDue);
+        when(guestClient.getGuestsBatch(List.of(GUEST_ID)))
+                .thenReturn(List.of(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, GUEST_EMAIL)));
+
+        final Page<QuotationResponse> result = quotationService.searchQuotations(null, null, PageRequest.of(0, 10));
+
+        // validUntil == today is still valid; the day before is expired.
+        assertEquals(QuotationStatus.DRAFT, result.getContent().get(0).status());
+        assertEquals(QuotationStatus.EXPIRED, result.getContent().get(1).status());
+        assertEquals(GUEST_FIRST_NAME + " " + GUEST_LAST_NAME, result.getContent().get(0).guestFullName());
+    }
+
+    @Test
+    void searchOrdersByANonUniqueKeyWithATieBreakSoPagesDoNotOverlap() {
+        stubSearchReturning();
+
+        quotationService.searchQuotations(null, null,
+                PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "validUntil")));
+
+        verify(quotationRepository).searchByHotelId(any(), any(), any(), any(), any(), any(),
+                argThat(pageable -> pageable.getSort().getOrderFor("validUntil") != null
+                        && pageable.getSort().getOrderFor("id") != null));
     }
 
     // A room soft-deleted after it was quoted must not break reading the quotation (or the whole list page).

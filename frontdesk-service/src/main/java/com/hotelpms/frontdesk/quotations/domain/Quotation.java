@@ -148,7 +148,18 @@ public class Quotation {
      * @return true if expired
      */
     public boolean isExpired() {
+        return isExpiredOn(LocalDate.now());
+    }
+
+    /**
+     * Same as {@link #isExpired()} against a caller-supplied "today", so a request that both
+     * filters on and displays the expired state judges every row against the same date.
+     *
+     * @param today the date to compare {@code validUntil} with
+     * @return true if expired on that date
+     */
+    public boolean isExpiredOn(final LocalDate today) {
         return (status == QuotationStatus.DRAFT || status == QuotationStatus.SENT)
-                && validUntil.isBefore(LocalDate.now());
+                && validUntil.isBefore(today);
     }
 }

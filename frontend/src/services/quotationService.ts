@@ -1,6 +1,6 @@
 import api from './api';
 import { downloadViaIframe } from './downloadViaIframe';
-import type { QuotationRequest, QuotationResponse } from '../types';
+import type { QuotationRequest, QuotationResponse, QuotationStatus } from '../types';
 import type { ReservationResponse } from '../types';
 import type { SpringPage } from '../types';
 
@@ -8,8 +8,24 @@ const BASE_PATH = '/api/v1/quotations';
 const IFRAME_CLEANUP_DELAY_MS = 30000;
 
 export const quotationService = {
-  getAllQuotations: async (page = 0, size = 20): Promise<SpringPage<QuotationResponse>> => {
-    const response = await api.get<SpringPage<QuotationResponse>>(`${BASE_PATH}?page=${page}&size=${size}&sort=createdAt,desc`);
+  /**
+   * One page of the list, newest first (the server's default order), narrowed by status and a
+   * free-text query (guest name or email). `EXPIRED` is a valid status here although the server
+   * never stores it. Filter values left out are not sent.
+   */
+  searchQuotations: async (params: {
+    status?: QuotationStatus;
+    query?: string;
+    page?: number;
+    size?: number;
+  }): Promise<SpringPage<QuotationResponse>> => {
+    const searchParams = new URLSearchParams({
+      page: String(params.page ?? 0),
+      size: String(params.size ?? 20),
+    });
+    if (params.status) searchParams.set('status', params.status);
+    if (params.query?.trim()) searchParams.set('query', params.query.trim());
+    const response = await api.get<SpringPage<QuotationResponse>>(`${BASE_PATH}/search?${searchParams.toString()}`);
     return response.data;
   },
 

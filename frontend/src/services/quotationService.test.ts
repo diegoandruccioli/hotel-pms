@@ -9,24 +9,42 @@ describe('quotationService', () => {
     vi.clearAllMocks();
   });
 
-  it('should fetch all quotations with pagination defaults', async () => {
+  it('should search quotations with pagination defaults and no filter', async () => {
     const mockPage = { content: [{ id: 'q1' }], totalPages: 1 };
     vi.mocked(api.get).mockResolvedValueOnce({ data: mockPage });
 
-    const result = await quotationService.getAllQuotations();
+    const result = await quotationService.searchQuotations({});
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/quotations?page=0&size=20&sort=createdAt,desc');
+    expect(api.get).toHaveBeenCalledWith('/api/v1/quotations/search?page=0&size=20');
     expect(result).toEqual(mockPage);
   });
 
-  it('should fetch quotations for a given page and size', async () => {
+  it('should search a given page and size', async () => {
     const mockPage = { content: [], totalPages: 3 };
     vi.mocked(api.get).mockResolvedValueOnce({ data: mockPage });
 
-    const result = await quotationService.getAllQuotations(2, 10);
+    const result = await quotationService.searchQuotations({ page: 2, size: 10 });
 
-    expect(api.get).toHaveBeenCalledWith('/api/v1/quotations?page=2&size=10&sort=createdAt,desc');
+    expect(api.get).toHaveBeenCalledWith('/api/v1/quotations/search?page=2&size=10');
     expect(result).toEqual(mockPage);
+  });
+
+  it('should send the status and the trimmed query, and leave out what is empty', async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { content: [], totalPages: 0 } });
+
+    await quotationService.searchQuotations({ status: 'EXPIRED', query: '  rossi ', page: 1 });
+    expect(api.get).toHaveBeenLastCalledWith('/api/v1/quotations/search?page=1&size=20&status=EXPIRED&query=rossi');
+
+    await quotationService.searchQuotations({ query: '   ' });
+    expect(api.get).toHaveBeenLastCalledWith('/api/v1/quotations/search?page=0&size=20');
+  });
+
+  it('should encode a query with an email or spaces', async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { content: [], totalPages: 0 } });
+
+    await quotationService.searchQuotations({ query: 'anna b@x.it' });
+
+    expect(api.get).toHaveBeenLastCalledWith('/api/v1/quotations/search?page=0&size=20&query=anna+b%40x.it');
   });
 
   it('should fetch quotation by id', async () => {

@@ -89,6 +89,8 @@ const PAGINATED_ENDPOINTS: Array<{ name: string; path: string; sort?: string }> 
     { name: 'reservations (default checkInDate sort)', path: '/api/v1/reservations' },
     { name: 'reservations search (client sort=status)', path: '/api/v1/reservations/search', sort: 'status,asc' },
     { name: 'quotations (no @PageableDefault — relies entirely on the global resolver)', path: '/api/v1/quotations' },
+    { name: 'quotations search', path: '/api/v1/quotations/search' },
+    { name: 'quotations search (client sort=validUntil)', path: '/api/v1/quotations/search', sort: 'validUntil,asc' },
     { name: 'stays (default actualCheckInTime sort)', path: '/api/v1/stays' },
     { name: 'reservation groups', path: '/api/v1/reservation-groups' },
     { name: 'rooms (default roomNumber sort)', path: '/api/v1/rooms' },

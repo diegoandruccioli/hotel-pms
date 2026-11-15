@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.quotations.controller;
 
+import com.hotelpms.frontdesk.quotations.domain.QuotationStatus;
 import com.hotelpms.frontdesk.quotations.dto.ConvertQuotationRequest;
 import com.hotelpms.frontdesk.quotations.dto.QuotationRequest;
 import com.hotelpms.frontdesk.quotations.dto.QuotationResponse;
@@ -9,6 +10,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -37,6 +41,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class QuotationController {
 
+    private static final int DEFAULT_PAGE_SIZE = 20;
     private static final String PDF_FILENAME_PREFIX = "preventivo-";
     private static final String PDF_EXTENSION = ".pdf";
 
@@ -87,6 +92,29 @@ public class QuotationController {
     @GetMapping
     public ResponseEntity<Page<QuotationResponse>> getAllQuotations(final Pageable pageable) {
         return ResponseEntity.ok(quotationService.getAllQuotations(pageable));
+    }
+
+    /**
+     * Searches the caller's hotel quotations: an optional status filter and an optional free-text
+     * query matched against the guest's name/email/city or the prospect's name/email. {@code EXPIRED}
+     * is accepted as a status although it is never stored: it selects the {@code DRAFT}/{@code SENT}
+     * quotations past their validity date.
+     *
+     * @param status   optional status filter; an unknown value is a 400
+     * @param query    optional free-text query
+     * @param pageable pagination and sorting parameters (newest first by default)
+     * @return a page of matching quotations
+     */
+    @GetMapping("/search")
+    public ResponseEntity<Page<QuotationResponse>> searchQuotations(
+            @RequestParam(required = false) final QuotationStatus status,
+            @RequestParam(required = false) final String query,
+            @PageableDefault(
+                    size = DEFAULT_PAGE_SIZE,
+                    sort = "createdAt",
+                    direction = Sort.Direction.DESC
+            ) final Pageable pageable) {
+        return ResponseEntity.ok(quotationService.searchQuotations(status, query, pageable));
     }
 
     /**
