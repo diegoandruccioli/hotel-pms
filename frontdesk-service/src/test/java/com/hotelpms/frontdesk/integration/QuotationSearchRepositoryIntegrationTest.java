@@ -57,7 +57,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class QuotationSearchRepositoryIntegrationTest {
 
     @Container
-    @SuppressWarnings("resource")
     static final PostgreSQLContainer<?> POSTGRES =
             new PostgreSQLContainer<>("postgres:16-alpine")
                     .withDatabaseName("hotel_frontdesk_test")
