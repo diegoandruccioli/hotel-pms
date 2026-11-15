@@ -92,6 +92,15 @@ describe('M3Pagination', () => {
     expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
   });
 
+  it('keeps the button labels for assistive tech but hides them visually below sm', () => {
+    render(<M3Pagination {...baseProps} page={1} totalPages={3} />);
+    expect(screen.getByRole('button', { name: 'Previous' })).toHaveTextContent('Previous');
+    expect(screen.getByText('Previous')).toHaveClass('max-sm:sr-only');
+    expect(screen.getByText('Next')).toHaveClass('max-sm:sr-only');
+    // The page counter must never wrap, whatever the label length.
+    expect(screen.getByText('Page 2 of 3')).toHaveClass('whitespace-nowrap');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <M3Pagination

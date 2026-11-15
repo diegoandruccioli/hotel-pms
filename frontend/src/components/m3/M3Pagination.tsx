@@ -19,6 +19,10 @@ interface M3PaginationProps {
  * Extracted from the pagination block Guests.tsx already had — every list
  * page needs the same prev/next + "page X of Y" control over a SpringPage
  * response, previously copy-pasted per page.
+ *
+ * Below `sm` the buttons are icon-only (the label stays for screen readers and as `aria-label`):
+ * with a long label ("Precedente"/"Successivo") the row is wider than a 390 px screen's content
+ * column and "Pagina X di Y" wraps onto two lines. Icon-only keeps one row whatever the language.
  */
 export const M3Pagination = ({
   page,
@@ -50,9 +54,9 @@ export const M3Pagination = ({
           onClick={onPrev}
           aria-label={prevLabel}
         >
-          {prevLabel}
+          <span className="max-sm:sr-only">{prevLabel}</span>
         </M3Button>
-        <span className="text-sm font-body text-on-surface-variant">
+        <span className="text-sm font-body text-on-surface-variant whitespace-nowrap">
           {pageOfLabel(page + 1, totalPages)}
         </span>
         <M3Button
@@ -62,8 +66,8 @@ export const M3Pagination = ({
           onClick={onNext}
           aria-label={nextLabel}
         >
-            {nextLabel}
-          </M3Button>
+          <span className="max-sm:sr-only">{nextLabel}</span>
+        </M3Button>
       </div>
     </nav>
   );
