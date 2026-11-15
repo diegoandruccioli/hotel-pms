@@ -1,5 +1,5 @@
-import { useFormatters, useListRangeSummary } from '../hooks';
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useDebounce, useFormatters, useListRangeSummary } from '../hooks';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { quotationService } from '../services';
@@ -8,6 +8,8 @@ import { M3LoadingState } from '../components/m3';
 import { M3EmptyState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
 import { PageHeader } from '../components/PageHeader';
+import { ListToolbar } from '../components/ListToolbar';
+import { M3FilterChip } from '../components/m3';
 import { M3Button } from '../components/m3';
 import { M3Pagination } from '../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../components/m3';
@@ -16,7 +18,12 @@ import { M3StatusChip } from '../components/m3';
 import { M3ConfirmDialog } from '../components/m3';
 import { useToastStore } from '../store';
 import { getErrorMessage, quotationStatusTone } from '../utils';
-import { quotationListParamsToSearch, readQuotationListParams } from './Quotations/quotationListParams';
+import {
+  QUOTATION_STATUS_FILTERS,
+  quotationListParamsToSearch,
+  readQuotationListParams,
+  type QuotationStatusFilter,
+} from './Quotations/quotationListParams';
 import { QuotationSendDialog } from './Quotations/QuotationSendDialog';
 
 const PAGE_SIZE = 20;
@@ -133,7 +140,11 @@ export const Quotations = () => {
 
   // The page lives in the URL, so a refresh or Back from a detail comes back to the same place.
   const [urlParams, setUrlParams] = useSearchParams();
-  const { page } = readQuotationListParams(urlParams);
+  const { page, status: statusFilter } = readQuotationListParams(urlParams);
+  // The search text is not in the URL: it holds guest names and emails.
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery);
+  const hasActiveFilters = statusFilter !== 'ALL' || debouncedSearch.trim() !== '';
   const [quotations, setQuotations] = useState<QuotationResponse[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
@@ -146,25 +157,40 @@ export const Quotations = () => {
   const [convertTarget, setConvertTarget] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // A slow answer to an earlier search must not overwrite the answer to the current one: only the
+  // latest request may touch the state.
+  const latestRequest = useRef(0);
+
   const loadQuotations = useCallback(async () => {
+    const request = ++latestRequest.current;
+    const isStale = () => request !== latestRequest.current;
     try {
       setLoading(true);
       setError(null);
-      const data = await quotationService.getAllQuotations(page, PAGE_SIZE);
+      const data = await quotationService.searchQuotations({
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+        query: debouncedSearch,
+        page,
+        size: PAGE_SIZE,
+      });
+      if (isStale()) return;
       if (data.content.length === 0 && page > 0) {
         // The last row of the last page went away (or the URL names a page that does not exist).
-        setUrlParams(quotationListParamsToSearch({ page: Math.max(0, data.totalPages - 1) }), { replace: true });
+        setUrlParams(
+          quotationListParamsToSearch({ status: statusFilter, page: Math.max(0, data.totalPages - 1) }),
+          { replace: true },
+        );
         return;
       }
       setQuotations(data.content);
       setTotalPages(data.totalPages);
       setTotalElements(data.totalElements);
     } catch (err: unknown) {
-      setError(getErrorMessage(err, t('error_loading_quotations')));
+      if (!isStale()) setError(getErrorMessage(err, t('error_loading_quotations')));
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
-  }, [page, t, setUrlParams]);
+  }, [page, statusFilter, debouncedSearch, t, setUrlParams]);
 
   useEffect(() => {
     loadQuotations();
@@ -173,7 +199,23 @@ export const Quotations = () => {
   const summary = useListRangeSummary(page, PAGE_SIZE, quotations.length, totalElements);
 
   const handleNew = useCallback(() => navigate('/quotations/new'), [navigate]);
-  const goToPage = useCallback((next: number) => setUrlParams(quotationListParamsToSearch({ page: next })), [setUrlParams]);
+  const goToPage = useCallback(
+    (next: number) => setUrlParams(quotationListParamsToSearch({ status: statusFilter, page: next })),
+    [setUrlParams, statusFilter],
+  );
+  // Any change other than the page itself invalidates the current page: restart from the first.
+  const handleStatusSelect = useCallback(
+    (next: QuotationStatusFilter) => setUrlParams(quotationListParamsToSearch({ status: next, page: 0 })),
+    [setUrlParams],
+  );
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    if (page > 0) setUrlParams(quotationListParamsToSearch({ status: statusFilter, page: 0 }), { replace: true });
+  }, [page, statusFilter, setUrlParams]);
+  const handleShowAll = useCallback(() => {
+    setSearchQuery('');
+    setUrlParams(quotationListParamsToSearch({ status: 'ALL', page: 0 }), { replace: true });
+  }, [setUrlParams]);
   const handlePrevPage = useCallback(() => goToPage(page - 1), [goToPage, page]);
   const handleNextPage = useCallback(() => goToPage(page + 1), [goToPage, page]);
   const pageOfLabel = useCallback(
@@ -299,6 +341,24 @@ export const Quotations = () => {
         }
       />
 
+      <ListToolbar
+        searchLabel={t('search_placeholder')}
+        searchPlaceholder={t('search_hint')}
+        searchValue={searchQuery}
+        onSearchChange={handleSearchChange}
+        filtersLabel={t('common:filter_status')}
+      >
+        {QUOTATION_STATUS_FILTERS.map((s) => (
+          <M3FilterChip
+            key={s}
+            value={s}
+            selected={statusFilter === s}
+            label={s === 'ALL' ? t('common:filter_all') : t(`status_${s.toLowerCase()}`)}
+            onValueSelect={handleStatusSelect}
+          />
+        ))}
+      </ListToolbar>
+
       {loading ? (
         <M3LoadingState label={t('common:loading')} />
       ) : error ? (
@@ -309,12 +369,20 @@ export const Quotations = () => {
           onRetry={loadQuotations}
         />
       ) : quotations.length === 0 ? (
-        <M3EmptyState
-          icon="request_quote"
-          title={t('empty_title')}
-          description={t('empty_hint')}
-          action={<M3Button icon="add" onClick={handleNew}>{t('new_quotation')}</M3Button>}
-        />
+        hasActiveFilters ? (
+          <M3EmptyState
+            icon="request_quote"
+            title={t('no_quotations_filtered')}
+            action={<M3Button variant="outlined" onClick={handleShowAll}>{t('quotations_show_all')}</M3Button>}
+          />
+        ) : (
+          <M3EmptyState
+            icon="request_quote"
+            title={t('empty_title')}
+            description={t('empty_hint')}
+            action={<M3Button icon="add" onClick={handleNew}>{t('new_quotation')}</M3Button>}
+          />
+        )
       ) : (
         <M3Table headers={tableHeaders} stickyEnd className={HIDE_DETAIL_COLUMNS_ON_PHONE}>
           {quotations.map((quotation) => (

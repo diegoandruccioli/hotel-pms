@@ -18,9 +18,15 @@ import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -31,10 +37,13 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -51,6 +60,10 @@ class QuotationControllerTest {
     private static final String PATH_BY_ID = "/{id}";
     private static final String JSON_ID = "$.id";
     private static final String CONVERT_PATH = "/{id}/convert";
+    private static final String SEARCH_PATH = "/search";
+    private static final String SEARCH_TERM = "rossi";
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int CUSTOM_PAGE_SIZE = 5;
     private static final UUID GUEST_ID = UUID.randomUUID();
     private static final UUID ROOM_ID = UUID.randomUUID();
     private static final LocalDate CHECK_IN = LocalDate.now().plusDays(10);
@@ -80,6 +93,7 @@ class QuotationControllerTest {
 
         mockMvc = MockMvcBuilders.standaloneSetup(quotationController)
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
                 .setValidator(validator)
                 .build();
 
@@ -238,5 +252,45 @@ class QuotationControllerTest {
 
         mockMvc.perform(delete(BASE_URL + PATH_BY_ID, quotationId))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldSearchQuotationsPassingStatusQueryAndPaging() throws Exception {
+        when(quotationService.searchQuotations(eq(QuotationStatus.EXPIRED), eq(SEARCH_TERM), any()))
+                .thenReturn(new PageImpl<>(List.of(quotationResponse), PageRequest.of(0, DEFAULT_PAGE_SIZE), 1L));
+
+        // "search" must reach the search handler, not the "/{id}" one.
+        mockMvc.perform(get(BASE_URL + SEARCH_PATH)
+                        .param("status", "EXPIRED").param("query", SEARCH_TERM)
+                        .param("page", "1").param("size", String.valueOf(CUSTOM_PAGE_SIZE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(quotationId.toString()));
+
+        final ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(quotationService).searchQuotations(eq(QuotationStatus.EXPIRED), eq(SEARCH_TERM), pageable.capture());
+        assertEquals(1, pageable.getValue().getPageNumber());
+        assertEquals(CUSTOM_PAGE_SIZE, pageable.getValue().getPageSize());
+    }
+
+    @Test
+    void shouldSearchQuotationsNewestFirstWithNoFilterByDefault() throws Exception {
+        when(quotationService.searchQuotations(isNull(), isNull(), any()))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, DEFAULT_PAGE_SIZE), 0L));
+
+        mockMvc.perform(get(BASE_URL + SEARCH_PATH))
+                .andExpect(status().isOk());
+
+        final ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(quotationService).searchQuotations(isNull(), isNull(), pageable.capture());
+        assertEquals(DEFAULT_PAGE_SIZE, pageable.getValue().getPageSize());
+        assertEquals(Sort.Direction.DESC, pageable.getValue().getSort().getOrderFor("createdAt").getDirection());
+    }
+
+    @Test
+    void shouldReturn400WhenSearchingWithAnUnknownStatus() throws Exception {
+        mockMvc.perform(get(BASE_URL + SEARCH_PATH).param("status", "BOGUS"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(quotationService);
     }
 }

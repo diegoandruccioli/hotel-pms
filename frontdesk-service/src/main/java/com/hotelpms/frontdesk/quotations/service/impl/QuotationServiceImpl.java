@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.quotations.service.impl;
 
+import com.hotelpms.commonweb.paging.StablePaging;
 import com.hotelpms.internalauth.security.TenantContext;
 
 import com.hotelpms.frontdesk.client.GuestClient;
@@ -48,10 +49,12 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -78,6 +81,8 @@ public class QuotationServiceImpl implements QuotationService {
     private static final String NOT_SENDABLE_MSG = "QUOTATION_NOT_SENDABLE";
     private static final String RESEND_TOO_SOON_MSG = "QUOTATION_RESEND_TOO_SOON";
     private static final String RECIPIENT_EMAIL_MISSING_MSG = "QUOTATION_RECIPIENT_EMAIL_MISSING";
+    /** Most guests a free-text search resolves — a filter aid, not a guest directory (as the reservation search). */
+    private static final int GUEST_SEARCH_MATCH_CAP = 200;
     /** Minimum gap between two successful sends of the same quotation. */
     private static final Duration RESEND_COOLDOWN = Duration.ofMinutes(10);
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -216,7 +221,75 @@ public class QuotationServiceImpl implements QuotationService {
         final UUID hotelId = TenantContext.resolveHotelId();
         final Page<Quotation> page = quotationRepository.findAllByHotelId(hotelId,
                 pageable == null ? Pageable.unpaged() : pageable);
+        return toResponsePage(page, hotelId, LocalDate.now(clock));
+    }
 
+    /** {@inheritDoc} */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<QuotationResponse> searchQuotations(
+            final QuotationStatus status, final String query, final Pageable pageable) {
+        final UUID hotelId = TenantContext.resolveHotelId();
+        // One "today" for the whole request: the same date picks the rows of the EXPIRED filter and
+        // labels each of them, so a row listed as expired is never shown as a draft.
+        final LocalDate today = LocalDate.now(clock);
+        final String trimmedQuery = query == null || query.isBlank() ? null : query.trim();
+        log.info("REST request to search quotations | hotelId={} | status={} | hasQuery={}",
+                hotelId, status, trimmedQuery != null);
+        final List<UUID> guestIds = trimmedQuery == null ? List.of() : resolveGuestIds(trimmedQuery);
+
+        final Page<Quotation> page = quotationRepository.searchByHotelId(
+                hotelId,
+                statusesFor(status),
+                status == QuotationStatus.DRAFT || status == QuotationStatus.SENT ? today : null,
+                status == QuotationStatus.EXPIRED ? today : null,
+                trimmedQuery,
+                guestIds,
+                StablePaging.withCreatedAtTieBreak(pageable));
+        return toResponsePage(page, hotelId, today);
+    }
+
+    /**
+     * Stored statuses a filter selects. {@code EXPIRED} is never stored: it is a {@code DRAFT} or
+     * {@code SENT} quotation past its {@code validUntil}, so it selects those two and the date bound
+     * does the rest (and a plain {@code DRAFT}/{@code SENT} filter excludes the ones already expired).
+     *
+     * @param filter the requested status, or {@code null} for any
+     * @return the stored statuses to match
+     */
+    private static Set<QuotationStatus> statusesFor(final QuotationStatus filter) {
+        if (filter == null) {
+            return EnumSet.allOf(QuotationStatus.class);
+        }
+        return filter == QuotationStatus.EXPIRED
+                ? EnumSet.of(QuotationStatus.DRAFT, QuotationStatus.SENT)
+                : EnumSet.of(filter);
+    }
+
+    /**
+     * Resolves which guests (within the caller's hotel) match a free-text query, via guest-service:
+     * a quotation stores only the guest's id. Capped like the reservation and invoice searches; a
+     * guest-service outage yields no matches (circuit-breaker fallback), so only prospects match.
+     *
+     * @param query the trimmed, non-blank query
+     * @return the matching guest ids
+     */
+    private List<UUID> resolveGuestIds(final String query) {
+        return guestClient.searchGuests(query, GUEST_SEARCH_MATCH_CAP).content().stream()
+                .map(GuestResponse::id)
+                .toList();
+    }
+
+    /**
+     * Turns a page of quotations into responses, resolving guest names and room labels once per page.
+     *
+     * @param page    the page of entities
+     * @param hotelId the hotel UUID
+     * @param today   the date used to judge each quotation's expiry
+     * @return the page of responses
+     */
+    private Page<QuotationResponse> toResponsePage(
+            final Page<Quotation> page, final UUID hotelId, final LocalDate today) {
         final List<UUID> guestIds = page.getContent().stream()
                 .map(Quotation::getGuestId)
                 .filter(Objects::nonNull)
@@ -231,7 +304,8 @@ public class QuotationServiceImpl implements QuotationService {
         return page.map(quotation -> toResponse(
                 quotation,
                 quotation.getGuestId() == null ? null : guestsById.get(quotation.getGuestId()),
-                roomsById));
+                roomsById,
+                today));
     }
 
     /** {@inheritDoc} */
@@ -310,7 +384,7 @@ public class QuotationServiceImpl implements QuotationService {
      */
     private void requireSendable(final Quotation quotation, final UUID hotelId, final LocalDateTime now) {
         final QuotationStatus status = quotation.getStatus();
-        if (status != QuotationStatus.DRAFT && status != QuotationStatus.SENT || quotation.isExpired()) {
+        if (status != QuotationStatus.DRAFT && status != QuotationStatus.SENT || quotation.isExpiredOn(now.toLocalDate())) {
             throw new ConflictException(NOT_SENDABLE_MSG);
         }
         final LocalDateTime since = now.minus(RESEND_COOLDOWN);
@@ -352,7 +426,7 @@ public class QuotationServiceImpl implements QuotationService {
         if (quotation.getStatus() == QuotationStatus.ACCEPTED) {
             throw new ConflictException(ALREADY_ACCEPTED_MSG);
         }
-        if (quotation.isExpired()) {
+        if (quotation.isExpiredOn(LocalDate.now(clock))) {
             throw new ConflictException("QUOTATION_EXPIRED");
         }
         final QuotationOption chosen = resolveChosenOption(quotation, optionId);
@@ -653,12 +727,19 @@ public class QuotationServiceImpl implements QuotationService {
 
     private QuotationResponse toResponse(
             final Quotation quotation, final GuestResponse guest, final Map<UUID, RoomResponse> roomsById) {
+        return toResponse(quotation, guest, roomsById, LocalDate.now(clock));
+    }
+
+    private QuotationResponse toResponse(
+            final Quotation quotation, final GuestResponse guest, final Map<UUID, RoomResponse> roomsById,
+            final LocalDate today) {
         final String guestFullName = guest != null
                 ? guest.firstName() + " " + guest.lastName()
                 : quotation.getGuestId() != null
                         ? "Unknown Guest"
                         : quotation.getProspectFirstName() + " " + quotation.getProspectLastName();
-        final QuotationStatus effectiveStatus = quotation.isExpired() ? QuotationStatus.EXPIRED : quotation.getStatus();
+        final QuotationStatus effectiveStatus = quotation.isExpiredOn(today)
+                ? QuotationStatus.EXPIRED : quotation.getStatus();
         final String prospectEmail = quotation.getGuestId() == null ? quotation.getProspectEmail() : null;
 
         final List<QuotationOptionResponse> options = quotation.getOptions().stream()

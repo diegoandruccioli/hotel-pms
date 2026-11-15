@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.quotations.service;
 
+import com.hotelpms.frontdesk.quotations.domain.QuotationStatus;
 import com.hotelpms.frontdesk.quotations.dto.QuotationRequest;
 import com.hotelpms.frontdesk.quotations.dto.QuotationResponse;
 import com.hotelpms.frontdesk.reservations.dto.ReservationResponse;
@@ -62,6 +63,20 @@ public interface QuotationService {
      * @return a page of quotation responses
      */
     Page<QuotationResponse> getAllQuotations(Pageable pageable);
+
+    /**
+     * Searches the caller's hotel quotations by status and free text. {@code EXPIRED} is computed,
+     * never stored, so it selects the {@code DRAFT}/{@code SENT} quotations whose {@code validUntil}
+     * has passed, and a {@code DRAFT}/{@code SENT} filter leaves those out: the filter agrees with the
+     * status each row is shown with. The query matches a registered guest's name, email or city
+     * (resolved by guest-service) and a prospect's name or email.
+     *
+     * @param status   the status filter, or {@code null} for any
+     * @param query    the free-text query, or {@code null}/blank for none
+     * @param pageable pagination and sorting parameters
+     * @return a page of matching quotation responses
+     */
+    Page<QuotationResponse> searchQuotations(QuotationStatus status, String query, Pageable pageable);
 
     /**
      * Renders the quotation PDF.
