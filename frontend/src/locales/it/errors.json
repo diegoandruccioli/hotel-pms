@@ -104,5 +104,6 @@
   "GROUP_STALE_VERSION": "Questo gruppo è stato modificato da qualcun altro. Ricaricalo e riprova.",
   "MASTER_FOLIO_CREATION_FAILED": "Impossibile creare il master folio del gruppo. Riprova.",
   "QUOTATION_NOT_SENDABLE": "Questo preventivo non può essere inviato: è già accettato, rifiutato o scaduto.",
-  "QUOTATION_RESEND_TOO_SOON": "Il preventivo è stato inviato da poco. Attendi qualche minuto prima di reinviarlo."
+  "QUOTATION_RESEND_TOO_SOON": "Il preventivo è stato inviato da poco. Attendi qualche minuto prima di reinviarlo.",
+  "QUOTATION_RECIPIENT_EMAIL_MISSING": "Il destinatario non ha un indirizzo email. Aggiungilo nella scheda dell'ospite e riprova."
 }

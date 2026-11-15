@@ -81,7 +81,9 @@ public interface QuotationService {
      * @return the updated quotation response
      * @throws com.hotelpms.frontdesk.exception.ConflictException {@code QUOTATION_NOT_SENDABLE}
      *         unless the quotation is {@code DRAFT} or {@code SENT} and not expired, or
-     *         {@code QUOTATION_RESEND_TOO_SOON} inside the cooldown (or when a concurrent send won)
+     *         {@code QUOTATION_RESEND_TOO_SOON} inside the cooldown (or when a concurrent send won), or
+     *         {@code QUOTATION_RECIPIENT_EMAIL_MISSING} when the guest has no email address (checked
+     *         before the cooldown is stamped, so nothing is recorded)
      */
     QuotationResponse sendQuotationEmail(UUID id);
 

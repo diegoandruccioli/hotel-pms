@@ -104,5 +104,6 @@
   "GROUP_STALE_VERSION": "This group was changed by someone else. Reload it and try again.",
   "MASTER_FOLIO_CREATION_FAILED": "The group's master folio could not be created. Try again.",
   "QUOTATION_NOT_SENDABLE": "This quotation can't be sent: it is already accepted, declined or expired.",
-  "QUOTATION_RESEND_TOO_SOON": "This quotation was sent a moment ago. Wait a few minutes before resending it."
+  "QUOTATION_RESEND_TOO_SOON": "This quotation was sent a moment ago. Wait a few minutes before resending it.",
+  "QUOTATION_RECIPIENT_EMAIL_MISSING": "The recipient has no email address. Add one in the guest's record and try again."
 }

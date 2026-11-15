@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { useMemo } from 'react';
 import { axe } from 'vitest-axe';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -12,7 +12,8 @@ vi.mock('react-router-dom', async () => {
 import { Quotations } from './Quotations';
 import { quotationService } from '../services';
 import { useToastStore } from '../store';
-import { openRowMenu } from '../test-utils';
+import { guestService } from '../services/guestService';
+import { openRowMenu, renderWithQuery } from '../test-utils';
 
 // One stable `t` for every render: a new function each time would re-create the load callback and refetch.
 const i18nMock = vi.hoisted(() => {
@@ -37,6 +38,10 @@ vi.mock('../services/quotationService', () => ({
     deleteQuotation: vi.fn(),
     downloadPdf: vi.fn(),
   },
+}));
+
+vi.mock('../services/guestService', () => ({
+  guestService: { getGuestById: vi.fn() },
 }));
 
 vi.mock('../store/toastStore', () => ({
@@ -96,13 +101,23 @@ const Harness = ({ entry }: { entry: string }) => {
   );
 };
 
-const renderPage = (entry = '/quotations') => render(<Harness entry={entry} />);
+const renderPage = (entry = '/quotations') => renderWithQuery(<Harness entry={entry} />);
+
+const GUEST = { id: 'g1', firstName: 'Mario', lastName: 'Rossi', email: 'mario.rossi@example.com' };
+
+// Sending asks first, and the dialog is enabled only once the recipient's address is known.
+const confirmSend = async (label = 'send_dialog_confirm') => {
+  const confirm = await screen.findByRole('button', { name: label });
+  await waitFor(() => expect(confirm).toBeEnabled());
+  fireEvent.click(confirm);
+};
 
 describe('Quotations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useToastStore).mockImplementation((sel: unknown) =>
       (sel as (s: { addToast: typeof mockAddToast }) => unknown)({ addToast: mockAddToast }));
+    vi.mocked(guestService.getGuestById).mockResolvedValue(GUEST as never);
   });
 
   it('renders heading', async () => {
@@ -154,8 +169,36 @@ describe('Quotations', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('action_send')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_send'));
+    await confirmSend();
     await waitFor(() => expect(quotationService.sendQuotation).toHaveBeenCalledWith('q1'));
     expect(mockAddToast).toHaveBeenCalledWith('toast_sent', 'success');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('action_send asks first and shows who receives the email; nothing is sent until confirmed', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([DRAFT_QUOTATION]) as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('action_send')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('action_send'));
+
+    expect(await screen.findByText('mario.rossi@example.com')).toBeInTheDocument();
+    expect(guestService.getGuestById).toHaveBeenCalledWith('g1');
+    expect(quotationService.sendQuotation).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'common:cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(quotationService.sendQuotation).not.toHaveBeenCalled();
+  });
+
+  it('a SENT quotation asks to resend, with the resend wording', async () => {
+    vi.mocked(quotationService.getAllQuotations).mockResolvedValue(page([{ ...DRAFT_QUOTATION, status: 'SENT' }]) as never);
+    vi.mocked(quotationService.sendQuotation).mockResolvedValue({ ...DRAFT_QUOTATION, status: 'SENT' } as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('action_resend')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('action_resend'));
+    expect(await screen.findByText('send_dialog_title_resend')).toBeInTheDocument();
+    await confirmSend('send_dialog_confirm_resend');
+    await waitFor(() => expect(quotationService.sendQuotation).toHaveBeenCalledWith('q1'));
   });
 
   it('action_send shows error toast when send fails', async () => {
@@ -164,6 +207,7 @@ describe('Quotations', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('action_send')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_send'));
+    await confirmSend();
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_send_failed', 'error'));
   });
 
@@ -173,6 +217,7 @@ describe('Quotations', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('action_send')).toBeInTheDocument());
     fireEvent.click(screen.getByText('action_send'));
+    await confirmSend();
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_send_failed', 'error'));
   });
 

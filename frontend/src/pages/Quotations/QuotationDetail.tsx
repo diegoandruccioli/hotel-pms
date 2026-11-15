@@ -15,6 +15,7 @@ import { M3StatusChip } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { QuotationPdfPreviewDialog } from './QuotationPdfPreviewDialog';
 import { QuotationOptionCard } from './QuotationOptionCard';
+import { QuotationSendDialog } from './QuotationSendDialog';
 import { useQuotationDetailActions } from './useQuotationDetailActions';
 import { getErrorMessage, cn, quotationStatusTone } from '../../utils';
 
@@ -33,7 +34,7 @@ export const QuotationDetail = () => {
   const loadQuotation = useCallback(() => { void refetch(); }, [refetch]);
 
   const {
-    busy, previewOpen, declineConfirmOpen, deleteConfirmOpen, convertDialogOpen, convertChoiceId, setConvertChoiceId,
+    busy, previewOpen, sendConfirmOpen, openSendConfirm, closeSendConfirm, declineConfirmOpen, deleteConfirmOpen, convertDialogOpen, convertChoiceId, setConvertChoiceId,
     handleEdit, handleOpenReservation, handleBack, openPreview, closePreview, handleDownload, handleSend, handleConvertClick, closeConvertDialog,
     confirmConvert, handleDuplicate, openDeclineConfirm, closeDeclineConfirm, handleDeclineConfirmed,
     openDeleteConfirm, closeDeleteConfirm, handleDeleteConfirmed,
@@ -169,7 +170,7 @@ export const QuotationDetail = () => {
 
       <div className="flex flex-wrap gap-2">
         {canSend && (
-          <M3Button icon="send" onClick={handleSend} loading={busy} disabled={busy}>
+          <M3Button icon="send" onClick={openSendConfirm} loading={busy} disabled={busy}>
             {quotation.status === 'SENT' ? t('action_resend') : t('action_send')}
           </M3Button>
         )}
@@ -214,6 +215,10 @@ export const QuotationDetail = () => {
       </div>
 
       {previewOpen && id && <QuotationPdfPreviewDialog quotationId={id} onClose={closePreview} />}
+
+      {sendConfirmOpen && (
+        <QuotationSendDialog quotation={quotation} onConfirm={handleSend} onCancel={closeSendConfirm} loading={busy} />
+      )}
 
       {convertDialogOpen && (
         <M3Dialog open title={t('action_convert')} titleId="convert-quotation-choose-option-dialog" onClose={closeConvertDialog}>

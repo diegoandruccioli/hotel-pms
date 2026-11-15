@@ -77,6 +77,7 @@ public class QuotationServiceImpl implements QuotationService {
     private static final int DUPLICATE_VALID_DAYS = 7;
     private static final String NOT_SENDABLE_MSG = "QUOTATION_NOT_SENDABLE";
     private static final String RESEND_TOO_SOON_MSG = "QUOTATION_RESEND_TOO_SOON";
+    private static final String RECIPIENT_EMAIL_MISSING_MSG = "QUOTATION_RECIPIENT_EMAIL_MISSING";
     /** Minimum gap between two successful sends of the same quotation. */
     private static final Duration RESEND_COOLDOWN = Duration.ofMinutes(10);
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -255,8 +256,14 @@ public class QuotationServiceImpl implements QuotationService {
 
         final GuestResponse guest = quotation.getGuestId() != null
                 ? guestClient.getGuestById(quotation.getGuestId()) : null;
-        final Map<UUID, RoomResponse> roomsById = resolveRoomsForQuotation(quotation, hotelId);
         final String recipientEmail = guest != null ? guest.email() : quotation.getProspectEmail();
+        // A guest may be registered with a phone number only. Refuse before the cooldown is stamped:
+        // otherwise the notification-service rejects the blank address, the attempt is recorded as a
+        // service outage, and the recipient is locked out of a resend for no reason.
+        if (recipientEmail == null || recipientEmail.isBlank()) {
+            throw new ConflictException(RECIPIENT_EMAIL_MISSING_MSG);
+        }
+        final Map<UUID, RoomResponse> roomsById = resolveRoomsForQuotation(quotation, hotelId);
         final String recipientName = guest != null
                 ? guest.firstName() + " " + guest.lastName()
                 : quotation.getProspectFirstName() + " " + quotation.getProspectLastName();
