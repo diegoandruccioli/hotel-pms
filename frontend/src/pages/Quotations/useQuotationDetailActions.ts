@@ -18,6 +18,7 @@ export function useQuotationDetailActions(id: string | undefined, quotation: Quo
 
   const [busy, setBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
   const [declineConfirmOpen, setDeclineConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
@@ -44,6 +45,9 @@ export function useQuotationDetailActions(id: string | undefined, quotation: Quo
     }
   }, [id, addToast, t]);
 
+  // "Send" only opens the confirmation, which shows the recipient; `handleSend` is its confirm.
+  const openSendConfirm = useCallback(() => setSendConfirmOpen(true), []);
+  const closeSendConfirm = useCallback(() => setSendConfirmOpen(false), []);
   const handleSend = useCallback(async () => {
     if (!id) return;
     setBusy(true);
@@ -55,6 +59,7 @@ export function useQuotationDetailActions(id: string | undefined, quotation: Quo
       addToast(getErrorMessage(err, t('toast_send_failed')), 'error');
     } finally {
       setBusy(false);
+      setSendConfirmOpen(false);
     }
   }, [id, addToast, t, queryClient]);
 
@@ -134,7 +139,7 @@ export function useQuotationDetailActions(id: string | undefined, quotation: Quo
   }, [id, addToast, t, navigate]);
 
   return {
-    busy, previewOpen, declineConfirmOpen, deleteConfirmOpen, convertDialogOpen, convertChoiceId, setConvertChoiceId,
+    busy, previewOpen, sendConfirmOpen, openSendConfirm, closeSendConfirm, declineConfirmOpen, deleteConfirmOpen, convertDialogOpen, convertChoiceId, setConvertChoiceId,
     handleEdit, handleOpenReservation, handleBack, openPreview, closePreview, handleDownload, handleSend, handleConvertClick, closeConvertDialog, confirmConvert, handleDuplicate, openDeclineConfirm, closeDeclineConfirm, handleDeclineConfirmed, openDeleteConfirm, closeDeleteConfirm, handleDeleteConfirmed,
   };
 }

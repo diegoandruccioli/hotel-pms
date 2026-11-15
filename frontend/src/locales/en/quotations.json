@@ -82,5 +82,17 @@
   "err_delete": "Could not delete the quotation",
   "err_duplicate": "Could not duplicate the quotation",
   "err_create": "Could not create the quotation",
-  "err_update": "Could not update the quotation"
+  "err_update": "Could not update the quotation",
+  "send_dialog_title": "Send the quotation?",
+  "send_dialog_title_resend": "Resend the quotation?",
+  "send_dialog_intro": "The quotation, with the PDF attached, will be sent to:",
+  "send_dialog_recipient": "Recipient",
+  "send_dialog_email": "Email",
+  "send_dialog_cooldown": "After sending, you can resend it to this recipient only after 10 minutes.",
+  "send_dialog_confirm": "Send quotation",
+  "send_dialog_confirm_resend": "Resend quotation",
+  "send_dialog_loading": "Looking up the email address…",
+  "send_dialog_no_email": "{{name}} has no email address. Add one in the guest's record and try again.",
+  "send_dialog_open_guest": "Open guest record",
+  "send_dialog_guest_unreadable": "Could not look up the guest's email address. Try again shortly."
 }

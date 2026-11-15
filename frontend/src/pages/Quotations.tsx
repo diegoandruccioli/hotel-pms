@@ -17,6 +17,7 @@ import { M3ConfirmDialog } from '../components/m3';
 import { useToastStore } from '../store';
 import { getErrorMessage, quotationStatusTone } from '../utils';
 import { quotationListParamsToSearch, readQuotationListParams } from './Quotations/quotationListParams';
+import { QuotationSendDialog } from './Quotations/QuotationSendDialog';
 
 const PAGE_SIZE = 20;
 
@@ -139,6 +140,7 @@ export const Quotations = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sendTarget, setSendTarget] = useState<string | null>(null);
   const [declineTarget, setDeclineTarget] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [convertTarget, setConvertTarget] = useState<string | null>(null);
@@ -179,7 +181,12 @@ export const Quotations = () => {
     [t],
   );
 
-  const handleSend = useCallback(async (id: string) => {
+  // "Send" only opens the confirmation: the dialog shows who will receive the email.
+  const handleSendRequest = useCallback((id: string) => setSendTarget(id), []);
+  const handleSendClose = useCallback(() => setSendTarget(null), []);
+  const handleSendConfirm = useCallback(async () => {
+    if (!sendTarget) return;
+    const id = sendTarget;
     setSendingId(id);
     try {
       const updated = await quotationService.sendQuotation(id);
@@ -189,8 +196,9 @@ export const Quotations = () => {
       addToast(getErrorMessage(err, t('toast_send_failed')), 'error');
     } finally {
       setSendingId(null);
+      setSendTarget(null);
     }
-  }, [addToast, t]);
+  }, [sendTarget, addToast, t]);
 
   const handleConvert = useCallback(async (id: string) => {
     const target = quotations.find((q) => q.id === id);
@@ -260,6 +268,7 @@ export const Quotations = () => {
     }
   }, [deleteTarget, addToast, t, loadQuotations]);
 
+  const sendQuotationTarget = sendTarget ? quotations.find((q) => q.id === sendTarget) : undefined;
   const declineQuotation = declineTarget ? quotations.find((q) => q.id === declineTarget) : undefined;
   const deleteQuotationTarget = deleteTarget ? quotations.find((q) => q.id === deleteTarget) : undefined;
   const convertQuotation = convertTarget ? quotations.find((q) => q.id === convertTarget) : undefined;
@@ -312,7 +321,7 @@ export const Quotations = () => {
             <QuotationRow
               key={quotation.id}
               quotation={quotation}
-              onSend={handleSend}
+              onSend={handleSendRequest}
               onConvert={handleConvert}
               onDecline={handleDeclineRequest}
               onDelete={handleDeleteRequest}
@@ -335,6 +344,15 @@ export const Quotations = () => {
           nextLabel={t('common:next_page')}
           pageOfLabel={pageOfLabel}
           summary={summary}
+        />
+      )}
+
+      {sendQuotationTarget && (
+        <QuotationSendDialog
+          quotation={sendQuotationTarget}
+          onConfirm={handleSendConfirm}
+          onCancel={handleSendClose}
+          loading={sendingId === sendQuotationTarget.id}
         />
       )}
 

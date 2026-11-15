@@ -4,9 +4,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { QuotationDetail } from './QuotationDetail';
 import { quotationService } from '../../services';
+import { guestService } from '../../services/guestService';
 import { renderWithQuery } from '../../test-utils';
 
 vi.mock('../../services/quotationService');
+vi.mock('../../services/guestService', () => ({
+  guestService: { getGuestById: vi.fn() },
+}));
+
+const GUEST = { id: 'g1', firstName: 'Mario', lastName: 'Rossi', email: 'mario.rossi@example.com' };
+
+// Sending asks first, and the dialog is enabled only once the recipient's address is known.
+const confirmSend = async () => {
+  const confirm = await screen.findByRole('button', { name: 'send_dialog_confirm' });
+  await waitFor(() => expect(confirm).toBeEnabled());
+  fireEvent.click(confirm);
+};
 
 vi.mock('./QuotationPdfPreviewDialog', () => ({
   QuotationPdfPreviewDialog: ({ onClose }: { onClose: () => void }) => (
@@ -100,7 +113,10 @@ const renderDetail = (entries: Parameters<typeof MemoryRouter>[0]['initialEntrie
 );
 
 describe('QuotationDetail', () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(guestService.getGuestById).mockResolvedValue(GUEST as never);
+  });
 
   it('renders the guest name, status and line items after load', async () => {
     vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
@@ -155,7 +171,23 @@ describe('QuotationDetail', () => {
     await waitFor(() => expect(screen.getByText('action_send')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('action_send'));
+    await confirmSend();
     await waitFor(() => expect(quotationService.sendQuotation).toHaveBeenCalledWith('q1'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('asks before sending and shows the recipient; cancelling sends nothing', async () => {
+    vi.mocked(quotationService.getQuotationById).mockResolvedValue(DRAFT_QUOTATION as never);
+    renderDetail();
+    await waitFor(() => expect(screen.getByText('action_send')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('action_send'));
+    expect(await screen.findByText('mario.rossi@example.com')).toBeInTheDocument();
+    expect(quotationService.sendQuotation).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'common:cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(quotationService.sendQuotation).not.toHaveBeenCalled();
   });
 
   it('duplicates the quotation and navigates to the new draft', async () => {
@@ -194,6 +226,7 @@ describe('QuotationDetail', () => {
     await waitFor(() => expect(screen.getByText('action_send')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('action_send'));
+    await confirmSend();
     await waitFor(() => expect(quotationService.sendQuotation).toHaveBeenCalledWith('q1'));
   });
 

@@ -30,6 +30,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -427,6 +430,25 @@ class QuotationServiceImplTest {
                 ConflictException.class, () -> quotationService.sendQuotationEmail(QUOTATION_ID));
 
         assertEquals(RESEND_TOO_SOON, ex.getMessage());
+        verify(notificationClient, never()).sendQuotation(any());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "   "})
+    void sendQuotationEmailToAGuestWithoutAnEmailThrowsConflictAndRecordsNothing(final String blankEmail) {
+        final Quotation quotation = quotationEntity(QuotationStatus.DRAFT, VALID_UNTIL);
+        when(quotationRepository.findByIdAndHotelId(QUOTATION_ID, HOTEL_ID)).thenReturn(Optional.of(quotation));
+        when(guestClient.getGuestById(GUEST_ID))
+                .thenReturn(new GuestResponse(GUEST_ID, GUEST_FIRST_NAME, GUEST_LAST_NAME, blankEmail));
+
+        final ConflictException ex = assertThrows(
+                ConflictException.class, () -> quotationService.sendQuotationEmail(QUOTATION_ID));
+
+        assertEquals("QUOTATION_RECIPIENT_EMAIL_MISSING", ex.getMessage());
+        // Nothing is stamped (no cooldown, no failure flag) and nothing is mailed.
+        verify(quotationRepository, never()).saveAndFlush(any(Quotation.class));
+        verify(quotationRepository, never()).save(any(Quotation.class));
         verify(notificationClient, never()).sendQuotation(any());
     }
 
