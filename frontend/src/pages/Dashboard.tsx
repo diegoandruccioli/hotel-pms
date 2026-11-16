@@ -101,8 +101,7 @@ export const Dashboard = () => {
       value: daySheet ? daySheet.availableRooms.toString() : '0',
       icon: 'meeting_room',
       tone: 'neutral',
-      to: '/rooms',
-      state: { availableToday: true },
+      to: '/rooms?available=1',
       trend: { field: 'availableRooms', today: daySheet?.availableRooms ?? 0 },
     },
   ], [daySheet]);
