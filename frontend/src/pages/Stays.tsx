@@ -5,7 +5,7 @@ import { useAuthStore } from '../store';
 import { useToastStore } from '../store';
 import type { StayResponse, StayStatus } from '../types';
 import { PageHeader } from '../components/PageHeader';
-import { M3Button } from '../components/m3';
+import { M3Button, M3EmptyState } from '../components/m3';
 import { M3DataTable } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3ErrorState } from '../components/m3';
@@ -50,7 +50,8 @@ interface StaysFilters {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const SORT_FIELDS: readonly StaySortField[] = ['actualCheckInTime', 'expectedCheckOutDate', 'status'];
-const STATUS_FILTERS = ['ALL', 'EXPECTED', 'CHECKED_IN', 'CHECKED_OUT'] as const;
+// Only the statuses a stay really has: check-in creates it as CHECKED_IN, so an 'expected' filter would always be empty.
+const STATUS_FILTERS = ['ALL', 'CHECKED_IN', 'CHECKED_OUT'] as const;
 
 /**
  * The URL is the source of truth once any filter has been set (`status` is always written with the
@@ -92,7 +93,6 @@ const HIDE_DETAIL_COLUMNS_ON_PHONE = [
 ].join(' ');
 const STATUS_FILTER_LABEL_KEYS: Record<(typeof STATUS_FILTERS)[number], string> = {
   ALL: 'filter_all',
-  EXPECTED: 'status_expected',
   CHECKED_IN: 'status_checked_in',
   CHECKED_OUT: 'status_checked_out',
 };
@@ -151,6 +151,12 @@ export const Stays = memo(() => {
   const handleToggleAlloggiatiFailed = useCallback(() => {
     updateFilters({ alloggiatiFailed: !alloggiatiFailed });
   }, [updateFilters, alloggiatiFailed]);
+
+  const hasActiveFilters = statusFilter !== 'ALL' || departingOn !== null || alloggiatiFailed || debouncedSearch.trim() !== '';
+  const handleShowAll = useCallback(() => {
+    setSearchQuery('');
+    updateFilters({ statusFilter: 'ALL', departingOn: null, alloggiatiFailed: false });
+  }, [updateFilters]);
 
   const listFilters = useMemo<StayListFilters>(() => ({
     status: statusFilter === 'ALL' ? undefined : statusFilter,
@@ -250,7 +256,7 @@ export const Stays = memo(() => {
   const columns = useMemo<ColumnDef<StayResponse>[]>(() => [
     {
       id: 'roomId',
-      header: t('room_id'),
+      header: t('stays_col_room'),
       enableSorting: false,
       cell: ({ row }) => (
         <>
@@ -272,7 +278,7 @@ export const Stays = memo(() => {
     },
     {
       id: 'guestId',
-      header: t('guest_id'),
+      header: t('stays_col_guest'),
       enableSorting: false,
       cell: ({ row }) => <GuestCell stay={row.original} onGuestClick={handleGuestNavigate} />,
     },
@@ -304,7 +310,7 @@ export const Stays = memo(() => {
       id: 'guests',
       header: t('guests'),
       enableSorting: false,
-      cell: ({ row }) => <GuestsCountCell stay={row.original} onManageGuests={handleManageGuests} />,
+      cell: ({ row }) => <GuestsCountCell stay={row.original} onManageGuests={handleManageGuests} t={t} />,
     },
     {
       id: 'status',
@@ -369,31 +375,38 @@ export const Stays = memo(() => {
       <ListToolbar
         searchLabel={t('search_placeholder')}
         searchPlaceholder={t('stays_search_hint')}
-        filtersLabel={t('filter_status')}
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}
       >
-        {STATUS_FILTERS.map((s) => (
+        <div role="group" aria-label={t('filter_status')} className="flex flex-wrap items-center gap-2">
+          {STATUS_FILTERS.map((status) => (
+            <M3FilterChip
+              key={status}
+              value={status}
+              selected={statusFilter === status}
+              label={t(STATUS_FILTER_LABEL_KEYS[status])}
+              onValueSelect={handleStatusSelect}
+            />
+          ))}
+        </div>
+        <div
+          role="group"
+          aria-label={t('stays_filter_group_show')}
+          className="flex flex-wrap items-center gap-2 md:border-l md:border-outline-variant md:pl-3"
+        >
           <M3FilterChip
-            key={s}
-            value={s}
-            selected={statusFilter === s}
-            label={t(STATUS_FILTER_LABEL_KEYS[s])}
-            onValueSelect={handleStatusSelect}
+            value="departingToday"
+            selected={departingOn === today}
+            label={t('stays_filter_departing_today')}
+            onValueSelect={handleToggleDepartingToday}
           />
-        ))}
-        <M3FilterChip
-          value="departingToday"
-          selected={departingOn === today}
-          label={t('stays_filter_departing_today')}
-          onValueSelect={handleToggleDepartingToday}
-        />
-        <M3FilterChip
-          value="alloggiatiFailed"
-          selected={alloggiatiFailed}
-          label={t('stays_filter_alloggiati_failed')}
-          onValueSelect={handleToggleAlloggiatiFailed}
-        />
+          <M3FilterChip
+            value="alloggiatiFailed"
+            selected={alloggiatiFailed}
+            label={t('stays_filter_alloggiati_failed')}
+            onValueSelect={handleToggleAlloggiatiFailed}
+          />
+        </div>
       </ListToolbar>
 
 
@@ -406,6 +419,16 @@ export const Stays = memo(() => {
           retryLabel={t('try_again')}
           onRetry={handleRetry}
         />
+      ) : stays.length === 0 ? (
+        hasActiveFilters ? (
+          <M3EmptyState
+            icon="hotel"
+            title={t('stays_no_results')}
+            action={<M3Button variant="outlined" onClick={handleShowAll}>{t('stays_show_all')}</M3Button>}
+          />
+        ) : (
+          <M3EmptyState icon="hotel" title={t('stays_empty_title')} description={t('stays_empty_hint')} />
+        )
       ) : (
         <M3DataTable
           data={stays}
@@ -414,7 +437,7 @@ export const Stays = memo(() => {
           sorting={sorting}
           onSortingChange={handleSortingChange}
           className={HIDE_DETAIL_COLUMNS_ON_PHONE}
-          emptyMessage={t('no_active_stays')}
+          emptyMessage=""
         />
       )}
 
