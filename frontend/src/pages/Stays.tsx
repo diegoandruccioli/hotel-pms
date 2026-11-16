@@ -13,14 +13,13 @@ import { M3Pagination } from '../components/m3';
 import { useTranslation } from 'react-i18next';
 
 import { M3FilterChip } from '../components/m3';
-import { M3StatusChip } from '../components/m3';
 import { ListToolbar } from '../components/ListToolbar';
 import { AlloggiatiReportSection } from './Stays/AlloggiatiReportSection';
 import { StayGuestManagerDialog } from './Stays/StayGuestManagerDialog';
 import { StayExtensionDialog } from './Stays/StayExtensionDialog';
 import { StayRoomChangeDialog } from './Stays/StayRoomChangeDialog';
-import { ActionsCell, AlloggiatiCell, GuestCell, GuestsCountCell } from './Stays/StayRowCells';
-import { getErrorMessage, stayStatusTone, todayIsoDate } from '../utils';
+import { ActionsCell, AlloggiatiCell, GuestCell, GuestsCountCell, StayPhoneSummary, StayStatusChip } from './Stays/StayRowCells';
+import { getErrorMessage, todayIsoDate } from '../utils';
 import {
   useStaysList,
   useCheckOutStay,
@@ -81,6 +80,16 @@ function readFilters(params: URLSearchParams, nav: StaysNavState | null): StaysF
 }
 
 const EMPTY_STAYS: StayResponse[] = [];
+
+// Below `md` only the room (with who, when and the state under it) and the row actions stay as columns,
+// so the list needs no sideways scroll on a phone (the edge padding shrinks to 16 px to fit 390 px exactly).
+// Sorting by a hidden column stays reachable from `md` up.
+const HIDE_DETAIL_COLUMNS_ON_PHONE = [
+  'max-md:[&_th:not(:first-child):not(:last-child)]:hidden',
+  'max-md:[&_td:not(:first-child):not(:last-child):not([colspan])]:hidden',
+  'max-md:[&_th:first-child]:pl-4 max-md:[&_td:first-child]:pl-4',
+  'max-md:[&_th:last-child]:pr-4 max-md:[&_td:last-child]:pr-4',
+].join(' ');
 const STATUS_FILTER_LABEL_KEYS: Record<(typeof STATUS_FILTERS)[number], string> = {
   ALL: 'filter_all',
   EXPECTED: 'status_expected',
@@ -244,9 +253,21 @@ export const Stays = memo(() => {
       header: t('room_id'),
       enableSorting: false,
       cell: ({ row }) => (
-        <span className="truncate block max-w-[120px] font-medium" title={row.original.roomId}>
-          {row.original.roomNumber ?? `${row.original.roomId.substring(0, 8)}…`}
-        </span>
+        <>
+          <span className="truncate block max-w-[120px] font-medium" title={row.original.roomId}>
+            {row.original.roomNumber ?? `${row.original.roomId.substring(0, 8)}…`}
+          </span>
+          <StayPhoneSummary
+            stay={row.original}
+            onGuestClick={handleGuestNavigate}
+            formatDate={formatDate}
+            onRetryInvoice={handleRetryInvoice}
+            retryingInvoice={retryingInvoice}
+            onRetryCheckoutEmail={handleRetryCheckoutEmail}
+            retryingEmail={retryingEmail}
+            t={t}
+          />
+        </>
       ),
     },
     {
@@ -289,12 +310,7 @@ export const Stays = memo(() => {
       id: 'status',
       accessorKey: 'status',
       header: t('status'),
-      cell: ({ row }) => (
-        <M3StatusChip
-          label={t(`status_${row.original.status.toLowerCase()}`, row.original.status.replace('_', ' '))}
-          tone={stayStatusTone[row.original.status]}
-        />
-      ),
+      cell: ({ row }) => <StayStatusChip stay={row.original} t={t} />,
     },
     {
       id: 'alloggiati',
@@ -397,6 +413,7 @@ export const Stays = memo(() => {
           getRowId={getStayRowId}
           sorting={sorting}
           onSortingChange={handleSortingChange}
+          className={HIDE_DETAIL_COLUMNS_ON_PHONE}
           emptyMessage={t('no_active_stays')}
         />
       )}
