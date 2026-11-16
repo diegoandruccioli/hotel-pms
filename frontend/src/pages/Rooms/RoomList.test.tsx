@@ -131,8 +131,21 @@ describe('RoomList', () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValue({ ...roomPage, content: [{ ...ROOM, status }] } as never);
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     renderPage();
-    const chip = await screen.findByText(`room_status_${status.toLowerCase()}`);
-    expect(chip.closest('span')?.className).toContain(expectedClass);
+    const chips = await screen.findAllByText(`room_status_${status.toLowerCase()}`);
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) expect(chip.closest('span')?.className).toContain(expectedClass);
+  });
+
+  it('stacks type and state under the room number on a phone and hides the actions header text', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue(roomPage as never);
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
+    renderPage();
+    const summary = (await screen.findAllByText('Single'))
+      .map((el) => el.closest('div[class~="md:hidden"]'))
+      .find((el) => el !== null);
+    expect(summary).toBeTruthy();
+    expect(summary).toHaveTextContent('room_status_clean');
+    expect(screen.getByText('actions')).toHaveClass('sr-only');
   });
 
   it('renders empty state when no rooms', async () => {

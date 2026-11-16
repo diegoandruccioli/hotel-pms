@@ -60,6 +60,15 @@ describe('RoomTypeList', () => {
     expect(screen.getByText('€50.00')).toBeInTheDocument();
   });
 
+  it('repeats capacity and price under the name on a phone and hides the actions header text', async () => {
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
+    render(<RoomTypeList />);
+    const summary = (await screen.findByText('Single')).querySelector('div[class~="md:hidden"]');
+    expect(summary).toHaveTextContent('max_occupancy: 1');
+    expect(summary).toHaveTextContent('base_price: €50.00');
+    expect(screen.getByText('actions')).toHaveClass('sr-only');
+  });
+
   it('formats the base price in Italian locale', async () => {
     mockLanguage = 'it';
     try {
