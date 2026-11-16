@@ -123,7 +123,7 @@ test.describe('Rooms management', () => {
   test('opens add room modal from Rooms tab', async ({ page }) => {
     await page.goto('/rooms');
     await expect(page.getByText('101')).toBeVisible({ timeout: 10000 });
-    await page.getByRole('button', { name: /add room|aggiungi camera/i }).click();
+    await page.getByRole('button', { name: /^(new room|nuova camera)$/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3000 });
   });
 
