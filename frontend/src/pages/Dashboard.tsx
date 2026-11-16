@@ -11,7 +11,9 @@ import { M3ErrorState } from '../components/m3';
 import { stayService } from '../services';
 import { formatSigned, getErrorMessage, todayIsoDate } from '../utils';
 import type { StatusTone } from '../utils';
-import { useDaySheet, useDaySheetTrend, useOwnerFinancialSummary } from '../hooks/queries';
+import {
+  ALL_TIME_SUMMARY_END, ALL_TIME_SUMMARY_START, useDaySheet, useDaySheetTrend, useOwnerFinancialSummary,
+} from '../hooks/queries';
 import type { AlloggiatiFailureSummaryResponse, CityTaxUnassessedSummaryResponse } from '../types';
 import { ArrivalsDeparturesPanel } from './Dashboard/ArrivalsDeparturesPanel';
 import { OwnerSummarySection } from './Dashboard/OwnerSummarySection';
@@ -19,12 +21,6 @@ import { RoomStatusCard } from './Dashboard/RoomStatusCard';
 import { TodayTasksCard } from './Dashboard/TodayTasksCard';
 import { kpiTrend } from './Dashboard/kpiTrend';
 import type { TrendField } from './Dashboard/kpiTrend';
-
-/** Owner financial summary covers the hotel's full operating history — same
- * range the pre-day-sheet Dashboard used for pending revenue — but now backed
- * by an aggregate-only query instead of downloading every invoice. */
-const SUMMARY_START_DATE = '2000-01-01';
-const SUMMARY_END_DATE = '2099-12-31';
 
 const TREND_DAYS = 7;
 
@@ -51,7 +47,7 @@ export const Dashboard = () => {
 
   const { data: daySheet, isLoading, error: queryError, refetch } = useDaySheet();
   const { data: trendData } = useDaySheetTrend(TREND_DAYS);
-  const { data: ownerSummary } = useOwnerFinancialSummary(SUMMARY_START_DATE, SUMMARY_END_DATE, isOwnerOrAdmin);
+  const { data: ownerSummary } = useOwnerFinancialSummary(ALL_TIME_SUMMARY_START, ALL_TIME_SUMMARY_END, isOwnerOrAdmin);
   const error = queryError ? getErrorMessage(queryError, t('failed_load_dashboard')) : null;
   const handleRetry = useCallback(() => { refetch(); }, [refetch]);
   const handleNewReservation = useCallback(() => navigate('/reservations/new'), [navigate]);
