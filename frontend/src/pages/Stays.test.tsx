@@ -18,7 +18,7 @@ vi.mock('react-i18next', () => {
 
 vi.mock('../services/stayService', () => ({
   stayService: {
-    getAllStays: vi.fn(),
+    listStays: vi.fn(),
     downloadAlloggiatiJson: vi.fn(),
     downloadAlloggiatiReport: vi.fn(),
     retryInvoiceCreation: vi.fn(),
@@ -54,7 +54,7 @@ vi.mock('react-router-dom', async (importOriginal) => ({
 const renderStays = (url = '/stays') =>
   render(<MemoryRouter initialEntries={[url]}><Stays /></MemoryRouter>);
 
-const lastFilters = () => vi.mocked(stayService.getAllStays).mock.calls.at(-1)?.[2];
+const lastFilters = () => vi.mocked(stayService.listStays).mock.calls.at(-1)?.[2];
 
 const EMPTY_PAGE = {
   content: [], totalElements: 0, totalPages: 0, number: 0, size: 20, numberOfElements: 0, first: true, last: true, empty: true,
@@ -70,13 +70,13 @@ describe('Stays', () => {
   });
 
   it('should show loading spinner initially', () => {
-    vi.mocked(stayService.getAllStays).mockReturnValue(new Promise(() => {}));
+    vi.mocked(stayService.listStays).mockReturnValue(new Promise(() => {}));
     renderStays();
     expect(screen.getByText('progress_activity')).toBeInTheDocument();
   });
 
   it('should render stays on success', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [{ id: 's1', roomId: 'room-1234-abcd', guestId: 'guest-5678-efgh',
         status: 'CHECKED_IN', actualCheckInTime: '2026-03-15T14:00:00' }],
       totalElements: 1, totalPages: 1, number: 0, size: 20,
@@ -91,7 +91,7 @@ describe('Stays', () => {
   });
 
   it('should show empty state when no stays', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
       numberOfElements: 0, first: true, last: true, empty: true,
     } as never);
@@ -103,7 +103,7 @@ describe('Stays', () => {
   });
 
   it('should show FAILED badge for a stay with a failed Alloggiati submission', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [{ id: 's1', roomId: 'room-1234-abcd', guestId: 'guest-5678-efgh',
         status: 'CHECKED_IN', actualCheckInTime: '2026-03-15T14:00:00',
         alloggiatiSent: false, alloggiatiSendFailed: true, alloggiatiFailureReason: 'PS portal down' }],
@@ -119,7 +119,7 @@ describe('Stays', () => {
   });
 
   it('should show error on failure', async () => {
-    vi.mocked(stayService.getAllStays).mockRejectedValueOnce(new Error('Network error'));
+    vi.mocked(stayService.listStays).mockRejectedValueOnce(new Error('Network error'));
     renderStays();
 
     await waitFor(() => {
@@ -128,7 +128,7 @@ describe('Stays', () => {
   });
 
   it('should show invoice-failed badge and retry, clearing the flag on success', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [{ id: 's1', roomId: 'room-1234-abcd', guestId: 'guest-5678-efgh',
         status: 'CHECKED_IN', actualCheckInTime: '2026-03-15T14:00:00',
         invoiceCreationFailed: true, invoiceCreationFailureReason: 'BILLING_SERVICE_UNAVAILABLE' }],
@@ -152,7 +152,7 @@ describe('Stays', () => {
   });
 
   it('should show checkout-email-failed badge and retry on failure keeps the badge', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [{ id: 's1', roomId: 'room-1234-abcd', guestId: 'guest-5678-efgh',
         status: 'CHECKED_OUT', actualCheckInTime: '2026-03-15T14:00:00',
         checkoutEmailFailed: true, checkoutEmailFailureReason: 'NOTIFICATION_SERVICE_UNAVAILABLE' }],
@@ -173,7 +173,7 @@ describe('Stays', () => {
   });
 
   it('should render page title', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
       numberOfElements: 0, first: true, last: true, empty: true,
     } as never);
@@ -184,28 +184,44 @@ describe('Stays', () => {
     });
   });
 
-  it('should filter stays by room number on search input', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValue({
+  it('asks the server for the typed text, over the whole history, from the first page', async () => {
+    vi.mocked(stayService.listStays).mockResolvedValue(EMPTY_PAGE as never);
+    renderStays();
+    await waitFor(() => expect(stayService.listStays).toHaveBeenCalled());
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '  Rossi ' } });
+
+    await waitFor(() => expect(lastFilters()).toMatchObject({ query: 'Rossi' }), { timeout: 1500 });
+    expect(vi.mocked(stayService.listStays).mock.calls.at(-1)?.[0]).toBe(0);
+  });
+
+  it('sends no query while the search box is empty or blank', async () => {
+    vi.mocked(stayService.listStays).mockResolvedValue(EMPTY_PAGE as never);
+    renderStays();
+    await waitFor(() => expect(stayService.listStays).toHaveBeenCalled());
+
+    expect(lastFilters()?.query).toBeUndefined();
+  });
+
+  it('shows what the server returned for the search without narrowing it again in the browser', async () => {
+    vi.mocked(stayService.listStays).mockResolvedValue({
       content: [
-        { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'John Doe', status: 'CHECKED_IN' },
-        { id: 's2', roomId: 'r2', roomNumber: '202', guestId: 'g2', guestDisplayName: 'Jane Smith', status: 'CHECKED_IN' },
+        { id: 's9', roomId: 'r9', roomNumber: '909', guestId: 'g9', guestDisplayName: 'Verdi Luca', status: 'CHECKED_OUT' },
       ],
-      totalElements: 2, totalPages: 1, number: 0, size: 20, numberOfElements: 2, first: true, last: true, empty: false,
+      totalElements: 1, totalPages: 1, number: 0, size: 20, numberOfElements: 1, first: true, last: true, empty: false,
     } as never);
     renderStays();
-    await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('909')).toBeInTheDocument());
 
-    const input = screen.getByRole('searchbox');
-    fireEvent.change(input, { target: { value: '202' } });
+    // The typed text matches neither the room nor the name shown: only the server decides.
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'luca' } });
 
-    await waitFor(() => {
-      expect(screen.queryByText('101')).not.toBeInTheDocument();
-      expect(screen.getByText('202')).toBeInTheDocument();
-    }, { timeout: 500 });
+    await waitFor(() => expect(lastFilters()).toMatchObject({ query: 'luca' }), { timeout: 1500 });
+    expect(screen.getByText('909')).toBeInTheDocument();
   });
 
   it('should filter stays by status chip', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValue({
+    vi.mocked(stayService.listStays).mockResolvedValue({
       content: [
         { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'John Doe', status: 'CHECKED_IN' },
         { id: 's2', roomId: 'r2', roomNumber: '202', guestId: 'g2', guestDisplayName: 'Jane Smith', status: 'EXPECTED' },
@@ -219,11 +235,11 @@ describe('Stays', () => {
 
     // The status is a server filter now: it goes into the request (and resets to the first page).
     await waitFor(() => expect(lastFilters()).toMatchObject({ status: 'EXPECTED' }));
-    expect(vi.mocked(stayService.getAllStays).mock.calls.at(-1)?.[0]).toBe(0);
+    expect(vi.mocked(stayService.listStays).mock.calls.at(-1)?.[0]).toBe(0);
   });
 
   it('should have no accessibility violations', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
       numberOfElements: 0, first: true, last: true, empty: true,
     } as never);
@@ -237,7 +253,7 @@ describe('Stays', () => {
     vi.mocked(useAuthStore).mockImplementation((selector: unknown) =>
       (selector as (s: { user: { role: string } }) => unknown)({ user: { role: 'RECEPTIONIST' } })
     );
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
       numberOfElements: 0, first: true, last: true, empty: true,
     } as never);
@@ -250,7 +266,7 @@ describe('Stays', () => {
     vi.mocked(useAuthStore).mockImplementation((selector: unknown) =>
       (selector as (s: { user: { role: string } }) => unknown)({ user: { role: 'ADMIN' } })
     );
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
       numberOfElements: 0, first: true, last: true, empty: true,
     } as never);
@@ -260,7 +276,7 @@ describe('Stays', () => {
   });
 
   it('should navigate to guests page when guest name is clicked', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValue({
+    vi.mocked(stayService.listStays).mockResolvedValue({
       content: [
         { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'guest-uuid-001', guestDisplayName: 'John Doe', status: 'CHECKED_IN' },
       ],
@@ -278,7 +294,7 @@ describe('Stays', () => {
     vi.mocked(useAuthStore).mockImplementation((selector: unknown) =>
       (selector as (s: { user: { role: string } }) => unknown)({ user: { role: 'OWNER' } })
     );
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [], totalElements: 0, totalPages: 1, number: 0, size: 20,
       numberOfElements: 0, first: true, last: true, empty: true,
     } as never);
@@ -288,7 +304,7 @@ describe('Stays', () => {
   });
 
   it('renders the expected check-out date column', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [
         { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'John Doe',
           status: 'CHECKED_IN', expectedCheckOutDate: '2026-07-01' },
@@ -300,7 +316,7 @@ describe('Stays', () => {
   });
 
   it('extends a CHECKED_IN stay via the extension dialog', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [
         { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'John Doe',
           status: 'CHECKED_IN', expectedCheckOutDate: '2026-07-01' },
@@ -327,7 +343,7 @@ describe('Stays', () => {
   });
 
   it('sorts by expected check-out date when the sort field is changed', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValue({
+    vi.mocked(stayService.listStays).mockResolvedValue({
       content: [
         { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'A',
           status: 'CHECKED_IN', expectedCheckOutDate: '2026-07-05' },
@@ -348,7 +364,7 @@ describe('Stays', () => {
 
   it('applies statusFilter, sortField and sortDir from navigation state on initial load', async () => {
     mockLocationState.current = { statusFilter: 'CHECKED_IN', sortField: 'expectedCheckOutDate', sortDir: 'asc' };
-    vi.mocked(stayService.getAllStays).mockResolvedValueOnce({
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
       content: [
         { id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'A',
           status: 'CHECKED_IN', expectedCheckOutDate: '2026-07-05' },
@@ -366,7 +382,7 @@ describe('Stays', () => {
 
   it("turns the dashboard departingToday flag into today's date filter", async () => {
     mockLocationState.current = { statusFilter: 'CHECKED_IN', departingToday: true };
-    vi.mocked(stayService.getAllStays).mockResolvedValue(EMPTY_PAGE as never);
+    vi.mocked(stayService.listStays).mockResolvedValue(EMPTY_PAGE as never);
     renderStays();
 
     await waitFor(() => expect(lastFilters()?.departingOn).toMatch(/^\d{4}-\d{2}-\d{2}$/));
@@ -374,7 +390,7 @@ describe('Stays', () => {
   });
 
   it('reads status, sort, departure day and Alloggiati failure from the URL', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValue(EMPTY_PAGE as never);
+    vi.mocked(stayService.listStays).mockResolvedValue(EMPTY_PAGE as never);
     renderStays('/stays?status=CHECKED_IN&sort=expectedCheckOutDate&dir=asc&departingOn=2026-10-27&alloggiatiFailed=true');
 
     await waitFor(() => expect(lastFilters()).toEqual({
@@ -385,7 +401,7 @@ describe('Stays', () => {
   });
 
   it('ignores a malformed departure day and unknown status/sort values in the URL', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValue(EMPTY_PAGE as never);
+    vi.mocked(stayService.listStays).mockResolvedValue(EMPTY_PAGE as never);
     renderStays('/stays?status=BOGUS&sort=nope&departingOn=tomorrow');
 
     await waitFor(() => expect(lastFilters()).toMatchObject({ sortField: 'actualCheckInTime', sortDir: 'desc' }));
@@ -394,9 +410,9 @@ describe('Stays', () => {
   });
 
   it('toggles the departing-today and Alloggiati-failed chips as server filters', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValue(EMPTY_PAGE as never);
+    vi.mocked(stayService.listStays).mockResolvedValue(EMPTY_PAGE as never);
     renderStays();
-    await waitFor(() => expect(stayService.getAllStays).toHaveBeenCalled());
+    await waitFor(() => expect(stayService.listStays).toHaveBeenCalled());
 
     fireEvent.click(screen.getByRole('button', { name: 'stays_filter_alloggiati_failed' }));
     await waitFor(() => expect(lastFilters()).toMatchObject({ alloggiatiFailed: true }));
@@ -418,7 +434,7 @@ describe('Stays', () => {
   });
 
   it('opens the stay detail and the reservation from the row menu of a closed stay', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValue(oneStay('CHECKED_OUT') as never);
+    vi.mocked(stayService.listStays).mockResolvedValue(oneStay('CHECKED_OUT') as never);
     renderStays();
     await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
 
@@ -432,7 +448,7 @@ describe('Stays', () => {
   });
 
   it('keeps only the detail entry, inline, for a walk-in stay without a reservation', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValue(oneStay('CHECKED_OUT', null) as never);
+    vi.mocked(stayService.listStays).mockResolvedValue(oneStay('CHECKED_OUT', null) as never);
     renderStays();
     await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
 
@@ -444,7 +460,7 @@ describe('Stays', () => {
   });
 
   it('opens the reservation from the row menu of an in-house stay', async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValue(oneStay('CHECKED_IN') as never);
+    vi.mocked(stayService.listStays).mockResolvedValue(oneStay('CHECKED_IN') as never);
     renderStays();
     await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
 
@@ -455,9 +471,9 @@ describe('Stays', () => {
   });
 
   it("starts a new check-in from today's arrivals", async () => {
-    vi.mocked(stayService.getAllStays).mockResolvedValue(EMPTY_PAGE as never);
+    vi.mocked(stayService.listStays).mockResolvedValue(EMPTY_PAGE as never);
     renderStays();
-    await waitFor(() => expect(stayService.getAllStays).toHaveBeenCalled());
+    await waitFor(() => expect(stayService.listStays).toHaveBeenCalled());
 
     fireEvent.click(screen.getByRole('button', { name: /new_checkin/ }));
 
@@ -474,7 +490,7 @@ describe('Stays', () => {
     };
 
     it('groups the status chips under the filter label', async () => {
-      vi.mocked(stayService.getAllStays).mockResolvedValue(TWO_STAYS as never);
+      vi.mocked(stayService.listStays).mockResolvedValue(TWO_STAYS as never);
       renderStays();
       await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
 
@@ -482,18 +498,19 @@ describe('Stays', () => {
       expect(within(group).getAllByRole('button')).toHaveLength(6); // 4 statuses + departing today + Alloggiati failed
     });
 
-    it('shows the server-wide range, and hides it while the page-only search narrows the list', async () => {
-      vi.mocked(stayService.getAllStays).mockResolvedValue(TWO_STAYS as never);
+    it('keeps the server-wide range while searching, since the server counts the matches', async () => {
+      vi.mocked(stayService.listStays).mockResolvedValue(TWO_STAYS as never);
       renderStays();
       await waitFor(() => expect(screen.getByText('list_range_summary')).toBeInTheDocument());
 
       fireEvent.change(screen.getByRole('searchbox'), { target: { value: '202' } });
 
-      await waitFor(() => expect(screen.queryByText('list_range_summary')).not.toBeInTheDocument());
+      await waitFor(() => expect(lastFilters()).toMatchObject({ query: '202' }), { timeout: 1500 });
+      expect(screen.getByText('list_range_summary')).toBeInTheDocument();
     });
 
     it('has no range summary for an empty list', async () => {
-      vi.mocked(stayService.getAllStays).mockResolvedValue({
+      vi.mocked(stayService.listStays).mockResolvedValue({
         content: [], totalElements: 0, totalPages: 0, number: 0, size: 20, numberOfElements: 0, first: true, last: true, empty: true,
       } as never);
       renderStays();

@@ -8,7 +8,7 @@ import { queryKeys } from '../../lib';
 export function useStaysList(page: number, filters: StayListFilters) {
   return useQuery({
     queryKey: queryKeys.stays.list(page, filters),
-    queryFn: () => stayService.getAllStays(page, 20, filters),
+    queryFn: () => stayService.listStays(page, 20, filters),
     placeholderData: (previousData) => previousData,
   });
 }

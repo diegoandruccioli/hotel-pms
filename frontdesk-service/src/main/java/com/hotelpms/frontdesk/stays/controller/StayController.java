@@ -171,6 +171,34 @@ public class StayController {
     }
 
     /**
+     * Searches the caller's hotel stays: optional status, expected check-out day and
+     * Alloggiati-failed filters plus a free-text query matched against the primary guest's name
+     * and the room number. Searches the whole history, so a stay is found on whatever page it
+     * would sit.
+     *
+     * @param status           optional stay status filter; an unknown value is a 400
+     * @param departingOn      optional exact expected check-out date
+     * @param alloggiatiFailed when {@code true}, only stays whose last Alloggiati send failed
+     * @param query            optional free-text query
+     * @param pageable         the pagination and sorting parameters
+     * @return a page of matching stays
+     */
+    @GetMapping("/search")
+    public ResponseEntity<Page<StayResponse>> searchStays(
+            @RequestParam(required = false) final StayStatus status,
+            @RequestParam(required = false) final LocalDate departingOn,
+            @RequestParam(defaultValue = "false") final boolean alloggiatiFailed,
+            @RequestParam(required = false) final String query,
+            @PageableDefault(size = DEFAULT_PAGE_SIZE,
+                    sort = "actualCheckInTime",
+                    direction = Sort.Direction.DESC)
+            final Pageable pageable) {
+        final UUID hotelId = Objects.requireNonNull(TenantContext.resolveHotelId());
+        return ResponseEntity.ok(stayService.searchStays(
+                pageable, hotelId, status, departingOn, alloggiatiFailed, query));
+    }
+
+    /**
      * Returns the most recent completed stay for a guest within the caller's hotel, used
      * to pre-fill the check-in form. Scoped to the caller's hotel (T-STAY-06, IDOR/
      * cross-tenant stay history leak): a guest's stay at a different hotel is never

@@ -91,6 +91,23 @@ public interface StayService {
             LocalDate departingOn, boolean alloggiatiFailed);
 
     /**
+     * Searches the hotel's stays: optional status, exact expected check-out day, Alloggiati-failed
+     * switch and a free-text query matched (case-insensitively, as a substring) against the primary
+     * guest's name and the room number. Unlike the filtered {@code getAllStays} overloads, the whole
+     * history is searched, whatever the actual check-in time.
+     *
+     * @param pageable         the pagination and sorting parameters
+     * @param hotelId          the authenticated hotel UUID
+     * @param status           optional stay status filter
+     * @param departingOn      optional exact expected check-out date
+     * @param alloggiatiFailed when {@code true}, only stays whose last Alloggiati send failed
+     * @param query            optional free-text query; blank is the same as none
+     * @return a page of matching stay responses
+     */
+    Page<StayResponse> searchStays(Pageable pageable, @NonNull UUID hotelId, StayStatus status,
+            LocalDate departingOn, boolean alloggiatiFailed, String query);
+
+    /**
      * Retrieves all stays for a given reservation, scoped to the authenticated hotel.
      *
      * @param reservationId the reservation ID

@@ -36,6 +36,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -146,6 +147,43 @@ class StayServiceImplFilterTest {
                 PAGEABLE, hotelId, null, null, null, DEPARTING_ON, false);
 
         assertEquals(0, response.getTotalElements());
+    }
+
+    @Test
+    void shouldSearchWithALowerCasedSubstringPatternAndEveryStatusByDefault() {
+        when(stayRepository.searchByHotelId(
+                hotelId, EnumSet.allOf(StayStatus.class), null, false, "%rossi%", PAGEABLE))
+                .thenReturn(Page.empty(PAGEABLE));
+
+        stayService.searchStays(PAGEABLE, hotelId, null, null, false, "  Rossi ");
+
+        verify(stayRepository).searchByHotelId(
+                hotelId, EnumSet.allOf(StayStatus.class), null, false, "%rossi%", PAGEABLE);
+    }
+
+    @Test
+    void shouldEscapeLikeWildcardsInTheSearchQuery() {
+        when(stayRepository.searchByHotelId(
+                hotelId, Set.of(StayStatus.CHECKED_IN), DEPARTING_ON, true, "%100!%!_!!%", PAGEABLE))
+                .thenReturn(Page.empty(PAGEABLE));
+
+        stayService.searchStays(PAGEABLE, hotelId, StayStatus.CHECKED_IN, DEPARTING_ON, true, "100%_!");
+
+        verify(stayRepository).searchByHotelId(
+                hotelId, Set.of(StayStatus.CHECKED_IN), DEPARTING_ON, true, "%100!%!_!!%", PAGEABLE);
+    }
+
+    @Test
+    void shouldSkipTheTextFilterForABlankOrMissingQuery() {
+        when(stayRepository.searchByHotelId(
+                hotelId, EnumSet.allOf(StayStatus.class), null, false, null, PAGEABLE))
+                .thenReturn(Page.empty(PAGEABLE));
+
+        stayService.searchStays(PAGEABLE, hotelId, null, null, false, "   ");
+        stayService.searchStays(PAGEABLE, hotelId, null, null, false, null);
+
+        verify(stayRepository, times(2)).searchByHotelId(
+                hotelId, EnumSet.allOf(StayStatus.class), null, false, null, PAGEABLE);
     }
 
     @Test
