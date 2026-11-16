@@ -113,15 +113,23 @@ const page = (results: InvoiceSearchResult[], totalPages = 1) =>
 const result = (invoice: InvoiceResponse, guestName: string | null = null): InvoiceSearchResult =>
   ({ invoice, guestName });
 
-const SUMMARY = {
-  startDate: '2026-04-01', endDate: '2026-04-15', totalRevenue: 1200, totalInvoices: 8, paidInvoices: 5, pendingRevenue: 450,
+const ALL_TIME_START = '2000-01-01';
+const ALL_TIME_END = '2099-12-31';
+// Nothing issued this month is still open, yet 450 is open overall: "to collect" must show the latter.
+const MONTH_SUMMARY = {
+  startDate: '2026-04-01', endDate: '2026-04-15', totalRevenue: 1200, totalInvoices: 8, paidInvoices: 8, pendingRevenue: 0,
+};
+const ALL_TIME_SUMMARY = {
+  startDate: ALL_TIME_START, endDate: ALL_TIME_END, totalRevenue: 9000, totalInvoices: 70, paidInvoices: 60, pendingRevenue: 450,
 };
 
 describe('Billing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useAuthStore).mockReturnValue({ user: { role: 'ADMIN' } } as never);
-    vi.mocked(billingReportService.getOwnerFinancialSummary).mockResolvedValue(SUMMARY);
+    vi.mocked(billingReportService.getOwnerFinancialSummary).mockImplementation(
+      (start: string) => Promise.resolve(start === ALL_TIME_START ? ALL_TIME_SUMMARY : MONTH_SUMMARY),
+    );
   });
 
   it('should show loading spinner initially', () => {
@@ -287,14 +295,15 @@ describe('Billing', () => {
     });
     render(<Billing />);
     await waitFor(() => screen.getByText('register_payment'));
-    expect(billingReportService.getOwnerFinancialSummary).toHaveBeenCalledTimes(1);
+    // Month and all-time summaries.
+    expect(billingReportService.getOwnerFinancialSummary).toHaveBeenCalledTimes(2);
 
     await user.click(screen.getByText('register_payment'));
     await screen.findByText('register_payment_title');
     await user.click(screen.getByText('confirm_payment'));
 
     await waitFor(
-      () => expect(billingReportService.getOwnerFinancialSummary).toHaveBeenCalledTimes(2),
+      () => expect(billingReportService.getOwnerFinancialSummary).toHaveBeenCalledTimes(4),
       { timeout: 5000 },
     );
   });
@@ -483,15 +492,25 @@ describe('Billing', () => {
     const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
     const today = format(new Date(), 'yyyy-MM-dd');
 
-    it('shows billed and outstanding amounts for the month to ADMIN/OWNER', async () => {
+    it('shows billed for the month and everything still to collect to ADMIN/OWNER', async () => {
       vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
       render(<Billing />);
 
       expect(await screen.findByText('billing_kpi_billed')).toBeInTheDocument();
-      expect(screen.getByText('billing_kpi_outstanding')).toBeInTheDocument();
+      expect(screen.getByText('stat_pending_revenue')).toBeInTheDocument();
       expect(screen.getByText(formatCurrency(1200, 'en'))).toBeInTheDocument();
+      // Open credits issued before this month still count (month pending is 0).
       expect(screen.getByText(formatCurrency(450, 'en'))).toBeInTheDocument();
       expect(billingReportService.getOwnerFinancialSummary).toHaveBeenCalledWith(monthStart, today);
+      expect(billingReportService.getOwnerFinancialSummary).toHaveBeenCalledWith(ALL_TIME_START, ALL_TIME_END);
+    });
+
+    it('links the "to collect" card to the issued invoices', async () => {
+      vi.mocked(billingService.searchInvoices).mockResolvedValueOnce(page([result(ISSUED_INVOICE)]) as never);
+      render(<Billing />);
+
+      const card = (await screen.findByText('stat_pending_revenue')).closest('a');
+      expect(card).toHaveAttribute('href', '/billing?status=ISSUED');
     });
 
     it('does not request or show KPIs for RECEPTIONIST (endpoint is owner/admin only)', async () => {

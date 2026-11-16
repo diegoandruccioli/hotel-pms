@@ -21,6 +21,12 @@ export function useDaySheetTrend(days = 7) {
   });
 }
 
+/** The hotel's full operating history: what Dashboard and Billing both ask for
+ * when a number must not depend on the month (e.g. what is still to collect).
+ * One shared range means one cache entry for both screens. */
+export const ALL_TIME_SUMMARY_START = '2000-01-01';
+export const ALL_TIME_SUMMARY_END = '2099-12-31';
+
 /** `enabled: false` for RECEPTIONIST — the owner-summary endpoint is
  * role-gated server-side and would just 403. */
 export function useOwnerFinancialSummary(startDate: string, endDate: string, enabled: boolean) {

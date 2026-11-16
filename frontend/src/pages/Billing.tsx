@@ -26,7 +26,9 @@ import type {
   BillingListParams, BillingNavState, BillingSortField, BillingStatusFilter,
 } from './Billing/billingListParams';
 import { useTranslation } from 'react-i18next';
-import { useInvoicesSearch, useOwnerFinancialSummary, usePatchInvoiceInCache } from '../hooks/queries';
+import {
+  ALL_TIME_SUMMARY_END, ALL_TIME_SUMMARY_START, useInvoicesSearch, useOwnerFinancialSummary, usePatchInvoiceInCache,
+} from '../hooks/queries';
 import { useDebounce, useListRangeSummary } from '../hooks';
 import { getErrorMessage } from '../utils';
 import { billingService } from '../services';
@@ -141,7 +143,11 @@ export const Billing = memo(() => {
     const now = new Date();
     return [format(startOfMonth(now), 'yyyy-MM-dd'), format(now, 'yyyy-MM-dd')];
   }, []);
-  const { data: kpiSummary } = useOwnerFinancialSummary(monthStart, today, isAdminOrOwner);
+  const { data: monthSummary } = useOwnerFinancialSummary(monthStart, today, isAdminOrOwner);
+  // What is still to collect ignores the month: credits issued earlier stay open.
+  const { data: allTimeSummary } = useOwnerFinancialSummary(
+    ALL_TIME_SUMMARY_START, ALL_TIME_SUMMARY_END, isAdminOrOwner,
+  );
   const error = queryError ? getErrorMessage(queryError, t('failed_load_invoices')) : null;
   const handleRetry = useCallback(() => { refetch(); }, [refetch]);
 
@@ -188,7 +194,9 @@ export const Billing = memo(() => {
         subtitle={t('billing_subtitle')}
       />
 
-      {isAdminOrOwner && kpiSummary && <BillingKpiCards summary={kpiSummary} />}
+      {isAdminOrOwner && monthSummary && allTimeSummary && (
+        <BillingKpiCards monthSummary={monthSummary} allTimeSummary={allTimeSummary} />
+      )}
 
       <ListToolbar
         searchLabel={t('invoice_search_placeholder')}
