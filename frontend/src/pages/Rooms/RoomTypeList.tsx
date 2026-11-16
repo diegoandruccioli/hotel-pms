@@ -4,12 +4,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { RoomTypeResponse } from '../../types';
-import { M3Button } from '../../components/m3';
+import { M3Button, M3EmptyState } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { M3RowActionsMenu, type RowAction } from '../../components/m3';
 import { M3LoadingState } from '../../components/m3';
 import { M3ErrorState } from '../../components/m3';
-import { M3TableEmptyRow } from '../../components/m3';
 import { useRoomTypes } from '../../hooks/queries';
 import { queryKeys } from '../../lib';
 import { getErrorMessage } from '../../utils';
@@ -122,15 +121,17 @@ export const RoomTypeList = memo(() => {
           retryLabel={t('try_again')}
           onRetry={handleRetry}
         />
+      ) : types.length === 0 ? (
+        <M3EmptyState
+          icon="category"
+          title={t('rooms_no_types_title')}
+          description={t('rooms_no_types_hint')}
+        />
       ) : (
         <M3Table headers={headers} stickyEnd className={HIDE_DETAIL_COLUMNS_ON_PHONE}>
-          {types.length === 0 ? (
-            <M3TableEmptyRow colSpan={headers.length} message={t('no_rooms_found')} />
-          ) : (
-            types.map((rt) => (
-              <RoomTypeRow key={rt.id} rt={rt} onEdit={openEditModal} onManageSeasons={openSeasonsModal} t={t} />
-            ))
-          )}
+          {types.map((rt) => (
+            <RoomTypeRow key={rt.id} rt={rt} onEdit={openEditModal} onManageSeasons={openSeasonsModal} t={t} />
+          ))}
         </M3Table>
       )}
 

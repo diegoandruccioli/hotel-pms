@@ -10,10 +10,13 @@ import { queryKeys } from '../../lib';
 export function useRoomsList(availableOnly: boolean) {
   return useQuery({
     queryKey: queryKeys.rooms.list(availableOnly),
-    queryFn: () =>
-      availableOnly
-        ? inventoryService.getAvailableRooms(todayIsoDate(), addDaysIso(todayIsoDate(), 1))
-        : fetchAllRooms(),
+    queryFn: async () => {
+      const rooms = availableOnly
+        ? await inventoryService.getAvailableRooms(todayIsoDate(), addDaysIso(todayIsoDate(), 1))
+        : await fetchAllRooms();
+      // The availability search returns rooms in no particular order: number order like the full list.
+      return [...rooms].sort((a, b) => a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true }));
+    },
   });
 }
 

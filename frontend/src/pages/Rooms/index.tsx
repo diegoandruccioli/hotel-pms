@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '../../components/PageHeader';
 import { M3SegmentedRow, type M3SegmentOption } from '../../components/m3';
@@ -16,6 +16,9 @@ const TAB_OPTIONS: M3SegmentOption<Tab>[] = [
 export const Rooms = memo(() => {
   const { t } = useTranslation('common');
   const [activeTab, setActiveTab] = useState<Tab>('rooms');
+  const showTypes = useCallback(() => {
+    setActiveTab('room_types');
+  }, []);
   // Same queries as the tabs below (shared cache), only to say how many there are.
   const { data: rooms } = useRoomsList(false);
   const { data: roomTypes } = useRoomTypes();
@@ -37,7 +40,7 @@ export const Rooms = memo(() => {
       />
 
       <div>
-        {activeTab === 'rooms' && <RoomList />}
+        {activeTab === 'rooms' && <RoomList onGoToTypes={showTypes} />}
         {activeTab === 'room_types' && <RoomTypeList />}
       </div>
     </div>

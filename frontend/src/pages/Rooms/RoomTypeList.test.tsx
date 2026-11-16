@@ -84,7 +84,7 @@ describe('RoomTypeList', () => {
   it('renders empty state when no room types', async () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([]);
     render(<RoomTypeList />);
-    await waitFor(() => expect(screen.getByText('no_rooms_found')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('rooms_no_types_title')).toBeInTheDocument());
   });
 
   it('renders error state on load failure', async () => {

@@ -47,11 +47,13 @@ const ROOM = {
 const emptyPage = { content: [], totalElements: 0, totalPages: 1, number: 0, size: 20 };
 const roomPage = { content: [ROOM], totalElements: 1, totalPages: 1, number: 0, size: 20 };
 
+const goToTypes = vi.fn();
+
 const renderPage = (state?: Record<string, unknown>) => {
   const initialEntries = [{ pathname: '/rooms', state }];
   return renderWithQuery(
     <MemoryRouter initialEntries={initialEntries}>
-      <RoomList />
+      <RoomList onGoToTypes={goToTypes} />
     </MemoryRouter>,
   );
 };
@@ -63,7 +65,7 @@ describe('RoomList', () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValue(emptyPage as never);
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     renderPage();
-    await waitFor(() => expect(screen.getByText('no_rooms_found')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('rooms_empty_title')).toBeInTheDocument());
     expect(screen.queryByRole('heading')).not.toBeInTheDocument();
   });
 
@@ -111,7 +113,7 @@ describe('RoomList', () => {
 
     it('keeps the add-room action in the toolbar', async () => {
       await renderWithRooms();
-      expect(screen.getByRole('button', { name: 'add_room' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'rooms_new_room' })).toBeInTheDocument();
     });
   });
 
@@ -152,7 +154,7 @@ describe('RoomList', () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValue(emptyPage as never);
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     renderPage();
-    await waitFor(() => expect(screen.getByText('no_rooms_found')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('rooms_empty_title')).toBeInTheDocument());
   });
 
   it('renders error state on load failure', async () => {
@@ -167,18 +169,49 @@ describe('RoomList', () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([]);
     renderPage();
     await waitFor(() => {
-      const btn = screen.getByText('add_room').closest('button');
+      const btn = screen.getByText('rooms_new_room').closest('button');
       expect(btn).toBeDisabled();
     });
   });
 
-  it('shows warning banner when no room types exist', async () => {
+  it('with no room types, explains it and sends the user to the room types tab', async () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValue(emptyPage as never);
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([]);
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByText('error_loading_room_types (rooms_add_room_type_first)')).toBeInTheDocument()
+    expect(await screen.findByText('rooms_no_types_title')).toBeInTheDocument();
+    expect(screen.queryByText(/error_loading_room_types/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'rooms_create_first_type' }));
+    expect(goToTypes).toHaveBeenCalledTimes(1);
+  });
+
+  it('with types but no rooms, shows the first-room hint without a reset button', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue(emptyPage as never);
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
+    renderPage();
+    expect(await screen.findByText('rooms_empty_title')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'rooms_show_all' })).not.toBeInTheDocument();
+  });
+
+  it('lists rooms in numeric order, also for the availability search', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue(roomPage as never);
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
+    vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue(
+      ['103', '9', '101'].map((roomNumber, i) => ({ ...ROOM, id: `r${i}`, roomNumber })),
     );
+    renderPage({ availableToday: true });
+    await screen.findByText('103');
+    const numbers = screen.getAllByRole('row').slice(1).map((row) => row.querySelector('span.font-bold')?.textContent);
+    expect(numbers).toEqual(['9', '101', '103']);
+  });
+
+  it('"show all rooms" clears the search, the type and the availability filter', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue(roomPage as never);
+    vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue([]);
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
+    renderPage({ availableToday: true });
+    expect(await screen.findByText('no_rooms_available_today')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'rooms_show_all' }));
+    expect(await screen.findByText('101')).toBeInTheDocument();
   });
 
   it('add room button is enabled when room types exist', async () => {
@@ -186,7 +219,7 @@ describe('RoomList', () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     renderPage();
     await waitFor(() => {
-      const btn = screen.getByText('add_room').closest('button');
+      const btn = screen.getByText('rooms_new_room').closest('button');
       expect(btn).not.toBeDisabled();
     });
   });
@@ -195,8 +228,8 @@ describe('RoomList', () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValue(emptyPage as never);
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     renderPage();
-    await waitFor(() => expect(screen.getByText('add_room').closest('button')).not.toBeDisabled());
-    fireEvent.click(screen.getByText('add_room'));
+    await waitFor(() => expect(screen.getByText('rooms_new_room').closest('button')).not.toBeDisabled());
+    fireEvent.click(screen.getByText('rooms_new_room'));
   });
 
   it('passes axe accessibility check with data', async () => {

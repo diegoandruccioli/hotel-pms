@@ -8,16 +8,16 @@ test.describe('Blocco 3 — Rooms & Room Types', () => {
   test('tab switch, room type create validation, create+delete a room type', async ({ page }) => {
     const guard = new ConsoleGuard(page, { role: 'admin', locale: 'it' });
     await page.goto('/rooms');
-    await page.getByRole('heading', { name: /inventario|inventory/i }).waitFor();
+    await page.getByRole('heading', { name: /camere|rooms/i, level: 1 }).waitFor();
     guard.checkpoint('rooms page loaded');
 
     // The tab has no heading of its own: the segment turning active and the tab's action button prove the switch.
-    const roomTypesTab = page.getByRole('radio', { name: /tipologie|room categories/i });
+    const roomTypesTab = page.getByRole('radio', { name: /tipologie|room types/i });
     await roomTypesTab.click();
     await expect(roomTypesTab).toBeChecked();
     guard.checkpoint('switched to room types tab');
 
-    await page.getByRole('button', { name: /nuova tipologia|add category/i }).click();
+    await page.getByRole('button', { name: /nuova tipologia|new room type/i }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
 
@@ -50,7 +50,7 @@ test.describe('Blocco 3 — Rooms & Room Types', () => {
   test('rooms tab: availability filter toggles without console errors', async ({ page }) => {
     const guard = new ConsoleGuard(page, { role: 'admin', locale: 'it' });
     await page.goto('/rooms');
-    await page.getByRole('heading', { name: /inventario|inventory/i }).waitFor();
+    await page.getByRole('heading', { name: /camere|rooms/i, level: 1 }).waitFor();
 
     const filterChip = page.getByRole('button', { name: /disponibili oggi|available today/i });
     await filterChip.click();
