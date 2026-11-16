@@ -92,7 +92,7 @@ test.describe('Rooms management', () => {
     await page.getByRole('radio', { name: /Room Categories/i }).click();
     await expect(page.getByRole('cell', { name: 'Standard', exact: true })).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole('cell', { name: 'Suite', exact: true })).toBeVisible();
-    await expect(page.getByText('80.00')).toBeVisible();
+    await expect(page.getByText('80.00').filter({ visible: true })).toBeVisible();
   });
 
   test('opens add room type modal', async ({ page }) => {
@@ -131,8 +131,8 @@ test.describe('Rooms management', () => {
     await page.goto('/rooms');
     await expect(page.getByText('101')).toBeVisible({ timeout: 10000 });
     // room_status_clean → "Clean", room_status_dirty → "Dirty"
-    // Use .first() — nav may contain material icon text "cleaning_services" that also matches /clean/i
-    await expect(page.getByText(/^Clean$/).first()).toBeVisible();
-    await expect(page.getByText(/^Dirty$/).first()).toBeVisible();
+    // Phone copy of the chip is hidden from md up, so keep visible ones; .first() — nav may contain material icon text "cleaning_services" that also matches /clean/i
+    await expect(page.getByText(/^Clean$/).filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByText(/^Dirty$/).filter({ visible: true }).first()).toBeVisible();
   });
 });
