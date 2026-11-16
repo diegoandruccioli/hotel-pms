@@ -114,7 +114,7 @@ describe('Stays', () => {
     renderStays();
 
     await waitFor(() => {
-      expect(screen.getByText('alloggiati_failed')).toBeInTheDocument();
+      expect(screen.getAllByText('alloggiati_failed')).toHaveLength(2);
     });
   });
 
@@ -125,6 +125,24 @@ describe('Stays', () => {
     await waitFor(() => {
       expect(screen.getByText('error_loading_stays')).toBeInTheDocument();
     });
+  });
+
+  it('repeats who, when and the state under the room for the phone, without the Alloggiati chip when all is well', async () => {
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
+      content: [{ id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'John Doe',
+        status: 'CHECKED_IN', actualCheckInTime: '2026-03-15T14:00:00', expectedCheckOutDate: '2026-03-18',
+        alloggiatiSent: true }],
+      totalElements: 1, totalPages: 1, number: 0, size: 20, numberOfElements: 1, first: true, last: true, empty: false,
+    } as never);
+
+    renderStays();
+
+    await waitFor(() => expect(screen.getAllByText('John Doe')).toHaveLength(2));
+    const room = screen.getByText('101').closest('td') as HTMLElement;
+    expect(within(room).getByText('John Doe')).toBeInTheDocument();
+    expect(within(room).getByText('status_checked_in')).toBeInTheDocument();
+    expect(within(room).queryByText('alloggiati_sent')).not.toBeInTheDocument();
+    expect(screen.getAllByText('status_checked_in').length).toBeGreaterThanOrEqual(2);
   });
 
   it('should show invoice-failed badge and retry, clearing the flag on success', async () => {
@@ -141,9 +159,9 @@ describe('Stays', () => {
     } as never);
 
     renderStays();
-    await waitFor(() => expect(screen.getByText('invoice_creation_failed')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('invoice_creation_failed')).toHaveLength(2));
 
-    fireEvent.click(screen.getByRole('button', { name: 'retry_invoice_creation' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'retry_invoice_creation' })[0]);
 
     await waitFor(() => {
       expect(stayService.retryInvoiceCreation).toHaveBeenCalledWith('s1');
@@ -162,13 +180,13 @@ describe('Stays', () => {
     vi.mocked(stayService.retryCheckoutEmail).mockRejectedValueOnce(new Error('still down'));
 
     renderStays();
-    await waitFor(() => expect(screen.getByText('checkout_email_failed')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('checkout_email_failed')).toHaveLength(2));
 
-    fireEvent.click(screen.getByRole('button', { name: 'retry_checkout_email' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'retry_checkout_email' })[0]);
 
     await waitFor(() => {
       expect(stayService.retryCheckoutEmail).toHaveBeenCalledWith('s1');
-      expect(screen.getByText('checkout_email_failed')).toBeInTheDocument();
+      expect(screen.getAllByText('checkout_email_failed')).toHaveLength(2);
     });
   });
 
@@ -283,9 +301,9 @@ describe('Stays', () => {
       totalElements: 1, totalPages: 1, number: 0, size: 20, numberOfElements: 1, first: true, last: true, empty: false,
     } as never);
     renderStays();
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('John Doe')).toHaveLength(2));
 
-    fireEvent.click(screen.getByRole('button', { name: 'John Doe' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'John Doe' })[0]);
 
     expect(mockNavigate).toHaveBeenCalledWith('/guests', { state: { guestId: 'guest-uuid-001' } });
   });
