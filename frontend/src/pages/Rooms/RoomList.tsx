@@ -17,6 +17,7 @@ import { useRoomsList, useRoomTypes } from '../../hooks/queries';
 import { queryKeys } from '../../lib';
 import { getErrorMessage, roomStatusTone } from '../../utils';
 import { RoomFormModal } from './RoomFormModal';
+import { HIDE_DETAIL_COLUMNS_ON_PHONE } from './phoneColumns';
 
 interface RoomListNavState {
   availableToday?: boolean;
@@ -33,13 +34,21 @@ const RoomRow = memo(({ room, onEdit, t }: {
     onEdit(room);
   }, [onEdit, room]);
 
+  const statusChip = (
+    <M3StatusChip label={t(`room_status_${room.status.toLowerCase()}`)} tone={roomStatusTone[room.status]} />
+  );
+
   return (
     <M3TableRow key={room.id}>
-      <M3TableCell className="font-bold">{room.roomNumber}</M3TableCell>
-      <M3TableCell className="text-on-surface-variant">{room.roomType.name}</M3TableCell>
       <M3TableCell>
-        <M3StatusChip label={t(`room_status_${room.status.toLowerCase()}`)} tone={roomStatusTone[room.status]} />
+        <span className="font-bold">{room.roomNumber}</span>
+        <div className="mt-1 flex flex-col items-start gap-1.5 text-on-surface-variant md:hidden">
+          <span>{room.roomType.name}</span>
+          {statusChip}
+        </div>
       </M3TableCell>
+      <M3TableCell className="text-on-surface-variant">{room.roomType.name}</M3TableCell>
+      <M3TableCell>{statusChip}</M3TableCell>
       <M3TableCell className="text-right">
         <M3TableActionLink onClick={handleEdit} className="lg:mr-4">
           {t('edit')}
@@ -130,7 +139,7 @@ export const RoomList = memo(() => {
     t('room_number_col'),
     t('room_type'),
     t('status'),
-    t('actions')
+    <span key="actions" className="sr-only">{t('actions')}</span>,
   ], [t]);
 
   return (
@@ -185,7 +194,7 @@ export const RoomList = memo(() => {
           onRetry={handleRetry}
         />
       ) : (
-        <M3Table headers={headers} stickyEnd>
+        <M3Table headers={headers} stickyEnd className={HIDE_DETAIL_COLUMNS_ON_PHONE}>
           {visibleRooms.length === 0 ? (
             <M3TableEmptyRow colSpan={headers.length} message={emptyMessage} />
           ) : (

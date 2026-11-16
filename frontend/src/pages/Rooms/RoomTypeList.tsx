@@ -15,6 +15,7 @@ import { queryKeys } from '../../lib';
 import { getErrorMessage } from '../../utils';
 import { RoomTypeFormModal } from './RoomTypeFormModal';
 import { RateSeasonManagerModal } from './RateSeasonManagerModal';
+import { HIDE_DETAIL_COLUMNS_ON_PHONE } from './phoneColumns';
 
 const RoomTypeRow = memo(({ rt, onEdit, onManageSeasons, t }: {
   rt: RoomTypeResponse;
@@ -38,7 +39,13 @@ const RoomTypeRow = memo(({ rt, onEdit, onManageSeasons, t }: {
 
   return (
     <M3TableRow key={rt.id}>
-      <M3TableCell className="font-medium">{rt.name}</M3TableCell>
+      <M3TableCell className="font-medium">
+        {rt.name}
+        <div className="mt-1 flex flex-col text-on-surface-variant font-normal md:hidden">
+          <span>{t('max_occupancy')}: {rt.maxOccupancy}</span>
+          <span>{t('base_price')}: {formatCurrency(rt.basePrice)}</span>
+        </div>
+      </M3TableCell>
       <M3TableCell className="text-on-surface-variant font-medium">{rt.maxOccupancy}</M3TableCell>
       <M3TableCell className="text-on-surface-variant font-medium">{formatCurrency(rt.basePrice)}</M3TableCell>
       <M3TableCell className="text-on-surface-variant max-w-xs truncate" title={rt.description}>{rt.description || '-'}</M3TableCell>
@@ -97,7 +104,7 @@ export const RoomTypeList = memo(() => {
     t('max_occupancy'),
     t('base_price'),
     t('description'),
-    t('actions')
+    <span key="actions" className="sr-only">{t('actions')}</span>,
   ], [t]);
 
   return (
@@ -116,7 +123,7 @@ export const RoomTypeList = memo(() => {
           onRetry={handleRetry}
         />
       ) : (
-        <M3Table headers={headers} stickyEnd>
+        <M3Table headers={headers} stickyEnd className={HIDE_DETAIL_COLUMNS_ON_PHONE}>
           {types.length === 0 ? (
             <M3TableEmptyRow colSpan={headers.length} message={t('no_rooms_found')} />
           ) : (
