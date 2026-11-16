@@ -98,7 +98,7 @@ describe('Stays', () => {
     renderStays();
 
     await waitFor(() => {
-      expect(screen.getByText('no_active_stays')).toBeInTheDocument();
+      expect(screen.getByText('stays_empty_title')).toBeInTheDocument();
     });
   });
 
@@ -238,6 +238,37 @@ describe('Stays', () => {
     expect(screen.getByText('909')).toBeInTheDocument();
   });
 
+  const guestsOf = (...departures: (string | null)[]) => departures.map((departureDate, i) => ({
+    id: `g${i}`, firstName: 'A', lastName: String(i), departureDate,
+  }));
+
+  it('counts only the guests still in the room for a stay in house, and says how many already left', async () => {
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
+      content: [{ id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'John Doe',
+        status: 'CHECKED_IN', guests: guestsOf(null, null, '2026-03-16') }],
+      totalElements: 1, totalPages: 1, number: 0, size: 20, numberOfElements: 1, first: true, last: true, empty: false,
+    } as never);
+
+    renderStays();
+
+    const button = await screen.findByTitle('stays_guests_departed');
+    expect(button).toHaveTextContent('2');
+  });
+
+  it('counts everyone who stayed for a finished stay, even those who left earlier', async () => {
+    vi.mocked(stayService.listStays).mockResolvedValueOnce({
+      content: [{ id: 's1', roomId: 'r1', roomNumber: '101', guestId: 'g1', guestDisplayName: 'John Doe',
+        status: 'CHECKED_OUT', guests: guestsOf(null, '2026-03-16') }],
+      totalElements: 1, totalPages: 1, number: 0, size: 20, numberOfElements: 1, first: true, last: true, empty: false,
+    } as never);
+
+    renderStays();
+
+    await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
+    expect(screen.queryByTitle('stays_guests_departed')).not.toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+  });
+
   it('should filter stays by status chip', async () => {
     vi.mocked(stayService.listStays).mockResolvedValue({
       content: [
@@ -249,10 +280,10 @@ describe('Stays', () => {
     renderStays();
     await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: 'status_expected' }));
+    fireEvent.click(screen.getByRole('button', { name: 'status_checked_out' }));
 
     // The status is a server filter now: it goes into the request (and resets to the first page).
-    await waitFor(() => expect(lastFilters()).toMatchObject({ status: 'EXPECTED' }));
+    await waitFor(() => expect(lastFilters()).toMatchObject({ status: 'CHECKED_OUT' }));
     expect(vi.mocked(stayService.listStays).mock.calls.at(-1)?.[0]).toBe(0);
   });
 
@@ -262,7 +293,7 @@ describe('Stays', () => {
       numberOfElements: 0, first: true, last: true, empty: true,
     } as never);
     const { container } = renderStays();
-    await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('stays_empty_title')).toBeInTheDocument());
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
@@ -276,7 +307,7 @@ describe('Stays', () => {
       numberOfElements: 0, first: true, last: true, empty: true,
     } as never);
     renderStays();
-    await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('stays_empty_title')).toBeInTheDocument());
     expect(screen.queryByText('download_json_export')).not.toBeInTheDocument();
   });
 
@@ -289,7 +320,7 @@ describe('Stays', () => {
       numberOfElements: 0, first: true, last: true, empty: true,
     } as never);
     renderStays();
-    await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('stays_empty_title')).toBeInTheDocument());
     expect(screen.getByText('download_json_export')).toBeInTheDocument();
   });
 
@@ -317,7 +348,7 @@ describe('Stays', () => {
       numberOfElements: 0, first: true, last: true, empty: true,
     } as never);
     renderStays();
-    await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('stays_empty_title')).toBeInTheDocument());
     expect(screen.getByText('download_json_export')).toBeInTheDocument();
   });
 
@@ -507,13 +538,61 @@ describe('Stays', () => {
       totalElements: 2, totalPages: 1, number: 0, size: 20, numberOfElements: 2, first: true, last: true, empty: false,
     };
 
-    it('groups the status chips under the filter label', async () => {
+    it('keeps the one-of-three status chips apart from the two switches, in their own labelled groups', async () => {
       vi.mocked(stayService.listStays).mockResolvedValue(TWO_STAYS as never);
       renderStays();
       await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
 
-      const group = screen.getByRole('group', { name: 'filter_status' });
-      expect(within(group).getAllByRole('button')).toHaveLength(6); // 4 statuses + departing today + Alloggiati failed
+      const status = screen.getByRole('group', { name: 'filter_status' });
+      expect(within(status).getAllByRole('button').map((b) => b.textContent))
+        .toEqual(['filter_all', 'status_checked_in', 'status_checked_out']);
+      const switches = screen.getByRole('group', { name: 'stays_filter_group_show' });
+      expect(within(switches).getAllByRole('button').map((b) => b.textContent))
+        .toEqual(['stays_filter_departing_today', 'stays_filter_alloggiati_failed']);
+    });
+
+    it('does not offer an expected-status filter: a stay is created already checked in', async () => {
+      vi.mocked(stayService.listStays).mockResolvedValue(TWO_STAYS as never);
+      renderStays();
+      await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
+
+      expect(screen.queryByRole('button', { name: 'status_expected' })).not.toBeInTheDocument();
+    });
+
+    it('lets a switch be on while All stays selected, since they are separate groups', async () => {
+      vi.mocked(stayService.listStays).mockResolvedValue(TWO_STAYS as never);
+      renderStays();
+      await waitFor(() => expect(screen.getByText('101')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: 'stays_filter_departing_today' }));
+
+      await waitFor(() => expect(lastFilters()?.departingOn).toBeDefined());
+      expect(screen.getByRole('button', { name: 'filter_all' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'stays_filter_departing_today' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('says there are no stays yet, without a reset button, when nothing is filtered', async () => {
+      vi.mocked(stayService.listStays).mockResolvedValue(EMPTY_PAGE as never);
+      renderStays();
+
+      await waitFor(() => expect(screen.getByText('stays_empty_title')).toBeInTheDocument());
+      expect(screen.getByText('stays_empty_hint')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'stays_show_all' })).not.toBeInTheDocument();
+    });
+
+    it('offers to show all stays when the filters leave none, and clears filters and search', async () => {
+      vi.mocked(stayService.listStays).mockResolvedValue(EMPTY_PAGE as never);
+      renderStays('/stays?status=CHECKED_IN&sort=actualCheckInTime&dir=desc&alloggiatiFailed=true');
+      await waitFor(() => expect(screen.getByText('stays_no_results')).toBeInTheDocument());
+      fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'rossi' } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'stays_show_all' }));
+
+      await waitFor(() => expect(lastFilters()?.status).toBeUndefined());
+      expect(lastFilters()?.alloggiatiFailed).toBeUndefined();
+      expect(lastFilters()?.departingOn).toBeUndefined();
+      expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('');
+      expect(lastFilters()).toMatchObject({ sortField: 'actualCheckInTime', sortDir: 'desc' });
     });
 
     it('keeps the server-wide range while searching, since the server counts the matches', async () => {
@@ -532,7 +611,7 @@ describe('Stays', () => {
         content: [], totalElements: 0, totalPages: 0, number: 0, size: 20, numberOfElements: 0, first: true, last: true, empty: true,
       } as never);
       renderStays();
-      await waitFor(() => expect(screen.getByText('no_active_stays')).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText('stays_empty_title')).toBeInTheDocument());
       expect(screen.queryByText('list_range_summary')).not.toBeInTheDocument();
     });
   });

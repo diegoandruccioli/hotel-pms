@@ -89,11 +89,24 @@ export const AlloggiatiCell = ({ stay, onRetryInvoice, retryingInvoice, onRetryC
   );
 };
 
-export const GuestsCountCell = ({ stay, onManageGuests }: { stay: StayResponse; onManageGuests: (stayId: string) => void }) => {
+/**
+ * Guests of the stay. For a stay still in house only those who have not left yet count: a guest who
+ * left early (own `departureDate`) is no longer in the room, and the number tells the receptionist who
+ * is there now. A finished stay counts everyone who stayed.
+ */
+export const GuestsCountCell = ({ stay, onManageGuests, t }: {
+  stay: StayResponse;
+  onManageGuests: (stayId: string) => void;
+  t: TFunction;
+}) => {
   const handleClick = useCallback(() => onManageGuests(stay.id), [onManageGuests, stay.id]);
-  const count = stay.guests?.length || 0;
+  const all = stay.guests ?? [];
+  const inHouse = stay.status === 'CHECKED_IN';
+  const departed = inHouse ? all.filter((g) => g.departureDate).length : 0;
+  const count = all.length - departed;
+  const hint = departed > 0 ? t('stays_guests_departed', { count: departed }) : undefined;
 
-  if (stay.status !== 'CHECKED_IN') {
+  if (!inHouse) {
     return (
       <div className="font-medium flex items-center gap-1.5 text-on-surface">
         <MaterialIcon name="group" size={18} />
@@ -106,10 +119,12 @@ export const GuestsCountCell = ({ stay, onManageGuests }: { stay: StayResponse; 
     <button
       type="button"
       onClick={handleClick}
+      title={hint}
       className="font-medium flex items-center gap-1.5 text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-xs"
     >
       <MaterialIcon name="group" size={18} />
       <span>{count}</span>
+      {hint && <span className="sr-only">{hint}</span>}
     </button>
   );
 };
