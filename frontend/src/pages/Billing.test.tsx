@@ -141,7 +141,20 @@ describe('Billing', () => {
   it('should show the pilot-mode fiscal disclaimer banner (VITE_PILOT_MODE defaults to shown)', () => {
     vi.mocked(billingService.searchInvoices).mockReturnValue(new Promise(() => {}));
     render(<Billing />);
-    expect(screen.getByText('pilot_mode_fiscal_banner')).toBeInTheDocument();
+    expect(screen.getByText('pilot_mode_fiscal_banner_title')).toBeInTheDocument();
+    expect(screen.getByText('pilot_mode_fiscal_banner_details')).toBeInTheDocument();
+  });
+
+  it('should keep the full pilot-mode text behind a closed disclosure until it is opened', async () => {
+    const user = userEvent.setup();
+    vi.mocked(billingService.searchInvoices).mockReturnValue(new Promise(() => {}));
+    render(<Billing />);
+    const disclosure = screen.getByText('pilot_mode_fiscal_banner').closest('details');
+    expect(disclosure).not.toHaveAttribute('open');
+
+    await user.click(screen.getByText('pilot_mode_fiscal_banner_title'));
+
+    expect(disclosure).toHaveAttribute('open');
   });
 
   it('opens filtered on the status carried by the navigation state', async () => {
