@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'vitest-axe';
-import { renderWithQuery as render } from '../test-utils';
+import { useMemo } from 'react';
+import { MemoryRouter } from 'react-router-dom';
+import { renderWithQuery } from '../test-utils';
 import { Rooms } from './Rooms';
 
 vi.mock('react-i18next', () => ({
@@ -30,10 +32,13 @@ vi.mock('../store/toastStore', () => ({
     (selector as (s: { addToast: () => void }) => unknown)({ addToast: vi.fn() }),
 }));
 
-vi.mock('react-router-dom', () => ({
-  useNavigate: () => vi.fn(),
-  useLocation: () => ({ pathname: '/rooms', state: null, search: '', hash: '', key: 'test' }),
-}));
+const Harness = ({ entry, children }: { entry: string; children: React.ReactNode }) => {
+  const initialEntries = useMemo(() => [entry], [entry]);
+  return <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>;
+};
+
+const render = (ui: React.ReactElement, entry = '/rooms') =>
+  renderWithQuery(<Harness entry={entry}>{ui}</Harness>);
 
 describe('Rooms', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -43,6 +48,11 @@ describe('Rooms', () => {
     await waitFor(() => {
       expect(screen.getByText('rooms_title')).toBeInTheDocument();
     });
+  });
+
+  it('opens on the room types tab when the URL says so', () => {
+    render(<Rooms />, '/rooms?tab=types');
+    expect(screen.getByRole('radio', { name: 'tab_room_types' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('renders both tabs as radios in a labelled group', () => {

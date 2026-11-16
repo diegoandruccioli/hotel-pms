@@ -49,8 +49,8 @@ const roomPage = { content: [ROOM], totalElements: 1, totalPages: 1, number: 0, 
 
 const goToTypes = vi.fn();
 
-const renderPage = (state?: Record<string, unknown>) => {
-  const initialEntries = [{ pathname: '/rooms', state }];
+const renderPage = (search = '') => {
+  const initialEntries = [`/rooms${search}`];
   return renderWithQuery(
     <MemoryRouter initialEntries={initialEntries}>
       <RoomList onGoToTypes={goToTypes} />
@@ -95,12 +95,13 @@ describe('RoomList', () => {
     it('filters rows by room type with one chip at a time and "all" restores the list', async () => {
       await renderWithRooms();
       fireEvent.click(screen.getByRole('button', { name: 'Suite' }));
-      expect(screen.getByRole('button', { name: 'Suite' })).toHaveAttribute('aria-pressed', 'true');
+      // The type lives in the URL, so the list follows the router's update.
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Suite' })).toHaveAttribute('aria-pressed', 'true'));
       expect(screen.getByText('201')).toBeInTheDocument();
       expect(screen.queryByText('101')).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'filter_all' }));
-      expect(screen.getByText('101')).toBeInTheDocument();
+      expect(await screen.findByText('101')).toBeInTheDocument();
       expect(screen.getByText('201')).toBeInTheDocument();
     });
 
@@ -108,7 +109,7 @@ describe('RoomList', () => {
       await renderWithRooms();
       fireEvent.click(screen.getByRole('button', { name: 'Suite' }));
       fireEvent.change(screen.getByRole('searchbox', { name: 'rooms_search_label' }), { target: { value: '10' } });
-      expect(screen.getByText('no_rooms_match_filters')).toBeInTheDocument();
+      expect(await screen.findByText('no_rooms_match_filters')).toBeInTheDocument();
     });
 
     it('keeps the add-room action in the toolbar', async () => {
@@ -198,17 +199,36 @@ describe('RoomList', () => {
     vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue(
       ['103', '9', '101'].map((roomNumber, i) => ({ ...ROOM, id: `r${i}`, roomNumber })),
     );
-    renderPage({ availableToday: true });
+    renderPage('?available=1');
     await screen.findByText('103');
     const numbers = screen.getAllByRole('row').slice(1).map((row) => row.querySelector('span.font-bold')?.textContent);
     expect(numbers).toEqual(['9', '101', '103']);
+  });
+
+  it('starts on the type named in the URL and ignores one that does not exist', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue({
+      ...roomPage, content: [ROOM, { ...ROOM, id: 'r9', roomNumber: '909', roomType: { ...ROOM_TYPE, id: 'rt9', name: 'Suite' } }],
+    } as never);
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE, { ...ROOM_TYPE, id: 'rt9', name: 'Suite' }]);
+    renderPage('?type=rt9');
+    await screen.findByText('909');
+    expect(screen.queryByText('101')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Suite' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('treats an unknown type id in the URL as all types', async () => {
+    vi.mocked(inventoryService.getAllRooms).mockResolvedValue(roomPage as never);
+    vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
+    renderPage('?type=gone');
+    expect(await screen.findByText('101')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'filter_all' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('"show all rooms" clears the search, the type and the availability filter', async () => {
     vi.mocked(inventoryService.getAllRooms).mockResolvedValue(roomPage as never);
     vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue([]);
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
-    renderPage({ availableToday: true });
+    renderPage('?available=1');
     expect(await screen.findByText('no_rooms_available_today')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'rooms_show_all' }));
     expect(await screen.findByText('101')).toBeInTheDocument();
@@ -263,7 +283,7 @@ describe('RoomList', () => {
   it('starts with the "available today" filter on when navigated from the dashboard', async () => {
     vi.mocked(inventoryService.getAllRoomTypes).mockResolvedValue([ROOM_TYPE]);
     vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue([]);
-    renderPage({ availableToday: true });
+    renderPage('?available=1');
 
     await waitFor(() => expect(inventoryService.getAvailableRooms).toHaveBeenCalledTimes(1));
     expect(inventoryService.getAllRooms).not.toHaveBeenCalled();

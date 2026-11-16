@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, memo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { RoomResponse } from '../../types';
@@ -16,14 +16,11 @@ import { queryKeys } from '../../lib';
 import { getErrorMessage, roomStatusTone } from '../../utils';
 import { RoomFormModal } from './RoomFormModal';
 import { HIDE_DETAIL_COLUMNS_ON_PHONE } from './phoneColumns';
+import { readRoomListParams, roomListParamsToSearch } from './roomListParams';
 
 interface RoomListProps {
   /** Takes the user to the room types tab (a room needs a type before it can be added). */
   onGoToTypes: () => void;
-}
-
-interface RoomListNavState {
-  availableToday?: boolean;
 }
 
 const ALL_TYPES = 'ALL';
@@ -63,16 +60,13 @@ const RoomRow = memo(({ room, onEdit, t }: {
 
 export const RoomList = memo(({ onGoToTypes }: RoomListProps) => {
   const { t } = useTranslation('common');
-  const location = useLocation();
   const queryClient = useQueryClient();
-  const [availableOnly, setAvailableOnly] = useState(
-    () => ((location.state as RoomListNavState | null)?.availableToday ?? false),
-  );
+  const [urlParams, setUrlParams] = useSearchParams();
+  const { typeId, availableToday: availableOnly } = readRoomListParams(urlParams);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<RoomResponse | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>(ALL_TYPES);
 
   const {
     data: roomsData,
@@ -87,6 +81,8 @@ export const RoomList = memo(({ onGoToTypes }: RoomListProps) => {
     refetch: refetchRoomTypes,
   } = useRoomTypes();
   const roomTypes = roomTypesData ?? [];
+  // A type id that is not (or no longer) one of the loaded types counts as "all".
+  const typeFilter = roomTypes.some((rt) => rt.id === typeId) ? typeId : ALL_TYPES;
   const loading = roomsLoading || roomTypesLoading;
   const queryError = roomsError ?? roomTypesError;
   const error = queryError ? getErrorMessage(queryError, t('error_unexpected_fallback')) : null;
@@ -100,9 +96,20 @@ export const RoomList = memo(({ onGoToTypes }: RoomListProps) => {
     setSearchQuery(e.target.value);
   }, []);
 
+  // Filters live in the URL (replace: no history entry per click); the tab is the rooms one by definition.
+  const writeFilters = useCallback((patch: { typeId?: string; availableToday?: boolean }) => {
+    setUrlParams(roomListParamsToSearch({
+      tab: 'rooms', typeId: typeFilter === ALL_TYPES ? '' : typeFilter, availableToday: availableOnly, ...patch,
+    }), { replace: true });
+  }, [setUrlParams, typeFilter, availableOnly]);
+
+  const setTypeFilter = useCallback((value: string) => {
+    writeFilters({ typeId: value === ALL_TYPES ? '' : value });
+  }, [writeFilters]);
+
   const toggleAvailableOnly = useCallback(() => {
-    setAvailableOnly((prev) => !prev);
-  }, []);
+    writeFilters({ availableToday: !availableOnly });
+  }, [writeFilters, availableOnly]);
 
   const openAddModal = useCallback(() => {
     setEditingRoom(undefined);
@@ -135,10 +142,9 @@ export const RoomList = memo(({ onGoToTypes }: RoomListProps) => {
   }, [roomsData, typeFilter, searchQuery]);
 
   const handleShowAll = useCallback(() => {
-    setTypeFilter(ALL_TYPES);
     setSearchQuery('');
-    setAvailableOnly(false);
-  }, []);
+    writeFilters({ typeId: '', availableToday: false });
+  }, [writeFilters]);
 
   const headers = useMemo(() => [
     t('room_number_col'),
