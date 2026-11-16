@@ -43,7 +43,7 @@ export const ROUTES: RouteSpec[] = [
   { path: '/restaurant', roles: ALL, headingPattern: /ristorante|restaurant/i },
   { path: '/calendar', roles: ALL, headingPattern: /calendario|calendar/i },
   { path: '/housekeeping', roles: ALL, headingPattern: /pulizie|housekeeping/i },
-  { path: '/rooms', roles: ALL, headingPattern: /inventario|inventory/i }, // Rooms/index.tsx heading is rooms_title ("Inventory" in EN), not the nav_rooms label
+  { path: '/rooms', roles: ALL, headingPattern: /camere|rooms/i }, // Rooms/index.tsx heading is rooms_title, same text as the nav_rooms label
   { path: '/rates', roles: ALL, headingPattern: /calendario tariffe|rate calendar/i },
   { path: '/settings', roles: ALL, headingPattern: /impostazioni|settings/i },
   { path: '/settings/profile', roles: ALL, headingPattern: /profilo|profile/i },

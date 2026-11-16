@@ -74,11 +74,11 @@ test.describe('Rooms management', () => {
 
   test('renders rooms page with tab navigation', async ({ page }) => {
     await page.goto('/rooms');
-    // rooms_title → "Inventory" (h1); also h2="Physical Rooms" exists — scope to level 1
-    await expect(page.getByRole('heading', { name: /inventory/i, level: 1 })).toBeVisible({ timeout: 10000 });
-    // tab_rooms → "Physical Rooms", tab_room_types → "Room Categories"
-    await expect(page.getByRole('radio', { name: /Physical Rooms/i })).toBeVisible();
-    await expect(page.getByRole('radio', { name: /Room Categories/i })).toBeVisible();
+    // rooms_title → "Rooms" (h1), same as the menu entry — scope to level 1
+    await expect(page.getByRole('heading', { name: /^rooms$/i, level: 1 })).toBeVisible({ timeout: 10000 });
+    // tab_rooms → "Rooms", tab_room_types → "Room types"
+    await expect(page.getByRole('radio', { name: /^Rooms$/ })).toBeVisible();
+    await expect(page.getByRole('radio', { name: /Room types/i })).toBeVisible();
   });
 
   test('shows room list on Rooms tab', async ({ page }) => {
@@ -89,7 +89,7 @@ test.describe('Rooms management', () => {
 
   test('switches to room types tab and shows types', async ({ page }) => {
     await page.goto('/rooms');
-    await page.getByRole('radio', { name: /Room Categories/i }).click();
+    await page.getByRole('radio', { name: /Room types/i }).click();
     await expect(page.getByRole('cell', { name: 'Standard', exact: true })).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole('cell', { name: 'Suite', exact: true })).toBeVisible();
     await expect(page.getByText('80.00').filter({ visible: true })).toBeVisible();
@@ -97,19 +97,19 @@ test.describe('Rooms management', () => {
 
   test('opens add room type modal', async ({ page }) => {
     await page.goto('/rooms');
-    await page.getByRole('radio', { name: /Room Categories/i }).click();
+    await page.getByRole('radio', { name: /Room types/i }).click();
     await expect(page.getByRole('cell', { name: 'Standard', exact: true })).toBeVisible({ timeout: 5000 });
-    // add_room_type → "Add Category"
-    await page.getByRole('button', { name: /Add Category/i }).click();
+    // add_room_type → "New room type"
+    await page.getByRole('button', { name: /New room type/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3000 });
   });
 
   test('creates a new room type', async ({ page }) => {
     await page.goto('/rooms');
-    await page.getByRole('radio', { name: /Room Categories/i }).click();
+    await page.getByRole('radio', { name: /Room types/i }).click();
     await expect(page.getByRole('cell', { name: 'Standard', exact: true })).toBeVisible({ timeout: 5000 });
 
-    await page.getByRole('button', { name: /Add Category/i }).click();
+    await page.getByRole('button', { name: /New room type/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3000 });
 
     await page.getByRole('textbox', { name: /name|nome/i }).fill('Deluxe');

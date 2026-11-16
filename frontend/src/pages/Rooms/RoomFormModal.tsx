@@ -136,7 +136,7 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
   return (
     <M3Dialog
       open
-      title={room ? t('edit_room') : t('add_room')}
+      title={room ? t('edit_room') : t('rooms_new_room')}
       titleId="room-modal-title"
       onClose={onClose}
       footer={footer}

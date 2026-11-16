@@ -43,7 +43,7 @@ describe('RoomFormModal', () => {
 
   it('renders add room heading when no room prop', () => {
     render(<RoomFormModal roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
-    expect(screen.getByText('add_room')).toBeInTheDocument();
+    expect(screen.getByText('rooms_new_room')).toBeInTheDocument();
   });
 
   it('renders edit room heading when room prop provided', () => {

@@ -3,21 +3,24 @@ import { useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { RoomResponse } from '../../types';
-import { Alert } from '../../components/Alert';
 import { ListToolbar } from '../../components/ListToolbar';
-import { M3Button } from '../../components/m3';
+import { M3Button, M3EmptyState } from '../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { M3FilterChip } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
 import { M3TableActionLink } from '../../components/m3';
 import { M3LoadingState } from '../../components/m3';
 import { M3ErrorState } from '../../components/m3';
-import { M3TableEmptyRow } from '../../components/m3';
 import { useRoomsList, useRoomTypes } from '../../hooks/queries';
 import { queryKeys } from '../../lib';
 import { getErrorMessage, roomStatusTone } from '../../utils';
 import { RoomFormModal } from './RoomFormModal';
 import { HIDE_DETAIL_COLUMNS_ON_PHONE } from './phoneColumns';
+
+interface RoomListProps {
+  /** Takes the user to the room types tab (a room needs a type before it can be added). */
+  onGoToTypes: () => void;
+}
 
 interface RoomListNavState {
   availableToday?: boolean;
@@ -58,7 +61,7 @@ const RoomRow = memo(({ room, onEdit, t }: {
   );
 });
 
-export const RoomList = memo(() => {
+export const RoomList = memo(({ onGoToTypes }: RoomListProps) => {
   const { t } = useTranslation('common');
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -122,7 +125,7 @@ export const RoomList = memo(() => {
 
   // Search and type narrow the loaded list only (the backend has no room search, and the
   // list is capped at one page of 100, as before).
-  const filtersActive = typeFilter !== ALL_TYPES || searchQuery.trim() !== '';
+  const filtersActive = typeFilter !== ALL_TYPES || searchQuery.trim() !== '' || availableOnly;
   const visibleRooms = useMemo(() => {
     const needle = searchQuery.trim().toLowerCase();
     return (roomsData ?? []).filter(
@@ -131,9 +134,11 @@ export const RoomList = memo(() => {
     );
   }, [roomsData, typeFilter, searchQuery]);
 
-  const emptyMessage = filtersActive
-    ? t('no_rooms_match_filters')
-    : availableOnly ? t('no_rooms_available_today') : t('no_rooms_found');
+  const handleShowAll = useCallback(() => {
+    setTypeFilter(ALL_TYPES);
+    setSearchQuery('');
+    setAvailableOnly(false);
+  }, []);
 
   const headers = useMemo(() => [
     t('room_number_col'),
@@ -152,7 +157,7 @@ export const RoomList = memo(() => {
         onSearchChange={handleSearchChange}
         trailing={
           <M3Button icon="add" onClick={openAddModal} disabled={roomTypes.length === 0}>
-            {t('add_room')}
+            {t('rooms_new_room')}
           </M3Button>
         }
       >
@@ -178,12 +183,6 @@ export const RoomList = memo(() => {
         />
       </ListToolbar>
 
-      {roomTypes.length === 0 && !loading && !error && (
-        <Alert tone="info" className="mb-4">
-          {t('error_loading_room_types')} ({t('rooms_add_room_type_first')})
-        </Alert>
-      )}
-
       {loading ? (
         <M3LoadingState label={t('loading')} />
       ) : error ? (
@@ -193,15 +192,30 @@ export const RoomList = memo(() => {
           retryLabel={t('try_again')}
           onRetry={handleRetry}
         />
+      ) : visibleRooms.length === 0 ? (
+        roomTypes.length === 0 ? (
+          <M3EmptyState
+            icon="category"
+            title={t('rooms_no_types_title')}
+            description={t('rooms_no_types_hint')}
+            action={<M3Button variant="outlined" onClick={onGoToTypes}>{t('rooms_create_first_type')}</M3Button>}
+          />
+        ) : filtersActive ? (
+          <M3EmptyState
+            icon="meeting_room"
+            title={availableOnly && !searchQuery.trim() && typeFilter === ALL_TYPES
+              ? t('no_rooms_available_today')
+              : t('no_rooms_match_filters')}
+            action={<M3Button variant="outlined" onClick={handleShowAll}>{t('rooms_show_all')}</M3Button>}
+          />
+        ) : (
+          <M3EmptyState icon="meeting_room" title={t('rooms_empty_title')} description={t('rooms_empty_hint')} />
+        )
       ) : (
         <M3Table headers={headers} stickyEnd className={HIDE_DETAIL_COLUMNS_ON_PHONE}>
-          {visibleRooms.length === 0 ? (
-            <M3TableEmptyRow colSpan={headers.length} message={emptyMessage} />
-          ) : (
-            visibleRooms.map((room) => (
-              <RoomRow key={room.id} room={room} onEdit={openEditModal} t={t} />
-            ))
-          )}
+          {visibleRooms.map((room) => (
+            <RoomRow key={room.id} room={room} onEdit={openEditModal} t={t} />
+          ))}
         </M3Table>
       )}
 
