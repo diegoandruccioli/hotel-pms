@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8"/>
 <title th:text="${docTitle}">Preventivo</title>
+<meta name="description"
+      th:content="'Preventivo di ' + ${hotelName} + ' per ' + ${guestDisplayName} + ', dal ' + ${checkInDate} + ' al ' + ${checkOutDate}"/>
+<meta name="subject" content="Preventivo"/>
 <style>
     @page { size: A4; margin: 2.2cm 1.8cm; }
     body { font-family: 'Noto Sans', sans-serif; font-size: 9pt; color: #1a1a1a; }
