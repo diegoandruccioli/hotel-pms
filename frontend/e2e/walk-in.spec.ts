@@ -174,6 +174,7 @@ test.describe('Walk-in Check-in', () => {
 
     await expect(checklist.getByText('101 — Standard')).toBeVisible();
     await expect(checklist.getByText('Bianchi Lucia').first()).toBeVisible();
+    await expect(checklist.getByText('Primary guest: Bianchi Lucia')).toBeVisible();
     await expect(checklist.getByText(/Check-out on/)).toBeVisible();
     await expect(checklist.getByText('4 of 6 items complete')).toBeVisible();
   });

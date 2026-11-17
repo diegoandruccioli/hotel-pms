@@ -1,5 +1,5 @@
 import type { CityTaxUnassessedReason, TravellerType } from '../../types';
-import { todayIsoDate } from '../../utils';
+import { formatGuestName, todayIsoDate } from '../../utils';
 import { getGuestMissingFields, hasExpiredDocument, TYPES_WITHOUT_DOC } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
 
@@ -48,10 +48,8 @@ export const buildWalkInItems = ({ roomLabel, guestName, checkOutDate }: WalkInI
     : { id: 'checkout', tone: 'pending', titleKey: 'checklist_checkout', detailKey: 'checklist_checkout_pending' },
 ];
 
-const guestName = (g: IdentifiableGuest): string => `${g.firstName} ${g.lastName}`.trim();
-
 const guestTitle = (g: IdentifiableGuest, index: number): Pick<ChecklistItem, 'titleKey' | 'titleParams'> => {
-  const name = guestName(g);
+  const name = formatGuestName(g);
   if (!name) return { titleKey: 'checklist_guest_unnamed', titleParams: { number: index + 1 } };
   return { titleKey: g.isPrimaryGuest ? 'checklist_guest_primary' : 'checklist_guest', titleParams: { name } };
 };
@@ -102,7 +100,7 @@ export const buildCheckInChecklist = ({ guests, cityTaxWarning, checkOutDate, ex
       id: `doc-${index}`,
       tone: 'warn',
       titleKey: 'checklist_document',
-      titleParams: { name: guestName(g) || `#${index + 1}` },
+      titleParams: { name: formatGuestName(g) || `#${index + 1}` },
       detailKey: expired ? 'checklist_doc_expired' : 'checklist_doc_expires_in_stay',
       detailParams: { date: expiry },
       dateParam: 'date',

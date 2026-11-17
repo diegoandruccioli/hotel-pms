@@ -42,6 +42,22 @@ describe('buildCheckInChecklist', () => {
     expect(find(buildCheckInChecklist({ guests: [complete()], cityTaxWarning: null }), 'primary')).toBeUndefined();
   });
 
+  it('names each guest "Cognome Nome", like the rest of the UI', () => {
+    const items = buildCheckInChecklist({
+      guests: [complete(), complete({ isPrimaryGuest: false, firstName: 'Bo', lastName: 'Verdi' })],
+      cityTaxWarning: null,
+    });
+    expect(find(items, 'guest-0')?.titleParams).toEqual({ name: 'Rossi Ada' });
+    expect(find(items, 'guest-1')?.titleParams).toEqual({ name: 'Verdi Bo' });
+  });
+
+  it('names the guest "Cognome Nome" in the document warning and keeps a lone name as is', () => {
+    const expiredDoc = buildCheckInChecklist({ guests: [withDoc('2000-01-01')], cityTaxWarning: null });
+    expect(find(expiredDoc, 'doc-0')?.titleParams).toEqual({ name: 'Rossi Ada' });
+    const lone = buildCheckInChecklist({ guests: [complete({ firstName: '' })], cityTaxWarning: null });
+    expect(find(lone, 'guest-0')?.titleParams).toEqual({ name: 'Rossi' });
+  });
+
   it('does not call a guest with an expired document complete', () => {
     const items = buildCheckInChecklist({ guests: [withDoc('2000-01-01')], cityTaxWarning: null });
     expect(find(items, 'guest-0')).toMatchObject({ tone: 'warn', detailKey: 'checklist_doc_expired_short' });
@@ -86,10 +102,10 @@ describe('buildWalkInItems', () => {
   });
 
   it('is ok once each is chosen, and carries the room label, the guest name and the departure date', () => {
-    const items = buildWalkInItems({ roomLabel: '101 — Standard', guestName: 'Ada Rossi', checkOutDate: '2099-01-02' });
+    const items = buildWalkInItems({ roomLabel: '101 — Standard', guestName: 'Rossi Ada', checkOutDate: '2099-01-02' });
     expect(items.every((i) => i.tone === 'ok')).toBe(true);
     expect(items[0].detailParams).toMatchObject({ room: '101 — Standard' });
-    expect(items[1].detailParams).toMatchObject({ name: 'Ada Rossi' });
+    expect(items[1].detailParams).toMatchObject({ name: 'Rossi Ada' });
     expect(items[2]).toMatchObject({ dateParam: 'date', detailParams: { date: '2099-01-02' } });
   });
 });
